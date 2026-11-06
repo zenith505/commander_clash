@@ -1202,6 +1202,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "secretChoose":
     case "randomCounterKind":
     case "destroyRandom":
+    case "chooseRandom":
     case "keepRest":
     case "keepDestroyRest":
     case "empowerJace":

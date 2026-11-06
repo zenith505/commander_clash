@@ -20,7 +20,7 @@ import { continueDraws, log, player } from "./game";
 import { RulesError, type CardDef, type GameObject, type GameState, type ObjectId, type Player, type PlayerId } from "./types";
 
 const ORDER_WORDS =
-  /\b(?:top|bottom)\b(?: (?:two|three|four|\w+)?)?(?: \w+){0,2} cards? (?:of|in) (?:your|their|target player.s|defending player.s|a|each player.s|that player.s|its owner.s|an opponent.s) graveyard|directly (?:above|below)|top of (?:your|a|their) graveyard|reorder (?:your|their) graveyard/i;
+  /\b(?:top|bottom)\b(?: (?:two|three|four|\w+)?)?(?: \w+){0,2} cards? (?:of|in) (?:your|their|target player.s|defending player.s|a|each player.s|that player.s|its owner.s|an opponent.s) graveyard|directly (?:above|below)|cards above it|top of (?:your|a|their) graveyard|reorder (?:your|their) graveyard/i;
 const readsCache = new Map<string, boolean>();
 
 /** Does this card's text care about the order of a graveyard ("the top creature card of your graveyard")? */
@@ -149,6 +149,13 @@ export function creatureCardAbove(s: GameState, o: GameObject): boolean {
   const yard = player(s, o.owner).graveyard;
   const above = yard[yard.indexOf(o.id) + 1];
   return !!above && defOf(s, s.objects[above]!).types.includes("Creature");
+}
+
+/** Nether Shadow: how many creature cards are above `o` in its owner's graveyard (put there after it, rulings). */
+export function creatureCardsAbove(s: GameState, o: GameObject): number {
+  if (o.zone !== "graveyard") return 0;
+  const yard = player(s, o.owner).graveyard;
+  return yard.slice(yard.indexOf(o.id) + 1).filter((id) => defOf(s, s.objects[id]!).types.includes("Creature")).length;
 }
 
 /** "The top three black cards of your graveyard": the topmost `n` cards there that match, top first (fewer if there aren't). */

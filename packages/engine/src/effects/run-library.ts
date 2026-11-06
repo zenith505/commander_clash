@@ -296,6 +296,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // All of them if there are fewer (rulings on Sanity Grinding); they stay on top for now.
         const ids = p.library.slice(0, e.n);
         s.resolving!.revealedUntil = ids;
+        // Petals of Insight: only looked at, by the player alone (the orderTop after it shows them).
+        if (e.look) return;
         log(s, ids.length ? `${p.name} reveals the top ${ids.length === 1 ? "card" : `${ids.length} cards`} of their library (${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}).` : `${p.name} has no cards in their library to reveal.`);
         return;
       }
@@ -1809,7 +1811,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         const options = sc.looked.filter((id) => (!printed || printedMatches(printed, defOf(s, obj(s, id)))) && (!kin || shareCreatureType(kin, creatureTypesOf(s, obj(s, id)))) && (totalMv === undefined || defMv(defOf(s, obj(s, id))) <= totalMv));
         // "If ~ was kicked, put two of those cards into your hand instead" (Consult the Star Charts, CR 702.33e).
         const yardHas = (f: TargetSpec) => player(s, ctx.controller).graveyard.some((id) => printedMatches(f, defOf(s, obj(s, id))));
-        const count = e.countAll ? sc.looked.length : e.countX ? Math.max(0, ctx.x ?? 0) : e.kickedCount !== undefined && ctx.kicked?.length ? e.kickedCount : (e.countIfYard?.min ? player(s, ctx.controller).graveyard.filter((id) => printedMatches(e.countIfYard!.has[0]!, defOf(s, obj(s, id)))).length >= e.countIfYard.min : e.countIfYard?.has.every(yardHas)) ? e.countIfYard!.count : e.count;
+        const count = e.countAll ? sc.looked.length : e.countX ? Math.max(0, ctx.x ?? 0) : e.kickedCount !== undefined && ctx.kicked?.length ? e.kickedCount : (e.countIfYard?.min ? player(s, ctx.controller).graveyard.filter((id) => printedMatches(e.countIfYard!.has[0]!, defOf(s, obj(s, id)))).length >= e.countIfYard.min : e.countIfYard?.has.every(yardHas)) ? e.countIfYard!.count : e.countIfCond && staticConditionNow(s, e.countIfCond.cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller) ? e.countIfCond.count : e.count;
         // Wand of Denial: each card taken is paid for with life, so no more than can be paid (CR 119.4).
         // Niv-Mizzet Reborn: one for each color pair, as many as you can (rulings): as many as fit one each.
         const eachMost = e.oneOfEach && e.required ? options.reduce<ObjectId[]>((a, id) => (oneOfEachFits(e.oneOfEach!, [...a, id].map((x) => defOf(s, obj(s, x)))) ? [...a, id] : a), []).length : undefined;

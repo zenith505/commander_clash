@@ -844,6 +844,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Avoid Fate: "Counter target instant or Aura spell that targets a permanent you control": a spell of those kinds.
   // Mistfolk: "Counter target spell that targets ~": its source (TargetSpec.targetsSource).
   if (ctx.activated && /^Counter target spell that targets ~$/.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", targetsSource: true, text: "target spell that targets ~" }) }];
+  // Teferi's Response: "Counter target spell or ability an opponent controls that targets a land you control, and if a
+  // permanent's ability is countered this way, destroy that permanent" (joined by body.ts): an opponent's (no teammates
+  // here), its source destroyed as for Green Slime.
+  const response = /^Counter target spell or ability an opponent controls that targets an? (.+), and if a permanent's ability is countered this way, destroy that permanent$/.exec(s);
+  if (response) {
+    const what = parseTargetPhrase(response[1]!);
+    if (what?.kind !== "object") return null;
+    return [{ type: "counterSpell", index: addTarget(ctx, { ...stackSpec("spell or ability"), controller: "opponent", targetsWhat: what, text: `target spell or ability an opponent controls that targets a ${response[1]}` }), thenSource: "destroy" }];
+  }
   if ((m = /^Counter target (spell|spell or ability|instant or Aura spell) that targets (you or )?(you|an? .+)$/i.exec(s)) && !(m[2] && m[3] === "you")) {
     const what = m[3] === "you" ? "you" : parseTargetPhrase(m[3]!.replace(/^an? /, ""));
     // Outwit: "Counter target spell that targets a player": any player (targetsMatch).

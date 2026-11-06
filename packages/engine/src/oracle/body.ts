@@ -443,6 +443,9 @@ const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" 
 /** "You may [this]. If you do, ...": whether it was done is known (see canDoNow in effects.ts). */
 const checkableMay = (e: Effect): boolean =>
   e.type === "collectEvidence" ||
+  // Petals of Insight: "You may put those cards on the bottom of your library in any order. If you do, ...": the cards just
+  // looked at, done if there's one to move (see canDoNow).
+  (e.type === "revealedUntilToBottom" && !e.hand && !e.random) ||
   // "You may exile all cards from your hand face down. If you do, ..." (Duplicity): even an empty hand (rulings on
   // exiling or discarding your hand, Herigast).
   (e.type === "exileFaceDown" && e.from === "hand") ||
@@ -1630,6 +1633,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // ability is countered this way, destroy that permanent." Trickbind: "... activated abilities of that permanent can't be
   // activated this turn." One instruction each, about the countered ability's source (see sentences/spells.ts).
   text = text.replace(/(^|\. )([Cc]ounter target (?:activated or triggered|activated|triggered) ability[^.]*)\. If a permanent's ability is countered this way, (destroy that permanent|activated abilities of that permanent can't be activated this turn)\./, "$1$2, and if a permanent's ability is countered this way, $3.");
+  // Teferi's Response: "Counter target spell or ability an opponent controls that targets a land you control. If a
+  // permanent's ability is countered this way, destroy that permanent.": the same.
+  text = text.replace(/(^|\. )([Cc]ounter target spell or ability an opponent controls that targets [^.]+)\. If a permanent's ability is countered this way, (destroy that permanent)\./, "$1$2, and if a permanent's ability is countered this way, $3.");
   // Mayael's Aria: "put a +1/+1 counter on each creature you control if you control a creature with power 5 or greater.
   // Then you gain 10 life if .... Then you win the game if ...": each condition checked in turn as it resolves (rulings),
   // the same as "If you control ..., put .... Then if you control ..., you gain .... Then if ..., you win the game."
@@ -2338,6 +2344,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Skull Raid: "Target opponent discards two cards. If fewer than two cards were discarded this way, you draw cards equal
   // to the difference.": two minus the cards that player discarded (none drawn when both were).
   text = text.replace(/^(Target opponent discards (two|three) cards\.) If fewer than \2 cards were discarded this way, you draw cards equal to the difference\.$/, "$1 You draw cards equal to $2 minus the number of cards discarded this way.");
+  // Advice from the Fae: "Look at the top five cards of your library. If you control more creatures than each other player,
+  // put two of those cards into your hand. Otherwise, put one of them into your hand. Then put the rest on the bottom of
+  // your library in any order.": one look, the number taken checked as it resolves; strictly more than every other player
+  // (rulings), each of them an opponent here (no teams, CR 102.3).
+  text = text.replace(/^(Look at the top \w+ cards of your library)\. If you control more creatures than each other player, put (two|three) of those cards into your hand\. Otherwise, put one of them into your hand\. Then put the rest on the bottom of your library in any order\.$/, "$1. Put one of them into your hand and the rest on the bottom of your library in any order. Put $2 of those cards into your hand instead if you control more creatures than each opponent.");
   // Borrowed Knowledge: "Discard your hand, then draw cards equal to the number of cards discarded this way.": the same as
   // two sentences, the count made after the discard.
   text = text.replace(/^Discard your hand, then draw cards equal to the number of cards discarded this way\.$/, "Discard your hand. Draw cards equal to the number of cards discarded this way.");
@@ -6523,6 +6534,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Cinderheart Giant: "it deals 7 damage to a creature an opponent controls chosen at random": not targeted, so chosen as
+    // it resolves among all of them, hexproof or protection included (rulings; the damage is then prevented as usual).
+    const randomDamage = /^(~|[Ii]t) deals (\d+) damage to an? (creature an opponent controls) chosen at random$/.exec(s);
+    if (randomDamage) {
+      const filter = parseTargetPhrase(randomDamage[3]!);
+      if (filter?.kind !== "object") return null;
+      effects.push({ type: "chooseRandom", filter: { ...filter, text: randomDamage[3]! } }, { type: "damage", amount: Number(randomDamage[2]), to: { ref: "created" } });
+      continue;
+    }
     // Metzali, Tower of Triumph: "Choose a creature at random that attacked this turn. Destroy that creature.": any player's
     // creature declared as an attacker this turn (not one put onto the battlefield attacking), chosen as it resolves with
     // nothing in between (rulings); not targeted.
@@ -8399,6 +8419,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const by = parsePlayer("that player", ctx);
       if (by?.ref !== "target") return null;
       effects.push({ type: "orderTop", who: { ref: "you" }, n: num(theyOrder[1]!), by });
+      si++;
+      continue;
+    }
+    // Petals of Insight: "Look at the top three cards of your library. You may put those cards on the bottom of your library
+    // in any order. If you do, return ~ to its owner's hand. Otherwise, draw three cards.": all of them or none, looked at
+    // first (they stay on top otherwise, in the same order, CR 701.16a); "If you do" is whether they went to the bottom.
+    const petals = new RegExp(`^Look at the top ${NUM} cards of your library$`).exec(s);
+    if (petals && /^You may put those cards on the bottom of your library in any order$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "") && /^If you do, /.test(sentences[si + 2] ?? "")) {
+      const n = num(petals[1]!);
+      if (!(n > 1)) return null;
+      effects.push({ type: "revealTop", n, look: true }, { type: "orderTop", who: { ref: "you" }, n, lookOnly: true }, { type: "may", effects: [{ type: "revealedUntilToBottom" }], text: "put those cards on the bottom of your library in any order" });
       si++;
       continue;
     }
@@ -10928,10 +10959,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         done.countIfYard = { has: [{ kind: "card", subtypes: [lessons[2]!], text: `${lessons[2]} card` }], count: done.n as number, min: num(lessons[1]!) };
         si++;
       }
+      // Advice from the Fae (rewritten above): "Put two of those cards into your hand instead if you control more creatures
+      // than each opponent", checked as it resolves.
+      const moreInstead = !yardInstead && !lessons && done.into === "hand" && done.count === 1 && !done.upTo && !done.filter && done.rest === "bottom" && !done.random && !done.kickedCount && !done.countX && !done.countIfYard
+        ? /^Put (two|three) of those cards into your hand instead if (you control more creatures than each opponent)\.?$/.exec(sentences[si + 1] ?? "")
+        : null;
+      const moreCond = moreInstead ? parseStaticCondition(moreInstead[2]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+      if (moreInstead) {
+        if (!moreCond) return null;
+        done.countIfCond = { cond: moreCond, count: num(moreInstead[1]!) };
+        si++;
+      }
       // Gather the Pack: "If there are two or more instant and/or sorcery cards in your graveyard, put up to two creature
       // cards from among the revealed cards into your hand instead of one": spell mastery, checked as it resolves (the
       // spell itself is still on the stack, rulings).
-      const mastery = !yardInstead && !lessons && done.into === "hand" && done.count === 1 && done.upTo && done.filter?.kind === "card" && !done.kickedCount && !done.countX && !done.countIfYard
+      const mastery = !yardInstead && !lessons && !moreInstead && done.into === "hand" && done.count === 1 && done.upTo && done.filter?.kind === "card" && !done.kickedCount && !done.countX && !done.countIfYard
         ? new RegExp(`^If there are ${NUM} or more instant and/or sorcery cards in your graveyard, put up to (two|three) (.+?) cards from among the revealed cards into your hand instead of one\\.?$`).exec(sentences[si + 1] ?? "")
         : null;
       if (mastery && done.filter?.text === `${mastery[3]} card`) {
@@ -12956,6 +12998,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = parseSearchFilter(discardInstead[1]!);
       if (!filter || draw?.type !== "draw" || draw.who.ref !== "you" || draw.n !== 1 || prev?.type !== "may" || prev.effects.length !== 1 || prev.effects[0]!.type !== "discard" || (prev.effects[0] as { who: PlayerRef }).who.ref !== "you") return null;
       (last as Extract<Effect, { type: "if" }>).effects = [{ type: "if", cond: { kind: "discardedThisWayIs", filter }, effects: [{ ...draw, n: discardInstead[2] === "two" ? 2 : 3 }], otherwise: [draw] }];
+      continue;
+    }
+    // Rowdy Crew: "draw three cards, then discard two cards at random. If two cards that share a card type are discarded this
+    // way, put two +1/+1 counters on ~": the two cards just discarded, any card type in common, and no more for more of them
+    // (rulings).
+    const shareType = /^If two cards that share a card type are discarded this way, (.+)$/.exec(s);
+    if (shareType) {
+      const last = effects.at(-1);
+      const inner = parseOne(capital(shareType[1]!), ctx);
+      if (last?.type !== "discard" || last.who.ref !== "you" || last.n !== 2 || last.upTo || !inner || inner.some((e) => pauses(e))) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "discardedShareType" } }, min: 1 }, effects: inner });
       continue;
     }
     // Lord Windgrace: "Discard a card, then draw a card. If a land card is discarded this way, draw an additional card":
@@ -17161,7 +17214,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     if (picked && pk.who.ref === "target") ctx.lastPut = true;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || last?.type === "myriad" || faceDown || (last?.type === "returnAllFromGraveyard" && !last.toHand);
     ctx.dugToHand = last?.type === "dig" && last.into === "hand" && !last.each && !last.who;
-    ctx.dugOneToHand = last?.type === "dig" && ctx.dugToHand && last.count === 1 && !last.upTo && !last.countX && last.kickedCount === undefined && !last.countIfYard && !last.oneOfEach;
+    ctx.dugOneToHand = last?.type === "dig" && ctx.dugToHand && last.count === 1 && !last.upTo && !last.countX && last.kickedCount === undefined && !last.countIfYard && !last.countIfCond && !last.oneOfEach;
     ctx.lastDugLands = last?.type === "dig" && last.into === "battlefield" && last.filter?.kind === "card" && last.filter.types?.length === 1 && last.filter.types[0] === "Land" && !last.filter.notTypes?.length;
     ctx.lastDugCreature = last?.type === "dig" && last.into === "battlefield" && last.count === 1 && !last.each && !last.who && last.filter?.kind === "card" && last.filter.types?.length === 1 && last.filter.types[0] === "Creature";
     // "Each opponent discards a card. For each opponent who can't, ..." (Aclazotz).

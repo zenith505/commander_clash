@@ -1,6 +1,6 @@
 # Roadmap
 
-29,971 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,982 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,960 of 4,988 (99%), top 10,000: 9,601 of
 9,979 (96%).
 
@@ -4073,7 +4073,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   life"), Carrion Wurm ("any player may exile three"), Matopi Golem (a regeneration shield's rider), Taunt (a rule
   bound to a target player), Goblin Sappers ("destroy it and ~ at end of combat"), Curtain of Light (done in round B110), Dazzling Beauty (done in round B110) and
   Trap Runner (done in round B110) ("becomes blocked" by an effect), Kill-Suit Cultist (a destroy-instead damage shield), Rock Jockey,
-  Explosion of Riches, Power Pack, Cinderheart Giant (chosen at random as it resolves, not targeted), Juju Bubble ("play
+  Explosion of Riches, Power Pack, Cinderheart Giant (done in round B116) (chosen at random as it resolves, not targeted), Juju Bubble ("play
   a card"), Curse Artifact, Erithizon (done in round B110) (a target chosen by the defending player), Selfless Exorcist, Cut the Tethers.
 - Round B32 (harder skipped cards, least played first): "you may pay ... If you do ... Otherwise, ..." (Spitting
   Slug), "each permanent with fading you control" (Parallax Inhibitor), "a land with a trap counter on it" as a
@@ -4322,7 +4322,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the Pack), the Empires trio (Throne, Scepter, Crown), Destroy the Evidence, Oathsworn Knight, Relic Amulet, Seeds of
   Innocence, Urgoros, Foul Renewal, Hog-Monkey Rampage, Roiling Terrain, Lictor, Moment of Glory. +30 (27,843 of
   31,936 with rounds 209 to 211 and B40-B42).
-- Out after round B43: Cinderheart Giant (damage to a creature chosen at random, not targeted), Torment of Venom and
+- Out after round B43: Cinderheart Giant (done in round B116) (damage to a creature chosen at random, not targeted), Torment of Venom and
   Xathrid Demon (new punisher forms), Courier of Comestibles and Inscribed Tablet ("if you didn't put a card into your
   hand this way" after a search or a fixed-count reveal, not parsed yet).
 - Round B44 (harder skipped cards, least played first): mana that can only be spent some ways ("only to cast kicked
@@ -4555,9 +4555,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "Whenever you activate a loyalty ability"; once it merges, Gideon only needs "an opponent activates" on that
   template), Dismantle (a choice of counter kind), Price of Betrayal (counters removed divided among objects),
   Watchers of the Dead (each opponent keeps two cards), Mire's Toll (reveal N chosen cards), Dead Reckoning (done in round B113), Victor
-  Mancha, Encumbered Reejerey (done in round B112) ("while" trigger conditions), Entrails Feaster (done in round B112), Ichorid, Nether Shadow, Cursed Rack (done in round B104),
-  Celestial Kirin, Skyfire Kirin, Lumaret's Favor, Definitely Not a Turtle, Advice from the Fae, Petals of Insight,
-  Rowdy Crew, Thijarian Witness, Riptide Replicator, Teferi's Response, Dawn Evangel, Earthbind, plus the multi-line
+  Mancha, Encumbered Reejerey (done in round B112) ("while" trigger conditions), Entrails Feaster (done in round B112), Ichorid (done in round B116), Nether Shadow (done in round B116), Cursed Rack (done in round B104),
+  Celestial Kirin (done in round B116), Skyfire Kirin (done in round B116), Lumaret's Favor, Definitely Not a Turtle (done in round B116), Advice from the Fae (done in round B116), Petals of Insight (done in round B116),
+  Rowdy Crew (done in round B116), Thijarian Witness, Riptide Replicator, Teferi's Response (done in round B116), Dawn Evangel (done in round B116), Earthbind, plus the multi-line
   or new-mechanic cards in the same range (Oath of Scholars, Oath of Ghouls, Soul of Shandalar, Kenku Artificer, Harsh
   Justice, Bill Potts and others).
 - Round B53 (cards no earlier round wrote down, least played first, EDHREC rank about 22,000 to 19,700):
@@ -5669,6 +5669,22 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   you attacked with that object, CR 400.7, or with three or more creatures, whatever became of them, rulings), Hiveheart
   Shaman (a basic land card that shares no land type with a land you control as it resolves, CR 205.3i). No new prompts.
   +10 (29,971 of 31,936 with round 282).
+- Round B116 (single-line blockers from the round B52 list and other fresh ones): Celestial Kirin and Skyfire Kirin ("with
+  that spell's mana value" in a cast trigger: X included, as it is on the stack or last was, rulings), Ichorid (a graveyard
+  upkeep trigger paid by exiling a black creature card other than itself; one Ichorid exiling another stops that one,
+  rulings, CR 603.4), Nether Shadow ("three or more creature cards above it": put there after it, rulings), Rowdy Crew (two
+  cards discarded at random that share any card type, rulings), Cinderheart Giant (a creature an opponent controls chosen at
+  random as it resolves, not targeted, hexproof included, rulings), Definitely Not a Turtle ("a land or legendary Turtle
+  card"), Advice from the Fae (two cards only with strictly more creatures than every other player, rulings; no teams,
+  CR 102.3), Petals of Insight (all three looked-at cards to the bottom in the order you choose and it returns to your hand
+  from the stack, or draw three, rulings), Dawn Evangel ("if an Aura you controlled was attached to it": the Aura's
+  controller as it last existed, CR 603.10a), Teferi's Response (an opponent's spell or ability that targets a land you
+  control; an ability's permanent source destroyed, as Green Slime). No new prompts (Petals of Insight uses the look, may
+  and bottom-order prompts). +11 (29,982 of 31,936).
+- Out after round B116 (looked at, not done): Earthbind (an Aura gaining a static ability with the timestamp of the gain,
+  CR 613.7a, after an intervening if on the enchanted creature), Goblin Test Pilot (a target chosen at random as an
+  activated ability is activated: activation always lets the player choose), Thijarian Witness ("if it was attacking or
+  blocking alone" as it died, CR 506.5, with other creatures dying at the same time).
 - Out after round B115 (looked at, not done): Cut the Tethers (a punisher for each Spirit that returns only the ones
   their owners didn't pay for), Song of Blood (a delayed attack trigger whose bonus counts the creature cards milled as
   it resolved), Expel the Unworthy (a kicker that changes what the spell can target), Kill-Suit Cultist and Goblin

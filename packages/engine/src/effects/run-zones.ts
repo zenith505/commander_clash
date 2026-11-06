@@ -2116,6 +2116,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       destroyPermanent(s, obj(s, id), `${src} destroys ${nameOf(s, id)}.`, false, ctx.controller);
       return;
     }
+    case "chooseRandom": {
+      // Cinderheart Giant: chosen at random as it resolves among those it could be (rulings: not targeted).
+      const options = s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+      s.resolving!.created = [];
+      if (!options.length) return;
+      const id = options[Math.floor(nextRandom(s) * options.length)]!;
+      log(s, `${src} chooses ${nameOf(s, id)} at random.`);
+      s.resolving!.created = [id];
+      return;
+    }
     case "keepRest":
       return keepRest(s, e, ctx, src);
     case "keepDestroyRest": {
@@ -2862,6 +2872,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           (!e.notSacrificed || !s.resolving!.sacrificedThisWay?.some((k) => k.id === id && k.controller === ctx.controller)) &&
           // Blood for Bones: "another creature card" than the one chosen for the battlefield.
           (!e.another || !s.resolving!.yardToBattlefield?.includes(id)) &&
+          // Ichorid: "other than ~", not the card with the ability.
+          (!e.notSelf || id !== ctx.sourceId) &&
           // Starfall Invocation: a card that died to this destroy and hasn't moved since (CR 400.7).
           (!e.destroyedThisWay || !!s.resolving!.destroyed?.some((d) => d.died && d.o.id === id && (obj(s, id).zoneChanges ?? 0) === (d.o.zoneChanges ?? 0) + 1));
         const all = p.graveyard.filter((id) => milled(id) && (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))) && (e.totalMv === undefined || defMv(defOf(s, obj(s, id))) <= e.totalMv));

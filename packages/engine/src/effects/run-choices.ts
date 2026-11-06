@@ -765,8 +765,14 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? nextRandom(s) < 0.5
             : e.cond.kind === "destroyedThisWay"
             ? !!s.resolving!.destroyed?.some((d) => (!(e.cond as { died?: true }).died || d.died) && (!(e.cond as { you?: true }).you || d.ch.controller === ctx.controller) && (!(e.cond as { youOrToken?: true }).youOrToken || d.ch.controller === ctx.controller || !!d.o.isToken) && (!(e.cond as { cardType?: string }).cardType || d.ch.types.includes((e.cond as { cardType: string }).cardType)) && (!(e.cond as { color?: Color }).color || d.ch.colors.includes((e.cond as { color: Color }).color)))
+            : e.cond.kind === "ownsNamedEverywhere"
+            ? ((name) => {
+                const mine = Object.values(s.objects).filter((o) => o.owner === ctx.controller && !o.isToken && !o.faceDown && !(o.zone === "exile" && (o.foretold || o.hiddenExile)));
+                const card = (zone: string) => mine.some((o) => o.zone === zone && sameName(defOf(s, o).name, name));
+                return card("exile") && card("hand") && card("graveyard") && mine.some((o) => o.zone === "battlefield" && sameName(characteristics(s, o).name, name));
+              })(ctx.sourceDef.name)
             : e.cond.kind === "sacrificedThisWay"
-            ? !!s.resolving!.sacrificedThisWay?.some((k) => (!(e.cond as { you?: true }).you || k.controller === ctx.controller) && (!(e.cond as { commander?: true }).commander || !!k.commander) && ((sub) => !sub || !!k.subtypes?.includes(sub) || (!!k.allCreatureTypes && CREATURE_TYPES.has(sub)))((e.cond as { subtype?: string }).subtype))
+            ? !!s.resolving!.sacrificedThisWay?.some((k) => (!(e.cond as { you?: true }).you || k.controller === ctx.controller) && (!(e.cond as { commander?: true }).commander || !!k.commander) && (!(e.cond as { snow?: true }).snow || !!k.snow) && ((sub) => !sub || !!k.subtypes?.includes(sub) || (!!k.allCreatureTypes && CREATURE_TYPES.has(sub)))((e.cond as { subtype?: string }).subtype))
             : e.cond.kind === "anotherDied"
             ? ((t) => (s.diedThisTurn?.length ?? 0) - (t?.kind === "object" && s.resolving!.destroyed?.some((d) => d.died && d.o.id === t.id) ? 1 : 0) > 0)(ctx.targets[e.cond.index])
             : e.cond.kind === "targetSpellTargets"

@@ -1535,6 +1535,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // The Wretched: "gain control of all creatures blocking ~" (with "for as long as you control ~"): those blocking it as this
   // resolves (CR 509.1h; none once it has left combat, CR 506.4), the set locked in then (CR 611.2c). Layer 2.
   if (/^Gain control of all creatures blocking ~$/.test(s) && !ctx.spell) return [{ type: "continuous", what: { ref: "blockingIt" }, mods: [{ kind: "control" }], duration: "game" }];
+  // Wellspring: "When ~ enters, gain control of enchanted land until end of turn"; "untap enchanted land. You gain control of
+  // that land until end of turn": the land it's attached to as this resolves, until end of turn even if the Aura leaves
+  // first (rulings). Layer 2. ("That land" is the enchanted land, see body.ts.)
+  if (/^[Gg]ain control of enchanted land until end of turn$/.test(s) && !ctx.spell && !ctx.activated)
+    return [{ type: "continuous", what: { ref: "attached" }, mods: [{ kind: "control" }], duration: "endOfTurn" }];
   // Captivating Glance: "If you win, gain control of enchanted creature. Otherwise, that player gains control of enchanted
   // creature.": the creature it's attached to as this resolves, for the rest of the game, even once the Aura is gone
   // (rulings). Layer 2.
@@ -1913,6 +1918,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[2]!, ctx);
     const mods = what && parseChanges(m[3]!);
     return what && mods ? [{ type: "continuous", what, mods, duration: m[1] === "end of turn" ? "endOfTurn" : m[1] === "your next upkeep" ? "yourNextUpkeep" : "yourNextTurn" }] : null;
+  }
+  // Orcish Farmer: "Target land becomes a Swamp until its controller's next untap step": the player who controls it as this
+  // resolves; it ends as that player's next untap step begins (a skipped one doesn't, CR 614.10).
+  if ((m = /^(target [a-z]+) (becomes an? [A-Z][a-z]+) until its controller's next untap step$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const mods = what?.ref === "target" && !what.n ? parseChanges(m[2]!) : null;
+    return what && mods ? [{ type: "continuous", what, mods, duration: "controllersNextUntap" }] : null;
   }
   // Thermal Flux: "Target snow permanent isn't snow until end of turn" (parseChanges).
   // Erhnam Djinn: "... gains forestwalk until your next upkeep": it ends as your next upkeep begins.

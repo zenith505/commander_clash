@@ -232,6 +232,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             addDelayed(s, e.when, ctx.controller, s.objects[t]!, body);
             // "When that token leaves the battlefield" (Ugin, the Ineffable): for whatever zone it goes to (CR 603.6c).
             if (e.when === "leaves") s.delayed![s.delayed!.length - 1]!.to = ["graveyard", "exile", "hand", "library", "command"];
+            // Stangg: "Sacrifice ~ when that token leaves the battlefield": ~ as it is now; if it left, it's a new object (CR 400.7).
+            const me = e.withSource && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+            if (me) s.delayed![s.delayed!.length - 1]!.source = { id: me.id, zc: ctx.sourceZc ?? me.zoneChanges ?? 0 };
           }
         return;
       }

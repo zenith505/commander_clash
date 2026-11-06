@@ -1175,13 +1175,15 @@ function castSpellSource(s: GameState, ctx: ResolveCtx): DamageSource | undefine
 
 function subjectSource(s: GameState, ctx: ResolveCtx): DamageSource | undefined {
   const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
-  if (!o) return undefined;
-  if (o.zone === "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc) return objectSource(s, o);
+  // Splintering Wind: "When it leaves the battlefield, it deals 1 damage ...": a token that has ceased to exist (CR 111.7)
+  // deals it as it last existed (CR 608.2h).
+  if (!o && !(ctx.subject && s.lastKnown?.[ctx.subject.id]?.source)) return undefined;
+  if (o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc) return objectSource(s, o);
   // A "dies" trigger's subject is the card in the graveyard, one zone change after the creature (see subjectEvenIfGone).
-  const lk = s.lastKnown?.[o.id];
+  const lk = s.lastKnown?.[ctx.subject!.id];
   if (!lk || (lk.zc !== ctx.subject!.zc && lk.zc !== ctx.subject!.zc - 1)) return undefined;
-  const ref = { object: o.id, zc: lk.zc };
-  return lk.source ? { ...lk.source, controller: lk.controller, ref } : cardSource((lk.copyKey && s.cards[lk.copyKey]) || defOf(s, o), lk.controller, ref);
+  const ref = { object: ctx.subject!.id, zc: lk.zc };
+  return lk.source ? { ...lk.source, controller: lk.controller, ref } : cardSource((lk.copyKey && s.cards[lk.copyKey]) || defOf(s, o!), lk.controller, ref);
 }
 
 /**

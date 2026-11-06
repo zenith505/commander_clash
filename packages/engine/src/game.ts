@@ -3889,6 +3889,13 @@ function beginStep(s: GameState, step: Step): void {
         log(s, `${player(s, ap).name} skips their untap step.`);
         return advanceStep(s);
       }
+      // "Until its controller's next untap step" (Orcish Farmer): it ends as that player's next untap step begins, before
+      // anything untaps; for a player who left the game, at the next untap step (CR 800.4m).
+      const untilUntap = s.effects.filter((e) => e.duration === "controllersNextUntap" && ((e.turnOf === ap && s.turn > (e.sinceTurn ?? 0)) || (e.turnOf !== undefined && player(s, e.turnOf).lost)));
+      if (untilUntap.length) {
+        s.effects = s.effects.filter((e) => !untilUntap.includes(e));
+        invalidateCharacteristics(s);
+      }
       untapStepPhasing(s, ap); // CR 502.1, 702.26a
       dayNightUntapCheck(s); // CR 502.2
       // "Lands you control don't untap during your next untap step": this is that step, for whatever they control now.

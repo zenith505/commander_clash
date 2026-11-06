@@ -3069,6 +3069,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Angelic Skirmisher: "Choose first strike, vigilance, or lifelink. Creatures you control gain that ability until end of
   // turn." The keyword is chosen as it resolves (CR 608.2d), and only creatures you control then gain it (CR 611.2c).
   // Linvala, Shield of Sea Gate: "Choose hexproof or indestructible. Creatures you control gain that ability ..." with two.
+  // Gabriel Angelfire: "At the beginning of your upkeep, choose flying, first strike, trample, or rampage 3. ~ gains that
+  // ability until your next upkeep." The same, for ~, until the ability ends as your next upkeep begins (rulings).
+  text = text.replace(/^[Cc]hoose ((?:[a-z ]+, )+or [a-z ]+ \d+)\. ~ gains that ability until your next upkeep\.$/, "~ gains your choice of $1 until your next upkeep.");
   text = text.replace(/(^|, )[Cc]hoose ((?:[a-z ]+, )+or [a-z ]+|[a-z]+ or [a-z]+)\. (Creatures you control) gain that ability until end of turn\.$/, (_, pre: string, opts: string, who: string) => `${pre}${pre ? who.toLowerCase() : who} gain your choice of ${opts} until end of turn.`);
   // "Create a token that's a copy of a permanent you control" (Awaken the Maelstrom): not targeted, so chosen as it
   // resolves (CR 608.2d, rulings), the same as "Choose a permanent you control. Create a token that's a copy of it."
@@ -3539,6 +3542,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\b(enchanted player) mills X cards, where X is the number of cards put into their graveyard/g, "$1 mills X cards, where X is the number of cards put into enchanted player's graveyard");
   // Liliana of the Veil's two sentences are one effect: the piles, then the sacrifice of the chosen one (CR 700.3).
   text = text.replace(/\bSeparate all permanents (target player|target opponent) controls into two piles\. That player sacrifices all permanents in the pile of their choice\./g, "Separate all permanents $1 controls into two piles for that player to sacrifice the pile of their choice.");
+  // Wellspring: "untap enchanted land. You gain control of that land until end of turn.": that land is the enchanted one.
+  text = text.replace(/^untap enchanted land\. You gain control of that land until end of turn\.$/, "untap enchanted land. Gain control of enchanted land until end of turn.");
+  // Splintering Wind: "Create a 1/1 green Splinter creature token. It has flying and "Cumulative upkeep {G}."": what the
+  // token is created with, the same as "a ... token with flying and "..."".
+  text = text.replace(/(\b[Cc]reate an? \d+\/\d+ [a-z]+ [A-Z][a-z]+ creature token)\. It has ([a-z]+) and ("[^"]+")/g, "$1 with $2 and $3");
   // "You may pay eight {E}. If you pay, ..." (Lightning Runner) says the same as "If you do".
   text = text.replace(/(you may pay [^.]+\.) If you pay, /g, "$1 If you do, ");
   // "Roll a d20. [Instructions with X.] 1—9 | X is one. 10—19 | X is two. 20 | X is three." (Wand of Wonder): each row
@@ -3754,6 +3762,55 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         { type: "if", cond: { kind: "revealedIs", filter: land }, effects: [{ type: "may", effects: [{ type: "putOntoBattlefield", what: { ref: "revealed" } }, { type: "spellToHand" }], text: "put the revealed land onto the battlefield and return ~ to its owner's hand" }] },
       );
       si += 3;
+      continue;
+    }
+    // Hedron Alignment: "you may reveal your hand. If you do, you win the game if you own a card named ~ in exile, in your
+    // hand, in your graveyard, and on the battlefield": revealing is doing it (an empty hand too), and the zones are
+    // checked as it resolves.
+    if (!ctx.spell && /^[Yy]ou may reveal your hand$/.test(s) && /^If you do, you win the game if you own a card named ~ in exile, in your hand, in your graveyard, and on the battlefield\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push(
+        { type: "may", effects: [{ type: "lookAtHand", who: { ref: "you" }, reveal: true }], text: "reveal your hand" },
+        { type: "if", cond: { kind: "youDid" }, effects: [{ type: "if", cond: { kind: "ownsNamedEverywhere" }, effects: [{ type: "winGame", who: { ref: "you" } }] }] },
+      );
+      si++;
+      continue;
+    }
+    // Gargantuan Gorilla: "you may sacrifice a Forest. If you sacrifice a snow Forest this way, ~ gains trample until end of
+    // turn. If you don't sacrifice a Forest, sacrifice ~ and it deals 7 damage to you.": the same as Elder Spawn's "unless
+    // you sacrifice ..." (with none, or declining, ~ goes and deals the damage as it last existed, CR 113.7a), then trample
+    // if the Forest sacrificed was snow as it last existed (CR 608.2h).
+    const snowSac = /^[Yy]ou may sacrifice an? ([A-Z][a-z]+)$/.exec(s);
+    const snowThen = snowSac && new RegExp(`^If you sacrifice a snow ${snowSac[1]} this way, (~ gains [a-z]+ until end of turn)$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    const snowElse = snowThen && new RegExp(`^If you don't sacrifice an? ${snowSac[1]}, (sacrifice ~ and it deals \\d+ damage to you)$`).exec(sentences[si + 2]?.replace(/\.$/, "") ?? "");
+    if (snowSac && snowThen && snowElse && !ctx.spell) {
+      const keep = parseOne(`Unless you sacrifice ${/^[AEIOU]/.test(snowSac[1]!) ? "an" : "a"} ${snowSac[1]}, ${snowElse[1]}`, ctx);
+      const gain = parseOne(snowThen[1]!, ctx);
+      if (keep?.length !== 1 || keep[0]!.type !== "may" || !gain?.length) return null;
+      effects.push(keep[0]!, { type: "if", cond: { kind: "sacrificedThisWay", subtype: snowSac[1]!, snow: true }, effects: gain });
+      si += 2;
+      continue;
+    }
+    // Demonic Hordes: "unless you pay {B}{B}{B}, tap ~ and sacrifice a land of an opponent's choice": unpaid, you choose an
+    // opponent as it resolves (as Tasigur's "of an opponent's choice", not a target), that player chooses one of your
+    // lands, and you sacrifice it (CR 701.21a).
+    const hordes = !ctx.spell && !ctx.chosenOpponent && !ctx.eventPlayer && ctx.lastObjectTarget === undefined ? /^[Uu]nless you pay ((?:\{[WUBRG]\})+), tap ~ and sacrifice a land of an opponent's choice$/.exec(s) : null;
+    if (hordes) {
+      ctx.chosenOpponent = true;
+      const land: TargetSpec = { kind: "object", types: ["Land"], notTypes: [], notColors: [], text: "land" };
+      effects.push({
+        type: "may", effects: [], pay: { mana: hordes[1]! }, keep: true,
+        otherwise: [{ type: "tap", what: { ref: "self" } }, { type: "choose", choice: "opponent" }, { type: "pick", who: { ref: "chosenPlayer" }, among: { ref: "you" }, filter: land, n: 1, action: "choose", prompt: "click a land of the player whose ~ it is: they sacrifice it." }, { type: "sacrifice", what: { ref: "created" } }],
+        text: `Pay ${hordes[1]} to keep ~ untapped and your lands`,
+      });
+      continue;
+    }
+    // Cyclone: "sacrifice ~ unless you pay {G} for each wind counter on it. If you pay, ~ deals damage ...": what paying
+    // does too, done only if the whole payment was made (the cost counted as it resolves, CR 608.2h).
+    const ifPaid = /^If you pay, (.+)$/.exec(s);
+    if (ifPaid && last?.type === "may" && last.keep && last.pay && last.payTimes && !last.effects.length && last.otherwise?.length === 1 && last.otherwise[0]!.type === "sacrifice") {
+      const fx = parseOne(capital(ifPaid[1]!), ctx);
+      if (!fx?.length) return null;
+      last.effects = fx;
       continue;
     }
     // Spinal Embrace: "At the beginning of the next end step, sacrifice it. If you do, you gain life equal to its toughness":
@@ -11951,6 +12008,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si = sentences.length;
       continue;
     }
+    // Rogue Skycaptain: "You may pay {2} for each wage counter on it. If you don't, remove all wage counters from ~ and an
+    // opponent gains control of it.": the payment counted as it resolves, all or none of it (rulings); unpaid, you choose
+    // the opponent then (rulings), who gains control of ~ for as long as it stays on the battlefield.
+    const payEach = !ctx.spell && ctx.lastObjectTarget === undefined && !ctx.chosenOpponent && !ctx.eventPlayer ? /^[Yy]ou may pay (\{\d+\}) for each ([a-z]+) counter on (?:it|~)$/.exec(s) : null;
+    const payEachDont = payEach ? new RegExp(`^If you don't, remove all ${payEach[2]} counters from ~ and an opponent gains control of (?:it|~)\\.?$`).exec(sentences[si + 1] ?? "") : null;
+    if (payEach && payEachDont) {
+      const n = parseCount(`${payEach[2]} counter on ~`, ctx, true);
+      if (!n) return null;
+      ctx.chosenOpponent = true;
+      effects.push({
+        type: "may", effects: [], pay: { mana: payEach[1]! }, payTimes: n, keep: true,
+        otherwise: [{ type: "removeCounters", what: { ref: "self" }, counter: payEach[2]!, n: "all" }, { type: "choose", choice: "opponent" }, { type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }],
+        text: `Pay ${payEach[1]} for each ${payEach[2]} counter on ~ to keep it`,
+      });
+      si++;
+      continue;
+    }
     const mayPay = /^[Yy]ou may pay (.+)$/.exec(s);
     if (mayPay) {
       const pay = parsePayCost(mayPay[1]!);
@@ -16496,6 +16570,30 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "delayed", when: "leaves", of: { ref: "self" }, effects: [{ type: "exileRemembered" }], text: "exile those tokens" });
       continue;
     }
+    // Wellspring: "untap enchanted land. You gain control of that land until end of turn.": that land is the enchanted one.
+  text = text.replace(/^untap enchanted land\. You gain control of that land until end of turn\.$/, "untap enchanted land. Gain control of enchanted land until end of turn.");
+  // Splintering Wind: "Create a 1/1 green Splinter creature token. ... When it leaves the battlefield, it deals 1 damage to
+    // you and each creature you control.": a delayed trigger (CR 603.7) of the ability, not an ability of the token, the
+    // token dealing the damage as it last existed (CR 608.2h) to the player who created it and that player's creatures.
+    const leavesDeals = madeOne0(effects[effects.length - 1]) && !ctx.spell ? /^When it leaves the battlefield, it deals (\d+) damage to you and each creature you control$/.exec(s) : null;
+    if (leavesDeals) {
+      const creature: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "each creature you control" };
+      effects.push({ type: "delayed", when: "leaves", each: "created", effects: [{ type: "damage", amount: num(leavesDeals[1]!), to: { ref: "you" }, also: [{ ref: "each", filter: creature }], by: "subject" }], text: `it deals ${leavesDeals[1]} damage to you and each creature you control` });
+      continue;
+    }
+    // Stangg: "create Stangg Twin, a legendary 3/4 ... token. Exile that token when ~ leaves the battlefield. Sacrifice ~
+    // when that token leaves the battlefield.": the same for its one token, and a second delayed trigger (CR 603.7) for the
+    // token, about ~ as the object it is now (if ~ left first, it's another object and isn't sacrificed, CR 400.7).
+    const madeOne = madeOne0(effects[effects.length - 1]);
+    if (s === "Exile that token when ~ leaves the battlefield" && madeOne && !ctx.spell && /^Sacrifice ~ when that token leaves the battlefield\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push(
+        { type: "delayed", when: "leaves", of: { ref: "self" }, effects: [{ type: "exileRemembered" }], text: "exile that token" },
+        { type: "delayed", when: "leaves", each: "created", withSource: true, effects: [{ type: "sacrifice", what: { ref: "self" } }], text: "sacrifice ~" },
+      );
+      si++;
+      continue;
+    }
+
     // each token made (rulings: with two tokens, the first to leave brings the card back), about the card exiled.
     if (s === "When that token leaves the battlefield, put the exiled card into your hand") {
       const [made, faceDown] = [effects[effects.length - 1], effects[effects.length - 2]];
@@ -16536,9 +16634,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Gains protection from colorless or from the color of your choice" (Giver of Runes): one of six, chosen as it resolves.
     // "Gains protection from artifacts or from the color of your choice" (Apostle's Blessing) likewise.
     s = s.replace(/ (gains?) protection from (colorless|artifacts) or from the color of your choice\b/, " $1 your choice of protection from $2, protection from white, protection from blue, protection from black, protection from red, or protection from green");
-    const choiceOf = / (gains?|gain|loses?) your choice of ((?:[a-z ]+, )*[a-z ]+,? or [a-z ]+?)(?= until end of turn\b| and |$)/.exec(s);
+    // Gabriel Angelfire: "... or rampage 3 until your next upkeep" (a keyword with a number).
+    const choiceOf = / (gains?|gain|loses?) your choice of ((?:[a-z ]+, )*[a-z ]+,? or [a-z ]+?(?: \d+)?)(?= until end of turn\b| until your next upkeep$| and |$)/.exec(s);
     if (choiceOf) {
-      const options = choiceOf[2]!.split(/,? or |, /).map((w) => keywordOf(w));
+      const options = choiceOf[2]!.split(/,? or |, /).map((w) => (/^rampage \d+$/.test(w) ? `Rampage ${w.slice(8)}` : keywordOf(w)));
       // One such choice per ability: it's kept for the rest of the resolution.
       if (options.length < 2 || options.some((k) => !k || k === CHOSEN_PROTECTION) || effects.some((x) => x.type === "choose" && x.choice === "keyword")) return null;
       effects.push({ type: "choose", choice: "keyword", options: options as string[] });
@@ -17655,6 +17754,9 @@ function lastAllChose(e: Effect | undefined): Extract<Effect, { type: "if" }> | 
   if (!e.otherwise) return e;
   return e.otherwise.length === 1 ? lastAllChose(e.otherwise[0]) : undefined;
 }
+
+/** The effect, if it creates exactly one token (Stangg, Splintering Wind: "that token", "it"). */
+const madeOne0 = (e: Effect | undefined) => (e?.type === "createToken" && e.n === 1 && !e.who?.ref.startsWith("each") ? e : undefined);
 
 function parseOne(s: string, ctx: Ctx): Effect[] | null {
   // Binding Negotiation: "Otherwise, you may put a face-up exiled card they own into their graveyard": the target

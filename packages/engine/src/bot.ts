@@ -814,6 +814,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const weakest = [...pend.options].sort((a, b) => might(Number(a)) - might(Number(b)))[0]!;
         return [{ type: "chooseOption", player: pid, choice: weakest }];
       }
+      // Rogue Skycaptain: "If you don't, ... an opponent gains control of it" (inside the unpaid branch): the opponent with
+      // the least power on the battlefield.
+      if (r && pend.what === "opponent" && opps.length && allEffects(r.body.effects).some((e) => e.type === "continuous" && e.giveTo?.ref === "chosenPlayer" && e.what.ref === "self" && e.mods.some((m) => m.kind === "control"))) {
+        const weakest = [...opps].sort((a, b) => might(Number(a)) - might(Number(b)))[0]!;
+        return [{ type: "chooseOption", player: pid, choice: weakest }];
+      }
       // Sandstone Oracle: "If that player has more cards in hand than you, draw cards equal to the difference": the most.
       if (next?.type === "if" && next.cond.kind === "amountsCompare" && opps.length && JSON.stringify(next.cond.a).includes('"chosenPlayer"') && next.effects.some((e) => e.type === "draw")) {
         const most = [...opps].sort((a, b) => player(s, Number(b)).hand.length - player(s, Number(a)).hand.length)[0]!;

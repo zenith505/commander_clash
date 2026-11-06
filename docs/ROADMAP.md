@@ -5860,6 +5860,24 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   mana only, CR 118.7a), Thick-Skinned Goblin (pay {0} rather than the echo cost, mana or not; the echo trigger's "may"
   now carries an echo flag, so every echo card's compiled form changes, nothing else), Kenku Artificer ("That artifact
   becomes ..." after its counters). +10 (30,042 of 31,936 with round 285 and B118).
+- Round B120 (single-line blockers from the skip lists, least played first: damage redirection, CR 614.9): Turn the Tables
+  (all combat damage to you this turn dealt to the target attacking creature, even one removed from combat; not once it's
+  gone, rulings), Weathered Bodyguards and Veteran Bodyguard (damage to you from unblocked creatures dealt to it while it's
+  untapped: not trample damage from a blocked creature, and only combat damage for Weathered Bodyguards, rulings),
+  Reverberation (all the target sorcery's damage dealt to its controller, adding up, rulings), Aegis of Honor and Harsh
+  Judgment ("that spell deals that damage to its controller instead": whoever controls the instant or sorcery spell as it
+  deals the damage, only a spell, not an ability; a new redirect to the source's controller in damage.ts), Shield Dancer
+  (the target attacker's next combat damage to it dealt to that attacker, two activations being for two damage steps,
+  rulings), Soltari Guerrillas (its next combat damage to whichever opponent dealt to the target creature) and Mercenaries
+  (its next damage to whoever activated it prevented, CR 602.2), Gloom Surgeon (combat damage to it prevented and that many
+  cards exiled from the top of its controller's library, even damage that can't be prevented, rulings, CR 615.12). Bots
+  answer threats with Turn the Tables (at their biggest attacker), Aegis of Honor and Reverberation. No new prompts. +10
+  (30,073 of 31,936 with B119 and rounds 286 and 287).
+- Out after round B120 (looked at, not done): Nova Pentacle (a target creature an opponent of your choice chooses, rulings),
+  Lichenthrope, Force Bubble and Crumbling Sanctuary (damage replaced by counters or exiled cards: a replacement that isn't
+  a prevention, so it applies to damage that can't be prevented and is ordered with the shields, CR 616.1; the damage rules
+  only prevent or redirect), Eye for an Eye (the damage is dealt and the same amount dealt to the source's controller),
+  Channel Harm ("you may have ~ deal that much damage" each time damage is prevented, a choice inside the prevention).
 - Out after round B119 (looked at, not done): Gloom (activated abilities of white enchantments cost {3} more: mana
   abilities too, and their cost paths take no tax), Kodama of the Center Tree (soulshift X, X counted as the trigger
   goes on the stack), Invoke the Ancients (a separate counter choice for each of the two tokens created, rulings).

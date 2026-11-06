@@ -119,13 +119,20 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     rule.by = { chosen, filter };
   }
   if (spec.by?.filter) rule.by = { ...rule.by, filter: bindChosen(spec.by.filter, ctx.chosen) };
+  if (spec.by?.spellOnly) rule.by = { ...rule.by, spellOnly: true };
   if (spec.by?.notSelf && ctx.sourceId) rule.by = { ...rule.by, not: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0 } };
   // Terrifying Presence: every creature's combat damage but that target's.
   if (spec.by?.notTarget !== undefined) {
     const so = objects(s, { ref: "target", index: spec.by.notTarget }, ctx)[0];
     if (so) rule.by = { ...rule.by, not: { id: so.id, zc: so.zoneChanges ?? 0 } };
   }
-  if (spec.by?.target) {
+  // Soltari Guerrillas, Mercenaries: "The next time ~ would deal ... damage": the ability's source, as the object it is
+  // now (CR 400.7); none if it has left the battlefield.
+  if (spec.by?.target?.ref === "self") {
+    const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) return;
+    rule.by = { ...rule.by, chosen: { id: me.id, zc: me.zoneChanges ?? 0 } };
+  } else if (spec.by?.target) {
     // "Prevent all damage target spell would deal this turn" (Hallow): that spell, and the permanent it becomes.
     const i = spec.by.target.ref === "target" ? spec.by.target.index : -1;
     const t = ctx.targets[i];
@@ -165,6 +172,7 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     if (!r) return;
     rule.redirect = r;
   }
+  if (spec.redirectToSourceController) rule.redirect = { sourceController: true };
   if (spec.gainLife) rule.gainLife = spec.gainLife;
   if (spec.dealBack) rule.dealBack = spec.dealBack;
   if (spec.tokens) rule.tokens = spec.tokens;
@@ -209,6 +217,6 @@ export function describeRule(s: GameState, r: DamageRule): string {
   if (r.to?.player !== undefined) who.push(player(s, r.to.player).name);
   const to = who.length ? ` to ${who.join(" and ")}` : "";
   const what = r.left !== undefined ? `the next ${r.left} ${r.combat === "only" ? "combat " : ""}damage` : r.nextTime ? `the next ${r.combat === "only" ? "combat " : ""}damage` : `all ${r.combat === "only" ? "combat " : r.combat === "non" ? "noncombat " : ""}damage`;
-  const dest = r.redirect ? ("player" in r.redirect ? player(s, r.redirect.player).name : defOf(s, obj(s, r.redirect.object)).name) : "";
+  const dest = r.redirect ? ("sourceController" in r.redirect ? "its controller" : "player" in r.redirect ? player(s, r.redirect.player).name : defOf(s, obj(s, r.redirect.object)).name) : "";
   return `${what}${by ? ` ${by} would deal` : " that would be dealt"}${to} this turn will be ${dest ? `dealt to ${dest} instead` : "prevented"}`;
 }

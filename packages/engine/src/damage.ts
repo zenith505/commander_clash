@@ -416,7 +416,7 @@ type ShieldOp =
   /** A damage amount replacement or a prevention effect that changes the amount (see DamageMod): `from` became `n`. */
   | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** Damage to a player: who. */ player?: PlayerId; /** A "next time" one, used up now. */ once?: string }
   /** The Mindskinner's additional effect (CR 615.5): each opponent of `by` mills `n` cards, even if the damage couldn't be prevented (615.12). */
-  | { kind: "mill"; by: PlayerId; n: number; card: string; /** `by` mills it themselves (Angel of Suffering). */ self?: true }
+  | { kind: "mill"; by: PlayerId; n: number; card: string; /** `by` mills it themselves (Angel of Suffering). */ self?: true; /** Gloom Surgeon: `by` exiles that many from the top of their library instead (not a mill, CR 701.17a). */ exile?: true }
   /** Khârn the Betrayer's additional effect (CR 615.5): `to` gains control of it, after any prevention. */
   | { kind: "betrayer"; id: ObjectId; to: PlayerId; prevented: boolean; toName: string }
   /** Nine Lives' counter (`counter` of it) for one source's damage to its controller, prevented or not (CR 615.5, 615.12). */
@@ -491,8 +491,18 @@ function staticRules(s: GameState, events: DamageEvent[]): DamageRule[] {
         to: { players: "you", ...(red.others ? { objects: { kind: "object", types: [], controller: "you", text: "permanent you control" } } : {}) },
         redirect: { object: dest.id, zc: dest.zoneChanges ?? 0 },
         ...(red.by ? { by: { filter: red.by } } : {}),
+        ...(red.combat ? { combat: "only" as const } : {}),
       });
     }
+    // Harsh Judgment: an instant or sorcery spell of the color chosen as it entered (CR 614.12) that would deal damage to
+    // its controller deals it to that spell's controller instead (CR 614.9), each time.
+    const harsh = abilitiesOf(s, cover).spellDamageToYouToController;
+    if (harsh)
+      out.push({ id: `static-spellredirect:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, to: { players: "you" }, by: { filter: bindChosen(harsh, cover.chosen), spellOnly: true }, redirect: { sourceController: true } });
+    // Gloom Surgeon: "prevent that damage and exile that many cards from the top of your library": the cards are exiled
+    // even if the damage can't be prevented, and all of it is prevented however many cards there are (rulings, CR 615.12).
+    const surgeon = abilitiesOf(s, cover).preventToSelfExileTop;
+    if (surgeon) out.push({ id: `static-exiletop:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, ...(surgeon.combat ? { combat: surgeon.combat } : {}), to: { object: { id, zc: cover.zoneChanges ?? 0 } }, mill: true, millSelf: 1, exileTop: true });
     // Treacherous Link: all damage that would be dealt to the enchanted creature is dealt to the player who controls it as
     // the damage would be dealt instead (CR 614.9), from every source, combat or not.
     const att = abilitiesOf(s, cover).attachedDamageToController && cover.attachedTo ? s.objects[cover.attachedTo] : undefined;
@@ -562,6 +572,8 @@ function sourceMatches(s: GameState, spec: TargetSpec, src: DamageSource, contro
 function ruleTakes(s: GameState, r: DamageRule, e: DamageEvent): boolean {
   if (r.combat && (r.combat === "only") !== !!e.combat) return false;
   if (r.sourceYours && e.src.controller !== r.controller) return false;
+  if (r.srcController !== undefined && e.src.controller !== r.srcController) return false;
+  if (r.by?.spellOnly && !e.src.spell) return false;
   const c = r.by?.chosen;
   if (c) {
     const ref = e.src.ref;
@@ -573,8 +585,22 @@ function ruleTakes(s: GameState, r: DamageRule, e: DamageEvent): boolean {
   return !r.by?.filter || sourceMatches(s, r.by.filter, e.src, r.controller);
 }
 
+/**
+ * A rule that redirects damage to its source's controller (Aegis of Honor, Harsh Judgment) as one rule for each player
+ * who could control the source, each sending that player's sources' damage to them: who it goes to depends on the
+ * damage, which the planner sees only through the rule's own destination. They're one rule for what they use up (`base`).
+ */
+function bySourceController(s: GameState, rules: DamageRule[]): DamageRule[] {
+  return rules.flatMap((r) =>
+    r.redirect && "sourceController" in r.redirect
+      ? s.turnOrder.filter((p) => !player(s, p).lost).map((p): DamageRule => ({ ...r, id: `${r.id}@${p}`, base: r.id, redirect: { player: p }, srcController: p }))
+      : [r],
+  );
+}
+
 /** Where a rule redirects damage to, if it's still there to be dealt it (CR 614.9). */
 function ruleDestination(s: GameState, r: DamageRule): Rec | null {
+  if (r.redirect && "sourceController" in r.redirect) return null;
   return r.redirect ? redirectDestination(s, { id: r.id, n: 0, to: r.redirect, source: "" }) : null;
 }
 
@@ -727,7 +753,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
   };
   const ops: ShieldOp[] = [];
   const final: DamageEvent[] = [];
-  const allRules = [...live(s), ...staticRules(s, events)];
+  const allRules = bySourceController(s, [...live(s), ...staticRules(s, events)]);
   const allMods = liveMods(s);
   const preventCap = new Map<string, number>();
   const redirectCap = new Map<string, number>();
@@ -823,7 +849,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     for (const e of here) {
       // The Mindskinner's prevention can't prevent damage that can't be prevented, but its additional effect still
       // happens, once for each such effect (CR 615.12, 615.12a); the damage is dealt.
-      if (!prev(e)) for (const r of allRules.filter((r) => r.mill && ruleCovers(s, r, to) && ruleTakes(s, r, e))) ops.push({ kind: "mill", by: r.controller, n: e.n * (r.millSelf ?? 1), card: cardName(s, r), ...(r.millSelf ? { self: true as const } : {}) });
+      if (!prev(e)) for (const r of allRules.filter((r) => r.mill && ruleCovers(s, r, to) && ruleTakes(s, r, e))) ops.push({ kind: "mill", by: r.controller, n: e.n * (r.millSelf ?? 1), card: cardName(s, r), ...(r.millSelf ? { self: true as const } : {}), ...(r.exileTop ? { exile: true as const } : {}) });
       if (!prev(e)) for (const r of allRules.filter((r) => r.counterOn && ruleCovers(s, r, to) && ruleTakes(s, r, e))) ops.push({ kind: "counterOn", id: r.counterOn!.id, counter: r.counterOn!.kind, by: r.controller, card: cardName(s, r) });
       // Anti-Venom: "prevent that damage and put that many +1/+1 counters on ~": the counters even so (CR 615.12).
       // Ironscale Hydra: "prevent that damage and put a +1/+1 counter on ~": one counter for this source's damage, even so
@@ -846,7 +872,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         if ((rule.gainLife || rule.dealBack || rule.tokens || rule.countersOn || rule.dealTo) && boost.length && boost.length <= 6 && rule.controller === chooserOf(to))
           for (const order of permutations(boost)) n = Math.max(n, order.reduce((a, m) => (a > 0 ? modAmount(s, m, a) : 0), e.n));
         ops.push({ kind: "preventAll", srcName: e.src.name, toName, rule: rule.id, n, src: e.src, ...(rule.mill ? { card: cardName(s, rule) } : {}), ...toPlayer(to) });
-        if (rule.mill) ops.push({ kind: "mill", by: rule.controller, n: n * (rule.millSelf ?? 1), card: cardName(s, rule), ...(rule.millSelf ? { self: true as const } : {}) });
+        if (rule.mill) ops.push({ kind: "mill", by: rule.controller, n: n * (rule.millSelf ?? 1), card: cardName(s, rule), ...(rule.millSelf ? { self: true as const } : {}), ...(rule.exileTop ? { exile: true as const } : {}) });
         if (rule.counterOn) ops.push({ kind: "counterOn", id: rule.counterOn.id, counter: rule.counterOn.kind, by: rule.controller, card: cardName(s, rule) });
         continue;
       }
@@ -1210,7 +1236,8 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
   const madeLater = new Map<string, { r: DamageRule; n: number }>();
   const ruleById = (id: string) => s.damageRules?.find((x) => x.id === id) ?? plan.rules?.find((x) => x.id === id);
   const ruleUsed = (id: string, n: number, src?: DamageSource, prevented = false) => {
-    const r = ruleById(id);
+    const copy = ruleById(id);
+    const r = copy?.base ? (ruleById(copy.base) ?? copy) : copy;
     if (!r) return;
     if (r.left !== undefined) r.left -= n;
     if (r.nextTime) used.add(r.id);
@@ -1240,6 +1267,12 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     } else if (op.kind === "mill") {
       for (const pid of op.self ? (player(s, op.by).lost ? [] : [op.by]) : turnOrderFrom(s, s.activePlayer).filter((q) => q !== op.by && !player(s, q).lost)) {
         const p = player(s, pid);
+        if (op.exile) {
+          const top = p.library.slice(0, op.n);
+          for (const id of top) moveObject(s, id, "exile");
+          log(s, `${p.name} exiles the top ${top.length === 1 ? "card" : `${top.length} cards`} of their library (${op.card}).`);
+          continue;
+        }
         const n = millCount(s, pid, op.n);
         for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard", { milled: true });
         log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"} (${op.card}).`);
@@ -1374,7 +1407,7 @@ export function shieldChoicesPossible(s: GameState): boolean {
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     const a = abilitiesOf(s, o);
-    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.attachedDamageToController || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills || a.damageToYouMillsTwice || a.preventToYou || a.preventToYouCounter || a.preventToSelfCounters);
+    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.attachedDamageToController || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills || a.damageToYouMillsTwice || a.preventToYou || a.preventToYouCounter || a.preventToSelfCounters || a.spellDamageToYouToController || a.preventToSelfExileTop);
   });
 }
 

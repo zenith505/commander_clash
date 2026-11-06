@@ -2296,6 +2296,12 @@ export function compile(d: CardDef): CompiledCard {
       out.graveyardExile = { whose: "opponents", notYours: true, linked: true };
       continue;
     }
+    // Wheel of Sun and Moon: an Aura with enchant player (CR 702.5d) whose replacement effect sends cards headed to that
+    // player's graveyard to the bottom of their library.
+    if (line === "If a card would be put into enchanted player's graveyard from anywhere, instead that card is revealed and put on the bottom of that player's library." && d.subtypes.includes("Aura") && /^Enchant player$/m.test(d.oracleText)) {
+      out.graveyardToLibraryBottom = true;
+      continue;
+    }
     // Samurai of the Pale Curtain: "If a permanent would be put into a graveyard, exile it instead": any permanent, a token
     // too, going from the battlefield to any graveyard (CR 614.1a, 110.1).
     if (line === "If a permanent would be put into a graveyard, exile it instead." && !out.graveyardExile) {

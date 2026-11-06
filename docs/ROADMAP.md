@@ -1,6 +1,6 @@
 # Roadmap
 
-30,087 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,099 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,962 of 4,988 (99%), top 10,000: 9,621 of
 9,979 (96%).
 
@@ -2265,7 +2265,7 @@ line blocks.
    creatures, then those creatures phase out until this enchantment leaves the battlefield. Put a time counter on this
    enchantment for each creature that phased out this way" (Out of Time: they phase in untapped, and the count is only the
    creatures phased out directly, not their attachments, CR 702.26). Also fixed: a lone "unless pays life equal to ..."
-   (Essence Vortex) keeps checking the amount as it asks. +14, 30,087 of 31,936 with B120.
+   (Essence Vortex) keeps checking the amount as it asks. +14, 30,099 of 31,936 with B120 and B121.
    Out after round 288 (looked at, not done): Rift Elemental (a cost that removes a time counter from a permanent or
    suspended card you own); Red Sun's Twilight (copies of each artifact destroyed this way when X is 5 or more); Green
    Sun's Twilight (a creature and/or land card from among revealed cards, put onto the battlefield or into your hand when

@@ -724,6 +724,8 @@ export const blightCost = (n: number): AdditionalCost => ({ kind: "putCounter", 
 export function parseAdditionalCost(text: string, allowX = false): AdditionalCost | null {
   let m: RegExpExecArray | null;
   if ((m = /^blight (\d+)$/i.exec(text)) && Number(m[1]) > 0) return blightCost(Number(m[1]));
+  // Soul Immolation: "blight X", X announced as it's cast (CR 107.3a), all on one creature you control (rulings).
+  if (allowX && /^blight X$/i.test(text)) return { ...blightCost(0), x: true } as AdditionalCost;
   // Lethal Sting: "put a -1/-1 counter on a creature you control": not castable without one (rulings).
   if (/^put a -1\/-1 counter on a creature you control$/i.test(text)) return { kind: "putCounter", counter: "-1/-1", n: 1, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creature you control" } };
   const isX = (w: string) => allowX && w === "X";

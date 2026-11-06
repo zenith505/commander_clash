@@ -4526,6 +4526,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3e1b32a9-27a4-4550-a644-ebe254e1f512",
+  "name": "Clockspinning",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Buyback {3} (You may pay an additional {3} as you cast this spell. If you do, put this card into your hand as it resolves.)\nChoose a counter on target permanent or suspended card. Remove that counter from that permanent or card or put another of those counters on it.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Buyback"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "94ab7d13-bcd7-419f-9e68-bd8e7ef66d42",
   "name": "Clone Shell",
   "manaCost": "{5}",
@@ -7339,6 +7367,36 @@
   "commanderLegal": "legal",
   "set": "mul",
   "releasedAt": "2023-04-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d65728cf-e9ce-46d8-a890-e1295b18cfbe",
+  "name": "Endless Detour",
+  "manaCost": "{G}{W}{U}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "The owner of target spell, nonland permanent, or card in a graveyard puts it on their choice of the top or bottom of their library.",
+  "colors": [
+   "G",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -12082,6 +12140,33 @@
   "set": "dds",
   "releasedAt": "2017-03-31",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "afe11d79-1edd-4175-9cdd-11e475240e7a",
+  "name": "Jhoira's Timebug",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact Creature — Insect",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Insect"
+  ],
+  "oracleText": "{T}: Choose target permanent you control or suspended card you own. If that permanent or card has a time counter on it, you may remove a time counter from it or put another time counter on it.",
+  "power": "1",
+  "toughness": "2",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -18497,6 +18582,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4b51edb1-37cc-4993-a8a5-2eb5f79fa191",
+  "name": "Protection Racket",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, repeat the following process for each opponent in turn order. Reveal the top card of your library. That player may pay life equal to that card's mana value. If they do, exile that card. Otherwise, put it into your hand.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "97024e8e-dfde-4769-bc27-c3d6fad19e7c",
   "name": "Proteus Staff",
   "manaCost": "{3}",
@@ -22156,6 +22267,32 @@
   "set": "ltc",
   "releasedAt": "2023-11-03",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "338747e8-bed8-4e60-8b19-5c2b80799477",
+  "name": "Soul Immolation",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, blight X. X can't be greater than the greatest toughness among creatures you control. (Put X -1/-1 counters on a creature you control.)\nSoul Immolation deals X damage to each opponent and each creature they control.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -27969,6 +28106,35 @@
   ],
   "keywords": [
    "Ninjutsu"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "77dd6ce0-91fc-4e71-99ff-47cdf3359067",
+  "name": "Yuna's Decision",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose one —\n• Continue the Pilgrimage — Sacrifice a creature. If you do, draw a card, then you may put a creature card and/or a land card from your hand onto the battlefield.\n• Find Another Way — Return one or two target permanent cards from your graveyard to your hand.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Find Another Way",
+   "Continue the Pilgrimage"
   ],
   "commanderLegal": "legal",
   "set": "fic",

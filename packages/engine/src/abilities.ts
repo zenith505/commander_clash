@@ -280,6 +280,8 @@ export type Count =
   | { kind: "stillExiled"; cards?: { id: ObjectId; zc: number }[] }
   /** "For each creature tapped this way", "the number of creatures tapped this way" after tapAnyNumber, or in its reflexive trigger. */
   | { kind: "tappedThisWay" }
+  /** "For each creature that phased out this way" (Out of Time): how many creatures this resolution's phaseOut phased out directly (CR 702.26g). */
+  | { kind: "phasedThisWay" }
   /** "For each creature goaded this way" (Kaima, the Fractured Calm): how many this resolution's goad affected (CR 701.15). */
   | { kind: "goadedThisWay" }
   /**
@@ -1089,6 +1091,11 @@ export interface TargetSpec {
    * creatures from the battlefield and/or creature cards from graveyards" (Angel of Serenity). One target, either kind.
    */
   orCard?: TargetSpec;
+  /**
+   * For "object" targets: "target permanent or suspended card" (Clockspinning): a suspended card in exile can be the
+   * target instead (CR 702.62b), any player's, or with "you" only one you own ("suspended card you own").
+   */
+  orSuspended?: "any" | "you";
   /**
    * "Target spell that targets a permanent you control", "... that targets you": a spell with at least one target that's
    * still that object on the battlefield and matches, or that is you (rulings on Rebuff the Wicked).
@@ -2755,7 +2762,7 @@ export type Effect =
       /** "Do this only once each turn" (Emet-Selch, CR 603.2h): casting it is doing it; then the ability doesn't trigger again this turn. */
       once?: true;
     }
-  | { type: "putFromHand"; who?: PlayerRef; /** "Put all land cards from it onto the battlefield" (Manabond): every card in the hand that fits, no choice. */ all?: true; /** Aura swap (CR 702.65a): "You may exchange this permanent with an Aura card in your hand": an Aura card that could enchant what the source enchants, put onto the battlefield attached to it as the source returns to your hand; nothing if either half can't be done (702.65b). */ auraSwap?: true; /** "If that card is an enchantment card, it enters tapped and attacking" (Summoner's Grimoire): `tapped` and `attacking` only for a card matching this. */ onlyIf?: TargetSpec; /** "Whenever equipped creature deals combat damage, you may put an Aura card from your hand onto the battlefield attached to it" (Holy Avenger): only to the trigger's creature, still on the battlefield as the same object (CR 400.7, 303.4f). */ attachToSubject?: true; /** "If it's an Equipment, attach it to ~" (The Invincible Iron Man): after it enters, an Equipment put this way is attached to the source, still on the battlefield as the same object, if it could be (CR 701.3a-b). */ equipToSelf?: true; /** "And attach ~ to it" (Deathrender): the source Equipment, still on the battlefield as the same object, to the creature it became (CR 701.3). */ attachSelf?: true; /** "Look at defending player's hand. You may put a creature card from it onto the battlefield under your control tapped and attacking that player or a planeswalker they control" (Zara): a card from that player's hand, attacking only them or a planeswalker of theirs. */ fromHandOf?: PlayerRef; filter?: TargetSpec; tapped?: boolean; /** "With a finality counter on it" (Kastral, the Windcrested): it enters with these (CR 122.6). */ counters?: Record<string, number>; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon), "up to X" (Worldsoul's Rage). */ upTo?: Amount; /** "From your hand and/or graveyard" (Worldsoul's Rage): cards from either, together. */ orGraveyard?: true; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand"; /** "If you do, draw a card and repeat this process" (Cultivator Colossus): after each card put, a draw, then again until you put none (rulings). */ drawRepeat?: true; /** "Each manifest two cards from their hands" (Kozilek, the Broken Reality): exactly this many (all with fewer), face down (CR 701.40a). */ manifest?: number; /** With `manifest`: "Cloak a card from your hand" (Vannifar, Evolved Enigma): cloaked instead, so with ward {2} (CR 701.58a). */ cloak?: true;
+  | { type: "putFromHand"; who?: PlayerRef; /** With `any`: "a creature card and/or a land card" (Yuna's Decision): up to one card for each of these, each card put matching a different one, all put at once. */ oneOfEach?: TargetSpec[]; /** "Put all land cards from it onto the battlefield" (Manabond): every card in the hand that fits, no choice. */ all?: true; /** Aura swap (CR 702.65a): "You may exchange this permanent with an Aura card in your hand": an Aura card that could enchant what the source enchants, put onto the battlefield attached to it as the source returns to your hand; nothing if either half can't be done (702.65b). */ auraSwap?: true; /** "If that card is an enchantment card, it enters tapped and attacking" (Summoner's Grimoire): `tapped` and `attacking` only for a card matching this. */ onlyIf?: TargetSpec; /** "Whenever equipped creature deals combat damage, you may put an Aura card from your hand onto the battlefield attached to it" (Holy Avenger): only to the trigger's creature, still on the battlefield as the same object (CR 400.7, 303.4f). */ attachToSubject?: true; /** "If it's an Equipment, attach it to ~" (The Invincible Iron Man): after it enters, an Equipment put this way is attached to the source, still on the battlefield as the same object, if it could be (CR 701.3a-b). */ equipToSelf?: true; /** "And attach ~ to it" (Deathrender): the source Equipment, still on the battlefield as the same object, to the creature it became (CR 701.3). */ attachSelf?: true; /** "Look at defending player's hand. You may put a creature card from it onto the battlefield under your control tapped and attacking that player or a planeswalker they control" (Zara): a card from that player's hand, attacking only them or a planeswalker of theirs. */ fromHandOf?: PlayerRef; filter?: TargetSpec; tapped?: boolean; /** "With a finality counter on it" (Kastral, the Windcrested): it enters with these (CR 122.6). */ counters?: Record<string, number>; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon), "up to X" (Worldsoul's Rage). */ upTo?: Amount; /** "From your hand and/or graveyard" (Worldsoul's Rage): cards from either, together. */ orGraveyard?: true; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand"; /** "If you do, draw a card and repeat this process" (Cultivator Colossus): after each card put, a draw, then again until you put none (rulings). */ drawRepeat?: true; /** "Each manifest two cards from their hands" (Kozilek, the Broken Reality): exactly this many (all with fewer), face down (CR 701.40a). */ manifest?: number; /** With `manifest`: "Cloak a card from your hand" (Vannifar, Evolved Enigma): cloaked instead, so with ward {2} (CR 701.58a). */ cloak?: true;
     /** "Onto the battlefield attached to ~" (Danitha, Benalia's Hope): an Aura only onto the source, if it could enchant it, or it stays where it is (CR 303.4f-g); an Equipment attached to it if it could be, else unattached (rulings, CR 301.5c). */ attachToSelf?: true }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
@@ -2920,7 +2927,7 @@ export type Effect =
    * "For each kind of counter on target permanent, put another counter of that kind on it or remove one from it" (Quarry
    * Hauler): each kind it has as this resolves, add or remove chosen kind by kind (rulings), then all at once.
    */
-  | { type: "counterKindsAddOrRemove"; what: ObjRef }
+  | { type: "counterKindsAddOrRemove"; what: ObjRef; /** "Choose a counter on target permanent or suspended card. Remove that counter ... or put another of those counters on it" (Clockspinning): one kind it has, chosen as it resolves (rulings), not each kind. */ one?: true; /** "If that permanent or card has a time counter on it, you may remove a time counter from it or put another time counter on it" (Jhoira's Timebug): only this kind, and doing neither is allowed. */ kind?: string; may?: true }
   /** Proliferate (CR 701.27): another counter of each kind on the chosen permanents and players. */
   /** `thenPhaseOut`: "then choose any number of permanents you control that had a counter put on them this way. Those permanents phase out." (Ripples of Potential). */
   | { type: "proliferate"; thenPhaseOut?: true; /** "Proliferate twice" (Agent Frank Horrigan, Ezuri): two proliferate actions. */ twice?: true; /** "Proliferate X times, where X is ..." (Tromell): that many proliferate actions. */ n?: Amount }
@@ -3590,7 +3597,7 @@ export type Effect =
    */
   /** Sphinx's Tutelage: "If two nonland cards that share a color were milled this way, repeat this process" (cond "milledShareColor"). */
   /** "Then repeat this process X more times" (Another Round): `effects` `n` times in all, each pass its own choices. */
-  | { type: "repeat"; effects: Effect[]; n: Amount; /** "Manifest dread X times, then put X +1/+1 counters on each of those creatures" (Valgavoth's Onslaught): what every pass put onto the battlefield is remembered together (ObjRef "created"). */ gather?: true }
+  | { type: "repeat"; effects: Effect[]; n: Amount; /** "Repeat the following process for each opponent in turn order" (Protection Racket): one pass for each of these players, in turn order starting after this ability's controller, that player being PlayerRef "eachOne"; `n` is unused. */ forEach?: PlayerRef; /** "Manifest dread X times, then put X +1/+1 counters on each of those creatures" (Valgavoth's Onslaught): what every pass put onto the battlefield is remembered together (ObjRef "created"). */ gather?: true }
   | { type: "repeatIf"; effects: Effect[]; cond: { kind: "milledIs"; filter: TargetSpec } | { kind: "milledShareColor" } | /** Hoarder's Greed: "If you win, repeat this process." */ { kind: "wonClash" }; then: Effect[] }
   /** "You may roll again" in a results table's row (Delina, Wild Mage): if its controller wants, the ability's roll and the rows after it happen again (CR 706.3c). */
   | { type: "rollAgain" }
@@ -4194,7 +4201,7 @@ export type Effect =
   | { type: "juxtapose"; who: PlayerRef; types: string[] }
   /** Time and Tide: "Simultaneously, all phased-out creatures phase in and all creatures with phasing phase out." (CR 702.26). */
   | { type: "phaseSwap" }
-  | { type: "phaseOut"; what: ObjRef; /** Oubliette: "until ~ leaves the battlefield. Tap that creature as it phases in this way." (CR 610.3): it phases in tapped only then, not in an untap step. */ untilSourceLeaves?: true; /** "You may have any number of them phase out" (Change of Plans): the controller picks which of them, none too. */ anyNumber?: true }
+  | { type: "phaseOut"; what: ObjRef; /** Oubliette: "until ~ leaves the battlefield. Tap that creature as it phases in this way." (CR 610.3): it phases in tapped only then, not in an untap step. */ untilSourceLeaves?: true; /** With `untilSourceLeaves`: Out of Time's creatures phase in as they were, not tapped (only Oubliette's text taps them). */ noTap?: true; /** "You may have any number of them phase out" (Change of Plans): the controller picks which of them, none too. */ anyNumber?: true }
   /** Speed's inherent trigger (CR 702.179d): "if your speed is less than 4, your speed increases by 1". */
   | { type: "increaseSpeed" }
   /**
@@ -6423,7 +6430,7 @@ export type AdditionalCost =
    * matches, chosen as it's paid (CR 602.2b, 601.2h; CostChoices.counterOn), the source too. Not payable on one counters
    * can't be put on (rulings on Solemnity).
    */
-  | { kind: "putCounter"; counter: CounterKind; n: number; filter: TargetSpec; /** Blight N (CR 701.68a): `n` -1/-1 counters on one creature you control. */ blight?: true }
+  | { kind: "putCounter"; counter: CounterKind; n: number; filter: TargetSpec; /** Blight N (CR 701.68a): `n` -1/-1 counters on one creature you control. */ blight?: true; /** "Blight X" (Soul Immolation): X announced as it's cast (CR 107.3a, 601.2b), `n` then X. */ x?: true }
   /**
    * Craft's materials (CR 702.167a-b): "Exile [materials] from among permanents you control and/or cards in your
    * graveyard", `n` objects that match `filter` (a permanent by its characteristics, a card by its printed ones), any mix
@@ -7952,6 +7959,8 @@ export interface CompiledCard {
   evidenceReduction?: number;
   /** Open the Way: "X can't be greater than the number of players in the game." */
   xMaxPlayers?: true;
+  /** Soul Immolation: "X can't be greater than the greatest toughness among creatures you control", as X is announced (CR 601.2b). */
+  xMaxGreatestToughness?: true;
   /** The Marches: "~ costs {2} less to cast for each card exiled this way" (its optional exileFromHand cost, CR 601.2f). */
   exiledReduction?: number;
   /**

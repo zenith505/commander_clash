@@ -1,4 +1,4 @@
-import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption, type SpellCondition, type StaticCondition, type TargetSpec } from "../abilities";
+import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption, type UnlessPays, type SpellCondition, type StaticCondition, type TargetSpec } from "../abilities";
 import { coloredManaSymbols, manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool, mayPayUse, type ManaUse } from "../spend";
 import { planMana } from "../autopay";
@@ -228,9 +228,27 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Another Round: the process `n` times, worked out once (CR 608.2h); each pass's choices made anew (rulings). The
       // scratch a pass leaves behind is cleared before the next one.
       const sc = (s.resolving!.scratch ??= {});
-      const st = (sc.repeat ??= { left: amountNow(s, e.n, ctx), keep: Object.keys(sc) });
+      // Protection Racket: a pass for each opponent, in turn order starting after you (worked out once, as it begins).
+      const order = (pids: PlayerId[]) => {
+        const i = s.turnOrder.indexOf(ctx.controller);
+        return [...s.turnOrder.slice(i + 1), ...s.turnOrder.slice(0, i + 1)].filter((p) => pids.includes(p));
+      };
+      type Pass = { left: number; step?: number; keep: string[]; gathered?: ObjectId[]; order?: PlayerId[] };
+      const first = (): Pass => {
+        if (!e.forEach) return { left: amountNow(s, e.n, ctx), keep: Object.keys(sc) };
+        const o = order(players(s, e.forEach, ctx));
+        return { left: o.length, keep: Object.keys(sc), order: o };
+      };
+      const st = (sc.repeat ??= first());
       while (st.left > 0) {
-        for (st.step ??= 0; st.step < e.effects.length; st.step++) if (runEffect(s, e.effects[st.step]!, ctx) === "paused") return "paused";
+        // A player who left the game is skipped (CR 800.4a).
+        const who = st.order?.[st.order.length - st.left];
+        if (who !== undefined && player(s, who).lost) {
+          st.left--;
+          continue;
+        }
+        const sub: ResolveCtx = who !== undefined ? { ...ctx, eachOne: who } : ctx;
+        for (st.step ??= 0; st.step < e.effects.length; st.step++) if (runEffect(s, e.effects[st.step]!, sub) === "paused") return "paused";
         for (const k of Object.keys(sc) as (keyof typeof sc)[]) if (k !== "repeat" && !st.keep.includes(k)) delete sc[k];
         st.step = undefined;
         // Valgavoth's Onslaught: each pass's face-down creature, kept for "each of those creatures" afterwards.
@@ -1246,6 +1264,11 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
   return true;
 }
 
+/** "Pay life equal to that card's mana value" (Protection Racket): only life, counted as the punisher starts. */
+function lifeOnly(o: PunisherOption): o is { pay: UnlessPays } {
+  return "pay" in o && !o.pay.cost && !o.pay.generic && o.pay.life === undefined && !!o.pay.lifeAmount && Object.keys(o.pay).every((k) => k === "cost" || k === "lifeAmount");
+}
+
 /** What a punisher's option reads as on its button: "Discard a card", "Sacrifice a nonland permanent", "Pay {2}". */
 export function punisherLabel(o: PunisherOption): string {
   if ("discard" in o) return o.filter ? `Discard ${o.discard === 1 ? (/^[aeiou]/i.test(o.filter.text) ? "an" : "a") : o.discard} ${o.filter.text}` : o.discard === 1 ? "Discard a card" : `Discard ${o.discard} cards`;
@@ -1253,7 +1276,7 @@ export function punisherLabel(o: PunisherOption): string {
   if ("damage" in o) return `Be dealt ${o.damage} damage`;
   if ("allow" in o) return o.allow;
   if ("halfLife" in o) return `Pay half your life, rounded ${o.halfLife}`;
-  if (!o.pay.cost && o.pay.generic === undefined && o.pay.life) return `Pay ${o.pay.life} life`;
+  if (!o.pay.cost && o.pay.generic === undefined && o.pay.life !== undefined) return `Pay ${o.pay.life} life`;
   return `Pay ${o.pay.cost}${o.pay.life ? ` and ${o.pay.life} life` : ""}`;
 }
 
@@ -1290,7 +1313,10 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
     const picks = e.picks === undefined ? 1 : amountNow(s, e.picks, ctx);
     if (times <= 0 || picks <= 0) return;
     // "Equal to ~'s power" (Combustion Man): the amount as the choices start, the same for everyone.
-    const options = e.options.map((o) => ("damage" in o && typeof o.damage !== "number" ? { damage: amountNow(s, o.damage, ctx) } : o));
+    // Protection Racket: "pay life equal to that card's mana value", likewise (a payment of 0 life can always be made, CR 119.4).
+    // A lone "unless pays life equal to ..." (Essence Vortex) stays with paidUnless, which counts it as it asks.
+    const chosen = !!e.mode || e.options.length > 1;
+    const options = e.options.map((o) => ("damage" in o && typeof o.damage !== "number" ? { damage: amountNow(s, o.damage, ctx) } : chosen && lifeOnly(o) ? { pay: { cost: "", life: Math.max(0, amountNow(s, o.pay.lifeAmount!, ctx)) } } : o));
     const doomed = e.effects.length === 1 && e.effects[0]!.type === "destroy" ? objects(s, e.effects[0]!.what, ctx)[0]?.id : undefined;
     // For the bots: damage counted as the choices start (Osseous Sticktwister's "equal to its power", Craig Boone's counters).
     const dmg = e.effects.length === 1 && e.effects[0]!.type === "damage" ? e.effects[0]! : undefined;
@@ -1298,7 +1324,8 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
     const hurt = dmg?.type === "damage" && "index" in dmg.to && dmg.to.ref === "target" ? objects(s, { ref: "target", index: dmg.to.index }, ctx)[0] : undefined;
     sc.punish = { queue: apnap(s, players(s, e.who, ctx)), picked: {}, made: {}, round: 0, times, picks, options, ...punisherHarm(e), ...(dmgN !== undefined && !hurt ? { lose: dmgN } : {}), ...(hurt && dmg?.type === "damage" ? { hurts: { id: hurt.id, n: dmgN ?? (typeof dmg.amount === "number" ? dmg.amount : 0) }, lose: undefined } : {}), ...(doomed ? { destroys: doomed } : {}), ...(e.mode ? { mode: e.mode } : {}) };
   }
-  if (e.options.some((o) => "damage" in o && typeof o.damage !== "number")) e = { ...e, options: e.options.map((o, i) => ("damage" in o ? sc.punish!.options[i]! : o)) };
+  const fixLife = (o: PunisherOption) => (!!e.mode || e.options.length > 1) && lifeOnly(o);
+  if (e.options.some((o) => ("damage" in o && typeof o.damage !== "number") || fixLife(o))) e = { ...e, options: e.options.map((o, i) => ("damage" in o || fixLife(o) ? sc.punish!.options[i]! : o)) };
   // "A permanent of their choice that shares a card type with it" (Braids): the types of what was sacrificed this way.
   if (e.options.some((o) => "sacrifice" in o && o.sacrifice.sharesTypeWithSacrificed)) {
     const types = [...new Set((s.resolving!.sacrificedThisWay ?? []).flatMap((k) => k.types ?? []))];
@@ -1331,10 +1358,10 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
           const n = halfOfLife(s, pid, o.halfLife);
           if (n) payLife(s, pid, n);
           log(s, `${p.name} pays ${n} life (half their life, rounded ${o.halfLife}).`);
-        } else if (o && "pay" in o && (e.mode || e.options.length > 1) && !o.pay.cost && !o.pay.generic && !o.pay.discard && o.pay.life) {
+        } else if (o && "pay" in o && (e.mode || e.options.length > 1) && !o.pay.cost && !o.pay.generic && !o.pay.discard && o.pay.life !== undefined) {
           // "Any player may pay 5 life" (Dash Hopes), "sacrifices a creature or pays 3 life" (Indulgent Tormentor):
           // chosen on the prompt above, so paid now, not asked again (CR 119.4).
-          payLife(s, pid, o.pay.life);
+          if (o.pay.life) payLife(s, pid, o.pay.life);
           log(s, `${p.name} pays ${o.pay.life} life.`);
         } else if (o && "pay" in o) {
           const paid = e.mode ? paidUnless(s, ctx, pid, o.pay, src, "don't", "don't pay") : paidUnless(s, ctx, pid, o.pay, src, lowerFirst(describePenalty(s, e, ctx)), lowerFirst(describePenalty(s, e, ctx)));

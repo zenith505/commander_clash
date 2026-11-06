@@ -320,7 +320,7 @@ export function parseCostKeyword(
       const keep = parseBody(`Sacrifice ~ unless you ${cost.replace(/^./, (c) => c.toLowerCase())}.`, { selfIt: true });
       const may = keep?.effects.length === 1 && !keep.targets.length ? keep.effects[0] : undefined;
       if (may?.type !== "may" || may.otherwise?.length !== 1 || may.otherwise[0] !== sacrificeSelf) return "fail";
-      return { trigger: { event: "yourUpkeep", ifEcho: true, body: { targets: [], effects: [{ ...may, text: `Pay echo (${cost.replace(/^./, (c) => c.toLowerCase())}) to keep ~` }], text: `Echo—${cost}: at the beginning of your upkeep, if ~ came under your control since the beginning of your last upkeep, sacrifice it unless you ${cost.replace(/^./, (c) => c.toLowerCase())}.` } } };
+      return { trigger: { event: "yourUpkeep", ifEcho: true, body: { targets: [], effects: [{ ...may, echo: true, text: `Pay echo (${cost.replace(/^./, (c) => c.toLowerCase())}) to keep ~` }], text: `Echo—${cost}: at the beginning of your upkeep, if ~ came under your control since the beginning of your last upkeep, sacrifice it unless you ${cost.replace(/^./, (c) => c.toLowerCase())}.` } } };
     }
     if (!/^(\{[^}]+\})+$/.test(cost) || !plainMana(cost)) return "fail";
     const text = `Echo ${cost}: at the beginning of your upkeep, if ~ came under your control since the beginning of your last upkeep, sacrifice it unless you pay ${cost}.`;
@@ -329,7 +329,7 @@ export function parseCostKeyword(
         event: "yourUpkeep",
         ifEcho: true,
         // Paying it is what "When ~'s echo cost is paid" triggers on (Shah of Naar Isle).
-        body: { targets: [], effects: [{ type: "may", effects: [{ type: "echoPaid" }], pay: { mana: cost }, otherwise: [sacrificeSelf], keep: true, text: `Pay echo ${cost} to keep ~` }], text },
+        body: { targets: [], effects: [{ type: "may", effects: [{ type: "echoPaid" }], pay: { mana: cost }, otherwise: [sacrificeSelf], keep: true, echo: true, text: `Pay echo ${cost} to keep ~` }], text },
       },
     };
   }

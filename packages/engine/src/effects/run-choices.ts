@@ -27,6 +27,7 @@ import { fireEvent } from "./triggers";
 export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
     case "may": {
+      // (Thick-Skinned Goblin's {0} echo: see echoZeroFor.)
       // The controller decides now whether to do it (CR 608.2d); the answer is kept while it runs.
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
@@ -143,6 +144,12 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Pendrell Flux: "unless you pay its mana cost", ~'s as this resolves, colored symbols and all; X is 0 (rulings). With
       // no mana cost it can't be paid (CR 118.6).
       const ownCost = e.payManaCost ? manaCostToPay(s, ctx) : undefined;
+      // Thick-Skinned Goblin: {0} rather than the echo cost of a permanent its controller controls (CR 118.9; rulings: paying
+      // {0} is paying the echo cost). Paying the echo cost itself instead would only cost more, so {0} is what's offered.
+      if (e.echo && echoZeroFor(s, ctx)) {
+        const zero: Extract<Effect, { type: "may" }> = { ...e, echo: undefined, effects: [{ type: "echoPaid" }], pay: { mana: "{0}" }, text: `${e.text} (paying {0} rather than its echo cost)` };
+        return runEffect(s, zero, ctx);
+      }
       const pay = ownCost !== undefined ? (ownCost === null ? undefined : { mana: ownCost }) : e.payEnergy !== undefined ? { ...e.pay, energy: Math.max(0, amountNow(s, e.payEnergy, ctx)) } : e.payLife !== undefined ? { ...e.pay, life: Math.max(0, amountNow(s, e.payLife, ctx)) } : e.payTimes !== undefined && e.pay ? timesPay(e.pay, Math.max(0, amountNow(s, e.payTimes, ctx))) : e.pay;
       // Greenbelt Rampager: "pay {E}{E}. If you can't, ...": paid if it can be (rulings), no choice; energy only.
       if (e.must && sc.may === undefined) {
@@ -1505,4 +1512,12 @@ function villainAgain(s: GameState, pid: PlayerId): number {
     const o = obj(s, id);
     return abilitiesOf(s, o).villainAgain && controllerOf(s, o) !== pid;
   }).length;
+}
+
+/** Thick-Skinned Goblin: does the echo trigger's permanent's controller control one that lets them pay {0} instead? */
+function echoZeroFor(s: GameState, ctx: ResolveCtx): boolean {
+  const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+  if (me?.zone !== "battlefield") return false;
+  const you = controllerOf(s, me);
+  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === you && !!abilitiesOf(s, obj(s, id)).echoZero);
 }

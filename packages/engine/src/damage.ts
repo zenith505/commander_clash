@@ -483,6 +483,11 @@ function staticRules(s: GameState, events: DamageEvent[]): DamageRule[] {
         ...(red.by ? { by: { filter: red.by } } : {}),
       });
     }
+    // Treacherous Link: all damage that would be dealt to the enchanted creature is dealt to the player who controls it as
+    // the damage would be dealt instead (CR 614.9), from every source, combat or not.
+    const att = abilitiesOf(s, cover).attachedDamageToController && cover.attachedTo ? s.objects[cover.attachedTo] : undefined;
+    if (att && att.zone === "battlefield")
+      out.push({ id: `static-linkredirect:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, to: { object: { id: att.id, zc: att.zoneChanges ?? 0 } }, redirect: { player: controllerOf(s, att) } });
     const n = abilitiesOf(s, cover).preventCombatFromEach;
     if (n === undefined) continue;
     const you = controllerOf(s, cover);
@@ -1359,7 +1364,7 @@ export function shieldChoicesPossible(s: GameState): boolean {
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     const a = abilitiesOf(s, o);
-    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills || a.damageToYouMillsTwice || a.preventToYou || a.preventToYouCounter || a.preventToSelfCounters);
+    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.attachedDamageToController || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills || a.damageToYouMillsTwice || a.preventToYou || a.preventToYouCounter || a.preventToSelfCounters);
   });
 }
 

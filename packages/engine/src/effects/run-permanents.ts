@@ -633,6 +633,61 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (!left) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "time" });
       return;
     }
+    case "counterKindsAddOrRemove": {
+      // Quarry Hauler, Dramatist's Puppet: the target's kinds of counter as this resolves, each its own choice (rulings),
+      // made one after another; then the counters are put and removed together.
+      const you = ctx.controller;
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.addOrRemove) {
+        const o = objects(s, e.what, ctx).find((x) => x.zone === "battlefield");
+        const kinds = o ? Object.keys(o.counters).filter((k) => (o.counters[k] ?? 0) > 0) : [];
+        if (!o || !kinds.length) return;
+        sc.addOrRemove = { id: o.id, zc: o.zoneChanges ?? 0, kinds, picks: {} };
+      }
+      const st = sc.addOrRemove;
+      const o = s.objects[st.id];
+      if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== st.zc) {
+        sc.addOrRemove = undefined;
+        return;
+      }
+      const name = characteristics(s, o).name;
+      const kind = st.kinds.find((k) => st.picks[k] === undefined);
+      if (kind !== undefined) {
+        const n = o.counters[kind] ?? 0;
+        s.pending = {
+          kind: "chooseOption",
+          player: you,
+          source: src,
+          what: "addOrRemoveCounter",
+          options: ["add", "remove"],
+          labels: [`Put another ${kind} counter on it`, `Remove a ${kind} counter from it`],
+          about: o.id,
+          counterKind: kind,
+          prompt: `${name} has ${n} ${kind} counter${n === 1 ? "" : "s"}: put another or remove one`,
+        };
+        return "paused";
+      }
+      sc.addOrRemove = undefined;
+      const changed: string[] = [];
+      const last: string[] = [];
+      for (const k of st.kinds) {
+        if (st.picks[k] === "add") {
+          const put = putCounters(s, o, k, 1);
+          if (put) changed.push(`+${put} ${k}`);
+        } else if (removableCounters(s, o, k) > 0) {
+          const left = (o.counters[k] ?? 0) - 1;
+          if (left > 0) o.counters[k] = left;
+          else delete o.counters[k];
+          changed.push(`-1 ${k}`);
+          countersRemoved(s, o, k, 1);
+          if (!left) last.push(k);
+        }
+      }
+      invalidateCharacteristics(s);
+      log(s, `${src}: ${name}${changed.length ? ` (${changed.join(", ")})` : " is unchanged"}.`);
+      for (const k of last) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: k });
+      return;
+    }
     case "timeTravel": {
       // CR 701.56a: "choose any number of permanents you control with one or more time counters on them and/or suspended
       // cards you own in exile with one or more time counters on them and, for each of those objects, put a time counter

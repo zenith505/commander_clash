@@ -166,6 +166,7 @@ export function canonicalKeyword(text: string): string | undefined {
   if (q === "each of that creature's colors" || q === "each of that permanent's colors") return TARGET_COLORS_PROTECTION;
   if (q === "each color that's not in your commander's color identity") return IDENTITY_PROTECTION;
   if (q === "each color among permanents you control") return YOURS_COLORS_PROTECTION;
+  if (q === "each of its colors") return OWN_COLORS_PROTECTION;
   if (q === "everything" || q === "multicolored" || q === "monocolored" || q === "colorless" || q === "each color" || q === "all colors" || q === "the chosen color") return q === "the chosen color" ? CHOSEN_PROTECTION : `Protection from ${q}`;
   if (PROTECTION_TYPES[q]) return `Protection from ${q}`;
   if (/^mana value \d+ or (?:less|greater)$/.test(q)) return `Protection from ${q}`;
@@ -222,6 +223,11 @@ export const COLOR_WORD: Record<string, string> = { W: "white", U: "blue", B: "b
  */
 export const OWN_COLORS_HEXPROOF = "Hexproof from each of its colors";
 /**
+ * "Each creature has protection from each of its colors" (Earnest Fellowship): the same, one "protection from [color]"
+ * for each color the permanent has after layer 5 (CR 613.1e-f, 702.16a); none if it's colorless (rulings).
+ */
+export const OWN_COLORS_PROTECTION = "Protection from each of its colors";
+/**
  * "Protection from each color that's not in your commander's color identity" (Commander's Plate): filled in with the
  * colors outside the combined color identity of the commanders of the effect's controller; none if they have no
  * commander (rulings).
@@ -268,8 +274,8 @@ export const CARD_TYPE_PLURAL: Record<string, string> = { Artifact: "artifacts",
  */
 export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[], cardType?: string, creatureType?: string, chosenKeywords?: readonly string[], ownColors?: readonly string[], landType?: string) =>
   keywords.flatMap((k) =>
-    k === OWN_COLORS_HEXPROOF
-      ? (ownColors ?? []).filter((c) => COLOR_WORD[c]).map((c) => `Hexproof from ${COLOR_WORD[c]}`)
+    k === OWN_COLORS_HEXPROOF || k === OWN_COLORS_PROTECTION
+      ? (ownColors ?? []).filter((c) => COLOR_WORD[c]).map((c) => `${k === OWN_COLORS_HEXPROOF ? "Hexproof" : "Protection"} from ${COLOR_WORD[c]}`)
       : k === CHOSEN_KEYWORDS
       ? [...(chosenKeywords ?? [])]
       : k === CHOSEN_CREATURE_TYPE_PROTECTION

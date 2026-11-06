@@ -2903,6 +2903,11 @@ export type Effect =
   | { type: "removeTimeSuspended"; n: Amount }
   /** Time travel (CR 701.56a): for each permanent you control with a time counter and suspended card you own, you may put a time counter on it or remove one. */
   | { type: "timeTravel" }
+  /**
+   * "For each kind of counter on target permanent, put another counter of that kind on it or remove one from it" (Quarry
+   * Hauler): each kind it has as this resolves, add or remove chosen kind by kind (rulings), then all at once.
+   */
+  | { type: "counterKindsAddOrRemove"; what: ObjRef }
   /** Proliferate (CR 701.27): another counter of each kind on the chosen permanents and players. */
   /** `thenPhaseOut`: "then choose any number of permanents you control that had a counter put on them this way. Those permanents phase out." (Ripples of Potential). */
   | { type: "proliferate"; thenPhaseOut?: true; /** "Proliferate twice" (Agent Frank Horrigan, Ezuri): two proliferate actions. */ twice?: true; /** "Proliferate X times, where X is ..." (Tromell): that many proliferate actions. */ n?: Amount }
@@ -3961,7 +3966,7 @@ export type Effect =
    * chooses X as it resolves (CR 107.1c, 608.2d), at most `max` ("where X is less than or equal to the amount of life you
    * gained", Well of Lost Dreams), then pays `pay` with that X; `effects` use it as X.
    */
-  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; /** The payment is ~'s cumulative upkeep (CR 702.24a), for mana spent "only to pay cumulative upkeep costs". */ cumulativeUpkeep?: true; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G"; /** "You may pay any amount of life" (Necrodominance): X life, up to the life the player could pay (CR 119.4). */ life?: true; /** "You may pay any amount of {E}" (Galvanic Discharge): X energy, up to the energy the player has (CR 107.14). */ energy?: true; /** "You may pay one or more {E}. If you do" (Localized Destruction): paying none is not paying. */ atLeastOne?: true; /** "You may pay {1}{W} any number of times" (Intrepid Adversary): `pay` X times, X chosen first (none is not paying), at most as many times as the player could pay. */ times?: true }; /** "Pay {E}{E}. If you can't, ..." (Greenbelt Rampager): energy paid whenever it can be, with no choice (rulings). */ must?: true; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /** "Unless you pay {1} for each card in your hand" (Megatherium): `pay` that many times, counted as it resolves. */ payTimes?: Amount; /** "Unless you pay its mana cost" (Pendrell Flux): the source's mana cost as it resolves, X as 0 (unpayable with none, CR 118.6). */ payManaCost?: true; /**
+  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; /** The payment is ~'s cumulative upkeep (CR 702.24a), for mana spent "only to pay cumulative upkeep costs". */ cumulativeUpkeep?: true; /** The payment is ~'s echo cost (CR 702.30a): Thick-Skinned Goblin lets {0} be paid instead. */ echo?: true; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G"; /** "You may pay any amount of life" (Necrodominance): X life, up to the life the player could pay (CR 119.4). */ life?: true; /** "You may pay any amount of {E}" (Galvanic Discharge): X energy, up to the energy the player has (CR 107.14). */ energy?: true; /** "You may pay one or more {E}. If you do" (Localized Destruction): paying none is not paying. */ atLeastOne?: true; /** "You may pay {1}{W} any number of times" (Intrepid Adversary): `pay` X times, X chosen first (none is not paying), at most as many times as the player could pay. */ times?: true }; /** "Pay {E}{E}. If you can't, ..." (Greenbelt Rampager): energy paid whenever it can be, with no choice (rulings). */ must?: true; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /** "Unless you pay {1} for each card in your hand" (Megatherium): `pay` that many times, counted as it resolves. */ payTimes?: Amount; /** "Unless you pay its mana cost" (Pendrell Flux): the source's mana cost as it resolves, X as 0 (unpayable with none, CR 118.6). */ payManaCost?: true; /**
    * "For each opponent, you may put up to one target creature card from that player's graveyard onto the battlefield"
    * (Sepulchral Primordial): asked about each target in turn, then done at once to the ones chosen (rulings: they enter
    * simultaneously). The targets turned down aren't affected.
@@ -6558,6 +6563,8 @@ export interface CompiledCard {
    * replacement effect (CR 614.1a).
    */
   libraryInsteadOfDying?: "top" | "bottom";
+  /** Necromancer's Magemark: "If a creature you control that's enchanted would die, return it to its owner's hand instead" (CR 614.1a). */
+  handInsteadOfDying?: TargetSpec;
   /** Mossbridge Troll: "If ~ would be destroyed, regenerate it" (CR 614.1a, 701.19a), every time. */
   regeneratesInsteadOfDestroyed?: true;
   /** Possessed Portal: "If a player would draw a card, that player skips that draw instead" (CR 614.1b). */
@@ -6854,6 +6861,8 @@ export interface CompiledCard {
    * Giant); `untapped`: "as long as ~ is untapped"; `by`: only damage from such sources ("by artifacts").
    */
   damageToYouRedirect?: { to: "self" | "attached"; others?: true; untapped?: true; by?: TargetSpec };
+  /** "All damage that would be dealt to enchanted creature is dealt to its controller instead" (Treacherous Link, CR 614.9). */
+  attachedDamageToController?: true;
   /** "Damage isn't removed from ~ during cleanup steps" (Ancient Adamantoise, CR 514.2). */
   keepsDamage?: true;
   /** "~ can't be countered." CR 101.2 */
@@ -7291,6 +7300,12 @@ export interface CompiledCard {
   yardCreatureAbilityLess?: number;
   /** Catalyst Stone: "Flashback costs you pay cost {2} less" (CR 601.2f). */
   flashbackLess?: number;
+  /** Warbringer: "Dash costs you pay cost {2} less": the generic mana of a dash cost its controller pays (CR 601.2f, rulings). */
+  dashLess?: number;
+  /** Thick-Skinned Goblin: "You may pay {0} rather than pay the echo cost for permanents you control" (CR 118.9). */
+  echoZero?: true;
+  /** Memory Crystal: "Buyback costs cost {2} less": the generic mana of any player's buyback cost (CR 601.2f, rulings). */
+  buybackLess?: number;
   /** Catalyst Stone: "Flashback costs your opponents pay cost {2} more" (CR 601.2f). */
   flashbackTax?: number;
   /** Inquisitive Glimmer: "Unlock costs you pay cost {1} less" (CR 709.5e, 601.2f): less generic mana, for its controller's Rooms. */

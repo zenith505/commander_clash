@@ -253,6 +253,12 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     const redirect = destination(m[2]!, ctx);
     return redirect ? rule({ to: { target: { ref: "self" } }, redirect }) : null;
   }
+  // Sivvi's Valor: "All damage that would be dealt to target creature this turn is dealt to you instead": a redirection
+  // (CR 614.9) for that creature as long as it's that object (CR 400.7), from every source, combat or not.
+  if (/^All damage that would be dealt to target creature this turn is dealt to you instead$/.test(s)) {
+    const target = parseDamageRecipient("target creature", ctx);
+    return target ? rule({ to: { target }, redirect: { ref: "you" } }) : null;
+  }
   // Shimian Night Stalker: "All damage that would be dealt to you this turn by target attacking creature is dealt to ~
   // instead" (from combat and abilities, rulings); Mirror Strike: "All combat damage ... by target unblocked creature is
   // dealt to its controller instead": that creature as a source, for as long as it's that object (CR 609.7).

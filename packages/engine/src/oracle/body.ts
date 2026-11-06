@@ -6362,6 +6362,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Emberwilde Djinn: "At the beginning of each player's upkeep, that player may pay {R}{R} or 2 life. If the player
+    // does, they gain control of ~": either payment, their choice, then what it buys; nothing if they pay neither.
+    const eitherPay = thatMay && /^((?:\{[WUBRGC0-9]\})+) or (\d+) life$/.exec(thatMay[2]!);
+    const eitherDo = eitherPay && /^If (?:the player|that player|they) (?:does|do), (.+?)\.?$/.exec(sentences[si + 1] ?? "");
+    if (eitherPay && eitherDo && ctx.eventPlayer && /^that player$/i.test(thatMay![1]!)) {
+      const then = parseOne(capital(eitherDo[1]!.replace(/^they gain control of ~$/, "that player gains control of ~")), ctx);
+      if (!then || then.some((e) => pauses(e))) return null;
+      effects.push({ type: "punisher", who: { ref: "eventPlayer" }, options: [{ pay: { cost: eitherPay[1]! } }, { pay: { cost: "", life: Number(eitherPay[2]) } }], effects: then, mode: "ifAny", thenText: eitherDo[1]! });
+      si++;
+      continue;
+    }
     // "At the beginning of the upkeep of enchanted creature's controller, that player may pay {1}{B}. If the player does,
     // untap that creature." (Dance of the Dead): their payment, then what it buys.
     // "If that player doesn't, ~ can't be blocked this turn" (Shrouded Serpent), "If they don't, ~ deals 2 damage to that

@@ -119,6 +119,15 @@ export function parseDamageMod(line: string): StaticAbility | null {
     if (!a || a.mods.length !== 1 || m?.kind !== "damageMod" || m.mod.while) return null;
     return { ...a, mods: [{ ...m, mod: { ...m.mod, while: { kind: "yourTurn" }, text: line } }], text: line };
   }
+  // Lichenthrope, Phytohydra: "If damage would be dealt to ~, put that many -1/-1 (+1/+1) counters on it instead": a
+  // replacement, not prevention (rulings: damage that can't be prevented is replaced too; no damage is dealt, so nothing
+  // that triggers on damage does), applied once to each source's damage to it (CR 614.1a, 614.5).
+  const toCounters = /^If damage would be dealt to (?:~|this creature), put that many ([+-]1\/[+-]1) counters on it instead\.?$/.exec(line);
+  if (toCounters) {
+    if (toCounters[1] !== "+1/+1" && toCounters[1] !== "-1/-1") return null;
+    const mod: DamageMod = { op: "counters", counter: toCounters[1], to: { self: true }, text: line };
+    return { affects: { kind: "self" }, mods: [{ kind: "damageMod", mod }], text: line };
+  }
   const text = line
     .replace(/\.$/, "")
     .replace(/^[A-Z][A-Za-z' -]+ — (?=If )/, "")

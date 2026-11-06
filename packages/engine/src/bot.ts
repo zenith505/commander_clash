@@ -3859,6 +3859,9 @@ function linkedOwned(s: GameState, sourceId: ObjectId | undefined, pid: PlayerId
 function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
+  // Purgatory: "you may pay {4} and 2 life. If you do, return a card exiled with ~ to the battlefield": only with a card
+  // there to return (CR 607.2a).
+  if (r && e?.type === "may" && e.effects.length && e.effects.every((x) => x.type === "moveLinked")) return linkedCards(s, r.item.sourceId, r.item.sourceZc).length > 0;
   // Neera, Wild Mage: "you may put it on the bottom of its owner's library. If you do, reveal ... until you reveal a nonland
   // card. You may cast that card without paying its mana cost": a cheap spell for a free card worth more on average.
   if (r && e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "causeToBottom") {

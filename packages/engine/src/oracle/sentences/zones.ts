@@ -1720,6 +1720,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Ethereal Forager: "return an instant or sorcery card exiled with ~ to its owner's hand": one of them, chosen as it
     // resolves.
     if (/^Return an instant or sorcery card exiled with ~ to its owner's hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", one: true, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } }];
+    // Purgatory: "return a card exiled with ~ to the battlefield": one of them, chosen as it resolves, under the control of
+    // the player who puts it there, the ability's controller (CR 110.2a; rulings: even if an opponent took Purgatory).
+    if (/^Return a card exiled with ~ to the battlefield$/.test(s)) return [{ type: "moveLinked", dest: "battlefield", one: true }];
     // Roads Go Ever, Ever On: "Put a card exiled with this Saga into its owner's hand": one of them, chosen as it resolves.
     if (/^Put a card exiled with ~ into its owner's hand$/.test(s)) return [{ type: "moveLinked", dest: "hand", one: true }];
     // Currency Converter: one of them, chosen as it resolves.

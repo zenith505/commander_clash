@@ -1679,7 +1679,9 @@ export interface DamageMod {
    * `times` multiplies by `n` (double, triple); `half` halves, rounded down (`up`: rounded up); `plus` / `minus` add or
    * take away `amount`; `allBut`: all but `n` of it; `prevent`: all of it.
    */
-  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo";
+  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo" | /** "Put that many -1/-1 counters on it instead" (Lichenthrope, Phytohydra, CR 614.1a): none of it is dealt; `counter`s go on the holder. */ "counters";
+  /** With op "counters": the kind put on the permanent instead of the damage. */
+  counter?: "+1/+1" | "-1/-1";
   n?: number;
   amount?: Amount;
   up?: true;

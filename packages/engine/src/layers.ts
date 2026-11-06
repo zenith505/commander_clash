@@ -24,7 +24,7 @@ import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
 import { liveEmblems } from "./emblems";
-import { bindChosenKeywords, CHOSEN_LAND_TYPE, COLOR_WORD, CREATURE_TYPES, IDENTITY_PROTECTION, isLandwalk, LINKED_TYPES_PROTECTION, YOURS_COLORS_PROTECTION, protectionFromCardTypes, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
+import { bindChosenKeywords, CHOSEN_LAND_TYPE, COLOR_WORD, CREATURE_TYPES, IDENTITY_PROTECTION, isLandwalk, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, YOURS_COLORS_PROTECTION, protectionFromCardTypes, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
 import { bindGrantSource, compileCard, compileGranted, QUOTED_SOURCE_NAME } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
@@ -1517,6 +1517,18 @@ function linkedCardTypesProtection(s: GameState, sourceId: ObjectId | undefined)
   return protectionFromCardTypes(types);
 }
 
+/**
+ * Urborg Scavengers: `keyword` if a face-up card exiled with this object (CR 607.2a), still in exile, has it as its own
+ * printed keyword (CR 113.6: its abilities are there in exile, whatever zone they work in); none otherwise.
+ */
+function linkedCardKeyword(s: GameState, sourceId: ObjectId | undefined, keyword: string): string[] {
+  const src = sourceId ? s.objects[sourceId] : undefined;
+  if (!src) return [];
+  const linked = s.linkedExile?.[`${src.id}@${src.zoneChanges ?? 0}`] ?? [];
+  const has = linked.some((l) => { const o = s.objects[l.id]; return o?.zone === "exile" && (o.zoneChanges ?? 0) === l.zc && !o.faceDown && printedKeywords(defOf(s, o)).some((k) => k.toLowerCase() === keyword.toLowerCase()); });
+  return has ? [keyword] : [];
+}
+
 /** Duplicant: the last creature card exiled with this object that's still in exile (CR 607.2a). */
 function lastLinkedCreatureCard(s: GameState, sourceId: ObjectId | undefined): GameObject | undefined {
   const src = sourceId ? s.objects[sourceId] : undefined;
@@ -1631,7 +1643,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "addKeywords":
       // "Has protection from the chosen color": the color chosen as the source entered.
       // Empty-Shrine Kannushi: "protection from each color among permanents you control", the colors layer 5 left them.
-      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) || m.keywords.includes(YOURS_COLORS_PROTECTION) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : k === YOURS_COLORS_PROTECTION ? colorsAmongYours(chars, controllerOfInst(e, chars)).map((col) => `Protection from ${COLOR_WORD[col]}`) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors, e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined)) {
+      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) || m.keywords.includes(YOURS_COLORS_PROTECTION) || m.keywords.some((k) => k.startsWith(LINKED_CARD_KEYWORD)) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : k === YOURS_COLORS_PROTECTION ? colorsAmongYours(chars, controllerOfInst(e, chars)).map((col) => `Protection from ${COLOR_WORD[col]}`) : k.startsWith(LINKED_CARD_KEYWORD) ? linkedCardKeyword(s, e.sourceId, k.slice(LINKED_CARD_KEYWORD.length)) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors, e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined)) {
         const key = k.toLowerCase();
         if (/^ward\b/i.test(k)) delete c.wardLost;
         if (!c.keywords.some((x) => sameCI(x, k))) {

@@ -1525,6 +1525,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // found (CR 603.7), the same as "At the beginning of the next end step, return it to its owner's hand" (yours: it came
   // from your library).
   text = text.replace(/(^|\. )(Search your library for [^.]+, put it onto the battlefield, then shuffle\. It gains haste\.) Return it to your hand at the beginning of the next end step\./, "$1$2 At the beginning of the next end step, return it to its owner's hand.");
+  // Nick Fury, Spymaster: "put a creature card ... from your hand onto the battlefield. It enters tapped and attacking and
+  // gains indestructible until end of turn": put onto the battlefield tapped and attacking (CR 508.4), then the keyword.
+  text = text.replace(/(you may put an? [^.]+? from your hand onto the battlefield)\. It enters tapped and attacking and gains indestructible until end of turn\./, "$1 tapped and attacking. It gains indestructible until end of turn.");
   // Cruel Ultimatum: "Target opponent sacrifices a creature of their choice, discards three cards, then loses 5 life. You
   // return a creature card from your graveyard to your hand, draw three cards, then gain 5 life." The same, in order.
   text = text.replace(/\. You return a creature card from your graveyard to your hand, draw three cards, then gain 5 life\.$/, ". Return a creature card from your graveyard to your hand. Draw three cards. You gain 5 life.");
@@ -4457,6 +4460,27 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // beginning of the next end step" (one instruction, no condition).
     // Berserk: "At the beginning of the next end step, destroy that creature if it attacked this turn": checked as the
     // delayed trigger resolves; it's destroyed even if it stopped being a creature (rulings).
+    // Siren's Call: "At the beginning of the next end step, destroy all non-Wall creatures that player controls that didn't
+    // attack this turn. Ignore this effect for each creature the player didn't control continuously since the beginning of
+    // the turn.": the active player's, as the delayed trigger resolves, those not declared as attackers this turn (CR
+    // 508.1a), whether or not they could attack (rulings), and not ones that came under their control this turn.
+    if (s === "At the beginning of the next end step, destroy all non-Wall creatures that player controls that didn't attack this turn" && sentences[si + 1]?.replace(/\.$/, "") === "Ignore this effect for each creature the player didn't control continuously since the beginning of the turn" && opts.spell) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "continuous" || prev.what.ref !== "each" || prev.what.of?.ref !== "activePlayer") return null;
+      const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], notSubtypes: ["Wall"], combat: "didntAttackThisTurn", controlledSinceTurnBegan: true, text: "non-Wall creature that player controls that didn't attack this turn" };
+      effects.push({ type: "delayed", when: "nextEndStep", effects: [{ type: "destroy", what: { ref: "each", filter, of: { ref: "activePlayer" } } }], text: "destroy all non-Wall creatures that player controls that didn't attack this turn" });
+      si++;
+      continue;
+    }
+    // Nettling Imp: "Destroy it at the beginning of the next end step if it didn't attack this turn": the same, the other way
+    // round; destroyed even if the Imp has left the battlefield (rulings), or if it simply couldn't attack (rulings).
+    if (s === "Destroy it at the beginning of the next end step if it didn't attack this turn" && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many) {
+      const later = parseOne("Destroy that creature at the beginning of the next end step", ctx);
+      const d = later?.length === 1 && later[0]!.type === "delayed" ? later[0]! : undefined;
+      if (!d) return null;
+      effects.push({ ...d, effects: [{ type: "if", cond: { kind: "subjectIs", filter: { kind: "object", types: [], combat: "didntAttackThisTurn", text: "permanent that didn't attack this turn" } }, effects: d.effects }], text: "Destroy it if it didn't attack this turn" });
+      continue;
+    }
     if (s === "At the beginning of the next end step, destroy that creature if it attacked this turn") {
       const later = parseOne("Destroy that creature at the beginning of the next end step", ctx);
       const d = later?.length === 1 && later[0]!.type === "delayed" ? later[0]! : undefined;
@@ -14185,6 +14209,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!n || !("count" in n) || n.count.kind !== "power") return null;
       effects.push({ type: "impulse", n: { count: n.count }, until: "exiled", who: { ref: "subjectOwner" }, castOnly: true, anyType: true });
       si++;
+      continue;
+    }
+    // Elkin Lair: "that player exiles a card at random from their hand. The player may play that card this turn. At the
+    // beginning of the next end step, if the player hasn't played the card, they put it into their graveyard.": the trigger's
+    // player's card, their permission; a delayed trigger (CR 603.7) for that card if it's still exiled as the same object
+    // then (CR 400.7: played, it has left exile).
+    if (/^[Tt]hat player exiles a card at random from their hand$/.test(s) && ctx.eventPlayer && sentences[si + 1]?.replace(/\.$/, "") === "The player may play that card this turn" && sentences[si + 2]?.replace(/\.$/, "") === "At the beginning of the next end step, if the player hasn't played the card, they put it into their graveyard") {
+      effects.push({ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eventPlayer" }, randomFromHand: true }, { type: "delayed", when: "nextEndStep", effects: [{ type: "exiledToGraveyard" }], text: "if the player hasn't played the card, they put it into their graveyard" });
+      si += 2;
       continue;
     }
     // "At the beginning of the next end step, if any of those cards remain exiled, return them to their owners'

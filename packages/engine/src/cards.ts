@@ -406,7 +406,9 @@ function yardGranted(s: GameState, o: GameObject): CompiledCard["activated"] {
     for (const g of grants) {
       if (!printedMatches(g.filter, d)) continue;
       // X in a card's mana cost is 0 here (CR 202.3e).
-      const mv = g.manaValueCost ? `{${manaValue(parseManaCost(d.manaCost ?? ""))}}` : undefined;
+      // A card with no mana cost has an unpayable cost for "equal to its mana cost" (CR 118.6): no ability to activate.
+      if (g.manaCostCost && !d.manaCost) continue;
+      const mv = g.manaValueCost ? `{${manaValue(parseManaCost(d.manaCost ?? ""))}}` : g.manaCostCost ? d.manaCost! : undefined;
       out.push(mv ? { ...g.activated, manaCost: mv, text: g.activated.text.replace(/\{[^}]+\}$/, mv) } : g.activated);
     }
   }

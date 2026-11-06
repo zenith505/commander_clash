@@ -178,6 +178,13 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     if (!base || base.anyOf) return null;
     return { ...base, anyOf: ["Eternalize", "Embalm"].map((k) => ({ kind: "card" as const, keywords: [k], text: k.toLowerCase() })), text: p };
   }
+  // Dermoplasm: "a creature card with a morph ability": morph or megamorph, a variant of it (CR 702.37b), as printed.
+  const morphAb = /^(.+ card) with a morph ability$/.exec(p);
+  if (morphAb) {
+    const base = parseSearchFilter(morphAb[1]!, count);
+    if (!base || base.anyOf) return null;
+    return { ...base, anyOf: ["Morph", "Megamorph"].map((k) => ({ kind: "card" as const, keywords: [k], text: k.toLowerCase() })), text: p };
+  }
   // Rootless Yew: "a creature card with power or toughness 6 or greater": either one (anyOf).
   const pOrT = /^(.+ card) with power or toughness (\d+) or greater$/.exec(p);
   if (pOrT) {

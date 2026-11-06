@@ -3661,6 +3661,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`${inYardReturn[1]}, you may return ~ from your graveyard to your hand.`);
     return t && t !== "fail" && t.zone === "graveyard" && t.event === "batch" && t.batch?.milled ? t : "fail";
   }
+  // Invader Parasite: "Whenever a land an opponent controls with the same name as the exiled card enters, ...": the card
+  // its imprint ability exiled (linked in compile.ts, CR 607.2a), still exiled, named as the permanent that entered is.
+  const sameNameExiled = /^(Whenever an? .+?) with the same name as the exiled card enters, (.+)$/.exec(line);
+  if (sameNameExiled) {
+    const t = parseTrigger(`${sameNameExiled[1]} enters, ${sameNameExiled[2]}`);
+    return t && t !== "fail" && t.event === "permanentEnters" && t.enters && !t.enters.other && !t.enters.orSelf ? { ...t, enters: { ...t.enters, nameExiledWithSelf: true } } : "fail";
+  }
   // Prized Amalgam: works only in the graveyard (CR 113.6m), with an intervening if about the creature that entered (CR
   // 603.4); the delayed trigger returns this card only if it's still there, the same object (rulings, CR 400.7).
   if (line === "Whenever a creature enters, if it entered from your graveyard or you cast it from your graveyard, return ~ from your graveyard to the battlefield tapped at the beginning of the next end step.") {

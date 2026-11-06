@@ -1,6 +1,6 @@
 # Roadmap
 
-30,009 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,022 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,960 of 4,988 (99%), top 10,000: 9,601 of
 9,979 (96%).
 
@@ -2174,6 +2174,36 @@ line blocks.
    Rory Williams and Sinister Concierge (exiling the spell or the dying card with time counters, gaining suspend);
    Aradesh, the Founder ("if it enlisted a creature this combat"); Tetsuo, Imperial Champion (the greatest mana value
    among attached Equipment); Kotose, the Silent Spider; The Toymaker's Trap; Expert-Level Safe (secret numbers).
+   Round 284 took the next names from the top that no earlier round looked at: "Each artifact creature card in your
+   graveyard has encore. Its encore cost is equal to its mana cost." (Wire Surgeons: each card's own mana cost, none for a
+   card without one, CR 118.6); "turn target creature with a morph ability face down" and "any number of target creatures
+   with morph abilities other than ~" (Master of the Veil, Weaver of Lies, Backslide: morph or megamorph, CR 702.37b, on
+   the permanent now, so never a face-down one; its controller may turn it face up again for its morph cost); "put a
+   creature card with a morph ability from your hand onto the battlefield face up. If you do, return ~ to its owner's hand"
+   (Dermoplasm, with a browser test for the hand pick, and one for Weaver of Lies's targets); "you may play lands and cast
+   Mutant, Ninja, or Turtle spells from the top of your library. If you cast a creature spell this way, that creature enters
+   with an additional +1/+1 counter on it" (Mikey & Don, Party Planners); "Creatures the active player controls attack this
+   turn if able" and, at the next end step, the non-Wall ones that didn't attack destroyed unless they came under that
+   player's control this turn (Siren's Call: destroyed even if they couldn't attack, rulings); "target non-Wall creature the
+   active player has controlled continuously since the beginning of the turn ... attacks this turn if able. Destroy it at
+   the beginning of the next end step if it didn't attack this turn" (Nettling Imp, Norritt: even with the source gone,
+   rulings); "that player exiles a card at random from their hand. The player may play that card this turn" and the end
+   step's graveyard if they didn't (Elkin Lair); "put a creature card ... from your hand onto the battlefield. It enters
+   tapped and attacking and gains indestructible until end of turn" when a creature attacks alone (Nick Fury, Spymaster);
+   "~ has flying as long as a card exiled with it has flying. The same is true for ..." (Urborg Scavengers: a face-up card
+   still exiled with it, by that card's own keywords, layer 6); "a land an opponent controls with the same name as the
+   exiled card" entering (Invader Parasite). +13, 29,993 of 31,936 (30,004 with B116).
+   Out after round 284 (looked at, not done): Sin, Spira's Punishment (a token copy of a card exiled at random, repeated
+   for lands); Galea, Kindler of Hope (a cast trigger that gives the Equipment spell an enters ability); Kellan, Planar
+   Trailblazer (becoming a Detective and gaining an impulse trigger, only if it's a Scout); Cloudspire Coordinator (the
+   Mounts and Vehicles that entered this turn, tokens that saddle and crew as though their power were 2 greater); Nashi,
+   Moon's Legacy (copying a graveyard card and casting the copy, paying its costs); Discover the Impossible (a face-down
+   exiled card cast free only if it's an instant with mana value 2 or less, else into your hand); Meeting of the Five
+   (spells with exactly three colors, and mana only for them); Essence of the Wild (creatures entering as a copy of it,
+   ordered with other copy effects, CR 616.1); Ice Cave (any other player may pay a spell's mana cost to counter it);
+   Journey to the Lost City (a d20 table over the four exiled cards); Ghastly Conscription (manifesting a shuffled
+   face-down pile); Soulflayer and Rayami, First of the Fallen (keywords of cards exiled by delve or with blood counters,
+   as Urborg Scavengers).
    Round 282 took earlier skips from the top: "choose left or right" and "each player may attack only the nearest
    opponent in the chosen direction and planeswalkers controlled by that opponent" (Pramikon, Sky Rampart, as it enters;
    Teyo, Geometric Tactician's −2 until your next turn; left is the next seat in turn order, a player who left the game
@@ -5713,7 +5743,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   chooses), Addle (a card of the color chosen as it resolves), Watchers of the Dead (each opponent chooses two cards in their
   graveyard, then all the others are exiled at once, rulings; a new "keep" picker over your graveyard, with a browser test,
   and a bot that keeps what it can use there), Samite Elder (protection from each of the target permanent's colors as it
-  resolves, rulings). Mire's Toll and Riptide Replicator were already supported. +8 (29,999 of 31,936).
+  resolves, rulings). Mire's Toll and Riptide Replicator were already supported. +8 (30,012 of 31,936 with round 284).
 - Round B118 (single-line blockers from the skip lists, least played first): Knight of Valor ("each creature without flanking
   blocking ~": the blockers as it resolves, flanking granted or not; not flanking itself, rulings), Dredging Claw ("Whenever
   a creature enters from your graveyard": a card you own, under anyone's control, CR 404.2), Elderwood Scion ("Spells you
@@ -5724,8 +5754,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ... if you've drawn three or more cards this turn": the colored symbol off too, CR 118.7), Hide // Seek ("you gain life
   equal to its mana value", the card the search exiled), Kitesail Skirmisher ("another target creature attacking the same
   player or planeswalker", not a battle, CR 506.2), Vhati il-Dal (base power 1 or base toughness 1, chosen as it resolves,
-  rulings; the choice prompt has a browser test, and a bot takes an opponent's creature's greater stat down). +10 (30,009 of
-  31,936).
+  rulings; the choice prompt has a browser test, and a bot takes an opponent's creature's greater stat down). +10 (30,022 of
+  31,936 with round 284).
 - Out after round B118 (looked at, not done): Flying Drone ("another creature with flying entered the battlefield under your
   control this turn": the turn's enter log doesn't keep keywords), Cellar Door ("puts the bottom card of their library into
   their graveyard": not a mill, CR 701.17a, so it needs a move of its own), Relive the Past (three "up to one" graveyard

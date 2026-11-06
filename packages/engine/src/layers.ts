@@ -861,6 +861,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return eventPlayer !== undefined && !s.players[eventPlayer]!.rad;
     case "eventPlayerLifeLost":
       return eventPlayer !== undefined && (s.turnLog?.lifeLost?.[eventPlayer] ?? 0) <= cond.max;
+    case "selfDealtEventPlayer": {
+      if (eventPlayer === undefined) return false;
+      const zc = src.zone === "battlefield" ? (src.zoneChanges ?? 0) : (s.lastKnown?.[src.id]?.zc ?? src.zoneChanges ?? 0);
+      return (s.turnLog?.sourceToPlayer?.[`${src.id}@${zc}`]?.[eventPlayer] ?? 0) >= cond.min;
+    }
     case "defenderMostLife": {
       // The player it attacked: from the trigger event, or the one it's attacking as it triggers.
       const that = eventPlayer ?? src.attacking;
@@ -973,6 +978,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "permanentToYourHand":
       return (s.turnLog?.permanentToHand ?? []).includes(you);
     case "cardLeftYourGraveyard":
+      if (cond.creature) return (s.turnLog?.creatureCardLeftGraveyard ?? []).includes(you);
       return cond.n ? (s.turnLog?.leftGraveyardCount?.[you] ?? 0) >= cond.n : (s.turnLog?.leftGraveyard ?? []).includes(you);
     case "castAnother": { // checked before the spell counts itself (CR 601.2f, 601.2i)
       const mine = (s.castThisTurn ?? []).filter((c) => c.player === you && (!cond.color || c.colors?.includes(cond.color)) && (!cond.types || cond.types.some((t) => s.cards[c.card]?.types.includes(t))));

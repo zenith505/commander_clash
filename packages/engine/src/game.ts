@@ -755,6 +755,8 @@ export function moveObject(
 ) {
   const o = obj(s, id);
   const fromZone = o.zone;
+  // Syrix, Carrier of the Flame: "if a creature card left your graveyard this turn": a creature card as it was there.
+  const creatureCardLeavesYard = fromZone === "graveyard" && to !== "graveyard" && !o.isToken && objIsType(s, o, "Creature");
   // "Can't be sacrificed": an instruction to sacrifice it does nothing (rulings on Alexios, CR 701.21).
   if (opts.sacrificed && fromZone === "battlefield" && (opts.cost ? characteristics(s, o).cantBeSacrificed : !canBeSacrificed(s, o))) {
     log(s, `${defOf(s, o).name} can't be sacrificed.`);
@@ -1172,6 +1174,7 @@ export function moveObject(
     if (!left.includes(o.owner)) left.push(o.owner);
     const count = (s.turnLog!.leftGraveyardCount ??= {});
     count[o.owner] = (count[o.owner] ?? 0) + 1;
+    if (creatureCardLeavesYard && !(s.turnLog!.creatureCardLeftGraveyard ??= []).includes(o.owner)) s.turnLog!.creatureCardLeftGraveyard!.push(o.owner);
   }
   // Barrin, Tolarian Archmage: "if a permanent was put into your hand from the battlefield this turn": its owner's hand
   // (CR 400.3), a token too, which is put there before it ceases to exist (rulings, CR 111.7).

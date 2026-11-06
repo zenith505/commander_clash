@@ -778,6 +778,11 @@ export function compile(d: CardDef): CompiledCard {
     // "Vivid — {T}: For each color among permanents you control, add ..." (Bloom Tender): an ability word too.
     else if (!isSpell && /^Vivid — \{/.test(line)) line = line.replace(/^Vivid — /, "");
     if (!line) continue;
+    // Planechase replacements (Ichor Elixir: "If you would roll one or more planar dice, instead ..."; Susan Foreman: "If
+    // you would planeswalk, instead ..."): a player may planeswalk, and a planar die is rolled, only in a Planechase game
+    // (CR 701.31a, 901.9; Start the TARDIS's rulings: "If you are instructed to planeswalk in any other game, nothing
+    // happens"), so outside one these never apply.
+    if (/^If you would (?:roll one or more planar dice|planeswalk), instead [^"]*\.$/.test(line)) continue;
     // Conspiracy's draft-matters lines (CR 905.2) in a game no draft came before (oracle/draft.ts).
     const drafted = draftLine(line);
     if (drafted === null) continue;

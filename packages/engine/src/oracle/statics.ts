@@ -693,6 +693,9 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     if (!base || base === "fail" || !("costMod" in base) || !c) return "fail";
     return { costMod: { ...base.costMod, times: c, text: line } };
   }
+  // Vine Gecko: "The first kicked spell you cast each turn costs {1} less to cast": a spell whose kicker cost is paid,
+  // announced before its total cost is worked out (CR 601.2b, 601.2f, 702.33d); earlier kicked spells this turn count.
+  if ((m = /^The first kicked spell you cast each turn costs \{(\d+)\} less to cast$/.exec(text))) return { costMod: { who: "you", filter: { kind: "spell", text: "kicked spells" }, n: -Number(m[1]), nth: 1, kicked: true, text: line } };
   if ((m = /^The (first|second) (.*?)spell( with (?:flying|haste|trample|deathtouch|lifelink|vigilance|reach|defender|menace))? you cast( with \{X\} in its mana cost)? (each turn|during each of your turns) costs \{(\d+)\} less to cast$/.exec(text)) && !(m[3] && m[4])) {
     const filter = m[2] ? parseTargetPhrase(`${m[2]}spell`) : { kind: "spell" as const, text: "spell" };
     if (!filter || filter.kind !== "spell") return "fail";
@@ -1499,6 +1502,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^you attacked with ${NUM} or more creatures this turn$`).exec(text))) return { kind: "attackedWith", n: num(m[1]!) };
   // Deepway Navigator: "you attacked with three or more Merfolk this turn": of that type as they were declared.
   if ((m = new RegExp(`^you attacked with ${NUM} or more ([A-Z][a-z]+) this turn$`).exec(text)) && CREATURE_TYPES.has(singularWord(m[2]!))) return { kind: "attackedWith", n: num(m[1]!), subtype: singularWord(m[2]!) };
+  // Thaumaton Torpedo: "you attacked with a Spacecraft this turn": an artifact type, as it was declared (CR 205.3g).
+  if (/^you attacked with a Spacecraft this turn$/.test(text)) return { kind: "attackedWith", n: 1, subtype: "Spacecraft" };
   if ((m = new RegExp(`^you attacked with creatures with total power ${NUM} or greater this combat$`).exec(text))) return { kind: "attackPower", n: num(m[1]!) };
   if ((m = new RegExp(`^you've drawn ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) };
   // "If you've drawn more than one card this turn" (Proft's Eidetic Memory): two or more.

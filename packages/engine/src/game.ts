@@ -13,7 +13,7 @@ import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCos
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
+import { flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
@@ -944,6 +944,15 @@ export function moveObject(
       log(s, `${defOf(s, o).name} is returned to its owner's hand instead of dying (${by}).`);
     }
   }
+  // Firestorm Phoenix: "If ~ would die, return it to its owner's hand instead. Until that player's next turn, that player
+  // plays with that card revealed in their hand and can't play it." (CR 614.1a): that card only, while it stays there
+  // (rulings); other effects may still put it onto the battlefield.
+  let rebirth = false;
+  if (to === "graveyard" && fromZone === "battlefield" && objIsType(s, o, "Creature") && abilitiesOf(s, o).rebirthToHand) {
+    to = "hand";
+    rebirth = true;
+    log(s, `${defOf(s, o).name} is returned to ${player(s, o.owner).name}'s hand instead of dying; it stays revealed there and can't be played until their next turn.`);
+  }
   // A merged permanent's components all go where it goes (CR 730.3, 730.3d), but the commander redirect below is the
   // commander card's alone (903.9c).
   const merged = fromZone === "battlefield" ? o.merged : undefined;
@@ -1063,6 +1072,7 @@ export function moveObject(
   // 702.145b).
   else if (to === "battlefield" && s.dayNight === "night" && o.face === undefined && !o.faceDown && transformedFace(s, o) === 1 && hasKeyword(defOf(s, o), "Daybound")) setFace(s, o, 1);
   o.zoneChanges = (o.zoneChanges ?? 0) + 1; // a new object (CR 400.7)
+  if (rebirth) (s.cantPlayUntilTurn ??= []).push({ id, zc: o.zoneChanges, player: o.owner, card: defOf(s, o).name });
   o.copyOf = undefined; // copy effects end with the object (CR 400.7)
   o.textFrom = undefined; // so do text-changing effects
   o.melded = undefined; // a melded permanent's cards are separate cards again (CR 712.21)
@@ -3584,6 +3594,11 @@ function startNextTurn(s: GameState, skipping = false) {
   // end as that turn begins too, not only for the turn itself (CR 611.2b).
   s.damageMods = s.damageMods?.filter((r) => !(r.until === "yourNextTurn" && began.has(r.you)));
   if (!s.damageMods?.length) s.damageMods = undefined;
+  s.damageRules = s.damageRules?.filter((r) => !(r.untilYourNextTurn && began.has(r.controller)));
+  if (!s.damageRules?.length) s.damageRules = undefined;
+  // Firestorm Phoenix: playable again once its owner's next turn begins.
+  s.cantPlayUntilTurn = s.cantPlayUntilTurn?.filter((c) => !began.has(c.player));
+  if (!s.cantPlayUntilTurn?.length) s.cantPlayUntilTurn = undefined;
   // "Noncreature spells your opponents cast cost {2} more to cast until your next turn" (Elspeth Conquers Death).
   s.costModsThisTurn = s.costModsThisTurn?.filter((c) => c.untilYourNextTurn && !began.has(c.player));
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.filter((r) => !began.has(r.controller));
@@ -4126,7 +4141,9 @@ function finishCleanup(s: GameState) {
     p.redirectNext = undefined;
   }
   s.preventCombatDamage = undefined;
-  s.damageRules = undefined;
+  // Ascent of the Worthy's "until your next turn" ones stay until that turn begins (CR 611.2b).
+  const lasting = s.damageRules?.filter((r) => r.untilYourNextTurn);
+  s.damageRules = lasting?.length ? lasting : undefined;
   // "Until end of turn" control ends: "when you lose control of the creature" triggers now (rulings on Ray of Command).
   checkLostControl(s);
   // "You may play that card this turn" / "until the end of your next turn" ends now.
@@ -4785,6 +4802,11 @@ export function topRevealed(s: GameState, pid: PlayerId): boolean {
   });
 }
 
+/** Firestorm Phoenix: why this card in a hand can't be played yet (and stays revealed there), if it can't. */
+export function cantPlayYet(s: GameState, o: GameObject): { player: PlayerId; card: string } | undefined {
+  return o.zone === "hand" ? s.cantPlayUntilTurn?.find((c) => c.id === o.id && c.zc === (o.zoneChanges ?? 0)) : undefined;
+}
+
 /** Whether `pid`'s hand is revealed (to `viewer`): "players play with their hands revealed", Telepathy (CR 402.3). */
 export function handRevealed(s: GameState, pid: PlayerId, viewer: PlayerId): boolean {
   if (pid === viewer) return true;
@@ -5209,6 +5231,9 @@ export function castProblem(
     }
   }
   const d = defOf(s, o);
+  // Firestorm Phoenix: that card can't be played until its owner's next turn (rulings), whatever would let it be.
+  const barred = cantPlayYet(s, o);
+  if (barred) return `${d.name} can't be played until ${player(s, barred.player).name}'s next turn (${barred.card})`;
   const fromCommand = o.zone === "command";
   const free = freeCastOf(s, pid) === id;
   const madness = madnessCastOf(s, pid, id);
@@ -5366,6 +5391,8 @@ export function castProblem(
   // "X damage divided as you choose": the X announced (CR 601.2b, 601.2d).
   // Before targets are chosen, "with mana value X" asks for none in particular: X is announced as it's cast (601.2b).
   let specs = settleDivided(s, { targets: castTimeTargets(d, spellTargetSpecs(d, modes, castHow(choices))), effects: [], text: "" }, { controller: pid, sourceId: id, x: x ?? 0 }, !targets).targets;
+  // "Any number of target creatures" could take a Flagbearer more (flagbearerProblem).
+  const manySpecs = specs.filter((t) => t.many === "any" && !t.skip);
   if (targets && manySlot(specs) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c).
     const fit = fitMany({ targets: specs, effects: [], text: "" }, targets, manyX(s, specs, pid, id, x));
@@ -5382,7 +5409,7 @@ export function castProblem(
     // A spell's colors are its card's (CR 702.16b: protection stops spells of that color). Before its optional costs
     // are announced, it can be cast if it has legal targets with them paid or without (CR 702.33g).
     const any = () => hasLegalTargetsFor(s, specs, pid, sq) || (!choices && !!spell && hasGatedTargets(specs) && hasLegalTargetsFor(s, castTimeTargets(d, spellTargetSpecs(d, modes, ALL_PAID)), pid, sq));
-    const tp = targets ? targetProblem(s, specs, targets, pid, sq) : any() ? null : `${d.name} has no legal targets`;
+    const tp = targets ? (targetProblem(s, specs, targets, pid, sq) ?? flagbearerProblem(s, specs, targets, pid, sq, undefined, manySpecs)) : any() ? null : `${d.name} has no legal targets`;
     if (tp) return tp;
   }
   const tax = fromCommand ? commanderTax(p, o, d) : 0;
@@ -5498,7 +5525,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const kickCost = (kicker?.required ? kicker.costs[0]! : kicks.map((i) => kicker?.costs[i] ?? "").join("")) + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice);
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
-  const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x, how.lifeFor);
+  const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x, how.lifeFor, kicks.length > 0 && isRealKicker(kicker));
   // Memory Crystal (anyone's): "Buyback costs cost {2} less"; Warbringer (yours): "Dash costs you pay cost {2} less". Only
   // the generic mana in that buyback or dash cost comes off, never more (rulings).
   if (!how.faceDown && (how.buyback || how.alt === "dash")) {
@@ -5713,7 +5740,7 @@ export function eminenceCommanders(s: GameState): GameObject[] {
   return s.players.filter((p) => !p.lost).flatMap((p) => p.command.map((id) => s.objects[id]!)).filter((o) => o?.zone === "command" && !o.emblem && !!compileCard(defOf(s, o)).costMods?.some((m) => m.eminence));
 }
 
-function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number, lifeFor?: ObjectId[]): { more: number; less: number; moreColored: Color[]; lessColored: Color[]; lessColoredOrGeneric: Color[]; lifeOffers: { id: ObjectId; life: number }[] } {
+function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number, lifeFor?: ObjectId[], kicked = false): { more: number; less: number; moreColored: Color[]; lessColored: Color[]; lessColoredOrGeneric: Color[]; lifeOffers: { id: ObjectId; life: number }[] } {
   let [more, less] = [0, 0];
   const moreColored: Color[] = [];
   const lessColored: Color[] = [];
@@ -5760,7 +5787,8 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
         if ((pw.min !== undefined && p < pw.min) || (pw.max !== undefined && p > pw.max)) continue;
       }
       // "The first creature spell you cast each turn": the creature spells you cast earlier this turn count, even before this permanent was on the battlefield (rulings).
-      if (m.nth && (s.castThisTurn ?? []).filter((c) => c.player === pid && printedMatches(rest, s.cards[c.card]!)).length !== m.nth - 1) continue;
+      if (m.kicked && !kicked) continue;
+      if (m.nth && (s.castThisTurn ?? []).filter((c) => c.player === pid && (!m.kicked || c.kicked) && printedMatches(rest, s.cards[c.card]!)).length !== m.nth - 1) continue;
       // The Defilers: offered as an additional cost, and only then a reduction.
       if (m.payLife) {
         if (!lifeOffers.some((l) => l.id === src.id)) lifeOffers.push({ id: src.id, life: m.payLife });
@@ -6664,7 +6692,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     s.effects = s.effects.filter((e) => !(e.untilCast?.id === o.id && (o.zoneChanges ?? 0) === e.untilCast.zc));
     invalidateCharacteristics(s);
   }
-  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv });
+  const kickedNow = !!item.kicked?.length && isRealKicker(compileCard(d).kicker);
+  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv, ...(kickedNow ? { kicked: true as const } : {}) });
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv, castColors: [...characteristics(s, o).colors], ...(o.faceDown ? {} : { castName: d.name }) };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
   if (o.preparedFrom) unprepareFor(s, o);
@@ -8098,6 +8127,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     return abilityProblem(s, pid, id, index, targets, modes, tapCreatures, 0, costs);
   }
   let body = settleDivided(s, withModes(ab.body, modes), { controller: pid, sourceId: id, x: x ?? 0 }, !targets);
+  const manySpecs = body.targets.filter((t) => t.many === "any" && !t.skip);
   if (targets && manySlot(body.targets) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c, 602.2b).
     const fit = fitMany(body, targets, manyX(s, body.targets, pid, id, x));
@@ -8106,7 +8136,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   }
   if (body.targets.length) {
     const src = sourceQuality(s, id);
-    const tp = targets ? targetProblem(s, body.targets, targets, pid, src, id) : hasLegalTargetsFor(s, body.targets, pid, src, id) ? null : "no legal targets";
+    const tp = targets ? (targetProblem(s, body.targets, targets, pid, src, id) ?? flagbearerProblem(s, body.targets, targets, pid, src, id, manySpecs)) : hasLegalTargetsFor(s, body.targets, pid, src, id) ? null : "no legal targets";
     if (tp) return tp;
   }
   if (ab.costs?.length || costs?.sacrifice?.length || costs?.discard?.length || costs?.returnToHand?.length || costs?.tap?.length) {
@@ -10794,9 +10824,14 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   const w = p.attackedWith?.turn === s.turn ? p.attackedWith.keys : [];
   const keys = attacks.map((a) => `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`);
   const kinds = { ...(p.attackedWith?.turn === s.turn ? p.attackedWith.kinds : {}) };
+  const others = { ...(p.attackedWith?.turn === s.turn ? p.attackedWith.others : {}) };
   for (const a of attacks) {
     const c = characteristics(s, obj(s, a.attacker));
-    kinds[`${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`] = c.allCreatureTypes ? "all" : c.subtypes.filter((t) => CREATURE_TYPES.has(t));
+    const key = `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`;
+    kinds[key] = c.allCreatureTypes ? "all" : c.subtypes.filter((t) => CREATURE_TYPES.has(t));
+    // Thaumaton Torpedo: "if you attacked with a Spacecraft this turn": its artifact types too (CR 205.3g).
+    const rest = c.subtypes.filter((t) => !CREATURE_TYPES.has(t));
+    if (rest.length) others[key] = rest;
   }
   // Whom each attacked: players only, not their planeswalkers (Ramses, Assassin Lord rulings).
   const to = { ...(p.attackedWith?.turn === s.turn ? p.attackedWith.to : {}) };
@@ -10804,7 +10839,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     const key = `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`;
     if (a.planeswalker === undefined && !to[key]?.includes(a.defender)) to[key] = [...(to[key] ?? []), a.defender];
   }
-  if (attacks.length) p.attackedWith = { turn: s.turn, keys: [...new Set([...w, ...keys])], kinds, ...(Object.keys(to).length ? { to } : {}) };
+  if (attacks.length) p.attackedWith = { turn: s.turn, keys: [...new Set([...w, ...keys])], kinds, ...(Object.keys(to).length ? { to } : {}), ...(Object.keys(others).length ? { others } : {}) };
   // Declared as attackers in this combat; not ones put onto the battlefield attacking (Kytheon rulings, CR 508.4).
   p.attackedCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0, n: attacks.length };
   s.attackersThisTurn = (s.attackersThisTurn ?? 0) + attacks.length;

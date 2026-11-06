@@ -22932,6 +22932,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1d6e9716-8c3c-443d-afd8-68d0d6c469a5",
+  "name": "Standard Bearer",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Flagbearer",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Flagbearer"
+  ],
+  "oracleText": "While an opponent is choosing targets as part of casting a spell they control or activating an ability they control, that player must choose at least one Flagbearer on the battlefield if able.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "apc",
+  "releasedAt": "2001-06-04",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "fb03befb-b4e4-4ae9-908d-a16d5b03b054",
   "name": "Star Athlete",
   "manaCost": "{1}{R}{R}",

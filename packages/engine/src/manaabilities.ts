@@ -163,7 +163,8 @@ export function removeXCombos(o: GameObject, p: Extract<ManaProduce, { kind: "re
   const out: ManaType[][] = [];
   const [a, b] = p.colors;
   for (let x = p.min; x <= (o.counters[p.counter] ?? 0); x++)
-    for (let i = x; i >= (b ? 0 : x); i--) out.push([...Array<ManaType>(i + (p.base ?? 0)).fill(a!), ...Array<ManaType>(x - i).fill(b ?? a!)]);
+    if (p.oneColor) for (const c of x ? p.colors : p.colors.slice(0, 1)) out.push(Array<ManaType>(x + (p.base ?? 0)).fill(c));
+    else for (let i = x; i >= (b ? 0 : x); i--) out.push([...Array<ManaType>(i + (p.base ?? 0)).fill(a!), ...Array<ManaType>(x - i).fill(b ?? a!)]);
   return out;
 }
 

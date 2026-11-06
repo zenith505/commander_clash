@@ -2427,6 +2427,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
   // Goblin Brawler: "can't be equipped": no Equipment can become attached to it, and one that is becomes unattached (CR
   // 301.5c, 701.3b, 704.5n; rulings).
   if (/^can't be equipped$/.test(rest)) return [{ kind: "cantBeEquipped" }];
+  // Anti-Magic Aura, Consecrate Land: "can't be enchanted by other Auras": by any Aura but the one this effect is from (CR
+  // 303.4); ones already attached go to the graveyard as it applies (704.5m, rulings).
+  if (/^can't be enchanted by other Auras$/.test(rest)) return [{ kind: "cantBeEnchantedByOthers" }];
   if (/^can't be turned face up$/.test(rest)) return [{ kind: "cantTurnFaceUp" }];
   // Alexios: "attacks each combat if able, can't be sacrificed, and can't attack its owner".
   if ((m = /^((?:attacks each combat if able|can't [^,]+)), ((?:attacks each combat if able|can't [^,]+)),? and (attacks each combat if able|can't [^,]+)$/.exec(rest))) {
@@ -2981,9 +2984,16 @@ function parseStaticLine(line: string): StaticAbility | null {
   // block unless its controller pays {3}"; Myr Prototype: "... {1} for each +1/+1 counter on it"; Cowed by Wisdom: "...
   // {1} for each card in your hand" (the Aura's controller's hand, counted as the cost is worked out): blocking costs it
   // too, paid as blockers are declared (CR 509.1d-e).
-  const ownTax = /^(Enchanted creature|~) can't attack( or block)? unless (?:its controller pays|you pay) \{(\d+)\}( for each \+1\/\+1 counter on it| for each card in your hand)?$/.exec(text);
-  if (ownTax && (ownTax[1] === "~" ? / you pay /.test(text) : / its controller pays /.test(text)) && (ownTax[4] !== " for each card in your hand" || ownTax[1] !== "~")) {
-    const per = ownTax[4] === " for each +1/+1 counter on it" ? { perPlusOne: true as const } : ownTax[4] ? { amount: { count: { kind: "cardsInHand", who: { ref: "you" } } } as Amount } : {};
+  // Whipgrass Entangler's granted 'This creature can't attack or block unless its controller pays {1} for each Cleric on the
+  // battlefield': its own controller, the same as "you" (CR 109.5); the Clerics counted as the cost is worked out, and
+  // two of them are two costs (rulings: cumulative).
+  const ownTax = /^(Enchanted creature|~) can't attack( or block)? unless (?:its controller pays|you pay) \{(\d+)\}( for each \+1\/\+1 counter on it| for each card in your hand| for each [A-Z][a-z]+ on the battlefield)?$/.exec(text);
+  const typeOnField = ownTax?.[4] ? / for each ([A-Z][a-z]+) on the battlefield$/.exec(ownTax[4]) : null;
+  if (typeOnField && !CREATURE_TYPES.has(typeOnField[1]!)) return null;
+  if (ownTax && (ownTax[1] === "~" ? / you pay /.test(text) || (!!typeOnField && / its controller pays /.test(text)) : / its controller pays /.test(text)) && (ownTax[4] !== " for each card in your hand" || ownTax[1] !== "~")) {
+    const onField = typeOnField ? parseCount(`${typeOnField[1]} on the battlefield`, null) : null;
+    if (typeOnField && !onField) return null;
+    const per = ownTax[4] === " for each +1/+1 counter on it" ? { perPlusOne: true as const } : onField ? { amount: onField } : ownTax[4] ? { amount: { count: { kind: "cardsInHand", who: { ref: "you" } } } as Amount } : {};
     const n = Number(ownTax[3]);
     return { affects: { kind: ownTax[1] === "~" ? "self" : "attached" }, mods: [{ kind: "ownAttackTax", n, ...per }, ...(ownTax[2] ? [{ kind: "ownBlockTax" as const, n, ...per }] : [])], text: line };
   }

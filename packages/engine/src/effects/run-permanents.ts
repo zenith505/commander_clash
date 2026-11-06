@@ -2,7 +2,7 @@ import type { Effect, Modification, TokenSpec } from "../abilities";
 import { abilitiesOf, realDefOf, enchantOf, basePowerNow, cardIdOf, defOf, roomOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { turnFaceUpByEffect, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
 import { nextRandom } from "../rng";
-import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
+import { characteristics, controllerOf, enchantableBy, invalidateCharacteristics } from "../layers";
 import { countersRemoved, countersStay, putPlayerCounters, putCounters, removableCounters, tokenBatch, withModular, withPutter } from "../counters";
 import { compileCard } from "../oracle";
 import type { ContinuousEffect, GameObject, GameState, ObjectId, PlayerId } from "../types";
@@ -2273,6 +2273,8 @@ export function canAttachTo(s: GameState, me: GameObject, host: GameObject | Pla
   const creature = objIsType(s, host, "Creature") || (!!asCreature && !aura && objIsType(s, host, "Planeswalker"));
   // Goblin Brawler: "can't be equipped" (CR 701.3b).
   if (!aura && characteristics(s, host).cantBeEquipped) return false;
+  // Anti-Magic Aura: "can't be enchanted by other Auras" (CR 303.4j: the Aura doesn't move).
+  if (aura && !enchantableBy(characteristics(s, host), me.id)) return false;
   const only = aura ? undefined : abilitiesOf(s, me).attachOnly; // O-Naginata
   return aura ? enchant?.kind === "object" && objectMatches(s, enchant, host, who, false, meChars) : creature && objectMatches(s, only ?? { kind: "object", text: "" }, host, who, false, meChars);
 }

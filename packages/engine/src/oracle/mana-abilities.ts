@@ -55,7 +55,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     .replace(/: Choose a color of a card in your graveyard\. Add one mana of that color\.$/, ": Add one mana of any color among cards in your graveyard.")
     // Doubling Cube: a mana ability (rulings), adding as much again of each type of mana in the pool.
     .replace(/: Double the amount of each type of unspent mana you have\.$/, ": Add as much again of each type of unspent mana you have.");
-  const part = String.raw`\{[^}]+\}|Sacrifice ~|Return ~ to its owner's hand|Exert ~|Discard your hand|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Put an? [^,:]+? counter on ~|Remove (?:any number of|X) [a-z]+ counters from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;
+  const part = String.raw`\{[^}]+\}|Sacrifice ~|Return ~ to its owner's hand|Exert ~|Discard your hand|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Put an? [^,:]+? counter on ~|Remove (?:any number of|X|one or more) (?:[a-z]+|[+-]\d+\/[+-]\d+) counters from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;
   const m = new RegExp(`^((?:${part})(?:, (?:${part}))*): Add ([^.]+)\\.((?: [^.]+\\.)*)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!.split(", ");
@@ -68,7 +68,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   let energyCost: number | undefined;
   let removeCounters: ManaAbility["removeCounters"];
   let tapCost: ManaAbility["tapCost"];
-  let removeX: { counter: CounterKind; any: boolean } | undefined;
+  let removeX: { counter: CounterKind; any: boolean; oneOrMore?: boolean } | undefined;
   let discardHand = false;
   let exert = false;
   let putCost: CounterKind | undefined;
@@ -76,11 +76,12 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     const pc = new RegExp(`^Put an? ${COUNTER} counter on ~$`).exec(c);
     const rc = removeCounterCost(c);
     const tc = new RegExp(`^Tap ${NUM} untapped (.+) you control$`).exec(c);
-    const rx = new RegExp(`^Remove (any number of|X) ${COUNTER} counters from ~$`).exec(c);
+    // Rasputin, the Oneiromancer: "Remove one or more dream counters from ~": X counters, at least one (CR 107.3a).
+    const rx = new RegExp(`^Remove (any number of|X|one or more) ${COUNTER} counters from ~$`).exec(c);
     if (rc) removeCounters = rc;
     // "Put a -0/-1 counter on ~: Add {G}" (Wall of Roots): put as the cost is paid, with the rest (CR 602.2b, 605.3a).
     else if (pc && !putCost) putCost = counterKind(pc[1]!);
-    else if (rx && !removeX && !removeCounters) removeX = { counter: counterKind(rx[2]!), any: rx[1] === "any number of" };
+    else if (rx && !removeX && !removeCounters) removeX = { counter: counterKind(rx[2]!), any: rx[1] === "any number of", ...(rx[1] === "one or more" ? { oneOrMore: true } : {}) };
     else if (tc) {
       const filter = pickFilter(tc[2]!);
       if (!filter || tapCost) return null;
@@ -101,7 +102,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     else if (/^(\{(\d+|[WUBRGC]|[WUBRG]\/[WUBRG])\})+$/.test(c)) manaCost += c;
     else return null;
   }
-  const produces = removeX ? removedProduced(m[2]!, removeX.counter, removeX.any) : parseManaProduced(m[2]!);
+  const produces = removeX ? removedProduced(m[2]!, removeX.counter, removeX.any, !!removeX.oneOrMore) : parseManaProduced(m[2]!);
   if (!produces || (removeCounters && removeX)) return null;
   const out: ManaAbility = { text: line0, manaCost, tap, ...(untapSelf ? { untapSelf: true as const } : {}), sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}), ...(discardHand ? { discardHand: true as const } : {}), ...(returnSelf ? { returnSelf: true as const } : {}), ...(exert ? { skipNextUntap: true } : {}), ...(putCost ? { putCounter: putCost } : {}) };
   let m2: RegExpExecArray | null;
@@ -303,7 +304,17 @@ export function removeCounterCost(part: string): { counter: CounterKind; n: numb
  * way" after "Remove any number of", "X mana in any combination of {U} and/or {B}" after "Remove X". Null for the rest
  * ("X mana in any combination of colors": too many ways to pick from).
  */
-function removedProduced(text: string, counter: CounterKind, any: boolean): ManaProduce | null {
+function removedProduced(text: string, counter: CounterKind, any: boolean, oneOrMore = false): ManaProduce | null {
+  // Rasputin, the Oneiromancer: "Remove one or more dream counters from ~: Add that much {C}": one {C} per counter.
+  const thatMuch = /^that much \{([WUBRGC])\}$/.exec(text);
+  if (oneOrMore) return thatMuch ? { kind: "removeX", counter, colors: [thatMuch[1] as ManaType], min: 1 } : null;
+  // Kyren Toy: "Remove X charge counters from ~: Add an amount of {C} equal to X plus one": X chosen as it's activated,
+  // 0 too (CR 107.3a), and one more {C} than that.
+  const plusOneX = /^an amount of \{([WUBRGC])\} equal to X plus one$/.exec(text);
+  if (!any && plusOneX) return { kind: "removeX", counter, colors: [plusOneX[1] as ManaType], min: 0, base: 1 };
+  // Petalmane Baku, Haruspex: "Remove X ki counters from ~: Add X mana of any one color": X of one color chosen as it
+  // resolves (CR 106.1b, 605.3b); none removed adds nothing, so X is at least 1 here.
+  if (!any && text === "X mana of any one color") return { kind: "removeX", counter, colors: ["W", "U", "B", "R", "G"], min: 1, oneColor: true };
   const each = new RegExp(`^\\{([WUBRGC])\\} for each ${COUNTER} counter removed this way$`).exec(text);
   if (any && each && counterKind(each[2]!) === counter) return { kind: "removeX", counter, colors: [each[1] as ManaType], min: 0 };
   // The Mana Batteries: "{G}, then add an additional {G} for each charge counter removed this way": one more than removed.

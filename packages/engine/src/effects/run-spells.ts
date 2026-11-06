@@ -1310,6 +1310,31 @@ export function cantBeCountered(s: GameState, item: StackItem): boolean {
  */
 export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unless: UnlessPays, by: string, what: string, otherwise?: string): boolean | "paused" {
   const sc = (s.resolving!.scratch ??= {});
+  // "Ward—Discard a card or pay {2}" (Titania, Rugged Rumbler): its payer chooses which cost to pay, or neither (CR
+  // 702.21a, 118.12); one they can't pay (no cards to discard) isn't offered.
+  if (unless.orElse) {
+    if (sc.paid !== undefined) return sc.paid;
+    const ways = [{ ...unless, orElse: undefined }, unless.orElse];
+    if (sc.unlessWay === undefined) {
+      const p = player(s, payer);
+      const can = (u: UnlessPays) => !p.lost && !(u.discard && p.hand.length < u.discard);
+      const options = ways.flatMap((u, i) => (can(u) ? [String(i)] : []));
+      if (!options.length) {
+        sc.paid = false;
+        return false;
+      }
+      s.pending = { kind: "chooseOption", player: payer, source: by, what: "unlessWay", prompt: `which cost do you pay, or is ${what} countered?`, options: [...options, "none"], labels: [...options.map((i) => ways[Number(i)]!.label ?? ways[Number(i)]!.cost), "Pay neither"] };
+      return "paused";
+    }
+    if (sc.unlessWay === "none") {
+      sc.unlessWay = undefined;
+      sc.paid = false;
+      return false;
+    }
+    const r = paidUnless(s, ctx, payer, ways[Number(sc.unlessWay)]!, by, what, otherwise);
+    if (r !== "paused") sc.unlessWay = undefined;
+    return r;
+  }
   // "Ward—Discard a card": the cards they chose to discard (see payUnless).
   if (sc.paid === undefined && (unless.discard || unless.discardHand || unless.discardRandom) && sc.chosen?.[payer]) {
     discardCards(s, payer, sc.chosen[payer]!);

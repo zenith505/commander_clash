@@ -542,8 +542,10 @@ function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | n
   const m0 = /^Whenever a source you control deals (one|two|three|four|five|six|seven|eight|nine|ten|\d+) or more damage to a player, (.+)$/.exec(line);
   // Talon of Pain: "a source you control other than ~"; Night Dealings: "to another player", every other player being an
   // opponent in this free-for-all game (CR 102.3).
-  const m1 = m0 ? null : /^Whenever a source you control( other than ~)? deals (noncombat )?damage to (?:an opponent|another player), (.+)$/.exec(line);
-  const m = m0 ? ([m0[0], undefined, m0[2]] as const) : m1 ? ([m1[0], m1[2], m1[3]] as const) : null;
+  // Molten Lavamancer: "during your turn": only while this ability's controller is the active player, as the damage is
+  // dealt (a trigger condition, not an intervening "if").
+  const m1 = m0 ? null : /^Whenever a source you control( other than ~)? deals (noncombat )?damage to (?:an opponent|another player)( during your turn)?, (.+)$/.exec(line);
+  const m = m0 ? ([m0[0], undefined, m0[2]] as const) : m1 ? ([m1[0], m1[2], m1[4]] as const) : null;
   if (!m) return null;
   let text = m[2]!;
   // Fear of Burning Alive: "..., if there are four or more card types among cards in your graveyard, ...": an
@@ -558,7 +560,7 @@ function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | n
   let body = parseBody(text, { eventPlayer: true });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[2]!) };
-  return { event: "sourceYouControlDamagesOpponent", body, ...(m[1] ? { noncombatOnly: true as const } : {}), ...(m0 ? { minDamage: num(m0[1]!), anyPlayer: true as const } : {}), ...(m1?.[1] ? { otherSource: true as const } : {}) };
+  return { event: "sourceYouControlDamagesOpponent", body, ...(m1?.[3] ? { activeIf: { kind: "yourTurn" as const } } : {}), ...(m[1] ? { noncombatOnly: true as const } : {}), ...(m0 ? { minDamage: num(m0[1]!), anyPlayer: true as const } : {}), ...(m1?.[1] ? { otherSource: true as const } : {}) };
 }
 
 function parseDamagesYouTrigger(line: string): TriggeredAbility | "fail" | null {
@@ -3335,7 +3337,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Wundagore: "on another creature" (anyone's, not ~): the same.
     // Cloaked Cadet: "Whenever one or more +1/+1 counters are put on one or more Humans you control": once for each Human
     // they're put on, only the first each turn doing anything (rulings: one card however many).
-    const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, ").replace(/^Whenever one or more (\+1\/\+1 )?counters are put on one or more ([A-Z][a-z]+)s you control, /, (x, k: string | undefined, type: string) => (CREATURE_TYPES.has(type) ? `Whenever one or more ${k ?? ""}counters are put on ${/^[AEIOU]/.test(type) ? "an" : "a"} ${type} you control, ` : x)).replace(/^Whenever you put a (\+1\/\+1 )?counter on (a creature you control|another creature you control|another creature|a creature), /, "Whenever you put one or more $1counters on $2, ").replace(/^Whenever you tap one or more untapped creatures your opponents control, /, "Whenever you tap an untapped creature an opponent controls, "));
+    const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, ").replace(/^Whenever one or more (\+1\/\+1 )?counters are put on one or more ([A-Z][a-z]+)s you control, /, (x, k: string | undefined, type: string) => (CREATURE_TYPES.has(type) ? `Whenever one or more ${k ?? ""}counters are put on ${/^[AEIOU]/.test(type) ? "an" : "a"} ${type} you control, ` : x)).replace(/^Whenever you put a (\+1\/\+1 )?counter on (a creature you control|another creature you control|another creature|a creature), /, "Whenever you put one or more $1counters on $2, ").replace(/^Whenever you tap one or more untapped creatures your opponents control, /, "Whenever you tap an untapped creature an opponent controls, ")
+      // Molten Lavamancer: "Whenever a source you control deals noncombat damage to one or more of your opponents during
+      // your turn, ...": once for each source and opponent, only the first each turn doing anything: the same.
+      .replace(/^Whenever a source you control deals noncombat damage to one or more of your opponents( during your turn)?, /, "Whenever a source you control deals noncombat damage to an opponent$1, "));
     return t && t !== "fail" && !t.oncePerTurn && t.event !== "state" ? { ...t, oncePerTurn: true } : "fail";
   }
   // Acrobatic Cheerleader: "This ability triggers only once.": never again for this object, even if it's countered

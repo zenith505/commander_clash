@@ -307,10 +307,7 @@ describe("Wolverine, Fierce Fighter", () => {
     s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: w, defender: opp }] });
     for (let i = 0; i < 20 && s.pending?.kind !== "declareBlockers"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
     s = act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker: b1, attacker: w }, { blocker: b2, attacker: w }] });
-    for (let i = 0; i < 40 && s.step !== "endCombat" && s.step !== "main2"; i++) {
-      if (s.pending?.kind === "orderBlockers" || s.pending?.kind === "assignCombatDamage") break;
-      s = act(s, { type: "passPriority", player: waitingOn(s)! });
-    }
+    s = passUntil(s, "main2", ap);
     // The 2 damage from before is healed; the two blockers' 3 + 3 are both dealt (lethal for a 3/5).
     expect(zone(s, w)).toBe("graveyard");
   });

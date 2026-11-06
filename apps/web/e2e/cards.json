@@ -26811,6 +26811,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9ac46f46-3099-4ad9-ae58-bf25d7270e87",
+  "name": "Watchers of the Dead",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact Creature — Cat",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Cat"
+  ],
+  "oracleText": "Exile this creature: Each opponent chooses two cards in their graveyard and exiles the rest.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "akh",
+  "releasedAt": "2017-04-28",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3d28886c-46bf-4d2e-a257-cb9016cc3573",
   "name": "Waterbending Lesson",
   "manaCost": "{3}{U}",

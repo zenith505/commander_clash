@@ -1110,7 +1110,12 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
               : m.kind === "setColors" && m.chosen
               ? { kind: "setColors", colors: s.resolving?.chosen?.color ? [s.resolving.chosen.color] : [] }
               : m,
-  );
+  ).flatMap((m0): Modification[] => {
+    const m = m0 as Modification;
+    // Gabriel Angelfire: "rampage 3" chosen is the keyword and its triggered ability (CR 702.23a), as "gains rampage 3" is.
+    const ramp = m.kind === "addKeywords" ? m.keywords.find((k) => /^Rampage \d+$/.test(k)) : undefined;
+    return ramp && m.kind === "addKeywords" ? [{ ...m, keywords: m.keywords.map((k) => (k === ramp ? "Rampage" : k)) }, { kind: "addAbility", text: ramp }] : [m];
+  });
 }
 
 export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | void {

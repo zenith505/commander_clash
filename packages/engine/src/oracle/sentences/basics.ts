@@ -981,7 +981,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "if", cond: { kind: "state", cond: { kind: "self", is: "escaped" } }, effects: [], otherwise: [sacrificeSelf] }];
   // Megatherium, Extravagant Spirit, Fettergeist, Phantasmal Sphere: "sacrifice ~ unless you pay {1} for each card in your hand", the
   // number counted as it resolves (CR 608.2h).
-  if ((m = /^(?:[Tt]hen )?[Ss]acrifice (~|it) unless you pay (\{\d+\}) for each (.+)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+  // Cyclone: "{G} for each wind counter on it", colored mana that many times.
+  if ((m = /^(?:[Tt]hen )?[Ss]acrifice (~|it) unless you pay (\{\d+\}|(?:\{[WUBRG]\})+) for each (.+)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
     // Phantasmal Sphere: "for each +1/+1 counter on it", on ~.
     const n = parseCount(m[3]!.replace(/ on it$/, " on ~"), ctx, true);
     if (!n) return null;

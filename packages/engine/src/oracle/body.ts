@@ -1198,6 +1198,10 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
 function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfAttacking?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~")
+    // Ecstatic Beauty: "You may play those cards until end of turn." after an exile from the top: the usual wording.
+    .replace(/^(Exile the top (?:two|three|four|five) cards of your library\. )You may play those cards until end of turn\./, "$1Until end of turn, you may play those cards.")
+    // Hellcarver Demon: "sacrifice all other permanents you control and discard your hand": two instructions, in order.
+    .replace(/^sacrifice all other permanents you control and discard your hand\. /, "sacrifice all other permanents you control. Discard your hand. ")
     // Homarid Warrior: "~ gains shroud until end of turn and doesn't untap during your next untap step. Tap it.": two
     // instructions about ~, then tapping ~.
     .replace(/^~ gains (\w+) until end of turn and doesn't untap during your next untap step\. Tap it\.$/, "~ gains $1 until end of turn. ~ doesn't untap during your next untap step. Tap ~.")
@@ -15561,7 +15565,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Knollspine Dragon: "you may discard your hand and draw cards equal to ...": the same as ", then draw", in that order
     // (CR 608.2c), one choice for both (Clive, Ifrit's Dominant).
     if (/^[Yy]ou may discard your hand and draw cards equal to /.test(s)) s = s.replace(" and draw ", ", then draw ");
-    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)(?: until the next end step)?$|attach any number of Equipment you control to (?:target creature you control|it|that creature)$|play the exiled card |cast the exiled card without paying its mana cost$|play one of the cards exiled with ~ without paying its mana cost$|cast an? (?:(?:instant or sorcery|instant|sorcery|creature|artifact|enchantment) )?spell(?: with mana value X)? from among cards exiled with ~ without paying its mana cost$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |change the targets of target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$|have any number of them phase out$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)(?: until the next end step)?$|attach any number of Equipment you control to (?:target creature you control|it|that creature)$|play the exiled card |cast the exiled card without paying its mana cost$|play one of the cards exiled with ~ without paying its mana cost$|cast an? (?:(?:instant or sorcery|instant|sorcery|creature|artifact|enchantment) )?spell(?: with mana value X)? from among cards exiled with ~ without paying its mana cost$|cast a spell from among cards you own in exile with dream counters on them without paying its mana cost$|cast any number of spells from among cards exiled with ~ with total mana value X or less without paying their mana costs$|exile a(?: nonland)? card from your hand with a number of time counters on it equal to its mana value$|exile it and put \w+ time counters? on it$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |change the targets of target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$|have any number of them phase out$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.
@@ -16581,6 +16585,39 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // "Exile that card instead of putting it into your graveyard as it resolves. If you do, return it to your hand at the
+    // beginning of the next end step." (Feather, the Redeemed), "exile that spell ... If you do, it becomes plotted."
+    // (Lilah, Undefeated Slickshot), "exile that card with three time counters on it instead of ... Then if the exiled card
+    // doesn't have suspend, it gains suspend." (Gandalf of the Secret Fire), "exile it instead of putting it into a
+    // graveyard as it resolves" (River Song's Diary, linked to it: "cards exiled with ~", CR 607.2a): a replacement effect
+    // on the spell that triggered this, applied as it finishes resolving (CR 608.2n, 614.1a).
+    // Goliath Daydreamer: "exile that card with a dream counter on it instead of ...".
+    const asRes = ctx.castSpell ? new RegExp(`^(?:[Tt]hen )?[Ee]xile (?:that card|that spell|it)( with ${NUM} time counters? on it| with a (dream) counter on it)? instead of putting it into (your|a) graveyard as it resolves$`).exec(s) : null;
+    if (asRes?.[3]) {
+      if (asRes[4] === "a") return null;
+      effects.push({ type: "exileAsResolves", counters: { [asRes[3]]: 1 } });
+      continue;
+    }
+    if (asRes) {
+      const next = sentences[si + 1]?.replace(/\.$/, "");
+      const then = next === "If you do, return it to your hand at the beginning of the next end step" ? ("returnEndStep" as const) : next === "If you do, it becomes plotted" ? ("plot" as const) : undefined;
+      const suspend = asRes[1] && /^Then if the exiled card doesn't have suspend, it gains suspend$/.test(next ?? "") ? Number(amt(asRes[2]!)) : undefined;
+      if (asRes[1] && !suspend) return null;
+      const anyGraveyard = asRes[4] === "a";
+      // Only River Song's Diary's plain "it ... a graveyard" is linked to its source, for its "cards exiled with ~".
+      if (anyGraveyard && (then || suspend)) return null;
+      effects.push({ type: "exileAsResolves", ...(then ? { then } : {}), ...(suspend ? { suspend } : {}), ...(anyGraveyard ? { anyGraveyard: true as const, linked: true as const } : {}) });
+      if (then || suspend) si++;
+      continue;
+    }
+    // River Song's Diary (its "choose one of them at random" rewritten in compile.ts): "choose a card exiled with ~ at
+    // random. You may cast it without paying its mana cost.": one of the cards linked to it (CR 607.2a), cast as this
+    // resolves or not at all (rulings).
+    if (/^[Cc]hoose a card exiled with ~ at random$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "You may cast it without paying its mana cost" && !ctx.spell) {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, fromLinked: true, randomOne: true, max: 1 });
+      si++;
+      continue;
+    }
     // "If that spell is countered this way, exile it instead of putting it into its owner's graveyard" (CR 701.6a),
     // "... put it on top of its owner's library instead of into that player's graveyard" (Memory Lapse).
     // Remand: "... put it into its owner's hand instead of into that player's graveyard".
@@ -16596,6 +16633,62 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (ex?.type !== "exile" || ex.until || ex.linked || ex.ownerMay || ex.youMay || ctx.targets.length > before + 1) return null;
       effects.push({ ...ex, suspend: Number(amt(susp[2] ?? susp[3]!)) });
       if (!susp[4]) si++;
+      continue;
+    }
+    // Sinister Concierge: "you may exile it and put three time counters on it. If you do, exile up to one target creature
+    // and put three time counters on it. Each card exiled this way that doesn't have suspend gains suspend.": the dead card,
+    // still in the graveyard (CR 400.7), and only once it's exiled, the target (a token ceases to exist, CR 704.5d).
+    const concierge = ctx.selfCard ? new RegExp(`^[Yy]ou may exile it and put ${NUM} time counters? on it$`).exec(s) : null;
+    const conciergeThen = concierge && new RegExp(`^If you do, (exile up to one target creature) and put ${NUM} time counters? on it$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (concierge && conciergeThen && /^Each card exiled this way that doesn't have suspend gains suspend\.?$/.test(sentences[si + 2] ?? "")) {
+      const before = ctx.targets.length;
+      const ex = parseOne(capital(conciergeThen[1]!), ctx);
+      if (ex?.length !== 1 || ex[0]!.type !== "exile" || ctx.targets.length !== before + 1) return null;
+      effects.push(
+        { type: "may", text: `exile it with ${concierge[1]} time counters on it`, effects: [{ type: "exile", what: { ref: "selfCard" }, suspend: Number(amt(concierge[1]!)) }] },
+        { type: "if", cond: { kind: "exiledThisWay", cards: true }, effects: [{ ...ex[0]!, suspend: Number(amt(conciergeThen[2]!)) }] },
+      );
+      si += 2;
+      continue;
+    }
+    // Rory Williams: "When you cast this spell ..., exile it with three time counters on it. It gains suspend.": the spell
+    // itself, if it's still on the stack, exiled (not countered) and suspended (CR 702.62b); a copy has ceased to exist
+    // (CR 707.10a). If the trigger is countered, it resolves normally (rulings).
+    const selfExileSusp = ctx.selfCastSpell ? new RegExp(`^[Ee]xile it with ${NUM} time counters? on it$`).exec(s) : null;
+    if (selfExileSusp && /^It gains suspend\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "counterSpell", index: -1, cause: true, exileSpell: true, suspend: Number(amt(selfExileSusp[1]!)) });
+      si++;
+      continue;
+    }
+    // The Eleventh Doctor: "you may exile a card from your hand with a number of time counters on it equal to its mana
+    // value. If it doesn't have suspend, it gains suspend.": one of your choice as this resolves (not a discard), with its
+    // own mana value in time counters (CR 702.62a-b).
+    if (/^[Yy]ou may exile a card from your hand with a number of time counters on it equal to its mana value$/.test(s) && /^If it doesn't have suspend, it gains suspend\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "may", text: "exile a card from your hand with time counters on it equal to its mana value (it gains suspend)", effects: [{ type: "discard", who: { ref: "you" }, n: 1, exile: true, suspendMv: true }] });
+      si++;
+      continue;
+    }
+    // The Wedding of River Song: "you may exile a nonland card from your hand with a number of time counters on it equal
+    // to its mana value. Then target opponent does the same. Cards exiled this way that don't have suspend gain suspend.":
+    // you, then that opponent, each deciding (CR 702.62).
+    if (/^(?:[Tt]hen )?[Yy]ou may exile a nonland card from your hand with a number of time counters on it equal to its mana value$/.test(s) && /^Then target opponent does the same\.?$/.test(sentences[si + 1] ?? "") && /^Cards exiled this way that don't have suspend gain suspend\.?$/.test(sentences[si + 2] ?? "")) {
+      const before = ctx.targets.length;
+      const who = parsePlayer("target opponent", ctx);
+      if (!who || ctx.targets.length !== before + 1) return null;
+      const nonland: TargetSpec = { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "nonland card" };
+      const fx: Effect[] = [{ type: "discard", who: { ref: "you" }, n: 1, exile: true, suspendMv: true, filter: nonland }];
+      const text = "exile a nonland card from your hand with time counters on it equal to its mana value (it gains suspend)";
+      effects.push({ type: "may", text, effects: fx }, { type: "eachMay", who, effects: fx, text, each: true });
+      si += 2;
+      continue;
+    }
+    // Ecstatic Beauty: "Put four time counters on each of those cards that has suspend": the cards the impulse before
+    // exiled, so they're suspended (CR 702.62b) and may still be played this turn.
+    const impulseSusp = effects.at(-1)?.type === "impulse" ? new RegExp(`^Put ${NUM} time counters on each of those cards that has suspend$`).exec(s) : null;
+    if (impulseSusp) {
+      const imp = effects.at(-1) as Extract<Effect, { type: "impulse" }>;
+      if ((imp.who && imp.who.ref !== "you") || imp.graveyards || imp.hand || imp.randomFromHand || imp.oneOf || imp.choose) return null;
+      effects.push({ type: "suspendImpulsed", n: Number(amt(impulseSusp[1]!)) });
       continue;
     }
     // "Put four time counters on the exiled card. If it doesn't have suspend, it gains suspend." (Jhoira of the Ghitu): the

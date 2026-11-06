@@ -653,6 +653,9 @@ export function compile(d: CardDef): CompiledCard {
       // card is put into your graveyard from anywhere other than the battlefield, ...": two events that never overlap, one
       // trigger for each.
       .replace(/^Whenever another artifact is put into your graveyard from the battlefield or an artifact card is put into your graveyard from anywhere other than the battlefield, ([^\n]+)$/m, "Whenever another artifact is put into your graveyard from the battlefield, $1\nWhenever an artifact card is put into your graveyard from anywhere other than the battlefield, $1")
+      // River Song's Diary: "if there are four or more cards exiled with ~, choose one of them at random": one of the cards
+      // exiled with it.
+      .replace(/^(At the beginning of your upkeep, if there are (?:two|three|four|five) or more cards exiled with ~, )choose one of them at random\. You may cast it without paying its mana cost\.$/m, "$1choose a card exiled with ~ at random. You may cast it without paying its mana cost.")
       // Call Damage Control: "Choose up to two. Return those cards from your graveyard to your hand." then "• Target
       // artifact card." and so on: each mode returns its one target.
       .replace(/^Choose up to two\. Return those cards from your graveyard to your hand\.((?:\n• Target [a-z]+ card\.)+)$/m, (_, b: string) => `Choose up to two —${b.replace(/• Target ([a-z]+) card\./g, "• Return target $1 card from your graveyard to your hand.")}`)
@@ -6398,8 +6401,9 @@ function linkExile(out: CompiledCard) {
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const searches = all.filter((e): e is Extract<Effect, { type: "search" }> => e.type === "search" && e.dest.zone === "exile" && !e.others && !e.split && !e.mayInstead && !e.condDest && !e.landTo && !e.cardTo);
-    // Kayla's Music Box: "exile it face down", always linked to its source.
-    const faceDown = all.filter((e) => e.type === "exileFaceDown");
+    // Kayla's Music Box: "exile it face down", always linked to its source. River Song's Diary: its spells exiled as they
+    // resolve, linked as they're exiled.
+    const faceDown = all.filter((e) => e.type === "exileFaceDown" || (e.type === "exileAsResolves" && !!e.linked));
     const others = all.some((e) => (e.type === "exile" && !!e.until) || (e.type === "search" && !searches.includes(e)) || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileHand" || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile) || (e.type === "castFromAmong" && !e.fromLinked));
     if (others || out.spell || impulses.length || tops.length + exiles.length + searches.length + faceDown.length !== 1 || out.exileInsteadOfDying) out.unsupported.push("(casts a card exiled with it that it can't link to one exile ability)");
     else if (faceDown.length) {

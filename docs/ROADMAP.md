@@ -1,7 +1,7 @@
 # Roadmap
 
-30,042 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,960 of 4,988 (99%), top 10,000: 9,602 of
+30,063 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,961 of 4,988 (99%), top 10,000: 9,611 of
 9,979 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2226,6 +2226,34 @@ line blocks.
    Charbelcher: with no land card, all the cards revealed count, rulings); "until you reveal a Doctor card, a card with
    doctor's companion, or a Vehicle card" (An Unearthly Child). Also fixed: a "you may search" answer was cleared by the
    search itself, so a "may" before a search with an opponent's choice asked twice. +8, 30,050 of 31,936 with B118 and B119.
+   Round 287 took the first names from the top that no earlier round looked at, and cards on the same pieces: "exile that
+   card instead of putting it into your graveyard as it resolves. If you do, return it to your hand at the beginning of the
+   next end step" (Feather, the Redeemed: a replacement on that spell made as the trigger resolves, kept with Feather gone,
+   not for a spell you don't own or one that doesn't resolve, rulings); "... If you do, it becomes plotted" (Lilah,
+   Undefeated Slickshot); "with three time counters on it ... Then if the exiled card doesn't have suspend, it gains
+   suspend" on a spell cast from your hand during an opponent's turn (Gandalf of the Secret Fire); "exile it instead of
+   putting it into a graveyard as it resolves" for every player's spells, linked to the artifact (River Song's Diary, with
+   "choose one of them at random. You may cast it without paying its mana cost" at your upkeep; Rod of Absorption, with
+   any number of them up to a total mana value X); "with a dream counter on it" and "cast a spell from among cards you own
+   in exile with dream counters on them" (Goliath Daydreamer: every such card, whatever exiled it); "The next time you
+   cast an instant or sorcery spell from your hand this turn, put that card into your hand instead" (Soulfire Grand
+   Master: used up even if that spell doesn't resolve, rulings); "you may exile a card from your hand with a number of time
+   counters on it equal to its mana value" (The Eleventh Doctor; The Wedding of River Song, then the target opponent the
+   same way: a card with mana value 0 gains suspend with no counters, so it isn't suspended, rulings); "When you cast this
+   spell from anywhere other than exile, exile it with three time counters on it. It gains suspend." (Rory Williams);
+   "you may exile it and put three time counters on it. If you do, exile up to one target creature ..." (Sinister
+   Concierge: only if the dead card was still in the graveyard to exile); "sacrifice all other permanents you control and
+   discard your hand" (Hellcarver Demon); "Put four time counters on each of those cards that has suspend" after an
+   impulse (Ecstatic Beauty). +13, 30,063 of 31,936 with B118 and B119.
+   Known gap from round 287: when a spell exiled as it resolves (Feather, Lilah, Gandalf, River Song's Diary, Rod of
+   Absorption, Goliath Daydreamer) also has buyback, rebound or an Adventure's exile, its controller would choose which
+   replacement applies (CR 616.1); the engine applies the exile (with flashback's exile, Feather's goes first, which is the
+   choice its rulings allow). Two Rods or Diaries: the first trigger to resolve is the one that exiles it (its controller
+   chooses, rulings).
+   Out after round 287 (looked at, not done): Haldan, Avid Arcanist and Evelyn, the Covetous ("cards you exiled": who
+   exiled a card isn't tracked); Blim, Comedic Genius ("permanents they control but don't own"); The Beamtown Bullies
+   ("Target opponent whose turn it is puts ... onto the battlefield under their control"); Forger's Foundry (an exile as it
+   resolves chosen as mana is spent).
    Out after round 286 (looked at, not done): Undead Alchemist and Szadek, Lord of Secrets (damage replaced by milling,
    ordered with prevention and other replacements, CR 616.1); Turtles Forever (a search of your library and outside the
    game); Panglacial Wurm (cast from your library while searching it).

@@ -575,6 +575,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           ...(e.uncounterable ? { uncounterable: true as const } : {}),
           ...(e.fromHand ? { fromHand: true as const } : {}),
           ...(e.flash ? { flash: true as const } : {}),
+          ...(e.toHand ? { toHand: true as const } : {}),
           ...(ctx.x ? { x: ctx.x } : {}),
         });
       return;
@@ -980,6 +981,18 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const stackOnly = (k: string) => k === "Rebound" || k === "Sunburst" || /^Bloodthirst \d+$/.test(k);
       const mods = e.mods.flatMap((x): Modification[] => (x.kind !== "addKeywords" ? [x] : x.keywords.some((k) => !stackOnly(k)) ? [{ ...x, keywords: x.keywords.filter((k) => !stackOnly(k)) }] : []));
       if (mods.length) (o.spellGains ??= []).push({ mods, timestamp: s.nextTimestamp++, controller: ctx.controller, source: src, ...(e.forever ? { forever: true as const } : {}), ...(e.whileSpell ? { whileSpell: true as const } : {}), ...(e.until ? { until: e.until } : {}) });
+      return;
+    }
+    case "exileAsResolves": {
+      // The spell that triggered this, while it's still that spell on the stack (CR 400.7); a copy isn't a card and never
+      // goes to a graveyard (CR 707.10a), so it isn't exiled. One its controller doesn't own isn't going to your graveyard
+      // (rulings on Feather, the Redeemed).
+      const item = ctx.cause ? s.stack.find((x) => x.id === ctx.cause) : undefined;
+      const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+      if (!o || o.zone !== "stack" || o.spellCopy || o.isToken) return;
+      if (!e.anyGraveyard && o.owner !== ctx.controller) return;
+      const link = e.linked && ctx.sourceId ? `${ctx.sourceId}@${ctx.sourceZc ?? 0}` : undefined;
+      (o.exileAsResolves ??= []).push({ by: ctx.controller, zc: o.zoneChanges ?? 0, src, ...(e.then ? { then: e.then } : {}), ...(e.suspend ? { suspend: e.suspend } : {}), ...(link ? { link } : {}), ...(e.anyGraveyard ? { anyGraveyard: true as const } : {}), ...(e.counters ? { counters: e.counters } : {}) });
       return;
     }
     case "spellUncounterable": {

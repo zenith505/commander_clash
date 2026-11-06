@@ -2088,6 +2088,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       } else if (d.cascade && spell) {
         nextCastCascade = true;
         s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
+      } else if (d.toHand) {
+        // Soulfire Grand Master: used up by this spell, which goes to its owner's hand as it resolves, not if it doesn't
+        // resolve (rulings); a copy isn't a card (CR 707.10a).
+        if (spell && !spell.spellCopy) spell.toHandOnResolve = true;
       } else if (d.storm) {
         // "Has storm" (Crackling Spellslinger): likewise the spell's own storm ability (CR 702.40a).
         if (spell) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: STORM_BODY, cause: ev.stackId });
@@ -2095,7 +2099,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       else if (!d.cascade) s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId, ...(d.x ? { x: d.x } : {}) });
     }
     // Casualty's copy only if its casualty cost was paid (CR 702.153a).
-    if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifKicked || kickedMatches(item?.kicked, t.ifKicked)) && (!t.ifCasualty || !!item?.casualty) && (!t.ifX || (item?.x ?? 0) >= t.ifX) && (!t.ifConspired || !!item?.conspired) && (!t.ifSpent || spentMeets(ev.spent, t.ifSpent)) && (!t.castFromHand || spell.castFrom === "hand"), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked, ev.manaSpent ? { manaSpent: ev.manaSpent } : undefined); // Prossh: the mana spent on it (CR 601.2h)
+    if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifKicked || kickedMatches(item?.kicked, t.ifKicked)) && (!t.ifCasualty || !!item?.casualty) && (!t.ifX || (item?.x ?? 0) >= t.ifX) && (!t.ifConspired || !!item?.conspired) && (!t.ifSpent || spentMeets(ev.spent, t.ifSpent)) && (!t.castFromHand || spell.castFrom === "hand") && (!t.castNotFromExile || spell.castFrom !== "exile"), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked, ev.manaSpent ? { manaSpent: ev.manaSpent } : undefined); // Prossh: the mana spent on it (CR 601.2h)
     // Conspire a permanent gave the spell (Raiding Schemes): the spell's own "if its conspire cost was paid, copy it" (CR 702.78a).
     // Only if it still has conspire as it becomes cast: sacrificing Wort to cast it takes it away (rulings).
     // Each instance paid copies it (CR 702.78b): its printed one first (its own trigger above), then one for each grant

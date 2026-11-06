@@ -4872,7 +4872,10 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   s.playingLand = id;
   // Mariposa Military Base: not untapped means its player has it enter tapped, and they get the rad counters (CR 614.1c).
   const tapRad = choice?.kind === "mayTapRad" && !untapped ? choice.n : 0;
-  moveObject(s, id, "battlefield", { controller: p.id, untapped, ...(tapRad ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}) });
+  // Kaldring, the Rimestaff: played with that card's own permission, "it enters tapped" (CR 614.1c); with Crucible of
+  // Worlds or mayhem too, its player plays it that way instead.
+  const permitTapped = fromZone === "graveyard" && !!o.mayPlay?.tapped && ownGraveyardPlay(s, o, p.id) && !mayhemPlay(s, o) && !landsFromGraveyardNow(s, p.id, o);
+  moveObject(s, id, "battlefield", { controller: p.id, untapped: untapped && !permitTapped, ...(tapRad || permitTapped ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}) });
   s.playingLand = undefined;
   log(s, `${p.name} plays ${d.name}${from}${obj(s, id).tapped ? " (tapped)" : ""}.`);
   if (tapRad) {
@@ -5449,7 +5452,7 @@ function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostCh
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "offering" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "offering" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor" | "permit"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
   how = convertChoices(o, how);
   // As the face cast, only that face's mana cost (CR 709.3a, 712.11c, 715.3a).
   if (how.face !== undefined && o.face !== how.face) return asFace(s, o, how.face, () => spellCost(s, pid, o, x, kicks, how));
@@ -5575,7 +5578,10 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const pend = s.pending;
   // Vizier of the Menagerie: any creature spell, wherever it's cast from (rulings); bestowed, it's an Aura spell (CR 702.103b).
   const creatureAnyType = asAura.types.includes("Creature") && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).spendAnyTypeCreatureSpells);
-  const anyTypeNow = !!exiled?.anyType || (pend?.kind === "castFree" && pend.player === pid && pend.objectId === o.id && !!pend.anyType) || creatureAnyType;
+  // Whispersteel Dagger: cast with its "this turn" permission from that player's graveyard, "you may spend mana as though it
+  // were mana of any color to cast that spell" (CR 609.4b).
+  const grantAnyType = how.via === "turnPermission" && !!((k) => k && s.graveGrants?.find((g) => g.key === k)?.anyType)(castPermit(s, o.id, d, x, how.permit, pid));
+  const anyTypeNow = !!exiled?.anyType || (pend?.kind === "castFree" && pend.player === pid && pend.objectId === o.id && !!pend.anyType) || creatureAnyType || grantAnyType;
   const anyType = (c: ParsedCost): ParsedCost => (anyTypeNow ? { ...c, symbols: c.symbols.map((y) => (y.kind === "colored" || y.kind === "hybrid" || y.kind === "twoHybrid" ? { kind: "generic" as const, amount: 1 } : y)) } : c);
   // "You may play that card without paying its mana cost" (Intet, CR 118.9): additional costs are still paid.
   // Prototyped isn't an alternative cost (CR 718.3): it's still free.
@@ -6430,6 +6436,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   // Undead Sprinter: "If you do, ~ enters with a +1/+1 counter on it": the spell cast with that permission (CR 614.1c).
   if (via?.entersWith) o.extraCounters = { ...o.extraCounters, [via.entersWith.counter]: (o.extraCounters?.[via.entersWith.counter] ?? 0) + via.entersWith.n };
+  // Kaldring, the Rimestaff: "If you do, it enters tapped": the permanent this spell becomes (CR 614.1c).
+  if (via?.entersTapped) o.castEntersTapped = true;
   // "Once each turn, you may pay {0} ..." (As Foretold): that permanent's permission is used up for this turn.
   if (choices.alt === "payZero") {
     const by = payZeroSource(s, p.id, o)!;
@@ -6673,7 +6681,7 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
   if (named) return named;
   // "Your opponents can't cast spells this turn" (Silence) and the like.
   for (const c of s.cantCastThisTurn ?? [])
-    if (c.player === pid && !(c.afterCasts !== undefined && (s.castThisTurn ?? []).filter((x) => x.player === pid).length < c.afterCasts) && (c.turn === s.turn || c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined) && !(c.duringTheirNextTurn && !(s.activePlayer === pid && (player(s, pid).turnBegan ?? 0) > c.turn)) && (!c.filter || printedMatches(c.filter, d))) return c.afterCasts !== undefined ? `${c.source}: you can't cast more spells this turn` : `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells ${c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined ? "for now" : "this turn"}`;
+    if (c.player === pid && !(c.afterCasts !== undefined && (s.castThisTurn ?? []).filter((x) => x.player === pid).length < c.afterCasts) && (c.turn === s.turn || c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined) && !(c.duringTheirNextTurn && !(s.activePlayer === pid && (player(s, pid).turnBegan ?? 0) > c.turn)) && (!c.filter || printedMatches(c.filter, d)) && (c.mv === undefined || (mv !== undefined ? mv === c.mv : !parseManaCost(d.manaCost).hasX && defMv(d) === c.mv))) return c.afterCasts !== undefined ? `${c.source}: you can't cast more spells this turn` : `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells ${c.mv !== undefined ? `with mana value ${c.mv} ` : ""}${c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined ? "for now" : "this turn"}`;
   // Permanents, and emblems in the command zone (CR 114.4).
   for (const o of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
     // "Each opponent can cast spells only any time they could cast a sorcery" (Teferi, Time Raveler).
@@ -6782,7 +6790,7 @@ export function graveyardWays(s: GameState, o: GameObject, caster?: PlayerId): C
  * How much a permission to cast from a graveyard asks beyond the card's mana cost, for picking among several: costs on
  * top or a counter as it enters (Noctis, Prince of Lucis), then exile afterwards (Jaya Ballard's emblem). 0: nothing.
  */
-const permissionBurden = (w: CastFromGraveyard) => (w.costs.length || w.entersWith ? 2 : 0) + (w.exileIfToGraveyard ? 1 : 0);
+const permissionBurden = (w: CastFromGraveyard) => (w.costs.length || w.entersWith || w.entersTapped ? 2 : 0) + (w.exileIfToGraveyard ? 1 : 0);
 
 /**
  * Escape, flashback or retrace a permanent its owner controls gives this card in their graveyard (Underworld Breach,
@@ -6799,7 +6807,7 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
     // Vohar, Vodalian Desecrator: "If that spell would be put into your graveyard, exile it instead".
     // Sins of the Past: "without paying its mana cost" (CR 118.9): a {0} cost, so X is 0 (CR 107.3b) and no alternative
     // cost can be paid (rulings).
-    out.push({ kind: "permission", mana: m.free ? "{0}" : d.manaCost, costs: [], exile: false, ...(m.exileAfter ? { exileIfToGraveyard: true as const } : {}), ...(m.free ? { free: true as const } : {}) });
+    out.push({ kind: "permission", mana: m.free ? "{0}" : d.manaCost, costs: [], exile: false, ...(m.exileAfter ? { exileIfToGraveyard: true as const } : {}), ...(m.free ? { free: true as const } : {}), ...(m.tapped ? { entersTapped: true as const } : {}) });
   // Permanents, and emblems in the command zone (Wrenn and Realmbreaker's, CR 114.4).
   for (const p of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
     if (controllerOf(s, p) !== o.owner) continue;
@@ -6854,7 +6862,8 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
   // the once-each-turn permissions (rulings: each activation is a permission of its own).
   const used = s.turnLog?.gravePermits ?? [];
   // Locke, Treasure Hunter: one spell from among the cards milled, for its controller, whoever owns them.
-  const fits = (g: NonNullable<GameState["graveGrants"]>[number]) => (g.cards ? g.player === caster && g.cards.some((c) => c.id === o.id && c.zc === (o.zoneChanges ?? 0)) : g.player === o.owner);
+  // Whispersteel Dagger: for its controller, a card in the graveyard of the player its creature damaged.
+  const fits = (g: NonNullable<GameState["graveGrants"]>[number]) => (g.cards ? g.player === caster && g.cards.some((c) => c.id === o.id && c.zc === (o.zoneChanges ?? 0)) : g.fromYardOf !== undefined ? g.player === caster && o.owner === g.fromYardOf : g.player === o.owner);
   const grants = d.manaCost ? (s.graveGrants ?? []).filter((g) => fits(g) && g.turn === s.turn && !used.includes(g.key) && printedMatches(g.filter, d)).map((g) => g.key) : [];
   if (grants.length) {
     const had = out.find((w) => w.kind === "turnPermission");
@@ -8120,6 +8129,15 @@ export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: A
       if (!z) continue;
       less += z.n;
       if (z.atLeastOne) atLeastOne = true;
+    }
+  // Convergence of Dominion: an ability of a card in its controller's graveyard (CR 602.2b, 601.2f).
+  if (o.zone === "graveyard")
+    for (const id of s.battlefield) {
+      const src = obj(s, id);
+      const g = controllerOf(s, src) === o.owner ? abilitiesOf(s, src).graveyardActivationLess : undefined;
+      if (!g || (g.if && !staticConditionNow(s, g.if, src.id, o.owner))) continue;
+      less += g.n;
+      if (g.atLeastOne) atLeastOne = true;
     }
   less += firstArtifactLess(s, pid, o, !!ab.mana);
   return activationLessCost(s, o, activationCostBefore(s, pid, o, ab, targets), x, less ? { n: less, atLeastOne } : undefined);

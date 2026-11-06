@@ -1380,7 +1380,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // With The Great Work, any graveyard's instants and sorceries.
     const anyYard = s.graveyardTurn?.some((g) => g.anyGraveyard && g.player === pid && g.turn === s.turn);
     // Locke, Treasure Hunter: the cards it milled, in anyone's graveyard.
-    const milled = (s.graveGrants ?? []).flatMap((g) => (g.cards && g.player === pid && g.turn === s.turn && !(s.turnLog?.gravePermits ?? []).includes(g.key) ? g.cards.map((c) => c.id) : []));
+    // Whispersteel Dagger: the damaged player's graveyard.
+    const milled = (s.graveGrants ?? []).flatMap((g) => (g.player === pid && g.turn === s.turn && !(s.turnLog?.gravePermits ?? []).includes(g.key) ? (g.cards ? g.cards.map((c) => c.id) : g.fromYardOf !== undefined ? [...(s.players[g.fromYardOf]?.graveyard ?? [])] : []) : []));
     const fromYard = [...new Set([...(anyYard ? s.players.flatMap((q) => q.graveyard) : p.graveyard), ...milled.filter((id) => s.objects[id]?.zone === "graveyard")])].filter((id) => graveyardWays(s, obj(s, id), pid).length);
     // Cards exiled with "you may play them until ..." first: they won't wait (impulse draw).
     const options = [...exilePlayable(s, pid), ...topPlayable(s, pid), ...p.command, ...p.hand, ...fromYard]

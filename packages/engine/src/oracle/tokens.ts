@@ -239,7 +239,8 @@ export function parseCopyExcept(text: string, round?: "up" | "down"): CopyExcept
   const quoted: string[] = [];
   let t = text.replace(/"([^"]+)"/g, (_, q: string) => `\u0000${quoted.push(q) - 1}\u0000`);
   // "Except the token has ..." (Mythos of Illuna) says the same as "except it has".
-  t = t.replace(/^(?:it|they|he|she|the tokens?) /, "");
+  // Echoing Equation: "except those creatures aren't legendary" (each creature that becomes a copy).
+  t = t.replace(/^(?:it|they|he|she|the tokens?|those creatures) /, "");
   const parts = t.split(/,? and (?=(?:it|they|he|she|its|his|her|is|are|has|have|isn't|aren't)\b)|, (?=(?:it|they|he|she|its|his|her|is|are|has|have|isn't|aren't)\b)/).map((p) => p.trim().replace(/^(?:it|they|he|she) /, ""));
   for (const p of parts) {
     let m: RegExpExecArray | null;

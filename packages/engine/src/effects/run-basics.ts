@@ -271,6 +271,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           if (!("object" in ev.to)) return [ev];
           const o = obj(s, ev.to.object);
           const excess = excessOver(lethalAmounts(s, from, o), ev.n);
+          if (excess && s.resolving) s.resolving.excessRedirected = (s.resolving.excessRedirected ?? 0) + excess;
           return excess ? [{ ...ev, n: ev.n - excess }, { src: from, to: { player: controllerOf(s, o) }, n: excess }] : [ev];
         });
       // Errant Minion: "Prevent X of that damage": prevented as it would be dealt (CR 615.1a), unless damage can't be
@@ -346,7 +347,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       s.preventCombatDamage = true;
       log(s, `${src}: all combat damage will be prevented this turn.`);
       return;
-    case "cantCast":
+    case "cantCast": {
+      const mvIs = e.mvIs !== undefined ? evalAmount(s, e.mvIs, amountCtx(s, ctx)) : undefined;
       for (const pid of players(s, e.who, ctx)) {
         if (e.oneMore) {
           // Irencrag Feat: one more spell this turn, counted from now (rulings); it doesn't lift any other ban.
@@ -355,10 +357,11 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           log(s, `${player(s, pid).name} can cast only one more spell this turn.`);
           continue;
         }
-        (s.cantCastThisTurn ??= []).push({ player: pid, turn: s.turn, ...(e.filter ? { filter: e.filter } : {}), source: src, ...(e.untilYourNextTurnEnds ? { untilEndOfTurnOf: ctx.controller } : {}), ...(e.untilYourNextTurn ? { untilTurnOf: ctx.controller } : {}), ...(e.duringTheirNextTurn ? { untilEndOfTurnOf: pid, duringTheirNextTurn: true as const } : {}) });
-        log(s, `${player(s, pid).name} can't cast ${e.filter ? `${e.filter.text.replace(/ spell$/, "")} ` : ""}spells ${e.duringTheirNextTurn ? "during their next turn" : e.untilYourNextTurnEnds ? `until the end of ${player(s, ctx.controller).name}'s next turn` : e.untilYourNextTurn ? `until ${player(s, ctx.controller).name}'s next turn` : "this turn"}.`);
+        (s.cantCastThisTurn ??= []).push({ player: pid, turn: s.turn, ...(e.filter ? { filter: e.filter } : {}), ...(mvIs !== undefined ? { mv: mvIs } : {}), source: src, ...(e.untilYourNextTurnEnds ? { untilEndOfTurnOf: ctx.controller } : {}), ...(e.untilYourNextTurn ? { untilTurnOf: ctx.controller } : {}), ...(e.duringTheirNextTurn ? { untilEndOfTurnOf: pid, duringTheirNextTurn: true as const } : {}) });
+        log(s, `${player(s, pid).name} can't cast ${e.filter ? `${e.filter.text.replace(/ spell$/, "")} ` : ""}spells ${mvIs !== undefined ? `with mana value ${mvIs} ` : ""}${e.duringTheirNextTurn ? "during their next turn" : e.untilYourNextTurnEnds ? `until the end of ${player(s, ctx.controller).name}'s next turn` : e.untilYourNextTurn ? `until ${player(s, ctx.controller).name}'s next turn` : "this turn"}.`);
       }
       return;
+    }
     case "blockTaxThisTurn": {
       const n = Math.max(0, evalAmount(s, e.n, amountCtx(s, ctx)));
       s.blockTaxes = [...(s.blockTaxes ?? []).filter((b) => b.turn === s.turn), { turn: s.turn, n }];
@@ -439,7 +442,13 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Locke: the cards milled, as they are now (CR 400.7).
       const cards = e.milled ? [...(s.resolving?.milled ?? [])] : undefined;
       if (cards && !cards.length) return;
-      (s.graveGrants ??= []).push({ key: `grant${s.nextId++}`, player: ctx.controller, turn: s.turn, filter: e.filter, source: src, ...(e.rider ? { rider: e.rider } : {}), ...(cards ? { cards } : {}) });
+      const yardOf = e.fromYardOf ? players(s, e.fromYardOf, ctx)[0] : undefined;
+      if (e.fromYardOf && yardOf === undefined) return;
+      (s.graveGrants ??= []).push({ key: `grant${s.nextId++}`, player: ctx.controller, turn: s.turn, filter: e.filter, source: src, ...(e.rider ? { rider: e.rider } : {}), ...(cards ? { cards } : {}), ...(yardOf !== undefined ? { fromYardOf: yardOf } : {}), ...(e.anyType ? { anyType: true as const } : {}) });
+      if (yardOf !== undefined) {
+        log(s, `${player(s, ctx.controller).name} may cast a ${e.filter.text.replace(/ card$/, "")} spell from ${player(s, yardOf).name}'s graveyard this turn${e.anyType ? ", spending mana as though it were mana of any color" : ""} (${src}).`);
+        return;
+      }
       if (cards) log(s, `${player(s, ctx.controller).name} may cast a spell from among ${cards.map((c) => defOf(s, obj(s, c.id)).name).join(", ")} this turn (${src}).`);
       else log(s, `${player(s, ctx.controller).name} may cast a ${e.filter.text.replace(/ card$/, "")} spell from their graveyard this turn (${src}).`);
       return;

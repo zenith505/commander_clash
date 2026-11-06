@@ -16,7 +16,7 @@
 // another (CR 613.8). Once an effect starts applying, it keeps applying to the same
 // objects in later layers even if its source loses the ability meanwhile (CR 613.6).
 
-import { creatureCardAbove } from "./graveyard";
+import { creatureCardAbove, creatureCardsAbove } from "./graveyard";
 import type { AbilityBody, Affects, Amount, DamageMod, Modification, MostStat, StaticAbility, StaticCondition, TargetSpec, TimingWindow, TurnPoint, Untargetable } from "./abilities";
 import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
@@ -728,7 +728,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return !!s.turnLog?.damagedCreature?.includes(`${src.id}@${src.zoneChanges ?? 0}`);
     case "selfInGraveyard": // the card's own graveyard ability's intervening if (CR 603.4)
       // Nether Spirit: no other creature card there (rulings: two of them stop each other), as the cards are there.
-      return src.zone === "graveyard" && src.owner === you && (!cond.creatureAbove || creatureCardAbove(s, src)) && (!cond.onlyCreature || (defOf(s, src).types.includes("Creature") && !(s.players[you]?.graveyard ?? []).some((id) => id !== src.id && !!s.objects[id] && defOf(s, s.objects[id]!).types.includes("Creature"))));
+      return src.zone === "graveyard" && src.owner === you && (!cond.creatureAbove || creatureCardAbove(s, src)) && (cond.creaturesAbove === undefined || creatureCardsAbove(s, src) >= cond.creaturesAbove) && (!cond.onlyCreature || (defOf(s, src).types.includes("Creature") && !(s.players[you]?.graveyard ?? []).some((id) => id !== src.id && !!s.objects[id] && defOf(s, s.objects[id]!).types.includes("Creature"))));
     case "topCardIs": {
       const top = s.objects[s.players[you]?.library[0] ?? ""];
       return !!top && printedMatches(cond.filter, defOf(s, top));

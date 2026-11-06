@@ -1441,7 +1441,9 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   const wasHistoric = attached && attachedM![3] === "leaves the battlefield" ? /^if it was historic, (.+)$/.exec(bodyText) : null;
   if (wasHistoric) bodyText = wasHistoric[1]!;
   // Koll, the Forgemaster: "if it was enchanted or equipped": what was attached to it as it last existed (CR 603.10a).
-  const wasAttached = attached ? null : /^if it was (enchanted or equipped|enchanted|equipped), (.+)$/.exec(bodyText);
+  // Dawn Evangel: "if an Aura you controlled was attached to it": one controlled by the watcher's controller, as both last
+  // existed on the battlefield (CR 603.10a; rulings: any player's creature, Dawn Evangel itself too).
+  const wasAttached = attached ? null : /^if it was (enchanted or equipped|enchanted|equipped), (.+)$/.exec(bodyText) ?? ((x) => (x ? ([x[0], "enchanted by an Aura you controlled", x[1]] as unknown as RegExpExecArray) : null))(/^if an Aura you controlled was attached to it, (.+)$/.exec(bodyText));
   if (wasAttached) bodyText = wasAttached[2]!;
   const hadKw = attached ? null : /^if it (didn't have|had) ([\w ]+?), (.+)$/.exec(bodyText);
   const kw = hadKw ? parseKeywordList(hadKw[2]!) : null;
@@ -1517,7 +1519,7 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   const had = hadKw && kw ? (hadKw[1] === "had" ? { keywords: [...(filter.keywords ?? []), ...kw] } : { notKeywords: [...(filter.notKeywords ?? []), ...kw] }) : {};
   if (wasPT && filter[wasPT[1] as "power" | "toughness"]) return "fail";
   if (wasAttached && (filter.status || hadKw || wasPT)) return "fail";
-  const attachedStatus = wasAttached ? { status: wasAttached[1] === "enchanted or equipped" ? ("enchantedOrEquipped" as const) : (wasAttached[1] as "enchanted" | "equipped") } : {};
+  const attachedStatus = wasAttached ? { status: wasAttached[1] === "enchanted or equipped" ? ("enchantedOrEquipped" as const) : wasAttached[1] === "enchanted by an Aura you controlled" ? ("enchantedByYours" as const) : (wasAttached[1] as "enchanted" | "equipped") } : {};
   const wasRange = wasPT ? { [wasPT[1]!]: ptRange } : {};
   return {
     event: "permanentDies",
@@ -3581,6 +3583,28 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger("At the beginning of your upkeep, you may return ~ from your graveyard to the battlefield.");
     if (!t || t === "fail" || t.zone !== "graveyard" || t.ifCond) return "fail";
     return { ...t, ifCond: { kind: "selfInGraveyard", onlyCreature: true } };
+  }
+  // Nether Shadow: "At the beginning of your upkeep, if ~ is in your graveyard with three or more creature cards above it,
+  // you may put ~ onto the battlefield": cards put into that graveyard after it (rulings), counted as it triggers and as
+  // it resolves (CR 603.4).
+  const shadow = /^At the beginning of your upkeep, if ~ is in your graveyard with (two|three|four|five) or more creature cards above it, you may put ~ onto the battlefield\.$/.exec(line);
+  if (shadow) {
+    const t = parseTrigger("At the beginning of your upkeep, you may return ~ from your graveyard to the battlefield.");
+    if (!t || t === "fail" || t.zone !== "graveyard" || t.ifCond) return "fail";
+    const fx = t.body.effects[0];
+    if (t.body.effects.length !== 1 || fx?.type !== "may") return "fail";
+    return { ...t, body: { ...t.body, effects: [{ ...fx, text: "put ~ onto the battlefield" }], text: "you may put ~ onto the battlefield." }, ifCond: { kind: "selfInGraveyard", creaturesAbove: ["two", "three", "four", "five"].indexOf(shadow[1]!) + 2 } };
+  }
+  // Ichorid: "At the beginning of your upkeep, if ~ is in your graveyard, you may exile a black creature card other than ~
+  // from your graveyard. If you do, return ~ to the battlefield": the same, a card from the graveyard as the payment (an
+  // Ichorid that exiled another can't be returned by its own ability then, rulings: not in the graveyard as it resolves).
+  const ichorid = /^(At the beginning of your upkeep), if ~ is in your graveyard, (you may exile an? [^.]+ from your graveyard)\. If you do, return ~ to the battlefield\.$/.exec(line);
+  if (ichorid) {
+    const t = parseTrigger(`${ichorid[1]}, draw a card.`);
+    if (!t || t === "fail" || t.event !== "yourUpkeep" || t.zone || t.ifCond || t.host) return "fail";
+    const body = parseBody(`${capital(ichorid[2]!)}. If you do, return ~ from your graveyard to the battlefield.`, { selfCard: true });
+    if (!body || !allEffects(body.effects).some((e) => e.type === "chooseFromGraveyard" && e.dest === "exile")) return "fail";
+    return { ...t, body: { ...body, text: `${ichorid[2]}. If you do, return ~ to the battlefield.` }, zone: "graveyard", ifCond: { kind: "selfInGraveyard" } };
   }
   // "At the beginning of your upkeep, if ~ is in your graveyard, you may pay {2}{G}. If you do, return target creature
   // card from your graveyard to your hand." (Genesis): the same, about other cards; its target may be the card itself.

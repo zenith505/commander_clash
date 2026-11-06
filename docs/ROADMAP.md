@@ -1,6 +1,6 @@
 # Roadmap
 
-30,032 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,042 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,960 of 4,988 (99%), top 10,000: 9,602 of
 9,979 (96%).
 
@@ -5781,6 +5781,20 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   player or planeswalker", not a battle, CR 506.2), Vhati il-Dal (base power 1 or base toughness 1, chosen as it resolves,
   rulings; the choice prompt has a browser test, and a bot takes an opponent's creature's greater stat down). +10 (30,032 of
   31,936 with rounds 284 and 285).
+- Round B119 (single-line blockers from the skip lists, least played first): Sivvi's Valor ("All damage that would be
+  dealt to target creature this turn is dealt to you instead") and Treacherous Link (all damage to the enchanted creature
+  is dealt to its controller instead), both redirections, CR 614.9, Quarry Hauler and Dramatist's Puppet ("for each
+  kind of counter on target permanent, put another counter of that kind on it or remove one from it": each kind chosen
+  in turn, then all at once, rulings; a new add-or-remove prompt with a browser test, and a bot that adds helpful kinds to
+  its own permanents and harmful ones to an opponent's), Necromancer's Magemark (an enchanted creature you control that
+  would die returns to its owner's hand instead, CR 614.6), Earnest Fellowship (protection from each of its own colors,
+  layer 6; a colorless creature has none), Memory Crystal and Warbringer (buyback and dash cost {2} less, generic
+  mana only, CR 118.7a), Thick-Skinned Goblin (pay {0} rather than the echo cost, mana or not; the echo trigger's "may"
+  now carries an echo flag, so every echo card's compiled form changes, nothing else), Kenku Artificer ("That artifact
+  becomes ..." after its counters). +10 (30,042 of 31,936 with round 285 and B118).
+- Out after round B119 (looked at, not done): Gloom (activated abilities of white enchantments cost {3} more: mana
+  abilities too, and their cost paths take no tax), Kodama of the Center Tree (soulshift X, X counted as the trigger
+  goes on the stack), Invoke the Ancients (a separate counter choice for each of the two tokens created, rulings).
 - Out after round B118 (looked at, not done): Flying Drone ("another creature with flying entered the battlefield under your
   control this turn": the turn's enter log doesn't keep keywords), Cellar Door ("puts the bottom card of their library into
   their graveyard": not a mill, CR 701.17a, so it needs a move of its own), Relive the Past (three "up to one" graveyard

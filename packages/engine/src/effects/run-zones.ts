@@ -558,6 +558,11 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
       }
       sc.queue = [chooser];
       sc.chosen = {};
+      // Planar Overlay: the ones chosen are returned, so the question is which one goes.
+      if (e.bounceChosen) {
+        s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "bounce", what: k.filter.text, options, count: max, prompt: `click ${/^[AEIOU]/.test(k.filter.text) ? "an" : "a"} ${k.filter.text} of yours to return to its owner's hand.` };
+        return "paused";
+      }
       s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...(k.upTo ? { min: 0 } : {}), ...(e.destroy ? { destroy: true as const } : {}), ...(e.bounce ? { bounce: true as const } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}), ...(e.payLife !== undefined ? { payLife: lifeEach } : {}), ...(e.sparesTypeOfKept ? { sparesKin: true as const } : {}) };
       return "paused";
     }
@@ -577,13 +582,20 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
         log(s, `${player(s, pid).name} puts ${put === 1 ? "a" : put} ${e.counter} counter${put === 1 ? "" : "s"} on ${nameOf(s, id)}.`);
       }
       invalidateCharacteristics(s);
-    } else if (kept.size) log(s, `${player(s, pid).name} keeps ${[...kept].map((id) => nameOf(s, id)).join(", ")}${e.payLife !== undefined ? ` and pays ${lifeEach * kept.size} life` : ""}.`);
+    } else if (kept.size && !e.bounceChosen) log(s, `${player(s, pid).name} keeps ${[...kept].map((id) => nameOf(s, id)).join(", ")}${e.payLife !== undefined ? ` and pays ${lifeEach * kept.size} life` : ""}.`);
     // Killing Wave: the life is paid as the creatures are sacrificed, all at once (rulings).
     if (e.payLife !== undefined && kept.size && lifeEach > 0) payLife(s, pid, lifeEach * kept.size);
     keptAll.push(...kept);
     // Winnowing: only those sharing no creature type with the kept one (CR 702.73a: a changeling shares them all).
     const keptTypes = e.sparesTypeOfKept ? [...kept].filter((id) => s.objects[id]?.zone === "battlefield").map((id) => creatureTypesOf(s, obj(s, id))) : [];
     gone.push(...among(pid).filter((id) => !kept.has(id) && !(e.sparesTypeOfKept && keptTypes.some((t) => shareCreatureType(t, creatureTypesOf(s, obj(s, id)))))));
+  }
+  // Planar Overlay: the chosen lands return at the same time (one chosen for several types returns once).
+  if (e.bounceChosen) {
+    const back = [...new Set(keptAll)].filter((id) => s.objects[id]?.zone === "battlefield");
+    if (back.length) log(s, `${src} returns ${back.map((id) => nameOf(s, id)).join(", ")} to ${back.length === 1 ? "its owner's hand" : "their owners' hands"}.`);
+    for (const id of back) moveObject(s, id, "hand");
+    return;
   }
   if (e.counter && s.resolving) s.resolving.created = keptAll.filter((id) => s.objects[id]?.zone === "battlefield");
   if (e.destroy) {
@@ -3134,6 +3146,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Owners choosing for several objects (Aetherspouts): the active player makes all of their choices first, then each
       // other player in turn order (rulings, CR 101.4).
       const order = e.position === "ownersChoice" ? apnap(s, s.turnOrder) : [];
+      // Lost in the Woods: "Then put the revealed card on the bottom of your library": the card revealed from the top,
+      // still there, moves to the bottom of that library (no zone change, CR 400.7).
+      if (e.what.ref === "revealed" && e.position === "bottom")
+        for (const o of objects(s, e.what, ctx).filter((x) => x.zone === "library")) {
+          const lib = player(s, o.owner).library;
+          lib.splice(lib.indexOf(o.id), 1);
+          lib.push(o.id);
+          log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} on the bottom of their library.`);
+        }
       // Back after an owner's choice: those already put there are done (Tolarian Contempt's several targets).
       const todo = objects(s, e.what, ctx).filter((o) => o.zone !== "library");
       if (order.length) todo.sort((a, b) => order.indexOf(a.owner) - order.indexOf(b.owner));

@@ -1779,7 +1779,14 @@ function parseAttackerTrigger(line0: string): TriggeredAbility | "fail" | null {
   if (you) {
     const filter = parseTargetPhrase(you[2]!);
     if (!filter || filter.kind !== "object" || filter.controller || !filter.types?.includes("Creature")) return "fail";
-    const body = parseBody(you[4]!.replace(/\bthat creature\b(?!'s)/g, "it"), { subjectIt: true });
+    // Lost in the Woods: "reveal the top card of your library. If it's a Forest card, remove that creature from combat.
+    // Then put the revealed card on the bottom of your library.": one trigger for each attacker, each with its own card
+    // (rulings); removed from combat it stays tapped (rulings, CR 506.4). The card goes to the bottom either way.
+    const woods = /^reveal the top card of your library\. If it's a Forest card, remove that creature from combat\. Then put the revealed card on the bottom of your library\.$/.test(you[4]!);
+    const forest: TargetSpec = { kind: "card", types: [], notTypes: [], notColors: [], subtypes: ["Forest"], text: "Forest card" };
+    const body = woods
+      ? { targets: [], effects: [{ type: "revealTop" as const }, { type: "if" as const, cond: { kind: "revealedIs" as const, filter: forest }, effects: [{ type: "removeFromCombat" as const, what: { ref: "subject" as const } }] }, { type: "putInLibrary" as const, what: { ref: "revealed" as const }, position: "bottom" as const }], text: you[4]! }
+      : parseBody(you[4]!.replace(/\bthat creature\b(?!'s)/g, "it"), { subjectIt: true });
     if (!body) return "fail";
     return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, text: you[2]! }, anyone: true, attacksYou: you[3] ? "orPlaneswalker" : "player" }, body };
   }
@@ -2077,6 +2084,13 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(m[2]!.replace(/\bdefending player\b/g, "that player"), { eventPlayer: true, eventGroup: true });
     if (!body) return "fail";
     return { event: "creaturesYouControlAttack", body, anyoneAttacks: true, attacksOpponent: { ...(m[1] ? { orPlaneswalkers: true as const } : {}) } };
+  } else if (line === "Whenever a player attacks with one or more creatures, destroy all untapped non-Wall creatures that player controls that didn't attack, except for creatures the player hasn't controlled continuously since the beginning of the turn.") {
+    // Total War: any player's declaration of attackers (CR 508.1, rulings: a triggered ability on the declaration), the
+    // creatures of that player's left untapped and not declared as attackers then, other than Walls and the ones they
+    // haven't controlled since the turn began (as for summoning sickness, CR 302.6), destroyed as it resolves.
+    const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], notSubtypes: ["Wall"], tapped: false, combat: "didntAttackThisCombat", controlledSinceTurnBegan: true, text: "untapped non-Wall creature that player controls that didn't attack" };
+    const text = line.replace(/^[^,]+, /, "");
+    return { event: "creaturesYouControlAttack", body: { targets: [], effects: [{ type: "destroy", what: { ref: "each", filter, of: { ref: "eventPlayer" } } }], text }, anyoneAttacks: true };
   } else if ((m = /^Whenever (?:one or more creatures attack|a player attacks with (two|three|four|five) or more creatures), (.+)$/.exec(line.replace(/^Whenever (two|three|four|five) or more creatures attack, /, "Whenever a player attacks with $1 or more creatures, ")))) {
     // Argent Dais: "Whenever two or more creatures attack": the same, whoever attacks (rulings).
     // Duelist's Heritage: whoever attacks (rulings), once for each declaration (CR 508.1, 603.2c). "Whenever a player

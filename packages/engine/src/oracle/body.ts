@@ -2880,7 +2880,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Favored Hoplite: "put a +1/+1 counter on ~ and prevent all damage that would be dealt to it this turn": two instructions.
   text = text.replace(/\b([Pp]ut an? \+1\/\+1 counter on ~) and prevent all damage that would be dealt to it this turn\./, "$1. Prevent all damage that would be dealt to ~ this turn.");
   // Gomazoa: putting cards on top of libraries that are then shuffled is shuffling them in (see zones.ts).
-  text = text.replace(/^Put ~ and each creature it's blocking on top of their owners' libraries, then those players shuffle\.$/, "Shuffle ~ and each creature it's blocking into their owners' libraries.");
+  // Vortex Elemental: "Put ~ and each creature blocking or blocked by it on top of ...", the same.
+  text = text.replace(/^Put ~ and each creature (it's blocking|blocking or blocked by it) on top of their owners' libraries, then those players shuffle\.$/, "Shuffle ~ and each creature $1 into their owners' libraries.");
   // Spoils of Evil: "For each artifact or creature card in target opponent's graveyard, add {C} and you gain 1 life.": the
   // same two instructions, both counting that player's graveyard.
   text = text.replace(/^For each (artifact or creature card) in target opponent's graveyard, add (\{[WUBRGC]\}) and you gain (\d+) life\.$/, "Add $2 for each $1 in target opponent's graveyard. You gain $3 life for each $1 in that player's graveyard.");
@@ -8136,6 +8137,46 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = pickFilter(`${eachChooses[1]} permanent`);
       if (filter?.kind !== "object") return null;
       effects.push({ type: "keepRest", who: { ref: "eachPlayer" }, keep: [{ filter, n: 1 }], among: filter, bounce: true });
+      si++;
+      continue;
+    }
+    // Dreams of Steel and Oil: "You choose an artifact or creature card from it, then choose an artifact or creature card
+    // from their graveyard. Exile the chosen cards." (split at ", then") after "Target opponent reveals their hand": one of each if there's
+    // one (rulings: the graveyard card even with none in the hand). The hand card is chosen and exiled first; nothing it
+    // does changes that graveyard, so the cards chosen are the same.
+    if (s === "You choose an artifact or creature card from it" && sentences[si + 1] === "Choose an artifact or creature card from their graveyard" && sentences[si + 2]?.replace(/\.$/, "") === "Exile the chosen cards") {
+      const prev = effects.at(-1);
+      if (prev?.type !== "lookAtHand" || !prev.reveal || prev.who.ref !== "target") return null;
+      const filter: TargetSpec = { kind: "card", types: ["Artifact", "Creature"], notTypes: [], notColors: [], text: "artifact or creature card" };
+      effects.push({ type: "takeFromHand", who: prev.who, filter, action: "exile" }, { type: "chooseFromGraveyard", n: 1, filter, dest: "exile", who: prev.who, chooser: { ref: "you" } });
+      si++;
+      si++;
+      continue;
+    }
+    // Sita Varma, Masked Racer: "Then you may have the base power and toughness of each other creature you control become
+    // equal to ~'s power until end of turn": ~'s power as it resolves, after the counters before it (or as it last existed,
+    // CR 608.2h), locked in then (CR 608.2h), for the other creatures you control then (CR 611.2c), in layer 7b.
+    if (!ctx.spell && /^(?:Then )?you may have the base power and toughness of each other creature you control become equal to ~'s power until end of turn$/i.test(s)) {
+      const p: Amount = { count: { kind: "power", of: { ref: "self" } } };
+      effects.push({ type: "may", effects: [{ type: "continuous", what: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "other creatures you control" }, other: true }, mods: [{ kind: "setPT", power: p, toughness: p }], duration: "endOfTurn" }], text: "have the base power and toughness of each other creature you control become equal to ~'s power until end of turn" });
+      continue;
+    }
+    // Worlds Within Worlds: "Exile all creatures. Each player may put any number of creature cards from their hand onto the
+    // battlefield. Then put all cards exiled this way into their owners' hands.": in turn order, each knowing the choices
+    // before theirs (CR 101.4), the cards the creatures became in exile (CR 400.7; tokens cease to exist, 704.5d).
+    if (s === "Exile all creatures" && sentences[si + 1] === "Each player may put any number of creature cards from their hand onto the battlefield" && /^Then put all cards exiled this way into their owners' hands\.?$/.test(sentences[si + 2] ?? "")) {
+      const ex = parseOne(s, ctx);
+      const put = parseOne(sentences[si + 1]!, ctx);
+      if (ex?.length !== 1 || ex[0]!.type !== "exile" || ex[0]!.what.ref !== "each" || put?.length !== 1 || put[0]!.type !== "putFromHand") return null;
+      effects.push(ex[0]!, put[0]!, { type: "bounce", what: { ref: "exiledThisWay" } });
+      si += 2;
+      continue;
+    }
+    // Planar Overlay: "Each player chooses a land they control of each basic land type. Return those lands to their owners'
+    // hands." Chosen as Global Ruin's are, in turn order, a land with several basic land types counting for each of them
+    // (rulings), then all returned at once.
+    if (s === "Each player chooses a land they control of each basic land type" && sentences[si + 1]?.replace(/\.$/, "") === "Return those lands to their owners' hands") {
+      effects.push({ type: "keepRest", who: { ref: "eachPlayer" }, keep: BASIC_TYPES.map((t) => ({ filter: { kind: "object" as const, types: ["Land"], subtypes: [t], text: t }, n: 1 })), among: { kind: "object", types: ["Land"], text: "land" }, bounceChosen: true });
       si++;
       continue;
     }

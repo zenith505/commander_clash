@@ -909,6 +909,15 @@ export function moveObject(
     (s.extraTurns ??= []).push({ player: pid });
     log(s, `${defOf(s, o).name} is exiled instead of being put into a graveyard; ${player(s, pid).name} will take an extra turn after this one.`);
   }
+  // Wheel of Sun and Moon: a card (not a token or a copy of a spell, rulings) that would go to the enchanted player's
+  // graveyard from anywhere is revealed and put on the bottom of that library instead (CR 614.1a); several at once go
+  // there together (rulings). After the "exile it instead" ones above, as for Darksteel Colossus below.
+  const wheel = to === "graveyard" && !o.isToken && !o.spellCopy ? wheelFor(s, o, fromZone) : undefined;
+  if (wheel) {
+    to = "library";
+    opts = { ...opts, top: false };
+    log(s, `${player(s, o.owner).name} reveals ${defOf(s, o).name} and puts it on the bottom of their library instead of into their graveyard (${wheel}).`);
+  }
   const shuffleIn = to === "graveyard" && (fromZone === "battlefield" ? abilitiesOf(s, o) : compileCard(defOf(s, o))).shuffleInsteadOfGraveyard;
   if (shuffleIn) {
     to = "library";
@@ -2098,6 +2107,20 @@ function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName): { s
     if (!l.hadAbilities || l.id === o.id) continue;
     const x = withGranted(compileCard(defOf(s, obj(s, l.id))), l.granted ?? []).graveyardExile;
     if (applies(x, l.controller)) return { source: defOf(s, obj(s, l.id)).name, ...(x!.counter ? { counter: x!.counter } : {}) };
+  }
+  return undefined;
+}
+
+/** Wheel of Sun and Moon: the name of a permanent whose replacement effect sends `o` (going to its owner's graveyard) to the bottom of that player's library, also one leaving at the same time. */
+function wheelFor(s: GameState, o: GameObject, fromZone: ZoneName): string | undefined {
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (p.attachedToPlayer === o.owner && abilitiesOf(s, p).graveyardToLibraryBottom) return characteristics(s, p).name;
+  }
+  if (fromZone !== "battlefield") return undefined;
+  for (const l of s.leftTogether ?? []) {
+    if (!l.hadAbilities || l.id === o.id || s.lastKnown?.[l.id]?.attachedToPlayer !== o.owner) continue;
+    if (withGranted(compileCard(defOf(s, obj(s, l.id))), l.granted ?? []).graveyardToLibraryBottom) return defOf(s, obj(s, l.id)).name;
   }
   return undefined;
 }

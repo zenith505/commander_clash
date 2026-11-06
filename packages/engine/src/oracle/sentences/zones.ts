@@ -429,6 +429,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // makes it this): the owners of the cards put there shuffle, which is shuffling them in (CR 701.24c); without a creature
   // it blocks, only ~ (rulings).
   if (!ctx.spell && !ctx.selfCard && /^Shuffle ~ and each creature it's blocking into their owners' libraries$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "inCombatWithSelf", blocked: true, andSelf: true } }];
+  // Vortex Elemental: "Shuffle ~ and each creature blocking or blocked by it ...": both ways (CR 509.1h); without one,
+  // only ~ (rulings).
+  if (!ctx.spell && !ctx.selfCard && /^Shuffle ~ and each creature blocking or blocked by it into their owners' libraries$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "inCombatWithSelf", andSelf: true } }];
   // Dramatic Accusation: "Shuffle enchanted creature into its owner's library": the permanent it's attached to.
   if (/^[Ss]huffle enchanted creature into its owner's library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "attached" } }];
   // "Shuffle any number of target cards from your graveyard into your library" (Perpetual Timepiece, Piper's Melody),

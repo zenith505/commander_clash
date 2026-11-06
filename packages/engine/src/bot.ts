@@ -5833,7 +5833,11 @@ function shieldValue(s: GameState, pid: PlayerId, body: AbilityBody, t: DamageTh
     if (e.type !== "damageRule") continue;
     const r = e.rule;
     if (r.combat && (r.combat === "only") !== (t.kind === "combat")) continue;
-    if (r.redirect && r.redirect.ref !== "anyTarget") continue;
+    // Redirections count when the damage can go to an opponent: any target, or back to the threat (Reverberation's spell's
+    // controller, Aegis of Honor's, Turn the Tables' attacking creature).
+    const back = (r.redirect?.ref === "targetController" && !!r.by?.target) || (r.redirect?.ref === "target" && t.kind === "combat" && r.combat === "only" && r.to?.players === "you" && !r.by);
+    if (r.redirect && r.redirect.ref !== "anyTarget" && !back) continue;
+    if (r.redirectToSourceController && t.kind !== "stack") continue;
     const me = !r.to || r.to.players === "you" || r.to.players === "all" || (!!r.to.target && r.to.target.ref === "anyTarget");
     const mine = !r.to || (!!r.to.objects && r.to.objects.controller !== "opponent") || !!r.to.target;
     const saved = (cs: GameObject[]) => (mine ? cs.reduce((n, c) => n + worth(s, pid, c), 0) : 0);
@@ -5843,6 +5847,7 @@ function shieldValue(s: GameState, pid: PlayerId, body: AbilityBody, t: DamageTh
       if (r.by?.choose && !fits(bindChosen(r.by.choose, chosen), t.source, t.def)) continue;
       if (r.by?.filter && !fits(bindChosen(r.by.filter, chosen), t.source, t.def)) continue;
       if (r.by?.target && t.item.kind !== "spell") continue;
+      if (r.by?.spellOnly && t.item.kind !== "spell") continue;
       v = (me ? t.toMe : 0) + saved(t.creatures);
     } else {
       if (r.by?.target) continue;
@@ -5867,7 +5872,9 @@ function shieldTargets(s: GameState, pid: PlayerId, body: AbilityBody, t: Damage
     const pick = (want: TargetChoice | undefined) => (want && legal.some((x) => sameTarget(x, want)) ? want : undefined);
     let choice: TargetChoice | undefined;
     if (rules.some((r) => r.to?.target && refCovers(r.to.target, i))) choice = pick(t.toMe > 0 ? { kind: "player", id: pid } : t.creatures[0] ? { kind: "object", id: t.creatures[0].id } : undefined);
-    else if (rules.some((r) => r.redirect && refCovers(r.redirect, i))) choice = pick(foe !== undefined ? { kind: "player", id: foe } : undefined);
+    // Turn the Tables: the attacker that would deal the most.
+    else if (rules.some((r) => r.redirect?.ref === "target" && refCovers(r.redirect, i)) && t.kind === "combat") choice = pick([...t.attackers].sort((a, b) => power(s, b) - power(s, a)).map((a) => ({ kind: "object" as const, id: a.id })).find((x) => legal.some((y) => sameTarget(x, y))));
+    else if (rules.some((r) => r.redirect && r.redirect.ref !== "targetController" && refCovers(r.redirect, i))) choice = pick(foe !== undefined ? { kind: "player", id: foe } : undefined);
     else if (rules.some((r) => r.by?.target && refCovers(r.by.target, i)) && t.kind === "stack") choice = pick({ kind: "stack", id: t.item.id });
     if (!choice) return null;
     out.push(choice);

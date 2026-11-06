@@ -4427,14 +4427,32 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Pariah, Palisade Giant, Martyrs of Korlis (CR 614.9): see staticRules in damage.ts.
-    const redirect = /^(?:As long as ~ is untapped, a|A)ll damage that would be dealt to you( and other permanents you control)?( by artifacts)? is dealt to (~|enchanted creature|equipped creature) instead\.$/.exec(line);
-    if (redirect) {
+    // Veteran Bodyguard: "As long as ~ is untapped, all damage that would be dealt to you by unblocked creatures is dealt
+    // to ~ instead"; Weathered Bodyguards: "all combat damage": not trample damage from a blocked creature (rulings), which
+    // isn't unblocked; with two of them, the player picks which one takes it (rulings).
+    const redirect = /^(?:As long as ~ is untapped, a|A)ll (combat )?damage that would be dealt to you( and other permanents you control)?( by artifacts| by unblocked creatures)? is dealt to (~|enchanted creature|equipped creature) instead\.$/.exec(line);
+    if (redirect && !(redirect[1] && redirect[3] !== " by unblocked creatures")) {
       out.damageToYouRedirect = {
-        to: redirect[3] === "~" ? "self" : "attached",
-        ...(redirect[1] ? { others: true as const } : {}),
+        to: redirect[4] === "~" ? "self" : "attached",
+        ...(redirect[2] ? { others: true as const } : {}),
         ...(line.startsWith("As long as") ? { untapped: true as const } : {}),
-        ...(redirect[2] ? { by: { kind: "object" as const, types: ["Artifact"], text: "artifact" } } : {}),
+        ...(redirect[3] === " by artifacts" ? { by: { kind: "object" as const, types: ["Artifact"], text: "artifact" } } : {}),
+        ...(redirect[3] === " by unblocked creatures" ? { by: { kind: "object" as const, types: ["Creature"], combat: "unblocked" as const, text: "unblocked creatures" } } : {}),
+        ...(redirect[1] ? { combat: true as const } : {}),
       };
+      continue;
+    }
+    // Harsh Judgment: "If an instant or sorcery spell of the chosen color would deal damage to you, it deals that damage to
+    // its controller instead" (CR 614.9): see staticRules in damage.ts.
+    if (line === "If an instant or sorcery spell of the chosen color would deal damage to you, it deals that damage to its controller instead.") {
+      out.spellDamageToYouToController = { kind: "object", types: ["Instant", "Sorcery"], chosen: "color", text: "instant or sorcery spell of the chosen color" };
+      continue;
+    }
+    // Gloom Surgeon: "If combat damage would be dealt to ~, prevent that damage and exile that many cards from the top of
+    // your library." (CR 615.5): see staticRules in damage.ts.
+    const surgeon = /^If (combat |noncombat )?damage would be dealt to ~, prevent that damage and exile that many cards from the top of your library\.$/.exec(line);
+    if (surgeon) {
+      out.preventToSelfExileTop = surgeon[1] ? { combat: surgeon[1] === "combat " ? "only" : "non" } : {};
       continue;
     }
     // Treacherous Link: see staticRules in damage.ts.

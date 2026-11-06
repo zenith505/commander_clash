@@ -282,6 +282,43 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     const redirect: DamageRecipient | null = ctx.lastChosen && target === undefined ? { ref: "created" } : target !== undefined ? { ref: "target", index: target } : null;
     return to && redirect ? rule({ to, redirect }) : null;
   }
+  // Turn the Tables: "All combat damage that would be dealt to you this turn is dealt to target attacking creature
+  // instead": to that creature while it's on the battlefield, even if it's been removed from combat; not if it's gone
+  // (rulings, CR 614.9).
+  if ((m = /^All combat damage that would be dealt to you this turn is dealt to (target attacking creature) instead$/.exec(s))) {
+    const redirect = destination(m[1]!, ctx);
+    return redirect ? rule({ combat: "only", to: { players: "you" }, redirect }) : null;
+  }
+  // Reverberation: "All damage that would be dealt this turn by target sorcery spell is dealt to that spell's controller
+  // instead": all of it, to creatures and players, adds up for that player (rulings).
+  if (/^All damage that would be dealt this turn by target sorcery spell is dealt to that spell's controller instead$/.test(s)) {
+    const spec = parseTargetPhrase("sorcery spell");
+    if (spec?.kind !== "spell") return null;
+    const index = addTarget(ctx, spec);
+    return rule({ by: { target: { ref: "target", index } }, redirect: { ref: "targetController", index } });
+  }
+  // Aegis of Honor: "The next time an instant or sorcery spell would deal damage to you this turn, that spell deals that
+  // damage to its controller instead": any such spell, its controller as it deals the damage (CR 614.9, 615.8-like "next
+  // time" use).
+  if (/^The next time an instant or sorcery spell would deal damage to you this turn, that spell deals that damage to its controller instead$/.test(s))
+    return rule({ by: { filter: { kind: "object", types: ["Instant", "Sorcery"], text: "instant or sorcery spell" }, spellOnly: true }, to: { players: "you" }, nextTime: true, redirectToSourceController: true });
+  // Shield Dancer: "The next time target attacking creature would deal combat damage to ~ this turn, that creature deals
+  // that damage to itself instead": used up by that creature's next combat damage to it; two activations aren't twice the
+  // damage from one, they're for two combat damage steps (rulings).
+  if (/^The next time target attacking creature would deal combat damage to ~ this turn, that creature deals that damage to itself instead$/.test(s)) {
+    const spec = parseTargetPhrase("attacking creature");
+    if (spec?.kind !== "object") return null;
+    const index = addTarget(ctx, spec);
+    return rule({ combat: "only", by: { target: { ref: "target", index } }, to: { target: { ref: "self" } }, nextTime: true, redirect: { ref: "target", index } });
+  }
+  // Soltari Guerrillas: "The next time ~ would deal combat damage to an opponent this turn, it deals that damage to target
+  // creature instead": whichever opponent it would deal it to then (rulings). Mercenaries: "The next time ~ would deal
+  // damage to you this turn, prevent that damage" ("you" being whoever activated it, CR 602.2).
+  if ((m = /^The next time ~ would deal (combat )?damage to (an opponent|you) this turn, (?:it deals that damage to (target creature) instead|(prevent that damage))$/.exec(s))) {
+    const redirect = m[3] ? destination(m[3], ctx) : undefined;
+    if (redirect === null) return null;
+    return rule({ ...(m[1] ? { combat: "only" as const } : {}), by: { target: { ref: "self" } }, to: { players: m[2] === "you" ? "you" : "opponents" }, nextTime: true, ...(redirect ? { redirect } : {}) });
+  }
   // Kjeldoran Royal Guard: "All combat damage that would be dealt to you by unblocked creatures this turn is dealt to ~
   // instead": not if ~ has left the battlefield by then (rulings, CR 614.9).
   if (/^All combat damage that would be dealt to you by unblocked creatures this turn is dealt to ~ instead$/.test(s))

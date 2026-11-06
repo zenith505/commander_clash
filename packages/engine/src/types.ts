@@ -36,12 +36,21 @@ export interface DamageRule {
    * `chosen`: the source chosen (CR 609.7a), as the object it was then; `spell`: it was a spell, so the permanent it
    * becomes is that source too. `filter`: what the source has to be when it would deal the damage (CR 609.7b).
    */
-  by?: { chosen?: { id: ObjectId; zc: number; spell?: true }; filter?: TargetSpec; /** Haze Frog: not damage from this object (the rule's source, as it was when the rule was made). */ not?: { id: ObjectId; zc: number } };
+  by?: { chosen?: { id: ObjectId; zc: number; spell?: true }; filter?: TargetSpec; /** Haze Frog: not damage from this object (the rule's source, as it was when the rule was made). */ not?: { id: ObjectId; zc: number }; /** "An instant or sorcery spell" (Aegis of Honor): only a spell, not a card's ability from another zone. */ spellOnly?: true };
   /** What's left of "the next N damage" (CR 615.7). */
   left?: number;
   /** "The next time": it applies to the next damage event it can, then it's used up (CR 615.8). */
   nextTime?: true;
-  redirect?: { object: ObjectId; zc: number } | { player: PlayerId };
+  /**
+   * `sourceController`: "that spell deals that damage to its controller instead" (Aegis of Honor, Harsh Judgment): to
+   * whoever controls the source as the damage would be dealt (CR 614.9); worked out for each source in planShields.
+   */
+  redirect?: { object: ObjectId; zc: number } | { player: PlayerId } | { sourceController: true };
+  /** A copy of a `sourceController` rule for one controller of the source (planShields): that player, and the rule it's from. */
+  srcController?: PlayerId;
+  base?: string;
+  /** Gloom Surgeon: "prevent that damage and exile that many cards from the top of your library" (CR 615.5): its controller exiles them, even if the damage can't be prevented (rulings, 615.12). */
+  exileTop?: true;
   gainLife?: { colors?: Color[] };
   dealBack?: { colors?: Color[]; creatureToIt?: true };
   tokens?: TokenSpec;

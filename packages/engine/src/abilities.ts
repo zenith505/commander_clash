@@ -1553,13 +1553,15 @@ export interface DamageRuleSpec {
   /** The damage it applies to, by who'd be dealt it: players, permanents matching `objects`, or a target. Unset = any. */
   to?: { players?: "you" | "opponents" | "all"; objects?: TargetSpec; target?: DamageRecipient };
   /** By which sources: matching `filter` (as the damage would be dealt), a source of your choice, a target spell or permanent. Unset = any. */
-  by?: { filter?: TargetSpec; choose?: TargetSpec; /** With `choose`: "a creature of your choice" (Ajani's Aid): only a permanent, not a spell or a gone source. */ permanent?: true; target?: ObjRef; /** "That other creatures would deal" (Haze Frog): not the rule's own source, as the object it is now. */ notSelf?: true; /** "Creatures other than target creature" (Terrifying Presence): not that target, as the object it is as the rule begins. */ notTarget?: number };
+  by?: { filter?: TargetSpec; choose?: TargetSpec; /** With `choose`: "a creature of your choice" (Ajani's Aid): only a permanent, not a spell or a gone source. */ permanent?: true; target?: ObjRef; /** "That other creatures would deal" (Haze Frog): not the rule's own source, as the object it is now. */ notSelf?: true; /** "Creatures other than target creature" (Terrifying Presence): not that target, as the object it is as the rule begins. */ notTarget?: number; /** "An instant or sorcery spell" (Aegis of Honor): only a spell. */ spellOnly?: true };
   /** "Prevent the next N damage" (CR 615.7): a shield of N for all it applies to together. */
   n?: Amount;
   /** "The next time ... would deal damage": the next damage event only, however much (CR 615.8). */
   nextTime?: true;
   /** "... is dealt to [it] instead" (CR 614.9) rather than prevented. */
   redirect?: DamageRecipient;
+  /** "That spell deals that damage to its controller instead" (Aegis of Honor): to the source's controller as the damage would be dealt (CR 614.9). */
+  redirectToSourceController?: true;
   /** "You gain life equal to the damage prevented this way" (CR 615.5); `colors`: only for damage from a source of those colors. */
   gainLife?: { colors?: Color[] };
   /** "~ deals that much damage to that source's controller" (CR 615.5); `colors`: only for damage from a source of those colors. */
@@ -6868,7 +6870,14 @@ export interface CompiledCard {
    * goes (this permanent, or the creature it's attached to); `others`: "you and other permanents you control" (Palisade
    * Giant); `untapped`: "as long as ~ is untapped"; `by`: only damage from such sources ("by artifacts").
    */
-  damageToYouRedirect?: { to: "self" | "attached"; others?: true; untapped?: true; by?: TargetSpec };
+  damageToYouRedirect?: { to: "self" | "attached"; others?: true; untapped?: true; by?: TargetSpec; /** Weathered Bodyguards: "all combat damage". */ combat?: true };
+  /**
+   * Harsh Judgment: "If an instant or sorcery spell of the chosen color would deal damage to you, it deals that damage to
+   * its controller instead" (CR 614.9): spells matching `by` (the color chosen as it entered bound in staticRules).
+   */
+  spellDamageToYouToController?: TargetSpec;
+  /** Gloom Surgeon: "If combat damage would be dealt to ~, prevent that damage and exile that many cards from the top of your library" (CR 615.5). */
+  preventToSelfExileTop?: { combat?: "only" | "non" };
   /** "All damage that would be dealt to enchanted creature is dealt to its controller instead" (Treacherous Link, CR 614.9). */
   attachedDamageToController?: true;
   /** "Damage isn't removed from ~ during cleanup steps" (Ancient Adamantoise, CR 514.2). */

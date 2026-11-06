@@ -17,7 +17,7 @@ import { foundWith, newObjects } from "../mutate";
 import { attachTo } from "./run-permanents";
 import { addDelayed, paidUnless, removeCopy } from "./run-spells";
 import { toBottom } from "./run-library";
-import { attackDefault, fireEvent, inCombat } from "./triggers";
+import { attackDefault, closeZoneBatch, fireEvent, inCombat } from "./triggers";
 import { asFace, defMv, layoutOf, registerFace, sameName, transformedFace } from "../faces";
 import { meld, meldPartners } from "../meld";
 
@@ -1741,7 +1741,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       for (const o of objects(s, e.what, ctx)) {
         log(s, `${src} exiles ${defOf(s, o).name}${e.until === "sourceLeaves" ? ` until ${src} leaves the battlefield` : e.until === "targetLeaves" && me ? ` until ${defOf(s, me).name} leaves the battlefield` : e.until === "opponentMonarch" ? " until an opponent becomes the monarch" : ""}.`);
         // As it last existed, for "for each nontoken creature exiled this way" (CR 608.2h).
-        const before = o.zone === "battlefield" ? { o: structuredClone(o), ch: structuredClone(characteristics(s, o)) } : undefined;
+        const before = o.zone === "battlefield" ? { o: structuredClone(o), ch: structuredClone(characteristics(s, o)), controller: controllerOf(s, o) } : undefined;
         const fromYard = o.zone === "graveyard";
         moveObject(s, o.id, "exile");
         if (before && o.zone === "exile" && s.resolving) (s.resolving.exiled ??= []).push(before);
@@ -2094,8 +2094,18 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "returnLinked": {
       // The leaves ability triggered after the source moved, so the object it links to is the one before (CR 400.7).
       // A Saga's chapter III (The Princess Takes Flight): the Saga is still there, the same object as its chapter I's.
-      const key = e.here ? `${ctx.sourceId}@${ctx.sourceZc ?? 0}` : `${ctx.sourceId}@${(ctx.sourceZc ?? 1) - 1}`;
+      // Pyxis of Pandemonium: an activated ability's source, still there or just sacrificed for its cost.
+      const nowKey = `${ctx.sourceId}@${ctx.sourceZc ?? 0}`;
+      const key = e.here || (e.permanentCards && s.linkedExile?.[nowKey]) ? nowKey : `${ctx.sourceId}@${(ctx.sourceZc ?? 1) - 1}`;
       const sc = (s.resolving!.scratch ??= {});
+      if (e.permanentCards && !sc.flickered) {
+        // Every linked card is turned face up (CR 406.3); the nonpermanent ones stay in exile.
+        const all = (s.linkedExile?.[key] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc);
+        for (const l of all) obj(s, l.id).hiddenExile = undefined;
+        if (all.length) log(s, `${src} turns face up ${all.map((l) => defOf(s, obj(s, l.id)).name).join(", ")}.`);
+        sc.flickered = all.filter((l) => isPermanentCard(defOf(s, obj(s, l.id))));
+        delete s.linkedExile?.[key];
+      }
       if (!sc.flickered) {
         sc.flickered = (s.linkedExile?.[key] ?? []).filter((l) => !s.objects[l.id]?.isToken);
         delete s.linkedExile?.[key];
@@ -3143,6 +3153,70 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const ids = (e.cards ?? []).filter((c) => s.objects[c.id]?.zone === "battlefield" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc).map((c) => c.id);
       if (ids.length) log(s, `${src} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
       for (const id of ids) moveObject(s, id, "exile");
+      return;
+    }
+    case "untilLeavesToGraveyard": {
+      const sc = (s.resolving!.scratch ??= {});
+      const me = objects(s, { ref: "self" }, ctx)[0] ?? (ctx.sourceId ? s.objects[ctx.sourceId] : undefined);
+      // Its exiles last only while it's that object on the battlefield (CR 610.3); once it has left they're back.
+      const here = me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);
+      const live = (id: ObjectId) => !!here && (me!.exiledUntilLeaves ?? []).some((l) => l.id === id && s.objects[id]?.zone === "exile" && (s.objects[id]!.zoneChanges ?? 0) === l.zc);
+      s.resolving!.did = false;
+      if (!sc.found) {
+        const cards = here ? (me!.exiledUntilLeaves ?? []).map((l) => l.id).filter(live) : [];
+        if (!cards.length) return;
+        if (cards.length > 1) {
+          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: `a card exiled with ${src}`, cards, min: 1, max: 1, exiled: true, dig: { looked: cards, to: "to put into its owner's graveyard", rest: "stay in exile" } };
+          return "paused";
+        }
+        sc.found = cards;
+      }
+      const found = sc.found.filter(live);
+      sc.found = undefined;
+      for (const id of found) {
+        log(s, `${player(s, ctx.controller).name} puts ${defOf(s, obj(s, id)).name} from exile into its owner's graveyard.`);
+        me!.exiledUntilLeaves = me!.exiledUntilLeaves!.filter((l) => l.id !== id);
+        moveObject(s, id, "graveyard");
+        if (obj(s, id).zone === "graveyard") s.resolving!.did = true;
+      }
+      return;
+    }
+    case "returnOtherUntilLeaves": {
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.flickered) {
+        const now = s.resolving?.exiled ?? [];
+        if (!now.some((x) => x.ch.types.includes("Creature"))) return;
+        // Exiled until it leaves: if it has left, nothing was exiled (CR 610.3a), so this did nothing either.
+        const me = objects(s, { ref: "self" }, ctx)[0];
+        if (!me || me.zone !== "battlefield") return;
+        const just = new Set(now.map((x) => x.o.id));
+        const all = me.exiledUntilLeaves ?? [];
+        me.exiledUntilLeaves = all.filter((l) => just.has(l.id));
+        sc.flickered = all.filter((l) => !just.has(l.id) && !l.hand && !l.graveyard && s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc);
+      }
+      const cards = sc.flickered.map((l) => s.objects[l.id]).filter((c, i): c is GameObject => c?.zone === "exile" && (c.zoneChanges ?? 0) === sc.flickered![i]!.zc);
+      return returnFromExile(s, cards, (c) => c.owner, src);
+    }
+    case "pileOnTop": {
+      // Triumph of Saint Katherine: nothing happens unless the card is still in its owner's graveyard (CR 400.7) and
+      // that library has at least `n` cards (rulings). The pile is exiled face down, then shuffled and put back on top.
+      const card = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!card || card.zone !== "graveyard" || (ctx.sourceZc !== undefined && (card.zoneChanges ?? 0) !== ctx.sourceZc)) return;
+      const lib = player(s, card.owner).library;
+      if (lib.length < e.n) {
+        log(s, `${src} does nothing: there are fewer than ${e.n} cards in ${player(s, card.owner).name}'s library.`);
+        return;
+      }
+      const pile = [card.id, ...lib.slice(0, e.n)];
+      for (const id of pile) {
+        moveObject(s, id, "exile");
+        obj(s, id).hiddenExile = { by: ctx.sourceId ?? "", seen: [], label: "Face down", at: s.nextTimestamp };
+      }
+      closeZoneBatch(s);
+      const back = pile.filter((id) => obj(s, id).zone === "exile");
+      shuffle(s, back);
+      log(s, `${player(s, card.owner).name} exiles ${defOf(s, card).name} and the top ${e.n} cards of their library in a face-down pile, shuffles it and puts it back on top of their library.`);
+      for (const id of back) moveObject(s, id, "library", { top: true });
       return;
     }
     case "linkedToBottom": {

@@ -1,6 +1,6 @@
 # Roadmap
 
-30,130 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,140 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,962 of 4,988 (99%), top 10,000: 9,621 of
 9,979 (96%).
 
@@ -2281,6 +2281,33 @@ line blocks.
    the bottom of their owners' libraries" (Vault 13: Dweller's Journey: two chosen, the rest ordered by each owner); "a
    tapped and attacking token that's a copy of the exiled card, except it's an Illusion in addition to its other types"
    (Phantom Steed). +9, 30,108 of 31,936 with B121.
+   Round 290 took names from the top that no earlier round looked at (from rank 10,000 on): "Sacrifice two artifact tokens,
+   Exile an artifact or creature card from your graveyard: Create a token that's a copy of the exiled card, except it's an
+   artifact" (Tawnos, Solemn Survivor; Dollhouse of Horrors too: the card the ability's only exiling cost took, kept in
+   StackItem.costExiled); "exile it and the top six cards of your library in a face-down pile. If you do, shuffle that
+   pile and put it back on top of your library" (Triumph of Saint Katherine: nothing with fewer than six cards or once it
+   has left the graveyard, rulings); "Each player exiles the top card of their library face down" and "Each player turns
+   face up all cards they own exiled with ~, then puts all permanent cards among them onto the battlefield" (Pyxis of
+   Pandemonium); "You may reveal the first card you draw each turn as you draw it. Whenever you reveal an instant or
+   sorcery card this way, create Cherubael ..." (Inquisitor Eisenhorn: as miracle, revealed as drawn and the token a "may"
+   as it resolves); "If a creature is put into exile this way, return each other card exiled with ~ to the battlefield"
+   (Mysterious Limousine); "each player chooses two nontoken, non-Vehicle creatures they control. Exile them until ~ leaves
+   the battlefield" and "put a card exiled with it into its owner's graveyard. If you do, investigate" (Foreboding
+   Steamboat); up to one target of each permanent type exiled at once, then for each its controller reveals until a card
+   that shares a card type with it, choosing the order of their own (Chaotic Transformation, with a browser test of the
+   order prompt); "Whenever ~ trains" (Savior of Ollenbock, CR 702.149c, with "up to one other target creature from the
+   battlefield or creature card from a graveyard"); "Copy target instant or sorcery spell an opponent controls twice"
+   (Venser, Fervent Forger). +10, 30,118 of 31,936 with round 289; 30,130 with B122.
+   Still open from the top (looked at, not done): Ria Ivor, Bane of Bladehold (the next combat damage to players prevented,
+   tokens for the amount); Volo, Itinerant Scholar and Long List of the Ents (noted creature types); Mavinda, Students'
+   Advocate (a cost increase for a spell that doesn't target your creature); Eye of Duskmantle (cards surveilled this
+   turn); Bruna, Light of Alabaster and Cass, Hand of Vengeance (Auras from several zones attached as it attacks or dies);
+   Draugr Necromancer (cards with ice counters, snow mana as any color); Apple of Eden, Isu Relic; Radiant Performer,
+   Agrus Kos, Eternal Soldier, Radiate, Exterminator Magmarch, Zevlor, Feather and Leori (a copy for each other legal
+   target); Gandalf, Westward Voyager (a copy if a revealed card shares a card type); Lagrella, the Magpie (any number of
+   targets controlled by different players, counters when they return under your control); Metamorphic Alteration (an
+   Aura's copy effect of a chosen creature); Nick Fury, Agent of S.H.I.E.L.D. (a double-faced card put onto the
+   battlefield transformed); The Day of the Doctor; Yannik, Scavenging Sentinel; The Spot, Living Portal.
    Out after round 289 (looked at, not done): Lara Croft, Tomb Raider ("You may play a card from exile with a discovery
    counter on it this turn": one card, not each); Filigree Vector (two "any number of target" groups in one ability);
    Sidequest: Play Blitzball (combat damage dealt to each player this turn, then transform and attach); Memory Vessel
@@ -5945,7 +5972,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   step: a new duration ending as that player's untap step begins), Gabriel Angelfire (your choice of flying, first
   strike, trample or rampage 3 until your next upkeep, with a browser test of the Rampage 3 button), Wellspring (you gain
   control of the enchanted land until end of turn on entering and at your upkeep; bots enchant an opponent's land).
-  +10 (30,130 of 31,936 with B122).
+  +10 (30,140 of 31,936 with B122 and round 290).
 - Out after round B123 (looked at, not done): Misfortune, Library of Lat-Nam and Fatal Lore (an opponent chooses the mode
   as the spell is cast, CR 700.2e), Kheru Lich Lord (a returned card's abilities and its exile replacement), Fasting (an
   optional draw-step skip with a counter rider), Matopi Golem and Skeleton Scavengers (a rider on one regeneration

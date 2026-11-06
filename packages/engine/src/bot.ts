@@ -1132,6 +1132,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Zada's copies: the order hardly matters to a bot, so battlefield order.
     if (pend.kind === "chooseOption" && pend.what === "copyOrder") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Sword-Point Diplomacy: the cheapest revealed card first (its opponents pay life for the costly ones later).
+    // Chaotic Transformation: the order of its own exiled permanents doesn't matter much; the first.
+    if (pend.kind === "chooseOption" && pend.what === "nextExiled") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "nextRevealed") return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => mv(s, a) - mv(s, b))[0]! }];
     // Which opponent to clash with: nothing is known about their libraries, so the next one in turn order.
     if (pend.kind === "chooseOption" && pend.what === "clash") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];

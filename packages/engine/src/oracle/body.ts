@@ -2992,6 +2992,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Spoils of Evil: "For each artifact or creature card in target opponent's graveyard, add {C} and you gain 1 life.": the
   // same two instructions, both counting that player's graveyard.
   text = text.replace(/^For each (artifact or creature card) in target opponent's graveyard, add (\{[WUBRGC]\}) and you gain (\d+) life\.$/, "Add $2 for each $1 in target opponent's graveyard. You gain $3 life for each $1 in that player's graveyard.");
+  // Chaotic Transformation: "..., puts that card onto the battlefield, then shuffles." One instruction (below).
+  text = text.replace(/\bFor each permanent exiled this way, its controller reveals cards from the top of their library until they reveal a card that shares a card type with it, puts that card onto the battlefield, then shuffles\./, "For each permanent exiled this way, its controller reveals cards from the top of their library until they reveal a card that shares a card type with it and puts that card onto the battlefield and shuffles.");
+  // Pyxis of Pandemonium: "Each player turns face up all cards they own exiled with ~, then puts all permanent cards among
+  // them onto the battlefield": one instruction (sentences/zones.ts).
+  text = text.replace(/^Each player turns face up all cards they own exiled with ~, then puts all permanent cards among them onto the battlefield\.$/, "Each player turns face up all cards they own exiled with ~ and puts all permanent cards among them onto the battlefield.");
   // "You may copy the exiled card. If you do, you may cast the copy without paying its mana cost." (Isochron Scepter):
   // copying without casting does nothing, so it's one choice.
   text = text.replace(/\b[Yy]ou may copy the exiled card\. If you do, you may cast the copy without paying its mana cost\./g, "You may cast a copy of the exiled card without paying its mana cost.");
@@ -4706,6 +4711,27 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // creatures tapped for it, at most one for each mana its cost could have (here up to ten).
     if (s === "Each creature that convoked ~ connives" && ctx.spell) {
       for (let i = 0; i < 10; i++) effects.push({ type: "connive", what: { ref: "convoker", index: i }, n: 1 });
+      continue;
+    }
+    // Foreboding Steamboat: "each player chooses two nontoken, non-Vehicle creatures they control. Exile them until ~ leaves
+    // the battlefield.": in turn order, starting with the active player (rulings, CR 101.4), each all of theirs if they
+    // have fewer; then all of them are exiled at the same time (rulings, CR 610.3).
+    const steamChooses = !ctx.spell && sentences[si + 1]?.replace(/\.$/, "") === "Exile them until ~ leaves the battlefield" ? new RegExp(`^[Ee]ach player chooses (${NUM}) (.+?) they control$`).exec(s) : null;
+    if (steamChooses) {
+      const n = num(steamChooses[1]!);
+      const filter = pickFilter(n > 1 ? steamChooses[steamChooses.length - 1]!.replace(/s$/, "") : steamChooses[steamChooses.length - 1]!);
+      if (!filter || filter.kind !== "object" || !Number.isInteger(n) || n < 1) return null;
+      effects.push({ type: "pick", who: { ref: "eachPlayer" }, filter, n, action: "choose" }, { type: "exile", what: { ref: "created" }, until: "sourceLeaves" });
+      si++;
+      continue;
+    }
+    // Foreboding Steamboat: "Whenever ~ attacks, put a card exiled with it into its owner's graveyard. If you do,
+    // investigate.": one of the cards it exiled until it leaves (CR 610.3), chosen as this resolves.
+    if (!ctx.spell && /^[Pp]ut a card exiled with (?:it|~) into its owner's graveyard$/.test(s) && /^If you do, /.test(sentences[si + 1] ?? "")) {
+      const rest = parseBody(`${capital(sentences[si + 1]!.replace(/^If you do, /, ""))}${/\.$/.test(sentences[si + 1]!) ? "" : "."}`);
+      if (!rest || rest.targets.length || rest.modal) return null;
+      effects.push({ type: "untilLeavesToGraveyard" }, { type: "if", cond: { kind: "youDid" }, effects: rest.effects });
+      si++;
       continue;
     }
     // Abdel Adrian: "exile any number of other nonland permanents you control until ~ leaves the battlefield" (CR 610.3),
@@ -7331,6 +7357,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // card. Those players put the exiled cards onto the battlefield, then shuffle." Each destroyed permanent's controller
     // as it last existed, once for each (one put elsewhere than a graveyard counts; one not destroyed doesn't), all the
     // exiled cards onto the battlefield at once; a player with none destroyed doesn't reveal or shuffle (rulings).
+    // Chaotic Transformation, after "Exile up to one target artifact, up to one target creature, ... and/or up to one target
+    // land": the targets are exiled at the same time (rulings), so one exile of them all, then each one's controller
+    // reveals for it (Effect revealUntilPerExiled).
+    if (/^For each permanent exiled this way, its controller reveals cards from the top of their library until they reveal a card that shares a card type with it and puts that card onto the battlefield and shuffles$/.test(s)) {
+      const exiles = effects.filter((x): x is Extract<Effect, { type: "exile" }> => x.type === "exile");
+      if (!ctx.spell || exiles.length !== effects.length || !exiles.length || exiles.some((x, i) => x.until || x.what.ref !== "target" || x.what.index !== i || x.what.n || Object.keys(x).length !== 2) || exiles.length !== ctx.targets.length || ctx.targets.some((t) => t.kind !== "object" || t.many)) return null;
+      effects.splice(0, effects.length, { type: "exile", what: { ref: "target", index: 0, n: exiles.length } }, { type: "revealUntilPerExiled" });
+      continue;
+    }
     const perDestroyed = /^For each permanent destroyed this way, its controller reveals cards from the top of their library until an? (.+? card) is revealed and exiles that card$/.exec(s);
     if (perDestroyed && /^Those players put the exiled cards onto the battlefield, then shuffle\.?$/.test(sentences[si + 1] ?? "") && effects[effects.length - 1]?.type === "destroy") {
       const filter = parseSearchFilter(perDestroyed[1]!);
@@ -12292,6 +12327,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Feral Appetite: "If a creature card is exiled this way, ..." too.
     // Corpse Appraiser: "Exile up to one target creature card from a graveyard. If a card is put into exile this way, ...":
     // only if that target was chosen and still legal as this resolves, so exiled.
+    // Mysterious Limousine: "Exile up to one other target creature until ~ leaves the battlefield. If a creature is put
+    // into exile this way, return each other card exiled with ~ to the battlefield under its owner's control."
+    if (/^If a creature is put into exile this way, return each other card exiled with ~ to the battlefield under its owner's control$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (ctx.spell || prev?.type !== "exile" || prev.until !== "sourceLeaves" || prev.what.ref !== "target" || prev.what.n) return null;
+      effects.push({ type: "returnOtherUntilLeaves" });
+      continue;
+    }
     const anyExiled = /^If a card is put into exile this way, (.+)$/.exec(s);
     if (anyExiled) {
       const i = ctx.targets.length - 1;

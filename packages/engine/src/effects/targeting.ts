@@ -383,6 +383,7 @@ function isParity(n: number | undefined, p: { is?: "odd" | "even"; not?: true })
 
 export function choiceOptions(what: ChoiceKind | EntersOption, except?: string): string[] {
   if (what === "parity") return ["odd", "even"];
+  if (what === "direction") return ["left", "right"];
   if (what === "landOrNonland") return ["land", "nonland"];
   if (what === "riot") return [ENTERS_COUNTER, "Haste"];
   if (what === "unleash") return [ENTERS_COUNTER, "No counter"];
@@ -399,6 +400,7 @@ export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice:
   if (what === "cardName") return { ...chosen, name: choice };
   if (what === "number") return { ...chosen, number: Number(choice) };
   if (what === "parity") return { ...chosen, parity: choice === "odd" ? "odd" : "even" };
+  if (what === "direction") return { ...chosen, direction: choice === "left" ? "left" : "right" };
   if (what === "landOrNonland") return { ...chosen, landOrNonland: choice === "land" ? "land" : "nonland" };
   // "White Citizen": the color and the creature type.
   if (what === "colorAndType") {

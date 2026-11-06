@@ -2988,9 +2988,11 @@ function parseStaticLine(line: string): StaticAbility | null {
   const ownCost = /^~ can't attack unless you (sacrifice|return) (an?|two|three) (.+?)( you control to its owner's hand)?$/.exec(text);
   if (ownCost && (ownCost[1] === "return") === !!ownCost[4]) {
     const n = /^an?$/.test(ownCost[2]!) ? 1 : num(ownCost[2]!);
-    const spec = parseTargetPhrase(n === 1 ? ownCost[3]! : ownCost[3]!.replace(/s$/, ""));
+    // "Two Plains" is already singular in form (singularWord).
+    const one = n === 1 ? ownCost[3]! : ownCost[3]!.split(" ").map((w, i, all) => (i === all.length - 1 ? singularWord(w) : w)).join(" ");
+    const spec = parseTargetPhrase(one);
     if (spec?.kind !== "object" || spec.controller || !n) return null;
-    const filter: TargetSpec = { ...spec, controller: "you", text: n === 1 ? ownCost[3]! : ownCost[3]!.replace(/s$/, "") };
+    const filter: TargetSpec = { ...spec, controller: "you", text: one };
     return { affects: { kind: "self" }, mods: [{ kind: "ownAttackCost", action: ownCost[1] === "return" ? "bounce" : "sacrifice", filter, n }], text: line };
   }
   // Nils, Discipline Enforcer: each creature with counters on it, {X} for it (CR 508.1g-h), X all its counters (rulings).
@@ -3331,7 +3333,9 @@ function parseLandTypeStatic(text: string, line: string): StaticAbility | null {
   let m: RegExpExecArray | null;
   if ((m = /^Nonbasic lands are (Plains|Islands|Swamps|Mountains|Forests)$/.exec(text)))
     return { affects: { kind: "filter", types: ["Land"], spec: { ...LAND, notSupertypes: ["Basic"], text: "nonbasic land" } }, mods: [{ kind: "setLandTypes", subtypes: [BASIC_PLURAL[m[1]!]!] }], text: line };
-  if ((m = /^All (Plains|Islands|Swamps|Mountains|Forests) are (Plains|Islands|Swamps|Mountains|Forests)$/.exec(text)) && m[1] !== m[2])
+  // "All Mountains are Mountains" (Conversion after a text change, CR 612.2) still sets their land types: each loses its
+  // other land types (CR 305.7).
+  if ((m = /^All (Plains|Islands|Swamps|Mountains|Forests) are (Plains|Islands|Swamps|Mountains|Forests)$/.exec(text)))
     return { affects: { kind: "filter", types: ["Land"], subtypes: [BASIC_PLURAL[m[1]!]!] }, mods: [{ kind: "setLandTypes", subtypes: [BASIC_PLURAL[m[2]!]!] }], text: line };
   if ((m = /^Enchanted land is an? (Plains|Island|Swamp|Mountain|Forest)$/.exec(text))) return { affects: { kind: "attached" }, mods: [{ kind: "setLandTypes", subtypes: [m[1]!] }], text: line };
   // Lush Growth: "Enchanted land is a Mountain, Forest, and Plains": those three instead of its other land types (CR 305.7).

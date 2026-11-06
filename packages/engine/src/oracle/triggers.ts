@@ -2824,6 +2824,16 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", /** Old One Eye: "At the beginning of your first main phase" (CR 505.1a). */ "yourFirstMain", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut", "youSacrifice", "opponentGainsLife", /** Deathless Knight. */ "youGainLife"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
+  // Bladegriff Prototype: "destroy target nonland permanent of that player's choice that one of your opponents controls":
+  // the damaged player chooses it among the permanents the controller's opponents control (rulings), read as "of
+  // their choice" on "target nonland permanent an opponent controls".
+  const damagedChooses = /^(Whenever ~ deals combat damage to a player, destroy )target nonland permanent of that player's choice that one of your opponents controls\.$/.exec(raw);
+  if (damagedChooses) {
+    const t = parseTrigger(`${damagedChooses[1]}target nonland permanent an opponent controls.`);
+    if (!t || t === "fail" || t.body.targets.length !== 1 || t.event !== "selfDealsCombatDamageToPlayer") return "fail";
+    const tgt = t.body.targets[0]!;
+    return { ...t, body: { ...t.body, targets: [{ ...tgt, chosenBy: "eventPlayer", text: "nonland permanent of that player's choice that one of your opponents controls" }], text: raw.replace(/^Whenever ~ deals combat damage to a player, /, "").replace(/\.$/, "") } };
+  }
   // "Destroy target nonartifact creature that player controls of their choice" (The Abyss), "put a +1/+1 counter on
   // target creature of defending player's choice" (Erithizon), "return target creature card of an opponent's choice from
   // your graveyard" (Mausoleum Turnkey): the ability is read without the chooser, then its one target is marked as
@@ -4089,6 +4099,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (each) {
     const body = parseBody(each[2]!.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ "), { selfIt: true });
     return body ? { event: "selfCountersPut", countersKind: each[1]!.trim(), countersEach: true, body } : "fail";
+  }
+  // Sigurd, Jarl of Ravensthorpe: "Whenever you put a lore counter on a Saga you control": once for each lore counter its
+  // controller puts on one (the precombat main phase's too, CR 714.3c, and a read ahead Saga's as it enters, CR 122.6a).
+  const youEach = /^Whenever you put an? (lore|\+1\/\+1) counter on an? ([A-Z][a-z]+) you control, (.+)$/.exec(line);
+  if (youEach) {
+    const body = parseBody(youEach[3]!, {});
+    const filter = parseTargetPhrase(`${youEach[2]} you control`);
+    return body && filter?.kind === "object" ? { event: "permanentCountersPut", tappedFilter: { ...filter, text: `${youEach[2]} you control` }, countersKind: youEach[1]!, countersEach: true, countersByYou: true, body } : "fail";
   }
   // "Whenever a -1/-1 counter is put on a creature, you may create a 1/1 green Elf Warrior creature token" (Flourishing
   // Defenses): once for each counter put on any creature (CR 122.6).

@@ -1,6 +1,6 @@
 import type { Effect, TargetSpec } from "../abilities";
 import { abilitiesOf, defOf, objIsType } from "../cards";
-import { draw, log, loseLife, obj, player } from "../game";
+import { draw, log, loseLife, obj, payableLife, payLife, player } from "../game";
 import { invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { dealDamageBatch } from "../damage";
@@ -76,6 +76,96 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, `${player(s, st.leader).name} wins the bidding with ${st.high} life (${src}).`);
       if (st.high > 0) loseLife(s, st.leader, st.high);
       r.chosen = { ...(r.chosen ?? {}), player: st.leader };
+      return;
+    }
+    case "playerVotes": {
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      const got = playerVotes(s);
+      if (e.then === "mobVerdict") {
+        if (!sc.mob) {
+          // Mob Verdict: 2 damage for each vote to each opponent who got any and to each creature they control, at once.
+          const hits = apnap(s, [...got.keys()].filter((p) => p !== ctx.controller && !player(s, p).lost));
+          const batch = hits.flatMap((p) => {
+            const n = 2 * got.get(p)!;
+            const creatures = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === p && objIsType(s, o, "Creature"));
+            return [{ src: ctxSource(s, ctx), to: { player: p }, n }, ...creatures.map((o) => ({ src: ctxSource(s, ctx), to: { object: o.id }, n }))];
+          });
+          sc.mob = true;
+          if (batch.length) dealDamageBatch(s, batch);
+        }
+        const mine = got.get(ctx.controller) ?? 0;
+        if (mine > 0 && !sc.mobDrawn) {
+          sc.mobDrawn = true;
+          log(s, `${player(s, ctx.controller).name} draws ${mine} card${mine === 1 ? "" : "s"} (${src}).`);
+          if (!draw(s, ctx.controller, mine)) return "paused";
+        }
+        return;
+      }
+      // Círdan the Shipwright: the draws in turn order from the active player (rulings), then the puts, each in turn.
+      const st = (sc.cirdan ??= { draws: apnap(s, [...got.keys()]), puts: apnap(s, s.turnOrder.filter((p) => !got.has(p))) });
+      while (st.draws.length) {
+        const pid = st.draws.shift()!;
+        const n = got.get(pid) ?? 0;
+        if (player(s, pid).lost || n <= 0) continue;
+        log(s, `${player(s, pid).name} draws ${n} card${n === 1 ? "" : "s"} (${src}).`);
+        if (!draw(s, pid, n)) return "paused";
+      }
+      while (st.puts.length) {
+        const pid = st.puts[0]!;
+        if (player(s, pid).lost) {
+          st.puts.shift();
+          continue;
+        }
+        // One at a time, each seeing what the ones before put (rulings), under their own control.
+        if (!st.asking) {
+          sc.found = undefined;
+          st.asking = true;
+        }
+        if (runEffect(s, { type: "putFromHand", filter: PERMANENT_CARD, may: true }, { ...ctx, controller: pid }) === "paused") return "paused";
+        sc.found = undefined;
+        st.asking = undefined;
+        st.puts.shift();
+      }
+      return;
+    }
+    case "payLifeRounds": {
+      // Plague of Vermin: each player in turn order from the controller, a round at a time, until a whole round starting
+      // with the controller goes by with no one paying (rulings: "all N players in sequence (starting with you)").
+      // A player can't pay more life than they have (CR 119.4, rulings); each payment is paid at once.
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      const st = (sc.lifeRounds ??= { order: turnOrderFrom(s, ctx.controller), next: 0, declines: 0, paid: {} });
+      for (let guard = 0; guard < 10_000; guard++) {
+        // A round ends: over if nobody paid in it (`declines` counts the round's players who didn't).
+        if (st.next > 0 && st.next % st.order.length === 0 && st.pick === undefined) {
+          if (st.declines >= st.order.length) break;
+          st.declines = 0;
+        }
+        const pid = st.order[st.next % st.order.length]!;
+        if (player(s, pid).lost) {
+          st.next++;
+          st.declines++;
+          continue;
+        }
+        const most = Math.max(0, payableLife(s, pid));
+        if (st.pick === undefined && most > 0) {
+          s.pending = { kind: "chooseOption", player: pid, source: src, what: "payLifeRound", options: ["0"], numberRange: { min: 0, max: most }, prompt: `pay any amount of life (up to ${most}), or 0 to pay none${st.paid[pid] ? `; you've paid ${st.paid[pid]} so far` : ""}` };
+          return "paused";
+        }
+        const n = Math.min(st.pick ?? 0, most);
+        st.pick = undefined;
+        st.next++;
+        if (n > 0) {
+          payLife(s, pid, n);
+          st.paid[pid] = (st.paid[pid] ?? 0) + n;
+          log(s, `${player(s, pid).name} pays ${n} life (${src}).`);
+        } else {
+          st.declines++;
+          log(s, `${player(s, pid).name} pays no life (${src}).`);
+        }
+      }
+      r.joinForcesPaidBy = Object.fromEntries(Object.entries(st.paid).map(([k, n]) => [Number(k), n]));
       return;
     }
     case "secretNumbers": {
@@ -287,6 +377,15 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
   }
 }
 
+const PERMANENT_CARD: TargetSpec = { kind: "card", types: ["Artifact", "Battle", "Creature", "Enchantment", "Land", "Planeswalker"], notTypes: [], notColors: [], text: "permanent card" };
+
+/** How many votes each player got in the vote resolving now (Effect "vote" `players`). */
+export function playerVotes(s: GameState): Map<PlayerId, number> {
+  const out = new Map<PlayerId, number>();
+  for (const [choice, n] of voteTally(s)) if (/^p:\d+$/.test(choice)) out.set(Number(choice.slice(2)), n);
+  return out;
+}
+
 /** The living players in turn order, starting with `first` (CR 701.38a, 101.4). */
 function turnOrderFrom(s: GameState, first: PlayerId): PlayerId[] {
   const i = Math.max(0, s.turnOrder.indexOf(first));
@@ -311,6 +410,8 @@ function extraVotes(s: GameState, pid: PlayerId): { get: number; may: number } {
  */
 export function voteOptions(s: GameState, e: Extract<Effect, { type: "vote" }>, ctx: ResolveCtx, voter?: PlayerId): string[] {
   if (e.options) return e.options;
+  // A player still in the game (CR 800.4a), not the voter for "another player".
+  if (e.players) return s.turnOrder.filter((p) => !player(s, p).lost && (e.players === "any" || p !== voter)).map((p) => `p:${p}`);
   const among = e.among!;
   return voteCandidates(s, among, e.theirs && voter !== undefined ? voter : ctx.controller).map((o) => `${o.id}@${o.zoneChanges ?? 0}`);
 }
@@ -325,6 +426,7 @@ function voteCandidates(s: GameState, among: TargetSpec, controller: PlayerId): 
 
 /** A vote's choice for people: the word, or the permanent or card with its controller or owner. */
 export function voteLabel(s: GameState, choice: string): string {
+  if (/^p:\d+$/.test(choice)) return player(s, Number(choice.slice(2))).name;
   const [id] = choice.split("@");
   const o = id ? s.objects[id] : undefined;
   if (!o || !choice.includes("@")) return choice;

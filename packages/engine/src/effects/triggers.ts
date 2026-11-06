@@ -2729,7 +2729,10 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
       // "Target creature of their choice" (TargetSpec.chosenBy): another player chooses it for the controller, who still
       // targets (rulings on The Abyss, Erithizon). "Of an opponent's choice": the controller chooses that opponent first
       // (rulings on Evangelize, Cuombajj Witches).
-      const by = body.targets.length === 1 ? body.targets[0]!.chosenBy : undefined;
+      const by0 = body.targets.length === 1 ? body.targets[0]!.chosenBy : undefined;
+      // A chooser who has left the game: the controller chooses another opponent to choose (CR 800.4g; rulings on
+      // Bladegriff Prototype).
+      const by = by0 === "eventPlayer" && t.event?.player !== undefined && t.event.player !== t.controller && player(s, t.event.player).lost ? "opponent" : by0;
       let chooser = t.controller;
       if (by === "opponent") {
         const opps = opponents(s, t.controller);

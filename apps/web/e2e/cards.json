@@ -7901,6 +7901,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "676935c8-22e0-427f-9566-16778cea0873",
+  "name": "Fatespinner",
+  "manaCost": "{1}{U}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "At the beginning of each opponent's upkeep, that player chooses draw step, main phase, or combat phase. The player skips each instance of the chosen step or phase this turn.",
+  "power": "1",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7b002cae-ee7d-400d-af9c-445eb10f1f0c",
   "name": "Fathom Trawl",
   "manaCost": "{3}{U}{U}",
@@ -15026,6 +15057,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cb91e09e-f7fb-44bc-b78f-de29705bd2d6",
+  "name": "Mob Verdict",
+  "manaCost": "{2}{R}{R}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Secret council — Each player secretly votes for another player, then those votes are revealed. For each vote an opponent received, Mob Verdict deals 2 damage to that player and each creature that player controls. For each vote you received, draw a card.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Secret council"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkc",
+  "releasedAt": "2024-02-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b9df2cdf-397c-458d-89cf-911568737ffa",
   "name": "Mockingbird",
   "manaCost": "{X}{U}",
@@ -17580,6 +17639,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "efc12acf-ffef-40a6-b2ce-fe93e89ad840",
+  "name": "Plague of Vermin",
+  "manaCost": "{6}{B}",
+  "cmc": 7,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Starting with you, each player may pay any amount of life. Repeat this process until no one pays life. Each player creates a 1/1 black Rat creature token for each 1 life they paid this way.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bc71ebf6-2056-41f7-be35-b2e5c34afa99",
   "name": "Plains",
   "manaCost": "",
@@ -17828,6 +17913,45 @@
   "set": "mh3",
   "releasedAt": "2024-06-14",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "377d0fa7-1b3d-4b97-b066-dceeff3734d0",
+  "name": "Pramikon, Sky Rampart",
+  "manaCost": "{U}{R}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Wall",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wall"
+  ],
+  "oracleText": "Flying, defender\nAs Pramikon enters, choose left or right.\nEach player may attack only the nearest opponent in the chosen direction and planeswalkers controlled by that opponent.",
+  "power": "1",
+  "toughness": "5",
+  "colors": [
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Defender"
+  ],
+  "commanderLegal": "legal",
+  "set": "c19",
+  "releasedAt": "2019-08-23",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

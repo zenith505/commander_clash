@@ -198,7 +198,7 @@ export interface Ctx {
   /** The ability ends "Round up each time." (CR 107.1a): every "half ..." in it is rounded that way. */
   halfRound?: "up" | "down";
   /** A vote came before (CR 701.38): its words ("death vote", "if taxes gets more votes"), or that it's for objects. */
-  vote?: { options?: string[]; among?: true; /** "Each player may choose ..." (not a vote): "each permanent chosen this way". */ choose?: true };
+  vote?: { options?: string[]; among?: true; /** For players (Effect "vote" `players`). */ players?: true; /** "Each player may choose ..." (not a vote): "each permanent chosen this way". */ choose?: true };
   /** "Each opponent chooses fame or fortune" came before: its words ("for each player who chose fortune"). */
   chooseWords?: string[];
   /** Who chose those words: "each opponent" or "each player". */
@@ -5648,6 +5648,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (noRegen) si++;
       effects.push({ type: "punisher", who: { ref: anyMay[1] === "player" ? "eachPlayer" : "eachOpponent" }, options, effects: then, mode: anyThen[1] === "a player does" ? "ifAny" : "ifNone", thenText: anyThen[2]! });
       si++;
+      continue;
+    }
+    // Plague of Vermin: "Starting with you, each player may pay any amount of life. Repeat this process until no one pays
+    // life. Each player creates a 1/1 black Rat creature token for each 1 life they paid this way." (Effect payLifeRounds.)
+    if (s === "Starting with you, each player may pay any amount of life" && sentences[si + 1]?.replace(/\.$/, "") === "Repeat this process until no one pays life") {
+      const tok = /^Each player creates an? (\d+)\/(\d+) (.+?) creature tokens? for each 1 life they paid this way\.?$/.exec(sentences[si + 2] ?? "");
+      const token = tok ? parseToken(Number(tok[1]), Number(tok[2]), tok[3]!) : null;
+      if (!token) return null;
+      effects.push({ type: "payLifeRounds" }, { type: "createToken", who: { ref: "eachPlayer" }, n: { count: { kind: "joinForcesPaid", whose: { ref: "eachOne" } } }, token });
+      si += 2;
       continue;
     }
     // "Target opponent may have you draw three cards. If the player doesn't, you mill three cards, then ~ deals damage to
@@ -11644,7 +11654,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // ~ was kicked, untap all Forests put onto the battlefield this way. They become 3/3 green creatures with haste that are
     // still lands.": the lands found, from then on (rulings: permanently, CR 611.2a), each while it's the same object (CR
     // 400.7); they're Forests by the search's filter.
-    const kickedLands = /^If ~ was kicked, untap all ([A-Z][a-z]+)s put onto the battlefield this way$/.exec(s);
+    const kickedLands = /^If ~ was kicked, untap all (Plains(?= )|[A-Z][a-z]+?)s? put onto the battlefield this way$/.exec(s);
     const forestSearch = effects.at(-1);
     const theyBecome = kickedLands ? /^They (become \d+\/\d+ [a-z ]+creatures(?: with [a-z]+)? that are still lands)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
     if (kickedLands && theyBecome && ctx.spell && forestSearch?.type === "search" && forestSearch.dest.zone === "battlefield" && forestSearch.filter?.subtypes?.join() === kickedLands[1] && !forestSearch.others && !forestSearch.who && !forestSearch.library && !forestSearch.split && !forestSearch.condDest && !forestSearch.landTo && !forestSearch.cardTo && !forestSearch.mayInstead && !forestSearch.payDiff && !forestSearch.withHeld && !forestSearch.orGraveyard && !forestSearch.andGraveyard) {
@@ -12686,12 +12696,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "Starting with you, each player votes for death or taxes" (CR 701.38a): the words, or "a nonland permanent you don't
     // control", "an artifact, creature, or enchantment card in your graveyard" (objects, not targeted). One vote per ability.
-    const vote = /^(?:[Ss]tarting with you, each player votes|Each player (secretly) votes) for (.+)$/.exec(s);
+    const vote = /^(?:[Ss]tarting with you, each player votes|[Ee]ach player (secretly) votes) for (.+)$/.exec(s);
     if (vote) {
       if (ctx.vote) return null;
       const what = vote[2]!;
       const one = /^an? (.+)$/.exec(what);
       const secret = vote[1] ? { secret: true as const } : {};
+      // "Each player secretly votes for another player" (Mob Verdict), "for a player" (Círdan the Shipwright).
+      if (what === "another player" || what === "a player") {
+        effects.push({ type: "vote", players: what === "a player" ? "any" : "other", ...secret, text: `vote for ${what}` });
+        ctx.vote = { players: true };
+        continue;
+      }
       if (one) {
         const spec = parseTargetPhrase(one[1]!);
         if (!spec || (spec.kind !== "object" && spec.kind !== "card") || spec.chosen || spec.counter || (spec.kind === "card" && spec.owner !== "you")) return null;
@@ -12705,12 +12721,39 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       }
       continue;
     }
+    // Mob Verdict and Círdan the Shipwright: what the votes for players do (Effect playerVotes).
+    const next1 = sentences[si + 1]?.replace(/\.$/, "") ?? "";
+    if (ctx.vote?.players && s === "For each vote an opponent received, ~ deals 2 damage to that player and each creature that player controls" && next1 === "For each vote you received, draw a card") {
+      effects.push({ type: "playerVotes", then: "mobVerdict" });
+      si++;
+      continue;
+    }
+    if (ctx.vote?.players && s === "Each player draws a card for each vote they received" && next1 === "Each player who received no votes may put a permanent card from their hand onto the battlefield") {
+      effects.push({ type: "playerVotes", then: "cirdan" });
+      si++;
+      continue;
+    }
+    // Trap the Trespassers: "For each creature with one or more votes, put that many stun counters on it, then tap it."
+    const stunVotes = ctx.vote?.among && !ctx.vote.choose ? /^For each creature with one or more votes, put that many (stun|\+1\/\+1|-1\/-1) counters on it$/.exec(s) : null;
+    // The sentence splitter makes "then tap it" a sentence of its own.
+    if (stunVotes && /^Tap it\.?$/.test(sentences[si + 1] ?? "")) {
+      si++;
+      effects.push({ type: "counters", what: { ref: "voted", any: true }, counter: stunVotes[1]! as CounterKind, n: 1, perVote: true }, { type: "tap", what: { ref: "voted", any: true } });
+      continue;
+    }
     // "Each opponent chooses fame or fortune" (Seize the Spotlight): words chosen in APNAP order (CR 101.4), not a vote.
     // "Each opponent chooses money, friends, or secrets" (Master of Ceremonies).
     // "Each opponent secretly chooses silence or snitch, then the choices are revealed" (Prisoner's Dilemma): all are
     // chosen before any is revealed.
     // Friend or foe (Khorvath's Fury, Pir's Whim): you choose for each player, yourself too (rulings); "each friend" and
     // "each foe" are the players chosen so, the friends' instructions done first, as written (rulings).
+    // Teyo, Geometric Tactician: "Choose left or right. Until your next turn, each player may attack only the nearest
+    // opponent in the last chosen direction and planeswalkers controlled by that opponent." (Effect attackDirection.)
+    if (s === "Choose left or right" && /^Until your next turn, each player may attack only the nearest opponent in the last chosen direction and planeswalkers controlled by that opponent$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      effects.push({ type: "choose", choice: "direction" }, { type: "attackDirection" });
+      si++;
+      continue;
+    }
     if (s === "For each player, choose friend or foe" && !ctx.chooseWords && !ctx.vote) {
       effects.push({ type: "eachChooses", who: { ref: "eachPlayer" }, options: ["friend", "foe"], text: "choose friend or foe", byYou: true });
       ctx.chooseWords = ["friend", "foe"];
@@ -15832,6 +15875,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!yes || !no || sub.targets.length) return null;
       effects.push({ type: "delayed", when: "playersNextEndStep", whose: { ref: "chosenPlayer" }, effects: [{ type: "if", cond: { kind: "eventPlayerAttackedYou", not: true }, effects: yes, otherwise: no }], text: `${theirEnd[1]!} if they didn't attack you that turn. Otherwise, ${theirElse[1]!}` });
       si = sentences.length;
+      continue;
+    }
+    // Fatespinner: "that player chooses draw step, main phase, or combat phase. The player skips each instance of the chosen
+    // step or phase this turn." (CR 614.10; every one of them this turn, rulings.)
+    const fate = /^(that player) chooses draw step, main phase, or combat phase$/i.exec(s);
+    if (fate && /^The player skips each instance of the chosen step or phase this turn\.?$/.test(sentences[si + 1] ?? "")) {
+      const who = parsePlayer(fate[1]!.toLowerCase(), ctx);
+      if (!who) return null;
+      effects.push({ type: "skipChosenThisTurn", who });
+      si++;
       continue;
     }
     // Teferi's Realm: "that player chooses artifact, creature, land, or non-Aura enchantment. All nontoken permanents of that

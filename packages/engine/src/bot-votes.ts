@@ -15,6 +15,8 @@ export function chooseVote(s: GameState, pid: PlayerId, options: string[]): stri
   if (!r) return options[0]!;
   const controller = r.item.controller;
   const effects = r.body.effects;
+  // A vote for a player (Mob Verdict, Círdan the Shipwright).
+  if (options.every((o) => /^p:\d+$/.test(o))) return playerVote(s, pid, controller, effects, options);
   const words = options.filter((o) => o !== "none" && !o.includes("@"));
   // An extra vote that may be passed on: always worth taking, for whatever the first one was for.
   // "Each player may choose ..." (Druid of Purification): choosing nothing beats choosing something that hurts us.
@@ -23,6 +25,24 @@ export function chooseVote(s: GameState, pid: PlayerId, options: string[]): stri
   let best = options[0]!;
   for (const o of options) if (score(o) > score(best)) best = o;
   return best;
+}
+
+/**
+ * A vote for a player: with Mob Verdict, the controller wants cards from votes for themselves only if no opponent is
+ * worth hurting, and another voter hurts the strongest player who is neither the controller nor themselves; with Círdan,
+ * a vote for ourselves is a card for us.
+ */
+function playerVote(s: GameState, pid: PlayerId, controller: PlayerId, effects: Effect[], options: string[]): string {
+  const mob = allEffects(effects).some((e) => e.type === "playerVotes" && e.then === "mobVerdict");
+  const strength = (q: PlayerId) => s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === q).reduce((n, o) => n + Math.max(1, worth(s, pid, o)), 0);
+  const score = (o: string) => {
+    const q = Number(o.slice(2));
+    if (!mob) return q === pid ? 1 : 0;
+    if (q === pid) return -1000;
+    if (q === controller) return pid === controller ? 5 : -5;
+    return strength(q);
+  };
+  return [...options].sort((a, b) => score(b) - score(a))[0]!;
 }
 
 /** A vote for a permanent or card: what the instructions about "each ... with the most votes" do to it, for us. */

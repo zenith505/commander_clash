@@ -1503,6 +1503,15 @@ export function parseTargetPhrase(
     p = p.slice(0, chosenNumber.index);
     phrase = phrase.trim().slice(0, chosenNumber.index);
   }
+  // The Fantastic Four: "a spell with power, toughness, or mana value 4": any one of them exactly that (a spell's on the
+  // stack, its X counted, CR 202.3e; a noncreature spell has no power or toughness).
+  const anyStat = !extra.chosen ? / with power, toughness, or mana value (\d+)$/i.exec(phrase.trim()) : null;
+  if (anyStat) {
+    extra.equalsChosen = ["manaValue", "power", "toughness"];
+    extra.equals = Number(anyStat[1]);
+    p = p.slice(0, anyStat.index);
+    phrase = phrase.trim().slice(0, anyStat.index);
+  }
   // Expel the Interlopers: "creatures with power greater than or equal to the chosen number" (Chosen.number).
   const atLeastChosen = / with power greater than or equal to the chosen number$/i.exec(phrase.trim());
   if (atLeastChosen && !extra.chosen) {

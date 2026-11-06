@@ -2,7 +2,8 @@ import type { Effect, SameNameRef } from "../abilities";
 import { defOf, isType, objIsType } from "../cards";
 import { attackingPermanentOf, creatureTypesOf, enterTogether, log, loseLife, moveObject, obj, player, shareCreatureType } from "../game";
 import { currentName } from "../names";
-import { defMv } from "../faces";
+import { defMv, restingDef } from "../faces";
+import { addCopyEffect, copyKey } from "../copies";
 import { CREATURE_TYPES } from "../keywords";
 import { shuffle, shuffleLibrary } from "../rng";
 import type { GameState, ObjectId, PlayerId } from "../types";
@@ -217,6 +218,19 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (hit) s.resolving!.revealedUntilMv = characteristics(s, obj(s, hit)).manaValue;
       else delete s.resolving!.revealedUntilMv;
       log(s, `${p.name} ${e.exile ? "exiles" : "reveals"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}${hit || !want ? "" : `, finding no ${filter.text}`}.`);
+      // Nascent Metamorph: the source, still the same object on the battlefield (CR 400.7), becomes a copy of the card found
+      // until end of turn, its values as printed (CR 707.2); then that card goes on the bottom with the rest (rulings). With
+      // none found, nothing is copied (rulings).
+      if (found === "copySelf") {
+        const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        if (hit && me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc)) {
+          const base = restingDef(s.cards[obj(s, hit).cardId]!);
+          const was = defOf(s, me).name;
+          addCopyEffect(s, me, copyKey(s, base), "endOfTurn");
+          log(s, `${was} becomes a copy of ${base.name} until end of turn.`);
+        }
+        hits.splice(0);
+      }
       // Venture Forth: the cards are exiled one at a time until a land card is (CR 406.3), then go on from exile.
       if (e.exile) for (const id of seen) moveObject(s, id, "exile");
       for (const id of stays) log(s, `${defOf(s, obj(s, id)).name} has nothing to enchant, so it stays in the library.`);
@@ -225,10 +239,15 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Old Stickfingers: all of them at once (CR 608.2c).
         for (const id of hits) moveObject(s, id, "graveyard");
         if (hits.length) log(s, `${p.name} puts ${hits.map((id) => defOf(s, obj(s, id)).name).join(", ")} into their graveyard.`);
-      } else
+      } else if (found !== "copySelf")
         enterTogether(s, () =>
           hits.forEach((id) => {
-            moveObject(s, id, found, { ...(e.tapped ? { tapped: true } : {}), ...(found === "battlefield" ? { controller: e.yours ? ctx.controller : p.id, ...hosts.get(id) } : {}) });
+            // Rohirrim Chargers: attached to the exerted creature, if it's still that object and this could equip it.
+            const d = defOf(s, obj(s, id));
+            const host = e.equipToSubject && ctx.subject ? s.objects[ctx.subject.id] : undefined;
+            const equip = host && found === "battlefield" && host.zone === "battlefield" && (host.zoneChanges ?? 0) === ctx.subject!.zc && d.subtypes.includes("Equipment") && !isType(d, "Creature") && objectMatches(s, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, host, p.id, false, d) ? { attachTo: host.id } : undefined;
+            if (e.equipToSubject && found === "battlefield") log(s, `${p.name} puts ${d.name} onto the battlefield${equip ? ` attached to ${defOf(s, host!).name}` : ", unattached"}.`);
+            moveObject(s, id, found, { ...(e.tapped ? { tapped: true } : {}), ...(found === "battlefield" ? { controller: e.yours ? ctx.controller : p.id, ...hosts.get(id), ...equip } : {}) });
             const o = obj(s, id);
             if (attack && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
               o.attacking = attack.player;

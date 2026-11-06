@@ -429,7 +429,8 @@ export function normalizeSelf(d: CardDef): string {
   // A card named for two characters ("Aang and La, Ocean's Fury", "Bebop & Rocksteady") takes plural verbs: "Whenever
   // Aang and La attack", "Whenever ~ enter or attack". It's still one object (CR 201.5), read as "~ attacks".
   // A plural name ("The Sackville-Bagginses", "The Notary Hobbits") too.
-  if (/ (?:and|&) /.test(comma) || /^The [^,]+[a-z]s$/.test(d.name)) {
+  // The Fantastic Four: "When ~ enter", "~ deal 3 damage".
+  if (/ (?:and|&) /.test(comma) || /^The [^,]+[a-z]s$/.test(d.name) || d.name === "The Fantastic Four") {
     const third = (v: string) => (v === "die" ? "dies" : `${v}s`);
     t = t.replace(/~ (attack|enter|deal|block|die|get|become)(?: or (attack|enter|block|die))?\b/g, (_, a: string, b?: string) => `~ ${third(a)}${b ? ` or ${third(b)}` : ""}`);
     // The Notary Hobbits: "When ~ enter, if they're not a token, create two tokens that are copies of them": ~ itself.
@@ -5775,6 +5776,8 @@ export function compile(d: CardDef): CompiledCard {
       // Eerie: "Whenever an enchantment you control enters and whenever you fully unlock a Room, ..." (Entity Tracker).
       /^Whenever (an enchantment you control enters|~ or another enchantment you control enters) and whenever you fully unlock a Room, (.+)$/.exec(line) ??
       // "When ~ enters and whenever you cast a spell with mana value 5 or greater, draw a card." (Up the Beanstalk)
+      // The Fantastic Four: "and whenever you cast a spell with power, toughness, or mana value 4", its commas before the number.
+      /^When ~ enters and (whenever you cast a spell with power, toughness, or mana value \d+), (.+)$/.exec(line) ??
       /^When ~ enters and (whenever (?!it )[^,]+), (.+)$/.exec(line) ??
       // "Whenever a creature you control of the chosen type enters or attacks, draw a card." (Kindred Discovery)
       /^Whenever (an? [^,]+? you control(?: of the chosen type)?) enters or attacks, (.+)$/.exec(line) ??

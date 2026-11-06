@@ -1652,6 +1652,47 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       });
       return;
     }
+    case "guildFeud": {
+      // Guild Feud: the target opponent's reveal and choice first (you see it before revealing yours, rulings), then yours;
+      // each puts the rest into their graveyard. Two creatures put there fight, nobody acting in between (rulings).
+      const sc = (s.resolving!.scratch ??= {});
+      const opp = players(s, e.who, ctx)[0];
+      const order = [opp, ctx.controller].filter((pid): pid is PlayerId => pid !== undefined && !player(s, pid).lost);
+      const feud = (sc.feud ??= { step: 0, put: [] });
+      while (feud.step < order.length) {
+        const p = player(s, order[feud.step]!);
+        if (!feud.looked) {
+          feud.looked = p.library.slice(0, e.n);
+          if (feud.looked.length) log(s, `${p.name} reveals ${feud.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library.`);
+        }
+        const looked = feud.looked.filter((id) => obj(s, id).zone === "library");
+        const creatures = looked.filter((id) => isType(defOf(s, obj(s, id)), "Creature"));
+        if (creatures.length && !feud.asked) {
+          feud.asked = true;
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a creature card", cards: creatures, min: 0, max: 1, dig: { looked, to: "onto the battlefield", rest: "into your graveyard" } };
+          return "paused";
+        }
+        const pick = feud.asked ? (sc.found ?? []).filter((id) => creatures.includes(id)) : [];
+        sc.found = undefined;
+        for (const id of pick) {
+          log(s, `${p.name} puts ${defOf(s, obj(s, id)).name} onto the battlefield.`);
+          moveObject(s, id, "battlefield", { controller: p.id });
+          if (obj(s, id).zone === "battlefield") feud.put.push(id);
+        }
+        const rest = looked.filter((id) => !pick.includes(id));
+        for (const id of rest) moveObject(s, id, "graveyard");
+        if (rest.length) log(s, `${p.name} puts ${rest.map((id) => defOf(s, obj(s, id)).name).join(", ")} into their graveyard.`);
+        feud.step++;
+        feud.looked = undefined;
+        feud.asked = undefined;
+      }
+      // "Those creatures fight each other" (CR 701.14): both still creatures on the battlefield.
+      if (feud.put.length === 2) {
+        const [a, b] = feud.put as [ObjectId, ObjectId];
+        runEffect(s, { type: "fight", a: { ref: "target", index: 0 }, b: { ref: "target", index: 1 } }, { ...ctx, targets: [{ kind: "object", id: a, zc: obj(s, a).zoneChanges ?? 0 }, { kind: "object", id: b, zc: obj(s, b).zoneChanges ?? 0 }], legal: [true, true] });
+      }
+      return;
+    }
     case "revealPick": {
       // "Reveal the top three cards of your library. An opponent chooses one of them." (Murmurs from Beyond): revealed
       // first, then the opponent chooses (one that fits, if it says what kind: Animal Magnetism), then the cards move.

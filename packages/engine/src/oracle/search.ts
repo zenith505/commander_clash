@@ -22,6 +22,13 @@ function searchDest(text: string): SearchDest {
  * hand" (Cultivate), "then shuffle and put that card on top" (Vampiric Tutor).
  */
 export function parseSearch(s: string, count?: (text: string) => AmountExpr | null, same?: (ref: string) => SameNameRef | null): Effect[] | null {
+  // Burning-Rune Demon: "exactly two cards": two or none (the searcher may fail to find, CR 701.23b), never one.
+  const exact = /^(Search your library for )exactly (two|three|four) /i.exec(s);
+  if (exact) {
+    const fx = parseSearch(s.replace(/exactly /, ""), count, same);
+    const sr = fx?.length === 1 ? fx[0]! : undefined;
+    return sr?.type === "search" && !sr.upTo && typeof sr.n === "number" && sr.n > 1 && !sr.others && !sr.oneOfEach ? [{ ...sr, exactly: true }] : null;
+  }
   const m = /^Search your library for (up to )?(a|an|one|two|three|four|five|six|seven|eight|nine|ten|X|any number of) (.+?)(?:, reveal (?:it|them|that card|those cards))?(?:,| and) ((?:put|then|exile) .+)$/i.exec(s);
   if (!m) return null;
   // "A permanent card with the same name as target nontoken creature" (Bifurcate), "a card with the same name as that
@@ -111,14 +118,19 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   // "That each have different names" (Tiamat), "that have different names" (Omenpath Journey) say the same.
   const different = / (?:with|that each have|that have) different names$/.exec(phrase);
   if ((different && n === 1) || (eachX && !different)) return null;
-  const filter00 = parseSearchFilter(different ? phrase.slice(0, different.index) : phrase, count);
+  // Threats Undetected: "up to four creature cards with different powers": no two found with the same power (rulings:
+  // different numbers).
+  const powers = !different && !eachX ? / with different powers$/.exec(phrase) : null;
+  if (powers && (n === 1 || share || total || unlike || noShare)) return null;
+  const filter00 = parseSearchFilter(different ? phrase.slice(0, different.index) : powers ? phrase.slice(0, powers.index) : phrase, count);
   if (filter00 === null || (eachX && (!filter00 || filter00.bound)) || (unlike && !filter00)) return null;
   if (noShare && (!filter00 || filter00.kind !== "card" || !filter00.types?.includes("Land") || unlike || total)) return null;
   const filter0 = unlike ? { ...filter00!, notNamedAsYours: { ...unlikeSpec!, kind: "object" as const, text: `${unlike[1]} you control` }, text: m[3]! } : noShare ? { ...filter00!, noLandTypeOfYours: true as const, text: m[3]! } : filter00;
   const filter = eachX ? { ...filter0!, bound: { key: "manaValue" as const, at: "exact" as const, amount: X }, text: `${filter0!.text} with mana value X` } : filter0;
   let r: RegExpExecArray | null;
   // An Aura put onto the battlefield this way: its controller chooses what it enchants as it enters (CR 303.4f).
-  const base = { type: "search" as const, ...(filter ? { filter: different ? { ...filter, text: `${filter.text} with different names` } : share ? { ...filter, text: `${filter.text} that share a land type` } : total ? { ...filter, text: `${filter.text} with total mana value ${total[1]} or less` } : filter } : {}), n, upTo, reveal, ...(different ? { oneEach: true as const } : {}), ...(share ? { shareLandType: true as const } : {}), ...(total ? { totalMv: Number(total[1]) } : {}) };
+  if (powers && !filter) return null;
+  const base = { type: "search" as const, ...(powers ? { differentPowers: true as const } : {}), ...(filter ? { filter: different ? { ...filter, text: `${filter.text} with different names` } : powers ? { ...filter, text: `${filter.text} with different powers` } : share ? { ...filter, text: `${filter.text} that share a land type` } : total ? { ...filter, text: `${filter.text} with total mana value ${total[1]} or less` } : filter } : {}), n, upTo, reveal, ...(different ? { oneEach: true as const } : {}), ...(share ? { shareLandType: true as const } : {}), ...(total ? { totalMv: Number(total[1]) } : {}) };
   if ((r = new RegExp(`^put ${SEARCH_PRONOUN} ${SEARCH_DEST}, then shuffle$`, "i").exec(rest))) return [{ ...base, dest: searchDest(r[1]!) }];
   // Foresight, Manipulate Fate: "Search your library for three cards, exile them, then shuffle"; Selective Memory: "any
   // number of nonland cards".
@@ -264,6 +276,8 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   }
   if (/^card named ~$/.test(p)) return { kind: "card", named: "~", text: "card named ~" };
   // "Dragon cards not named ~" (Tiamat): any other name.
+  // Burning-Rune Demon: "cards not named ~": any card with another name.
+  if (p === "card not named ~") return { kind: "card", notNamed: "~", text: p };
   const notSelf = /^(.+ card) not named ~$/.exec(p);
   if (notSelf) {
     const head = parseSearchFilter(notSelf[1]!);
@@ -312,11 +326,13 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     if (subs.some((x) => !x?.keywords?.length)) return null;
     return { kind: "card", anyOf: subs as TargetSpec[], text: p };
   }
+  // An Unearthly Child: "a card with doctor's companion", the printed keyword ability (CR 702.124m).
+  if (p === "card with doctor's companion") return { kind: "card", keywords: ["Doctor's companion"], text: p };
   // "A snow permanent card, a legendary card, or a Saga card" (Search for Glory): a card that fits any one of them.
   const parts = p.split(/,? or an? |, an? /);
   // "An instant card or a card with flash" (Waterlogged Teachings). "A basic Plains card or a creature card with mana value
   // 1 or less" (Starfield Shepherd).
-  if (parts.length > 1 && parts.every((x) => / card$|^card with [a-z]+$| card with a mana ability$| card with mana value \d+ or (?:less|greater)$|^card with \{X\} in its mana cost$/.test(x))) {
+  if (parts.length > 1 && parts.every((x) => / card$|^card with [a-z]+$|^card with doctor's companion$| card with a mana ability$| card with mana value \d+ or (?:less|greater)$|^card with \{X\} in its mana cost$/.test(x))) {
     const subs = parts.map((x) => parseSearchFilter(x));
     if (subs.some((x) => !x)) return null;
     return { kind: "card", anyOf: subs as TargetSpec[], text: p.replace(/\bcard\b(?=,| or )/g, "card") };

@@ -325,7 +325,8 @@ export const objIsType = (s: GameState, o: GameObject, t: string) => characteris
 /** Does this permanent have keyword `k` right now (printed, granted, or not lost)? */
 /** Whether it can be sacrificed: not if it "can't be sacrificed" (CR 701.21; rulings on Alexios), for a cost or by an effect. */
 export function canBeSacrificed(s: GameState, o: GameObject): boolean {
-  return !characteristics(s, o).cantBeSacrificed && !opponentForbidsSacrifice(s, o);
+  const c = characteristics(s, o);
+  return !c.cantBeSacrificed && !c.cantBeSacrificedBy.includes(c.controller) && !opponentForbidsSacrifice(s, o);
 }
 
 /**
@@ -346,7 +347,8 @@ export function opponentForbidsSacrifice(s: GameState, o: GameObject): boolean {
  */
 export function canSacrificeForCost(s: GameState, o: GameObject): boolean {
   // A cost of the player's own spell or ability isn't caused by an opponent's (Sigarda, Host of Herons), so only "can't be sacrificed".
-  if (characteristics(s, o).cantBeSacrificed) return false;
+  const c = characteristics(s, o);
+  if (c.cantBeSacrificed || c.cantBeSacrificedBy.includes(c.controller)) return false;
   return !s.battlefield.some((id) => {
     const r = abilitiesOf(s, s.objects[id]!).noSacrificeCosts;
     return r === "creatures" ? objIsType(s, o, "Creature") : r === "nonland" ? !objIsType(s, o, "Land") : false;

@@ -9003,6 +9003,7 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   if (found.length > pend.max) throw new RulesError(`find at most ${pend.max}`);
   // Searching simply for a number of cards, you find as many as you can (CR 701.23d).
   if (found.length < pend.min) throw new RulesError(`find ${pend.min} card${pend.min === 1 ? "" : "s"}`);
+  if (pend.exactly && found.length && found.length !== pend.max) throw new RulesError(`find exactly ${pend.max} cards or none`);
   if (pend.distinctManaValues && new Set(found.map((id) => defMv(defOf(s, obj(s, id))))).size !== found.length)
     throw new RulesError("choose cards with different mana values");
   if (pend.distinctPowers && new Set(found.map((id) => characteristics(s, obj(s, id)).power)).size !== found.length) throw new RulesError("choose cards with different powers");

@@ -1069,7 +1069,11 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   const hueKind = !parsed0 ? /^((?:white|blue|black|red|green) or (?:white|blue|black|red|green)) (instant or sorcery)(?: spell)?$/.exec(what) : null;
   const hue = hueKind ? parseTargetPhrase(`${hueKind[1]} spell`) : null;
   const kinds = hueKind ? parseTargetPhrase(`${hueKind[2]} spell`) : null;
-  const parsedHue = hue?.kind === "spell" && kinds?.kind === "spell" && hue.colors?.length === 2 && !hue.types?.length ? { ...kinds, colors: hue.colors, text: `${hueKind![1]} ${hueKind![2]} spell` } : null;
+  const parsedHue0 = hue?.kind === "spell" && kinds?.kind === "spell" && hue.colors?.length === 2 && !hue.types?.length ? { ...kinds, colors: hue.colors, text: `${hueKind![1]} ${hueKind![2]} spell` } : null;
+  // Lucky Clover: "an Adventure instant or sorcery spell": a spell type (CR 205.3k) on an instant or a sorcery spell.
+  const spellType = !parsed0 && !parsedHue0 ? /^(Adventure|Arcane|Lesson|Omen|Trap) instant or sorcery(?: spell)?$/.exec(what) : null;
+  const both = spellType ? parseTargetPhrase("instant or sorcery spell") : null;
+  const parsedHue = parsedHue0 ?? (both?.kind === "spell" && !both.subtypes?.length ? { ...both, subtypes: [spellType![1]!], text: `${spellType![1]} instant or sorcery spell` } : null);
   // Umara Mystic: "an instant, sorcery, or Wizard spell": any one of them.
   const orKind = !parsed0 ? /^(non[a-z]+|[A-Z][a-z]+) or ([A-Z][a-z]+|non[a-z]+)(?: spell)?$/.exec(what) ?? /^(instant), (sorcery), or ([A-Z][a-z]+)(?: spell)?$/.exec(what) : null;
   const sides = orKind ? orKind.slice(1).filter(Boolean).map((k) => parseTargetPhrase(`${k} spell`)) : [];

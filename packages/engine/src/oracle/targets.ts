@@ -2313,6 +2313,8 @@ export function parseTargetPhrase(
       // supertype is (below), only before bare card types.
       else if ((w === "multicolored" || w === "monocolored" || w === "colorless" || w === "colored") && !extra.colorCount && (alts.length === 1 || (alt === alts[0] && i === 0 && words.length === 2 && !!TYPE_WORDS[words[1]!] && alts.slice(1).every((a) => { const ws = a.trim().split(/\s+/); return ws.length === 1 && !!TYPE_WORDS[ws[0]!]; })))) extra.colorCount = w;
       else if (SUPERTYPE_WORDS[w]) supertypes.push(SUPERTYPE_WORDS[w]!);
+      // Riku of Many Paths: "a modal spell" (CR 700.2).
+      else if (w === "modal" && isSpell && alts.length === 1 && !extra.modal) extra.modal = true;
       else if (w === "permanent" && inGraveyard) types.push(...PERMANENT_TYPES); // "permanent card" (CR 110.4b)
       // "Green permanent spell": one that isn't an instant or a sorcery (CR 110.4a: those are the spells that become
       // permanents).

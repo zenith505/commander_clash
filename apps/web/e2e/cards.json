@@ -18847,6 +18847,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "10c2428f-6e4a-4b92-9087-720242a5c25c",
+  "name": "Queen Kayla bin-Kroog",
+  "manaCost": "{1}{R}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Noble",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Noble"
+  ],
+  "oracleText": "{4}, {T}: Discard all the cards in your hand, then draw that many cards. You may choose an artifact or creature card with mana value 1 you discarded this way, then do the same for artifact or creature cards with mana values 2 and 3. Return those cards to the battlefield. Activate only as a sorcery.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bro",
+  "releasedAt": "2022-11-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "82372776-bedd-4893-92ad-f1272f9c3250",
   "name": "Quicksilver Wall",
   "manaCost": "{2}{U}",

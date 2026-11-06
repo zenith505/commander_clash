@@ -1407,7 +1407,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // ability's): up to all the modes, each once (rulings), but no more than X, counted as it's put on the stack (CR 603.3c).
   const upToX = !opts.spell && !opts.activated ? /^[Cc]hoose up to X, where X is ([^—•]+?) —\s*((?:•[^•]+)+)$/.exec(text.trim()) : null;
   if (upToX) {
-    const maxCount = parseCount(upToX[1]!, null);
+    // Riku of Many Paths: "the number of times you chose a mode for that spell", in a cast trigger.
+    const maxCount = upToX[1] === "the number of times you chose a mode for that spell" ? (opts.castSpell ? ({ count: { kind: "castSpellModes" } } as AmountExpr) : null) : parseCount(upToX[1]!, null);
     const body = maxCount && parseModal("any number", upToX[2]!, text.trim(), opts);
     if (!body || usesX(body.modal!.modes)) return null;
     return { ...body, modal: { ...body.modal!, maxCount } };
@@ -2225,6 +2226,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Teferi's Reproach: "Choose target opponent. Until that player's next turn, they gain protection from everything and
   // their life total can't change. All nonland permanents they control phase out." (sentences/permanents.ts).
   text = text.replace(/^Choose target opponent\. Until that player's next turn, they gain protection from everything and their life total can't change\. All nonland permanents they control phase out\./, "Until target opponent's next turn, that player gains protection from everything and their life total can't change. All nonland permanents that player controls phase out.");
+  // Haunt the Network: "Choose target opponent. Create two ... tokens .... Then the chosen player loses X life and you gain X
+  // life, where X is ...": the chosen player is that target (CR 115.1), not a player chosen as a permanent enters.
+  text = text.replace(/^Choose target opponent\. (Create [^.]+ tokens(?: with [a-z]+)?\.) Then the chosen player (loses X life and you gain X life, where X is [^.]+\.)$/, "$1 Then target opponent $2");
   // Waking the Trolls: "Choose target opponent. If they control fewer lands than you, create a number of ... tokens ... equal
   // to the difference.": as many as you have more, none if they have as many or more (Superior Numbers' "in excess of").
   text = text.replace(/^Choose target opponent\. If they control fewer lands than you, create a number of ([^.]+? tokens(?: with [a-z]+)?) equal to the difference\.$/, "Create X $1, where X is the number of lands you control in excess of the number of lands target opponent controls.");
@@ -2414,6 +2418,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // your library in any order.": one look, the number taken checked as it resolves; strictly more than every other player
   // (rulings), each of them an opponent here (no teams, CR 102.3).
   text = text.replace(/^(Look at the top \w+ cards of your library)\. If you control more creatures than each other player, put (two|three) of those cards into your hand\. Otherwise, put one of them into your hand\. Then put the rest on the bottom of your library in any order\.$/, "$1. Put one of them into your hand and the rest on the bottom of your library in any order. Put $2 of those cards into your hand instead if you control more creatures than each opponent.");
+  // Queen Kayla bin-Kroog: "Discard all the cards in your hand, then draw that many cards. You may choose an artifact or
+  // creature card with mana value 1 you discarded this way, then do the same for artifact or creature cards with mana values
+  // 2 and 3. Return those cards to the battlefield.": up to one of each of those mana values, all put onto the battlefield at
+  // once (rulings; sentences/zones.ts).
+  text = text.replace(/^Discard all the cards in your hand, then draw that many cards\. You may choose an artifact or creature card with mana value 1 you discarded this way, then do the same for artifact or creature cards with mana values 2 and 3\. Return those cards to the battlefield\.$/, "Discard your hand. Draw cards equal to the number of cards discarded this way. Return up to one artifact or creature card with mana value 1, 2, and 3 each discarded this way to the battlefield.");
   // Borrowed Knowledge: "Discard your hand, then draw cards equal to the number of cards discarded this way.": the same as
   // two sentences, the count made after the discard.
   text = text.replace(/^Discard your hand, then draw cards equal to the number of cards discarded this way\.$/, "Discard your hand. Draw cards equal to the number of cards discarded this way.");
@@ -3193,6 +3202,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // turn, copy that spell an additional time. You may choose new targets for the copy.": a second, identical delayed
   // trigger, so the next one is copied twice (rulings).
   text = text.replace(/(^|\n|\. )If you attacked this turn, when you next cast an instant or sorcery spell this turn, copy that spell an additional time\. You may choose new targets for the copy\./, "$1If you attacked this turn, when you next cast an instant or sorcery spell this turn, copy that spell, and you may choose new targets for the copy.");
+  // Scarlet Witch, Chaotic Avenger: "look at the top two cards of your library, then exile them face down. Then you may cast
+  // ...": one instruction, as Kayla's Music Box's (you may look at them, CR 406.3).
+  text = text.replace(/^[Ll]ook at the top two cards of your library, then exile them face down\. Then you (may cast a Hero or noncreature spell from among cards exiled with ~ without paying its mana cost\.)$/, "Look at and exile the top two cards of your library face down. You $1");
+  // Vault 112: Sadistic Simulation: "Pay any amount of {E}. If you paid one or more {E} this way, shuffle your library, then
+  // exile that many cards from the top. You may play one of those cards without paying its mana cost.": one instruction
+  // (below), paying none doing nothing.
+  text = text.replace(/^Pay any amount of \{E\}\. If you paid one or more \{E\} this way, shuffle your library, then exile that many cards from the top\. You may play one of those cards without paying its mana cost\.$/, "Pay one or more {E} to shuffle your library and exile that many cards from the top to play one free.");
+  // Portal Manipulator: one instruction about both targets (sentences/permanents.ts).
+  text = text.replace(/^choose target player and any number of target attacking creatures their opponents control\. Those creatures are now attacking that player\.$/i, "Any number of target attacking creatures controlled by opponents of target player are now attacking that player.");
   // Kayla's Music Box: "Look at the top card of your library, then exile it face down": one instruction (see zones.ts).
   text = text.replace(/^Look at the top card of your library, then exile it face down\.$/, "Look at and exile the top card of your library face down.");
   // Believe (Reason // Believe): "Look at the top card of your library. You may put it onto the battlefield if it's a
@@ -3989,6 +4007,37 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // The Tale of Tamiyo: "Mill two cards. If two cards that share a card type were milled this way, draw a card and repeat
+    // this process.": again and again in this resolution while the two share a card type (rulings).
+    if (sentences[si + 1]?.replace(/\.$/, "") === "If two cards that share a card type were milled this way, draw a card and repeat this process") {
+      const mill = parseSentence(capital(s), ctx);
+      const m0 = mill?.length === 1 ? mill[0] : undefined;
+      if (m0?.type !== "mill" || m0.who.ref !== "you" || m0.n !== 2) return null;
+      effects.push({ ...m0, repeatSharedTypeDraw: true });
+      si++;
+      continue;
+    }
+    // Uldaros Theorix: "exile up to one target nonland card of each card type from your graveyard. Copy those cards. You may
+    // cast any number of spells with total mana value 6 or less from among the copies without paying their mana costs.": one
+    // "up to one" target for each nonland card type, one card for one word "target" (CR 115.3); copies made and cast as this
+    // resolves or never, permanent spells becoming tokens (CR 707.10, 608.3f), X 0 (rulings, CR 107.3).
+    if (/^[Ee]xile up to one target nonland card of each card type from your graveyard$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "Copy those cards" && sentences[si + 2]?.replace(/\.$/, "") === "You may cast any number of spells with total mana value 6 or less from among the copies without paying their mana costs") {
+      const first = ctx.targets.length;
+      const kinds = ["Artifact", "Battle", "Creature", "Enchantment", "Instant", "Kindred", "Planeswalker", "Sorcery"] as const;
+      kinds.forEach((t, k) => addTarget(ctx, { kind: "card", types: [t], notTypes: ["Land"], notColors: [], owner: "you", optional: true, ...(k ? { distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}), text: `target nonland ${t.toLowerCase()} card from your graveyard` }));
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { target: first, many: true, n: kinds.length }, totalMv: 6 });
+      si += 2;
+      continue;
+    }
+    // The Tale of Tamiyo: "Exile any number of target instant, sorcery, and/or Tamiyo planeswalker cards from your graveyard.
+    // Copy them. You may cast any number of the copies.": copies made and cast as this resolves, paying their costs (X chosen
+    // as usual), or never; those not cast cease to exist (rulings, CR 707.12).
+    if (s === "Exile any number of target instant, sorcery, and/or Tamiyo planeswalker cards from your graveyard" && sentences[si + 1]?.replace(/\.$/, "") === "Copy them" && sentences[si + 2]?.replace(/\.$/, "") === "You may cast any number of the copies") {
+      const index = addTarget(ctx, { kind: "card", anyOf: [{ kind: "card", types: ["Instant"], text: "instant card" }, { kind: "card", types: ["Sorcery"], text: "sorcery card" }, { kind: "card", types: ["Planeswalker"], subtypes: ["Tamiyo"], text: "Tamiyo planeswalker card" }], owner: "you", many: "any", text: "target instant, sorcery, or Tamiyo planeswalker card from your graveyard" });
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { target: index, many: true }, paid: true });
+      si += 2;
+      continue;
+    }
     // Grindstone: "Target player mills two cards. If two cards that share a color were milled this way, repeat this
     // process.": again and again in this resolution while the two milled share a color (rulings: both colorless don't).
     if (sentences[si + 1]?.replace(/\.$/, "") === "If two cards that share a color were milled this way, repeat this process") {
@@ -4585,7 +4634,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const yardIs = lastYard?.type === "chooseFromGraveyard" && lastYard.n === 1 && lastYard.dest === "exile" && !lastYard.anyNumber ? (lastYard.upTo ? null : /^If it's an? (.+? card), (.+)$/.exec(s)) ?? (lastYard.anyGraveyard ? /^If an? (.+? card) was exiled this way, (.+)$/.exec(s) : null) : null;
     if (yardIs) {
       const filter = parseSearchFilter(yardIs[1]!);
-      const then = filter && parseOne(capital(yardIs[2]!), ctx);
+      // Lazav, Familiar Stranger: "you may have ~ become a copy of that card until end of turn": the card exiled.
+      const copyIt = lastYard?.type === "chooseFromGraveyard" && lastYard.anyGraveyard && /^you may have ~ become a copy of that card until end of turn$/.test(yardIs[2]!);
+      const then: Effect[] | null | undefined = copyIt ? [{ type: "may", effects: [{ type: "becomeCopy", what: { ref: "self" }, of: { ref: "chosenFromYard" }, duration: "endOfTurn" }], text: "have ~ become a copy of that card until end of turn" }] : filter && parseOne(capital(yardIs[2]!), ctx);
       if (!filter || !then) return null;
       effects.push({ type: "if", cond: { kind: "yardChosenIs", filter }, effects: then });
       continue;
@@ -11614,6 +11665,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Vault 112: Sadistic Simulation (rewritten above): X energy, any amount (CR 107.14), none doing nothing; then the library
+    // shuffled and the top X exiled, one of them played free as this resolves: a land as your land play (CR 305.1).
+    if (s === "Pay one or more {E} to shuffle your library and exile that many cards from the top to play one free" && !ctx.spell) {
+      effects.push({ type: "may", effects: [{ type: "shuffle", who: { ref: "you" } }, { type: "castFromAmong", who: { ref: "you" }, n: { count: { kind: "x" } }, lands: true, max: 1 }], pay: {}, payX: { energy: true, atLeastOne: true }, text: "pay any amount of {E}" });
+      continue;
+    }
     // Localized Destruction: "You may pay one or more {E}. If you do, each creature you control with power equal to the
     // amount of {E} paid this way gains indestructible until end of turn": X energy, at least one to have paid (CR 107.14).
     const oneOrMoreEnergy = ctx.spell && /^[Yy]ou may pay one or more \{E\}$/.test(s) ? /^If you do, (.+) with power equal to the amount of \{E\} paid this way (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
@@ -15720,7 +15777,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Knollspine Dragon: "you may discard your hand and draw cards equal to ...": the same as ", then draw", in that order
     // (CR 608.2c), one choice for both (Clive, Ifrit's Dominant).
     if (/^[Yy]ou may discard your hand and draw cards equal to /.test(s)) s = s.replace(" and draw ", ", then draw ");
-    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)(?: until the next end step)?$|attach any number of Equipment you control to (?:target creature you control|it|that creature)$|play the exiled card |cast the exiled card without paying its mana cost$|play one of the cards exiled with ~ without paying its mana cost$|cast an? (?:(?:instant or sorcery|instant|sorcery|creature|artifact|enchantment) )?spell(?: with mana value X)? from among cards exiled with ~ without paying its mana cost$|cast a spell from among cards you own in exile with dream counters on them without paying its mana cost$|cast any number of spells from among cards exiled with ~ with total mana value X or less without paying their mana costs$|exile a(?: nonland)? card from your hand with a number of time counters on it equal to its mana value$|exile it and put \w+ time counters? on it$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |change the targets of target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$|have any number of them phase out$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)(?: until the next end step)?$|attach any number of Equipment you control to (?:target creature you control|it|that creature)$|play the exiled card |cast the exiled card without paying its mana cost$|play one of the cards exiled with ~ without paying its mana cost$|cast an? (?:(?:instant or sorcery|instant|sorcery|creature|artifact|enchantment|Hero or noncreature) )?spell(?: with mana value X)? from among cards exiled with ~ without paying its mana cost$|cast an Ally spell from among cards you own exiled with ~$|cast a spell from among cards you own in exile with dream counters on them without paying its mana cost$|cast any number of spells from among cards exiled with ~ with total mana value X or less without paying their mana costs$|exile a(?: nonland)? card from your hand with a number of time counters on it equal to its mana value$|exile it and put \w+ time counters? on it$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |change the targets of target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$|have any number of them phase out$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.

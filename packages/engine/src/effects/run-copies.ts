@@ -22,6 +22,12 @@ export function copiedValues(s: GameState, ref: ObjRef, ctx: ResolveCtx): CardDe
     return o && o.zone !== "battlefield" && !o.isToken ? restingDef(s.cards[o.cardId]!) : undefined;
   }
   if (ref.ref === "subjectCard" && ctx.lki?.copyKey) return key(ctx.lki.copyKey);
+  // Lazav, Familiar Stranger: "a copy of that card", the card exiled this way: exactly what's printed on it (rulings, CR
+  // 707.2), the front face of a double-faced card (CR 712.8a).
+  if (ref.ref === "chosenFromYard") {
+    const o = objects(s, ref, ctx)[0];
+    return o && o.zone !== "battlefield" && o.zone !== "stack" && !o.isToken ? restingDef(s.cards[o.cardId]!) : undefined;
+  }
   if (ref.ref === "target") {
     const t = ctx.targets[ref.index];
     if (!ctx.legal[ref.index] || t?.kind !== "object") return undefined;

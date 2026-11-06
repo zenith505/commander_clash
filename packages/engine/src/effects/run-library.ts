@@ -140,6 +140,33 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       return;
     case "mill":
+      if (e.repeatSharedTypeDraw) {
+        // The Tale of Tamiyo: mill two; while the two share a card type (not a supertype or subtype, rulings), as they are
+        // in the zone they went to, draw a card and mill two again. It ends with two that share none or fewer than two
+        // milled (rulings), so no shortcut is needed (CR 732). A draw can stop for dredge (CR 702.52a): then it carries on
+        // here with the next two.
+        const sc = (s.resolving!.scratch ??= {});
+        if (!sc.millRepeating) {
+          sc.millRepeating = true;
+          s.resolving!.milled = [];
+          s.resolving!.milledExiled = [];
+        }
+        const p = player(s, ctx.controller);
+        for (;;) {
+          if (p.lost) return;
+          const ids = p.library.slice(0, millCount(s, p.id, amountNow(s, e.n, ctx)));
+          for (const id of ids) {
+            moveObject(s, id, "graveyard", { milled: true });
+            if (obj(s, id).zone === "graveyard") s.resolving!.milled!.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+            else if (obj(s, id).zone === "exile") s.resolving!.milledExiled!.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+          }
+          log(s, `${p.name} mills ${ids.length} card${ids.length === 1 ? "" : "s"}${ids.length ? ` (${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
+          if (ids.length !== 2) return;
+          const [a, b] = ids.map((id) => characteristics(s, obj(s, id)).types);
+          if (!a!.some((t) => b!.includes(t))) return;
+          if (!draw(s, p.id, 1)) return "paused";
+        }
+      }
       // Kept for "if a card with the chosen name was milled this way" (Predict).
       s.resolving!.milled = [];
       s.resolving!.milledExiled = [];
@@ -2083,6 +2110,7 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
   if (cycled) for (const c of cards) (player(s, pid).cycledNames ??= {})[c.name] = (player(s, pid).cycledNames?.[c.name] ?? 0) + 1;
   ids.forEach((id, i) => fireEvent(s, { type: "discarded", player: pid, id, card: cards[i]!, ...(cycled ? { cycled: true } : {}), ...(cycledX ? { x: cycledX } : {}), ...(cause !== undefined ? { cause } : {}) }));
   if (s.resolving) s.resolving.discardedCards = ids.flatMap((id) => (obj(s, id).zone === "graveyard" ? [{ id, zc: obj(s, id).zoneChanges ?? 0 }] : []));
+  if (s.resolving) s.resolving.discardedExiled = ids.flatMap((id) => (obj(s, id).zone === "exile" ? [{ id, zc: obj(s, id).zoneChanges ?? 0 }] : []));
 }
 
 /** The Library of Leng `pid` controls, if any: its name. */

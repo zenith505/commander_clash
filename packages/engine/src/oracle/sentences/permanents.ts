@@ -364,6 +364,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "tapOrUntap", what, may: true }] : null;
   }
+  // Portal Manipulator: "choose target player and any number of target attacking creatures their opponents control. Those
+  // creatures are now attacking that player." (rewritten in body.ts as one sentence).
+  if (s === "Any number of target attacking creatures controlled by opponents of target player are now attacking that player") {
+    const p = addTarget(ctx, { kind: "player", text: "target player" });
+    const c = addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], combat: "attacking", controlledByOpponentOfTarget: p, many: "any", text: "target attacking creature that player's opponents control" });
+    return [{ type: "reselectAttack", what: { ref: "target", index: c }, toPlayer: { ref: "target", index: p } }];
+  }
   // Misleading Signpost, Portal Mage: "reselect which player or permanent target attacking creature is attacking".
   if ((m = /^[Rr]eselect which player or permanent (target attacking creature) is attacking$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);

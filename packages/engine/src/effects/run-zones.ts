@@ -1287,6 +1287,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (!sc.castAmong && e.fromLinked) {
         // Kaho, Jeleva, Shell of the Last Kappa: the cards exiled with this object (CR 607.2a), still in exile (CR 400.7).
         let ids = linkedCards(s, ctx.sourceId, ctx.sourceZc ?? 0);
+        // Boiling Rock Rioter: "cards you own exiled with ~".
+        if (e.ownedOnly) ids = ids.filter((x) => obj(s, x.id).owner === ctx.controller);
         // River Song's Diary: one of them chosen at random, the only one that may be cast.
         if (e.randomOne && ids.length) {
           const one = ids[Math.floor(nextRandom(s) * ids.length)]!;
@@ -1362,11 +1364,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       if (!sc.castAmong && e.fromYard) {
         // Mizzix's Mastery: the target card if it's still legal, or (overloaded) each one in your graveyard, all exiled.
-        const ids = e.fromYard.target !== undefined ? objects(s, { ref: "target", index: e.fromYard.target }, ctx).map((o) => o.id) : you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
+        const ids = e.fromYard.target !== undefined ? objects(s, { ref: "target", index: e.fromYard.target, ...(e.fromYard.many ? { n: e.fromYard.n ?? 1 } : {}) }, ctx).map((o) => o.id) : you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
         for (const id of ids) moveObject(s, id, "exile");
         const gone = ids.filter((id) => obj(s, id).zone === "exile");
         if (gone.length) log(s, `${you.name} exiles ${gone.map((id) => `${defOf(s, obj(s, id)).name}${obj(s, id).owner === you.id ? "" : ` (${player(s, obj(s, id).owner).name}'s)`}`).join(", ")} from ${gone.every((id) => obj(s, id).owner === you.id) ? "their" : "a"} graveyard.`);
-        sc.castAmong = { ids: gone.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
+        // Uldaros Theorix: "spells with total mana value 6 or less from among the copies", what's left of it as each is cast.
+        sc.castAmong = { ids: gone.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [], ...(e.totalMv !== undefined ? { budget: amountNow(s, e.totalMv, ctx) } : {}) };
       }
       if (!sc.castAmong && e.handAndYard) {
         // Invoke Calamity: cast from your hand and/or graveyard, where they are (rulings: the spells' mana values on the
@@ -1494,7 +1497,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (st.casting && st.copyOf) {
         // A copy: one not cast ceases to exist (CR 704.5e); the card it copied stays exiled, copied once (rulings).
         if (s.objects[st.casting]?.zone === "exile") removeCopy(s, st.casting);
-        else st.cast = (st.cast ?? 0) + 1;
+        else {
+          st.cast = (st.cast ?? 0) + 1;
+          // Uldaros Theorix: the copy's mana value as it's cast counts toward the total (CR 202.3).
+          const item = s.stack.find((x) => x.objectId === st.casting);
+          if (st.budget !== undefined) st.budget -= item ? spellManaValue(s, item) : 0;
+        }
         // Mnemonic Deluge: three copies of the card, each cast or not in turn; those not cast cease to exist (rulings).
         const made = ((st.copied ??= {})[st.copyOf] ?? 0) + 1;
         st.copied[st.copyOf] = made;
@@ -1526,7 +1534,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const mv = maxMv === undefined && st.exactMv === undefined ? undefined : { ...(maxMv !== undefined ? { max: maxMv } : {}), ...(st.exactMv !== undefined ? { exact: st.exactMv } : {}) };
       // Invoke Calamity: the spell's types as it's cast, not the card's (rulings).
       // Jacob Frye: "You may cast the copy", paying its costs (rulings).
-      const freeCast = (id: ObjectId) => ({ kind: "castFree" as const, player: you.id, objectId: id, source: src, ...(mv ? { mv } : {}), ...((e.handAndYard || e.asSpell) && e.filter?.types?.length ? { types: e.filter.types } : {}), ...(e.handAndYard && e.filter?.supertypes?.length ? { supertypes: e.filter.supertypes } : {}), ...(e.paid ? { how: "paid" as const } : {}) });
+      const freeCast = (id: ObjectId) => ({ kind: "castFree" as const, player: you.id, objectId: id, source: src, ...(mv ? { mv } : {}), ...((e.handAndYard || e.asSpell) && e.filter?.types?.length ? { types: e.filter.types } : {}), ...(e.handAndYard && e.filter?.supertypes?.length ? { supertypes: e.filter.supertypes } : {}), ...(e.asSpell && e.filter && !e.filter.types?.length ? { spellFilter: e.filter } : {}), ...(e.paid ? { how: "paid" as const } : {}) });
       if (st.handPick) return finish();
       // Plargg and Nassari: an opponent chosen by you picks one of the nonland cards; the others may be cast (rulings).
       if (e.opponentExcludes && !st.excluded) {
@@ -1554,7 +1562,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         st.landPick = undefined;
         const untapped = !!sc.may;
         sc.may = undefined;
-        if (exiled(id) && canPlayLandNow(s, you.id, id)) playLandByEffect(s, you.id, id, untapped);
+        if (exiled(id) && canPlayLandNow(s, you.id, id)) {
+          playLandByEffect(s, you.id, id, untapped);
+          // Vault 112: "play one of those cards": a land played is the one.
+          if (e.max !== undefined && obj(s, id).zone === "battlefield") st.cast = (st.cast ?? 0) + 1;
+        }
         st.declined.push(id);
       }
       if (st.pick !== undefined) {
@@ -1579,7 +1591,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, `${src} copies ${defOf(s, obj(s, pick)).name}${e.copyTimes ? ` (copy ${(st.copied?.[pick] ?? 0) + 1} of ${e.copyTimes})` : ""}.`);
           st.casting = copy.id;
           st.copyOf = pick;
-          s.pending = { kind: "castFree", player: you.id, objectId: copy.id, source: src, ...(e.paid ? { how: "paid" as const } : {}) };
+          s.pending = { kind: "castFree", player: you.id, objectId: copy.id, source: src, ...(mv ? { mv } : {}), ...(e.paid ? { how: "paid" as const } : {}) };
           return "paused";
         }
         s.pending = freeCast(pick);
@@ -2900,6 +2912,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         // "If a creature card was exiled this way" (Deathbonnet Hulk): the card exiled.
         if (!toField) s.resolving!.yardChosen = found.filter((id) => obj(s, id).zone === "exile");
+        // Lazav, Familiar Stranger: "become a copy of that card", the one card exiled, while it's still that card (CR 400.7).
+        const exiledOne = toField ? undefined : s.resolving!.yardChosen;
+        if (exiledOne?.length === 1) s.resolving!.chosenFromYard = { id: exiledOne[0]!, zc: obj(s, exiledOne[0]!).zoneChanges ?? 0 };
         return;
       }
       const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
@@ -2913,11 +2928,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const bound = e.filter?.chosen ? bindChosen(e.filter, ctx.chosen) : e.filter;
         if (bound?.chosen) return;
         const filter = bound && mvMax !== undefined ? { ...bound, manaValue: { max: mvMax }, text: bound.text.replace(/ X or less$/, ` ${mvMax} or less`) } : bound;
+        // Queen Kayla bin-Kroog: discarded cards exiled instead are found in exile (rulings).
+        const exiledToo = e.discarded && e.discardedExiled ? p.exile.filter((id) => !!s.resolving!.discardedExiled?.some((m) => m.id === id && (obj(s, id).zoneChanges ?? 0) === m.zc)) : [];
         // Only the cards milled just before, still in the graveyard (CR 400.7).
         // Colossal Grave-Reaver: only the cards the trigger's event put there, still the same objects.
         const milled = (id: ObjectId) =>
           (!e.milled || !!s.resolving!.milled?.some((m) => m.id === id && (obj(s, id).zoneChanges ?? 0) === m.zc)) &&
-          (!e.discarded || !!s.resolving!.discardedCards?.some((m) => m.id === id && (obj(s, id).zoneChanges ?? 0) === m.zc)) && (!e.eventGroup || !!ctx.event?.group?.some((g) => g.id === id && (obj(s, id).zoneChanges ?? 0) === g.zc)) &&
+          (!e.discarded || !!s.resolving!.discardedCards?.some((m) => m.id === id && (obj(s, id).zoneChanges ?? 0) === m.zc) || exiledToo.includes(id)) && (!e.eventGroup || !!ctx.event?.group?.some((g) => g.id === id && (obj(s, id).zoneChanges ?? 0) === g.zc)) &&
           // "Another permanent card" than the one you sacrificed this way (rulings on Rise of the Witch-king).
           (!e.notSacrificed || !s.resolving!.sacrificedThisWay?.some((k) => k.id === id && k.controller === ctx.controller)) &&
           // Blood for Bones: "another creature card" than the one chosen for the battlefield.
@@ -2926,7 +2943,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           (!e.notSelf || id !== ctx.sourceId) &&
           // Starfall Invocation: a card that died to this destroy and hasn't moved since (CR 400.7).
           (!e.destroyedThisWay || !!s.resolving!.destroyed?.some((d) => d.died && d.o.id === id && (obj(s, id).zoneChanges ?? 0) === (d.o.zoneChanges ?? 0) + 1));
-        const all = p.graveyard.filter((id) => milled(id) && (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))) && (e.totalMv === undefined || defMv(defOf(s, obj(s, id))) <= e.totalMv));
+        const all = [...p.graveyard, ...exiledToo].filter((id) => milled(id) && (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))) && (e.totalMv === undefined || defMv(defOf(s, obj(s, id))) <= e.totalMv));
         // Desecrator Hag: the greatest power among them, a characteristic-defining "*" counted there too (rulings).
         const top = e.greatestPower ? Math.max(...all.map((id) => characteristics(s, obj(s, id)).power)) : 0;
         const fit = e.greatestPower ? all.filter((id) => characteristics(s, obj(s, id)).power === top) : all;
@@ -2962,7 +2979,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           return "paused";
         }
       }
-      const found = sc.found.filter((id) => p.graveyard.includes(id));
+      const found = sc.found.filter((id) => p.graveyard.includes(id) || (!!e.discardedExiled && p.exile.includes(id)));
       if (e.dest === "battlefield") {
         // An Aura's controller chooses what it enchants as it enters (CR 303.4f), or it stays in the graveyard (303.4g).
         const hosts = chooseAuraHosts(s, found.map((id) => ({ o: obj(s, id), under: e.youChoose || e.underYours ? ctx.controller : p.id })), src);

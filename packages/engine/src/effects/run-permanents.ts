@@ -234,6 +234,18 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // Another player, or a planeswalker or battle it could attack (CR 506.2, 310.9b), never its controller or theirs;
       // requirements, restrictions and costs ignored, and it still attacked what it did (rulings).
       // Windshaper Planetar: each attacking creature in turn (the ones done so far in scratch), each one optional.
+      // Portal Manipulator: each of them attacks that player now (never its controller, CR 506.2), no choice.
+      if (e.toPlayer) {
+        const to = players(s, e.toPlayer, ctx).find((pid) => !player(s, pid).lost);
+        if (to === undefined) return;
+        for (const o of objects(s, e.what, ctx)) {
+          if (o.zone !== "battlefield" || o.attacking === undefined || controllerOf(s, o) === to) continue;
+          o.attacking = to;
+          o.attackingPermanent = undefined;
+          log(s, `${src}: ${defOf(s, o).name} now attacks ${attackedName(s, o)}.`);
+        }
+        return;
+      }
       const sc = (s.resolving!.scratch ??= {});
       const done = (sc.reselected ??= []);
       for (const o of objects(s, e.what, ctx)) {

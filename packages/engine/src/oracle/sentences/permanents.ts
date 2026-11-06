@@ -66,6 +66,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Wall of Deceit, Mischievous Quanar, Obscuring Aether: "Turn ~ face down" (an activated ability of its own): a 2/2 with
   // no text (CR 708.2a).
   if (/^[Tt]urn ~ face down$/.test(s)) return [{ type: "turnFaceDown", what: { ref: "self" }, as: "morph" }];
+  // Master of the Veil: "turn target creature with a morph ability face down"; Weaver of Lies: "turn any number of target
+  // creatures with morph abilities other than ~ face down": each a face-down 2/2 its controller may turn face up again
+  // for its morph cost (CR 702.37e, 708.2), still the same object (708.8 for the other way).
+  if ((fu = /^[Tt]urn ((?:any number of )?target creatures? with (?:a morph ability|morph abilities)(?: other than ~)?) face down$/.exec(s))) {
+    const what = parseObject(fu[1]!.replace(/^any number of target (.+) other than ~$/, "any number of other target $1"), ctx);
+    return what?.ref === "target" ? [{ type: "turnFaceDown", what, as: "morph" }] : null;
+  }
   if ((fu = /^[Tt]urn (target face-down .+?) face up$/.exec(s))) {
     const what = parseObject(fu[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "turnFaceUp", what }] : null;
@@ -1302,6 +1309,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = new RegExp(`^[Pp]ut an? ${COUNTER}, ${COUNTER}, or ${COUNTER} counter on (.+)$`).exec(s)) && new Set([m[1], m[2], m[3]]).size === 3) {
     const what = parseObject(m[4]!, ctx);
     return what && !isGroup(what) ? [{ type: "counters", what, counter: counterKind(m[1]!), orCounter: counterKind(m[2]!), orCounters: [counterKind(m[3]!)], n: 1 }] : null;
+  }
+  // Dismantle: "If that artifact had counters on it, put that many +1/+1 counters or charge counters on an artifact you
+  // control": as many as the target had of every kind as it last existed (rulings, CR 608.2h), even if it wasn't destroyed;
+  // you choose the artifact (not targeted) and then the kind as it resolves (rulings), none of that if it had none.
+  if ((m = new RegExp(`^If that artifact had counters on it, put that many ${COUNTER} counters or ${COUNTER} counters on an artifact you control$`).exec(s)) && m[1] !== m[2]) {
+    const n = parseCount("the number of counters on that artifact", ctx);
+    const filter = pickFilter("artifact");
+    if (!n || !filter) return null;
+    return [{ type: "if", cond: { kind: "amountNow", amount: n, min: 1 }, effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose" }, { type: "counters", what: { ref: "created" }, counter: counterKind(m[1]!), orCounter: counterKind(m[2]!), n }] }];
   }
   // Elspeth Conquers Death: "Put a +1/+1 counter or a loyalty counter on it": either kind, chosen as it resolves (rulings).
   if ((m = new RegExp(`^Put an? ${COUNTER} counter or an? ${COUNTER} counter on (.+)$`, "i").exec(s)) && m[1] !== m[2]) {

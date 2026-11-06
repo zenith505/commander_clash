@@ -874,6 +874,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Augusta, Order Returned: "each player exiles a card from their graveyard": each chooses one in APNAP order, then all
   // the chosen cards are exiled at the same time (CR 101.4, rulings).
   if (/^[Ee]ach player exiles a card from their graveyard$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, dest: "exile", who: { ref: "eachPlayer" } }];
+  // Watchers of the Dead: "Each opponent chooses two cards in their graveyard and exiles the rest": each chooses in APNAP
+  // order, knowing the choices before, then all the other cards are exiled at once; with two or fewer, none (rulings).
+  if ((m = /^(Each opponent|Each player) chooses (a|one|two|three) cards? in their graveyard and exiles the rest$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    const n = num(m[2]!.replace(/^an?$/, "one"));
+    if (!who || !Number.isInteger(n) || (n === 1) !== /^(a|one)$/.test(m[2]!)) return null;
+    return [{ type: "chooseFromGraveyard", n, dest: "keep", who }];
+  }
   // "Choose an opponent. That player returns a card from their graveyard to their hand" (Skullwinder): that player
   // chooses which, as it resolves (rulings).
   if ((m = /^(Target player|Target opponent|That player) returns (an?|one|two|three) (.+?) from their graveyard to their hand$/.exec(s))) {
@@ -1124,7 +1132,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // control onto the battlefield from your hand or graveyard with two +1/+1 counters on it": the same, worded the other
   // way round, entering with those counters (CR 122.6); the mana value checked where the card is (rulings).
   const reordered = /^(You may )?([Pp])ut (a|an) (.+?) onto the battlefield from your hand( or graveyard)?( with (?:a|two|three) (?:finality|\+1\/\+1) counters? on it)?$/.exec(s);
-  const sx = reordered ? `${reordered[1] ?? ""}${reordered[2]}ut ${reordered[3]} ${reordered[4]} from your hand${reordered[5] ?? ""} onto the battlefield${reordered[6] ?? ""}` : s;
+  // Dermoplasm: "... from your hand onto the battlefield face up": as any permanent enters unless told otherwise (CR 110.5b).
+  const sx = reordered ? `${reordered[1] ?? ""}${reordered[2]}ut ${reordered[3]} ${reordered[4]} from your hand${reordered[5] ?? ""} onto the battlefield${reordered[6] ?? ""}` : s.replace(/ from your hand onto the battlefield face up$/, " from your hand onto the battlefield");
   const withCounters = / with (a|two|three) (finality|\+1\/\+1) counters? on it$/.exec(sx);
   const finality = !!withCounters;
   // "You may put an Aura or Equipment card from your hand or graveyard onto the battlefield attached to ~" (Danitha,
@@ -1857,6 +1866,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "attacksIfAble" }, { kind: "mustBlock" }], duration: "endOfTurn" }] : null;
   }
+  // Siren's Call: "Creatures the active player controls attack this turn if able": the ones that player controls as it
+  // resolves (CR 611.2c), in each combat this turn (CR 508.1d).
+  if (/^Creatures the active player controls attack this turn if able$/.test(s))
+    return [{ type: "continuous", what: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creatures the active player controls" }, of: { ref: "activePlayer" } }, mods: [{ kind: "attacksIfAble" }], duration: "endOfTurn" }];
   // "Target creature attacks this turn if able": in each combat this turn (CR 508.1d).
   if ((m = /^(.+?) attacks? (?:each combat )?this turn if able$/i.exec(s)) && !/ and$/.test(m[1]!)) {
     const what = parseObject(m[1]!, ctx);
@@ -2082,6 +2095,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^(.+?) (sacrifices?|exiles?) a creature or planeswalker (?:they control )?with the greatest mana value among creatures and planeswalkers (?:they control|that player controls)$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature", "Planeswalker"], text: "creature or planeswalker" }, n: 1, action: /^sac/i.test(m[2]!) ? "sacrifice" : "exile", greatest: "manaValue" }] : null;
+  }
+  // Dispersal: "Each opponent returns a nonland permanent they control with the greatest mana value among permanents they
+  // control to its owner's hand": the greatest among all their permanents, lands too (a land's back face can have one), so
+  // a player whose greatest is a land's returns nothing; each chooses in turn order, then they return at once (rulings).
+  if ((m = /^(.+?) returns? a nonland permanent they control with the greatest mana value among permanents they control to its owner's hand$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = pickFilter("nonland permanent");
+    return who && who.ref !== "you" && filter ? [{ type: "pick", who, filter, n: 1, action: "bounce", greatest: "manaValue", greatestOfAll: true }] : null;
   }
   // "Each player sacrifices half the non-God creatures they control of their choice, rounded down" (Zodiark), "sacrifice
   // half the non-Demon permanents you control, rounded up" (Rakdos): each player half of their own, worked out before

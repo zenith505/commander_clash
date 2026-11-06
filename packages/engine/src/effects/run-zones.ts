@@ -392,7 +392,7 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
     }
     const taken = new Set(Object.values(yp.picked).flat());
     // Ill-Gotten Gains: into their hands, any cards; onto the battlefield, only permanent cards (CR 110.4b).
-    const toHand = e.dest === undefined || e.dest === "exile";
+    const toHand = e.dest === undefined || e.dest === "exile" || e.dest === "keep";
     const cards = p.lost ? [] : yardOf(pid).graveyard.filter((id) => !taken.has(id) && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (toHand || isPermanentCard(defOf(s, obj(s, id)))));
     const max = Math.min(e.n, cards.length);
     // Nothing to choose between: those are the ones (none at all, for a "may" with nothing there).
@@ -406,7 +406,7 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
     // Dredge the Mire: they choose for you, so the card that helps you least (bots), as Visions of Dread.
     const forYou = e.underYours && pid !== ctx.controller ? { forPlayer: ctx.controller, helps: true as const, under: ctx.controller } : {};
     const what = e.n > 1 ? `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
-    s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : pid, source: src, what: `${what}${whose}`, ...forYou, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest === "exile" ? "exile" : toHand ? "hand" : "battlefield" };
+    s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : pid, source: src, what: `${what}${whose}`, ...forYou, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest === "exile" || e.dest === "keep" ? e.dest : toHand ? "hand" : "battlefield" };
     return "paused";
   }
   sc.yardPicks = undefined;
@@ -416,6 +416,16 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
   if (e.dest === undefined) {
     for (const { id, pid } of moves) log(s, `${player(s, pid).name} returns ${defOf(s, obj(s, id)).name} from their graveyard to their hand.`);
     for (const { id } of moves) moveObject(s, id, "hand");
+    return;
+  }
+  // Watchers of the Dead: everything but the chosen cards, from every one of those graveyards, all at the same time.
+  if (e.dest === "keep") {
+    const rest = Object.entries(yp.picked).flatMap(([pid, ids]) => player(s, Number(pid) as PlayerId).graveyard.filter((id) => !ids.includes(id)).map((id) => ({ id, pid: Number(pid) as PlayerId })));
+    for (const pid of Object.keys(yp.picked).map((x) => Number(x) as PlayerId)) {
+      const gone = rest.filter((r) => r.pid === pid);
+      if (gone.length) log(s, `${player(s, pid).name} exiles ${gone.length === 1 ? defOf(s, obj(s, gone[0]!.id)).name : `${gone.length} cards`} from their graveyard.`);
+    }
+    for (const { id } of rest) moveObject(s, id, "exile");
     return;
   }
   // Augusta, Order Returned: each exiles the card they chose, all at the same time; "this way" is those cards.
@@ -2943,6 +2953,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         return;
       }
+      // "keep" is only compiled for each player's own graveyard (eachFromGraveyard).
+      if (e.dest === "keep") return;
       const names = found.map((id) => defOf(s, obj(s, id)).name).join(", ");
       if (found.length) log(s, e.dest === "exile" ? `${p.name} exiles ${names} from their graveyard.` : e.dest === "libraryTop" ? `${p.name} puts ${names} from their graveyard on top of their library.` : e.dest === "libraryBottom" ? `${p.name} puts ${names} from their graveyard on the bottom of their library.` : `${p.name} returns ${names} from their graveyard to their hand.`);
       for (const id of found) (e.dest === "libraryTop" ? moveObject(s, id, "library", { top: true }) : e.dest === "libraryBottom" ? moveObject(s, id, "library") : moveObject(s, id, e.dest ?? "hand"));
@@ -3724,6 +3736,20 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const from = e.who ? players(s, e.who, ctx)[0] : p.id;
       if (from === undefined) return;
+      if (e.randomFromHand) {
+        // Elkin Lair: one card chosen at random from that player's hand, exiled face up (CR 406.3); that player may play it
+        // this turn, the usual way (rulings: at any point this turn, not only as this resolves).
+        const hand = player(s, from).hand;
+        if (!hand.length) return void log(s, `${player(s, from).name} has no cards in hand.`);
+        const id = hand[Math.floor(nextRandom(s) * hand.length)]!;
+        moveObject(s, id, "exile");
+        const o = obj(s, id);
+        if (o.zone !== "exile") return;
+        o.mayPlay = { player: from, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn };
+        if (s.resolving) (s.resolving.impulsed ??= []).push(o.id);
+        log(s, `${player(s, from).name} exiles ${defOf(s, o).name}, chosen at random, from their hand and may play it this turn.`);
+        return;
+      }
       if (e.hand) {
         // Elder Brain: the whole hand, then that player draws as many as were exiled.
         const sc = (s.resolving!.scratch ??= {});

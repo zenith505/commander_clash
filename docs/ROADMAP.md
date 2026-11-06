@@ -1,6 +1,6 @@
 # Roadmap
 
-29,991 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,012 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,960 of 4,988 (99%), top 10,000: 9,601 of
 9,979 (96%).
 
@@ -2174,6 +2174,36 @@ line blocks.
    Rory Williams and Sinister Concierge (exiling the spell or the dying card with time counters, gaining suspend);
    Aradesh, the Founder ("if it enlisted a creature this combat"); Tetsuo, Imperial Champion (the greatest mana value
    among attached Equipment); Kotose, the Silent Spider; The Toymaker's Trap; Expert-Level Safe (secret numbers).
+   Round 284 took the next names from the top that no earlier round looked at: "Each artifact creature card in your
+   graveyard has encore. Its encore cost is equal to its mana cost." (Wire Surgeons: each card's own mana cost, none for a
+   card without one, CR 118.6); "turn target creature with a morph ability face down" and "any number of target creatures
+   with morph abilities other than ~" (Master of the Veil, Weaver of Lies, Backslide: morph or megamorph, CR 702.37b, on
+   the permanent now, so never a face-down one; its controller may turn it face up again for its morph cost); "put a
+   creature card with a morph ability from your hand onto the battlefield face up. If you do, return ~ to its owner's hand"
+   (Dermoplasm, with a browser test for the hand pick, and one for Weaver of Lies's targets); "you may play lands and cast
+   Mutant, Ninja, or Turtle spells from the top of your library. If you cast a creature spell this way, that creature enters
+   with an additional +1/+1 counter on it" (Mikey & Don, Party Planners); "Creatures the active player controls attack this
+   turn if able" and, at the next end step, the non-Wall ones that didn't attack destroyed unless they came under that
+   player's control this turn (Siren's Call: destroyed even if they couldn't attack, rulings); "target non-Wall creature the
+   active player has controlled continuously since the beginning of the turn ... attacks this turn if able. Destroy it at
+   the beginning of the next end step if it didn't attack this turn" (Nettling Imp, Norritt: even with the source gone,
+   rulings); "that player exiles a card at random from their hand. The player may play that card this turn" and the end
+   step's graveyard if they didn't (Elkin Lair); "put a creature card ... from your hand onto the battlefield. It enters
+   tapped and attacking and gains indestructible until end of turn" when a creature attacks alone (Nick Fury, Spymaster);
+   "~ has flying as long as a card exiled with it has flying. The same is true for ..." (Urborg Scavengers: a face-up card
+   still exiled with it, by that card's own keywords, layer 6); "a land an opponent controls with the same name as the
+   exiled card" entering (Invader Parasite). +13, 29,993 of 31,936 (30,004 with B116).
+   Out after round 284 (looked at, not done): Sin, Spira's Punishment (a token copy of a card exiled at random, repeated
+   for lands); Galea, Kindler of Hope (a cast trigger that gives the Equipment spell an enters ability); Kellan, Planar
+   Trailblazer (becoming a Detective and gaining an impulse trigger, only if it's a Scout); Cloudspire Coordinator (the
+   Mounts and Vehicles that entered this turn, tokens that saddle and crew as though their power were 2 greater); Nashi,
+   Moon's Legacy (copying a graveyard card and casting the copy, paying its costs); Discover the Impossible (a face-down
+   exiled card cast free only if it's an instant with mana value 2 or less, else into your hand); Meeting of the Five
+   (spells with exactly three colors, and mana only for them); Essence of the Wild (creatures entering as a copy of it,
+   ordered with other copy effects, CR 616.1); Ice Cave (any other player may pay a spell's mana cost to counter it);
+   Journey to the Lost City (a d20 table over the four exiled cards); Ghastly Conscription (manifesting a shuffled
+   face-down pile); Soulflayer and Rayami, First of the Fallen (keywords of cards exiled by delve or with blood counters,
+   as Urborg Scavengers).
    Round 282 took earlier skips from the top: "choose left or right" and "each player may attack only the nearest
    opponent in the chosen direction and planeswalkers controlled by that opponent" (Pramikon, Sky Rampart, as it enters;
    Teyo, Geometric Tactician's −2 until your next turn; left is the next seat in turn order, a player who left the game
@@ -4575,11 +4605,11 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Crowd-Control Warden). +27 (28,323 of 31,936 with rounds 217 to 221).
 - Out after round B52 (looked at, not done): Gideon the Oathless (done in round B104) and Way of the Paradox (Lane A's round 222 adds
   "Whenever you activate a loyalty ability"; once it merges, Gideon only needs "an opponent activates" on that
-  template), Dismantle (a choice of counter kind), Price of Betrayal (counters removed divided among objects),
-  Watchers of the Dead (each opponent keeps two cards), Mire's Toll (reveal N chosen cards), Dead Reckoning (done in round B113), Victor
+  template), Dismantle (done in round B117) (a choice of counter kind), Price of Betrayal (counters removed divided among objects),
+  Watchers of the Dead (done in round B117) (each opponent keeps two cards), Mire's Toll (supported already) (reveal N chosen cards), Dead Reckoning (done in round B113), Victor
   Mancha, Encumbered Reejerey (done in round B112) ("while" trigger conditions), Entrails Feaster (done in round B112), Ichorid (done in round B116), Nether Shadow (done in round B116), Cursed Rack (done in round B104),
-  Celestial Kirin (done in round B116), Skyfire Kirin (done in round B116), Lumaret's Favor, Definitely Not a Turtle (done in round B116), Advice from the Fae (done in round B116), Petals of Insight (done in round B116),
-  Rowdy Crew (done in round B116), Thijarian Witness, Riptide Replicator, Teferi's Response (done in round B116), Dawn Evangel (done in round B116), Earthbind, plus the multi-line
+  Celestial Kirin (done in round B116), Skyfire Kirin (done in round B116), Lumaret's Favor (done in round B117), Definitely Not a Turtle (done in round B116), Advice from the Fae (done in round B116), Petals of Insight (done in round B116),
+  Rowdy Crew (done in round B116), Thijarian Witness, Riptide Replicator (supported already), Teferi's Response (done in round B116), Dawn Evangel (done in round B116), Earthbind, plus the multi-line
   or new-mechanic cards in the same range (Oath of Scholars, Oath of Ghouls, Soul of Shandalar, Kenku Artificer, Harsh
   Justice, Bill Potts and others).
 - Round B53 (cards no earlier round wrote down, least played first, EDHREC rank about 22,000 to 19,700):
@@ -5703,6 +5733,20 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   controller as it last existed, CR 603.10a), Teferi's Response (an opponent's spell or ability that targets a land you
   control; an ability's permanent source destroyed, as Green Slime). No new prompts (Petals of Insight uses the look, may
   and bottom-order prompts). +11 (29,982 of 31,936).
+- Round B117 (single-line blockers from the round B52 list and other skip lists, plus fresh ones): Lumaret's Favor ("copy it
+  if you gained life this turn", checked as the infusion ability resolves, rulings; the copy may get a new target), Emerald
+  Dragon's Dissonant Wave ("an activated or triggered ability from a noncreature source", the source as it is or last
+  existed), Discovery // Dispersal (each opponent returns a nonland permanent with the greatest mana value among all their
+  permanents, lands included, so none if a land's is greatest; chosen in turn order, returned at once, then each discards,
+  rulings), Dismantle (as many +1/+1 or charge counters as the target had of every kind as it last existed, CR 608.2h, even
+  if it survived; the artifact and the kind chosen as it resolves, rulings), Ashnod's Cylix (the target player looks and
+  chooses), Addle (a card of the color chosen as it resolves), Watchers of the Dead (each opponent chooses two cards in their
+  graveyard, then all the others are exiled at once, rulings; a new "keep" picker over your graveyard, with a browser test,
+  and a bot that keeps what it can use there), Samite Elder (protection from each of the target permanent's colors as it
+  resolves, rulings). Mire's Toll and Riptide Replicator were already supported. +8 (30,012 of 31,936 with round 284).
+- Out after round B117 (looked at, not done): Price of Betrayal (counters removed from a target that may be a player: no
+  player counters as a target yet), Barroom Brawl (the copy's controller, the opponent to the left, "that player"),
+  Pit Automaton (a delayed trigger on the next exhaust ability activated).
 - Out after round B116 (looked at, not done): Earthbind (an Aura gaining a static ability with the timestamp of the gain,
   CR 613.7a, after an intervening if on the enchanted creature), Goblin Test Pilot (a target chosen at random as an
   activated ability is activated: activation always lets the player choose), Thijarian Witness ("if it was attacking or
@@ -5874,7 +5918,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Guard Dogs, Carry Away, Jandor's Ring.
 - Out after round B83 (looked at, not done): Fighting Chance (a coin flip for each blocking creature), Ersatz Gnomes
   (a spell becomes colorless: no rule for changing a spell's color yet), Clash of Elements (the owner's choice decides
-  what happens to it and who is dealt damage), Write into Being (manifest one of the top two cards), Samite Elder
+  what happens to it and who is dealt damage), Write into Being (manifest one of the top two cards), Samite Elder (done in round B117)
   (protection from each of a target permanent's colors).
 - Out after round B82 (looked at, not done): Builder's Bane (destroy X target artifacts: a variable number of
   targets), Burning of Xinye (each player destroys lands of their choice), Sirocco and Wand of Ith (a punisher per
@@ -5905,7 +5949,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   opponent's choice": an opponent picks the target).
 - Out after round B76 (looked at, not done): Mind Roots (done in round B112) (a land card discarded this way onto the battlefield: no
   effect for cards a discard just moved yet), Mark for Death (done in round B113) ("Other creatures that player controls can't block this
-  turn": a can't-block rule for one player's creatures except the target), Ashnod's Cylix (the target player looks at
+  turn": a can't-block rule for one player's creatures except the target), Ashnod's Cylix (done in round B117) (the target player looks at
   the top three and chooses which one goes back), Bullseye, Death Dealer and Ion Storm (costs with "or": "sacrifice an
   artifact or discard a nonland card", "remove a +1/+1 counter or a charge counter").
 - Out after round B75 (looked at, not done): Mishra, Artificer Prodigy (a search for a card with the cast spell's name),

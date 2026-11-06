@@ -134,6 +134,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.noCounters && Object.values(o.counters).some((n) => (n ?? 0) > 0)) return false;
   // Keldon Twilight: "that they controlled since the beginning of the turn": under its controller since before this turn.
   if (spec.controlledSinceTurnBegan && !(o.zone === "battlefield" && o.controlledSinceTurn < s.turn)) return false;
+  if (spec.activeController && c.controller !== s.activePlayer) return false;
   if (spec.notCounter && (o.counters[spec.notCounter] ?? 0) > 0) return false;
   if (spec.counter && !(spec.counter === ANY_COUNTER ? Object.values(o.counters).some((n) => (n ?? 0) > 0) : (o.counters[spec.counter] ?? 0))) return false;
   if (spec.counterMin && (o.counters[spec.counter!] ?? 0) < spec.counterMin) return false;
@@ -458,6 +459,7 @@ function abilitySourceIs(s: GameState, item: StackItem, from: NonNullable<Target
   if (from.supertypes?.some((t) => !(q.supertypes ?? []).includes(t))) return false;
   // Being a commander is the card's, in whatever zone it is (CR 903.3).
   if (from.notCommander && o?.isCommander) return false;
+  if (from.notTypes?.some((t) => q.types.includes(t))) return false;
   return !from.types?.length || from.types.some((t) => q.types.includes(t));
 }
 
@@ -1283,7 +1285,7 @@ export function distinctModeCap(s: GameState, body: AbilityBody, controller: Pla
 
 /** The permanents a player could pick for a "pick" effect: their own, matching the filter (not targeted, so hexproof doesn't matter). */
 /** `sourceId`: "another creature you control" (filter.notSource) can't be the ability's source. */
-export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness" | "power"; greatest?: "power" | "manaValue"; action?: PickAction; anyController?: true; destroyable?: true }, pid: PlayerId, sourceId?: ObjectId, sourceZc?: number): ObjectId[] {
+export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness" | "power"; greatest?: "power" | "manaValue"; greatestOfAll?: true; action?: PickAction; anyController?: true; destroyable?: true }, pid: PlayerId, sourceId?: ObjectId, sourceZc?: number): ObjectId[] {
   // "Put a +1/+1 counter on a creature" (Zimone's Hypothesis): any player's.
   // Drake Familiar: "return an enchantment to its owner's hand": any player's too.
   // The Horus Heresy: "each player chooses a creature", anyone's.
@@ -1346,7 +1348,8 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
   // player chooses among those tied (rulings on Crackling Doom). Mana value from the mana cost, X as 0 (CR 202.3, 107.3).
   if (e.greatest) {
     const of = (id: ObjectId) => (e.greatest === "power" ? power(s, obj(s, id)) : defMv(defOf(s, obj(s, id))));
-    const max = Math.max(...ids.map(of));
+    const all = e.greatestOfAll ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid) : ids;
+    const max = Math.max(...all.map(of));
     return ids.filter((id) => of(id) === max);
   }
   if (!e.least) return ids;

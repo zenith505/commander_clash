@@ -2126,7 +2126,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
       if (e.b.ref !== "target" || e.b.index !== i) continue;
       const chosen = e.a.ref === "target" ? out[e.a.index] : undefined;
       const a = e.a.ref === "self" ? (sourceId ? s.objects[sourceId] : undefined) : chosen?.kind === "object" ? obj(s, chosen.id) : undefined;
-      if (a) n += e.type === "bite" && e.loyalty ? (a.counters.loyalty ?? 0) : power(s, a);
+      if (a) n += e.type === "bite" && e.loyalty ? (a.counters.loyalty ?? 0) : e.type === "fight" && e.byToughness ? toughness(s, a) : power(s, a);
     }
     return n;
   };

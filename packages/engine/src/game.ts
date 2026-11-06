@@ -6444,6 +6444,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     ...(hasX ? { x: x ?? 0 } : {}),
     ...(kicks ? { kicked: kicks } : {}),
     ...(byControl ? { kickedByControl: true as const } : {}),
+    // Swallow Whole: the creature tapped for its "tap an untapped creature you control" additional cost (ObjRef costTapped).
+    ...(choices.tap?.length === 1 && s.objects[choices.tap[0]!] && compileCard(d).additionalCosts?.some((c) => c.kind === "tap" && c.n === 1 && !c.untap) ? { stationed: { id: choices.tap[0]!, zc: s.objects[choices.tap[0]!]!.zoneChanges ?? 0, power: power(s, s.objects[choices.tap[0]!]!) } } : {}),
   });
   const item = s.stack[s.stack.length - 1]!;
   const stackId = item.id;

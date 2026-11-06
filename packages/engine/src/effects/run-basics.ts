@@ -826,7 +826,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // the turn, not a change to the creatures there now, CR 611.2c).
       const of = e.ofPlayer ? players(s, e.ofPlayer, ctx)[0] : undefined;
       if (e.ofPlayer && of === undefined) return;
-      const chosen = e.exceptChosen ? objects(s, { ref: "created" }, ctx)[0] : undefined;
+      const chosen = e.exceptChosen ? objects(s, { ref: "created" }, ctx)[0] : e.exceptTarget !== undefined ? objects(s, { ref: "target", index: e.exceptTarget }, ctx)[0] : undefined;
       // "Of that quality" (Twins of Discord): the choice made as it resolved.
       // Rumbling Ruin: "with power less than or equal to that number", counted now (CR 608.2h).
       const filter0 = bindChosen(of !== undefined ? { ...e.filter, controlledBy: of } : e.filter, ctx.chosen);
@@ -1039,8 +1039,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const b = bs[0]!;
       // "Whenever one or more creatures you control fight" (Neyith): the creatures as they fight, whoever dies from it.
       const fighters = [a, b].map((x) => ({ id: x.id, controller: controllerOf(s, x) }));
-      const pa = power(s, a);
-      const pb = power(s, b);
+      const pa = e.byToughness ? toughness(s, a) : power(s, a);
+      const pb = e.byToughness ? toughness(s, b) : power(s, b);
       // The excess damage each is dealt (The Last Agni Kai, Rhino's Rampage), beyond what was lethal just before (CR 120.10).
       const [srcA, srcB] = [objectSource(s, a), objectSource(s, b)];
       const [lethalB, lethalA] = [lethalAmounts(s, srcA, b), lethalAmounts(s, srcB, a)];
@@ -1052,6 +1052,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       if (byA) fireEvent(s, { type: "dealtDamage", id: a.id, amount: byA, combat: false });
       if (byB) fireEvent(s, { type: "dealtDamage", id: b.id, amount: byB, combat: false });
+      if (e.byToughness) return;
       // Boxing Ring: "a creature that fought this turn", even one that's dealt no damage (CR 701.14b).
       for (const f of [a, b]) if (f.zone === "battlefield") f.foughtTurn = s.turn;
       fireEvent(s, { type: "fought", ids: fighters.map((f) => f.id), controllers: fighters.map((f) => f.controller) });

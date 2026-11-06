@@ -579,7 +579,9 @@ export type Count =
   /** How many players took a punisher's penalty this time (Acererak's "for each opponent, you create ... unless"). */
   | { kind: "punished" }
   /** 1 while the condition holds, else 0: "Add {G}{G}. If you've completed a dungeon, add six {G} instead." */
-  | { kind: "stateIf"; cond: StaticCondition };
+  | { kind: "stateIf"; cond: StaticCondition }
+  /** "During your turn, ~'s power and toughness are each equal to 2 plus the number of Swamps your opponents control. During turns other than yours, ... each 2." (Angry Mob): `of` while the condition holds, else 0. */
+  | { kind: "onlyIf"; cond: StaticCondition; of: Count };
 
 /** What a "target ..." phrase allows. CR 115 */
 export interface TargetSpec {
@@ -1382,7 +1384,9 @@ export type ObjRef =
    */
   | { ref: "countersPutThisWay"; kind?: CounterKind }
   /** "Put a +1/+1 counter on each of those Vampires" (Urge to Feed): the permanents this resolution's tapAnyNumber tapped, while each is still that object. */
-  | { ref: "tappedThisWay" };
+  | { ref: "tappedThisWay" }
+  /** Swallow Whole: "the creature tapped to pay ~'s additional cost" (a spell's "tap an untapped creature you control" additional cost), while it's still that object on the battlefield (CR 400.7). */
+  | { ref: "costTapped" };
 
 /** Which player(s) an effect touches. */
 /** What a player has the most of: life, cards in hand, or permanents they control that match `filter`. */
@@ -3767,7 +3771,7 @@ export type Effect =
     }
   /** "Creatures without flying can't block this turn" (Falter): a rule for the turn, not locked to the creatures there now,
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
-  | { type: "cantBlockRule"; filter: TargetSpec; /** Eunuchs' Intrigues: "Other creatures they control": controlled by this player, as it resolves, except the creature that player just chose (ObjRef "created"). */ ofPlayer?: PlayerRef; exceptChosen?: true }
+  | { type: "cantBlockRule"; filter: TargetSpec; /** Eunuchs' Intrigues: "Other creatures they control": controlled by this player, as it resolves, except the creature that player just chose (ObjRef "created"). */ ofPlayer?: PlayerRef; exceptChosen?: true; /** Mark for Death: "Other creatures that player controls can't block this turn": not this target, while it's the same object (CR 400.7). */ exceptTarget?: number }
   /** "Creatures can't attack this turn" (kicked Orim's Chant): a rule for the turn, so also creatures that arrive later (CR 611.2c). */
   | { type: "cantAttackRule"; filter: TargetSpec; /** "Creatures that player controls" (Oriss, Samite Guardian): those that player controls. */ ofPlayer?: PlayerRef; /** "Other creatures can't attack this turn" (Intimidation Bolt): not target `exceptTarget` while it's that object. */ exceptTarget?: number }
   /** "Creatures can't be blocked this turn" (Venser, the Sojourner): a rule for the turn, so also creatures that arrive later (CR 611.2c; rulings). */
@@ -3782,7 +3786,7 @@ export type Effect =
   | { type: "shuffleSpell"; /** "Put ~ on the bottom of its owner's library" (Seasons Past): there instead, with no shuffle. */ bottom?: true; /** "Put ~ into its owner's library seventh from the top" (Approach of the Second Sun): no shuffle. */ nth?: number }
   /** "Target player shuffles their graveyard into their library", "Each player shuffles their hand and graveyard into their library". */
   | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true; /** Sway of the Stars: "and all permanents they own", every player's at once before the cards are shuffled in (tokens cease to exist, CR 111.7). */ permanents?: true; /** "Target player mills that many cards" next (Psychic Spiral): how many cards were shuffled in, as ResolvingInfo.movedLinked. */ countThisWay?: true; /** "All creature cards from your graveyard": only those. */ filter?: TargetSpec; /** "Puts all the cards from their graveyard on the bottom of their library in a random order" (Endurance): no shuffle. */ bottom?: true; /** "Then draws that many cards" (Winds of Change): each player as many as they shuffled in, after all have shuffled. */ drawThatMany?: true; /** "You gain life equal to the number of cards shuffled into your library this way" (Elixir). */ gainThatMany?: true; /** "Exchange your graveyard and library" (Morality Shift): the library's cards go to the graveyard at the same time, and nothing is shuffled (a "Then shuffle" of its own does). With `hand`, "exchange your hand and library" (Mordenkainen): to the hand. With `hand` and `graveyard`, "exchange your hand and graveyard" (Harness Infinity): no library. */ exchange?: true }
-  | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
+  | { type: "fight"; a: ObjRef; b: ObjRef; /** Grim Contest: "Each of those creatures deals damage equal to its toughness to the other": the same exchange by toughness, which isn't fighting (no "fight" event, CR 701.14). */ byToughness?: true } // CR 701.14: each deals damage equal to its power to the other
   /** Echo's cost was just paid, by its "sacrifice it unless you pay": "When ~'s echo cost is paid" triggers (Shah of Naar Isle). */
   | { type: "echoPaid" }
   /**

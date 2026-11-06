@@ -1258,6 +1258,19 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Command Beacon with two commanders: the one that costs the most to cast from the command zone.
     // Spellskite: the target of ours the spell or ability would hurt most, else the first.
+    // "Ward—Discard a card or pay {2}": the mana if we have it, else a card, else neither (the spell is countered).
+    if (pend.kind === "chooseOption" && pend.what === "unlessWay") {
+      const u = s.resolving?.body.effects.find((e) => e.type === "counterUnlessPays");
+      const ways = u?.type === "counterUnlessPays" && u.unless.orElse ? [u.unless, u.unless.orElse] : [];
+      const ok = (i: string) => {
+        const w = ways[Number(i)];
+        if (!w) return false;
+        if (w.discard) return player(s, pid).hand.length >= w.discard;
+        return !!planMana(s, pid, parseManaCost(w.cost));
+      };
+      const pick = [...pend.options].filter((o) => o !== "none").sort((a, b) => (ways[Number(b)]?.discard ? 0 : 1) - (ways[Number(a)]?.discard ? 0 : 1)).find(ok);
+      return [{ type: "chooseOption", player: pid, choice: pick ?? "none" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "targetSlot") return [{ type: "chooseOption", player: pid, choice: targetSlotFor(s, pid, pend.options) }];
     // Stinging Study: the commander with the biggest mana value we can lose that much life for and stay above 4.
     if (pend.kind === "chooseOption" && pend.what === "commander" && /mana value counts/.test(pend.prompt ?? "")) {

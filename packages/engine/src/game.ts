@@ -20,7 +20,7 @@ import { blightOptions, countersBanned, countersRemoved, countersStay, putCounte
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { rollDice } from "./effects/run-dice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
-import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
+import { characteristics, controllerOf, enchantableBy, everyCreatureType, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
 import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, reduceSymbolsByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
@@ -1728,7 +1728,7 @@ export function auraHostOptions(s: GameState, aura: GameObject, pid: PlayerId): 
   if (enchant.kind === "player") return (enchant.opponent ? opponents(s, pid) : livingPlayers(s)).map((p) => ({ attachToPlayer: p }));
   // "Enchant creature card in a graveyard" (Animate Dead): such a card in any graveyard.
   if (enchant.kind === "card") return graveyardCards(s, enchant).map((id) => ({ attachTo: id }));
-  return s.battlefield.filter((id) => id !== aura.id && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura))).map((id) => ({ attachTo: id }));
+  return s.battlefield.filter((id) => id !== aura.id && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)) && enchantableBy(characteristics(s, obj(s, id)), aura.id)).map((id) => ({ attachTo: id }));
 }
 
 /** An AuraHost as a chooseOption option ("enchant"), and back. */
@@ -1741,7 +1741,7 @@ const graveyardCards = (s: GameState, f: TargetSpec): ObjectId[] => livingPlayer
 function auraObjectHost(s: GameState, aura: GameObject, pid: PlayerId, enchant: TargetSpec, among?: string[]): ObjectId | undefined {
   // Animate Dead entering without being cast: the biggest creature card in a graveyard.
   if (enchant.kind === "card") return graveyardCards(s, enchant).filter((id) => !among || among.includes(id)).sort((a, b) => defMv(defOf(s, obj(s, b))) - defMv(defOf(s, obj(s, a))))[0];
-  const legal = s.battlefield.filter((id) => id !== aura.id && (!among || among.includes(id)) && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)));
+  const legal = s.battlefield.filter((id) => id !== aura.id && (!among || among.includes(id)) && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)) && enchantableBy(characteristics(s, obj(s, id)), aura.id));
   const mine = (id: ObjectId) => controllerOf(s, obj(s, id)) === pid;
   const good = (m: Modification) =>
     m.kind === "addKeywords" || (m.kind === "addAbility" && !modsAreHarmful([m])) || (m.kind === "modifyPT" && !(typeof m.power === "number" && m.power < 0) && !(typeof m.toughness === "number" && m.toughness < 0));
@@ -5049,7 +5049,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   }
   if (ab.selfDamage && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
   // Vazi: "if mana from a Treasure was spent to ... activate it" counts mana abilities too.
-  fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}), ...(ab.exhaust ? { exhaust: true as const } : {}) });
+  fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}), ...(ab.exhaust ? { exhaust: true as const } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}) });
 }
 
 /** What mana casting it can spend (CR 106.6): Security Rhox's alternative cost only mana from Treasures (CR 106.3). */
@@ -8632,7 +8632,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     // A mana ability doesn't go on the stack: it resolves as soon as it's activated (CR 605.3b).
     log(s, `${p.name} activates ${d.name} (${ab.text.replace(/~/g, d.name).replace(/\.$/, "")}).`);
     resolveManaAbility(s, item, body, manaPick.mana);
-    fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}) });
+    fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}) });
     return true;
   }
   s.stack.push(item);
@@ -8662,7 +8662,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Once it's activated (CR 602.2i), abilities that trigger on that do.
   // As it was activated, for "copy that ability" once it has left the stack (rulings on Rings of Brighthearth).
   (s.castItems ??= {})[stackId] = structuredClone(item);
-  fireEvent(s, { type: "activated", player: p.id, stackId, ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}), ...(ab.keyword === "Embalm" || ab.keyword === "Eternalize" ? { embalm: true as const } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.outlast ? { outlast: true as const } : {}), ...(loyaltyRemoved !== undefined ? { loyalty: { removed: loyaltyRemoved } } : {}) });
+  fireEvent(s, { type: "activated", player: p.id, stackId, ...(ab.tap ? { tapSymbol: true as const } : {}), ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}), ...(ab.keyword === "Embalm" || ab.keyword === "Eternalize" ? { embalm: true as const } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.outlast ? { outlast: true as const } : {}), ...(loyaltyRemoved !== undefined ? { loyalty: { removed: loyaltyRemoved } } : {}) });
   fireEvent(s, { type: "targeted", stackId });
   return false;
 }
@@ -9340,6 +9340,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (pend.what === "targetSlot") {
     (r.scratch ??= {}).targetSlot = Number(choice);
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "unlessWay") {
+    if (!pend.options.includes(choice)) throw new RulesError("choose one of the costs offered, or neither");
+    (r.scratch ??= {}).unlessWay = choice;
     continueResolution(s);
     return;
   }
@@ -11823,6 +11829,8 @@ function attachmentSBAs(s: GameState): boolean {
         !!enchant &&
         objectMatches(s, enchant, host, c.controller, false) &&
         !protectedFrom(shielding, withCastThisTurn(s, o, c), protectionHolder(s, host)) &&
+        // Anti-Magic Aura: "can't be enchanted by other Auras" (CR 303.4).
+        enchantableBy(hc!, o.id) &&
         // Daybreak Coronet: another Aura attached to it (rulings: once they're all gone, the Coronet goes too).
         (!compileCard(defOf(s, o)).enchantAnotherAura || s.battlefield.some((x) => x !== o.id && s.objects[x]!.attachedTo === host.id && characteristics(s, s.objects[x]!).subtypes.includes("Aura")));
       if (!legal && o.bestowed) {

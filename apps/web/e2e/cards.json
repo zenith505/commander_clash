@@ -25219,6 +25219,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e380e37d-926b-4a4b-a275-7844bf4956d5",
+  "name": "Titania, Rugged Rumbler",
+  "manaCost": "{2}{B/G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Villain",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Villain"
+  ],
+  "oracleText": "As an additional cost to cast this spell, discard a card or pay {2}.\nWard—Discard a card or pay {2}. (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player discards a card or pays {2}.)",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "883a4180-9ede-4249-a4b8-3a29c998fb63",
   "name": "Tithing Blade // Consuming Sepulcher",
   "manaCost": "{1}{B}",

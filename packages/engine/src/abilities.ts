@@ -78,6 +78,10 @@ export interface UnlessPays {
   poison?: number;
   /** "Ward—Blight 2" (Auntie Ool, Cursewretch): this many -1/-1 counters on one creature they control as the payment (CR 701.68a); not with none (701.68b). */
   blight?: number;
+  /** "Ward—Discard a card or pay {2}" (Titania, Rugged Rumbler): this cost instead, if its payer chooses (with its own label, and this one's in `label`). */
+  orElse?: UnlessPays;
+  /** With `orElse`: how each cost reads on the choice ("Discard a card", "Pay {2}"). */
+  label?: string;
 }
 
 /**
@@ -1903,6 +1907,8 @@ export type Modification =
   | { kind: "cantCrew" }
   /** "~ can't be equipped" (Goblin Brawler): Equipment can't become attached to it (CR 701.3b) and becomes unattached (704.5n). */
   | { kind: "cantBeEquipped" }
+  /** "Can't be enchanted by other Auras" (Anti-Magic Aura, Consecrate Land): Auras other than this effect's source. */
+  | { kind: "cantBeEnchantedByOthers" }
   /** Blocking requirements (CR 509.1c): "must be blocked if able", "all creatures able to block ~ do so". */
   | { kind: "mustBeBlocked"; /** "Must be blocked this combat if able" (Neyith of the Dire Hunt): in that combat only, as for attacksIfAble. */ combat?: number | "this"; /** "Must be blocked by an Eldrazi if able" (Slayer's Cleaver): by at least one creature that fits this, if one is able to block it (CR 509.1c). */ by?: TargetSpec }
   | { kind: "allMustBlock"; /** "All Walls able to block ~ do so" (Marble Priest): only blockers that fit this (CR 509.1c). */ by?: TargetSpec }
@@ -5540,7 +5546,7 @@ export interface TriggeredAbility {
    * source had to be as it was activated, a permanent on the battlefield ("an ability of an artifact, creature, or land").
    * "That player" is who activated it.
    */
-  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "An ability that targets a creature or player" (Ertha Jo, Frontier Mentor): one of its targets as activated is a creature on the battlefield or a player. */ targetsCreatureOrPlayer?: true; /** "An ability with {X} in its activation cost": the mana symbol {X}, not another X (rulings on Unbound Flourishing). */ xCost?: true; /** "Whenever you activate a ninjutsu ability" (Satoru Umezawa): commander ninjutsu too (CR 702.49d). */ ninjutsu?: true; /** "Whenever you activate a boast ability" (Frenzied Raider, CR 702.142a). */ boast?: true; /** "Whenever you activate an eternalize or embalm ability" (Vizier of the Anointed, CR 702.128a, 702.129a). */ embalm?: true; /** "Whenever you activate an exhaust ability" (Afterburner Expert, CR 702.177a): mana abilities too. */ exhaust?: true; /** "Whenever you activate ~'s outlast ability" (Herald of Anafenza): this permanent's own (CR 702.107a). */ ownOutlast?: true; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true; /** "Whenever you activate an ability of a creature" (Elrond, Moon-Reader): mana abilities too (rulings). */ mana?: true; /** "Whenever you ... activate an ability of a card in your graveyard" (Neerdiv, Devious Diver): its source a card in its activator's graveyard as it's activated (CR 602.2). */ inYourGraveyard?: true; /** "Whenever you activate a loyalty ability" (Way of the Paradox, CR 606.3): a loyalty ability only. */ loyalty?: true; /** With `loyalty`: "if you removed two or more loyalty counters to activate it" (Way of the Mind Sculptor), the loyalty cost paid (CR 606.4). */ loyaltyRemoved?: number; /** `of` is matched for the player who activated it, not this ability's controller ("an artifact they control", Avalanche of Sector 7). */ ofActivators?: true };
+  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "An ability that targets a creature or player" (Ertha Jo, Frontier Mentor): one of its targets as activated is a creature on the battlefield or a player. */ targetsCreatureOrPlayer?: true; /** "An ability with {X} in its activation cost": the mana symbol {X}, not another X (rulings on Unbound Flourishing). */ xCost?: true; /** "Whenever you activate a ninjutsu ability" (Satoru Umezawa): commander ninjutsu too (CR 702.49d). */ ninjutsu?: true; /** "Whenever you activate a boast ability" (Frenzied Raider, CR 702.142a). */ boast?: true; /** "Whenever you activate an eternalize or embalm ability" (Vizier of the Anointed, CR 702.128a, 702.129a). */ embalm?: true; /** "Whenever you activate an exhaust ability" (Afterburner Expert, CR 702.177a): mana abilities too. */ exhaust?: true; /** "Whenever you activate ~'s outlast ability" (Herald of Anafenza): this permanent's own (CR 702.107a). */ ownOutlast?: true; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true; /** "Whenever you activate an ability of a creature" (Elrond, Moon-Reader): mana abilities too (rulings). */ mana?: true; /** "Whenever you ... activate an ability of a card in your graveyard" (Neerdiv, Devious Diver): its source a card in its activator's graveyard as it's activated (CR 602.2). */ inYourGraveyard?: true; /** "Whenever you activate a loyalty ability" (Way of the Paradox, CR 606.3): a loyalty ability only. */ loyalty?: true; /** With `loyalty`: "if you removed two or more loyalty counters to activate it" (Way of the Mind Sculptor), the loyalty cost paid (CR 606.4). */ loyaltyRemoved?: number; /** `of` is matched for the player who activated it, not this ability's controller ("an artifact they control", Avalanche of Sector 7). */ ofActivators?: true; /** "Without {T} in its activation cost" (Haunting Wind). */ noTapSymbol?: true; /** The permanent whose ability it is (as it was activated) is the trigger's subject: "that artifact's controller" (Haunting Wind). */ subjectSource?: true };
   /**
    * For "playerDiscards": who discards, `cycled` for "cycles a card" (only a card discarded to pay a cycling cost,
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
@@ -6093,7 +6099,7 @@ export type ManaProduce =
    * (two colors, `min` 1, as removing none adds nothing). How many are removed is chosen as it's activated (CR 107.3a,
    * 601.2b, 602.2b): each way to do it is a combination, numbered as for "combos" (`removeXCombos`).
    */
-  | { kind: "removeX"; counter: CounterKind; colors: ManaType[]; min: number; /** The Mana Batteries: "Add {G}, then add an additional {G} for each charge counter removed this way": this much more, of the one color. */ base?: number }
+  | { kind: "removeX"; counter: CounterKind; colors: ManaType[]; min: number; /** The Mana Batteries: "Add {G}, then add an additional {G} for each charge counter removed this way": this much more, of the one color. */ base?: number; /** "Add X mana of any one color" (Petalmane Baku): all X of one of `colors`, not a mix. */ oneColor?: true }
   /**
    * Metalworker: "Reveal any number of artifact cards in your hand. Add {C}{C} for each card revealed this way." How many
    * are revealed is chosen as it's activated (rulings: zero too); each number is a combination, numbered as for "combos"

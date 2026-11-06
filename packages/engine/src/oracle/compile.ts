@@ -6028,7 +6028,10 @@ export function compile(d: CardDef): CompiledCard {
     // Teamwork's "choose both" needs teamwork; either way, a list of exactly two modes.
     const modal = out.spell?.modal;
     const cond = bothIf !== undefined ? parseStaticCondition(bothIf.startsWith("?") ? bothIf.slice(1) : `you control ${bothIf}`, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
-    const playerCond = (cond?.kind === "control" && !cond.other && (cond.who ?? "you") === "you") || cond?.kind === "opponentGraveyard" || cond?.kind === "descended" || cond?.kind === "graveyardTypes" || cond?.kind === "graveyardPermanents";
+    // Soul Transfer: "If you control an artifact and an enchantment as you cast ~": both conditions about the caster.
+    const isPlayerCond = (c: StaticCondition | null | undefined): boolean =>
+      (c?.kind === "control" && !c.other && (c.who ?? "you") === "you") || c?.kind === "opponentGraveyard" || c?.kind === "descended" || c?.kind === "graveyardTypes" || c?.kind === "graveyardPermanents" || (c?.kind === "allOf" && c.conds.every(isPlayerCond));
+    const playerCond = isPlayerCond(cond);
     if (both === "control" && modal && modal.min === 1 && modal.max === 1 && modal.modes.length >= 2 && playerCond) {
       modal.both = both;
       modal.bothIf = cond!;
@@ -6478,6 +6481,13 @@ function linkExile(out: CompiledCard) {
     // exile instruction linked to its "cards exiled with ~" (CR 607.2a).
     else if (!others && exiles.length > 1 && ((texts) => texts.length === exiles.length && new Set(texts).size === 1)(out.triggers.filter((t) => t.event === "chapter" && allEffects(t.body.effects).some((e) => (exiles as Effect[]).includes(e))).map((t) => t.body.text))) for (const e of exiles) e.linked = true;
     else if (!others && !exiles.length && searches.length === 1 && !all.some((e) => e.type === "search" && e !== searches[0])) searches[0]!.dest = { ...searches[0]!.dest, linked: true };
+    // Vault 13: Dweller's Journey: "Return two cards exiled with ~ ..." are the ones its chapter I exiled "until ~ leaves the
+    // battlefield" (CR 607.2a), its only exile instruction; the ones chapter III moves are no longer there to return.
+    else if (!others && !exiles.length && !tops.length && !searches.length && all.some((e) => e.type === "moveLinked" && e.exactly !== undefined)) {
+      const until = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && e.until === "sourceLeaves");
+      if (until.length === 1 && all.filter((e) => e.type === "exile").length === 1) until[0]!.linked = true;
+      else out.unsupported.push("(refers to cards exiled with it that it can't link to its exile abilities)");
+    }
   }
   // Clone Shell, Summoner's Egg: "turn the exiled card face up" is about the one card its imprint exiled face down as it
   // entered (CR 607.2a), its only exile instruction.

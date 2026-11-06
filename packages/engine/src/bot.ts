@@ -726,7 +726,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "secretNumber") {
       const sn = s.resolving ? allEffects(s.resolving.body.effects).find((x) => x.type === "secretNumbers") : undefined;
       const me = player(s, pid);
-      const n = sn?.type === "secretNumbers" && sn.then === "ogre" ? (s.resolving?.item.controller === pid && me.life > 20 ? 3 : 0) : me.hand.length <= 2 && me.life > 10 ? 1 : 0;
+      // Goblin Game: few items, but not so few that it's likely the fewest when life is high (half of it is the bigger loss).
+      const n = sn?.type === "secretNumbers" && sn.then === "goblin" ? (me.life >= 16 ? 3 : 1) : sn?.type === "secretNumbers" && sn.then === "ogre" ? (s.resolving?.item.controller === pid && me.life > 20 ? 3 : 0) : me.hand.length <= 2 && me.life > 10 ? 1 : 0;
       return [{ type: "chooseOption", player: pid, choice: String(n) }];
     }
     if (pend.kind === "chooseOption" && (pend.what === "riot" || pend.what === "unleash")) {

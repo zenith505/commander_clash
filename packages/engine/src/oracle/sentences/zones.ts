@@ -1670,6 +1670,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Safe Haven: "return each card exiled with ~ to the battlefield under its owner's control", all at once and whatever
     // they are now (rulings).
     if (/^Return each card exiled with ~ to the battlefield under its owner's control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield", ownersControl: true }];
+    // Vault 13: Dweller's Journey: "Return two cards exiled with ~ to the battlefield under their owners' control and put the
+    // rest on the bottom of their owners' libraries": two chosen as it resolves, returned at once; the others to the bottom.
+    if (/^Return two cards exiled with ~ to the battlefield under their owners' control and put the rest on the bottom of their owners' libraries$/.test(s)) return [{ type: "moveLinked", dest: "battlefield", ownersControl: true, exactly: 2 }, { type: "linkedToBottom" }];
     // Cold Storage, Endless Sands: "Return each creature card exiled with ~ to the battlefield under your control / its
     // owner's control": the creature cards among them as they are now, all at once (CR 607.2a, 608.2f).
     // Synod Sanctum: "Return all cards exiled with ~ to the battlefield under your control": the same, all of them.
@@ -2195,6 +2198,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     const filter = pickFilter(m[2]!);
     return who && who.ref !== "you" && filter?.kind === "object" ? [{ type: "pick", who, filter, n: 1, action: "bounce" }] : null;
+  }
+  // The War Games: "You may exile a nontoken creature you control. When you do, ...": one of yours, chosen as it resolves
+  // (not targeted).
+  if ((m = /^[Ee]xile a (nontoken creature) you control$/.exec(s))) {
+    const filter = pickFilter(m[1]!);
+    return filter?.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "exile" }] : null;
   }
   // Fugitive of the Judoon: "You may exile a Human you control and an artifact you control. If you do, ...": two different
   // permanents of yours, chosen as it resolves (not targeted); doing it means exiling both (CR 609.3).

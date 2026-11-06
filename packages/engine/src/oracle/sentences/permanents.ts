@@ -1542,6 +1542,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const mods = what?.ref === "target" ? parseChanges(`gains ${m[2]} and ${m[3]}`) : null;
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
   }
+  // The Bears of Littjara: "Any number of target Shapeshifter creatures you control have base power and toughness 4/4":
+  // with no duration, for as long as each is that permanent (CR 611.2a), in layer 7b (CR 613.4b).
+  if ((m = /^(Any number of target [A-Z][a-z]+ creatures you control) have base power and toughness (\d+)\/(\d+)$/.exec(s))) {
+    const what = parseObject(m[1]!.replace(/^Any/, "any"), ctx);
+    const mods = what?.ref === "target" ? parseChanges(`has base power and toughness ${m[2]}/${m[3]}`) : null;
+    return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
+  }
   // Frenzied Fugue: "gain control of enchanted permanent until end of turn": the permanent it's attached to as this resolves
   // (layer 2), until the turn ends.
   if ((m = /^[Gg]ain control of enchanted (creature|permanent) until end of turn$/.exec(s)) && !ctx.spell)

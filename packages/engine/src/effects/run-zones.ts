@@ -2029,6 +2029,17 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const pick = cards[Math.floor(nextRandom(s) * cards.length)]!;
         log(s, `${src} chooses ${defOf(s, pick).name} at random.`);
         cards = [pick];
+      } else if (e.exactly !== undefined && cards.length > e.exactly) {
+        // Vault 13: exactly that many of them, chosen as it resolves; with that many or fewer, all of them.
+        if (!sc.linkedPick) {
+          sc.linkedPick = true;
+          delete sc.found;
+          const ids = cards.map((c) => c.id);
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: `${e.exactly} cards exiled with ${src}`, cards: ids, min: e.exactly, max: e.exactly, dig: { looked: ids, to: e.dest === "hand" ? "into their owners' hands" : e.dest === "battlefield" ? "onto the battlefield" : "into their owners' graveyards", rest: "stay exiled for now" } };
+          return "paused";
+        }
+        sc.linkedPick = undefined;
+        cards = cards.filter((c) => sc.found?.includes(c.id));
       } else if (e.upTo !== undefined) {
         // Bag of Devouring: up to that many of them, chosen as it resolves.
         if (!sc.linkedPick) {
@@ -2571,8 +2582,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (s.resolving) s.resolving.created = [];
         enterTogether(s, () => {
           for (const o of list) {
-            log(s, e.faceDown === "cyberman" ? `${src} puts a card onto the battlefield face down under ${player(s, under(o)).name}'s control: it's a 2/2 Cyberman artifact creature.` : `${src} returns ${defOf(s, o).name} to the battlefield face down under ${player(s, under(o)).name}'s control: it's a Forest land.`);
-            moveObject(s, o.id, "battlefield", { controller: under(o), faceDown: e.faceDown });
+            log(s, e.faceDown === "cyberman" ? `${src} puts a card onto the battlefield face down under ${player(s, under(o)).name}'s control: it's a 2/2 Cyberman artifact creature.` : e.faceDown === "plain" ? `${src} returns a card to the battlefield face down under ${player(s, under(o)).name}'s control: it's a 2/2 creature.` : `${src} returns ${defOf(s, o).name} to the battlefield face down under ${player(s, under(o)).name}'s control: it's a Forest land.`);
+            moveObject(s, o.id, "battlefield", { controller: under(o), faceDown: e.faceDown === "plain" ? "morph" : e.faceDown });
             if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
           }
         });
@@ -3132,6 +3143,31 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const ids = (e.cards ?? []).filter((c) => s.objects[c.id]?.zone === "battlefield" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc).map((c) => c.id);
       if (ids.length) log(s, `${src} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
       for (const id of ids) moveObject(s, id, "exile");
+      return;
+    }
+    case "linkedToBottom": {
+      // Vault 13: the cards still exiled with the source (CR 607.2a, 400.7) to the bottom of their owners' libraries, each
+      // owner ordering theirs (rulings), in APNAP order.
+      const zc = ctx.sourceZc ?? 0;
+      const key = s.linkedExile?.[`${ctx.sourceId}@${zc}`] ? `${ctx.sourceId}@${zc}` : `${ctx.sourceId}@${zc - 1}`;
+      const sc = (s.resolving!.scratch ??= {});
+      const all = (s.linkedExile?.[key] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).map((l) => l.id);
+      const orders = (sc.bottomOrders ??= {});
+      for (const pid of apnap(s, [...new Set(all.map((id) => obj(s, id).owner))])) {
+        if (orders[pid]) continue;
+        const cards = all.filter((id) => obj(s, id).owner === pid);
+        if (cards.length > 1 && !sc.arranged) {
+          s.pending = { kind: "arrangeTop", player: pid, how: "bottom", cards, source: src };
+          return "paused";
+        }
+        orders[pid] = sc.arranged ? sc.arranged.top.filter((id) => cards.includes(id)) : cards;
+        sc.arranged = undefined;
+      }
+      const moving = Object.values(orders).flat().filter((id) => all.includes(id));
+      if (moving.length) log(s, `${src} puts ${moving.map((id) => defOf(s, obj(s, id)).name).join(", ")} on the bottom of ${moving.length === 1 ? "its owner's library" : "their owners' libraries"}.`);
+      for (const id of moving) moveObject(s, id, "library");
+      if (s.linkedExile?.[key]) s.linkedExile[key] = s.linkedExile[key]!.filter((l) => !moving.includes(l.id));
+      sc.bottomOrders = undefined;
       return;
     }
     case "putAllOnBottom": {

@@ -6703,6 +6703,12 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     s.effects = s.effects.filter((e) => !(e.untilCast?.id === o.id && (o.zoneChanges ?? 0) === e.untilCast.zc));
     invalidateCharacteristics(s);
   }
+  // "Until a player casts a creature spell" (Soul Sculptor): a spell with the creature type as it became cast (rulings).
+  if (characteristics(s, o).types.includes("Creature") && s.effects.some((e) => e.untilCreatureSpell)) {
+    s.effects = s.effects.filter((e) => !e.untilCreatureSpell);
+    invalidateCharacteristics(s);
+    log(s, `${p.name} casts a creature spell: the effects lasting until then end.`);
+  }
   const kickedNow = !!item.kicked?.length && isRealKicker(compileCard(d).kicker);
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv, ...(kickedNow ? { kicked: true as const } : {}) });
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv, castColors: [...characteristics(s, o).colors], ...(o.faceDown ? {} : { castName: d.name }) };

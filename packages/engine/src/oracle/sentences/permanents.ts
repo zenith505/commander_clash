@@ -1683,6 +1683,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
       { type: "untap", what: { ref: "self" } },
       { type: "counters", what: { ref: "self" }, counter: "+1/+1", n: m[1] === "a" ? 1 : m[1] === "two" ? 2 : 3, by: { ref: "eventPlayer" } },
     ];
+  // The Caves of Androzani (as parseBody joins it): Effect counterOfKindEach.
+  if (s === "For each non-Saga permanent, you may put another counter of a kind already on it on it") return [{ type: "counterOfKindEach" }];
   if (s === "Put another counter of a kind already on target permanent or player on it") {
     const host = addTarget(ctx, { kind: "any", types: [...PERMANENT_TYPES], text: "target permanent or player" });
     return [{ type: "counterOfKindOnIt", what: { ref: "target", index: host }, host }];

@@ -1223,6 +1223,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "sacrificeEach":
     case "sacrificeRandom":
     case "secretChoose":
+    case "secretChooseEach":
+    case "eachExilesPermanentsOrHand":
     case "randomCounterKind":
     case "destroyRandom":
     case "chooseRandom":
@@ -1382,6 +1384,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "groupRules":
     case "ownersGainControl":
     case "scrambleControl":
+    case "successionControl":
+    case "counterOfKindEach":
     case "swapCreatures":
     case "juxtapose":
     case "exchangeControl":

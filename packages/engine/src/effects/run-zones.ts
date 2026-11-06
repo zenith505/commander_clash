@@ -895,6 +895,79 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       sc.chosen = undefined;
       return;
     }
+    case "eachExilesPermanentsOrHand": {
+      const sc = (s.resolving!.scratch ??= {});
+      const pool = (pid: PlayerId) => [...s.battlefield.filter((id) => !s.phasedOut?.includes(id) && controllerOf(s, obj(s, id)) === pid), ...player(s, pid).hand];
+      if (!sc.madness) {
+        const n = Math.max(0, amountNow(s, e.n, ctx));
+        if (!n) return;
+        sc.madness = { n, queue: turnOrderFrom(s, ctx.controller).filter((p) => !player(s, p).lost), picked: [] };
+      }
+      const st = sc.madness;
+      if (sc.found) {
+        const pid = st.queue.shift()!;
+        const ok = sc.found.filter((id) => pool(pid).includes(id));
+        st.picked.push(...ok);
+        const fromHand = ok.filter((id) => obj(s, id).zone === "hand").length;
+        const perms = ok.filter((id) => obj(s, id).zone === "battlefield").map((id) => defOf(s, obj(s, id)).name);
+        log(s, `${player(s, pid).name} chooses ${[...perms, ...(fromHand ? [`${fromHand} card${fromHand === 1 ? "" : "s"} from their hand`] : [])].join(", ") || "nothing"} to exile (${src}).`);
+        delete sc.found;
+      }
+      while (st.queue.length) {
+        const pid = st.queue[0]!;
+        const cards = pool(pid);
+        if (cards.length <= st.n) {
+          st.picked.push(...cards);
+          if (cards.length) log(s, `${player(s, pid).name} exiles everything they control and their whole hand (${src}).`);
+          st.queue.shift();
+          continue;
+        }
+        s.pending = { kind: "searchLibrary", player: pid, source: src, what: `${st.n} permanent${st.n === 1 ? "" : "s"} you control and/or card${st.n === 1 ? "" : "s"} from your hand to exile`, cards, min: st.n, max: st.n };
+        return "paused";
+      }
+      sc.madness = undefined;
+      for (const id of st.picked) {
+        const o = s.objects[id];
+        if (o?.zone !== "battlefield" && o?.zone !== "hand") continue;
+        if (o.zone === "battlefield") log(s, `${src} exiles ${defOf(s, o).name}.`);
+        moveObject(s, id, "exile");
+      }
+      return;
+    }
+    case "secretChooseEach": {
+      // Call to the Void: each player in turn order from the active player, a creature they control then one they don't
+      // (a player with none to choose from chooses nothing there); revealed together once all are made (rulings).
+      const sc = (s.resolving!.scratch ??= {});
+      const creatures = () => s.battlefield.filter((id) => !s.phasedOut?.includes(id) && objIsType(s, obj(s, id), "Creature"));
+      if (!sc.queue) {
+        sc.queue = apnap(s, livingPlayers(s)).flatMap((p) => [p, p]);
+        sc.chosen = {};
+        sc.secretPicks = [];
+      }
+      for (;;) {
+        // An answer just given (game.ts files it under the player): kept with the others.
+        for (const [pid, ids] of Object.entries(sc.chosen ?? {})) for (const id of ids) sc.secretPicks!.push({ player: Number(pid), id });
+        sc.chosen = {};
+        if (!sc.queue.length) break;
+        const pid = sc.queue[0]!;
+        const own = sc.queue[1] === pid;
+        const opts = creatures().filter((id) => (controllerOf(s, obj(s, id)) === pid) === own);
+        if (opts.length <= 1) {
+          sc.chosen[pid] = opts;
+          sc.queue.shift();
+          continue;
+        }
+        s.pending = { kind: "pickPermanents", player: pid, source: src, action: "choose", what: own ? "creature you control" : "creature you don't control", options: opts, count: 1, secret: own ? "own" : "theirs", prompt: `secretly choose a creature you ${own ? "control" : "don't control"}. All choices are then revealed, and each creature chosen is destroyed.` };
+        return "paused";
+      }
+      const picks = sc.secretPicks ?? [];
+      log(s, `The choices are revealed: ${apnap(s, livingPlayers(s)).map((pid) => `${player(s, pid).name} chose ${picks.filter((p) => p.player === pid).map((p) => defOf(s, obj(s, p.id)).name).join(" and ") || "nothing"}`).join("; ")}.`);
+      s.resolving!.created = [...new Set(picks.map((p) => p.id))].filter((id) => s.objects[id]?.zone === "battlefield");
+      sc.queue = undefined;
+      sc.chosen = undefined;
+      sc.secretPicks = undefined;
+      return;
+    }
     case "commanderToHand": {
       // "Your commander" is a commander you own (CR 903.3); in the command zone as this resolves, or nothing happens.
       const p = player(s, ctx.controller);

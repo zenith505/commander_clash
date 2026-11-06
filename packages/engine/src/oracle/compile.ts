@@ -1706,8 +1706,14 @@ export function compile(d: CardDef): CompiledCard {
     const exiledBan = /^(Players|Your opponents) can't cast spells with the same name as the exiled card\.$/.exec(line);
     if (exiledBan && !out.linkedNameCastBan) {
       const exiles = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && e.what.ref === "target" && !e.what.n && (!e.until || e.until === "sourceLeaves"));
-      const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "exileTop" || e.type === "exileFaceDown" || e.type === "takeFromHand" || e.type === "hideaway");
-      if (exiles.length !== 1 || all.length !== 1) out.unsupported.push(raw);
+      const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "exileTop" || e.type === "exileFaceDown" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "counterSpell");
+      // Ashiok's Erasure: "When ~ enters, exile target spell": the card that spell was, in exile (a copy leaves nothing
+      // exiled, rulings), its only exile.
+      const spells = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "counterSpell" }> => e.type === "counterSpell" && !!e.exileSpell && !e.cause && !e.plot && !e.ownerMayCost && !e.n);
+      if (!exiles.length && spells.length === 1 && all.length === 1) {
+        spells[0]!.linked = true;
+        out.linkedNameCastBan = exiledBan[1] === "Players" ? "players" : true;
+      } else if (exiles.length !== 1 || all.length !== 1) out.unsupported.push(raw);
       else {
         exiles[0]!.linked = true;
         out.linkedNameCastBan = exiledBan[1] === "Players" ? "players" : true;
@@ -6481,7 +6487,9 @@ function linkExile(out: CompiledCard) {
   }
   // Circu: both of its "exile the top card of target player's library" triggers are linked to its ban (CR 607.2a).
   // Exclusion Ritual, Ixalan's Binding: "the exiled card" lines linked their one exile as they were read; nothing more to do.
-  const exiledCardBan = out.linkedNameCastBan && bodies.flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" && e.linked).length === 1 && out.triggers.length === 1 && !out.activated.length && !out.spell;
+  // Ashiok's Erasure: its linked "exile target spell", and a leaves ability that returns that card (linked below).
+  const returnsOnly = (tr: (typeof out.triggers)[number]) => tr.event === "selfLeaves" && tr.body.effects.length === 1 && tr.body.effects[0]!.type === "returnLinked";
+  const exiledCardBan = out.linkedNameCastBan && bodies.flatMap((b) => allEffects(b.effects)).filter((e) => (e.type === "exile" || e.type === "counterSpell") && e.linked).length === 1 && out.triggers.filter((tr) => !returnsOnly(tr)).length === 1 && !out.activated.length && !out.spell;
   if (out.linkedNameCastBan && !exiledCardBan) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
@@ -6584,6 +6592,12 @@ function linkExile(out: CompiledCard) {
     if (returns.length !== 1 || chExiles.length !== 1 || allExiles.length !== 1 || chExiles[0]!.what.ref !== "target" || !(ret.chapter! > (out.triggers.find((t) => allEffects(t.body.effects).includes(chExiles[0]!))?.chapter ?? 99))) out.unsupported.push("(returns exiled cards it can't link to one exile ability)");
     else chExiles[0]!.linked = true;
     return;
+  }
+  // Ashiok's Erasure: the spell its enters ability exiled, already linked by its name ban, with no other exile.
+  const linkedSpells = [...out.triggers.map((tr) => tr.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "counterSpell" && e.linked);
+  if (linkedSpells.length === 1 && returns.length === 1 && returns[0]!.event === "selfLeaves" && !out.spell && allEffects(returns[0]!.body.effects).every((e) => e.type === "returnLinked")) {
+    const others = [...out.triggers.map((tr) => tr.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => ["exile", "exileTop", "exileFaceDown", "takeFromHand", "hideaway", "impulse", "exileHand", "exileGraveyard"].includes(e.type) || (e.type === "search" && e.dest.zone === "exile"));
+    if (!others.length) return;
   }
   // "When this creature is turned face up, exile ..." (Aurelia's Vindicator) is one of its exile abilities too (CR 607.2a).
   // Hoarding Dragon: "search your library for an artifact card, exile it, then shuffle" is its exile ability too.

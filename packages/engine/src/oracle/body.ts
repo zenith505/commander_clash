@@ -1354,6 +1354,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Moira, Urborg Haunt: "return to the battlefield target creature card in your graveyard that was put there from the
   // battlefield this turn": the same as "return target ... to the battlefield", in the usual word order.
   text = text.replace(/^([Rr]eturn) to the battlefield (target [a-z ]+? card in your graveyard(?: that was put there from the battlefield this turn)?)\.$/, "$1 $2 to the battlefield.");
+  // The Caves of Androzani: "For each non-Saga permanent, choose a counter on it. You may put an additional counter of that
+  // kind on that permanent." One instruction.
+  text = text.replace(/^For each non-Saga permanent, choose a counter on it\. You may put an additional counter of that kind on that permanent\./, "For each non-Saga permanent, you may put another counter of a kind already on it on it.");
   // Ichormoon Gauntlet: "choose a counter on target permanent. Put an additional counter of that kind on that permanent."
   text = text.replace(/\b[Cc]hoose a counter on (target [a-z ]+?)\. Put an additional counter of that kind on that permanent\./, "Put another counter of a kind already on $1 on it.");
   // Captain N'ghathrod: "choose target artifact or creature card in an opponent's graveyard that was put there from their
@@ -1502,6 +1505,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Malik, Grim Manipulator: "you and target opponent each secretly choose a creature that player controls. Then those
   // choices are revealed, and that player sacrifices those creatures." One instruction (Effect secretChoose).
   text = text.replace(/(^|\. )[Yy]ou and target opponent each secretly choose a creature that player controls\. Then those choices are revealed, and that player sacrifices those creatures\./, "$1You and target opponent each secretly choose a creature that player controls for that player to sacrifice.");
+  // Call to the Void: "Each player secretly chooses a creature they control and a creature they don't control. Then those
+  // choices are revealed. Destroy each creature chosen this way." One instruction (Effect secretChooseEach).
+  text = text.replace(/^Each player secretly chooses a creature they control and a creature they don't control\. Then those choices are revealed\. Destroy each creature chosen this way\./, "Each player secretly chooses a creature they control and a creature they don't control for those creatures to be destroyed.");
   // Neyam Shai Murad: "you may have that player return target permanent card from their graveyard to their hand. If you
   // do, that player chooses a permanent card in your graveyard, then you put it onto the battlefield under your control.":
   // the return is a graveyard card to its owner's hand (whoever does it), then that player's choice as it resolves
@@ -2990,6 +2996,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Volatile Rig: "When ~ dies, flip a coin. If you lose the flip, it deals 4 damage to each creature and each player": it
   // is ~, as it last existed (CR 608.2h).
   text = text.replace(/^([Ff]lip a coin\. If you lose the flip, )it (deals \d+ damage to each creature and each player\.)$/, "$1~ $2");
+  // Goblin Psychopath: "If you lose the flip, the next time it would deal combat damage this turn, it deals that damage to
+  // you instead": "it" is ~.
+  text = text.replace(/^([Ff]lip a coin\. If you lose the flip, )the next time it would deal combat damage this turn, it deals that damage to you instead\.$/, "$1the next time ~ would deal combat damage this turn, it deals that damage to you instead.");
   // Dragonspark Reactor: "It deals damage equal to the number of charge counters on it to target player and that much damage
   // to up to one target creature": ~ (sacrificed as the cost, so as it last existed, CR 608.2h) deals that amount to each.
   text = text.replace(/^~ deals damage equal to the number of ([a-z]+) counters on ~ to (target player) and that much damage to (up to one target creature)\.$/, "~ deals X damage to $2 and X damage to $3, where X is the number of $1 counters on ~.");
@@ -3699,6 +3708,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "It" is the spell cast only as the first instruction: "Untap ~. It gains ..." is about ~ (Pristine Skywise).
     if (si > 0) delete ctx.spellIt;
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
+    // Descent into Madness: "each player exiles X permanents they control and/or cards from their hand, where X is the
+    // number of despair counters on ~" (Effect eachExilesPermanentsOrHand; the counters as it last existed if it's gone).
+    const madness = /^[Ee]ach player exiles X permanents they control and\/or cards from their hand, where X is (the number of [a-z]+ counters on ~)$/.exec(s);
+    if (madness) {
+      const n = parseCount(madness[1]!, ctx);
+      if (!n) return null;
+      effects.push({ type: "eachExilesPermanentsOrHand", n });
+      continue;
+    }
     // An Aura token and what it has, said in the next sentence ("... attached to another target creature. That token has
     // enchant creature and "..."", The Rani): one instruction creating it (see parseTokensSentence). Without its enchant
     // ability the line isn't understood.
@@ -8913,6 +8931,40 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       }
       continue;
     }
+    // The Curse of Fenric II: "Target nontoken creature becomes a 6/6 legendary Horror creature named Fenric and loses all
+    // abilities.": with no duration (CR 611.2a), its creature type and name replaced (CR 205.1a, layer 3), legendary too,
+    // base 6/6 (layer 7b), no abilities (layer 6), one effect in the order written (CR 613.7).
+    const fenric = /^(Target nontoken creature) becomes a (\d+\/\d+) legendary ([A-Z][a-z]+) creature named ([A-Z][a-z]+) and loses all abilities$/.exec(s);
+    if (fenric) {
+      const got = attempt(ctx, () => parseOne(`${fenric[1]!} becomes a legendary ${fenric[2]!} ${fenric[3]!} creature named ${fenric[4]!}`, ctx));
+      const g = got?.length === 1 ? got[0]! : undefined;
+      if (g?.type !== "continuous" || g.duration !== "game" || g.what.ref !== "target") return null;
+      effects.push({ ...g, mods: [...g.mods, { kind: "loseAllAbilities" }] });
+      continue;
+    }
+    // The Curse of Fenric III: "Target Mutant fights another target creature named Fenric.": the second target is a
+    // creature with that name (CR 201.2).
+    const fightNamed = /^(Target [A-Z][a-z]+ fights another target creature) named ([A-Z][a-z]+)$/.exec(s);
+    if (fightNamed) {
+      const n0 = ctx.targets.length;
+      const got = attempt(ctx, () => parseOne(fightNamed[1]!, ctx));
+      const t1 = ctx.targets[n0 + 1];
+      if (!got || got.length !== 1 || got[0]!.type !== "fight" || ctx.targets.length !== n0 + 2 || t1?.kind !== "object") return null;
+      ctx.targets[n0 + 1] = { ...t1, named: fightNamed[2]!, text: `target creature named ${fightNamed[2]!}` };
+      effects.push(...got);
+      continue;
+    }
+    // Soul Sculptor: "Target creature becomes an enchantment and loses all abilities until a player casts a creature
+    // spell.": until any player's creature spell becomes cast (CR 601.2i), however many turns that takes; a spell with the
+    // type creature, whatever other types it has (rulings).
+    const untilCreature = /^(Target creature becomes an enchantment and loses all abilities) until a player casts a creature spell$/.exec(s);
+    if (untilCreature) {
+      const got = attempt(ctx, () => parseOne(`${untilCreature[1]!} until end of turn`, ctx));
+      const g = got?.length === 1 ? got[0]! : undefined;
+      if (g?.type !== "continuous" || g.duration !== "endOfTurn") return null;
+      effects.push({ ...g, duration: "game", untilCreatureSpellCast: true });
+      continue;
+    }
     // Shattered Seraph and its cycle, Emrakul, the Exigent Doom: "{2}, Exile this card from your hand: Target land gains "{T}:
     // Add {W}, {U}, or {B}" until this card is cast from exile. You may cast this card for as long as it remains exiled.":
     // the grant lasts until that card becomes cast from exile (its mana can pay for it, rulings), or forever if it leaves
@@ -13374,6 +13426,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (s === "Choose left or right" && /^Until your next turn, each player may attack only the nearest opponent in the last chosen direction and planeswalkers controlled by that opponent$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
       effects.push({ type: "choose", choice: "direction" }, { type: "attackDirection" });
       si++;
+      continue;
+    }
+    // Oath of Lim-Dûl: "for each 1 life you lost, sacrifice a permanent other than ~ unless you discard a card": one
+    // choice for each 1 life lost (the trigger's amount), each made in turn; with no card in hand, a sacrifice; with no
+    // other permanent, nothing.
+    if (/^[Ff]or each 1 life you lost, sacrifice another permanent unless you discard a card$/.test(s) && !ctx.spell && !ctx.activated) {
+      const sac: Effect = { type: "pick", who: { ref: "you" }, filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanent other than ~", notSource: true }, n: 1, action: "sacrifice" };
+      effects.push({ type: "repeat", n: { count: { kind: "eventAmount" } }, effects: [{ type: "may", effects: [{ type: "discard", who: { ref: "you" }, n: 1 }], otherwise: [sac], keep: true, text: "Discard a card rather than sacrifice a permanent other than ~" }] });
+      continue;
+    }
+    // Order of Succession (Effect successionControl).
+    if (s === "Choose left or right" && /^Starting with you and proceeding in the chosen direction, each player chooses a creature controlled by the next player in that direction$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "") && /^Each player gains control of the creature they chose\.?$/.test(sentences[si + 2] ?? "")) {
+      effects.push({ type: "successionControl" });
+      si += 2;
       continue;
     }
     if (s === "For each player, choose friend or foe" && !ctx.chooseWords && !ctx.vote) {

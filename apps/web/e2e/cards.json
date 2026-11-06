@@ -3617,6 +3617,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c2db2c28-3ddc-41ce-a0c2-ddc555dea133",
+  "name": "Call to the Void",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player secretly chooses a creature they control and a creature they don't control. Then those choices are revealed. Destroy each creature chosen this way.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "312c7a7b-2084-42b0-9b13-0a6d3e43a73d",
   "name": "Camellia, the Seedmiser",
   "manaCost": "{1}{B}{G}",
@@ -6229,6 +6255,32 @@
   "set": "cmm",
   "releasedAt": "2023-08-04",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "88d42e0e-3921-4873-a53b-146220341f76",
+  "name": "Descent into Madness",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, put a despair counter on this enchantment, then each player exiles X permanents they control and/or cards from their hand, where X is the number of despair counters on this enchantment.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "avr",
+  "releasedAt": "2012-05-04",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -17213,6 +17265,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1b95970c-e7eb-41c4-a8d2-9889b64b3c63",
+  "name": "Order of Succession",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose left or right. Starting with you and proceeding in the chosen direction, each player chooses a creature controlled by the next player in that direction. Each player gains control of the creature they chose.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c13",
+  "releasedAt": "2013-11-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "61eacaab-625b-499c-8602-f37ad5dda138",
   "name": "Orim's Cure",
   "manaCost": "{1}{W}",
@@ -24488,6 +24566,34 @@
   "releasedAt": "2024-07-05",
   "rarity": "mythic",
   "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5ce47fb9-4e4f-4419-af75-309d2743f5f9",
+  "name": "The Caves of Androzani",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after IV.)\nI — Put two stun counters on each of up to two target tapped creatures.\nII, III — For each non-Saga permanent, choose a counter on it. You may put an additional counter of that kind on that permanent.\nIV — Search your library for a Doctor card, reveal it, put it into your hand, then shuffle.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "saga",
   "gameChanger": false
  },
  {

@@ -1391,6 +1391,8 @@ export interface ContinuousEffect {
   whileControlled?: { id: ObjectId; zc: number; controller?: PlayerId };
   /** "Until this card is cast from exile" (Shattered Seraph): it ends as that card (this object in exile) becomes cast (CR 601.2i), so its mana ability can still pay for that spell (rulings); if the card leaves exile another way, it lasts. */
   untilCast?: { id: ObjectId; zc: number };
+  /** "Until a player casts a creature spell" (Soul Sculptor): over once any creature spell becomes cast (CR 601.2i). */
+  untilCreatureSpell?: true;
   /** "For as long as it has a vow counter on it" (CR 611.2b): it applies only to those of `affected` with one (Promise of Loyalty). */
   whileCounter?: string;
   /**
@@ -2555,6 +2557,12 @@ export interface Resolving {
   /** "Each player rolls a d20" (Chaos Dragon): each player's result. */
   rolledEach?: Partial<Record<PlayerId, number>>;
   scratch?: {
+    /** Effect "counterOfKindEach" (The Caves of Androzani): the permanents picked, as the objects they were, and the kind chosen for each. */
+    counterEach?: { picked: { id: ObjectId; zc: number }[]; kinds: Record<ObjectId, string> };
+    /** Effect "eachExilesPermanentsOrHand" (Descent into Madness): how many each exiles, who still chooses, and what the others chose. */
+    madness?: { n: number; queue: PlayerId[]; picked: ObjectId[] };
+    /** Effect "secretChooseEach" (Call to the Void): the creatures chosen so far and by whom, none revealed yet. */
+    secretPicks?: { player: PlayerId; id: ObjectId }[];
     /** Sculpted Sunburst: the choices are made and logged. */
     done?: boolean;
     /** Effect "bidLife": the bidders in turn order from the controller, the high bid and who made it, how many in a row have declined to top it since, whose turn to bid it is (an index into `order`), and the answer to the bid asked for ("pass" or a number). */

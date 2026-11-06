@@ -482,6 +482,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const theirs = pend.cards.filter((id) => obj(s, id).owner !== pid).sort((a, b) => score(b) - score(a) || mv(s, b) - mv(s, a));
       return [{ type: "searchLibrary", player: pid, found: theirs.slice(0, pend.min) }];
     }
+    // Watchers of the Dead: the cards to keep (the rest are exiled), those we can use there first, then the dearest.
+    if (pend.kind === "searchLibrary" && pend.fromGraveyard === "keep")
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => Number(usefulInGraveyard(s, b)) - Number(usefulInGraveyard(s, a)) || mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     // Exiling cards from our own graveyard: the ones we have no use for there, the cheapest first.
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile")
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => Number(usefulInGraveyard(s, a)) - Number(usefulInGraveyard(s, b)) || mv(s, a) - mv(s, b)).slice(0, pend.min) }];

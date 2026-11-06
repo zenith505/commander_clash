@@ -1321,6 +1321,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[4]!, ctx);
     return what && !isGroup(what) ? [{ type: "counters", what, counter: counterKind(m[1]!), orCounter: counterKind(m[2]!), orCounters: [counterKind(m[3]!)], n: 1 }] : null;
   }
+  // Dismantle: "If that artifact had counters on it, put that many +1/+1 counters or charge counters on an artifact you
+  // control": as many as the target had of every kind as it last existed (rulings, CR 608.2h), even if it wasn't destroyed;
+  // you choose the artifact (not targeted) and then the kind as it resolves (rulings), none of that if it had none.
+  if ((m = new RegExp(`^If that artifact had counters on it, put that many ${COUNTER} counters or ${COUNTER} counters on an artifact you control$`).exec(s)) && m[1] !== m[2]) {
+    const n = parseCount("the number of counters on that artifact", ctx);
+    const filter = pickFilter("artifact");
+    if (!n || !filter) return null;
+    return [{ type: "if", cond: { kind: "amountNow", amount: n, min: 1 }, effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose" }, { type: "counters", what: { ref: "created" }, counter: counterKind(m[1]!), orCounter: counterKind(m[2]!), n }] }];
+  }
   // Elspeth Conquers Death: "Put a +1/+1 counter or a loyalty counter on it": either kind, chosen as it resolves (rulings).
   if ((m = new RegExp(`^Put an? ${COUNTER} counter or an? ${COUNTER} counter on (.+)$`, "i").exec(s)) && m[1] !== m[2]) {
     const what = parseObject(m[3]!, ctx);

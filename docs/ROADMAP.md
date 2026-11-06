@@ -1,6 +1,6 @@
 # Roadmap
 
-30,014 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,022 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,960 of 4,988 (99%), top 10,000: 9,602 of
 9,979 (96%).
 
@@ -2209,7 +2209,7 @@ line blocks.
    CR 510.2); "If excess damage would be dealt to that creature this way, instead that damage is dealt to that creature's
    controller and you convert ~" (Megatron, Destructive Force); "As long as you control your commander, activated
    abilities of cards in your graveyard cost {2} less to activate" (Convergence of Dominion, not below one mana). +10,
-   30,014 of 31,936.
+   30,022 of 31,936 with B117.
    Round 286 took more earlier skips from the top: "Target player gains control of up to three target nonattacking
    creatures until end of turn. Untap those creatures. They block this turn if able" (Domineering Will, with a browser
    test); "Gain control of all creatures target opponent controls until end of turn ... You can't attack that player this
@@ -2225,7 +2225,7 @@ line blocks.
    this way to any target. If the revealed land card was a Mountain, ~ deals double that damage instead" (Goblin
    Charbelcher: with no land card, all the cards revealed count, rulings); "until you reveal a Doctor card, a card with
    doctor's companion, or a Vehicle card" (An Unearthly Child). Also fixed: a "you may search" answer was cleared by the
-   search itself, so a "may" before a search with an opponent's choice asked twice. +8, 30,022 of 31,936.
+   search itself, so a "may" before a search with an opponent's choice asked twice. +8, 30,030 of 31,936.
    Out after round 286 (looked at, not done): Undead Alchemist and Szadek, Lord of Secrets (damage replaced by milling,
    ordered with prevention and other replacements, CR 616.1); Turtles Forever (a search of your library and outside the
    game); Panglacial Wurm (cast from your library while searching it).
@@ -4649,11 +4649,11 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Crowd-Control Warden). +27 (28,323 of 31,936 with rounds 217 to 221).
 - Out after round B52 (looked at, not done): Gideon the Oathless (done in round B104) and Way of the Paradox (Lane A's round 222 adds
   "Whenever you activate a loyalty ability"; once it merges, Gideon only needs "an opponent activates" on that
-  template), Dismantle (a choice of counter kind), Price of Betrayal (counters removed divided among objects),
-  Watchers of the Dead (each opponent keeps two cards), Mire's Toll (reveal N chosen cards), Dead Reckoning (done in round B113), Victor
+  template), Dismantle (done in round B117) (a choice of counter kind), Price of Betrayal (counters removed divided among objects),
+  Watchers of the Dead (done in round B117) (each opponent keeps two cards), Mire's Toll (supported already) (reveal N chosen cards), Dead Reckoning (done in round B113), Victor
   Mancha, Encumbered Reejerey (done in round B112) ("while" trigger conditions), Entrails Feaster (done in round B112), Ichorid (done in round B116), Nether Shadow (done in round B116), Cursed Rack (done in round B104),
-  Celestial Kirin (done in round B116), Skyfire Kirin (done in round B116), Lumaret's Favor, Definitely Not a Turtle (done in round B116), Advice from the Fae (done in round B116), Petals of Insight (done in round B116),
-  Rowdy Crew (done in round B116), Thijarian Witness, Riptide Replicator, Teferi's Response (done in round B116), Dawn Evangel (done in round B116), Earthbind, plus the multi-line
+  Celestial Kirin (done in round B116), Skyfire Kirin (done in round B116), Lumaret's Favor (done in round B117), Definitely Not a Turtle (done in round B116), Advice from the Fae (done in round B116), Petals of Insight (done in round B116),
+  Rowdy Crew (done in round B116), Thijarian Witness, Riptide Replicator (supported already), Teferi's Response (done in round B116), Dawn Evangel (done in round B116), Earthbind, plus the multi-line
   or new-mechanic cards in the same range (Oath of Scholars, Oath of Ghouls, Soul of Shandalar, Kenku Artificer, Harsh
   Justice, Bill Potts and others).
 - Round B53 (cards no earlier round wrote down, least played first, EDHREC rank about 22,000 to 19,700):
@@ -5777,6 +5777,20 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   controller as it last existed, CR 603.10a), Teferi's Response (an opponent's spell or ability that targets a land you
   control; an ability's permanent source destroyed, as Green Slime). No new prompts (Petals of Insight uses the look, may
   and bottom-order prompts). +11 (29,982 of 31,936).
+- Round B117 (single-line blockers from the round B52 list and other skip lists, plus fresh ones): Lumaret's Favor ("copy it
+  if you gained life this turn", checked as the infusion ability resolves, rulings; the copy may get a new target), Emerald
+  Dragon's Dissonant Wave ("an activated or triggered ability from a noncreature source", the source as it is or last
+  existed), Discovery // Dispersal (each opponent returns a nonland permanent with the greatest mana value among all their
+  permanents, lands included, so none if a land's is greatest; chosen in turn order, returned at once, then each discards,
+  rulings), Dismantle (as many +1/+1 or charge counters as the target had of every kind as it last existed, CR 608.2h, even
+  if it survived; the artifact and the kind chosen as it resolves, rulings), Ashnod's Cylix (the target player looks and
+  chooses), Addle (a card of the color chosen as it resolves), Watchers of the Dead (each opponent chooses two cards in their
+  graveyard, then all the others are exiled at once, rulings; a new "keep" picker over your graveyard, with a browser test,
+  and a bot that keeps what it can use there), Samite Elder (protection from each of the target permanent's colors as it
+  resolves, rulings). Mire's Toll and Riptide Replicator were already supported. +8 (30,012 of 31,936 with round 284).
+- Out after round B117 (looked at, not done): Price of Betrayal (counters removed from a target that may be a player: no
+  player counters as a target yet), Barroom Brawl (the copy's controller, the opponent to the left, "that player"),
+  Pit Automaton (a delayed trigger on the next exhaust ability activated).
 - Out after round B116 (looked at, not done): Earthbind (an Aura gaining a static ability with the timestamp of the gain,
   CR 613.7a, after an intervening if on the enchanted creature), Goblin Test Pilot (a target chosen at random as an
   activated ability is activated: activation always lets the player choose), Thijarian Witness ("if it was attacking or
@@ -5948,7 +5962,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Guard Dogs, Carry Away, Jandor's Ring.
 - Out after round B83 (looked at, not done): Fighting Chance (a coin flip for each blocking creature), Ersatz Gnomes
   (a spell becomes colorless: no rule for changing a spell's color yet), Clash of Elements (the owner's choice decides
-  what happens to it and who is dealt damage), Write into Being (manifest one of the top two cards), Samite Elder
+  what happens to it and who is dealt damage), Write into Being (manifest one of the top two cards), Samite Elder (done in round B117)
   (protection from each of a target permanent's colors).
 - Out after round B82 (looked at, not done): Builder's Bane (destroy X target artifacts: a variable number of
   targets), Burning of Xinye (each player destroys lands of their choice), Sirocco and Wand of Ith (a punisher per
@@ -5979,7 +5993,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   opponent's choice": an opponent picks the target).
 - Out after round B76 (looked at, not done): Mind Roots (done in round B112) (a land card discarded this way onto the battlefield: no
   effect for cards a discard just moved yet), Mark for Death (done in round B113) ("Other creatures that player controls can't block this
-  turn": a can't-block rule for one player's creatures except the target), Ashnod's Cylix (the target player looks at
+  turn": a can't-block rule for one player's creatures except the target), Ashnod's Cylix (done in round B117) (the target player looks at
   the top three and chooses which one goes back), Bullseye, Death Dealer and Ion Storm (costs with "or": "sacrifice an
   artifact or discard a nonland card", "remove a +1/+1 counter or a charge counter").
 - Out after round B75 (looked at, not done): Mishra, Artificer Prodigy (a search for a card with the cast spell's name),

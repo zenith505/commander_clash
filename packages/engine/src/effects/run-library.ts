@@ -585,7 +585,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       if (!sc.found) {
         // "With mana value X or less" (Venarian Glimmer): the X it was cast with (CR 107.3a).
-        const filter = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
+        // Addle: "a card of the chosen color", the color chosen as this resolved; with none chosen, none matches.
+        const chosenF = e.filter?.chosen ? bindChosen(e.filter, ctx.chosen) : e.filter;
+        if (chosenF?.chosen) return;
+        const filter = chosenF && bindBound(s, chosenF, amountCtx(s, ctx));
         // Never Happened: the graveyard's cards too, after the hand's.
         const pool = e.reveal !== undefined ? sc.handRevealed!.filter((id) => p.hand.includes(id)) : e.orGraveyard ? [...p.hand, ...p.graveyard] : p.hand;
         const cards = pool.filter((id) => !filter || (e.anyFromYard && obj(s, id).zone === "graveyard") || printedMatches(filter, defOf(s, obj(s, id))));

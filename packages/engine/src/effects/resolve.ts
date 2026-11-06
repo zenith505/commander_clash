@@ -871,7 +871,9 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "subjectController": {
       const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
-      if (!o) return [];
+      // A token that has ceased to exist (CR 704.5d, a Clue sacrificed): its controller as it last existed, when the
+      // trigger carries it (CR 608.2h).
+      if (!o) return ctx.lki?.controller !== undefined && !player(s, ctx.lki.controller).lost ? [ctx.lki.controller] : [];
       if (o.zone === "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc) return [controllerOf(s, o)];
       // It left the battlefield: its controller as it last existed (CR 608.2h). A dies trigger saw it leave, so its
       // subject is the card where it went, and the trigger carries who controlled it.

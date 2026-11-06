@@ -1,6 +1,6 @@
 # Roadmap
 
-30,108 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,120 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,962 of 4,988 (99%), top 10,000: 9,621 of
 9,979 (96%).
 
@@ -3118,7 +3118,7 @@ line blocks.
      of an enters or cast trigger (Knickknack Ouphe, Genesis Hydra), exiled top cards (Xenagos, Tezzeret), "that many
      cards" (Gishath), "If you put fewer than two lands" (Expand the Sphere), "When a creature is put onto the battlefield this way" (Vivien's Invocation, Gilgamesh).
    - "Can't be the target of" still out: "unless it attacked or blocked this turn" (Lurker), "can't be enchanted by other
-     Auras" (Anti-Magic Aura), Wall of Shadows.
+     Auras" (Anti-Magic Aura (done in round B122)), Wall of Shadows.
    Left from the snow-mana rounds (snow mana, mana that remembers its source, "was spent", sacrifice the rest):
    - Autopay doesn't try to spend mana from creatures for Inga and Esika, or a single color for Steel Exemplar.
    - Snow: all 45 legal {S} cards are supported. Mana Reflection and Nyxbloom Ancient multiply mana as a replacement
@@ -3151,7 +3151,7 @@ line blocks.
      Yidris ("as you cast spells from your hand this turn"), Zhulodok ("Cascade, cascade" granted in quotes), Aurora
      Phoenix ("whenever you cast a spell with cascade").
    - "Whenever a player activates an ability that isn't a mana ability" works; "an ability of an artifact they
-     control" (Avalanche of Sector 7 (done in round B105), which counts mana abilities too) and Artifact Possession are still out.
+     control" (Avalanche of Sector 7 (done in round B105), which counts mana abilities too) and Artifact Possession (done in round B122) are still out.
    Left from the round after mana spent (a discard inside an "if", autopay that avoids harm, skips, keyword and finality
    counters):
    - Keyword and +1/+1 counters count on cards in other zones (CR 122.1b), but printed-card filters (a card in a
@@ -4035,7 +4035,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Gabriel Angelfire (rampage as a chosen ability); Goblin Sappers (one delayed trigger destroying two creatures);
   Nissa's Defeat (its Nissa rider); Martyrdom (a granted ability with "Only you may activate"); Exalted Dragon,
   Leviathan, Floodtide Serpent and Hollow Warrior (attack costs that aren't mana, which need a picker at declare
-  attackers); Premature Burial ("a creature that entered since your last turn ended"); Whipgrass Entangler and War
+  attackers); Premature Burial ("a creature that entered since your last turn ended"); Whipgrass Entangler (done in round B122) and War
   Cadence (not attempted yet). Known limit: the world rule can't see a tie, since two World permanents that enter at
   once still get different timestamps (CR 704.5k puts both into the graveyard).
 - Round B23 (harder skipped cards, least played first): "~ enters (escapes) with your choice of a flying counter or a
@@ -4177,7 +4177,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (27,140 of 31,936 with rounds 194-196).
 - Known limits there: bots never use Urborg Panther's search (it sacrifices itself), Sanguine Praetor or Endemic Plague
   (no value for "the sacrificed creature's" group), and may use Riptide Mangler or Obelisk of Undoing without a good
-  reason. Skipped there: Crucible of the Spirit Dragon, Haruspex and Petalmane Baku (mana abilities with an X counter
+  reason. Skipped there: Crucible of the Spirit Dragon, Haruspex (done in round B122) and Petalmane Baku (done in round B122) (mana abilities with an X counter
   cost); Insubordination, Erosion, Curse Artifact, Wicked Guardian, Mausoleum Turnkey (done in round B110), Desecrator Hag, Cinder Cloud,
   Cragganwick Cremator, Lumengrid Augur, Mind Maggots, Gravebane Zombie, Lichenthrope, Territorial Dispute (each needs
   a template of its own).
@@ -4532,7 +4532,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   chosen by the upkeep's player), Skulking Killer (done in round B106) ("if that opponent controls no other creatures" as it resolves),
   Rivals' Duel (two targets that share no creature type), Culling Scales (a target with the lowest mana value), Loyal
   Sentry ("destroy that creature and ~" at once), Gladewalker Ritualist ("another creature you control named ~"),
-  Marvel Boy (power-up activations), Goblin Researcher, Kyren Toy (each needs a new mechanic).
+  Marvel Boy (power-up activations), Goblin Researcher, Kyren Toy (done in round B122) (each needs a new mechanic).
 - Round B46 (harder skipped cards, least played first): "a creature dealt damage by ~ / equipped creature this turn
   dies" (Wight, Unscythe, Scythe of the Wretched, which returns it with the Scythe attached) and "if ~ dealt damage to it
   this turn" (Hawkeye), "When target creature dies this turn, return that card" (Graceful Reprieve), "Move a +1/+1
@@ -4632,7 +4632,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Grind // Dust). +26 (28,231 of 31,936 with rounds 217 to 221).
 - Out after round B49 (looked at, not done): Anthropede ("discard a card or pay {2}" as one cost choice), Retribution
   and Barrin's Spite (the targets' controller chooses one of them), Goblin Test Pilot (a random target as it's
-  activated), Ley Line (done in round B110) and Mausoleum Turnkey (done in round B110) (another player chooses the target), Tamanoa and Molten Lavamancer
+  activated), Ley Line (done in round B110) and Mausoleum Turnkey (done in round B110) (another player chooses the target), Tamanoa and Molten Lavamancer (done in round B122)
   (noncombat or noncreature damage triggers), Venser's Diffusion (a target among suspended cards), Nivmagus Elemental
   (exile an instant or sorcery spell you control as a cost), Warbringer (equip costs less: Lane A round 217 does it),
   Nomad Mythmaker (attach to a creature you choose as it resolves).
@@ -5916,6 +5916,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   replacement or trigger here tells apart), Chainer's Torment (III: an X/X token that deals X damage to you, X fixed as
   it resolves), Keen-Eared Sentry (each opponent ventures at most once each turn: a second venture does nothing). No new
   prompts. +12 (30,085 of 31,936 with B120 and round 287).
+- Round B122 (least played first, from the skip lists): Kyren Toy, Petalmane Baku, Haruspex and Rasputin, the Oneiromancer
+  (mana abilities that remove a chosen number of counters, X announced as it's activated, CR 107.3a: X plus one {C}, X
+  mana of any one color, "one or more ... that much {C}"), Haunting Wind, Powerleech and Artifact Possession (an artifact
+  becoming tapped for any reason, or an ability of one activated without {T} in its cost, mana abilities included: never
+  one event, so two triggers; "that artifact's controller" is its controller as it was activated, or as it last existed
+  when it was sacrificed for the cost, a token too, CR 608.2h, not the player who activated it), Anti-Magic Aura and
+  Consecrate Land ("can't be enchanted by other Auras": Auras already there go to the graveyard, CR 704.5m, an Aura put
+  onto it without being cast can't choose it, 303.4f, nor be moved onto it, 303.4j; an Aura spell can still target it,
+  as its enchant ability alone says what it can target, 702.5a, and is put into the graveyard once it resolves),
+  Titania, Rugged Rumbler ("Ward—Discard a card or pay {2}": the spell's controller picks a cost or neither, a new
+  prompt with a browser test; one they can't pay, discarding with no cards, isn't offered; bots pay the mana if they
+  can), Molten Lavamancer ("to one or more of your opponents during your turn" once each turn: during your turn as the
+  damage is dealt, a trigger condition), Whipgrass Entangler (the granted attack and block cost counts every Cleric on
+  the battlefield as it's paid, two of them cumulative, rulings). Bots now put Auras whose triggers hurt the enchanted
+  permanent's controller (Artifact Possession, Psychic Venom) on an opponent's permanent. +12 (30,120 of 31,936 with B121 and rounds 288-289).
+- Out after round B122 (looked at, not done): Tamanoa and Briarbridge Patrol (once for each damage event, which a spell
+  dealing damage to several things doesn't report as one yet), Guardian Beast ("can't be enchanted" for other permanents
+  while it's untapped, with "doesn't remove Auras already attached" and a control rule), Tetravus (its tokens' plain "can't be
+  enchanted", and its other upkeep line). Known gap: a bot may cast an Aura at a permanent another Aura
+  says can't be enchanted by it (Consecrate Land), wasting the Aura.
 - Out after round B121 (looked at, not done): Rain of Gore (life gain "a spell or ability would cause": the cause of a
   life gain isn't tracked, and lifelink isn't one, rulings), Wall of Shadows ("spells that can target only Walls" depends
   on every target of every mode, not the ones chosen), Obstinate Familiar ("you may skip that draw instead": the draw
@@ -5951,7 +5971,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   tracked per shield yet).
 - Out after round B111 (looked at, not done): Roar of Jukai, Torrent of Stone, Horobi's Whisper and Hundred-Talon Strike
   (splice costs that aren't mana: sacrificing lands, tapping creatures, exiling cards), Grip of Phyresis (attaching the
-  Equipment to the Germ just created), Anti-Magic Aura ("can't be enchanted by other Auras"). Possessed Portal's skip isn't
+  Equipment to the Germ just created), Anti-Magic Aura (done in round B122) ("can't be enchanted by other Auras"). Possessed Portal's skip isn't
   offered against a replacement that applies only to a draw from an empty library, as with Notion Thief.
 - Out after round B110 (looked at, not done): Evangelize, Preacher, Arena, Magus of the Arena, Cuombajj Witches, Diaochan,
   Artful Beauty, Echo Chamber, Nova Pentacle and Volcanic Offering (a target "of an opponent's choice" in a spell or an
@@ -5968,7 +5988,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   to Reflect and You Cannot Pass! (done in round B110) (a creature that blocked or was blocked by a Zombie / legendary creature: what the other
   creature was when the block happened, rulings, which the turn's block log doesn't keep), Heroic Feast (as many targets as
   the life gained), Bioshift (moving any number of counters), Erithizon (done in round B110), Mausoleum Turnkey (done in round B110) and Evangelize (a target chosen by
-  another player), Titania, Rugged Rumbler (a ward cost with a choice).
+  another player), Titania, Rugged Rumbler (done in round B122) (a ward cost with a choice).
 - Out after round B106 (looked at, not done): Tamanoa ("Whenever a noncreature source you control deals damage": once for
   each source's damage event, which single-target damage doesn't report as one yet), Mercadia's Downfall (each attacking
   creature's own defending player), Matopi Golem, Skeleton Scavengers, Soldevi Sentry and Debt of Loyalty ("When it
@@ -5976,7 +5996,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B105 (looked at, not done): Gloom and Oppressive Rays ("Activated abilities of ... cost {3} more": mana
   abilities too, and the engine taxes only abilities that aren't mana abilities); Briarbridge Patrol ("deals damage to one
   or more creatures": once per damage event, not once per creature); Light of Judgment ("Destroy up to one Equipment
-  attached to that creature", chosen as it resolves); Rasputin, the Oneiromancer, Kyren Toy, Petalmane Baku and Haruspex
+  attached to that creature", chosen as it resolves); Rasputin, the Oneiromancer (done in round B122), Kyren Toy (done in round B122), Petalmane Baku (done in round B122) and Haruspex (done in round B122)
   (mana abilities that remove a chosen number of counters); Bargaining Table (X is the cards in the hand of an opponent
   chosen as it's activated). Known limit: a token copy of Old Man Willow can't sacrifice itself as "a token".
 - Out after round B104 (looked at, not done): Memory Crystal ("Buyback costs cost {2} less": a reduction of only the
@@ -6053,8 +6073,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B93 (looked at, not done): Bewitching Leechcraft ("If ~ would untap during your untap step, remove a
   +1/+1 counter from it instead": with Freyalise's Winds too, its controller would order the two replacements, CR 616.1),
   Drafna's Restoration (targets in the graveyard of an earlier target player), Rite of Ruin (an order for three card
-  types, then three rounds of sacrifices), Tariff (a punisher whose cost is the chosen creature's mana cost), Powerleech
-  and Haunting Wind ("activates an artifact's ability without {T} in its activation cost", and "that artifact's
+  types, then three rounds of sacrifices), Tariff (a punisher whose cost is the chosen creature's mana cost), Powerleech (done in round B122)
+  and Haunting Wind (done in round B122) ("activates an artifact's ability without {T} in its activation cost", and "that artifact's
   controller"), Fasting (a may skip of the draw step as it would begin), Naked Singularity (a land with two basic land
   types, as Reality Twist), Harsh Judgment and Aegis of Honor (an instant or sorcery's damage redirected to its
   controller), Peace Talks ("this turn and next turn"), Stronghold Gambit, Grenzo's Rebuttal, Planar Overlay (done in round B114), Worldpurge,
@@ -6113,7 +6133,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B80 (looked at, not done): Gloom Surgeon (prevent combat damage and exile that many cards: a
   prevention with a follow-up action), Marvel Boy, Noh-Varr ("whenever you activate a power-up ability"), Ms. Marvel,
   Elastic Ally ("power greater than its base power"), Whirlwind, Killer Cyclone ("one or more creatures that entered
-  this turn attack a player": a batch attack trigger naming the player), Titania, Rugged Rumbler (an "or" additional
+  this turn attack a player": a batch attack trigger naming the player), Titania, Rugged Rumbler (done in round B122) (an "or" additional
   cost and an "or" ward cost).
 - Out after round B79 (looked at, not done): Aquamorph Entity (a choice as it's turned face up: the special action
   can't pause yet), Volrath's Laboratory and Riptide Replicator (tokens of the chosen color and creature type), Barbed
@@ -6124,10 +6144,10 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B78 (looked at, not done): Master of Barbs ("one or more opponents are dealt noncombat damage": no
   batch event for damage), Cellar Door ("the bottom card of their library into their graveyard"), Swallow Whole (done in round B113) (the
   creature tapped for the additional cost), Betrothed of Fire and Bloodfire Infusion (done in round B112) ("Sacrifice enchanted creature" as
-  a cost), Rasputin, the Oneiromancer (a mana ability whose X is the counters removed), Arcee, Sharpshooter (the back
+  a cost), Rasputin, the Oneiromancer (done in round B122) (a mana ability whose X is the counters removed), Arcee, Sharpshooter (the back
   face's "that many" targets), Lavabrink Floodgates (each player's own may), Lurebound Scarecrow (done in round B112) (a state trigger bound
   to the chosen color), Grim Contest (done in round B113) (each deals damage equal to its toughness to the other: a fight by toughness).
-- Out after round B77 (looked at, not done): Consecrate Land ("can't be enchanted by other Auras": no rule for it yet),
+- Out after round B77 (looked at, not done): Consecrate Land (done in round B122) ("can't be enchanted by other Auras": no rule for it yet),
   Corpseweft ("Exile one or more creature cards from your graveyard" as a cost, X from how many), Ruin in Their Wake
   (where a found card goes depends on controlling a land named Wastes, with a "may"), Evangelize ("target creature of an
   opponent's choice": an opponent picks the target).

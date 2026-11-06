@@ -424,7 +424,7 @@ export const CREATURE_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 // Other subtype lists (CR 205.3g-k), to tell which card type a subtype goes with.
-const LAND_TYPES = new Set(["Plains", "Island", "Swamp", "Mountain", "Forest", "Desert", "Gate", "Lair", "Locus", "Mine", "Power-Plant", "Tower", "Urza's", "Cave", "Sphere", "Town", "Planet"]);
+export const LAND_TYPES = new Set(["Plains", "Island", "Swamp", "Mountain", "Forest", "Desert", "Gate", "Lair", "Locus", "Mine", "Power-Plant", "Tower", "Urza's", "Cave", "Sphere", "Town", "Planet"]);
 const ARTIFACT_TYPES = new Set(["Attraction", "Blood", "Bobblehead", "Book", "Clue", "Contraption", "Equipment", "Food", "Fortification", "Gold", "Heartwood", "Incubator", "Infinity", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Spacecraft", "Stone", "Terminus", "Treasure", "Vehicle", "Vibranium"]);
 const ENCHANTMENT_TYPES = new Set(["Aura", "Background", "Cartouche", "Case", "Class", "Curse", "Role", "Room", "Rune", "Saga", "Shard", "Shrine"]);
 const SPELL_TYPES = new Set(["Adventure", "Arcane", "Chorus", "Lesson", "Omen", "Trap"]);

@@ -1,6 +1,6 @@
 # Roadmap
 
-29,970 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,980 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,960 of 4,988 (99%), top 10,000: 9,601 of
 9,979 (96%).
 
@@ -2166,7 +2166,7 @@ line blocks.
    turn, TurnLog.sourceToPlayer); "that player exiles ... until they exile a nonland card. You may put a +1/+1 counter on
    ~. If you don't, you may cast the exiled nonland card until end of turn and mana of any type can be spent" (Black
    Widow, Super Spy); "Otherwise, you may put a face-up exiled card they own into their graveyard" (Binding Negotiation,
-   chosen as it resolves, with a browser test for the picker). +9, 29,970 of 31,936 with B113 and B114.
+   chosen as it resolves, with a browser test for the picker). +9, 29,980 of 31,936 with B113-B115.
    Out after round 283 (looked at, not done): Squall, Gunblade Duelist (an intervening if over the creatures attacking
    one opponent and a chosen number); Barroom Brawl ("the opponent to your left", then that player may copy it with new
    targets); Vault 11: Voter's Dilemma (secret votes for up to one creature); Allure of the Unknown (an opponent exiles
@@ -5678,8 +5678,24 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Garruk, Savage Herald, Lurking Predators, Vivien's Grizzly, Aid from the Cowl, Ajani, Sleeper Agent, Cabaretti
   Ascendancy, Kenessos, Lantern of Revealing); in the app, two "click a permanent" questions in a row kept the first
   one's selection. Bots don't foresee Total War when they attack. +8 (29,951 of 31,936 with B113 and round 281).
-- Out after round B114 (looked at, not done): Binding Negotiation (putting a face-up exiled card into its owner's
-  graveyard: no such choice yet), Titania's Song (its effect continuing until end of turn after it leaves the
+- Round B115 (single-line blockers from the skip lists, least played first): Volcanic Eruption ("the number of Mountains
+  put into a graveyard this way": an indestructible or regenerated one doesn't count, X can be 0, rulings), Builder's Bane
+  (each player dealt damage for their own artifacts put into a graveyard this way, all at once, CR 608.2h), Elephant
+  Resurgence (each player's own Elephant with a characteristic-defining ability counting its controller's graveyard, not
+  locked in, rulings), Imperial Mask ("each of your teammates" is nobody in a game that isn't between teams, CR 102.3;
+  rulings: its controller gets no token), Hipparion (a cost of {1} to block a creature with power 3 or greater, its power
+  as blockers are declared, CR 509.1d; nothing obliges paying it for a block requirement, 509.1c; the Block button shows
+  it, with a browser test), Stench of Evil (a punisher once for each Plains a player controlled as it was destroyed, in
+  APNAP order), Superior Foes of Spider-Man ("you may exile the top card ... If you do, you may play that card until you
+  exile another card with ~"), Goblin Researcher and Boros Strike-Captain (the exiled card may be played during any turn
+  you attacked with that object, CR 400.7, or with three or more creatures, whatever became of them, rulings), Hiveheart
+  Shaman (a basic land card that shares no land type with a land you control as it resolves, CR 205.3i). No new prompts.
+  +10 (29,971 of 31,936 with round 282).
+- Out after round B115 (looked at, not done): Cut the Tethers (a punisher for each Spirit that returns only the ones
+  their owners didn't pay for), Song of Blood (a delayed attack trigger whose bonus counts the creature cards milled as
+  it resolved), Expel the Unworthy (a kicker that changes what the spell can target), Kill-Suit Cultist and Goblin
+  Psychopath (damage replaced by a destroy or redirected, ordered with other shields, CR 616.1, as Lichenthrope).
+- Out after round B114 (looked at, not done): Titania's Song (its effect continuing until end of turn after it leaves the
   battlefield), Fortunate Few (each player in turn choosing a nonland permanent not already chosen), Magnetic Mountain
   (paying {4} for each of any number of chosen creatures), Equipoise (phasing out the excess, one permanent type after
   another).

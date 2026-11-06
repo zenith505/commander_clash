@@ -4579,6 +4579,11 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   // Summon: Brynhildr: only during a turn they put a lore counter on that Saga, as that object (CR 400.7).
   if (m.loreOn && !(s.turnLog?.lorePut ?? []).includes(`${pid}:${m.loreOn.id}@${m.loreOn.zc}`)) return false;
   if (m.attackedWithType && !((w) => w?.turn === s.turn && Object.values(w.kinds ?? {}).some((k) => k === "all" || k.includes(m.attackedWithType!)))(s.players[pid]?.attackedWith)) return false;
+  // Goblin Researcher: only during a turn they declared that object as an attacker (rulings: whatever became of it since).
+  // Boros Strike-Captain: only during a turn they declared three or more creatures as attackers, in one combat or more.
+  const attackedNow = s.players[pid]?.attackedWith?.turn === s.turn ? s.players[pid]!.attackedWith!.keys : [];
+  if (m.attackedWithSource && !attackedNow.includes(`${m.attackedWithSource.id}@${m.attackedWithSource.zc}`)) return false;
+  if (m.attackedWithAtLeast && attackedNow.length < m.attackedWithAtLeast) return false;
   // Possibility Technician: only while that player controls a Kavu.
   if (m.ifControl && !s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, m.ifControl!, obj(s, id), pid, false))) return false;
   // "You may play one of those cards" (Nashi): not once one of them has been played.
@@ -10269,17 +10274,28 @@ export function attackTaxOf(s: GameState, a: { attacker?: ObjectId; defender: Pl
  * What blocking with `n` creatures costs, "{2}" ("" when blocking is free): Archangel of Tithes (CR 509.1d), and what
  * blocking with each of `blockers` costs itself (Qal Sisma Behemoth, Cowed by Wisdom, CR 509.1d-e).
  */
-export function blockCost(s: GameState, n: number, blockers: ObjectId[] = []): string {
+export function blockCost(s: GameState, n: number, blockers: ObjectId[] = [], blocks: { blocker: ObjectId; attacker: ObjectId }[] = []): string {
   // War Cadence: for the rest of the turn (GameState.blockTaxes).
   const per = s.battlefield.reduce((t, id) => t + characteristics(s, obj(s, id)).blockTax, 0) + (s.blockTaxes ?? []).reduce((t, b) => t + (b.turn === s.turn ? b.n : 0), 0);
   const own = blockers.reduce((t, id) => t + (s.objects[id]?.zone === "battlefield" ? characteristics(s, obj(s, id)).ownBlockTax : 0), 0);
-  const total = (n ? per * n : 0) + own;
+  // Hipparion: what blocking each of these attackers costs this blocker (`blocks`), by their power now (CR 509.1d).
+  const vs = blocks.reduce((t, b) => t + blockTaxVs(s, b.blocker, b.attacker), 0);
+  const total = (n ? per * n : 0) + own + vs;
   return total ? `{${total}}` : "";
 }
 
-/** Could blocking cost `pid` mana now: every block (Archangel of Tithes), or one of their creatures' own (Qal Sisma Behemoth)? */
+/** Could blocking cost `pid` mana now: every block (Archangel of Tithes), or one of their creatures' own (Qal Sisma Behemoth, Hipparion)? */
 export function blocksMayCost(s: GameState, pid: PlayerId): boolean {
-  return !!blockCost(s, 1) || creaturesOf(s, pid).some((o) => characteristics(s, o).ownBlockTax > 0);
+  return !!blockCost(s, 1) || creaturesOf(s, pid).some((o) => characteristics(s, o).ownBlockTax > 0 || characteristics(s, o).ownBlockTaxVs.length > 0);
+}
+
+/** Hipparion: what this creature blocking that attacker costs, "can't block creatures with power 3 or greater unless you pay {1}" (CR 509.1d). */
+export function blockTaxVs(s: GameState, blocker: ObjectId, attacker: ObjectId): number {
+  const b = s.objects[blocker];
+  const a = s.objects[attacker];
+  if (b?.zone !== "battlefield" || a?.zone !== "battlefield") return 0;
+  const at = power(s, a);
+  return characteristics(s, b).ownBlockTaxVs.reduce((t, x) => t + (at >= x.minPower ? x.n : 0), 0);
 }
 
 /** The total attack tax for a declaration: how many mana symbols (generic mana, and {W/P} each for Norn's Annex). */
@@ -10965,7 +10981,7 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   const req = taxed || ((earlier + seen.size >= limit || mineEarlier + seen.size >= mineLimit) && blocks.some(obeys)) ? null : blockRequirementProblem(s, p.id, blocks);
   if (req) throw new RulesError(req);
   // Block costs are totalled and paid, with mana abilities activated first (CR 509.1d-f).
-  const tax = blockCost(s, seen.size, [...seen.keys()]);
+  const tax = blockCost(s, seen.size, [...seen.keys()], blocks);
   // Odric: the blocks' controller chooses whether to pay their cost; if they don't, another set must be proposed (rulings).
   if (tax && p.id !== chooser.id) {
     s.pending = {
@@ -11049,6 +11065,8 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
   const blocking = new Map<ObjectId, ObjectId[]>();
   for (const b of blocks) blocking.set(b.blocker, [...(blocking.get(b.blocker) ?? []), b.attacker]);
   const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
+  // Hipparion: nor is one that has to pay to block that attacker (CR 509.1c).
+  const cannot = (b: GameObject, at: GameObject) => !!blockProblem(s, b, at) || blockTaxVs(s, b.id, at.id) > 0;
   // One that has to pay to block (Qal Sisma Behemoth) is never obliged to (CR 509.1c).
   const mine = creaturesOf(s, pid).filter((o) => !o.tapped && !cantBlockNow(s, o) && !characteristics(s, o).ownBlockTax && !(characteristics(s, o).cantBlockAlone && !earlier && blocking.size <= 1 && !blocking.has(o.id)));
   // A creature already blocking as many demanding attackers as it can block obeys all the requirements it can.
@@ -11062,7 +11080,7 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
   for (const b of mine) {
     const ats = provokersOf(s, b);
     if (!ats.length || ats.some((at) => (blocking.get(b.id) ?? []).includes(at.id)) || full(b)) continue;
-    const at = ats.find((a) => !blockProblem(s, b, a) && mine.filter((o) => o.id !== b.id && !blockProblem(s, o, a)).length >= blockersNeeded(s, a) - 1);
+    const at = ats.find((a) => !cannot(b, a) && mine.filter((o) => o.id !== b.id && !cannot(o, a)).length >= blockersNeeded(s, a) - 1);
     if (!at) continue;
     return `${characteristics(s, b).name} must block ${characteristics(s, at).name} if able (provoke)`;
   }
@@ -11070,12 +11088,12 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
   // creature beside it against menace (CR 509.1c).
   for (const b of mine) {
     if (!characteristics(s, b).mustBlock || blocking.has(b.id)) continue;
-    if (incoming.some((at) => !blockProblem(s, b, at) && mine.filter((o) => o.id !== b.id && !blockProblem(s, o, at)).length >= blockersNeeded(s, at) - 1))
+    if (incoming.some((at) => !cannot(b, at) && mine.filter((o) => o.id !== b.id && !cannot(o, at)).length >= blockersNeeded(s, at) - 1))
       return `${characteristics(s, b).name} must block this turn if able`;
   }
   for (const at of demanding) {
     const ac = characteristics(s, at);
-    const could = mine.filter((b) => !blockProblem(s, b, at));
+    const could = mine.filter((b) => !cannot(b, at));
     if (could.length < blockersNeeded(s, at)) continue;
     if (ac.allMustBlock && !ac.maxOneBlocker) {
       const shirk = could.find((b) => !(blocking.get(b.id) ?? []).includes(at.id) && !full(b));

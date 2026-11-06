@@ -4974,7 +4974,8 @@ function Controls({
     // Archangel of Tithes: what blocking costs, paid from your lands as you declare (CR 509.1d-f); with a cost, no
     // requirement makes a creature block (CR 509.1c).
     // Qal Sisma Behemoth: what blocking with each of them costs, too.
-    const blockTax = blockCost(s, Object.keys(blocks).length, Object.keys(blocks));
+    // Hipparion: what blocking a creature with enough power costs it.
+    const blockTax = blockCost(s, Object.keys(blocks).length, Object.keys(blocks), list);
     // Odric, Master Tactician: choosing another player's blocks; they decide whether to pay what blocking costs.
     const defender = pending.defender ?? HUMAN;
     const theirs = defender !== HUMAN ? s.players[defender]!.name : null;

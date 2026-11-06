@@ -384,7 +384,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "destroyedThisWay":
     case "exiledThisWay":
       // As they last existed on the battlefield (CR 608.2h).
-      return (s.resolving?.[c.kind === "destroyedThisWay" ? "destroyed" : "exiled"] ?? []).filter((x) => (c.kind !== "destroyedThisWay" || !c.died || ("died" in x && x.died)) && objectMatches(s, c.filter, x.o, ctx.controller, false, undefined, x.ch)).reduce((n, x) => n + (c.kind === "destroyedThisWay" && c.totalMv ? x.ch.manaValue : 1), 0);
+      return (s.resolving?.[c.kind === "destroyedThisWay" ? "destroyed" : "exiled"] ?? []).filter((x) => (c.kind !== "destroyedThisWay" || !c.died || ("died" in x && x.died)) && (c.kind !== "destroyedThisWay" || !c.controlledBy || refPlayers(s, c.controlledBy, ctx).includes(x.ch.controller)) && objectMatches(s, c.filter, x.o, ctx.controller, false, undefined, x.ch)).reduce((n, x) => n + (c.kind === "destroyedThisWay" && c.totalMv ? x.ch.manaValue : 1), 0);
     case "opponentsVotedOtherwise": {
       const votes = ctx.event?.votes ?? [];
       const mine = new Set(votes.filter((v) => v.voter === ctx.controller).map((v) => v.choice));

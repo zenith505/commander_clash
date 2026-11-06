@@ -380,6 +380,15 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(m[1]!, { chosen: true });
     return spec?.kind === "object" ? { count: { kind: "destroyedThisWay", filter: { ...spec, text: m[1]! }, died: true } } : null;
   }
+  // Volcanic Eruption: "Destroy X target Mountains. ~ deals damage ... equal to the number of Mountains put into a
+  // graveyard this way": those the destroy put into a graveyard, as they last existed (CR 608.2h); one regenerated or
+  // replaced to go elsewhere doesn't count. Builder's Bane: "... to each player equal to the number of artifacts they
+  // controlled that were put into a graveyard this way": each player's own, as they controlled them (PlayerRef eachOne).
+  if (!each && ctx?.afterDestroy && (m = /^the number of ([a-z]+?)s( they controlled that were)? put into a graveyard this way$/i.exec(p))) {
+    const spec = parseTargetPhrase(m[1]!, { chosen: true });
+    if (spec?.kind !== "object") return null;
+    return { count: { kind: "destroyedThisWay", filter: { ...spec, text: `${m[1]!}s` }, died: true, ...(m[2] ? { controlledBy: { ref: "eachOne" as const } } : {}) } };
+  }
   // Convert to Slime: "the total mana value of permanents destroyed this way", each as it last existed (rulings).
   if (!each && /^the total mana value of permanents destroyed this way$/.test(p))
     return { count: { kind: "destroyedThisWay", filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanents" }, totalMv: true } };

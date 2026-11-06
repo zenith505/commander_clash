@@ -10797,6 +10797,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "306fd9d2-5ded-4857-90f4-e62d73c6aed2",
+  "name": "Hipparion",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Horse",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Horse"
+  ],
+  "oracleText": "This creature can't block creatures with power 3 or greater unless you pay {1}.",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f3a0f155-05d8-465c-b0ef-35aa12e93013",
   "name": "Hired Hexblade",
   "manaCost": "{1}{B}",

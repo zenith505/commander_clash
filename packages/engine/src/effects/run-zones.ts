@@ -2844,7 +2844,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Only the cards milled just before, still in the graveyard (CR 400.7).
         // Colossal Grave-Reaver: only the cards the trigger's event put there, still the same objects.
         const milled = (id: ObjectId) =>
-          (!e.milled || !!s.resolving!.milled?.some((m) => m.id === id && (obj(s, id).zoneChanges ?? 0) === m.zc)) && (!e.eventGroup || !!ctx.event?.group?.some((g) => g.id === id && (obj(s, id).zoneChanges ?? 0) === g.zc)) &&
+          (!e.milled || !!s.resolving!.milled?.some((m) => m.id === id && (obj(s, id).zoneChanges ?? 0) === m.zc)) &&
+          (!e.discarded || !!s.resolving!.discardedCards?.some((m) => m.id === id && (obj(s, id).zoneChanges ?? 0) === m.zc)) && (!e.eventGroup || !!ctx.event?.group?.some((g) => g.id === id && (obj(s, id).zoneChanges ?? 0) === g.zc)) &&
           // "Another permanent card" than the one you sacrificed this way (rulings on Rise of the Witch-king).
           (!e.notSacrificed || !s.resolving!.sacrificedThisWay?.some((k) => k.id === id && k.controller === ctx.controller)) &&
           // Blood for Bones: "another creature card" than the one chosen for the battlefield.

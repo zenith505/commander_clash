@@ -149,7 +149,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Nightmare Incursion: "for up to X cards, where X is the number of Swamps you control, and exile them" (parseBody
   // moves the "where" to the end); Neverending Torment: "for X cards, where X is ...": as many as there are, up to X (CR
   // 701.23d), counted as it resolves.
-  const theirMany = new RegExp(`^Search (target opponent's|target player's) library for (up to )?(${NUM}|X) cards and exile them$`).exec(s);
+  // Earwig Squad: "search target opponent's library for three cards and exile them", a triggered ability's (lowercase).
+  const theirMany = new RegExp(`^[Ss]earch (target opponent's|target player's) library for (up to )?(${NUM}|X) cards and exile them$`).exec(s);
   if (theirMany && (theirMany[3] !== "X" || ctx.whereX)) {
     const library = parsePlayer(theirMany[1]!.replace(/'s$/, ""), ctx);
     return library ? [{ type: "search", n: amt(theirMany[3]!), upTo: !!theirMany[2], reveal: false, dest: { zone: "exile" }, library }] : null;
@@ -1570,8 +1571,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   const wouldDeal = /^Prevent all (combat )?damage (.+?) would deal this turn$/i.exec(s);
   if (((m = /^(Prevent all .+) this turn$/i.exec(s)) && parsePreventAll(m[1]!)) || (m = wouldDeal)) {
     const p = m !== wouldDeal ? parsePreventAll(m[1]!) : { subject: m[2]!, mod: { kind: "preventDamage" as const, by: true as const, ...(m[1] ? { combat: "only" as const } : {}) } };
-    // Soul Parry: "Prevent all damage one or two target creatures would deal this turn": each of them.
-    const what = p && /^(~|it|that creature|(?:another )?target .+|up to (?:one|two|three) target creatures?|one or two target creatures)$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;
+    // Soul Parry: "Prevent all damage one or two target creatures would deal this turn": each of them. Serene Sunset: "X
+    // target creatures", X announced as it's cast (CR 107.3a, 601.2c).
+    const what = p && /^(~|it|that creature|(?:another )?target .+|up to (?:one|two|three) target creatures?|one or two target creatures|X target creatures)$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;
     return p && what ? [{ type: "continuous", what, mods: [p.mod], duration: "endOfTurn" }] : null;
   }
   // Gatta and Luzzu: "If damage would be dealt to target creature you control this turn, prevent that damage and put

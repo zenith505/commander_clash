@@ -484,8 +484,9 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   if (ref.ref === "revealed") {
     const rv = s.resolving?.revealed;
     const o = rv && s.objects[rv.id];
-    // A card revealed at random from a hand stays there (Planeswalker's Mirth).
-    return o && (o.zone === "library" || o.zone === "hand") && (o.zoneChanges ?? 0) === rv.zc ? [o] : [];
+    // A card revealed at random from a hand stays there (Planeswalker's Mirth). Undying Flames: the card exiled from the
+    // library ("that card"), in exile.
+    return o && (o.zone === "library" || o.zone === "hand" || o.zone === "exile") && (o.zoneChanges ?? 0) === rv.zc ? [o] : [];
   }
   if (ref.ref === "affected")
     return (s.resolving?.affected ?? []).map((a) => s.objects[a.id]).filter((o): o is GameObject => o?.zone === "battlefield" && (o.zoneChanges ?? 0) === s.resolving!.affected!.find((a) => a.id === o.id)!.zc);
@@ -546,6 +547,14 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     if (!ref.aurasToo) return [it];
     const auras = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attachedTo === it.id && characteristics(s, o).subtypes.includes("Aura"));
     return [it, ...auras];
+  }
+  if (ref.ref === "attachedHost") {
+    // Artificer's Hex: the creature the enchanted Equipment is attached to as this resolves, which may not be the one it was
+    // attached to as it triggered (rulings).
+    const host = attachedHost(s, ctx);
+    const it = host?.here ? s.objects[host.id] : undefined;
+    const next = it?.attachedTo ? s.objects[it.attachedTo] : undefined;
+    return next?.zone === "battlefield" ? [next] : [];
   }
   if (ref.ref === "targetHost") {
     // Unforge: the permanent the target Equipment is attached to, or was attached to as it was destroyed (rulings).
@@ -1599,7 +1608,7 @@ export function damageRecipients(s: GameState, to: DamageRecipient, ctx: Resolve
     }
     return out;
   }
-  if (to.ref === "self" || to.ref === "created" || to.ref === "subject" || to.ref === "attached" || to.ref === "allCreatures" || to.ref === "each" || to.ref === "blockingIt" || to.ref === "blockHistory" || to.ref === "inCombatWithSelf" || to.ref === "eventGroup" || to.ref === "targetHost" || (to.ref === "target" && (("n" in to && !!to.n) || isObjectTarget(ctx, to.index))))
+  if (to.ref === "self" || to.ref === "created" || to.ref === "subject" || to.ref === "attached" || to.ref === "allCreatures" || to.ref === "each" || to.ref === "blockingIt" || to.ref === "blockHistory" || to.ref === "inCombatWithSelf" || to.ref === "eventGroup" || to.ref === "targetHost" || to.ref === "attachedHost" || (to.ref === "target" && (("n" in to && !!to.n) || isObjectTarget(ctx, to.index))))
     return { objs: objects(s, to as ObjRef, ctx), pids: [] };
   return { objs: [], pids: players(s, to as PlayerRef, ctx) };
 }

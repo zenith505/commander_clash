@@ -139,7 +139,7 @@ export function modsAreHarmful(mods: Modification[]): boolean {
     // "-X/-X" (Skullmane Baku) shrinks whatever X is: counted as 1, not 0.
     if (m.kind === "modifyPT") pt += estimate(m.power, 1) + estimate(m.toughness, 1);
     if (m.kind === "addAbility") pt -= grantCost(m.text);
-    if (["control", "loseAllAbilities", "removeKeywords", "cantAttack", "cantBlock", "doesntUntap", "setSubtypes", "setLandTypes", "goad", "cantActivate"].includes(m.kind)) return true;
+    if (["control", "loseAllAbilities", "loseStatic", "removeKeywords", "cantAttack", "cantBlock", "doesntUntap", "setSubtypes", "setLandTypes", "goad", "cantActivate"].includes(m.kind)) return true;
     // A small base P/T hurts a creature, but not a land made into one (awaken's counters come with it).
     if (m.kind === "setPT" && estimate(m.power) + estimate(m.toughness) <= 2 && !mods.some((x) => x.kind === "addTypes" && x.types.includes("Creature"))) return true;
     // "Is a colorless Forest land", "is an enchantment and loses all other card types": no longer a creature.

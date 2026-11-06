@@ -864,7 +864,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           : s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
       const what = c.kind === "sacrifice" ? c.filter.text.replace(/~/g, cardOf(s, d.objectId).name) : (c.filter?.text ?? "card");
       // "Sacrifice a creature with mana value 2 other than Sidisi": its text already says which.
-      const article = c.kind === "sacrifice" && c.other && !/ other than /.test(c.filter.text) ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
+      // Bloodfire Infusion: "Sacrifice enchanted creature": that one permanent.
+      const article = c.kind === "sacrifice" && c.filter.objectId !== undefined ? "the" : c.kind === "sacrifice" && c.other && !/ other than /.test(c.filter.text) ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
       // "Sacrifice a Swamp and a Forest" (Jarad): its text names both.
       // Ormos, Archive Keeper: "Discard three cards with different names".
       const many = c.kind === "sacrifice" && c.oneOfEach ? `a ${what}` : `${c.n === 1 ? article : c.n} ${c.n > 1 ? plural(what) : what}${c.kind === "discard" && c.differentNames ? " with different names" : c.kind === "discard" && c.sameName ? " with the same name" : ""}`;

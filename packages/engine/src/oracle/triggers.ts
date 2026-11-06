@@ -3030,6 +3030,22 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever ${entersInCombat[1]} enters, ${entersInCombat[2]}`);
     return t && t !== "fail" && t.event === "permanentEnters" && !t.activeIf ? { ...t, activeIf: { kind: "during", window: "combat" } } : "fail";
   }
+  // Artificer's Hex: "At the beginning of your upkeep, if enchanted Equipment is attached to a creature, destroy that
+  // creature.": an intervening if (CR 603.4), checked again as it resolves; the creature it's attached to then (rulings).
+  const hexed = /^(At the beginning of your upkeep), if enchanted Equipment is attached to a creature, destroy that creature\.$/.exec(line);
+  if (hexed) {
+    const t = parseTrigger(`${hexed[1]}, destroy enchanted creature.`);
+    if (!t || t === "fail" || t.ifCond || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "destroy") return "fail";
+    const creature: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+    return { ...t, body: { ...t.body, effects: [{ type: "destroy", what: { ref: "attachedHost" } }], text: "destroy that creature." }, ifCond: { kind: "attachedIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], attachedTo: creature, text: "Equipment attached to a creature" } } };
+  }
+  // Encumbered Reejerey: "Whenever ~ becomes tapped while it has a -1/-1 counter on it, ...": it triggers only if the counter
+  // is on it as it becomes tapped (a trigger condition, not an intervening if: nothing is checked again as it resolves).
+  const tappedWithCounter = new RegExp(`^Whenever ~ becomes tapped while it has an? ${COUNTER} counter on it, (.+)$`).exec(line);
+  if (tappedWithCounter) {
+    const t = parseTrigger(`Whenever ~ becomes tapped, ${tappedWithCounter[2]}`);
+    return t && t !== "fail" && t.event === "selfBecomesTapped" && !t.activeIf ? { ...t, activeIf: { kind: "selfCounter", counter: counterKind(tappedWithCounter[1]!) } } : "fail";
+  }
   const lossOnYourTurn = /^Whenever an opponent loses life during your turn, (.+)$/.exec(line);
   if (lossOnYourTurn) {
     const t = parseTrigger(`Whenever an opponent loses life, ${lossOnYourTurn[1]}`);
@@ -4163,6 +4179,17 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const filter = parseTargetPhrase(tappedMany[1]!.replace(/^creatures /, "creature "));
     const body = filter?.kind === "object" && parseBody(tappedMany[2]!);
     return filter && body ? { event: "permanentsBecomeTapped", tappedFilter: filter, body } : "fail";
+  }
+  // Royal Decree: "Whenever a Swamp, Mountain, black permanent, or red permanent becomes tapped": any one of these, once
+  // for a permanent that's more than one (rulings: Badlands is both).
+  const tappedMixed = /^Whenever a (Plains|Island|Swamp|Mountain|Forest), (Plains|Island|Swamp|Mountain|Forest), (white|blue|black|red|green) permanent, or (white|blue|black|red|green) permanent becomes tapped, (.+)$/.exec(line);
+  if (tappedMixed) {
+    const lands = parseTargetPhrase(`${tappedMixed[1]} or ${tappedMixed[2]}`);
+    const colored = parseTargetPhrase(`${tappedMixed[3]} or ${tappedMixed[4]} permanent`);
+    const body = parseBody(tappedMixed[5]!, { subjectIt: true });
+    if (lands?.kind !== "object" || lands.subtypes?.length !== 2 || colored?.kind !== "object" || colored.colors?.length !== 2 || !body) return "fail";
+    const text = `${tappedMixed[1]}, ${tappedMixed[2]}, ${tappedMixed[3]} permanent, or ${tappedMixed[4]} permanent`;
+    return { event: "permanentBecomesTapped", tappedFilter: { kind: "object", types: [], notTypes: [], notColors: [], anyOf: [lands, colored], text }, body };
   }
   const tapped = /^Whenever an? (.+?) becomes (tapped|untapped), (.+)$/.exec(line);
   if (tapped) {

@@ -1772,6 +1772,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Equipment, "you" the controller of the source (rulings).
   if ((m = /^an Equipment named (.+) is attached to a creature you control$/.exec(text)))
     return { kind: "onBattlefield", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Equipment"], named: m[1]!, attachedTo: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creature you control" }, text: `Equipment named ${m[1]} attached to a creature you control` }, min: 1 };
+  // Lurebound Scarecrow: "When you control no permanents of the chosen color": the color chosen as it entered; with none
+  // chosen the condition is undefined and never true (rulings), see layers.ts.
+  if (text === "you control no permanents of the chosen color") return { kind: "control", who: "you", filter: { kind: "object", types: [], notTypes: [], notColors: [], chosen: "color", text: "permanent of the chosen color" }, max: 0 };
   // Dust Stalker: "if you control no other colorless creatures".
   if ((m = /^you control no other ((?:colorless )?(?:artifact|creature|land|enchantment))s$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
   // Predator's Gambit: "Enchanted creature has intimidate as long as its controller controls no other creatures": the
@@ -3064,7 +3067,11 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (cda) return { affects: { kind: "self" }, mods: [cda], text: line };
   // Not a "where X is" inside a quoted ability: that X belongs to the ability granted (Hardy Outlander), nor mobilize's
   // (Infantry Shield: "has menace and mobilize X, where X is its power").
-  const where = /\bmobilize X, where X is [^,"]+$/i.test(text) ? null : /^([^"]+), where X is ([^"]+)$/.exec(text);
+  // Aspect of Wolf: "Enchanted creature gets +X/+Y, where X is half the number of Forests you control, rounded down, and Y
+  // is half the number of Forests you control, rounded up": two counts, each continuously (rulings).
+  const whereXY = /^([^"]+ gets \+X\/\+Y), where X is ([^"]+?), and Y is ([^"]+)$/.exec(text);
+  if (whereXY) text = whereXY[1]!.replace("+X/+Y", "+X/+X");
+  const where = whereXY || /\bmobilize X, where X is [^,"]+$/i.test(text) ? null : /^([^"]+), where X is ([^"]+)$/.exec(text);
   if (where) text = where[1]!;
   // "Creatures with power less than ~'s power can't block it." "All creatures able to block ~ do so." (CR 509.1b-c)
   if (/^Creatures with power less than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByLesserPower" }], text: line };
@@ -3222,6 +3229,11 @@ function parseStaticLine(line: string): StaticAbility | null {
     const def = counts(parseCount(where[2]!, null), where[2]!);
     if (!def) return null;
     mods = replaceX(mods, def);
+  } else if (whereXY) {
+    const x = counts(parseCount(whereXY[2]!, null), whereXY[2]!);
+    const y = counts(parseCount(whereXY[3]!, null), whereXY[3]!);
+    if (!x || !y || mods.length !== 1 || mods[0]!.kind !== "modifyPT") return null;
+    mods = [{ kind: "modifyPT", power: x, toughness: y }];
   }
   // A static ability has no X of its own to choose (CR 107.3).
   return usesX(mods) ? null : { affects, mods, text: line };

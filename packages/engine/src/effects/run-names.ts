@@ -30,9 +30,10 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const match = (id: ObjectId) => name !== undefined && printedMatches(filter, defOf(s, obj(s, id)));
       if (e.handOnly) {
         // Hour of Glory: the hand is revealed, so all of them, no choice (and no library to shuffle).
-        const ids = p.hand.filter(match);
+        // Legion's End: and from their graveyard, a public zone (CR 404.2), every one of them too.
+        const ids = [...p.hand.filter(match), ...(e.andGraveyard ? p.graveyard.filter(match) : [])];
         for (const id of ids) moveObject(s, id, "exile");
-        log(s, `${p.name} exiles ${ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "no cards"} from their hand.`);
+        log(s, `${p.name} exiles ${ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "no cards"} from their hand${e.andGraveyard ? " and graveyard" : ""}.`);
         return;
       }
       if (!sc.found) {

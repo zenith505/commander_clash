@@ -1,6 +1,6 @@
 # Roadmap
 
-29,932 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,943 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,590 of
 9,979 (96%).
 
@@ -2142,6 +2142,20 @@ line blocks.
    revealed for each player who shuffled a nontoken one (Collision of Realms); "a creature they control with equal or
    lesser power", the rest exiled (Sculpted Sunburst); two targets left in your graveyard by an opponent unless you
    control a Bolas planeswalker (Deliver Unto Evil). +11, 29,920 of 31,936 (with B110-B112).
+   Round 281 took the text-changing cards (CR 612, layer 3; the "Layer 3" known gap): "Change the text of target spell
+   or permanent by replacing all instances of one color word with another" (Sleight of Mind, Alter Reality, Glamerdye),
+   "... or one basic land type with another" (Mind Bend), basic land types only (Magical Hack), both "until end of
+   turn" (Crystal Spray, Whim of Volrath, Trait Doctoring), each as a mode (Spectral Shift, entwine too), creature types
+   (Artificial Evolution, never to Wall; New Blood, always to Vampire). The two words are chosen as it resolves (buttons
+   for color words and land types, the creature type picker for creature types); the change covers "nonblack",
+   "swampwalk", "Islandcycling", plurals and the type line (so a Forest changed to Island taps for {U}), never a card's
+   name (White Knight stays White Knight) or a mana symbol. It applies after copy effects and isn't copied (CR 707.2);
+   it ends when the object leaves its zone, except a permanent spell's, which goes on with the permanent (CR 400.7a); on
+   a spell it can make the spell's targets illegal (Doom Blade's "nonblack" made "nongreen"). +11, 29,931 of 31,936.
+   Out after round 281 (looked at, not done): Balduvian Shaman (a target "that doesn't have cumulative upkeep" and a
+   granted cumulative upkeep that must count for it); Swirl the Mists (every color word in every spell and permanent,
+   a static text change); The Animus, King Narfi's Betrayal, Wizard's Spellbook and the rest of the most played
+   remaining names, as listed in earlier rounds' notes (copies of cards in exile, casting from among exiled cards).
    Out after round 280 (looked at, not done): Wild Evocation (a random card from hand cast "if able" as the trigger
    resolves); Oath of Druids (a target chosen by the upkeep player among opponents with more creatures, then reveal until
    a creature); Fraying Line (rope counters each upkeep, or everything without one is exiled); Whims of the Fates (three
@@ -5605,7 +5619,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   +2/+2"), Primordial Ooze (pay {1} for each of its counters, or it's tapped and deals that much damage to you), Dead
   Reckoning (the card on top of your library is a may of its own; the damage is its power as it was in the graveyard),
   Not Forgotten (top or bottom of its owner's library, the caster's choice), Grim Contest (each deals damage equal to its
-  toughness to the other, not a fight). No new prompts. +12 (29,932 of 31,936 with B112 and round 280).
+  toughness to the other, not a fight). No new prompts. +12 (29,943 of 31,936 with B112 and rounds 280 and 281).
 - Out after round B113 (looked at, not done): Kaervek's Spite (sacrificing all permanents you control as an additional
   cost: whether it can be paid while one of them can't be sacrificed), Ruin in Their Wake (a "may" between the battlefield
   and your hand only while you control a land named Wastes), Bargaining Table (an opponent chosen as it's activated sets X).
@@ -5869,7 +5883,13 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 
 ## Known gaps (from earlier rounds)
 
-- Layer 3 (text-changing effects).
+- Layer 3: Swirl the Mists (a static text change on every spell and permanent) and Exchange of Words-style swaps are
+  still out; a text change and Deadpool's exchange of text boxes on one permanent apply exchange first, whatever their
+  timestamps. A text change leaves a few supported cards with a line the engine can't read (35 of about 5,000 color and
+  land-type swaps tried on supported cards, round 281: mostly "Plains" read as singular where it's plural, Defiler of
+  Faith's cost line, Hazezon Tamar's token colors); the game log says so, and that ability is lost. A text change on a
+  spell whose targets were fitted as it was cast ("any number of target", splice) keeps what the spell does from its
+  old text.
 - "Divided as you choose" with X ("X damage divided", Rolling Thunder, Fire Covenant), distributing X counters
   and "then" riders (Biogenic Upgrade), divided prevention (Remedy); "up to X target" with an X that isn't the spell's own (Rats' Feast, Martyr of
   Bones' "up to X target cards from a single graveyard").

@@ -998,6 +998,8 @@ export function moveObject(
   if (!(fromZone === "stack" && to === "battlefield")) {
     o.kicked = undefined;
     o.kickedByControl = undefined;
+    // Text changes end with the object, except a permanent spell's, which go on with the permanent (CR 400.7a).
+    o.textChanges = undefined;
     o.colorsSpent = undefined;
     o.phyrexianLife = undefined;
     o.convoked = undefined;
@@ -4054,6 +4056,15 @@ function finishCleanup(s: GameState) {
     o.preventNext = undefined;
     o.redirectNext = undefined;
     o.saddled = undefined; // "until end of turn" (CR 702.171b)
+  }
+  // "Change the text ... until end of turn" (Crystal Spray, CR 514.2): on spells still on the stack too.
+  for (const id of [...s.battlefield, ...(s.phasedOut ?? []), ...s.stack.flatMap((x) => (x.kind === "spell" && x.objectId ? [x.objectId] : []))]) {
+    const o = obj(s, id);
+    if (o.textChanges?.some((c) => c.endOfTurn)) {
+      const left = o.textChanges.filter((c) => !c.endOfTurn);
+      o.textChanges = left.length ? left : undefined;
+      invalidateCharacteristics(s);
+    }
   }
   invalidateCharacteristics(s);
   for (const p of s.players) {
@@ -9209,6 +9220,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "topOrBottom") {
     if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(" or ")}`);
     (r.scratch ??= {}).topOrBottom = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "textFrom" || pend.what === "textTo") {
+    // Effect "changeText": the word replaced, then the word it becomes (checked against the options above).
+    const st = ((r.scratch ??= {}).textWord ??= {});
+    if (pend.what === "textFrom") st.from = choice;
+    else st.to = choice;
     continueResolution(s);
     return;
   }

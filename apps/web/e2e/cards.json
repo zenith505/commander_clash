@@ -1353,6 +1353,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c5ab6dc9-34af-434f-ae8e-b2389ee6c5ae",
+  "name": "Artificial Evolution",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Change the text of target spell or permanent by replacing all instances of one creature type with another. The new creature type can't be Wall. (This effect lasts indefinitely.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9956f9b7-0140-484c-b606-3685690b84cc",
   "name": "Aryel, Knight of Windgrace",
   "manaCost": "{2}{W}{B}",
@@ -2767,6 +2793,39 @@
   "commanderLegal": "legal",
   "set": "blb",
   "releasedAt": "2024-08-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "508248d1-09a4-4e41-a4c9-286618e5061e",
+  "name": "Bog Wraith",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Wraith",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wraith"
+  ],
+  "oracleText": "Swampwalk (This creature can't be blocked as long as defending player controls a Swamp.)",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Landwalk",
+   "Swampwalk"
+  ],
+  "commanderLegal": "legal",
+  "set": "10e",
+  "releasedAt": "2007-07-13",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
@@ -9397,6 +9456,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d236b3fc-0d3f-4d99-875d-e32a33fe5767",
+  "name": "Goblin King",
+  "manaCost": "{1}{R}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Goblin",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin"
+  ],
+  "oracleText": "Other Goblins get +1/+1 and have mountainwalk.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2019-12-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "50608184-90d3-43d2-a221-deb186c78323",
   "name": "Goblin Piker",
   "manaCost": "{1}{R}",
@@ -14627,6 +14716,32 @@
   "set": "afr",
   "releasedAt": "2021-07-23",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d8377869-f8f7-4b4b-93ad-3ad3c4826b1a",
+  "name": "Mind Bend",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Change the text of target permanent by replacing all instances of one color word with another or one basic land type with another. (For example, you may change \"nonblack creature\" to \"nongreen creature\" or \"forestwalk\" to \"islandwalk.\" This effect lasts indefinitely.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -31,6 +31,30 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const mods = parseBecomes(m[2]!);
     return mods && spell?.kind === "spell" && (!perm || perm.kind === "object") ? [{ type: "continuous", what: { ref: "target", index: addTarget(ctx, spell) }, mods, duration: m[3] ? "endOfTurn" : "game" }] : null;
   }
+  // Sleight of Mind: "Change the text of target spell or permanent by replacing all instances of one color word with
+  // another"; Mind Bend: "... one color word with another or one basic land type with another"; Crystal Spray: "... until
+  // end of turn"; Artificial Evolution: "one creature type with another"; New Blood: "Change the text of that creature by
+  // replacing all instances of one creature type with Vampire" (CR 612; the words are chosen as it resolves, rulings).
+  if ((m = /^Change the text of (target spell or permanent|target .+?|that creature) by replacing all instances of one (color word|basic land type|creature type) with (another|[A-Z][a-z]+)(?: or one (color word|basic land type) with another)?( until end of turn)?( except Wall)?$/.exec(s))) {
+    const kindOf = (w: string) => (w === "color word" ? ("color" as const) : w === "basic land type" ? ("basicLandType" as const) : ("creatureType" as const));
+    const kinds = [kindOf(m[2]!), ...(m[4] ? [kindOf(m[4])] : [])];
+    // A named new word only for a creature type (New Blood's Vampire), with one kind.
+    if (m[3] !== "another" && (kinds.length > 1 || kinds[0] !== "creatureType" || !CREATURE_TYPES.has(m[3]!))) return null;
+    if (new Set(kinds).size !== kinds.length || (m[6] && kinds[0] !== "creatureType")) return null;
+    let what: ObjRef | null;
+    if (m[1] === "target spell or permanent") {
+      const perm = parseTargetPhrase("permanent");
+      if (perm?.kind !== "object") return null;
+      what = { ref: "target", index: addTarget(ctx, { kind: "spell", types: [], notTypes: [], notColors: [], orPermanent: perm, text: "target spell or permanent" }) };
+    } else {
+      what = parseObject(m[1] === "that creature" ? "that creature" : m[1]!, ctx);
+      // Only a target permanent or the one an earlier sentence targeted.
+      if (!what || what.ref !== "target") return null;
+      const spec = ctx.targets[what.index];
+      if (spec?.kind !== "object") return null;
+    }
+    return [{ type: "changeText", what, kinds, ...(m[3] !== "another" ? { newWord: m[3]! } : {}), ...(m[5] ? { endOfTurn: true as const } : {}), ...(m[6] ? { notTo: ["Wall"] } : {}) }];
+  }
   // "Turn target face-down creature face up" (CR 708.8), "you may turn a face-down creature you control face up" (Ugin's
   // Mastery): chosen as it resolves (CR 608.2d), with no cost paid.
   let fu: RegExpExecArray | null;

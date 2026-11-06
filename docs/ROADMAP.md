@@ -1,6 +1,6 @@
 # Roadmap
 
-30,130 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,140 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,962 of 4,988 (99%), top 10,000: 9,621 of
 9,979 (96%).
 
@@ -2315,7 +2315,7 @@ line blocks.
    to one target nonland card of each card type from your graveyard. Copy those cards. You may cast any number of spells
    with total mana value 6 or less from among the copies" (Uldaros Theorix, "if you cast him"); "Whenever you cast a modal
    spell, choose up to X, where X is the number of times you chose a mode for that spell" (Riku of Many Paths, spree too).
-   +10.
+   +10, 30,140 of 31,936 with B122.
    Out after round 291 (looked at, not done): Skyway Robber (escapes with a granted trigger about the cards its escape cost
    exiled); Hama, the Bloodbender (an exiled card cast by waterbending {X} while you control it); Synthesis Pod ("Exile a
    spell you control" as a cost); Jacob Hauken, Inspector (a face-down card exiled from your hand, then a transform paid for

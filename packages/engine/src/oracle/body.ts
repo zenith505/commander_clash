@@ -134,6 +134,8 @@ export interface Ctx {
   afterMillOne?: boolean;
   /** The instruction before was a mill, anyone's: "for each creature card put into a graveyard this way" (Dread Summons). */
   afterAnyMill?: boolean;
+  /** The instruction before was a search for one card that exiles it (Seek): "the exiled card" is that card. */
+  afterSearchExileOne?: boolean;
   /** The instruction before was a destroy: "the number of Mountains put into a graveyard this way" (Volcanic Eruption). */
   afterDestroy?: boolean;
   /** An instruction before in this ability discarded cards of yours: "for each card discarded this way" (Pyretic Charge). */
@@ -1843,6 +1845,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Eye of Yawgmoth: "Reveal a number of cards from the top of your library equal to the sacrificed creature's power":
   // that many off the top, X defined by the text (CR 107.3c).
   text = text.replace(/(^|\. )Reveal a number of cards from the top of your library equal to ([^.]+)\./, "$1Reveal the top X cards of your library, where X is $2.");
+  // Seek: "Search target opponent's library for a card and exile it. You gain life equal to its mana value. Then that player
+  // shuffles.": the shuffle comes with the search; nothing can happen between it and the life gain either way.
+  text = text.replace(/^(Search target opponent's library for a card and exile it\.) You gain life equal to its mana value\. (Then that player shuffles\.)$/, "$1 $2 You gain life equal to the exiled card's mana value.");
+  // Lethal Exploit: "It gets an additional -1/-1 until end of turn for each modified creature you controlled as you cast this
+  // spell": counted once as it's cast (CR 601.2i) and kept however things change before it resolves, copies included
+  // (Count asCast), the same as "-X/-X, where X is the number of ...".
+  text = text.replace(/(gets [+-]\d+\/[+-]\d+ until end of turn\. It) gets an additional ([+-])1\/([+-])1 until end of turn for each ([a-z]+) creature you controlled as you cast ~\./, (_, a: string, p: string, t: string, w: string) => `${a} gets ${p}X/${t}X until end of turn, where X is the number of ${w} creatures you controlled as you cast ~.`);
   // Growth Cycle: "Target creature gets +3/+3 until end of turn. It gets an additional +2/+2 until end of turn for each card
   // named ~ in your graveyard": a second bonus, counted as it resolves (rulings: ~ is on the stack, not in the graveyard).
   text = text.replace(/(gets [+-]\d+\/[+-]\d+ until end of turn\. It) gets an additional ([+-]\d+\/[+-]\d+ until end of turn for each )/, "$1 gets $2");
@@ -3762,6 +3771,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // card's mana value": one target player's card.
     ctx.afterMillOne = last?.type === "mill" && last.n === 1 && (last.who.ref === "you" || last.who.ref === "eventPlayer" || (last.who.ref === "target" && !last.who.n));
     ctx.afterAnyMill = last?.type === "mill";
+    ctx.afterSearchExileOne = last?.type === "search" && last.n === 1 && last.dest.zone === "exile" && !last.upTo;
     ctx.afterDestroy = last?.type === "destroy";
     // "You may discard your hand." (Balin, Loremaster): none discarded this way if you don't.
     ctx.afterYourDiscard = effects.some((e) => (e.type === "discard" && e.who.ref === "you") || (e.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "discard" && e.effects[0]!.who.ref === "you"));
@@ -10748,6 +10758,24 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!then || then.some((e) => pauses(e)) || otherwise === null || otherwise?.some((e) => pauses(e))) return null;
       effects.push({ type: "if", cond: { kind: "exiledFromHandIs", filter }, effects: then, ...(otherwise ? { otherwise } : {}) });
       if (other) si++;
+      continue;
+    }
+    // Vhati il-Dal: "Until end of turn, target creature has base power 1 or base toughness 1": which of the two is chosen as
+    // it resolves (rulings), a layer 7b effect (CR 613.4b).
+    const baseOr = /^Until end of turn, target creature has base power (\d+) or base toughness (\d+)$/.exec(s);
+    if (baseOr) {
+      const what = parseObject("target creature", ctx);
+      if (what?.ref !== "target") return null;
+      effects.push({ type: "either", options: [[{ type: "continuous", what, mods: [{ kind: "setPower", power: Number(baseOr[1]) }], duration: "endOfTurn" }], [{ type: "continuous", what, mods: [{ kind: "setToughness", toughness: Number(baseOr[2]) }], duration: "endOfTurn" }]], labels: [`Its base power becomes ${baseOr[1]}`, `Its base toughness becomes ${baseOr[2]}`] });
+      continue;
+    }
+    // Soul Search: "Exile that card. If the card's mana value is 1 or less, create ...": the card just exiled from that hand,
+    // as it is in exile (CR 608.2h; rulings: no mana cost is 0, X is 0, CR 202.3); nothing exiled, nothing created.
+    const exiledHandMv = ctx.exiledFromHand && effects.at(-1)?.type === "takeFromHand" ? /^If the card's mana value is (\d+) or less, (.+)$/.exec(s) : null;
+    if (exiledHandMv) {
+      const then = parseOne(exiledHandMv[2]!.charAt(0).toUpperCase() + exiledHandMv[2]!.slice(1), ctx);
+      if (!then || then.some((e) => pauses(e))) return null;
+      effects.push({ type: "if", cond: { kind: "exiledFromHandIs", filter: { kind: "card", manaValue: { max: Number(exiledHandMv[1]) }, text: `card with mana value ${exiledHandMv[1]} or less` } }, effects: then });
       continue;
     }
     // "Look at the top twenty cards of your library, put any number of land cards from among them onto the battlefield

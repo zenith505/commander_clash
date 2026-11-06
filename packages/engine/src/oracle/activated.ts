@@ -427,10 +427,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     }
     // Esquire of the King: "This ability costs {2} less to activate if you control a legendary creature", Thaumaton Torpedo:
     // "if you attacked with a Spacecraft this turn": as the cost is worked out (CR 602.2b, 601.2f).
-    const lessIf = / This ability costs \{(\d+)\} less to activate if (?!it targets )([^.]+)\.$/.exec(effectText);
+    // Kami of Jealous Thirst: "This ability costs {4}{B} less to activate if you've drawn three or more cards this turn": the
+    // colored symbol comes off too (CR 118.7).
+    const lessIf = / This ability costs (\{\d+\}|\{\d+\}(?:\{[WUBRG]\})+) less to activate if (?!it targets )([^.]+)\.$/.exec(effectText);
     const lessCond = lessIf && !costLess && !costLessIf && !costLessIfTarget ? parseStaticCondition(lessIf[2]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     if (lessIf && lessCond) {
-      costLessIf = { n: Number(lessIf[1]), cond: lessCond };
+      const generic = /^\{(\d+)\}$/.exec(lessIf[1]!);
+      costLessIf = generic ? { n: Number(generic[1]), cond: lessCond } : { n: 0, cond: lessCond, mana: lessIf[1]! };
       effectText = effectText.slice(0, lessIf.index);
       found = true;
     }

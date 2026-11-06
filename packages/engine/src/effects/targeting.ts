@@ -1135,6 +1135,16 @@ export function lesserPowerOk(s: GameState, spec: TargetSpec, t: TargetChoice, s
     const blocking = onField ? me.blocking : lk && (sourceZc === undefined || lk.zc === sourceZc) ? lk.blocking : undefined;
     if (!blocking?.includes(t.id) || s.objects[t.id]?.attacking === undefined) return false;
   }
+  if (spec.attackingSameAsSource && t.kind === "object") {
+    // Kitesail Skirmisher: the player or planeswalker the source is attacking, as it is or last existed (CR 506.2).
+    const me = sourceId ? s.objects[sourceId] : undefined;
+    if (!me) return false;
+    const onField = me.zone === "battlefield" && (sourceZc === undefined || (me.zoneChanges ?? 0) === sourceZc);
+    const lk = s.lastKnown?.[me.id];
+    const was = onField ? me : lk && (sourceZc === undefined || lk.zc === sourceZc) ? lk : undefined;
+    const o = s.objects[t.id];
+    if (was?.attacking === undefined || was.attackingPermanent?.battleController !== undefined || o?.attacking !== was.attacking || o.attackingPermanent?.id !== was.attackingPermanent?.id) return false;
+  }
   if (spec.blockingSource && t.kind === "object") {
     // A creature blocking the source is still blocking it while both are in combat (CR 509.1h, 506.4); one the source
     // blocks is still attacking.

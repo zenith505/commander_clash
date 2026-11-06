@@ -26211,6 +26211,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1759547a-52b3-4bae-817a-658a6fd047e3",
+  "name": "Vhati il-Dal",
+  "manaCost": "{2}{B}{G}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warrior"
+  ],
+  "oracleText": "{T}: Until end of turn, target creature has base power 1 or base toughness 1.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1b355139-4891-436c-9079-0ce17ecc2d65",
   "name": "Vial Smasher the Fierce",
   "manaCost": "{1}{B}{R}",

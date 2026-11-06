@@ -486,7 +486,7 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
  * is ...", "... if you control a Wizard" / "If an opponent controls seven or more lands, ...". Only generic
  * mana: a reduction can't take colored mana off (CR 118.7a).
  */
-export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec; colored?: Color[] } } | { targetTax: number } | { targetDiscount: number } | { targetDiscountAny: number } | { castTargetEnchantedPlayerLess: number } | { targetLifeTax: number } | { castTargetLess: { n: number; filter: TargetSpec } } | { lessEachColored: { color: Color; count: Amount } } | { commanderTargetTax: number } | { opponentsTargetTax: { n: number; filter: TargetSpec; abilities?: true } } | "fail" | null {
+export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec; colored?: Color[] } } | { targetTax: number } | { targetDiscount: number } | { targetDiscountAny: number } | { targetDiscountYou: number } | { castTargetEnchantedPlayerLess: number } | { targetLifeTax: number } | { castTargetLess: { n: number; filter: TargetSpec } } | { lessEachColored: { color: Color; count: Amount } } | { commanderTargetTax: number } | { opponentsTargetTax: { n: number; filter: TargetSpec; abilities?: true } } | "fail" | null {
   let text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
   // "Each spell you cast that's a Demon, Horror, or Nightmare costs {1} less to cast" (Ancient Cellarspawn): spells of
@@ -549,6 +549,9 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   if ((m = /^Spells your opponents cast that target ~ cost \{(\d+)\} less to cast$/.exec(text))) return { targetDiscount: Number(m[1]) };
   // Spellwild Ouphe: "Spells that target ~ cost {2} less to cast": any player's (rulings).
   if ((m = /^Spells that target ~ cost \{(\d+)\} less to cast$/.exec(text))) return { targetDiscountAny: Number(m[1]) };
+  // Elderwood Scion: "Spells you cast that target ~ cost {2} less to cast": its controller's, Aura spells and spells with
+  // other targets too, generic mana only, once per spell (rulings, CR 601.2f).
+  if ((m = /^Spells you cast that target ~ cost \{(\d+)\} less to cast$/.exec(text))) return { targetDiscountYou: Number(m[1]) };
   if ((m = /^Spells you cast that target enchanted player cost \{(\d+)\} less to cast$/.exec(text))) return { castTargetEnchantedPlayerLess: Number(m[1]) };
   // Killian, Ink Duelist: "Spells you cast that target a creature cost {2} less to cast" (generic mana only, rulings).
   if ((m = /^Spells you cast that target an? ([a-z]+) cost \{(\d+)\} less to cast$/.exec(text))) {

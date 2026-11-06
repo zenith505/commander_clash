@@ -171,6 +171,8 @@ export type Count =
   | { kind: "yardChosenMv" }
   | { kind: "discardedThisWay"; greatest?: true; /** Only these players' discards: "each player discards their hand, then draws that many cards" is each their own (Dark Deal). */ who?: PlayerRef; /** "For each land card discarded this way" (Gerrard's Verdict): only cards like this. */ filter?: TargetSpec }
   /** "The total mana value of those cards" after "you mill three cards" (Combustible Gearhulk): X counts 0 (CR 107.3). */
+  /** "The exiled card's mana value" after "Search target opponent's library for a card and exile it" (Seek): the card that search found, where it is now (0 with none, CR 202.3; X is 0, 107.3b). */
+  | { kind: "searchFoundMv" }
   | { kind: "milledManaValue"; /** "The greatest mana value among the milled cards" (Heretic's Punishment): the greatest, 0 with none. */ greatest?: true }
   /** "The discarded card's mana value" after "draw a card, then discard a card" (Ninja's Blades): of the cards discarded while this resolves, X counting 0 (CR 107.3). */
   | { kind: "discardedManaValue"; /** Ill-Timed Explosion: "the greatest mana value among cards discarded this way", not their total. */ greatest?: true }
@@ -809,6 +811,8 @@ export interface TargetSpec {
    * the source sacrificed to pay the cost (Urborg Panther), as it last existed (CR 608.2h).
    */
   blockingSource?: "blocking" | "either";
+  /** "Another target creature attacking the same player or planeswalker" (Kitesail Skirmisher): attacking what the source is attacking, a player or a planeswalker (not a battle), the source as it is or last existed. */
+  attackingSameAsSource?: true;
   /**
    * "Target creature that player controls" in a trigger about a player ("Whenever ~ deals combat damage to a
    * player"): "eventPlayer", made concrete as `controlledBy` once the trigger knows that player.
@@ -1378,7 +1382,7 @@ export type ObjRef =
   /** "All creatures blocking or blocked by ~" (Kjeldoran Frostbeast): the creatures in combat with the source now, none if it left (CR 506.4). */
   | { ref: "inCombatWithSelf"; /** "Each creature it's blocking" (Gomazoa): only the attackers it blocks. */ blocked?: true; /** "~ and each creature it's blocking": the source too, while it's on the battlefield. */ andSelf?: true; /** Trial: "all creatures blocking or blocked by target creature": in combat with that target instead of the source. */ ofTarget?: number; /** Abu Ja'far: "When ~ dies, destroy all creatures blocking or blocked by it": in combat with the source as it last existed on the battlefield (CR 603.10a, 608.2h), and still blocking or attacking. */ lastKnown?: true }
   /** "Each creature blocking it" (Plague Wight; `subject`: the trigger's attacker, Trailblazer's Torch): the creatures blocking the source now, none if it left combat (CR 506.4). */
-  | { ref: "blockingIt"; subject?: true; /** "All creatures blocked by ~" (Wall of Nets): the attackers it's blocking, while it's blocking (CR 509.1h, 506.4). */ blocked?: true }
+  | { ref: "blockingIt"; subject?: true; /** "All creatures blocked by ~" (Wall of Nets): the attackers it's blocking, while it's blocking (CR 509.1h, 506.4). */ blocked?: true; /** "Each creature without flanking blocking ~" (Knight of Valor): only the blockers that match, as this resolves. */ filter?: TargetSpec }
   /**
    * "All creatures that blocked ~ this turn" (Joven's Ferrets, `blockers`), "that were blocked by that creature this turn"
    * (Glyph of Doom, `blocked`), "that blocked or were blocked by it this turn" (Venomous Breath, both): declared blocks this
@@ -5866,7 +5870,8 @@ export interface ActivatedAbility {
   /** "This ability costs {1} more to activate for each card in your hand" (Loreseeker's Stone): counted as it's activated (CR 602.2b, 601.2f). */
   costMore?: Amount;
   /** "This ability costs {1} less to activate during your turn" (Hylda's Crown of Winter): `n` less while `cond` holds, generic mana only. */
-  costLessIf?: { n: number; cond: StaticCondition };
+  /** With `mana` (Kami of Jealous Thirst: "costs {4}{B} less ... if you've drawn three or more cards this turn"): those symbols come off, colored ones too (CR 601.2f, 118.7). */
+  costLessIf?: { n: number; cond: StaticCondition; mana?: string };
   /** "This ability costs {1} less to activate if it targets a creature with power 3 or less" (Raft Security Officer): `n` less once its target is chosen and matches (CR 602.2b, 601.2f), generic mana only. */
   costLessIfTarget?: { n: number; filter: TargetSpec };
   /**
@@ -7749,6 +7754,8 @@ export interface CompiledCard {
   targetDiscount?: number;
   /** "Spells that target ~ cost {2} less to cast" (Spellwild Ouphe): any player's spells, generic mana, once per spell however often it's targeted (rulings). */
   targetDiscountAny?: number;
+  /** "Spells you cast that target ~ cost {2} less to cast" (Elderwood Scion): its controller's spells, generic mana, once per spell however often it's targeted (rulings). */
+  targetDiscountYou?: number;
   /** "Spells you cast that target enchanted player cost {1} less to cast" (Infectious Curse): generic mana, once per spell (rulings). */
   castTargetEnchantedPlayerLess?: number;
   /** "Spells you cast that target a creature cost {2} less to cast" (Killian, Ink Duelist): generic mana only (CR 601.2f). */

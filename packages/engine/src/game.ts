@@ -5509,6 +5509,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
     if (t?.zone === "battlefield" && !how.faceDown && opponents(s, controllerOf(s, t)).includes(pid)) mods.less += abilitiesOf(s, t).targetDiscount ?? 0;
     // Spellwild Ouphe: "Spells that target ~ cost {2} less to cast", whoever casts them.
     if (t?.zone === "battlefield" && !how.faceDown) mods.less += abilitiesOf(s, t).targetDiscountAny ?? 0;
+    // Elderwood Scion: "Spells you cast that target ~ cost {2} less to cast": its controller's own spells.
+    if (t?.zone === "battlefield" && !how.faceDown && controllerOf(s, t) === pid) mods.less += abilitiesOf(s, t).targetDiscountYou ?? 0;
   }
   // Kaervek's Torch: "As long as ~ is on the stack, spells that target it cost {2} more to cast": each such spell once.
   for (const sid of new Set((how.targets ?? []).flatMap((t) => (t.kind === "stack" ? [t.id] : [])))) {
@@ -8227,7 +8229,9 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   // Power-up: "If this permanent entered this turn, this ability's cost is reduced by this permanent's mana cost" (CR
   // 702.193a-b, 118.7).
   const powerUp = ab.keyword === "Power-up" && o.zone === "battlefield";
-  const cost = powerUp && o.enteredTurn === s.turn ? reduceByManaCost(cost1, parseManaCost(defOf(s, o).manaCost ?? "")) : cost1;
+  const cost2 = powerUp && o.enteredTurn === s.turn ? reduceByManaCost(cost1, parseManaCost(defOf(s, o).manaCost ?? "")) : cost1;
+  // Kami of Jealous Thirst: "costs {4}{B} less ... if ...": colored symbols come off too (CR 601.2f, 118.7).
+  const cost = ab.costLessIf?.mana && staticConditionNow(s, ab.costLessIf.cond, o.id, pid) ? reduceByManaCost(cost2, parseManaCost(ab.costLessIf.mana)) : cost2;
   // Embalmer's Tools: "Activated abilities of creature cards in your graveyard cost {1} less to activate": generic mana
   // only (CR 601.2f), whoever's permanent says so about their own graveyard.
   const yardLess = o.zone === "graveyard" && objIsType(s, o, "Creature") ? s.battlefield.reduce((n, id) => n + (controllerOf(s, obj(s, id)) === o.owner ? (abilitiesOf(s, obj(s, id)).yardCreatureAbilityLess ?? 0) : 0), 0) : 0;

@@ -1087,6 +1087,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const mine = !!c && controllerOf(s, c) === pid;
       return [{ type: "chooseOption", player: pid, choice: pend.options.find((o) => has(o) !== mine) ?? pend.options[0]! }];
     }
+    // Vhati il-Dal: "base power 1 or base toughness 1": an opponent's creature loses the more of the two (toughness on a
+    // tie, it may die to damage); our own gets whichever raises it, else the power (keeps it alive).
+    if (pend.kind === "chooseOption" && either?.type === "either" && either.options.length === 2 && either.options.every((o) => o.length === 1 && o[0]!.type === "continuous" && o[0]!.what.ref === "target" && o[0]!.mods.length === 1 && (o[0]!.mods[0]!.kind === "setPower" || o[0]!.mods[0]!.kind === "setToughness"))) {
+      const t = s.resolving?.item.targets?.[0];
+      const c = t?.kind === "object" ? s.objects[t.id] : undefined;
+      const at = (k: "setPower" | "setToughness") => String(either.options.findIndex((o) => o[0]!.type === "continuous" && o[0]!.mods[0]!.kind === k));
+      if (!c || c.zone !== "battlefield") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+      const p = power(s, c);
+      const tt = toughness(s, c);
+      const pick = controllerOf(s, c) === pid ? (tt < 1 ? "setToughness" : "setPower") : p - 1 > tt - 1 ? "setPower" : "setToughness";
+      return [{ type: "chooseOption", player: pid, choice: pend.options.includes(at(pick)) ? at(pick) : pend.options[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "either") {
       const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
       return [{ type: "chooseOption", player: pid, choice: pend.options[Math.max(0, i)]! }];

@@ -723,7 +723,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           }
           return;
         }
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: [String(e.range.min)], numberRange: e.range, prompt: `choose a number between ${e.range.min} and ${e.range.max}` };
+        const range = e.maxHandOf ? { min: e.range.min, max: Math.max(e.range.min, ...players(s, e.maxHandOf, ctx).map((x) => player(s, x).hand.length)) } : e.range;
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: [String(range.min)], numberRange: range, prompt: e.maxHandOf ? `choose a number greater than ${e.range.min - 1} (up to ${range.max}, the cards in that player's hand)` : `choose a number between ${range.min} and ${range.max}` };
         return "paused";
       }
       if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "colors" ? "colors" : e.choice === "basicLandType" || e.choice === "landType" ? "landType" : e.choice === "keyword" ? "keyword" : e.choice === "parity" ? "parity" : e.choice === "direction" ? "direction" : e.choice === "landOrNonland" ? "landOrNonland" : "type"] === undefined) {

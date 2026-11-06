@@ -57,6 +57,10 @@ const purg = (): CardDef => ({"oracleId":"2fb8e100-58a1-4dc6-bc38-ad7f115e3e46",
 const ring = (): CardDef => ({"oracleId":"737db899-dcdb-48f9-8d30-cbbce3ae3434","name":"Jandor's Ring","manaCost":"{6}","cmc":6,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"{2}, {T}, Discard the last card you drew this turn: Draw a card.","colors":[],"colorIdentity":[],"keywords":[],"artUrl":"https://cards.scryfall.io/art_crop/front/7/1/71504078-a16f-4dc4-9626-0ecc42b1e93b.jpg?1783948378","commanderLegal":"legal","set":"arn","rarity":"rare","layout":"normal"}) as CardDef;
 const grimoire = (): CardDef => ({"oracleId":"090052a8-9e5b-4024-881f-5f8b65db7aa7","name":"Phyrexian Grimoire","manaCost":"{3}","cmc":3,"typeLine":"Artifact — Book","supertypes":[],"types":["Artifact"],"subtypes":["Book"],"oracleText":"{4}, {T}: Target opponent chooses one of the top two cards of your graveyard. Exile that card and put the other one into your hand.","colors":[],"colorIdentity":[],"keywords":[],"artUrl":"https://cards.scryfall.io/art_crop/front/2/f/2fcf5b8a-563b-48d7-a874-e9c226192320.jpg?1783946602","commanderLegal":"legal","set":"tmp","rarity":"rare","layout":"normal"}) as CardDef;
 const shifter = (): CardDef => ({"oracleId":"82a6d89d-9215-4540-b7d5-26cdd6afb05b","name":"Shapeshifter","manaCost":"{6}","cmc":6,"typeLine":"Artifact Creature — Shapeshifter","supertypes":[],"types":["Artifact","Creature"],"subtypes":["Shapeshifter"],"oracleText":"As this creature enters, choose a number between 0 and 7.\nAt the beginning of your upkeep, you may choose a number between 0 and 7.\nShapeshifter's power is equal to the last chosen number and its toughness is equal to 7 minus that number.","power":"*","toughness":"7-*","colors":[],"colorIdentity":[],"keywords":[],"artUrl":"https://cards.scryfall.io/art_crop/front/c/c/cc278af4-b60d-41b7-b9d7-36c8aefca1a7.jpg?1783948358","commanderLegal":"legal","set":"atq","rarity":"rare","layout":"normal"}) as CardDef;
+const halfdane = (): CardDef => ({"oracleId":"2ee13155-a3b8-4cad-8e68-5d2c5aba3bb4","name":"Halfdane","manaCost":"{1}{W}{U}{B}","cmc":4,"typeLine":"Legendary Creature — Shapeshifter","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Shapeshifter"],"oracleText":"At the beginning of your upkeep, Halfdane's base power and toughness become equal to the power and toughness of target creature other than Halfdane until the end of your next upkeep.","power":"3","toughness":"3","colors":["B","U","W"],"colorIdentity":["B","U","W"],"keywords":[],"artUrl":"https://cards.scryfall.io/art_crop/front/2/e/2e939761-3542-4044-9038-d1d30c6a38fc.jpg?1783948039","commanderLegal":"legal","set":"leg","rarity":"rare","layout":"normal"}) as CardDef;
+const glass = (): CardDef => ({"oracleId":"ca16b32c-3f1e-4f8d-821a-064f922c45d8","name":"Scrying Glass","manaCost":"{2}","cmc":2,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"{3}, {T}: Choose a number greater than 0 and a color. Target opponent reveals their hand. If that opponent reveals exactly the chosen number of cards of the chosen color, you draw a card.","colors":[],"colorIdentity":[],"keywords":[],"artUrl":"https://cards.scryfall.io/art_crop/front/7/2/7286819f-6c57-4503-898c-528786ad86e9.jpg?1783946055","commanderLegal":"legal","set":"uds","rarity":"rare","layout":"normal"}) as CardDef;
+const bolt = (): CardDef => ({"oracleId":"4457ed35-7c10-48c8-9776-456485fdf070","name":"Lightning Bolt","manaCost":"{R}","cmc":1,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Lightning Bolt deals 3 damage to any target.","colors":["R"],"colorIdentity":["R"],"keywords":[],"artUrl":"https://cards.scryfall.io/art_crop/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.jpg?1783903008","commanderLegal":"legal","set":"msc","rarity":"uncommon","layout":"normal"}) as CardDef;
+const llanowar = (): CardDef => ({"oracleId":"68954295-54e3-4303-a6bc-fc4547a4e3a3","name":"Llanowar Elves","manaCost":"{G}","cmc":1,"typeLine":"Creature — Elf Druid","supertypes":[],"types":["Creature"],"subtypes":["Elf","Druid"],"oracleText":"{T}: Add {G}.","power":"1","toughness":"1","colors":["G"],"colorIdentity":["G"],"keywords":[],"producedMana":["G"],"artUrl":"https://cards.scryfall.io/art_crop/front/e/e/ee1a40dc-30dc-4dda-9001-aa7fb0b43bb3.jpg?1785224528","commanderLegal":"legal","set":"sld","rarity":"rare","layout":"normal"}) as CardDef;
 
 describe("Lichenthrope and Phytohydra: damage replaced by counters", () => {
   it("compile", () => supported(lichen(), phyto()));
@@ -390,5 +394,149 @@ describe("Shapeshifter: power the last chosen number, toughness 7 minus it", () 
     invalidateCharacteristics(s);
     answer = botActions(s, ap)[0];
     expect(answer).toMatchObject({ type: "chooseOption", choice: "3" });
+  });
+});
+
+describe("Halfdane: base power and toughness of another creature until the end of your next upkeep", () => {
+  it("compile", () => supported(halfdane()));
+  const bigBear = (): CardDef => ({ ...bear(), name: "Big Bear", oracleId: "big-bear", power: "5", toughness: "4" });
+  /** Passes (bots answering, no attacks) until `pid` is asked a question; their target choices are what it waits for. */
+  const untilAsked = (s: GameState, pid: PlayerId) => {
+    for (let i = 0; i < 3000; i++) {
+      const q = s.pending;
+      if (q?.player === pid && q.kind === "chooseTargets") return s;
+      if (q?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: q.player, blocks: [] });
+      else if (q?.kind === "declareAttackers") s = act(s, { type: "declareAttackers", player: q.player, attacks: [] });
+      else if (q) s = run(s, botActions(s, q.player));
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    throw new Error("never asked");
+  };
+
+  it("copies the target's power and toughness as it resolves, until the end of the next upkeep, which a new copy outlasts", () => {
+    const { s: s0, ap } = setup([]);
+    const opp = s0.turnOrder.find((x) => x !== ap)!;
+    const h = putOnBattlefield(s0, ap, halfdane());
+    const big = putOnBattlefield(s0, opp, bigBear());
+    const small = putOnBattlefield(s0, opp, bear());
+    let s = untilAsked(s0, ap);
+    expect(s.activePlayer).toBe(ap);
+    expect(s.step).toBe("upkeep");
+    expect(ptOf(s, h)).toBe("3/3");
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [tgt(big)] }), { me: [ap] });
+    expect(ptOf(s, h)).toBe("5/4");
+    // Locked in as it resolved (CR 608.2h): a counter on the Big Bear later doesn't change it.
+    s.objects[big]!.counters["+1/+1"] = 2;
+    invalidateCharacteristics(s);
+    expect(ptOf(s, h)).toBe("5/4");
+    s = goTo(s, "draw", ap);
+    expect(ptOf(s, h)).toBe("5/4");
+    // Through the other players' turns, to the next upkeep: the new copy is the newer effect (CR 613.7).
+    s = untilAsked(s, ap);
+    expect(s.step).toBe("upkeep");
+    expect(ptOf(s, h)).toBe("5/4");
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [tgt(small)] }), { me: [ap] });
+    expect(ptOf(s, h)).toBe("2/2");
+    s = goTo(s, "draw", ap);
+    expect(ptOf(s, h)).toBe("2/2");
+  });
+
+  it("with no other creature at the next upkeep, the last copy lasts through that upkeep, then it's 3/3 (rulings)", () => {
+    const { s: s0, ap } = setup([]);
+    const opp = s0.turnOrder.find((x) => x !== ap)!;
+    const h = putOnBattlefield(s0, ap, halfdane());
+    const big = putOnBattlefield(s0, opp, bigBear());
+    let s = untilAsked(s0, ap);
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [tgt(big)] }), { me: [ap] });
+    expect(ptOf(s, h)).toBe("5/4");
+    moveObject(s, big, "graveyard");
+    invalidateCharacteristics(s);
+    const next = s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % s.turnOrder.length]!;
+    s = goTo(s, "main1", next);
+    s = goTo(s, "upkeep", ap);
+    expect(s.stack.length).toBe(0);
+    expect(ptOf(s, h)).toBe("5/4");
+    s = goTo(s, "draw", ap);
+    expect(ptOf(s, h)).toBe("3/3");
+  });
+
+  it("a bot copies the biggest creature", () => {
+    const { s: s0, ap } = setup([]);
+    const bot = s0.turnOrder.find((x) => x !== ap)!;
+    const h = putOnBattlefield(s0, bot, halfdane());
+    const big = putOnBattlefield(s0, ap, bigBear());
+    putOnBattlefield(s0, bot, bear());
+    let s = untilAsked(s0, bot);
+    const answer = botActions(s, bot)[0];
+    expect(answer).toMatchObject({ type: "chooseTargets", targets: [tgt(big)] });
+    s = settle(act(s, answer!));
+    expect(ptOf(s, h)).toBe("5/4");
+  });
+});
+
+describe("Scrying Glass: a number and a color; draw if the target opponent's hand has exactly that many of that color", () => {
+  it("compile", () => supported(glass()));
+  /** The opponent's hand: the cards given, and nothing else. */
+  const handOf = (s: GameState, pid: PlayerId, defs: CardDef[]) => {
+    for (const id of [...s.players[pid]!.hand]) moveObject(s, id, "library");
+    return defs.map((d) => {
+      const id = putOnBattlefield(s, pid, d);
+      moveObject(s, id, "hand");
+      return id;
+    });
+  };
+  const use = (s0: GameState, ap: PlayerId, opp: PlayerId, n: string, color: string) => {
+    const g = putOnBattlefield(s0, ap, glass());
+    pool(s0, ap, { C: 3 });
+    let s = settle(run(s0, planActivate(s0, ap, g, 0, [{ kind: "player", id: opp }])), { me: [ap] });
+    const p = s.pending;
+    if (p?.kind !== "chooseOption" || p.what !== "number") throw new Error(JSON.stringify(p));
+    const range = p.numberRange;
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: n }), { me: [ap] });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "color" });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: color }));
+    return { s, range };
+  };
+
+  it("exactly two red cards of three: choosing 2 and red draws a card, offered 1 to 3", () => {
+    const { s: s0, ap, opp } = setup([]);
+    handOf(s0, opp, [bolt(), bolt(), llanowar()]);
+    const before = s0.players[ap]!.hand.length;
+    const { s, range } = use(s0, ap, opp, "2", "Red");
+    expect(range).toEqual({ min: 1, max: 3 });
+    expect(s.players[ap]!.hand.length).toBe(before + 1);
+  });
+
+  it("not exactly: 1 and red, or 2 and green, draws nothing", () => {
+    for (const [n, color] of [["1", "Red"], ["2", "Green"]] as const) {
+      const { s: s0, ap, opp } = setup([]);
+      handOf(s0, opp, [bolt(), bolt(), llanowar()]);
+      const before = s0.players[ap]!.hand.length;
+      const { s } = use(s0, ap, opp, n, color);
+      expect(s.players[ap]!.hand.length).toBe(before);
+    }
+  });
+
+  it("an empty hand: only 1 is offered, and nothing is drawn", () => {
+    const { s: s0, ap, opp } = setup([]);
+    handOf(s0, opp, []);
+    const before = s0.players[ap]!.hand.length;
+    const { s, range } = use(s0, ap, opp, "1", "Blue");
+    expect(range).toEqual({ min: 1, max: 1 });
+    expect(s.players[ap]!.hand.length).toBe(before);
+  });
+
+  it("a bot chooses 1 and the color the opponent has shown most", () => {
+    const { s: s0, ap, opp } = setup([]);
+    handOf(s0, opp, [bolt()]);
+    putOnBattlefield(s0, opp, llanowar());
+    putOnBattlefield(s0, opp, llanowar());
+    const g = putOnBattlefield(s0, ap, glass());
+    pool(s0, ap, { C: 3 });
+    let s = settle(run(s0, planActivate(s0, ap, g, 0, [{ kind: "player", id: opp }])), { me: [ap] });
+    const num = botActions(s, ap)[0]!;
+    expect(num).toMatchObject({ type: "chooseOption", choice: "1" });
+    s = act(s, num);
+    expect(botActions(s, ap)[0]).toMatchObject({ type: "chooseOption", choice: "Green" });
   });
 });

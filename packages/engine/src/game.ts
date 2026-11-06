@@ -3358,6 +3358,16 @@ function advanceStep(s: GameState): void {
   if (s.step === "cleanup") return startNextTurn(s);
   // "There is an additional end step after this step" (Y'shtola Rhul, CR 500.8): only an end step, no cleanup before it
   // (rulings).
+  // "Until the end of your next upkeep" (Halfdane): it ends as that player's next upkeep step ends, the first one after
+  // the step it began in (an additional one, CR 500.8, counts); for a player who left the game, as any upkeep ends
+  // (CR 800.4m).
+  if (s.step === "upkeep") {
+    const ending = s.effects.filter((e) => e.duration === "endOfYourNextUpkeep" && ((e.turnOf === s.activePlayer && (s.turn > (e.sinceTurn ?? 0) || (s.turnLog?.upkeeps ?? 0) > (e.sinceUpkeeps ?? 0))) || (e.turnOf !== undefined && player(s, e.turnOf).lost)));
+    if (ending.length) {
+      s.effects = s.effects.filter((e) => !ending.includes(e));
+      invalidateCharacteristics(s);
+    }
+  }
   // "That player gets an additional upkeep step after this step" (Paradox Haze, CR 500.8).
   if (s.step === "upkeep" && s.extraUpkeeps) {
     s.extraUpkeeps = s.extraUpkeeps > 1 ? s.extraUpkeeps - 1 : undefined;

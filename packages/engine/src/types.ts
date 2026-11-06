@@ -1373,11 +1373,14 @@ export interface ContinuousEffect {
    * as `turnOf`'s next turn begins (CR 611.2b), or when it would have for a player who left (CR 800.4m);
    * "endOfYourNextTurn" in the cleanup step of `turnOf`'s next turn after `sinceTurn` (CR 514.2); "yourNextUpkeep" as
    * the upkeep of `turnOf`'s next turn after `sinceTurn` begins; "controllersNextUntap" as the untap step of `turnOf`'s
-   * next turn after `sinceTurn` begins.
+   * next turn after `sinceTurn` begins; "endOfYourNextUpkeep" as the first upkeep step of `turnOf`'s after the one it
+   * began in (a later turn's, or a later one of turn `sinceTurn` past its `sinceUpkeeps` upkeeps, CR 500.8) ends.
    */
-  duration: "endOfTurn" | /** "Until end of combat": it ends as the combat phase ends (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "yourNextUpkeep" | "controllersNextUntap" | "whileTapped" | "whileControlled";
+  duration: "endOfTurn" | /** "Until end of combat": it ends as the combat phase ends (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "yourNextUpkeep" | /** "Until the end of your next upkeep" (Halfdane). */ "endOfYourNextUpkeep" | "controllersNextUntap" | "whileTapped" | "whileControlled";
   turnOf?: PlayerId;
   sinceTurn?: number;
+  /** With "endOfYourNextUpkeep": the upkeep steps begun in turn `sinceTurn` when it began (TurnLog.upkeeps). */
+  sinceUpkeeps?: number;
   /**
    * "For as long as ~ remains tapped" (CR 611.2b): it ends when that object (`zc` as it was) untaps, leaves the
    * battlefield or phases out (CR 702.26f); `controller`: "for as long as you control ~" too.

@@ -2607,6 +2607,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Phyrexian Grimoire (see Effect "topYardSplit"): the opponent is targeted, the cards aren't (rulings).
   if (opts.activated && text.trim() === "Target opponent chooses one of the top two cards of your graveyard. Exile that card and put the other one into your hand.")
     return { targets: [{ kind: "player", opponent: true, text: "target opponent" }], effects: [{ type: "topYardSplit", chooser: { ref: "target", index: 0 } }], text };
+  // Scrying Glass: the number and the color are chosen as it resolves, then the opponent reveals (rulings); "exactly" the
+  // chosen number of cards of the chosen color in their hand (CR 105.1: five colors).
+  if (opts.activated && text.trim() === "Choose a number greater than 0 and a color. Target opponent reveals their hand. If that opponent reveals exactly the chosen number of cards of the chosen color, you draw a card.") {
+    const opp: PlayerRef = { ref: "target", index: 0 };
+    const ofColor: Amount = { count: { kind: "cardsInHand", who: opp, filter: { kind: "object", notTypes: [], notColors: [], chosen: "color", text: "card of the chosen color" } } };
+    const chosen: Amount = { count: { kind: "chosenNumber" } };
+    return {
+      targets: [{ kind: "player", opponent: true, text: "target opponent" }],
+      effects: [
+        { type: "choose", choice: "number", range: { min: 1, max: 1 }, maxHandOf: opp },
+        { type: "choose", choice: "color" },
+        { type: "lookAtHand", who: opp, reveal: true },
+        { type: "if", cond: { kind: "amountsCompare", a: ofColor, atLeast: chosen }, effects: [{ type: "if", cond: { kind: "amountsCompare", a: chosen, atLeast: ofColor }, effects: [{ type: "draw", who: { ref: "you" }, n: 1 }] }] },
+      ],
+      text,
+    };
+  }
   // Reins of Power (see Effect "swapCreatures").
   if (opts.spell && /^Untap all creatures you control and all creatures target opponent controls\. You and that opponent each gain control of all creatures the other controls until end of turn\. Those creatures gain haste until end of turn\.$/.test(text.trim()))
     return { targets: [{ kind: "player", opponent: true, text: "target opponent" }], effects: [{ type: "swapCreatures", who: { ref: "target", index: 0 } }], text };

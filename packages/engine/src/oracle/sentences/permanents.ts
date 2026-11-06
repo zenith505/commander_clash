@@ -792,6 +792,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // trigger's creature's as it resolves, locked in then (layer 7b; rulings, CR 608.2h).
   if (/^~'s base power and toughness become equal to that creature's power and toughness until end of turn$/.test(s) && ctx.subject && !ctx.subjectIt)
     return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPT", power: { count: { kind: "power", of: { ref: "subject" } } }, toughness: { count: { kind: "toughness", of: { ref: "subject" } } } }], duration: "endOfTurn" }];
+  // Halfdane: "~'s base power and toughness become equal to the power and toughness of target creature other than ~ until
+  // the end of your next upkeep" (read as "another target creature"): that creature's as this resolves, locked in then (CR 608.2h), in layer 7b (CR 613.4b).
+  if ((m = /^~'s base power and toughness become equal to the power and toughness of (another target creature) until the end of your next upkeep$/.exec(s)) && !ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    if (what?.ref !== "target" || what.n) return null;
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPT", power: { count: { kind: "power", of: what } }, toughness: { count: { kind: "toughness", of: what } } }], duration: "endOfYourNextUpkeep" }];
+  }
   // Galion, Elvenking's Butler: "choose up to one other target creature you control. Its base power and toughness become
   // equal to ~'s power and toughness until end of turn"; Exuberant Wolfbear: "you may have the base power and toughness of
   // target Human you control become equal to ~'s power and toughness until end of turn"; Unruly Krasis: "... become X/X

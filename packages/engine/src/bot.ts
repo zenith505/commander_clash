@@ -2127,6 +2127,15 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     const picks = to ? onUs.filter((id) => controllerOf(s, obj(s, id)) !== to.id).slice(0, slots) : [];
     return [{ kind: "player", id: target.id }, ...Array.from({ length: slots }, (_, k): TargetChoice => (picks[k] ? { kind: "object", id: picks[k]! } : { kind: "none" }))];
   }
+  // Halfdane: "~'s base power and toughness become equal to the power and toughness of another target creature": the
+  // biggest one there is, whoever controls it.
+  const copyPt = body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "continuous" && body.effects[0]!.what.ref === "self" && body.effects[0]!.mods.length === 1 ? body.effects[0]!.mods[0]! : undefined;
+  if (copyPt?.kind === "setPT" && typeof copyPt.power === "object" && copyPt.power.count?.kind === "power" && copyPt.power.count.of?.ref === "target") {
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const size = (t: TargetChoice) => (t.kind === "object" ? power(s, obj(s, t.id)) * 2 + toughness(s, obj(s, t.id)) : -1);
+    const pick = [...all].sort((a, b) => size(b) - size(a))[0];
+    return pick ? [pick] : null;
+  }
   // Goblin Welder: our own cheapest artifact for a costlier artifact card in our graveyard.
   const weld = body.effects.find((e) => e.type === "weld");
   if (weld?.type === "weld") {
@@ -4328,6 +4337,8 @@ function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, 
     });
     return String(Math.max(r.min, Math.min(r.max, big ? 3 : 4)));
   }
+  // Scrying Glass: "exactly the chosen number of cards of the chosen color" in a hand we can't see: one is the likeliest.
+  if (s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "choose" && !!e.maxHandOf)) return String(r.min);
   // A resolving spell's own "choose a number" (Expel the Interlopers).
   const forSpell = s.resolving && card ? groupNumber(s, pid, card) : undefined;
   if (forSpell !== undefined) return String(forSpell);
@@ -4472,9 +4483,11 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
     return [...options].sort((a, b) => score(b) - score(a))[0]!;
   }
   // Darigaaz, the Igniter: damage for each card of the chosen color in the damaged player's hand, so the color most of
-  // the cards they've shown have (their nonland permanents, graveyard and commander), not knowing their hand.
-  if (what === "color" && /cards of that color revealed this way/.test(card?.oracleText ?? "") && s.resolving?.item.event?.player !== undefined) {
-    const them = s.resolving.item.event.player;
+  // the cards they've shown have (their nonland permanents, graveyard and commander), not knowing their hand. Scrying
+  // Glass: the same for the target opponent's hand.
+  const handOf = s.resolving?.item.event?.player ?? (s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "choose" && !!e.maxHandOf) ? (s.resolving.item.targets ?? []).flatMap((t) => (t?.kind === "player" ? [t.id] : []))[0] : undefined);
+  if (what === "color" && /cards of that color revealed this way|cards of the chosen color/.test(card?.oracleText ?? "") && handOf !== undefined) {
+    const them = handOf;
     const shown = new Map<string, number>();
     const add = (d: CardDef) => !isType(d, "Land") && d.colors.forEach((col) => shown.set(COLOR_NAMES[col], (shown.get(COLOR_NAMES[col]) ?? 0) + 1));
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === them) add(defOf(s, obj(s, id)));

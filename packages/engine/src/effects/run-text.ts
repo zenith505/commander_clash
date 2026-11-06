@@ -72,8 +72,8 @@ export function runTextEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: str
     invalidateCharacteristics(s);
     const after = defOf(s, o); // registers its definition with the new text (cards.ts)
     if (o.zone === "stack") respell(s, o, before, after);
-    // A few changed texts are ones the engine can't read (a "Plains" it takes as singular, Defiler of Faith's cost line):
-    // said in the log, as those abilities are lost.
+    // A change that leaves text the engine can't read isn't offered (readableSwap); should one get through (a word
+    // chosen another way), the log says so, as those abilities are lost.
     if (!isFullySupported(after) && isFullySupported(before)) log(s, `(The engine can't read all of ${name}'s new text: ${compileCard(after).unsupported.join(" ")})`);
   }
   log(s, `${player(s, ctx.controller).name} changes the text of ${name}: ${st.from} becomes ${to}${e.endOfTurn ? " until end of turn" : ""} (${src}).`);

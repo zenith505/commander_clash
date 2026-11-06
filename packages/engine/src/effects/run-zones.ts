@@ -2913,7 +2913,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // "If a creature card was exiled this way" (Deathbonnet Hulk): the card exiled.
         if (!toField) s.resolving!.yardChosen = found.filter((id) => obj(s, id).zone === "exile");
         // Lazav, Familiar Stranger: "become a copy of that card", the one card exiled, while it's still that card (CR 400.7).
-        if (!toField && s.resolving!.yardChosen.length === 1) s.resolving!.chosenFromYard = { id: s.resolving!.yardChosen[0]!, zc: obj(s, s.resolving!.yardChosen[0]!).zoneChanges ?? 0 };
+        const exiledOne = toField ? undefined : s.resolving!.yardChosen;
+        if (exiledOne?.length === 1) s.resolving!.chosenFromYard = { id: exiledOne[0]!, zc: obj(s, exiledOne[0]!).zoneChanges ?? 0 };
         return;
       }
       const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;

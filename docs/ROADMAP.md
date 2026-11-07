@@ -1,7 +1,7 @@
 # Roadmap
 
-30,219 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,630 of
+30,241 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,641 of
 9,979 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -196,7 +196,7 @@ line blocks.
    then it explores again"); `npm run popular` from Detention Sphere on is still to go through.
    Out after round 175: Detention Sphere (done in round 277) (exiles every permanent with the same name, and returns them all: one exile
    linked to several cards), Tangle Wire (the upkeep player taps one permanent of their choice for each fade counter),
-   Steward of the Harvest (gaining the activated abilities of exiled land cards), Agent's Toolkit (moving one counter of a chosen kind), Heroes in a Half Shell ("one or more
+   Steward of the Harvest (gaining the activated abilities of exiled land cards), Agent's Toolkit (done in round 296) (moving one counter of a chosen kind), Heroes in a Half Shell ("one or more
    ... deal combat damage" with "each of those creatures"), Ran and Shaw ("if you cast them and" a graveyard count),
    Unstable Glyphbridge (a creature chosen for each player, then destroy the rest), From the Catacombs (a corpse counter, the initiative and an exile
    replacement together), Loki, God of Mischief (done in round 275), Katsumasa, the
@@ -431,7 +431,7 @@ line blocks.
    Fixed: "until your next turn" damage effects (Lightning, Army of One) now end when that turn begins; before, they
    came back on every other player's turn.
    Out after round 188 (looked at, not done): Protean Hydra (a trigger on counters removed by any cause), Caustic Bronco
-   (no "saddled" condition), Jared Carthalion, Garland, Royal Kidnapper, Lavabrink Venturer, Earthshape, Sigarda's Splendor ("note your life total"),
+   (no "saddled" condition), Jared Carthalion (done in round 296), Garland, Royal Kidnapper, Lavabrink Venturer, Earthshape, Sigarda's Splendor ("note your life total"),
    Ochre Jelly, Green Sun's Twilight, Industrial Advancement, Froghemoth.
    Round 189 went on from the top: "copy that spell X times" (Storm King's Thunder, with X kept from the Thunder;
    Photon Blast Barrage), "choose one. If ..., (you may) choose both instead" on triggers (SOLDIER Military Program
@@ -564,8 +564,8 @@ line blocks.
    bottom of its owner's library" (The Cauldron of Eternity), "for each legendary creature and planeswalker you control"
    (Mobilized District) and "you may exile this card from your graveyard. If you do / When you do" as a spell is cast
    (Kozilek's Return, Ugin's Binding).
-   Out after round 195 (looked at, not done): Tablet of the Guilds (two colors chosen), Puca's Covenant (done in round 295), Call of the
-   Death-Dweller ("put a deathtouch counter on either of them"), Myth Unbound (a trigger in the command zone), Siona,
+   Out after round 195 (looked at, not done): Tablet of the Guilds (done in round 296) (two colors chosen), Puca's Covenant (done in round 295), Call of the
+   Death-Dweller ("put a deathtouch counter on either of them"), Myth Unbound (done in round 296) (a trigger in the command zone), Siona,
    Captain of the Pyleas ("becomes attached"), Soul Diviner (a chosen counter kind), Icingdeath, Frost Tyrant (its token
    is named like part of it), Toggo, Goblin Weaponsmith (a quoted ability inside a quoted ability), Domineering Will,
    Immerwolf, Frenzied Saddlebrute.
@@ -872,7 +872,7 @@ line blocks.
    a one-of-each picker); Puca's Mischief (a second target's mana value bound by the first one's, chosen as a set);
    Hand of Vecna ("equipped creature or a creature you control named Vecna" and a life-per-card equip cost); Grave Sifter
    (each player's own creature type); Overseer of Vault 76 ("remove three quest counters from among permanents you
-   control"); Dragon's Approach (exiling four named cards as an optional cost); Signal the Clans (a random pick if the
+   control"); Dragon's Approach (done in round 296) (exiling four named cards as an optional cost); Signal the Clans (a random pick if the
    three names differ); Fblthp, the Lost (entered or cast from the library; "becomes the target of a spell");
    Dack Fayden ("gain control of those permanents" a spell targets); Ashiok, Nightmare Muse ("then that player exiles a
    card from their hand", cast face-up exiled cards).
@@ -904,7 +904,7 @@ line blocks.
    sharing a name with one attached to that player); Archmage Ascension (a "would draw" replacement by a search);
    Eumidian Wastewaker ("discard a card or sacrifice a permanent", then counting lands put into graveyards this way);
    Plasma Caster ("target creature that's blocking equipped creature"); Curie, Emergent Intelligence (base power and a
-   copy with an extra ability); Spry and Mighty (the difference between two chosen creatures' powers); Eventide's Shadow
+   copy with an extra ability); Spry and Mighty (done in round 296) (the difference between two chosen creatures' powers); Eventide's Shadow
    (remove any number of counters from among permanents).
    Round 212 took fresh cards from ranks 5,600 to 13,300: "manifest dread, then put ... counters on that creature"
    (Underwater Tunnel // Slimy Aquarium, Moldering Gym // Weight Room, Experimental Lab) and "turn that creature face up
@@ -926,7 +926,7 @@ line blocks.
    Out after round 212 (looked at, not done): Sheltering Ancient (cumulative upkeep putting a counter on an opponent's
    creature); Power Sink ("tap all lands with mana abilities"); Zilortha (lethal damage by power everywhere); Ravenous
    Slime (a die replacement); Astral Drift and Paranormal Analyst ("whenever you manifest dread" and cycling triggers);
-   Rowan, Scion of War; Aven Courier; Galactus. Eligeth with Kenessos: Kenessos's "scry one more" applies first (draws
+   Rowan, Scion of War; Aven Courier (done in round 296); Galactus. Eligeth with Kenessos: Kenessos's "scry one more" applies first (draws
    n+1), not the controller's choice of order (CR 616.1).
    Round 213 took fresh cards from ranks 11,900 to 13,500: "each opponent chooses a permanent they control that shares a
    card type with the sacrificed permanent" (Fatal Grudge; the sacrifice cost now remembers card types); "costs {1}{U}
@@ -1077,7 +1077,7 @@ line blocks.
    including the hexproof-from variants per its rulings); Key to the Side-Door (a discard cost "with the same name as a
    legendary permanent you control"); Sivriss, Nightmare Speaker (a per-opponent loop binding "that player"); Sanctuary
    Blade (a color chosen each time it becomes attached); Eater of Virtue (keywords of the cards exiled with it); Life and
-   Limb (Forests that are Saprolings and Saprolings that are Forests, a layer 4 dependency); Tombstone Stairwell (tokens
+   Limb (Forests that are Saprolings and Saprolings that are Forests, a layer 4 dependency); Tombstone Stairwell (done in round 296) (tokens
    "created with this enchantment" destroyed at each end step); Inferno of the Star Mounts ("when its power becomes 20
    this way"); Anzrag's Rampage (put a creature card from among the exiled ones onto the battlefield, return it at end
    step); Regna's Sanction and Zndrsplt's Judgment (friend or foe with "chooses one ..., then taps the rest" and "a
@@ -2363,6 +2363,29 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands.
+   Round 296 took cards back off the "Out after round N" lists, most played first: "As ~ enters, choose two colors" (two
+   different ones, CR 614.12, asked one at a time) and "you gain 1 life for each of the chosen colors it is" (Tablet of the
+   Guilds, with a browser test); "Your commander costs {1} less to cast for each time it's been cast from the command zone
+   this game", after the tax (CR 601.2f), and "Whenever your commander is put into the command zone from anywhere" (Myth
+   Unbound); "During your turn, ~ is a 4/4 Human Soldier creature with indestructible that's still a planeswalker" (CR
+   205.1b) and "Prevent all damage that would be dealt to ~ during your turn" (Gideon Blackblade); "put a number of +1/+1
+   counters on it equal to the number of colors it is" for each of two targets, and "If that card was all colors" (Jared
+   Carthalion); "As long as you have one or fewer cards in hand, if you would draw one or more cards, you draw that many
+   cards plus one instead" (Quantum Riddler: applied before Alms Collector's replacement, a legal order, CR 616.1); "Choose
+   exactly two creatures you control ... where X is the difference between the chosen creatures' powers" (Spry and Mighty,
+   with a browser test; the bot picks the strongest and the weakest); "You may exile this spell and four cards named ~ from
+   your graveyard. If you do" (Dragon's Approach, with a browser test); "enters with a +1/+1 counter, a flying counter, a
+   deathtouch counter, and a shield counter" and "move a counter from ~ onto that creature" (Agent's Toolkit, with a browser
+   test); "choose a counter on a permanent you control. Put a counter of that kind on target permanent you control if it
+   doesn't have a counter of that kind on it" (Aven Courier, with a browser test); "each player creates ... for each creature
+   card in their graveyard" and "At the beginning of each end step and when ~ leaves the battlefield, destroy all tokens
+   created with ~" (Tombstone Stairwell). +10, 30,241 of 31,936 with B125 to B127.
+   Out after round 296 (looked at, not done): Baba Lysaga, Night Witch ("Sacrifice up to three permanents" as a cost: no
+   up-to sacrifice cost or its picker); Fisher's Talent (a level's token replacement that the next level replaces again,
+   Fish to Shark to Octopus); Archelos, Lagoon Mystic (other permanents entering tapped or untapped, on every way a
+   permanent enters); Curse of Misfortunes (a Curse searched for and put onto the battlefield attached to the enchanted
+   player, by name among the Curses attached to them); Undead Alchemist and Szadek, Lord of Secrets (Lane B's round B125
+   damage-replacement changes merged while this round ran: next round).
    Round 295 took cards back off the "Out after round N" lists, most played first: "the amount of damage dealt to ~ this
    turn by sources they controlled" for each player (Grothama, All-Devouring: TurnLog damage by the source's controller);
    "you may reveal the top card of your library. If a creature card is revealed this way, put it onto the battlefield
@@ -2555,7 +2578,7 @@ line blocks.
    Out after round 270 (looked at, not done): Dauntless Bodyguard (still no choice of a permanent as something enters);
    Tegwyll's Scouring ("cast as though it had flash by tapping three untapped creatures you control with flying": an
    extra cost only when cast at instant speed); Osgir, the Reconstructor ("Exile an artifact card with mana value X from
-   your graveyard" as a cost, then token copies of that card); Agent's Toolkit (enters with four kinds of counters, then
+   your graveyard" as a cost, then token copies of that card); Agent's Toolkit (done in round 296) (enters with four kinds of counters, then
    "move a counter" of a kind chosen).
    Out after round 269 (looked at, not done): Brimaz, Blight of Oreskos ("a Phyrexian creature or artifact creature
    spell": how the words group isn't settled enough to compile honestly); Summoner's Sending (done in round 270).
@@ -2752,12 +2775,12 @@ line blocks.
    10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, The Foretold Soldier, Radiant Scrollwielder, Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
    7, Grappling Hook (done in round 278), Otrimi, Zhao, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained (done in round 278), Identity
    Thief, Mishra, Eminent One, Spell Queller, Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon, Grub, Storied Matriarch,
-   Taskmaster, Mercenary Mimic, Gideon Blackblade, Kolvori, God of Kinship, Fisher's Talent, Niko, Light of Hope,
+   Taskmaster, Mercenary Mimic, Gideon Blackblade (done in round 296), Kolvori, God of Kinship, Fisher's Talent, Niko, Light of Hope,
    Stick Together, Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
-   Augurelt, Quintorius, Loremaster, Quantum Riddler, Model of Unity, The Flood of Mars, Sigarda's Vanguard, Master of
+   Augurelt, Quintorius, Loremaster, Quantum Riddler (done in round 296), Model of Unity, The Flood of Mars, Sigarda's Vanguard, Master of
    the Wild Hunt, Audacious Reshapers, Kiora, Sovereign of the Deep, Quest for
    Ula's Temple; the ones skipped in rounds 182, 181, 180, 179, 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere (done in round 277), Tangle Wire,
-   Steward of the Harvest, Agent's Toolkit, Heroes in a Half Shell, Ran and
+   Steward of the Harvest, Agent's Toolkit (done in round 296), Heroes in a Half Shell, Ran and
    Shaw, Unstable Glyphbridge, From the Catacombs, Loki,
    God of Mischief, Katsumasa, the Animator, Slagstone Refinery, Inalla, Archmage Ritualist, Threats Undetected,
    Leader, Super-Genius; the ones skipped since round 173: Radagast the Brown, Quicksilver Elemental, Secret of
@@ -6192,7 +6215,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   two of them, as it would return once all the same, CR 115.3), Cruel
   Calculations (cards put into the target player's graveyard from their library this turn), Clay Champion and Bladecoil
   Serpent (for each {G}{G}, {W}{W}, {U}{U}, {B}{B} or {R}{R} spent to cast it, CR 601.2h; Bladecoil's trample and haste
-  once, as gaining them again changes nothing, CR 702.19g, 702.10d). +11 (30,242 of 31,936 with B127).
+  once, as gaining them again changes nothing, CR 702.19g, 702.10d). +11 (30,252 of 31,936 with B127 and round 296).
 - Out after round B128 (looked at, not done): Bullseye, Death Dealer and Ion Storm (an activation cost with "or" between
   two costs), Price of Betrayal (counters removed from an opponent, a player, as well as permanents), Bargaining Table
   (X set by the opponent chosen as it's activated), Selective Snare (a creature type chosen as it's cast).

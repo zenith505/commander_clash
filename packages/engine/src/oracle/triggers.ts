@@ -2926,6 +2926,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // is gone, so any creature (rulings: none left, none returns, checked again as it resolves, CR 603.4); the card, if
     // it's still in the graveyard then, under its owner's control.
     .replace(/^Whenever a creature dies, if another creature is on the battlefield, return the first card to the battlefield under its owner's control at the beginning of the next end step\.$/, "Whenever a creature dies, if a creature is on the battlefield, return that card to the battlefield under its owner's control at the beginning of the next end step.")
+    // Tablet of the Guilds: "Whenever you cast a spell, if it's at least one of the chosen colors, you gain 1 life for each
+    // of the chosen colors it is.": a spell of either color chosen as it entered (CR 105.2, 202.2). The intervening if (CR
+    // 603.4) is the trigger's filter; checked again as it resolves, the life is counted from the spell's colors then (or as
+    // it last existed on the stack), and with none of them it's 0, no life gained, which is the same as the if failing.
+    .replace(/^Whenever you cast a spell, if it's at least one of the chosen colors, you gain 1 life for each of the chosen colors it is\.$/, "Whenever you cast a spell of one of the chosen colors, you gain 1 life for each of the chosen colors that spell is.")
     // Cursed Wombat's granted ability: "put an additional +1/+1 counter on it" is one more on that permanent, ~.
     .replace(/^(Whenever one or more \+1\/\+1 counters are put on ~), put an additional \+1\/\+1 counter on it\./, "$1, put a +1/+1 counter on ~.")
     // Greener Pastures: "if that player controls more lands than each other player, the player creates ...": that player.
@@ -4639,6 +4644,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (toHand) {
     const body = parseBody(toHand[1]!, {});
     return body && !/\b(?:it|~)\b/.test(toHand[1]!) ? { event: "selfToHandFromGraveyard", body } : "fail";
+  }
+  // Myth Unbound: "Whenever your commander is put into the command zone from anywhere, draw a card": a commander you own
+  // (CR 903.3) moved there, from the battlefield instead of a library (CR 903.9b) or from a graveyard or exile (903.9a).
+  const toCommand = /^Whenever your commander is put into the command zone from anywhere, (.+)$/.exec(line);
+  if (toCommand) {
+    const body = parseBody(toCommand[1]!, {});
+    return body && !/\b(?:it|~|that card|that commander)\b/.test(toCommand[1]!) ? { event: "yourCommanderToCommand", body } : "fail";
   }
   const anywhere = /^When ~ is put into (?:a|your) graveyard from anywhere, (.+)$/.exec(line);
   if (anywhere) {

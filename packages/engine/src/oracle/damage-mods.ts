@@ -111,6 +111,12 @@ function parseTo(t: string | undefined, attached: boolean): DamageMod["to"] | nu
  * deal combat damage, it deals double that damage instead"). Null when the line isn't one, or isn't fully understood.
  */
 export function parseDamageMod(line: string): StaticAbility | null {
+  // Gideon Blackblade: "Prevent all damage that would be dealt to ~ during your turn" is "During your turn, prevent all
+  // damage that would be dealt to ~" (damage that can't be prevented is still dealt, rulings).
+  if (line === "Prevent all damage that would be dealt to ~ during your turn.") {
+    const a = parseDamageMod("During your turn, if a source would deal damage to ~, prevent that damage.");
+    return a && { ...a, text: line, mods: a.mods.map((m) => (m.kind === "damageMod" ? { ...m, mod: { ...m.mod, text: line } } : m)) };
+  }
   // Personal Sanctuary: "During your turn, prevent all damage that would be dealt to you": only while it's your turn.
   const during = /^During your turn, ([a-z].+)$/.exec(line);
   if (during) {

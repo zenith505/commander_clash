@@ -14,6 +14,9 @@ import { parseAffected, parseStaticCondition, parseStaticMods, parseUntargetable
 /**
  * Whole sentences about every player's cards that other templates would take apart (tried before them), or undefined.
  */
+
+/** "Any number of" cards: as many as there are. */
+export const ANY_NUMBER = 999;
 export function parseEveryPlayerZonesSentence(s: string, ctx: Ctx): Effect[] | undefined {
   if (s === "Put all creatures on the bottom of their owners' libraries") return [{ type: "putAllOnBottom", filter: { kind: "object", types: ["Creature"], text: "creature" } }];
   // Living Death: each part for all players at once (rulings, Effect livingDeath).
@@ -714,7 +717,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (/^[Rr]eturn X cards at random from your graveyard to your hand$/.test(s)) return [{ type: "randomFromGraveyard", dest: "hand", n: { count: { kind: "x" } } }];
   // Tomb Tyrant: "Return a Zombie creature card at random from your graveyard to the battlefield": a creature card, so a
   // permanent card (CR 110.4b).
-  if ((m = /^[Rr]eturn an? (.+? creature card) at random from your graveyard to the battlefield$/.exec(s))) {
+  // Kheru Lich Lord: "return a creature card at random from your graveyard to the battlefield" ("it" after it is the
+  // permanent it became, see noteLast).
+  if ((m = /^[Rr]eturn an? ((?:.+? )?creature card) at random from your graveyard to the battlefield$/.exec(s))) {
     const filter = parseSearchFilter(m[1]!);
     return filter?.types?.includes("Creature") ? [{ type: "randomFromGraveyard", dest: "battlefield", filter }] : null;
   }
@@ -937,6 +942,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Augusta, Order Returned: "each player exiles a card from their graveyard": each chooses one in APNAP order, then all
   // the chosen cards are exiled at the same time (CR 101.4, rulings).
   if (/^[Ee]ach player exiles a card from their graveyard$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, dest: "exile", who: { ref: "eachPlayer" } }];
+  // Grave Consequences: "Each player may exile any number of cards from their graveyard": each chooses theirs in APNAP
+  // order, then they're all exiled at the same time (CR 101.4).
+  if (/^[Ee]ach player may exile any number of cards from their graveyard$/.test(s)) return [{ type: "chooseFromGraveyard", n: ANY_NUMBER, upTo: true, dest: "exile", who: { ref: "eachPlayer" } }];
   // Watchers of the Dead: "Each opponent chooses two cards in their graveyard and exiles the rest": each chooses in APNAP
   // order, knowing the choices before, then all the other cards are exiled at once; with two or fewer, none (rulings).
   if ((m = /^(Each opponent|Each player) chooses (a|one|two|three) cards? in their graveyard and exiles the rest$/.exec(s))) {

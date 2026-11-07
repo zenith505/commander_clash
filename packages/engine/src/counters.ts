@@ -10,14 +10,15 @@ import type { GameObject, GameState, ObjectId, PlayerId } from "./types";
 import { opponents } from "./game";
 import { fireEvent } from "./effects";
 
-function modsInPlay(s: GameState): { mod: CountMod; controller: PlayerId; source: string }[] {
-  const out: { mod: CountMod; controller: PlayerId; source: string }[] = [];
+function modsInPlay(s: GameState): { mod: CountMod; controller: PlayerId; source: string; resolved?: true }[] {
+  const out: { mod: CountMod; controller: PlayerId; source: string; resolved?: true }[] = [];
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     for (const mod of abilitiesOf(s, o).countMods ?? []) out.push({ mod, controller: controllerOf(s, o), source: id });
   }
-  // Kaya, Geist Hunter: those a resolved ability made for this turn.
-  for (const x of s.turnCountMods ?? []) if (x.turn === s.turn) out.push({ mod: x.mod, controller: x.controller, source: x.source });
+  // Kaya, Geist Hunter, Prairie Dog: those a resolved ability made for this turn (not a permanent's, so CR 614.12 doesn't
+  // keep them off the permanent they came from as it enters).
+  for (const x of s.turnCountMods ?? []) if (x.turn === s.turn) out.push({ mod: x.mod, controller: x.controller, source: x.source, resolved: true });
   return out;
 }
 
@@ -86,13 +87,14 @@ export function countersToPut(s: GameState, o: GameObject, kind: string, n: numb
   const isCreature = types.includes("Creature");
   const fits = (on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet" | "creatureOrVehicle") => on === "permanent" || isCreature || (on === "artifactOrCreature" && types.includes("Artifact")) || (on === "creatureSpacecraftOrPlanet" && (subtypes.includes("Spacecraft") || subtypes.includes("Planet"))) || (on === "creatureOrVehicle" && subtypes.includes("Vehicle"));
   const ops = modsInPlay(s)
-    .filter(({ mod, controller, source }) => {
+    .filter(({ mod, controller, source, resolved }) => {
       if (mod.what !== "counters" || "onPlayer" in mod) return false;
       if ("modular" in mod && mod.modular && !modularNow) return false;
       // Mowu, Loyal Companion: only on itself, as it enters too (it affects only that permanent, CR 614.12; rulings).
       if ("self" in mod && mod.self) return source === o.id && (mod.counter === undefined || mod.counter === kind);
-      if ((("other" in mod && mod.other) || entering) && source === o.id) return false;
-      if ("putter" in mod && mod.putter) return putterFits(s, mod, controller, putter) && (!mod.putOn || (owner === controller && (mod.putOn === "permanentYouControl" || isCreature || types.includes("Planeswalker"))));
+      if (!resolved && (("other" in mod && mod.other) || entering) && source === o.id) return false;
+      if ("putter" in mod && mod.putter)
+        return putterFits(s, mod, controller, putter) && (mod.counter === undefined || mod.counter === kind) && (!mod.putOn || (owner === controller && (mod.putOn === "permanentYouControl" || isCreature || (mod.putOn !== "creatureYouControl" && types.includes("Planeswalker")))));
       return (mod.counter === undefined || mod.counter === kind) && fits(mod.on!) && (!mod.subtypes || mod.subtypes.some((st) => subtypes.includes(st) || (!!allCreatureTypes && CREATURE_TYPES.has(st)))) && (mod.who === "any" || controller === owner);
     })
     .map(({ mod }) => mod.op);
@@ -109,7 +111,7 @@ export function playerCountersToPut(s: GameState, pid: PlayerId, kind: string, n
   if (kind === "poison" && s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).noPoisonForYou && controllerOf(s, s.objects[id]!) === pid)) return 0;
   const putter = putterNow ?? pid;
   const ops = modsInPlay(s)
-    .filter(({ mod, controller }) => ("onPlayer" in mod && pid === controller && (!mod.counter || mod.counter === kind)) || ("putter" in mod && !!mod.putter && putterFits(s, mod, controller, putter) && (!mod.putOn || (mod.putOn === "creatureOrPlaneswalkerYouControlOrYou" && pid === controller))))
+    .filter(({ mod, controller }) => ("onPlayer" in mod && pid === controller && (!mod.counter || mod.counter === kind)) || ("putter" in mod && !!mod.putter && putterFits(s, mod, controller, putter) && (mod.counter === undefined || mod.counter === kind) && (!mod.putOn || (mod.putOn === "creatureOrPlaneswalkerYouControlOrYou" && pid === controller))))
     .map(({ mod }) => mod.op);
   return apply(n, ops, kind === "poison" || kind === "rad");
 }

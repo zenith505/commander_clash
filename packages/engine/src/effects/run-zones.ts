@@ -428,7 +428,7 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
     const whose = e.youChoose ? ` in ${pid === ctx.controller ? "your" : `${p.name}'s`} graveyard` : e.fromYours ? ` in ${player(s, ctx.controller).name}'s graveyard` : "";
     // Dredge the Mire: they choose for you, so the card that helps you least (bots), as Visions of Dread.
     const forYou = e.underYours && pid !== ctx.controller ? { forPlayer: ctx.controller, helps: true as const, under: ctx.controller } : {};
-    const what = e.n > 1 ? `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
+    const what = e.n >= 999 ? `any number of ${kind.replace(/\bcard\b/, "cards")}` : e.n > 1 ? `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
     s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : pid, source: src, what: `${what}${whose}`, ...forYou, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest === "exile" || e.dest === "keep" ? e.dest : toHand ? "hand" : "battlefield" };
     return "paused";
   }
@@ -3029,6 +3029,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       } else if ((e.dest === "battlefield" || isPermanentCard(d)) && d.types.includes("Creature") && !d.subtypes.includes("Aura")) {
         log(s, `${src}: ${d.name} is chosen at random and put onto the battlefield${p.id === ctx.controller ? "" : ` under ${player(s, ctx.controller).name}'s control`}.`);
         moveObject(s, o.id, "battlefield", { controller: ctx.controller }); // CR 110.2a
+        // Kheru Lich Lord: "It gains flying, trample, and haste. ..." is about the permanent it became.
+        if (s.resolving && o.zone === "battlefield") s.resolving.created = [o.id];
       } else if (e.dest === "creatureOrHand") {
         log(s, `${src}: ${d.name} is chosen at random and put into ${p.name}'s hand.`);
         moveObject(s, o.id, "hand");

@@ -2,7 +2,7 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { Amount, CounterKind, Modification, FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { canonicalKeyword, LAND_TYPES, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, SACRIFICED_LANDWALK, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
+import { canonicalKeyword, LAND_TYPES, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, SACRIFICED_LANDWALK, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CHOSEN_PARITY_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -2175,6 +2175,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "As an additional cost to cast this spell, sacrifice a creature." (CR 601.2b, 601.2f-h)
     const extra = /^As an additional cost to cast (?:this spell|~), (.+)\.$/.exec(line);
+    // Kaervek's Spite: "sacrifice all permanents you control and discard your hand": two costs with nothing to choose, paid
+    // as it's cast (CR 601.2h; rulings: once, not any number of times). Spells only.
+    if (extra?.[1] === "sacrifice all permanents you control and discard your hand" && !d.types.some((t) => t !== "Instant" && t !== "Sorcery")) {
+      (out.additionalCosts ??= []).push({ kind: "sacrificeAll" }, { kind: "discardHand" });
+      continue;
+    }
     if (extra) {
       const cost = parseAdditionalCost(extra[1]!, true);
       const or = cost ? null : parseCostOr(extra[1]!);
@@ -6253,6 +6259,8 @@ export function compile(d: CardDef): CompiledCard {
   if (out.entersWithCounters?.escaped !== undefined && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   if (out.entersCounterChoice?.escaped && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   checkCastingLinks(out);
+  // Lavabrink Venturer: protection "of the chosen quality" needs odd or even chosen as it enters (CR 614.12).
+  if (JSON.stringify([out.statics, out.triggers, out.activated, out.spell]).includes(CHOSEN_PARITY_PROTECTION) && !out.entersChoose?.some((c) => c.what === "parity")) out.unsupported.push("(protection of a chosen quality with no odd or even chosen as it enters)");
   // Grandeur's "Discard another card named ~": the card's own name (a copy has it too, CR 707.2).
   for (const ab of out.activated)
     if (ab.costs?.some((c) => c.kind === "discard" && c.filter?.named === "~"))

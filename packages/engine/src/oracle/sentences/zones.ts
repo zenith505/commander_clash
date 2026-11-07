@@ -666,6 +666,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToTarget }] : null;
   }
+  // Traveling Plague: "When enchanted creature leaves the battlefield, that creature's controller returns ~ from its owner's
+  // graveyard to the battlefield": the Aura's card that state-based actions put there (CR 704.5m), under the control of
+  // the creature's controller as it last existed (CR 608.2h, 110.2a), who chooses what it enchants (CR 303.4f, rulings);
+  // with nothing it could enchant, it stays (303.4g). It's a new object, with no counters (CR 400.7).
+  if (ctx.auraCard && ctx.subject && /^[Tt]hat creature's controller returns ~ from its owner's graveyard to the battlefield$/.test(s)) {
+    const who = parsePlayer("that creature's controller", ctx);
+    return who?.ref === "subjectController" ? [{ type: "putOntoBattlefield", what: { ref: "selfCard", moved: true }, under: who }] : null;
+  }
   if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield attached to that creature$/.test(s))
     return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToSubject: true }];
   // Sword of the Meek: "Return ~ from your graveyard to the battlefield, then attach it to that creature": it returns,
@@ -1597,8 +1605,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (ctx.activated && /^Return the exiled card to its owner's hand$/.test(s)) return [{ type: "bounce", what: { ref: "linkedCard" } }];
   // "When ~ leaves the battlefield, return the exiled card to the battlefield under its owner's control" (Fiend
   // Hunter): the cards its own exile ability took (CR 607.2a); compile() links the two.
-  if ((m = /^Return the exiled (?:card|cards|permanent|permanents|creature|creatures) to (the battlefield under (?:its|their) owners?'s? control|(?:its|their) owners?'s? hands?)$/i.exec(s)) && ctx.selfCard)
-    return [{ type: "returnLinked", dest: /^the battlefield/i.test(m[1]!) ? "battlefield" : "hand" }];
+  // Realm Razer: "return the exiled cards to the battlefield tapped under their owners' control", the same, tapped.
+  if ((m = /^Return the exiled (?:card|cards|permanent|permanents|creature|creatures) to (the battlefield (tapped )?under (?:its|their) owners?'s? control|(?:its|their) owners?'s? hands?)$/i.exec(s)) && ctx.selfCard)
+    return [{ type: "returnLinked", dest: /^the battlefield/i.test(m[1]!) ? "battlefield" : "hand", ...(m[2] ? { tapped: true as const } : {}) }];
   // Savior of Ollenbock: "When ~ leaves the battlefield, put the exiled cards onto the battlefield under their owners'
   // control": the same, the cards its own exile ability took (CR 607.2a).
   if (/^Put the exiled cards onto the battlefield under their owners' control$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "battlefield" }];

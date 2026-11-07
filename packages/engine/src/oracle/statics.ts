@@ -840,6 +840,10 @@ export function parseActivateCondition(text: string): StaticCondition | null {
     return conds.every((c): c is StaticCondition => !!c) ? { kind: "anyOf", conds } : null;
   }
   if (/^~ entered (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn" };
+  // Ashen Ghoul: "Activate only during your upkeep and only if three or more creature cards are above ~": cards put into
+  // its owner's graveyard after it (rulings, CR 404.1), counted as it's activated (CR 602.5b).
+  const above = /^(two|three|four|five) or more creature cards are above ~$/.exec(text);
+  if (above) return { kind: "selfInGraveyard", creaturesAbove: ["two", "three", "four", "five"].indexOf(above[1]!) + 2 };
   // Rocket Launcher (CR 302.6's test, for its controller's most recent turn).
   if (/^you've controlled ~ continuously since the beginning of your most recent turn$/.test(text)) return { kind: "self", is: "controlledSinceYourTurnBegan" };
   // Idol of Oblivion: "Activate only if you created a token this turn."
@@ -884,6 +888,8 @@ function parseTurnPoint(text: string): StaticCondition | null {
     "before attackers are declared": "beforeAttackers",
     "before blockers are declared": "beforeBlockers",
     "before the combat damage step": "beforeDamage",
+    // Dwarven Sea Clan: the end of combat step of the turn's first combat (CR 506.8d-e, 506.8g).
+    "before the end of combat step": "beforeEndCombat",
     "after combat": "afterCombat",
   };
   const w = points[text];

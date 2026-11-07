@@ -947,6 +947,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
         refs.add("subject");
         whats.add(JSON.stringify(y.to));
       }
+      // Dwarven Sea Clan: "Choose target attacking or blocking creature .... ~ deals 2 damage to that creature at end of
+      // combat": about the target as it is now (CR 603.7c, 400.7), not targeted again; ~ deals it even if it has left.
+      if (y.type === "damage" && "ref" in y.to && y.to.ref === "target" && ctx.activated && !ctx.spell && !y.by) {
+        refs.add("target");
+        whats.add(JSON.stringify(y.to));
+      }
       if ("who" in y && (y.who as PlayerRef).ref !== "you") players = false;
       if (y.type === "delayed") players = false;
     }

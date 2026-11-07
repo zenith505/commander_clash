@@ -13274,6 +13274,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7d69be1e-701a-4bcb-a83e-38b4174f7828",
+  "name": "Kaervek's Spite",
+  "manaCost": "{B}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, sacrifice all permanents you control and discard your hand.\nTarget player loses 5 life.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "vis",
+  "releasedAt": "1997-02-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "395a7bd6-7c2d-448e-842c-ca53256d7008",
   "name": "Kaho, Minamo Historian",
   "manaCost": "{2}{U}{U}",
@@ -14499,6 +14525,37 @@
   "set": "uma",
   "releasedAt": "2018-12-07",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ea66ffa3-d084-434f-91a6-fdff49806285",
+  "name": "Lavabrink Venturer",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "As this creature enters, choose odd or even. (Zero is even.)\nThis creature has protection from each mana value of the chosen quality.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "iko",
+  "releasedAt": "2020-04-24",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -27055,6 +27112,36 @@
   "set": "inv",
   "releasedAt": "2000-10-02",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "371e8e29-f569-4b23-bae4-cf89e5b09fd3",
+  "name": "Traveling Plague",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nAt the beginning of each upkeep, put a plague counter on this Aura.\nEnchanted creature gets -1/-1 for each plague counter on this Aura.\nWhen enchanted creature leaves the battlefield, that creature's controller returns this Aura from its owner's graveyard to the battlefield.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "ody",
+  "releasedAt": "2001-10-01",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

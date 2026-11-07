@@ -1282,6 +1282,13 @@ export function parseTargetPhrase(
     const head = parseTargetPhrase(activeSince[1]!, opts);
     return head?.kind === "object" && !head.controller && !head.controlledSinceTurnBegan ? { ...head, activeController: true, controlledSinceTurnBegan: true, text: `${head.text} the active player has controlled continuously since the beginning of the turn` } : null;
   }
+  // Dwarven Sea Clan, Seasinger: "target (attacking or blocking) creature whose controller controls an Island": a creature
+  // whose controller controls an Island as it's chosen and as the ability resolves (CR 608.2b, rulings).
+  const islander = /^(.+?) whose controller controls an Island$/.exec(phrase.trim());
+  if (islander) {
+    const head = parseTargetPhrase(islander[1]!, opts);
+    return head?.kind === "object" && !head.controller && !head.controllerControlsSubtype ? { ...head, controllerControlsSubtype: "Island", text: `${head.text} whose controller controls an Island` } : null;
+  }
   // Clockspinning, Timecrafting, Fury Charm: "target permanent or suspended card"; Jhoira's Timebug: "target permanent you
   // control or suspended card you own": one target, a permanent or a suspended card, one that has suspend, is in exile
   // and has a time counter on it (CR 702.62b, rulings) (TargetSpec.orSuspended).

@@ -1033,7 +1033,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (d.targets === undefined && specs.length && specs.every((t) => t.skip)) return continueCast({ ...d, targets: specs.map(() => ({ kind: "none" })) });
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: skipped(specs, []), label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
     for (const c of castExtraCosts(card, d, d.x ?? 0, s, HUMAN)) {
-      if (c.kind === "payLife" || c.kind === "payEnergy" || c.kind === "revealHand" || c.kind === "mill" || (c.kind === "discard" && c.random)) continue;
+      if (c.kind === "payLife" || c.kind === "payEnergy" || c.kind === "revealHand" || c.kind === "sacrificeAll" || c.kind === "discardHand" || c.kind === "mill" || (c.kind === "discard" && c.random)) continue;
       // Conspiracy Unraveler: collect evidence 10 rather than pay the mana cost (CR 701.59a, 118.9).
       if (c.kind === "collectEvidence") {
         if (d.collect !== undefined) continue;
@@ -2138,6 +2138,8 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "discard") return `discard ${n(c.n, c.filter?.text ?? "card")}${c.random ? " at random" : ""}`;
   if (c.kind === "returnToHand") return `return ${n(c.n, c.filter.text)} to hand`;
   if (c.kind === "revealHand") return "reveal your hand";
+  if (c.kind === "sacrificeAll") return "sacrifice all permanents you control";
+  if (c.kind === "discardHand") return "discard your hand";
   if (c.kind === "giveLife") return c.each ? `have each other player gain ${c.n} life` : `have an opponent gain ${c.n} life`;
   if (c.kind === "tap") return `${c.untap ? "untap" : "tap"} ${n(c.n, c.filter.text)}`;
   if (c.kind === "reveal" && c.orControl) return `behold ${beholdWhat(c)}${c.exile ? " and exile it" : ""}`;

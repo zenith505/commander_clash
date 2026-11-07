@@ -686,6 +686,17 @@ function reflectionKey(s: GameState, o: GameObject): string | undefined {
   return key;
 }
 
+/**
+ * "Attacking alone", "blocking alone" (CR 506.5): it's attacking (blocking) and no other creature is, counting those
+ * leaving the battlefield at the same time as it (s.leftTogether, their last known information).
+ */
+function combatAlone(s: GameState, o: GameObject): "attacking" | "blocking" | undefined {
+  const others = [...s.battlefield.filter((id) => id !== o.id).map((id) => ({ attacking: s.objects[id]!.attacking, blocking: s.objects[id]!.blocking })), ...(s.leftTogether ?? []).filter((l) => l.id !== o.id).map((l) => ({ attacking: s.lastKnown?.[l.id]?.attacking, blocking: s.lastKnown?.[l.id]?.blocking }))];
+  if (o.attacking !== undefined) return others.some((x) => x.attacking !== undefined) ? undefined : "attacking";
+  if (o.blocking?.length) return others.some((x) => !!x.blocking?.length) ? undefined : "blocking";
+  return undefined;
+}
+
 /** Move an object between zones. It becomes a new object with no memory of its old one (CR 400.7). */
 /** The name of a permanent whose ability stops this card entering the battlefield from its graveyard or library. */
 export function cantEnterFromHere(s: GameState, o: GameObject, zone: "graveyard" | "library", faceDown = false): string | undefined {
@@ -994,10 +1005,13 @@ export function moveObject(
   // The permanent as it last existed, for "whenever a creature you control with a +1/+1 counter dies".
   const snapshot: GameObject | undefined = fromZone === "battlefield" ? { ...o, counters: lastCounters } : undefined;
   const snapshotKey = cardIdOf(o);
+  // Thijarian Witness: "if it was attacking or blocking alone" (CR 506.5): no other creature attacking (blocking) as it
+  // left, ones leaving at the same time included (they were still in combat then, CR 603.10a).
+  const aloneIn = fromZone === "battlefield" ? combatAlone(s, o) : undefined;
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
@@ -7550,6 +7564,13 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       if (p.library.length < c.n) return `you need ${c.n === 1 ? "a card" : `${c.n} cards`} in your library to ${c.exile ? "exile" : "mill"} to ${doing}`;
       continue;
     }
+    // Kaervek's Spite: every permanent you control, so not with one that can't be sacrificed (CR 118.3).
+    if (c.kind === "sacrificeAll") {
+      const stuck = s.battlefield.map((id) => obj(s, id)).find((x) => controllerOf(s, x) === pid && !canSacrificeForCost(s, x));
+      if (stuck) return `${defOf(s, stuck).name} can't be sacrificed, so you can't sacrifice all your permanents to ${doing}`;
+      continue;
+    }
+    if (c.kind === "discardHand") continue; // an empty hand pays it too
     if (c.kind === "giveLife") {
       // A player who can't gain life can't be had gain life to pay a cost (CR 119.7; Invigorate rulings), though a
       // replaced life gain (Sulfuric Vortex's) can. Players who left the game aren't players any more (CR 800.4a).
@@ -7989,6 +8010,17 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       const n = millCount(s, p.id, c.n);
       log(s, `${p.name} mills ${n === 1 ? "a card" : `${n} cards`}.`);
       for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard", { milled: true });
+    } else if (c.kind === "sacrificeAll") {
+      // Kaervek's Spite: all of them at once (CR 701.21a), as they are now.
+      const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p.id);
+      log(s, ids.length ? `${p.name} sacrifices all their permanents: ${ids.map((id) => nameOf(s, id)).join(", ")}.` : `${p.name} has no permanents to sacrifice.`);
+      for (const id of ids) moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
+      closeZoneBatch(s);
+    } else if (c.kind === "discardHand") {
+      const ids = [...p.hand];
+      if (!ids.length) log(s, `${p.name} discards their hand (it's empty).`);
+      discarded?.push(...ids.map((id) => cardIdOf(obj(s, id))));
+      discardCards(s, p.id, ids);
     } else if (c.kind === "revealHand") log(s, `${p.name} reveals their hand${p.hand.length ? `: ${p.hand.map((id) => nameOf(s, id)).join(", ")}` : " (it's empty)"}.`);
     else if (c.kind === "giveLife") {
       // Unchosen (a caller that didn't ask), the cost is still paid: by the first opponent who can gain life.

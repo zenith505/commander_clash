@@ -177,6 +177,12 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     const base = parseSearchFilter(kindred[1]!, count);
     return base ? { ...base, sharesTypeWithAttached: true, text: p } : null;
   }
+  // Conjurer's Mantle: "a card that shares a creature type with that creature" (the trigger's subject), bound as the look
+  // resolves.
+  if (p === "card that shares a creature type with that creature") return { kind: "card", types: [], notTypes: [], notColors: [], sharesTypeWithSubjectCreature: true, text: p };
+  // Radagast the Brown: "a creature card that doesn't share a creature type with a creature you control", bound as the look
+  // resolves.
+  if (p === "creature card that doesn't share a creature type with a creature you control") return { kind: "card", types: ["Creature"], notTypes: [], notColors: [], notKinOfYourCreatures: true, text: p };
   // Fang-Druid Summoner: "a creature card with no abilities", by its printed text (TargetSpec.noAbilities).
   const noAb = /^(.+ card) with no abilities$/.exec(p);
   if (noAb) {

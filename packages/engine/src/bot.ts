@@ -3084,7 +3084,12 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
   // Nimble Hobbit: "When you do, tap target creature an opponent controls": a little, with an untapped one to tap.
   const reflexKind = reflex && reflex.targets.length === 1 && reflex.effects.length === 1 ? reflex.effects[0]!.type : undefined;
   const buys = (reflexKind === "destroy" || reflexKind === "tap") && s.battlefield.some((id) => opponents(s, pid).includes(controllerOf(s, obj(s, id))) && !(reflexKind === "tap" && obj(s, id).tapped) && objectMatches(s, reflex!.targets[0]!, obj(s, id), pid, false)) ? (reflexKind === "destroy" ? 6 : 2) : 0;
-  const penalty = mode && pu.losesSource ? sourceWorth : mode ? (controller === pid ? buys : controller === undefined || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.hurts ? hurtCost : doomed ? (doomed.zone === "battlefield" && !objHasKeyword(s, doomed, "Indestructible") ? worth(s, pid, doomed) : 0) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
+  // Carrion Rats: "If a player does, ~ assigns no combat damage this turn": worth it only to the player it's attacking or
+  // whose creature it's blocking, about the damage it would deal.
+  const quiet = mode === "ifAny" && s.resolving ? allEffects(s.resolving.body.effects).find((x) => x.type === "punisher" && x.mode === "ifAny" && x.effects.length === 1 && x.effects[0]!.type === "noCombatDamage" && x.effects[0]!.what.ref === "self") : undefined;
+  const rat = quiet && s.resolving?.item.sourceId ? s.objects[s.resolving.item.sourceId] : undefined;
+  const ratThreat = rat?.zone === "battlefield" ? (rat.attacking === pid || (rat.blocking !== undefined && [rat.blocking].flat().some((b) => s.objects[b] && controllerOf(s, obj(s, b)) === pid)) ? Math.max(1, power(s, rat)) : 0) : 0;
+  const penalty = quiet ? (controller === pid || settled ? 0 : ratThreat) : mode && pu.losesSource ? sourceWorth : mode ? (controller === pid ? buys : controller === undefined || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.hurts ? hurtCost : doomed ? (doomed.zone === "battlefield" && !objHasKeyword(s, doomed, "Indestructible") ? worth(s, pid, doomed) : 0) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
   const cost = (o: string): number => {
     if (o === "none") return penalty;
     const w = pu.options[Number(o)];
@@ -3108,6 +3113,13 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
     // Distant Memories: the one card it found, rather than the three cards it draws if no one does.
     if ("allow" in w) return 1;
     if ("halfLife" in w) return lifeCost(w.halfLife === "up" ? Math.ceil(Math.max(0, p.life) / 2) : Math.floor(Math.max(0, p.life) / 2));
+    // Tainted Specter: a card from our hand put back on top, drawn again later: a turn's draw, less than losing it.
+    if ("handToTop" in w) return p.hand.length - takenDiscards < w.handToTop ? Infinity : 1.5 * w.handToTop;
+    // Carrion Wurm: cards from our own graveyard, little unless we have a use for them there.
+    if ("exileFromGraveyard" in w) {
+      const yard = [...p.graveyard].sort((a, b) => Number(usefulInGraveyard(s, a)) - Number(usefulInGraveyard(s, b)) || mv(s, a) - mv(s, b)).slice(0, w.exileFromGraveyard);
+      return yard.length < w.exileFromGraveyard ? Infinity : yard.reduce((t, id) => t + (usefulInGraveyard(s, id) ? 4 : 0.5), 0);
+    }
     const mana = (w.pay.generic === undefined ? 0 : typeof w.pay.generic === "number" ? w.pay.generic : 3) + manaValue(parseManaCost(w.pay.cost));
     return availableMana(s, pid) >= mana ? mana / 2 + (w.pay.life ?? 0) : Infinity;
   };

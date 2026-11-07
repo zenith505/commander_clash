@@ -880,6 +880,12 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const same = ctx.sourceZc === undefined || zc === ctx.sourceZc || (zc === ctx.sourceZc + 1 && o.zone !== "battlefield");
       return same ? (o.mutations ?? 0) : 0;
     }
+    case "regenerations": {
+      // Spiny Starfish: the times it regenerated this turn, of that object only (CR 400.7).
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!o || o.zone !== "battlefield" || (ctx.sourceZc !== undefined && (o.zoneChanges ?? 0) !== ctx.sourceZc)) return 0;
+      return o.regenerated?.turn === s.turn ? o.regenerated.n : 0;
+    }
     case "stationPower": {
       // Its power as the ability resolves, or as it last existed; negative power puts on no counters (rulings).
       const st = ctx.stationed;
@@ -1610,6 +1616,8 @@ function describeCount(c: Count): string {
       return c.heads ? "coins that came up heads" : c.lost ? "flips lost" : "flips won";
     case "mutations":
       return "times mutated";
+    case "regenerations":
+      return "times it regenerated this turn";
     default:
       return c.kind;
   }

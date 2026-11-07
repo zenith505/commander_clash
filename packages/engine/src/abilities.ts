@@ -54,7 +54,7 @@ export interface PayCost {
  * One way to avoid a punisher's penalty: discard that many cards, sacrifice a permanent like this (`n` of them: "two
  * creatures"), pay, or have the source deal that much damage to you ("any opponent may have it deal 4 damage to them").
  */
-export type PunisherOption = { discard: number; /** "Unless they discard a nonland card" (Bandit's Talent): only cards like this. */ filter?: TargetSpec } | { sacrifice: TargetSpec; n?: number } | { pay: UnlessPays } | { /** "Equal to ~'s power" (Combustion Man): worked out as the punisher starts. */ damage: Amount } | { /** "Any opponent may have you put that card into your hand" (Distant Memories): nothing to pay, only a choice; its button's label. */ allow: string } | { /** "Any player may pay half their life, rounded up" (Temporal Extortion): half their own life total as it's paid (CR 107.1a, 119.4). */ halfLife: "up" | "down" };
+export type PunisherOption = { discard: number; /** "Unless they discard a nonland card" (Bandit's Talent): only cards like this. */ filter?: TargetSpec } | { sacrifice: TargetSpec; n?: number } | { pay: UnlessPays } | { /** "Equal to ~'s power" (Combustion Man): worked out as the punisher starts. */ damage: Amount } | { /** "Any opponent may have you put that card into your hand" (Distant Memories): nothing to pay, only a choice; its button's label. */ allow: string } | { /** "Any player may pay half their life, rounded up" (Temporal Extortion): half their own life total as it's paid (CR 107.1a, 119.4). */ halfLife: "up" | "down" } | { /** "Any player may exile three cards from their graveyard" (Carrion Wurm): that many cards of their choice from their own graveyard. */ exileFromGraveyard: number } | { /** "Unless they put a card from their hand on top of their library" (Tainted Specter): that many cards of their choice from their hand. */ handToTop: number };
 
 export interface UnlessPays {
   cost: string;
@@ -528,6 +528,8 @@ export type Count =
   | { kind: "aurasYouControlledAttached" }
   /** "The number of times ~ has mutated" (CR 702.140d): the source's, also as it last existed (CR 608.2h). */
   | { kind: "mutations" }
+  /** Spiny Starfish: "for each time it regenerated this turn" (CR 701.19): the source's, while it's still that object (GameObject.regenerated). */
+  | { kind: "regenerations" }
   /** "For each creature that died this turn" (CR 700.4); `yours`: "that died under your control this turn". */
   /** "For each creature that left the battlefield under your control this turn" (Kutzil's Flanker): a token too. */
   | { kind: "creaturesLeftThisTurn" }
@@ -2145,7 +2147,7 @@ export type StaticCondition =
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   /** `controlledThisTurn`: "it came under your control this turn" (CR 302.6). `hasCounter`: a counter of any kind on it. `not`: "~ didn't attack this turn" (Air Nomad Student). */
-  | { kind: "self"; is: "attacking" | /** "~ is blocking" (CR 509.1g). */ "blocking" | /** "~ is blocked": an attacking creature blocked this combat, even with its blockers gone (CR 509.1h). */ "blocked" | /** "At least one creature is blocking ~" (Grizzled Wolverine): blocked, by a creature still blocking it. */ "hasBlockers" | /** "Two or more creatures are blocking ~" (Rampaging Cyclops). */ "twoOrMoreBlockers" | "attackingOrBlocking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | /** "If it's an Aura" (Everflame Eidolon: a bestowed permanent, CR 702.103b). */ "aura" | "tapped" | "untapped" | "monstrous" | /** CR 702.112b. */ "renowned" | "escaped" | "attackedThisTurn" | /** "If ~ attacked or blocked this combat" (Kjeldoran Home Guard): declared as one in this combat (CR 508.1, 509.1). */ "attackedOrBlockedThisCombat" | /** "Unless it attacked or blocked this turn" (Lurker): declared as one this turn. */ "attackedOrBlockedThisTurn" | /** "If ~ attacked this combat" (Tolsimir, Midnight's Light): declared as an attacker in this combat. */ "attackedThisCombat" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | /** Rocket Launcher: "if you've controlled ~ continuously since the beginning of your most recent turn" (CR 302.6's test for its controller's most recent turn, whoever's turn it is). */ "controlledSinceYourTurnBegan" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token" | /** "If ~ was dealt damage this turn" (Wall of Resistance): read by triggers only. */ "dealtDamageThisTurn" | /** "If ~ dealt damage to an opponent this turn" (Whirling Dervish): read by triggers only. */ "dealtDamageToOpponentThisTurn" | /** "As long as it has dealt damage" (Karakyk Guardian's "hasn't dealt damage yet" is its `not`): since it became this object. */ "hasDealtDamage" | /** "As long as they haven't dealt combat damage yet" (Ruric Thar, Magecrusher) is its `not`. */ "hasDealtCombatDamage" | /** "If ~ wasn't kicked" (Skizzik): the permanent's spell was (CR 702.33d). */ "kicked" | /** "As long as it was cast" (The Tarrasque): it entered as a resolving spell, from any zone (rulings). */ "cast" | /** "If her sneak cost was paid this turn" (Karai, Future of the Foot): this permanent's spell was cast for its sneak cost this turn (CR 702.190a). */ "sneakThisTurn"; not?: true }
+  | { kind: "self"; is: "attacking" | /** "~ is blocking" (CR 509.1g). */ "blocking" | /** "~ is blocked": an attacking creature blocked this combat, even with its blockers gone (CR 509.1h). */ "blocked" | /** "At least one creature is blocking ~" (Grizzled Wolverine): blocked, by a creature still blocking it. */ "hasBlockers" | /** "Two or more creatures are blocking ~" (Rampaging Cyclops). */ "twoOrMoreBlockers" | "attackingOrBlocking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | /** "If it's an Aura" (Everflame Eidolon: a bestowed permanent, CR 702.103b). */ "aura" | "tapped" | "untapped" | "monstrous" | /** CR 702.112b. */ "renowned" | "escaped" | "attackedThisTurn" | /** "If ~ attacked or blocked this combat" (Kjeldoran Home Guard): declared as one in this combat (CR 508.1, 509.1). */ "attackedOrBlockedThisCombat" | /** "Unless it attacked or blocked this turn" (Lurker): declared as one this turn. */ "attackedOrBlockedThisTurn" | /** "If ~ attacked this combat" (Tolsimir, Midnight's Light): declared as an attacker in this combat. */ "attackedThisCombat" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | /** Rocket Launcher: "if you've controlled ~ continuously since the beginning of your most recent turn" (CR 302.6's test for its controller's most recent turn, whoever's turn it is). */ "controlledSinceYourTurnBegan" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token" | /** "If ~ was dealt damage this turn" (Wall of Resistance): read by triggers only. */ "dealtDamageThisTurn" | /** "If ~ regenerated this turn" (Spiny Starfish): a shield or a static regeneration replaced its destruction this turn; read by triggers only. */ "regeneratedThisTurn" | /** "If ~ dealt damage to an opponent this turn" (Whirling Dervish): read by triggers only. */ "dealtDamageToOpponentThisTurn" | /** "As long as it has dealt damage" (Karakyk Guardian's "hasn't dealt damage yet" is its `not`): since it became this object. */ "hasDealtDamage" | /** "As long as they haven't dealt combat damage yet" (Ruric Thar, Magecrusher) is its `not`. */ "hasDealtCombatDamage" | /** "If ~ wasn't kicked" (Skizzik): the permanent's spell was (CR 702.33d). */ "kicked" | /** "As long as it was cast" (The Tarrasque): it entered as a resolving spell, from any zone (rulings). */ "cast" | /** "If her sneak cost was paid this turn" (Karai, Future of the Foot): this permanent's spell was cast for its sneak cost this turn (CR 702.190a). */ "sneakThisTurn"; not?: true }
   /**
    * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
    * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
@@ -2593,7 +2595,18 @@ export type Effect =
   | { type: "exchangePower"; what: ObjRef; duration: "endOfTurn" | "endOfCombat" }
   | { type: "destroy"; what: ObjRef; /** "It can't be regenerated." "creatures": "Creatures destroyed this way can't be regenerated" (Catastrophe), only those that are creatures as they're destroyed. */ noRegen?: boolean | "creatures" }
   /** "Regenerate ~": a shield that replaces its next destruction this turn (CR 701.19a). */
-  | { type: "regenerate"; what: ObjRef }
+  | {
+      type: "regenerate";
+      what: ObjRef;
+      /**
+       * "When it regenerates this way, ..." (Matopi Golem): a delayed triggered ability linked to this one shield (CR 603.7),
+       * triggering when that shield replaces a destruction; `riderPlayer`: "that player" in it is this target (Soldevi Sentry).
+       */
+      rider?: AbilityBody;
+      riderPlayer?: number;
+      /** Debt of Loyalty: "You gain control of that creature if it regenerates this way": as that shield is used, part of the replacement (rulings), for the rest of the game. */
+      riderControl?: true;
+    }
   /**
    * `until`: "exile target creature until ~ leaves the battlefield" (CR 610.3): it comes back under its
    * owner's control right after the source leaves, and isn't exiled at all if the source left first.
@@ -3819,7 +3832,13 @@ export type Effect =
    * controller chooses (rulings), that card being "the revealed card" (ResolvingInfo.revealed) each time; then the rest of
    * them still there go to `rest`.
    */
-  | { type: "forEachRevealed"; effects: Effect[]; rest?: "exile" }
+  | {
+      type: "forEachRevealed";
+      effects: Effect[];
+      rest?: "exile";
+      /** Sirocco: "For each blue instant card revealed this way": the cards like this in the hand that player revealed (Effect lookAtHand), one after another, while each is still there. */
+      inHand?: { who: PlayerRef; filter: TargetSpec };
+    }
   /** "You may cast ~ for as long as it remains exiled" (Shattered Seraph): the card this activated ability's cost exiled from its owner's hand, that object only (CR 400.7). */
   | { type: "mayCastExiledSelf" }
   | { type: "revealedUntilToBottom"; hand?: true; /** "On the bottom of your library in a random order" (Amplifire), not ordered by their owner. */ random?: true }
@@ -6638,7 +6657,7 @@ export type AdditionalCost =
    * +1/+1 counters from among creatures you control" (Hopeful Initiate): counters on permanents you control that match,
    * any mix of them (of `counter`'s kind if set), chosen as it's paid (CR 602.2b, 601.2h); CostChoices.counters.
    */
-  | { kind: "removeCounters"; n: number; filter: TargetSpec; counter?: string; other?: true; /** "Remove a counter from ~" (Glen Elendra Guardian): any kind, from this permanent only. */ self?: true; /** "Remove X +1/+1 counters from among creatures you control" (Retribution of the Ancients): as many as the X announced (CR 107.3a). */ x?: true }
+  | { kind: "removeCounters"; n: number; filter: TargetSpec; counter?: string; /** Ion Storm: "Remove a +1/+1 counter or a charge counter from a permanent you control": a counter of any of these kinds. */ counters?: string[]; other?: true; /** "Remove a counter from ~" (Glen Elendra Guardian): any kind, from this permanent only. */ self?: true; /** "Remove X +1/+1 counters from among creatures you control" (Retribution of the Ancients): as many as the X announced (CR 107.3a). */ x?: true }
   /**
    * "Put a -1/-1 counter on a creature you control" (Hatchet Bully, Wandering Mage): on one permanent you control that
    * matches, chosen as it's paid (CR 602.2b, 601.2h; CostChoices.counterOn), the source too. Not payable on one counters

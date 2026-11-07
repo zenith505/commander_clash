@@ -1384,6 +1384,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "prepared") return !!src.prepared; // CR 722.3a
       if (cond.is === "token") return !!src.isToken; // Aeve, Progenitor Ooze
       if (cond.is === "dealtDamageThisTurn") return src.zone === "battlefield" && !!src.wasDealtDamage;
+      if (cond.is === "regeneratedThisTurn") return src.zone === "battlefield" && src.regenerated?.turn === s.turn;
       if (cond.is === "hasDealtDamage") return !!src.hasDealtDamage;
       if (cond.is === "hasDealtCombatDamage") return !!src.hasDealtCombatDamage;
       // Whirling Dervish: "if ~ dealt damage to an opponent this turn": this object (CR 400.7), to any opponent (CR 102.3).

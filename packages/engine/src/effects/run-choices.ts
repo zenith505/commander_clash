@@ -1303,6 +1303,8 @@ export function punisherLabel(o: PunisherOption): string {
   if ("damage" in o) return `Be dealt ${o.damage} damage`;
   if ("allow" in o) return o.allow;
   if ("halfLife" in o) return `Pay half your life, rounded ${o.halfLife}`;
+  if ("handToTop" in o) return `Put ${o.handToTop === 1 ? "a card" : `${o.handToTop} cards`} from your hand on top of your library`;
+  if ("exileFromGraveyard" in o) return `Exile ${o.exileFromGraveyard === 1 ? "a card" : `${o.exileFromGraveyard} cards`} from your graveyard`;
   if (!o.pay.cost && o.pay.generic === undefined && o.pay.life !== undefined) return `Pay ${o.pay.life} life`;
   return `Pay ${o.pay.cost}${o.pay.life ? ` and ${o.pay.life} life` : ""}`;
 }
@@ -1318,7 +1320,7 @@ export function punisherOptions(s: GameState, e: Extract<Effect, { type: "punish
   }, 0);
   // "Pay 5 life": only with at least that much (CR 119.4, rulings on Dash Hopes).
   // "Unless they discard a nonland card": only with one in hand.
-  return e.options.flatMap((o, i) => (("discard" in o && (o.filter ? p.hand.filter((id) => printedMatches(o.filter!, defOf(s, obj(s, id)))) : p.hand).length < discarding + o.discard) || ("sacrifice" in o && pickOptions(s, { filter: o.sacrifice }, pid, sourceId).length < sacrificing + (o.n ?? 1)) || ("pay" in o && !o.pay.cost && !o.pay.generic && (o.pay.life ?? 0) > payableLife(s, pid)) || ("halfLife" in o && halfOfLife(s, pid, o.halfLife) > payableLife(s, pid)) ? [] : [i]));
+  return e.options.flatMap((o, i) => (("discard" in o && (o.filter ? p.hand.filter((id) => printedMatches(o.filter!, defOf(s, obj(s, id)))) : p.hand).length < discarding + o.discard) || ("sacrifice" in o && pickOptions(s, { filter: o.sacrifice }, pid, sourceId).length < sacrificing + (o.n ?? 1)) || ("pay" in o && !o.pay.cost && !o.pay.generic && (o.pay.life ?? 0) > payableLife(s, pid)) || ("halfLife" in o && halfOfLife(s, pid, o.halfLife) > payableLife(s, pid)) || ("exileFromGraveyard" in o && p.graveyard.length < o.exileFromGraveyard) || ("handToTop" in o && p.hand.length < discarding + o.handToTop) ? [] : [i]));
 }
 
 /** Half a player's life total, rounded as the text says; 0 for a total of 0 or less (CR 107.1a-b). */
@@ -1421,6 +1423,41 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
         sc.chosen = undefined;
         sc.queue = undefined;
       }
+      // Carrion Wurm: which cards of their graveyard they exile (only exactly that many can be, CR 701.13a).
+      const yardN = made.reduce((n, m) => {
+        const o = e.options[Number(m)];
+        return n + (o && "exileFromGraveyard" in o ? o.exileFromGraveyard : 0);
+      }, 0);
+      if (yardN && !mine.exile) {
+        if (pu.yardAsked === pid && sc.found) mine.exile = sc.found;
+        else if (p.graveyard.length <= yardN) mine.exile = [...p.graveyard];
+        else {
+          pu.yardAsked = pid;
+          sc.found = undefined;
+          s.pending = { kind: "searchLibrary", player: pid, source: src, what: yardN === 1 ? "a card" : `${yardN} cards`, cards: [...p.graveyard], min: yardN, max: yardN, fromGraveyard: "exile" };
+          return "paused";
+        }
+        pu.yardAsked = undefined;
+        sc.found = undefined;
+      }
+      // Tainted Specter: which cards of their hand go on top of their library (the last one picked ends on top).
+      const topN = made.reduce((n, m) => {
+        const o = e.options[Number(m)];
+        return n + (o && "handToTop" in o ? o.handToTop : 0);
+      }, 0);
+      if (topN && !mine.top) {
+        const rest = p.hand.filter((id) => !(mine.discard ?? []).includes(id));
+        if (pu.topAsked === pid && sc.chosen?.[pid]) mine.top = sc.chosen[pid]!;
+        else if (rest.length <= topN) mine.top = [...rest];
+        else {
+          pu.topAsked = pid;
+          sc.chosen = undefined;
+          s.pending = { kind: "handToTop", player: pid, count: topN, source: src };
+          return "paused";
+        }
+        pu.topAsked = undefined;
+        sc.chosen = undefined;
+      }
       const sacs = made.flatMap((m) => {
         const o = e.options[Number(m)];
         return o && "sacrifice" in o ? Array.from({ length: o.n ?? 1 }, () => o.sacrifice) : [];
@@ -1447,6 +1484,16 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
       const who = apnap(s, Object.keys(pu.made).map(Number) as PlayerId[]);
       // "Unless that player discards a card": a cost, paid as it resolves (CR 118.12a), so not Library of Leng's.
       for (const pid of who) discardCards(s, pid, (pu.chosen?.[pid]?.discard ?? []).filter((id) => player(s, pid).hand.includes(id)), "", false, false, ctx.controller);
+      for (const pid of who) {
+        const top = (pu.chosen?.[pid]?.top ?? []).filter((id) => player(s, pid).hand.includes(id));
+        for (const id of [...top].reverse()) moveObject(s, id, "library", { top: true });
+        if (top.length) log(s, `${player(s, pid).name} puts ${top.length === 1 ? "a card" : `${top.length} cards`} from their hand on top of their library.`);
+      }
+      for (const pid of who) {
+        const gone = (pu.chosen?.[pid]?.exile ?? []).filter((id) => player(s, pid).graveyard.includes(id));
+        if (gone.length) log(s, `${player(s, pid).name} exiles ${gone.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their graveyard.`);
+        for (const id of gone) moveObject(s, id, "exile");
+      }
       for (const pid of who)
         for (const id of pu.chosen?.[pid]?.sacrifice ?? []) {
           const x = s.objects[id];

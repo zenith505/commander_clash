@@ -1834,6 +1834,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "regenerate":
       for (const o of objects(s, e.what, ctx)) {
         o.regenShields = (o.regenShields ?? 0) + 1;
+        // "When it regenerates this way, ..." (Matopi Golem): this shield's own delayed trigger (CR 603.7), made now; its
+        // source is the ability's (CR 603.7d), "that player" the player the ability targeted (Soldevi Sentry).
+        if (e.rider || e.riderControl) {
+          const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+          const t = e.riderPlayer !== undefined ? ctx.targets[e.riderPlayer] : undefined;
+          (o.regenRiders ??= []).push({ ...(e.rider ? { body: e.rider } : {}), ...(e.riderControl ? { control: true as const } : {}), controller: ctx.controller, sourceId: src?.id ?? o.id, sourceCardId: src ? cardIdOf(src) : cardIdOf(o), sourceZc: ctx.sourceZc ?? src?.zoneChanges ?? o.zoneChanges ?? 0, ...(t?.kind === "player" ? { player: t.id } : {}) });
+        }
         log(s, `${defOf(s, o).name} gets a regeneration shield.`);
       }
       return;

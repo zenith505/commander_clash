@@ -906,6 +906,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each creature it devoured" (CR 702.82b): only the permanent's own abilities know what it devoured.
   if (/^creatures? (?:it|~) devoured$/i.test(p) && (ctx === null || ctx.selfIt)) return count({ kind: "devoured" });
   if (/^times ~ has mutated$/i.test(p)) return count({ kind: "mutations" });
+  // Spiny Starfish: "for each time it regenerated this turn": the permanent's own abilities only.
+  if (each && (m = /^time (it|~) regenerated this turn$/i.exec(p)) && ctx && !ctx.subject && !ctx.subjectIt && (m[1] === "~" || ctx.selfIt || ctx.lastObjectTarget === undefined)) return count({ kind: "regenerations" });
   // Converge: "the number of colors of mana spent to cast this spell", "for each color of mana spent to cast it".
   // "It" is the object itself only where nothing else can be "it" (not "whenever you cast a spell").
   // Wildgrowth Archaic: "whenever you cast a creature spell, ... where X is the number of colors of mana spent to cast

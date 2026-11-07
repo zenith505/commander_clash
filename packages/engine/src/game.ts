@@ -1305,6 +1305,11 @@ export function moveObject(
   if (to === "graveyard" && o.zone === "graveyard" && (fromZone === "hand" || fromZone === "library") && !o.isToken) {
     const yards = ((s.turnLog ??= {}).toGraveyardFromHandOrLibrary ??= {});
     yards[o.owner] = (yards[o.owner] ?? 0) + 1;
+    // Cruel Calculations: "cards that were put into target player's graveyard from their library this turn".
+    if (fromZone === "library") {
+      const lib = (s.turnLog.toGraveyardFromLibrary ??= {});
+      lib[o.owner] = (lib[o.owner] ?? 0) + 1;
+    }
   }
   if (fromZone === "battlefield") {
     if (!(s.permanentLeftThisTurn ??= []).includes(lastController)) s.permanentLeftThisTurn.push(lastController); // revolt
@@ -8215,7 +8220,9 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (cp) return cp;
   }
   const cost = activationCost(s, pid, o, ab, targets, x);
-  const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : null) : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : xProblem(cost, x);
+  // A cost's X (Corpseweft's "one or more creature cards") is chosen as it's activated: asked before that (no X and no
+  // costs chosen, the menu's check), only whether the ability could be activated at all.
+  const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) && !(x === undefined && costs === undefined && !ab.loyaltyX) ? "X can't be 0" : null) : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : xProblem(cost, x);
   if (xp) return xp;
   if (ab.energyX && (x ?? 0) > (p.energy ?? 0)) return `you need ${x} energy`; // CR 107.14
   const due = lessWaterbend(cost, ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), ab, tapCreatures);

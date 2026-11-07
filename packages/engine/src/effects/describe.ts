@@ -62,6 +62,10 @@ export function describeMods(s: GameState, mods: Modification[], controller: Pla
       parts.push(`can't have ${plural ? "their" : "its"} activated abilities${m.tapCost ? " with {T} in their costs" : ""} activated`);
       continue;
     }
+    if (m.kind === "cantPhaseOut") {
+      parts.push("can't phase out");
+      continue;
+    }
     if (m.kind === "doesntUntap") {
       parts.push(plural ? "don't untap" : "doesn't untap");
       continue;

@@ -454,6 +454,8 @@ export type Count =
   | { kind: "wasKicked"; which?: number }
   /** 1 if the mana spent to cast it meets `req` (adamant, CR 601.2h), else 0. */
   | { kind: "spentWas"; req: SpentReq }
+  /** "For each {U}{U} spent to cast it" (Bladecoil Serpent, Clay Champion): how many whole pairs of mana of this color were spent to cast it (CR 601.2h); 0 if it wasn't cast. */
+  | { kind: "spentPairs"; color: Color }
   /** "That much", "that many" in a triggered ability: the damage its event dealt. */
   | { kind: "eventAmount" }
   /** Ancient Cellarspawn's "the difference": the cast spell's mana value (X included) less the mana spent to cast it. */
@@ -565,7 +567,7 @@ export type Count =
   /** "X or Y, whichever is greater" (Willowdusk, Essence Seer). */
   | { kind: "greaterOf"; of: [Count, Count] }
   /** "The number of cards put into their graveyard from anywhere this turn" (Fraying Sanity): that player's. */
-  | { kind: "cardsToGraveyardThisTurn"; whose: PlayerRef; /** "From your hand or library" (Welcome the Dead): only those (TurnLog.toGraveyardFromHandOrLibrary). */ fromHandOrLibrary?: true }
+  | { kind: "cardsToGraveyardThisTurn"; whose: PlayerRef; /** "From your hand or library" (Welcome the Dead): only those (TurnLog.toGraveyardFromHandOrLibrary). */ fromHandOrLibrary?: true; /** "From their library" (Cruel Calculations): only those (TurnLog.toGraveyardFromLibrary). */ fromLibrary?: true }
   /** "For each creature that attacked this turn": creatures declared as attackers this turn (CR 508.1). */
   | { kind: "attackersThisTurn" }
   /** "For each creature you attacked with this turn" (Search Party Captain): the creatures you declared as attackers this turn (PlayerState.attackedWith). */
@@ -1935,6 +1937,8 @@ export type Modification =
   | { kind: "cantTurnFaceUp" }
   /** "Can't transform" (Bound by Moonsilver): nor convert (CR 701.28f), not even by day and night (run-permanents.ts transformPermanent). */
   | { kind: "cantTransform" }
+  /** "Until your next upkeep, ~ can't phase out" (Ertai's Familiar, Spatial Binding): it doesn't phase out, directly or indirectly, for any reason (rulings; layers.ts phaseOut). */
+  | { kind: "cantPhaseOut" }
   /** "Can't crew Vehicles" (Revoke Privileges): it can't be tapped to pay a crew cost (CR 702.122a). */
   | { kind: "cantCrew" }
   /** "~ can't be equipped" (Goblin Brawler): Equipment can't become attached to it (CR 701.3b) and becomes unattached (704.5n). */

@@ -626,7 +626,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "greaterOf":
       return Math.max(evalCount(s, c.of[0], ctx), evalCount(s, c.of[1], ctx));
     case "cardsToGraveyardThisTurn":
-      return refPlayers(s, c.whose, ctx).reduce((n, pid) => n + ((c.fromHandOrLibrary ? s.turnLog?.toGraveyardFromHandOrLibrary : s.cardsToGraveyardThisTurn)?.[pid] ?? 0), 0);
+      return refPlayers(s, c.whose, ctx).reduce((n, pid) => n + ((c.fromLibrary ? s.turnLog?.toGraveyardFromLibrary : c.fromHandOrLibrary ? s.turnLog?.toGraveyardFromHandOrLibrary : s.cardsToGraveyardThisTurn)?.[pid] ?? 0), 0);
     case "chosenCommanderMv":
       return s.resolving?.commanderMv ?? 0;
     case "commandersMv": {
@@ -667,6 +667,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (ctx.kicked ?? []).some((i) => c.which === undefined || i === c.which) ? 1 : 0;
     case "spentWas":
       return spentMeets(ctx.spent, c.req) ? 1 : 0;
+    case "spentPairs":
+      return Math.floor((ctx.spent?.[c.color] ?? 0) / 2);
     case "castSpellModes": {
       // Riku of Many Paths: the modes chosen as it was cast (CR 601.2b), each time a mode was chosen.
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
@@ -1463,7 +1465,7 @@ function describeCount(c: Count): string {
     case "greaterOf":
       return `max(${describeCount(c.of[0])}, ${describeCount(c.of[1])})`;
     case "cardsToGraveyardThisTurn":
-      return c.fromHandOrLibrary ? "#cards put into that graveyard from hand or library this turn" : "#cards put into that graveyard this turn";
+      return c.fromLibrary ? "#cards put into that graveyard from library this turn" : c.fromHandOrLibrary ? "#cards put into that graveyard from hand or library this turn" : "#cards put into that graveyard this turn";
     case "commanderCasts":
       return "#times you've cast your commander";
     case "chosenCommanderMv":
@@ -1529,6 +1531,8 @@ function describeCount(c: Count): string {
       return "kicked";
     case "spentWas":
       return "mana spent";
+    case "spentPairs":
+      return `{${c.color}}{${c.color}} spent`;
     case "colorsSpent":
       return "colors of mana spent";
     case "castSpellX":

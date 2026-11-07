@@ -2,7 +2,7 @@
 
 import { objHasKeyword } from "./cards";
 import { clearCombat, log, nameOf, obj, removeFromCombat } from "./game";
-import { controllerOf, invalidateCharacteristics } from "./layers";
+import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
 import { pairedWith } from "./cards";
 import type { GameState, ObjectId, PlayerId } from "./types";
 import { fireEvent } from "./effects";
@@ -12,13 +12,16 @@ import { fireEvent } from "./effects";
  * (702.26g; an object phasing out both ways phases out indirectly, 702.26h). They're removed from combat.
  */
 export function phaseOut(s: GameState, ids: ObjectId[]) {
-  const direct = [...new Set(ids)].filter((id) => s.objects[id]?.zone === "battlefield");
+  // "Can't phase out" (Ertai's Familiar, Spatial Binding): for any reason, not even indirectly; an Aura that stays
+  // behind is then put into its owner's graveyard by state-based actions (rulings, CR 702.26d, 704.5m).
+  const can = (id: ObjectId) => !characteristics(s, obj(s, id)).cantPhaseOut;
+  const direct = [...new Set(ids)].filter((id) => s.objects[id]?.zone === "battlefield" && can(id));
   if (!direct.length) return;
   const indirect = new Set<ObjectId>();
   for (const queue = [...direct]; queue.length; ) {
     const host = queue.shift()!;
     for (const id of s.battlefield)
-      if (s.objects[id]!.attachedTo === host && !indirect.has(id)) {
+      if (s.objects[id]!.attachedTo === host && !indirect.has(id) && can(id)) {
         indirect.add(id);
         queue.push(id);
       }

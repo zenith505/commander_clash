@@ -760,7 +760,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         const extra = mvX.kind === "sacrifice" ? `sacrifice ${/^[aeiou]/i.test(mvX.filter.text) ? "an" : "a"} ${mvX.filter.text.replace(/~/g, cardOf(s, objectId).name)}` : "discard a card with mana value X";
         return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: mv !== undefined && mv <= max && fits(mv) ? mv : max, modes, extra });
       }
-      const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));
+      // "Exile one or more ...": X can't be 0 (Corpseweft), so 0 is never what we ask about.
+      const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, Math.max(n, ab.xMin ?? 0)));
       // "Tap X untapped Knights you control" (Aryel): the noun before "you control" in the plural.
       const extra = [...(ab.energyX ? ["pay X energy"] : []), ...(ab.removeCounters?.x ? [`remove X ${ab.removeCounters.counter} counters`] : []), ...(ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [c.kind === "removeCounters" ? `remove X ${c.counter ?? ""} counters from among ${c.filter.text}`.replace(/  +/g, " ") : `${c.kind === "sacrifice" ? "sacrifice" : c.kind === "exileFromGraveyard" ? "exile" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : c.kind === "tap" ? c.filter.text.replace(/(\w)( you control)$/, "$1s$2") : c.kind === "reveal" ? `${plural(c.filter.text)} from your hand` : c.kind === "exileFromGraveyard" ? `${plural(c.filter?.text ?? "card")} from your graveyard` : ""}`.trim()] : []))].join(" and ");
       return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: Math.min(max, Math.max(ab.xMin ?? 0, 1)), modes, extra });

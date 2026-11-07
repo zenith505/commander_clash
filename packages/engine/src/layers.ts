@@ -271,6 +271,8 @@ export interface Characteristics {
   cantTurnFaceUp: boolean;
   /** "Can't transform" (Bound by Moonsilver), nor convert (CR 701.28f). */
   cantTransform: boolean;
+  /** "Can't phase out" (Ertai's Familiar, Spatial Binding). */
+  cantPhaseOut: boolean;
   /** "Can't crew Vehicles" (Revoke Privileges). */
   cantCrew: boolean;
   /** "Can't be equipped" (Goblin Brawler). */
@@ -422,6 +424,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantBeSacrificedBy: [],
     cantTurnFaceUp: false,
     cantTransform: false,
+    cantPhaseOut: false,
     cantCrew: false,
     cantBeEquipped: false,
     enchantedOnlyBy: [],
@@ -1980,6 +1983,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantBeSacrificed":
     case "cantTurnFaceUp":
     case "cantTransform":
+    case "cantPhaseOut":
     case "cantCrew":
     case "cantBeEquipped":
     case "attackAsThoughHaste":

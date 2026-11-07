@@ -634,6 +634,18 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     tb.distinctFrom = [a.index];
     return [{ type: "putOntoBattlefield", what: { ref: "target", index: a.index, n: 2 } }];
   }
+  // Relive the Past: "Return up to one target artifact card, up to one target land card, and up to one target non-Aura
+  // enchantment card from your graveyard to the battlefield": all enter at the same time (CR 608.2c). One card could be
+  // chosen for two of them (CR 115.3) but would return once all the same, so each must be another card.
+  if (!ctx.targets.length && (m = /^Return (up to one target [a-z]+ card), (up to one target [a-z]+ card), and (up to one target [A-Za-z-]+ [a-z]+ card) from your graveyard to the battlefield$/.exec(s))) {
+    const refs = [m[1]!, m[2]!, m[3]!].map((p) => parseObject(`${p} from your graveyard`, ctx, true));
+    if (refs.some((r, i) => r?.ref !== "target" || r.n || r.index !== i)) return null;
+    const specs = ctx.targets.slice(0, 3);
+    if (specs.length !== 3 || specs.some((t) => t.kind !== "card" || t.owner !== "you" || !t.optional)) return null;
+    specs[1]!.distinctFrom = [0];
+    specs[2]!.distinctFrom = [0, 1];
+    return [{ type: "putOntoBattlefield", what: { ref: "target", index: 0, n: 3 } }];
+  }
   // Narcomoeba: "When ~ is put into your graveyard from your library, you may put it onto the battlefield": the card,
   // if it's still there (CR 400.7).
   if (ctx.selfCard && !ctx.activated && /^[Pp]ut (?:it|~) onto the battlefield$/.test(s)) return [{ type: "putOntoBattlefield", what: { ref: "selfCard" } }];
@@ -2247,9 +2259,16 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // The War Games: "You may exile a nontoken creature you control. When you do, ...": one of yours, chosen as it resolves
   // (not targeted).
-  if ((m = /^[Ee]xile a (nontoken creature) you control$/.exec(s))) {
+  // Wormfang Newt: "When ~ enters, exile a land you control": linked to its "return the exiled card" ability (CR 607.2a).
+  if ((m = /^[Ee]xile a (nontoken creature|land) you control$/.exec(s))) {
     const filter = pickFilter(m[1]!);
     return filter?.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "exile" }] : null;
+  }
+  // Wormfang Crab: "an opponent chooses a permanent you control other than ~ and exiles it": an opponent you choose as it
+  // resolves picks one of your permanents (not targeted) and exiles it.
+  if (/^[Aa]n opponent chooses a permanent you control other than ~ and exiles it$/.test(s)) {
+    const filter = pickFilter("permanent");
+    return filter?.kind === "object" ? [{ type: "choose", choice: "opponent" }, { type: "pick", who: { ref: "chosenPlayer" }, among: { ref: "you" }, filter: { ...filter, notSource: true, text: "permanent other than ~" }, n: 1, action: "exile" }] : null;
   }
   // Fugitive of the Judoon: "You may exile a Human you control and an artifact you control. If you do, ...": two different
   // permanents of yours, chosen as it resolves (not targeted); doing it means exiling both (CR 609.3).

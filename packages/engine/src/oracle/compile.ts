@@ -6,7 +6,7 @@ import { canonicalKeyword, LAND_TYPES, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
-import type { CardDef, ManaType, PlayerId } from "../types";
+import type { CardDef, Color, ManaType, PlayerId } from "../types";
 import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS, capital, singularWord } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
@@ -5009,6 +5009,15 @@ export function compile(d: CardDef): CompiledCard {
       else out.entersWithCounters = { counter: counterKind(eachConvoked[2]!), n: { count: { kind: "convokedCount" }, ...(per > 1 ? { times: per } : {}) } };
       continue;
     }
+    // Clay Champion: "~ enters with three +1/+1 counters on it for each {G}{G} spent to cast it": whole pairs of that color
+    // spent on the spell it was (CR 601.2h), none if it wasn't cast, as it enters (CR 614.1c).
+    const eachPair = new RegExp(`^~ enters with (a|an|two|three) ${COUNTER} counters? on it for each \\{([WUBRG])\\}\\{\\3\\} spent to cast it\\.$`).exec(line);
+    if (eachPair) {
+      const per = eachPair[1] === "two" ? 2 : eachPair[1] === "three" ? 3 : 1;
+      if (out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: counterKind(eachPair[2]!), n: { count: { kind: "spentPairs", color: eachPair[3] as Color }, ...(per > 1 ? { times: per } : {}) } };
+      continue;
+    }
     // Verazol, the Split Current: "~ enters with a +1/+1 counter on it for each mana spent to cast it": the same, none if
     // it wasn't cast (rulings), commander tax and other additional costs counted.
     const eachSpent = new RegExp(`^~ enters with an? ${COUNTER} counter on it for each mana spent to cast it\\.$`).exec(line);
@@ -5907,7 +5916,10 @@ export function compile(d: CardDef): CompiledCard {
       /^(At the beginning of your upkeep) and (whenever you cast an? (?:white|blue|black|red|green) spell), (.+)$/.exec(line) ??
       // Kratos, Stoic Father: "Whenever you attack with one or more Gods and whenever a God dies, ...": an attack and a
       // death are never one event.
-      /^(Whenever you attack with one or more [A-Z][a-z]+s) and (whenever an? [A-Z][a-z]+ dies), (.+)$/.exec(line);
+      /^(Whenever you attack with one or more [A-Z][a-z]+s) and (whenever an? [A-Z][a-z]+ dies), (.+)$/.exec(line) ??
+      // Ertai's Familiar: "When ~ phases out or leaves the battlefield, ...": phasing out isn't leaving the battlefield (CR
+      // 702.26d), so they're never one event.
+      /^When ~ (phases out) or (leaves the battlefield), (.+)$/.exec(line);
     // MACH-1, Swooping Scoundrel: "When ~ enters and whenever you gain life, surveil 1. This ability triggers only once each
     // turn.": one ability, so the two triggers share the once (CR 603.2h; keyed by the effect's text).
     const onceBoth = !!twice && /^When ~ enters and whenever [^,]+, [^."]+\. This ability triggers only once each turn\.$/.test(line);
@@ -5945,6 +5957,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever you create a token, ${effect}`, `Whenever you sacrifice a token, ${effect}`]
             : /^whenever /.test(twice[1]!)
               ? [`When ~ enters, ${effect}`, `W${twice[1]!.slice(1)}, ${effect}`]
+            : /^When ~ phases out or leaves the battlefield, /.test(line)
+              ? [`Whenever ~ phases out, ${effect}`, `When ~ leaves the battlefield, ${effect}`]
             : /^Whenever ~ attacks, blocks, or becomes the target of a spell, /.test(line)
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ blocks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]
             : /^Whenever ~ attacks or becomes the target of a spell(?: an opponent controls)?, /.test(line)
@@ -6687,7 +6701,9 @@ function linkExile(out: CompiledCard) {
   }
   // "When this creature is turned face up, exile ..." (Aurelia's Vindicator) is one of its exile abilities too (CR 607.2a).
   // Hoarding Dragon: "search your library for an artifact card, exile it, then shuffle" is its exile ability too.
-  const exiling = (e: Effect): e is Extract<Effect, { type: "exile" | "takeFromHand" | "hideaway" | "discard" | "exileHand" | "search" }> => (e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || (e.type === "discard" && !!e.exile) || e.type === "exileHand" || (e.type === "search" && e.dest.zone === "exile" && !e.others && !e.split)) && !("until" in e && e.until);
+  // Wormfang Newt, Crab and Drake: "exile a land you control", "an opponent chooses a permanent you control ... and exiles
+  // it", "unless you exile a creature you control": a player's pick of a permanent to exile, as it enters.
+  const exiling = (e: Effect): e is Extract<Effect, { type: "exile" | "takeFromHand" | "hideaway" | "discard" | "exileHand" | "search" | "pick" }> => ((e.type === "pick" && e.action === "exile" && !e.linked) || e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || (e.type === "discard" && !!e.exile) || e.type === "exileHand" || (e.type === "search" && e.dest.zone === "exile" && !e.others && !e.split)) && !("until" in e && e.until);
   const exiles0 = [...out.triggers.filter((t) => t.event === "selfEnters" || t.event === "selfTurnedFaceUp").map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter(exiling);
   // "Landfall — Whenever a land you control enters, you may exile target nonland permanent other than ~" (Admonition
   // Angel): with no exile as it enters or in an activated ability, its one other triggered ability that exiles.
@@ -6910,7 +6926,7 @@ function checkCastingLinks(out: CompiledCard) {
   if (/"kind":"treasureSpent","activated"/.test(JSON.stringify([out.spell, out.triggers, out.statics]))) bad = true;
   // Mana from snow sources spent (CR 107.4h): a spell's or its permanent's enters trigger's; Boreal Outrider's "of that
   // spell's colors" only in a cast trigger's condition.
-  const snowIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"snowSpent"');
+  const snowIn = (v: unknown) => /"kind":"(?:snowSpent|spentPairs)"/.test(JSON.stringify(v ?? null));
   if (out.triggers.some((t) => t.event !== "selfEnters" && snowIn(t.body)) || snowIn(out.statics) || snowIn(out.activated)) bad = true;
   if (JSON.stringify([out.spell, out.triggers.map((t) => ({ ...t, cast: undefined })), out.statics, out.activated, out.entersWithCounters]).includes('"snowOfColors"')) bad = true;
   // "Enters with a counter for each creature of the chosen type": counted once its own "as ~ enters, choose" is answered

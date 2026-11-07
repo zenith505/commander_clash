@@ -134,6 +134,18 @@ export function parseDamageMod(line: string): StaticAbility | null {
     const mod: DamageMod = { op: "counters", counter: toCounters[1], to: { self: true }, text: line };
     return { affects: { kind: "self" }, mods: [{ kind: "damageMod", mod }], text: line };
   }
+  // Undead Alchemist: "If a Zombie you control would deal combat damage to a player, instead that player mills that many
+  // cards"; Szadek, Lord of Secrets: "If ~ would deal combat damage to a player, instead put that many +1/+1 counters on ~
+  // and that player mills that many cards". Replacements, not prevention (CR 614.1a): none of the damage is dealt (so no
+  // lifelink, commander damage or "deals combat damage" trigger), applied once to each source's damage (rulings: two
+  // Alchemists mill once), and the damaged player orders them with prevention effects (CR 616.1, rulings on Szadek).
+  const toMill = /^If (.+?) would deal combat damage to a player, instead (put that many \+1\/\+1 counters on ~ and )?that player mills that many cards\.?$/.exec(line);
+  if (toMill) {
+    const byP = parseBy(toMill[1]!, false);
+    if (!byP || byP.attached || (toMill[2] && !byP.by?.self)) return null;
+    const mod: DamageMod = { op: toMill[2] ? "counters" : "mill", ...(toMill[2] ? { counter: "+1/+1" as const } : {}), mill: true, combat: "only", to: { players: "all" }, ...(byP.by ? { by: byP.by } : {}), text: line };
+    return { affects: { kind: "self" }, mods: [{ kind: "damageMod", mod }], text: line };
+  }
   // Force Bubble: "If damage would be dealt to you, put that many depletion counters on ~ instead": a replacement, not
   // prevention (rulings: the damage is neither dealt nor prevented), the counters on ~ for each source's damage to you.
   const toCountersYou = /^If damage would be dealt to you, put that many ([a-z]+) counters on ~ instead\.?$/.exec(line);

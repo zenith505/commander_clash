@@ -994,6 +994,8 @@ export interface TargetSpec {
   sharesTypeWithAttached?: true;
   /** "A card that shares a creature type with that creature" (Conjurer's Mantle): with the trigger's subject as it is, or last was, on the battlefield (rulings, CR 608.2h), as a look resolves. */
   sharesTypeWithSubjectCreature?: true;
+  /** "A card that shares a creature type with it" (Tajuru Paragon's enters trigger): with the source itself, as it is, or last was, on the battlefield (rulings), as a look resolves. */
+  sharesTypeWithSelf?: true;
   /** "A creature card that doesn't share a creature type with a creature you control" (Radagast the Brown): with none of your creatures as they are when a look resolves (a card with no creature type shares none, rulings). */
   notKinOfYourCreatures?: true;
   /** "Two target creature cards that share a creature type": shares one with each of these targets of the group. */
@@ -3517,7 +3519,7 @@ export type Effect =
       who?: PlayerRef;
       reveal?: true;
       shuffleFirst?: true;
-      then: "castFree" | "freeThisTurn" | "thisTurn" | "hand" | "suspend" | /** "Put that card onto the battlefield or into your hand" (Illuna, Apex of Wishes): its controller chooses after seeing it; the other cards stay exiled. */ "battlefieldOrHand" | /** "..., then put that card into your hand" (Demonlord Belzenlok): the nonland card exiled goes to its owner's hand, the others stay exiled; how many went is Resolution.dugToHand. */ "hitToHand" | /** With `reveal`: the cards stay where they are for "that card's mana value" (Resolution.revealed) and a later revealedUntilToBottom (Erratic Explosion). */ "keep";
+      then: "castFree" | "freeThisTurn" | "thisTurn" | "hand" | "suspend" | /** "Put that card onto the battlefield or into your hand" (Illuna, Apex of Wishes): its controller chooses after seeing it; the other cards stay exiled. */ "battlefieldOrHand" | /** "..., then put that card into your hand" (Demonlord Belzenlok): the nonland card exiled goes to its owner's hand, the others stay exiled; how many went is Resolution.dugToHand. */ "hitToHand" | /** With `reveal`: the cards stay where they are for "that card's mana value" (Resolution.revealed) and a later revealedUntilToBottom (Erratic Explosion). */ "keep" | /** With `reveal`: "Put the revealed cards on the bottom of your library in a random order" (Calibrated Blast); the nonland card's mana value is kept (Resolution.revealedUntilMv) for a reflexive "when you reveal a nonland card this way". */ "bottomRandom";
       /** `then` "suspend": "Put two time counters on that card. If it doesn't have suspend, it gains suspend." (Kang Prime). */
       suspend?: number;
       ownerCasts?: true;
@@ -3788,7 +3790,7 @@ export type Effect =
    */
   | { type: "duelReveal"; between: PlayerRef[] }
   /** "You may repeat this process any number of times" (Ad Nauseam): `effects` (none of which waits on a choice), then the controller decides whether to go again, each time after seeing the result (rulings). */
-  | { type: "repeatMay"; effects: Effect[]; text: string }
+  | { type: "repeatMay"; effects: Effect[]; text: string; /** Kindle the Carnage: offered again only while its controller has a card in hand (not a library, as Ad Nauseam's); each pass discards anew. */ needsHand?: true }
   /** Sunforger: the card a search with dest "cast" found, cast from the library without paying its mana cost (CR 608.2g). */
   | { type: "castSearched" }
   /** Geode Golem: "you may cast your commander from the command zone without paying its mana cost", as this resolves (CR 608.2g). */
@@ -3924,7 +3926,7 @@ export type Effect =
    * when target i is the one picked. `label` shows the choice, {0} the picked one's name and {1} the other's.
    */
   | { type: "splitTargets"; chooser: "controller" | "you"; options: Effect[][]; label: string }
-  | { type: "either"; options: Effect[][]; labels: string[]; onlyDoable?: true; /** "Forage" as an instruction (CR 701.61a): exile three cards from your graveyard or sacrifice a Food; doing either is foraging ("whenever you forage"). */ forage?: true }
+  | { type: "either"; options: Effect[][]; labels: string[]; onlyDoable?: true; /** "Forage" as an instruction (CR 701.61a): exile three cards from your graveyard or sacrifice a Food; doing either is foraging ("whenever you forage"). */ forage?: true; /** Invoke the Ancients: "For each of them, put your choice of ... on it": asked once for each permanent the instruction before created (ObjRef "created" being that one as it's done), in the order they were created (rulings: a separate choice for each token, more with a token doubler). */ eachCreated?: true }
   /**
    * "Unlock a locked door of a Room you control" (Ghostly Dancers), with `what` "... of up to one target Room you control"
    * (Ghostly Keybearer): its controller chooses a locked door and the Room gets that unlocked designation (CR 709.5f).
@@ -7834,6 +7836,12 @@ export interface CompiledCard {
   ownTriggersSpareTokens?: true;
   /** "The "legend rule" doesn't apply to permanents you control" (CR 704.5j): to these, from the source's controller's view. */
   noLegendRule?: TargetSpec[];
+  /**
+   * Brothers Yamazaki: "If there are exactly two permanents named ~ on the battlefield, the "legend rule" doesn't apply to
+   * them." (CR 704.5j): while exactly two permanents anywhere on the battlefield have the source's name, neither is in a
+   * legend rule group; a third one makes it apply again (rulings).
+   */
+  noLegendRuleIfTwo?: true;
   /**
    * "If you would copy a spell one or more times, instead copy it that many times plus an additional time. You may choose
    * new targets for the additional copy." (Twinning Staff, CR 614.1a): one more copy for each such permanent its

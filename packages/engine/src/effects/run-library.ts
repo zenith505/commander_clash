@@ -7,7 +7,7 @@ import { attackingPermanentOf, castProblem, creatureTypesOf, freeCastable, draw,
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, cardPT, objectMatches, pickOptions, printedMatches, sayBound } from "./targeting";
-import { ResolveCtx, apnap, gifteeOf, attachedHostTypes, subjectCreatureTypes, players, amountNow, amountCtx, amountFor, objects, runEffect } from "./resolve";
+import { ResolveCtx, apnap, gifteeOf, attachedHostTypes, subjectCreatureTypes, sourceCreatureTypes, players, amountNow, amountCtx, amountFor, objects, runEffect } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
 import { attackChoices, chooseAuraHosts, suspendExiled } from "./run-zones";
@@ -1989,11 +1989,12 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         const mvMax = filter?.manaValue?.max ?? ctx.x ?? 0;
         // Call to the Kindred: sharing a creature type with the enchanted creature, as it is now or last was.
         // Conjurer's Mantle: with the trigger's subject (the equipped creature that attacked), as it is now or last was.
-        const kin = filter?.sharesTypeWithAttached ? (attachedHostTypes(s, ctx) ?? new Set<string>()) : filter?.sharesTypeWithSubjectCreature ? (subjectCreatureTypes(s, ctx) ?? new Set<string>()) : undefined;
+        // Tajuru Paragon: with the source itself, as it is now or last was.
+        const kin = filter?.sharesTypeWithAttached ? (attachedHostTypes(s, ctx) ?? new Set<string>()) : filter?.sharesTypeWithSubjectCreature ? (subjectCreatureTypes(s, ctx) ?? new Set<string>()) : filter?.sharesTypeWithSelf ? sourceCreatureTypes(s, ctx) : undefined;
         // Radagast the Brown: the creature types of the creatures you control now; a card sharing none of them.
         const yours = filter?.notKinOfYourCreatures ? s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid && objIsType(s, o, "Creature")).map((o) => creatureTypesOf(s, o)) : undefined;
         const yourKin: Set<string> | "all" | undefined = yours && (yours.includes("all") ? "all" : new Set(yours.flatMap((t) => [...(t as Set<string>)])));
-        const printed = (kin || yourKin) && filter ? (({ sharesTypeWithAttached: _, sharesTypeWithSubjectCreature: __, notKinOfYourCreatures: ___, ...r }) => r)(filter) : filter;
+        const printed = (kin || yourKin) && filter ? (({ sharesTypeWithAttached: _, sharesTypeWithSubjectCreature: __, notKinOfYourCreatures: ___, sharesTypeWithSelf: ____, ...r }) => r)(filter) : filter;
         // Smelting Vat: a total counted as it resolves (the sacrificed artifact's mana value).
         const totalMv = e.totalMv === undefined ? undefined : amountNow(s, e.totalMv, ctx);
         const options = sc.looked.filter((id) => (!printed || printedMatches(printed, defOf(s, obj(s, id)))) && (!kin || shareCreatureType(kin, creatureTypesOf(s, obj(s, id)))) && (!yourKin || !shareCreatureType(yourKin, creatureTypesOf(s, obj(s, id)))) && (totalMv === undefined || defMv(defOf(s, obj(s, id))) <= totalMv));

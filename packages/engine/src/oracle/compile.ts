@@ -2979,6 +2979,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "The "legend rule" doesn't apply to permanents you control" (Sakashima, Mirror Box), "... to Slivers you control",
     // "The "legend rule" doesn't apply." (Mirror Gallery): CR 704.5j skips those.
+    if (line === 'If there are exactly two permanents named ~ on the battlefield, the "legend rule" doesn\'t apply to them.') {
+      out.noLegendRuleIfTwo = true;
+      continue;
+    }
     const noLegend = /^The "legend rule" doesn't apply(?: to (.+?))?\.$/.exec(line);
     const noLegendFilter = noLegend && (noLegend[1] ? parseGroup(noLegend[1], true)?.filter : ({ kind: "object", text: "permanent" } as TargetSpec));
     if (noLegend && noLegendFilter && !/ this turn$/.test(noLegend[1] ?? "")) {
@@ -5865,7 +5869,9 @@ export function compile(d: CardDef): CompiledCard {
     // Ivory Guardians: "Creatures named ~ get +1/+1 as long as ...": every creature with its name, anyone's, itself too
     // (rulings); each such ability applies once.
     // Shield of Kaldra: "Equipment named Sword of Kaldra, ~, and Helm of Kaldra have indestructible": by its name too.
-    const named = (/^Creatures named ~ /.test(line) || /^Equipment named [^.]*~/.test(line)) && /^[A-Z][A-Za-z' -]+$/.test(d.name) ? line.replace("~", d.name) : line;
+    // Brothers Yamazaki: "Each other creature named ~ gets +2/+2 and has haste.": read as "Other creatures named ~ get ...".
+    const eachOtherNamed = /^Each other creature named ~ gets ([+-]\d+\/[+-]\d+)( and has [a-z]+)?\.$/.exec(line);
+    const named = eachOtherNamed && /^[A-Z][A-Za-z' -]+$/.test(d.name) ? `Other creatures named ${d.name} get ${eachOtherNamed[1]}${eachOtherNamed[2]?.replace(" has ", " have ") ?? ""}.` : (/^Creatures named ~ /.test(line) || /^Equipment named [^.]*~/.test(line)) && /^[A-Z][A-Za-z' -]+$/.test(d.name) ? line.replace("~", d.name) : line;
     // Akron Legionnaire: "Except for creatures named ~ and artifact creatures, creatures you control can't attack": each
     // creature you control that's neither (by its name, CR 201.2, so another one named ~ too).
     if (line === "Except for creatures named ~ and artifact creatures, creatures you control can't attack.") {

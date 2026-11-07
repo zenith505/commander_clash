@@ -1,6 +1,6 @@
 # Roadmap
 
-30,180 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,189 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,962 of 4,988 (99%), top 10,000: 9,621 of
 9,979 (96%).
 
@@ -6079,6 +6079,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   of the artifact for as long as the Bandits remain; bots now aim a punisher's harmful effects at an opponent's permanent),
   Mimeofacture (you search the target's controller's library for a card with its name, which enters under your control;
   replicate copies choose new targets). No new prompts. +10 (30,180 of 31,936 with B123 and rounds 290-293).
+- Round B125 (least played first, from the skip lists): Lichenthrope and Phytohydra ("if damage would be dealt to it, put
+  that many -1/-1 or +1/+1 counters on it instead": a replacement, CR 614.1a, so damage that can't be prevented is
+  replaced too, CR 615.12; when a prevention shield would also apply, its controller picks which applies first, CR 616.1,
+  a new option on the damage-shield prompt with a browser test; bots take +1/+1 counters and prevent -1/-1 ones),
+  Emberwilde Djinn (at each player's upkeep that player may pay {R}{R} or 2 life to gain control of it, with a browser
+  test of the choice; bots pay 2 life for another player's Djinn, never for their own), Purgatory (nontoken creatures put into your graveyard from the
+  battlefield are exiled with it, CR 607.2a; at your upkeep you may pay {4} and 2 life to return one of them, chosen as it
+  resolves; bots pay only with one there), Jandor's Ring ("discard the last card you drew this turn" as a cost: the card
+  drawn last this turn, while it's still in your hand, no card to pick, with a browser test; bots cycle a land they just
+  drew once they have five), Phyrexian Grimoire (the target opponent picks which of your top two graveyard cards is
+  exiled, the other goes to your hand, CR 404.1; a browser test of the pick), Shapeshifter (its power is the last chosen
+  number and its toughness 7 minus it, a characteristic-defining ability, CR 604.3, kept on the permanent, CR 400.7:
+  0/7 elsewhere; bots pick 4/3, or 3/4 facing a creature with 3 or more power), Halfdane (base power and toughness of
+  another target creature, locked in as it resolves, CR 608.2h, until the end of your next upkeep: a new duration that
+  ends as that upkeep step ends, an additional upkeep counting, CR 500.8; with no target the old copy lasts through that
+  upkeep, rulings; bots copy the biggest creature), Scrying Glass (a number greater than 0, offered up to the cards in the
+  opponent's hand, since a greater one can never match, and a color; you draw if they reveal exactly that many cards of
+  that color; a browser test; bots guess 1 and the color the opponent has shown most). +9 (30,189 of 31,936 with B124 and rounds 290-293).
+- Out after round B125 (looked at, not done): Cut the Tethers (a punisher for each Spirit paid by its owner, all returned
+  at once: keepRest has no mana payment), Liquid Fire (a number chosen as an additional cost as it's cast, CR 601.2b: no
+  cast-time number choice yet), Preferred Selection (the two cards looked at are held across a "you may sacrifice ~ and
+  pay" choice), Thelon's Chant and Tourach's Chant (the player who put it onto the battlefield isn't tracked), Wand of Ith
+  and Tainted Specter (a payment or a library-top choice for the revealed or discarded card).
 - Out after round B123 (looked at, not done): Misfortune, Library of Lat-Nam and Fatal Lore (an opponent chooses the mode
   as the spell is cast, CR 700.2e), Kheru Lich Lord (a returned card's abilities and its exile replacement), Fasting (an
   optional draw-step skip with a counter rider), Matopi Golem and Skeleton Scavengers (a rider on one regeneration
@@ -6400,8 +6423,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Host of the Hereafter).
 - Graveyard order (CR 404.3) is modeled: cards put into a graveyard at the same time are arranged by their owner when
   a card in the game reads the order. Still out: Volrath's Shapeshifter (its text changes with the top card, layer 1/3),
-  Bösium Strip (cast the top instant or sorcery of your graveyard, exile it after), Phyrexian Grimoire (an opponent
-  picks one of the top two), Circling Vultures, Genesis and Kheru Lich
+  Bösium Strip (cast the top instant or sorcery of your graveyard, exile it after), Circling Vultures, Genesis and Kheru Lich
   Lord (blocked by other lines).
 - Collect evidence (CR 701.59) works as an optional additional cost, an alternative cost, an ability's cost and a "you
   may" on resolution; still out: ward—collect evidence (Axebane Ferox), bestow with it (Detective's Phoenix), "collect

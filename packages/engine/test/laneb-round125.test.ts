@@ -61,6 +61,7 @@ const halfdane = (): CardDef => ({"oracleId":"2ee13155-a3b8-4cad-8e68-5d2c5aba3b
 const glass = (): CardDef => ({"oracleId":"ca16b32c-3f1e-4f8d-821a-064f922c45d8","name":"Scrying Glass","manaCost":"{2}","cmc":2,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"{3}, {T}: Choose a number greater than 0 and a color. Target opponent reveals their hand. If that opponent reveals exactly the chosen number of cards of the chosen color, you draw a card.","colors":[],"colorIdentity":[],"keywords":[],"artUrl":"https://cards.scryfall.io/art_crop/front/7/2/7286819f-6c57-4503-898c-528786ad86e9.jpg?1783946055","commanderLegal":"legal","set":"uds","rarity":"rare","layout":"normal"}) as CardDef;
 const bolt = (): CardDef => ({"oracleId":"4457ed35-7c10-48c8-9776-456485fdf070","name":"Lightning Bolt","manaCost":"{R}","cmc":1,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Lightning Bolt deals 3 damage to any target.","colors":["R"],"colorIdentity":["R"],"keywords":[],"artUrl":"https://cards.scryfall.io/art_crop/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.jpg?1783903008","commanderLegal":"legal","set":"msc","rarity":"uncommon","layout":"normal"}) as CardDef;
 const llanowar = (): CardDef => ({"oracleId":"68954295-54e3-4303-a6bc-fc4547a4e3a3","name":"Llanowar Elves","manaCost":"{G}","cmc":1,"typeLine":"Creature — Elf Druid","supertypes":[],"types":["Creature"],"subtypes":["Elf","Druid"],"oracleText":"{T}: Add {G}.","power":"1","toughness":"1","colors":["G"],"colorIdentity":["G"],"keywords":[],"producedMana":["G"],"artUrl":"https://cards.scryfall.io/art_crop/front/e/e/ee1a40dc-30dc-4dda-9001-aa7fb0b43bb3.jpg?1785224528","commanderLegal":"legal","set":"sld","rarity":"rare","layout":"normal"}) as CardDef;
+const leyline = (): CardDef => ({"oracleId":"2608df54-dfbe-417d-aef5-49afbdfb03da","name":"Leyline of Punishment","manaCost":"{2}{R}{R}","cmc":4,"typeLine":"Enchantment","supertypes":[],"types":["Enchantment"],"subtypes":[],"oracleText":"If this card is in your opening hand, you may begin the game with it on the battlefield.\nPlayers can't gain life.\nDamage can't be prevented.","colors":["R"],"colorIdentity":["R"],"keywords":[],"artUrl":"https://cards.scryfall.io/art_crop/front/5/1/51a2eec5-f892-4466-b6c6-960626ba5640.jpg?1783941804","commanderLegal":"legal","set":"m11","rarity":"rare","layout":"normal"}) as CardDef;
 
 describe("Lichenthrope and Phytohydra: damage replaced by counters", () => {
   it("compile", () => supported(lichen(), phyto()));
@@ -72,6 +73,15 @@ describe("Lichenthrope and Phytohydra: damage replaced by counters", () => {
     expect(s.objects[l]!.counters["-1/-1"]).toBe(2);
     expect(s.objects[l]!.damage ?? 0).toBe(0);
     expect(ptOf(s, l)).toBe("3/3");
+  });
+
+  it("damage that can't be prevented is still replaced by counters (a replacement, CR 614.1a; only preventions stop working, CR 615.12)", () => {
+    const { s: s0, ap, ids } = setup([shock()]);
+    putOnBattlefield(s0, ap, leyline());
+    const l = putOnBattlefield(s0, ap, lichen());
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(l)])));
+    expect(s.objects[l]!.counters["-1/-1"]).toBe(2);
+    expect(s.objects[l]!.damage ?? 0).toBe(0);
   });
 
   it("Shock on Phytohydra puts two +1/+1 counters on it instead", () => {

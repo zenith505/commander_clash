@@ -836,6 +836,12 @@ function parseWhileTapped(inner: string, controlled: boolean | "controlled", ctx
     const fx = parseSentence(`${inner} this turn`, ctx);
     return fx?.[0]?.type === "continuous" && fx[0].duration === "endOfTurn" ? lasting(fx) : null;
   }
+  // Hedge Whisperer: "Target land you control becomes a 5/5 green Plant Boar creature with haste for as long as ~ remains
+  // tapped": as "until end of turn", for as long as ~ stays tapped (CR 611.2b); "It's still a land." after it keeps its types.
+  if (/^[^,]+ becomes an? \d+\/\d+ [^,]*creature(?: with [a-z ,]+)?$/.test(inner)) {
+    const fx = parseSentence(`${inner} until end of turn`, ctx);
+    return fx?.length === 1 && fx[0]!.type === "continuous" && fx[0]!.duration === "endOfTurn" ? lasting(fx) : null;
+  }
   if (!/ (?:gets?|has|have|loses?|gains?) /.test(inner)) return null;
   // "Gets +2/+2 and has trample" for as long as it lasts is "gains trample" from when it starts.
   const fx = parseSentence(`${inner.replace(/ (has|have) /, (_, w: string) => (w === "has" ? " gains " : " gain "))} until end of turn`, ctx);

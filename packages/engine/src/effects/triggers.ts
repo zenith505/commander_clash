@@ -2586,8 +2586,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ? ev.step === "beginCombat" && !(d.turn === s.turn && d.step === "beginCombat")
           : d.when === "nextEndStep"
           ? ev.step === "end" && !(d.turn === s.turn && d.step === "end" && !laterEndStep)
-          : d.when === "yourNextTurnEndStep"
-          ? ev.step === "end" && ev.active === d.controller && d.turn < s.turn
+          : d.when === "yourNextTurnEndStep" || d.when === "playersNextTurnEndStep"
+          ? ev.step === "end" && ev.active === (d.when === "playersNextTurnEndStep" ? d.player : d.controller) && d.turn < s.turn
           : d.when === "yourNextEndStep" || d.when === "playersNextEndStep"
           ? ev.step === "end" && ev.active === (d.when === "playersNextEndStep" ? d.player : d.controller) && !(d.turn === s.turn && d.step === "end" && !laterEndStep)
           : d.when === "endOfCombat"

@@ -1,4 +1,4 @@
-import { isRealKicker, type AbilityBody, type Effect, type Modification, type SpellCondition, type TargetChoice, type TargetSpec, type UnlessPays } from "../abilities";
+import { isRealKicker, type AbilityBody, type Amount, type Effect, type Modification, type SpellCondition, type TargetChoice, type TargetSpec, type UnlessPays } from "../abilities";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType, objIsType } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
@@ -268,7 +268,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       const o = id ? s.objects[id] : undefined;
       // Faramir: "that player's next end step", the chosen opponent's (CR 603.7), who is "they" then.
-      if (e.when === "playersNextEndStep") {
+      // Suppress: "the end step of that player's next turn", the target player's, on a later turn.
+      if (e.when === "playersNextEndStep" || e.when === "playersNextTurnEndStep") {
         const whose = e.whose ? players(s, e.whose, ctx)[0] : undefined;
         if (o && whose !== undefined) {
           addDelayed(s, e.when, ctx.controller, o, body, undefined, whose);
@@ -608,7 +609,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           // The Clone Saga: "a creature with the chosen name" is the name chosen as this resolved, kept with the delayed
           // trigger (its source may be gone by the time it triggers).
           // Zombie Boa: "a creature of that color", the color chosen as this resolved, likewise.
-          trigger: ctx.chosen?.name !== undefined || ctx.chosen?.color !== undefined ? bindChosenName(e.trigger, ctx.chosen) : e.trigger,
+          trigger: e.bound ? bindMilledCounts(s, ctx.chosen?.name !== undefined || ctx.chosen?.color !== undefined ? bindChosenName(e.trigger, ctx.chosen) : e.trigger, ctx) : ctx.chosen?.name !== undefined || ctx.chosen?.color !== undefined ? bindChosenName(e.trigger, ctx.chosen) : e.trigger,
           until: e.until,
           turn: s.turn,
           ...(e.once ? { once: true as const } : {}),
@@ -1556,6 +1557,18 @@ export function kickedMatches(kicked: number[] | undefined, cond: SpellCondition
   if (cond.kind !== "kicked") return false;
   if (cond.times) return (kicked?.length ?? 0) >= cond.times;
   return cond.which === undefined ? !!kicked?.length : !!kicked?.includes(cond.which);
+}
+
+/** Song of Blood: a copy of `t` with every amount counting this resolution's milled cards fixed at what it is now (CR 608.2h). */
+function bindMilledCounts<T>(s: GameState, t: T, ctx: ResolveCtx): T {
+  const walk = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(walk);
+    if (!v || typeof v !== "object") return v;
+    const o = v as Record<string, unknown>;
+    if (o.count && typeof o.count === "object" && (o.count as { kind?: string }).kind === "milledThisWay") return amountNow(s, o as unknown as Amount, ctx);
+    return Object.fromEntries(Object.entries(o).map(([k, x]) => [k, walk(x)]));
+  };
+  return walk(t) as T;
 }
 
 /** A copy of `t` with every "with the chosen name" (CR 201.4) or "of the chosen color" filter in it bound to what `chosen` holds. */

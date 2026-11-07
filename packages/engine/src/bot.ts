@@ -3060,7 +3060,12 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
   // Craig Boone: the damage to that creature, worth the creature if it would die of it, little otherwise.
   const hurt = pu.hurts ? s.objects[pu.hurts.id] : undefined;
   const hurtCost = hurt && hurt.zone === "battlefield" ? (toughness(s, hurt) - (hurt.damage ?? 0) <= pu.hurts!.n && !objHasKeyword(s, hurt, "Indestructible") ? worth(s, pid, hurt) : 0.5) : 0;
-  const penalty = mode && pu.losesSource ? sourceWorth : mode ? (controller === undefined || controller === pid || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.hurts ? hurtCost : doomed ? (doomed.zone === "battlefield" && !objHasKeyword(s, doomed, "Indestructible") ? worth(s, pid, doomed) : 0) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
+  // Anthropede: "you may discard a card or pay {2}. When you do, destroy target Room": its controller's own payment buys a
+  // reflexive destroy, worth about a card with an opponent's permanent to aim it at, nothing without one.
+  const ownPun = mode && controller === pid && s.resolving ? allEffects(s.resolving.body.effects).find((x) => x.type === "punisher" && x.who.ref === "you" && x.mode === "ifAny") : undefined;
+  const reflex = ownPun?.type === "punisher" && ownPun.effects.length === 1 && ownPun.effects[0]!.type === "reflexive" ? ownPun.effects[0]!.body : undefined;
+  const buys = reflex && reflex.targets.length === 1 && reflex.effects.length === 1 && reflex.effects[0]!.type === "destroy" && s.battlefield.some((id) => opponents(s, pid).includes(controllerOf(s, obj(s, id))) && objectMatches(s, reflex.targets[0]!, obj(s, id), pid, false)) ? 6 : 0;
+  const penalty = mode && pu.losesSource ? sourceWorth : mode ? (controller === pid ? buys : controller === undefined || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.hurts ? hurtCost : doomed ? (doomed.zone === "battlefield" && !objHasKeyword(s, doomed, "Indestructible") ? worth(s, pid, doomed) : 0) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
   const cost = (o: string): number => {
     if (o === "none") return penalty;
     const w = pu.options[Number(o)];

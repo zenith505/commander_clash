@@ -340,6 +340,34 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (id) log(s, e.look ? `${p.name} looks at the top card of their library.` : `${p.name} reveals ${defOf(s, obj(s, id)).name} from the top of their library.`);
       return;
     }
+    case "exileRevealedToCast": {
+      // The card revealed from the hand, while it's still that card there (CR 400.7), by its characteristics there.
+      const r = s.resolving!.revealed;
+      const card = r && s.objects[r.id]?.zone === "hand" && (obj(s, r.id).zoneChanges ?? 0) === r.zc ? obj(s, r.id) : undefined;
+      if (!card || !printedMatches(e.filter, defOf(s, card))) return;
+      log(s, `${player(s, ctx.controller).name} exiles ${defOf(s, card).name} from ${player(s, card.owner).name}'s hand.`);
+      moveObject(s, card.id, "exile");
+      const o = obj(s, card.id);
+      if (o.zone !== "exile") return;
+      // Cast only, by the ability's controller, with its usual timing (CR 601.3), for as long as it remains exiled.
+      o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, castOnly: true, ...(e.free ? { free: true as const } : {}) };
+      if (e.returnAtEnd) {
+        const item = s.resolving!.item;
+        const from = item.kind === "spell" && item.objectId ? s.objects[item.objectId] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [{ type: "exiledToGraveyard", cards: [{ id: o.id, zc: o.zoneChanges ?? 0 }], toHand: true }], text: `If you haven't cast ${defOf(s, o).name}, return it to its owner's hand.` }, from ? cardIdOf(from) : cardIdOf(o));
+      }
+      return;
+    }
+    case "discardRevealed": {
+      // The card revealed from the hand, while it's still that card there (CR 400.7), discarded by its owner (CR 701.9a).
+      const r = s.resolving!.revealed;
+      const card = r && s.objects[r.id]?.zone === "hand" && (obj(s, r.id).zoneChanges ?? 0) === r.zc ? obj(s, r.id) : undefined;
+      if (!card) return;
+      const tops = discardToTop(s, card.owner, [card.id], src, ctx);
+      if (tops === "paused") return "paused";
+      discardCards(s, card.owner, [card.id], "", false, false, ctx.controller, undefined, tops);
+      return;
+    }
     case "revealedToGraveyardCopySelf": {
       const r = s.resolving!.revealed;
       const card = r && s.objects[r.id]?.zone === "library" && (obj(s, r.id).zoneChanges ?? 0) === r.zc ? obj(s, r.id) : undefined;
@@ -710,6 +738,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           // "For as long as that card remains exiled, its owner may play it" (Elite Spellbinder): with its usual timing.
           // Covetous Urge: "You may cast that card for as long as it remains exiled" (not a land: "cast").
           if (e.youMay && (!e.youMay.ifGift || gifteeOf(s, ctx) !== undefined)) o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, castOnly: true, ...(e.youMay.anyType ? { anyType: true as const } : {}) };
+          // Psychic Theft: returned at the beginning of the next end step if it's still this object in exile (not cast, CR
+          // 400.7), a delayed trigger (CR 603.7) of the spell's.
+          if (e.youMay?.returnAtEnd) {
+            const item = s.resolving!.item;
+            const from = item.kind === "spell" && item.objectId ? s.objects[item.objectId] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+            addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [{ type: "exiledToGraveyard", cards: [{ id, zc: o.zoneChanges ?? 0 }], toHand: true }], text: `If you haven't cast ${defOf(s, o).name}, return it to its owner's hand.` }, from ? cardIdOf(from) : cardIdOf(o));
+          }
           if (e.ownerMay) o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, ...(e.ownerMay.play ? {} : { castOnly: true as const }), ...(e.ownerMay.more ? { more: e.ownerMay.more } : {}) };
           // "It becomes plotted" (CR 702.170c): cast without paying its mana cost on a later turn (702.170d).
           if (e.plot) {

@@ -171,7 +171,8 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const want = e.n === undefined ? 1 : Math.max(0, amountNow(s, e.n, ctx));
       const named = !(filter.chosen === "name" && ctx.chosen?.name === undefined);
       const hits: ObjectId[] = [];
-      let end = want ? p.library.length : 0;
+      // Thought Dissector: "or X cards are revealed, whichever comes first".
+      let end = want ? (e.atMost === undefined ? p.library.length : Math.min(p.library.length, Math.max(0, amountNow(s, e.atMost, ctx)))) : 0;
       for (let i = 0; named && i < end; i++)
         if (matches(p.library[i]!) && hits.push(p.library[i]!) === want) end = i + 1;
       const seen = p.library.slice(0, end);
@@ -257,6 +258,10 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           }),
         );
       if (e.remember && s.resolving) s.resolving.created = found === "battlefield" ? hits.filter((id) => obj(s, id).zone === "battlefield") : [];
+      // Thought Dissector: "and sacrifice ~", once an artifact card was revealed, if ~ is still that permanent (CR 400.7).
+      if (e.sacrificeSelfIfFound && hit) {
+        runEffect(s, { type: "sacrifice", what: { ref: "self" } }, ctx);
+      }
       for (const id of toHand) {
         log(s, `${defOf(s, obj(s, id)).name} has nothing to enchant, so it goes into ${p.name}'s hand.`);
         moveObject(s, id, "hand");

@@ -2685,7 +2685,15 @@ export type Effect =
    * your graveyard": the cards the spell exiled (`cards`, filled in as the delayed trigger is made) that are still the
    * same objects in exile (CR 400.7); how many went to the graveyard is "put into your graveyard this way".
    */
-  | { type: "exiledToGraveyard"; cards?: { id: ObjectId; zc: number }[] }
+  /**
+   * Planeswalker's Mischief: "If it's an instant or sorcery card, exile it. You may cast it without paying its mana cost for
+   * as long as it remains exiled. At the beginning of the next end step, if you haven't cast it, return it to its owner's
+   * hand.": the card the revealTop before revealed from a hand, if it's still there and matches `filter`.
+   */
+  | { type: "exileRevealedToCast"; filter: TargetSpec; free?: true; returnAtEnd?: true }
+  /** Dementia Sliver: "that player discards it": the card the revealTop before revealed from a hand, if it's still there. */
+  | { type: "discardRevealed" }
+  | { type: "exiledToGraveyard"; cards?: { id: ObjectId; zc: number }[]; /** Psychic Theft: "return it to its owner's hand" instead. */ toHand?: true }
   /**
    * Mysterio, Master of Illusion: "Exile those tokens when ~ leaves the battlefield": the tokens the ability created
    * (`cards`, filled in as the delayed trigger is made) that are still the same permanents (CR 400.7).
@@ -3186,7 +3194,7 @@ export type Effect =
    * spell's) is its event player, "that spell's mana value" (Mana Drain) its event amount. `yourNextMain`: "at the
    * beginning of your next main phase", the next one that begins after it's made (rulings on Mana Drain).
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | /** "At the beginning of their next upkeep" (Phytotitan), with `each` "selfCard": the card's owner's next upkeep. */ "ownersNextUpkeep" | /** "When that creature becomes blocked this turn" (Barreling Attack): each time it does this turn (CR 603.7b). */ "becomesBlocked" | "nextEndStep" | "yourNextEndStep" | /** "At the beginning of the end step on your next turn" (Kav Landseeker): your end step on a later turn. */ "yourNextTurnEndStep" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; /** Heroic Sacrifice: the delayed trigger's own targets, chosen as it's put on the stack (CR 603.3d); with `when` "dies", `lkiCounters` gives it the counters the creature had as it died (CR 608.2h). */ targets?: TargetSpec[]; lkiCounters?: true; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned" | /** Unexpected Request: each Equipment the attach before attached this way (ResolvingState.attachedThisWay). */ "attachedThisWay"; /** With each "subject": the delayed trigger also remembers this ability's source as it is now, its "~" (Contempt). */ withSource?: true; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; /** With `when` "dies": "When the permanent you don't control dies this turn" (Devouring Tendrils): a planeswalker too, any permanent put into a graveyard from the battlefield (CR 700.4). */ anyPermanent?: true; /** With "dies": "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only if you own it. */ intoYourGraveyard?: true; /** With "dies": "if it has an egg counter on it" (Xira), as it last existed (CR 603.4, 603.10a). */ ifHadCounter?: CounterKind; /** With `of` countersPutThisWay: "For each -1/-1 counter you put on a creature this way, remove a -1/-1 counter from that creature at the beginning of the next end step" (Shambling Swarm): each creature's removeCounters is as many as were put on it. */ perCounterPut?: true; /** With "leaves" `of` self: "When ~ leaves the battlefield this turn, destroy that creature" (War Barge): its instructions are about this target as it is now, not about ~ (CR 603.7c, 400.7). */ about?: number; event?: { player?: PlayerRef; amount?: Amount } }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | /** "At the beginning of their next upkeep" (Phytotitan), with `each` "selfCard": the card's owner's next upkeep. */ "ownersNextUpkeep" | /** "When that creature becomes blocked this turn" (Barreling Attack): each time it does this turn (CR 603.7b). */ "becomesBlocked" | "nextEndStep" | "yourNextEndStep" | /** "At the beginning of the end step on your next turn" (Kav Landseeker): your end step on a later turn. */ "yourNextTurnEndStep" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep" | /** "At the beginning of the end step of that player's next turn" (Suppress): `whose`'s end step on a later turn. */ "playersNextTurnEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; /** Heroic Sacrifice: the delayed trigger's own targets, chosen as it's put on the stack (CR 603.3d); with `when` "dies", `lkiCounters` gives it the counters the creature had as it died (CR 608.2h). */ targets?: TargetSpec[]; lkiCounters?: true; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned" | /** Unexpected Request: each Equipment the attach before attached this way (ResolvingState.attachedThisWay). */ "attachedThisWay"; /** With each "subject": the delayed trigger also remembers this ability's source as it is now, its "~" (Contempt). */ withSource?: true; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; /** With `when` "dies": "When the permanent you don't control dies this turn" (Devouring Tendrils): a planeswalker too, any permanent put into a graveyard from the battlefield (CR 700.4). */ anyPermanent?: true; /** With "dies": "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only if you own it. */ intoYourGraveyard?: true; /** With "dies": "if it has an egg counter on it" (Xira), as it last existed (CR 603.4, 603.10a). */ ifHadCounter?: CounterKind; /** With `of` countersPutThisWay: "For each -1/-1 counter you put on a creature this way, remove a -1/-1 counter from that creature at the beginning of the next end step" (Shambling Swarm): each creature's removeCounters is as many as were put on it. */ perCounterPut?: true; /** With "leaves" `of` self: "When ~ leaves the battlefield this turn, destroy that creature" (War Barge): its instructions are about this target as it is now, not about ~ (CR 603.7c, 400.7). */ about?: number; event?: { player?: PlayerRef; amount?: Amount } }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu"; /** Zareth San, the Trickster: not ninjutsu, so it attacks what its controller chooses as it enters (CR 508.4; rulings), not what the returned creature attacked (702.49c). */ chooseDefender?: true }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -3261,7 +3269,7 @@ export type Effect =
    */
   /** `about`: its "~" is this target (Hunter's Insight's "that creature"), the object it was as this resolved (CR 603.7c). */
   /** `aboutPlayer`: only for combat damage to the player of that target (Great Train Heist). */
-  | { type: "floatingTrigger"; trigger: TriggeredAbility; until: TriggerDuration; about?: number; aboutPlayer?: number; /** With `about`: that many targets in a row from it, one for each ("either of those creatures", Tamiyo). */ each?: number; /** "When you next attack this turn" (All-Out Assault): only the first time (CR 603.7c). */ once?: true }
+  | { type: "floatingTrigger"; trigger: TriggeredAbility; until: TriggerDuration; about?: number; aboutPlayer?: number; /** With `about`: that many targets in a row from it, one for each ("either of those creatures", Tamiyo). */ each?: number; /** "When you next attack this turn" (All-Out Assault): only the first time (CR 603.7c). */ once?: true; /** Song of Blood: the amounts in its effects that count this resolution's cards ("for each creature card put into your graveyard this way") are fixed as it's made (CR 608.2h). */ bound?: true }
   /**
    * Copy a spell (CR 707.10): the one whose casting triggered this ("cause": storm, replicate, "copy that spell") or a
    * target. `n`: "storm" is the spells cast before it this turn, "kicked" the times its replicate cost was paid.
@@ -3420,6 +3428,10 @@ export type Effect =
       sharesCreatureTypeWithSacrificed?: true;
       /** "Exile cards from the top of your library until you exile a land card" (Venture Forth): exiled, not revealed (CR 406.3), then put where they go from exile. */
       exile?: true;
+      /** Thought Dissector: "until an artifact card or X cards are revealed, whichever comes first": no more than this many cards. */
+      atMost?: Amount;
+      /** Thought Dissector: "If an artifact card is revealed this way, put it onto the battlefield under your control and sacrifice ~": ~ is sacrificed once one is found, if it's still that object. */
+      sacrificeSelfIfFound?: true;
     }
   /**
    * "Exile cards from the top of your library until you exile a nonland card", or "reveal ... until you reveal a nonland
@@ -3808,7 +3820,7 @@ export type Effect =
       /** With `orGraveyard`: Agonizing Remorse's "a nonland card from it or a card from their graveyard": `filter` is for the hand's cards only. */
       anyFromYard?: true;
       /** Covetous Urge: "You may cast that card for as long as it remains exiled, and you may spend mana as though it were mana of any color to cast that spell": the ability's controller may (action "exile"). */
-      youMay?: { anyType?: true; /** Cruelclaw's Heist: "If the gift was promised, you may cast that card ...": only then. */ ifGift?: true };
+      youMay?: { anyType?: true; /** Cruelclaw's Heist: "If the gift was promised, you may cast that card ...": only then. */ ifGift?: true; /** Psychic Theft: "At the beginning of the next end step, if you haven't cast the card, return it to its owner's hand": a delayed trigger for the card while it's still exiled as that object. */ returnAtEnd?: true };
       /** Rakdos Augermage: "discard a card of target opponent's choice": who chooses the card, if not the controller (CR 701.9b). */
       by?: PlayerRef;
     }
@@ -6922,6 +6934,8 @@ export interface CompiledCard {
    * (CR 208.2b, 707.2), so a copy effect over what it is; `text` is the choice as offered.
    */
   entersForms?: { except: CopyExcept; text: string }[];
+  /** Gaea's Liege: its "*" power and toughness are 0 off the battlefield (CR 208.2) and set by its own conditional static abilities on it, one of which always applies there. */
+  starsSetOnBattlefield?: true;
   /** Fear of Abduction: the card exiled to pay its "exile a creature you control" cost is linked to its leaves ability too, with the card its enters ability exiles (CR 607.2q). */
   costExileLinked?: true;
   /** Ethereal Forager: the cards its delve exiled as it was cast are "exiled with ~", linked to the permanent it becomes (rulings, CR 607.2q). */

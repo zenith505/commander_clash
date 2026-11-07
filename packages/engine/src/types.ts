@@ -1724,6 +1724,8 @@ export interface TurnLog {
   lorePut?: string[];
   /** Cards put into each owner's graveyard from their hand or library this turn (Welcome the Dead). */
   toGraveyardFromHandOrLibrary?: Record<number, number>;
+  /** Cards put into each owner's graveyard from their library this turn (Cruel Calculations). */
+  toGraveyardFromLibrary?: Record<number, number>;
   /** Each event this turn that discarded cards: who discarded them, and the cards (keys into `cards`). */
   discards?: { player: PlayerId; cards: string[] }[];
   /** Each event that put cards into graveyards this turn: the cards (CardDef keys), by their owner (Crawling Sensation's "for the first time each turn"). */

@@ -2,7 +2,7 @@ import type { AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "../abilit
 import { ANY_COUNTER } from "../abilities";
 import { NUM, num, COUNTER, counterKind, COLOR_WORDS, capital, singularWord } from "./words";
 import { CREATURE_TYPES, SUPPORTED_KEYWORDS, canonicalKeyword, type SupportedKeyword } from "../keywords";
-import { STARTING_LIFE } from "../types";
+import { STARTING_LIFE, type Color } from "../types";
 import { Ctx, addTarget } from "./body";
 import { parseGroup, parsePlayer, parseTargetPhrase, subtypeClause } from "./targets";
 import { parseSearchFilter } from "./search";
@@ -922,6 +922,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each {S} spent to cast ~", "the amount of {S} spent to cast ~" (CR 107.4h): the spell's, or its permanent's
   // enters trigger's (compile checks it's one of those).
   if ((m = /^(?:the )?(?:amount of )?\{S\} spent to cast (~|it)$/i.exec(p)) && ctx !== null && (ctx.spell || (ctx.selfIt && m[1] === "it") || m[1] === "~")) return count({ kind: "snowSpent" });
+  // Bladecoil Serpent, Clay Champion: "for each {U}{U} spent to cast it (this creature)": whole pairs of that color, the
+  // spell's or its permanent's (compile checks it's one of those, CR 601.2h).
+  if (each && (m = /^\{([WUBRG])\}\{\1\} spent to cast (~|it)$/.exec(p)) && ctx !== null && (ctx.spell || ctx.selfIt || m[2] === "~")) return count({ kind: "spentPairs", color: m[1] as Color });
   // Blood Tyrant: "each player loses 1 life. Put a +1/+1 counter on ~ for each 1 life lost this way": what its loseLife
   // took off life totals, every player's (rulings: yours too).
   if (each && /^1 life lost this way$/i.test(p) && ctx !== null) return count({ kind: "lifeLostThisWay", byLoss: true });
@@ -1046,6 +1049,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^cards? put into (your|their|that player's|enchanted player's) graveyard from anywhere this turn$/i.exec(p))) {
     const whose = whosePlayer(m[1]!, ctx);
     return whose && count({ kind: "cardsToGraveyardThisTurn", whose });
+  }
+  // Cruel Calculations: "the number of cards that were put into target player's graveyard from their library this turn":
+  // milled or otherwise, owned by that player (a card goes to its owner's graveyard, CR 404.2), tokens aren't cards.
+  if ((m = /^cards? (?:that were )?put into (target player's) graveyard from their library this turn$/i.exec(p))) {
+    const whose = whosePlayer(m[1]!, ctx);
+    return whose && count({ kind: "cardsToGraveyardThisTurn", whose, fromLibrary: true });
   }
   // Welcome the Dead: "cards that were put into your graveyard from your hand or library this turn": cards, not tokens.
   if ((m = /^cards? (?:that were )?put into your graveyard from your hand or library this turn$/i.exec(p)))

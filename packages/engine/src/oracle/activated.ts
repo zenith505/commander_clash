@@ -84,6 +84,8 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const costs = (halfLife ? m[1]!.replace(halfLife[0], "Pay half your life") : m[1]!).replace(/(^|, )Exile ~ and (one|two|three|four|five) other ([^,:]+? you control)(?=, |$)/, "$1Exile ~, Exile $2 other $3");
   // Sacrificing other permanents or discarding cards as part of the cost (CR 602.2b, 601.2h).
   const extra: AdditionalCost[] = [];
+  /** Corpseweft: "where X is twice the number of cards exiled this way" (see its cost). */
+  let twiceExiled = false;
   let removeCounters: ActivatedAbility["removeCounters"];
   let putCounters: ActivatedAbility["putCounters"];
   // "From among other artifacts, creatures, and planeswalkers you control" is one cost, commas and all.
@@ -295,6 +297,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       // Painbringer: "Exile any number of cards from your graveyard: ... where X is the number of cards exiled this way":
       // how many is chosen as it's activated (CR 602.2b, 601.2h), so it's an X announced then (none included).
       extra.push({ kind: "exileFromGraveyard", n: 0, x: true });
+    } else if (/^Exile one or more creature cards from your graveyard$/.test(part) && /^Create a tapped X\/X [a-z]+ [A-Z][a-z]+(?: [A-Z][a-z]+)* creature token, where X is twice the number of cards exiled this way\.$/.test(m[2]!)) {
+      // Corpseweft: "Exile one or more creature cards from your graveyard: ... where X is twice the number of cards exiled
+      // this way": how many is chosen as it's activated (CR 602.2b, 601.2h), an X announced then that can't be 0; the
+      // cards exiled are this activation's, none from before (rulings).
+      extra.push({ kind: "exileFromGraveyard", n: 0, x: true, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" } });
+      twiceExiled = true;
     } else if (/^Exile X cards from your graveyard$/.test(part)) {
       // Necropolis Fiend: "{X}, {T}, Exile X cards from your graveyard": the one X announced as it's activated, paid in
       // mana and in that many cards (CR 107.3a, 602.2b).
@@ -342,6 +350,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // cost is paid, targets having been chosen first (CR 601.2c, 601.2h).
   const tapAttached = /(?:^|, )Tap enchanted (?:creature|land)(?=, |$)/.test(costs);
   let effectText = tapAttached ? m[2]!.replace(/\bother than the creature tapped this way\b/, "other than enchanted creature") : m[2]!;
+  if (twiceExiled) effectText = effectText.replace(/, where X is twice the number of cards exiled this way\.$/, ".");
   // Painbringer: the X its cost announced (see above).
   if (/(?:^|, )Exile any number of cards from your graveyard(?=, |$)/.test(costs) && extra.some((c) => c.kind === "exileFromGraveyard" && c.x)) effectText = effectText.replace(/, where X is the number of cards exiled this way\.$/, ".");
   // Relic Amulet: "Remove all charge counters from ~: It deals that much damage to target creature": as many as were
@@ -656,6 +665,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     // Blademane Baku: "For each counter removed, ~ gets +2/+0 until end of turn" after "Remove X ki counters from ~".
     .replace(/^For each counter removed, (~ gets [+-]\d+\/[+-]\d+ until end of turn)\.$/, removeCounters?.x ? "$1 for each counter removed this way." : "$&").replace(/^(Put [^.]+ counters? on ~\. )It (?=deals\b)/, "$1~ ").replace(/^(Untap ~\. Put an? [^.]+ counter on) it\.$/, "$1 ~."), { activated: true, ...(activateIf?.kind === "self" && activateIf.is === "attacking" ? { selfAttacking: true } : {}), ...(removeCounters?.x ? { ownX: true } : {}), ...(returnsSelf || inYard ? { selfCard: true } : {}), ...(fromHand ? { discardedSelf: true as const } : {}), ...(extra.some((c) => c.kind === "exileFromGraveyard" && c.linked) ? { costLinked: true } : {}) });
   if (!body) return "fail";
+  // Corpseweft: the token is X/X for twice the cards exiled (the X announced, see above).
+  if (twiceExiled) {
+    const tok = body.effects.length === 1 && body.effects[0]!.type === "createToken" ? body.effects[0]! : undefined;
+    if (tok?.type !== "createToken" || JSON.stringify(tok.pt) !== '{"count":{"kind":"x"}}') return "fail";
+    tok.pt = { count: { kind: "x" }, times: 2 };
+    xMin = 1;
+  }
   if (uncopyable) body.uncopyable = true;
   // An activated ability without a target that could add mana, and that moves no card to or from a library, is a mana
   // ability (CR 605.1a): it doesn't use the stack (605.3b). One whose other instructions aren't known to stay clear of

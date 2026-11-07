@@ -1953,6 +1953,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Gideon, Champion of Justice: "Until end of turn, ~ becomes a Human Soldier creature with power and toughness each equal
   // to the number of loyalty counters on him and gains indestructible. He's still a planeswalker.": the number locked in
   // as it resolves (rulings, CR 608.2h), like Gideon Jura's "becomes a 6/6 ... creature that's still a planeswalker".
+  // Bladecoil Serpent: "for each {R}{R} spent to cast it, it gets +1/+0 and gains trample and haste until end of turn":
+  // +1/+0 for each pair, and the keywords once there's one (gaining them again changes nothing, CR 702.19g, 702.10d).
+  text = text.replace(/^[Ff]or each \{([WUBRG])\}\{\1\} spent to cast it, it gets \+1\/\+0 and gains ([a-z]+) and ([a-z]+) until end of turn\.$/, "If {$1}{$1} was spent to cast it, ~ gets +1/+0 until end of turn for each {$1}{$1} spent to cast it. If {$1}{$1} was spent to cast it, ~ gains $2 and $3 until end of turn.");
+  // Clay Champion: "Choose up to two other target creatures you control. For each {W}{W} spent to cast ~, put a +1/+1
+  // counter on each of them.": one counter on each per pair.
+  text = text.replace(/^[Cc]hoose up to two other target creatures you control\. For each \{([WUBRG])\}\{\1\} spent to cast ~, put a \+1\/\+1 counter on each of them\.$/, "Put a +1/+1 counter on each of up to two other target creatures you control for each {$1}{$1} spent to cast ~.");
   text = text.replace(/^Until end of turn, ~ becomes an? ([A-Z][a-z]+(?: [A-Z][a-z]+)*) creature with power and toughness each equal to the number of loyalty counters on ~ and gains indestructible\. (?:He|She|It)'s still a planeswalker\./, "Until end of turn, ~ becomes an X/X $1 creature with indestructible that's still a planeswalker, where X is the number of loyalty counters on it.");
   // Veiled Sentry: "it becomes an Illusion creature with power and toughness each equal to that spell's mana value": the
   // mana value of the spell that triggered it as it was cast, remembered if it has left the stack (rulings), locked in as
@@ -15201,6 +15207,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const spec = prev?.type === "putOntoBattlefield" && prev.what.ref === "target" && !prev.what.n ? ctx.targets[prev.what.index] : undefined;
       const mods = parseBecomes(`a ${theyAre[1]} in addition to its other types`);
       if (prev?.type !== "putOntoBattlefield" || !spec?.perOpponent || !mods || prev.alsoMods) return null;
+      prev.alsoMods = mods;
+      continue;
+    }
+    // Relive the Past: "They are 5/5 Elemental creatures in addition to their other types" after returning its targets:
+    // each permanent they became, from then on (CR 611.2c), its types in layer 4 and its P/T in layer 7b (rulings).
+    const theyAreNN = /^They are (\d+)\/(\d+) ([A-Z][a-z]+) creatures in addition to their other types$/.exec(s);
+    if (theyAreNN) {
+      const prev = effects[effects.length - 1];
+      const mods = CREATURE_TYPES.has(theyAreNN[3]!) ? parseBecomes(`a ${theyAreNN[1]}/${theyAreNN[2]} ${theyAreNN[3]} creature in addition to its other types`) : null;
+      if (prev?.type !== "putOntoBattlefield" || prev.what.ref !== "target" || prev.what.n !== 3 || !mods || prev.alsoMods) return null;
       prev.alsoMods = mods;
       continue;
     }

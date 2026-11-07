@@ -1278,6 +1278,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const away: Effect = /^sacrifice/i.test(m[1]!) ? sacrificeSelf : /^tap/i.test(m[1]!) ? { type: "tap", what: { ref: "self" } } : /^destroy/i.test(m[1]!) ? { type: "destroy", what: { ref: "self" } } : { type: "exile", what: { ref: "self" } };
     return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true }, n: many ? num(many[1]!) : 1, action: "sacrifice" }], otherwise: [away], keep: true, text: `Sacrifice ${m[3]} to keep ~${/^tap/i.test(m[1]!) ? " untapped" : ""}` }];
   }
+  // Wormfang Drake: "sacrifice it unless you exile a creature you control other than ~": the choice is made as it resolves,
+  // even after it has left (then the exiled card stays exiled, rulings); with no other creature, it's sacrificed.
+  if ((m = /^[Ss]acrifice (~|it) unless you exile a creature you control other than ~$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const filter = pickFilter("creature");
+    if (filter?.kind !== "object") return null;
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: "creature other than ~" }, n: 1, action: "exile" }], otherwise: [sacrificeSelf], keep: true, text: "Exile a creature you control other than ~ to keep ~" }];
+  }
   // Bandit's Talent: "draw an additional card for each opponent who has one or fewer cards in hand" (in your draw step).
   if ((m = /^(.*?\b[Dd]raws?) an additional card for each (.+)$/.exec(s))) return parseSentence(`${m[1]} a card for each ${m[2]}`, ctx);
   // "That player draws an additional card" (Howling Mine): just another draw.

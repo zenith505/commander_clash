@@ -397,6 +397,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     damagedBy: capped(Object.fromEntries(Object.entries(t.damagedBy ?? {}).map(([k, v]) => [k, v.length]))),
     toGraveyard: capped(t.toGraveyard ?? {}),
     toGraveyardFromHandOrLibrary: capped(t.toGraveyardFromHandOrLibrary ?? {}),
+    toGraveyardFromLibrary: capped(t.toGraveyardFromLibrary ?? {}),
     landPlayedNotFromHand: t.landPlayedNotFromHand,
     playedFromExile: t.playedFromExile,
     lorePut: t.lorePut ? [...t.lorePut].sort() : undefined,

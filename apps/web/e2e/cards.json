@@ -5286,6 +5286,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9ffb5615-124e-4848-9e0d-120851bd50e5",
+  "name": "Corpseweft",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}{B}, Exile one or more creature cards from your graveyard: Create a tapped X/X black Zombie Horror creature token, where X is twice the number of cards exiled this way.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dtk",
+  "releasedAt": "2015-03-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "acf4d685-a718-42f7-9a7a-dee069ae8db2",
   "name": "Council's Judgment",
   "manaCost": "{1}{W}{W}",
@@ -5943,6 +5969,34 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8dc067bf-f78f-4ac4-b6e7-b305c42cf0bc",
+  "name": "Darksteel Citadel",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Artifact Land",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "Indestructible\n{T}: Add {C}.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Indestructible"
+  ],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2021-10-15",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -28989,6 +29043,102 @@
   "set": "ons",
   "releasedAt": "2002-10-07",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4216f9ce-bdd9-4213-8c3f-e2ef4cd848f9",
+  "name": "Wormfang Crab",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Nightmare Crab",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Nightmare",
+   "Crab"
+  ],
+  "oracleText": "This creature can't be blocked.\nWhen this creature enters, an opponent chooses a permanent you control other than this creature and exiles it.\nWhen this creature leaves the battlefield, return the exiled card to the battlefield under its owner's control.",
+  "power": "3",
+  "toughness": "6",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "jud",
+  "releasedAt": "2002-05-27",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d37c4e77-5023-4d13-9cfe-a43f513364bf",
+  "name": "Wormfang Drake",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Nightmare Drake",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Nightmare",
+   "Drake"
+  ],
+  "oracleText": "Flying\nWhen this creature enters, sacrifice it unless you exile a creature you control other than this creature.\nWhen this creature leaves the battlefield, return the exiled card to the battlefield under its owner's control.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "jud",
+  "releasedAt": "2002-05-27",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "be014a79-5550-4f79-8789-b4d6783d7ec8",
+  "name": "Wormfang Newt",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Nightmare Salamander Beast",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Nightmare",
+   "Salamander",
+   "Beast"
+  ],
+  "oracleText": "When this creature enters, exile a land you control.\nWhen this creature leaves the battlefield, return the exiled card to the battlefield under its owner's control.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "jud",
+  "releasedAt": "2002-05-27",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

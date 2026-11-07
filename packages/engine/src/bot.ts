@@ -4897,7 +4897,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // "Pay X {E}, Sacrifice ...: ... target ... with mana value X" (Chthonian Nightmare, HELIOS One): the biggest X with
       // a target worth it (mana value 3 or more), as much energy as we have at most.
       const energyX = ab.energyX && !ab.costs?.length && !xTarget ? Math.min(player(s, pid).energy ?? 0, player(s, pid).library.length - 2) : 0;
-      const discardX = discardXCount(s, pid, id, ab);
+      const discardX = discardXCount(s, pid, id, ab) ?? graveXCount(s, pid, id, ab);
       // "Remove X ki counters from ~" (the Bakus): as many as it has, or as the mana for an {X} allows (Talon of Pain).
       const counterX = ab.removeCounters?.x ? Math.min(removableCounters(s, o, ab.removeCounters.counter), parseManaCost(ab.manaCost).hasX ? Math.max(0, availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(parseManaCost(ab.manaCost))) : Infinity) : 0;
       // Sidisi, Regent of the Mire: our least useful creature (never our commander) for the biggest creature card in our
@@ -4940,6 +4940,10 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.body.effects.length && ab.body.effects.every((e) => e.type === "delayed" && e.when === "dies")) continue;
       // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.
       if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
+      // "Until your next upkeep, ~ can't phase out" (Ertai's Familiar): only to keep our own phasing permanent here, once;
+      // Spatial Binding's "target permanent can't phase out" bots leave alone.
+      const binds = ab.body.effects.length > 0 && ab.body.effects.every((e) => e.type === "continuous" && e.mods.every((m) => m.kind === "cantPhaseOut"));
+      if (binds && !ab.body.effects.every((e) => e.type === "continuous" && e.what.ref === "self" && objHasKeyword(s, o, "Phasing") && !characteristics(s, o).cantPhaseOut)) continue;
       // Mirror-Mad Phantasm: shuffling itself into its owner's library, then revealing until a card of its name with the
       // rest milled, which for a bot is only its own library put into the graveyard.
       if (ab.body.effects.some((e) => e.type === "shuffleIntoLibrary" && e.what.ref === "self") && allEffects(ab.body.effects).some((e) => e.type === "revealUntil" && e.rest === "graveyard")) continue;
@@ -4992,7 +4996,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         // O-Naginata: not to a creature it can't be attached to (it would stay where it is, rulings).
         const only = ab.equip ? abilitiesOf(s, o).attachOnly : undefined;
         if (only && targets.some((t) => t.kind === "object" && !objectMatches(s, only, obj(s, t.id), pid, false))) continue;
-        const costs = discardX !== undefined ? discardXCosts(s, pid, o, ab, targets, discardX) : abilityCosts(s, pid, o, ab, targets);
+        const costs = discardX !== undefined ? (graveXPool(s, pid, id, ab) ? graveXCosts(s, pid, o, ab, targets, discardX) : discardXCosts(s, pid, o, ab, targets, discardX)) : abilityCosts(s, pid, o, ab, targets);
         if (costs === null) continue;
         if (titan && (costs?.sacrifice ?? []).reduce((a, c) => a + Math.max(0, power(s, obj(s, c))), 0) >= 10) continue;
         if (flips && flipWorth(s, pid, o, ab, flips, targets) <= 0) continue;
@@ -5313,6 +5317,33 @@ function discardXCount(s: GameState, pid: PlayerId, id: ObjectId, ab: ActivatedA
   const keep = hand.filter((x) => !isLand(x) && mv(s, x) <= mana).length + (p.landsPlayedThisTurn < landsAllowed(s, pid) && hand.some(isLand) ? 1 : 0);
   const x = hand.length - keep;
   return x >= 2 ? x : undefined;
+}
+
+/**
+ * "Exile one or more creature cards from your graveyard: Create a tapped X/X ... token" (Corpseweft): the cards matching
+ * the cost we have no use for in our graveyard, when the ability makes a token and targets nothing, or undefined.
+ */
+function graveXPool(s: GameState, pid: PlayerId, id: ObjectId, ab: ActivatedAbility): ObjectId[] | undefined {
+  const xs = (ab.costs ?? []).filter((c) => "x" in c && c.x);
+  const c = xs[0];
+  if (xs.length !== 1 || c?.kind !== "exileFromGraveyard" || c.top || c.linked || c.process || parseManaCost(ab.manaCost).hasX) return undefined;
+  if (!ab.body.effects.some((e) => e.type === "createToken") || ab.body.targets?.length) return undefined;
+  return player(s, pid).graveyard.filter((x) => x !== id && !usefulInGraveyard(s, x) && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))));
+}
+
+/** X for graveXPool: all of those cards, in our main phase with an empty stack, two at least (and the ability's minimum). */
+function graveXCount(s: GameState, pid: PlayerId, id: ObjectId, ab: ActivatedAbility): number | undefined {
+  const pool = graveXPool(s, pid, id, ab);
+  if (!pool || s.activePlayer !== pid || (s.step !== "main1" && s.step !== "main2") || s.stack.length) return undefined;
+  return pool.length >= Math.max(2, ab.xMin ?? 0) ? pool.length : undefined;
+}
+
+/** The costs for graveXCount's X: the other costs as usual, and those graveyard cards. */
+function graveXCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets: TargetChoice[], x: number): CostChoices | null {
+  const others = abilityCosts(s, pid, o, { ...ab, costs: (ab.costs ?? []).filter((c) => !("x" in c && c.x)) }, targets);
+  const pool = graveXPool(s, pid, o.id, ab);
+  if (others === null || !pool || pool.length < x) return null;
+  return { ...others, exileCards: [...(others?.exileCards ?? []), ...pool.slice(0, x)] };
 }
 
 /** The costs for discardXCount's X: the other costs as usual, and the X cards we'd most readily discard. */

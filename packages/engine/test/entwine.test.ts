@@ -6,7 +6,6 @@ import { act, bear, card, cast, putOnBattlefield, setup, target } from "./helper
 import { botActions, castProblem, isFullySupported, planCast, spellCost, manaValue, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
-const unsupported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(false));
 
 // Real oracle text (Scryfall).
 const rust = card("Rain of Rust", "Instant", "{3}{R}{R}", { keywords: ["Entwine"], oracleText: "Choose one —\n• Destroy target artifact.\n• Destroy target land.\nEntwine {3}{R} (Choose both if you pay the entwine cost.)" });
@@ -22,9 +21,10 @@ const cost = (s: GameState, pid: PlayerId, id: string, modes: number[]) => {
 };
 
 describe("entwine", () => {
-  it("parses mana entwine costs; a non-mana one stays unsupported", () => {
+  it("parses mana entwine costs, and a non-mana one (Betrayal of Flesh, since round B134)", () => {
     supported(rust, barbed);
-    unsupported(betrayal);
+    // Flipped in Lane B round B134: entwine costs that aren't mana are supported now (laneb-round134.test.ts).
+    supported(betrayal);
   });
 
   it("choosing every mode adds the entwine cost; more than allowed without all of them is still illegal", () => {

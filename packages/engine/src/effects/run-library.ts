@@ -400,13 +400,17 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // decide about one card before the next, knowing the earlier choices).
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
-      const here = (id: ObjectId) => s.objects[id]?.zone === "library";
-      const st = (sc.eachRevealed ??= { left: (r.revealedUntil ?? []).filter(here), step: 0 });
+      const here = (id: ObjectId) => s.objects[id]?.zone === (e.inHand ? "hand" : "library");
+      // Sirocco: the cards of the kind in the hand revealed, as it is now; the player who revealed it decides about each in
+      // turn, so no order is asked for (the cards are alike to the effect).
+      const inHand = e.inHand ? players(s, e.inHand.who, ctx)[0] : undefined;
+      const handCards = inHand !== undefined ? player(s, inHand).hand.filter((id) => printedMatches(e.inHand!.filter, defOf(s, obj(s, id)))) : undefined;
+      const st = (sc.eachRevealed ??= { left: (handCards ?? r.revealedUntil ?? []).filter(here), step: 0 });
       for (;;) {
         if (st.current === undefined) {
           const left = st.left.filter(here);
           if (!left.length) break;
-          if (left.length > 1 && (st.next === undefined || !left.includes(st.next))) {
+          if (left.length > 1 && !e.inHand && (st.next === undefined || !left.includes(st.next))) {
             s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "nextRevealed", options: left, labels: left.map((id) => defOf(s, obj(s, id)).name), prompt: "choose the revealed card to do next" };
             return "paused";
           }

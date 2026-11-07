@@ -46,6 +46,7 @@ import {
   type GameObject,
   type GameState,
   type LastKnown,
+  type RegenRider,
   type StackItem,
   type ManaLot,
   type ManaOrigin,
@@ -1105,6 +1106,8 @@ export function moveObject(
   o.damagedWalkers = undefined;
   o.deathtouchDamage = false;
   o.regenShields = undefined;
+  o.regenRiders = undefined;
+  o.regenerated = undefined;
   o.preventNext = undefined;
   o.redirectNext = undefined;
   o.activatedThisTurn = undefined;
@@ -2376,7 +2379,29 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
   // Mossbridge Troll: "If ~ would be destroyed, regenerate it": regenerated with no shield used up (rulings).
   const always = !noRegen && o.noRegenTurn !== s.turn && !!abilitiesOf(s, o).regeneratesInsteadOfDestroyed;
   if (!noRegen && o.noRegenTurn !== s.turn && ((o.regenShields ?? 0) > 0 || always)) {
-    if (!always) o.regenShields! -= 1;
+    if (!always) {
+      // Which shield replaces it is its controller's choice (CR 616.1), made for them: one without a "When it regenerates this
+      // way" rider first, unless the rider only puts +1/+1 counters on it (Skeleton Scavengers); the oldest rider first.
+      const riders = o.regenRiders ?? [];
+      const plain = o.regenShields! - riders.length;
+      const good = (r: RegenRider) => !!r.body?.effects.every((e) => e.type === "counters" && e.counter === "+1/+1" && e.what.ref === "self");
+      const pick = plain > 0 && !riders.some(good) ? -1 : Math.max(0, riders.findIndex(good));
+      o.regenShields! -= 1;
+      if (pick >= 0 && riders.length) {
+        const [r] = riders.splice(pick, 1);
+        if (!riders.length) o.regenRiders = undefined;
+        // Debt of Loyalty: control changes as it regenerates (rulings), with no end (CR 611.2a), in layer 2 (CR 613.1b).
+        if (r!.control) {
+          s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: r!.controller, sourceName: s.cards[r!.sourceCardId]?.name ?? name, duration: "game", affected: [o.id], mods: [{ kind: "control" }] });
+          invalidateCharacteristics(s);
+          log(s, `${player(s, r!.controller).name} gains control of ${name} as it regenerates.`);
+        }
+        // "When it regenerates this way, ...": its delayed trigger (CR 603.7), put on the stack the next time a player would
+        // receive priority (CR 603.3).
+        else if (r!.body) s.triggerQueue.push({ sourceId: r!.sourceId, sourceCardId: r!.sourceCardId, controller: r!.controller, index: -1, sourceZc: r!.sourceZc, body: r!.body, ...(r!.player !== undefined ? { event: { player: r!.player } } : {}) });
+      }
+    }
+    o.regenerated = { turn: s.turn, n: o.regenerated?.turn === s.turn ? o.regenerated.n + 1 : 1 };
     o.damage = 0;
     o.deathtouchDamage = false;
     tapPermanent(s, o);
@@ -4178,6 +4203,7 @@ function finishCleanup(s: GameState) {
     o.wasDealtNoncombatDamage = undefined;
     o.deathtouchDamage = false;
     o.regenShields = undefined; // "this turn" effects end
+    o.regenRiders = undefined;
     o.preventNext = undefined;
     o.redirectNext = undefined;
     o.saddled = undefined; // "until end of turn" (CR 702.171b)
@@ -7534,7 +7560,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (c.kind === "removeCounters") {
       // Any mix of the counters on those permanents (CR 602.2b): as many as it says, each one there to remove.
       const pool = counterCostCandidates(s, pid, o, c);
-      const what = `${c.n} ${c.counter ? `${c.counter} ` : ""}counter${c.n === 1 ? "" : "s"} ${c.self ? `from ${d.name}` : `from among ${c.filter.text}`}`;
+      const what = `${c.n} ${counterCostKinds(c)}counter${c.n === 1 ? "" : "s"} ${c.self ? `from ${d.name}` : `from among ${c.filter.text}`}`;
       const chosen = choices?.counters;
       if (!chosen) {
         if (pool.reduce((n, x) => n + x.n, 0) < c.n) return `you need to remove ${what} to ${doing}`;
@@ -7740,11 +7766,16 @@ export function untapViaMana(s: GameState, pid: PlayerId, source: GameObject, c:
  * The counters "Remove three counters from among other artifacts, creatures, and planeswalkers you control" can remove:
  * each permanent you control that matches and each kind of counter on it (only `counter`'s kind if the cost names one).
  */
+/** The kind of counter a "remove counters" cost names, for its prompt: "+1/+1 ", "+1/+1 or charge " (Ion Storm), or none. */
+export function counterCostKinds(c: Extract<AdditionalCost, { kind: "removeCounters" }>): string {
+  return c.counter ? `${c.counter} ` : c.counters ? `${c.counters.join(" or ")} ` : "";
+}
+
 export function counterCostCandidates(s: GameState, pid: PlayerId, source: GameObject, c: Extract<AdditionalCost, { kind: "removeCounters" }>): { id: ObjectId; kind: string; n: number }[] {
   return s.battlefield.flatMap((id) => {
     const x = obj(s, id);
     if (controllerOf(s, x) !== pid || (c.other && id === source.id) || (c.self && id !== source.id) || !objectMatches(s, c.filter, x, pid, false)) return [];
-    return Object.entries(x.counters).filter(([k, n]) => n > 0 && (!c.counter || k === c.counter) && !countersStay(s, x, k)).map(([kind, n]) => ({ id, kind, n }));
+    return Object.entries(x.counters).filter(([k, n]) => n > 0 && (!c.counter || k === c.counter) && (!c.counters || c.counters.includes(k)) && !countersStay(s, x, k)).map(([kind, n]) => ({ id, kind, n }));
   });
 }
 

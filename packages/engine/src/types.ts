@@ -308,6 +308,10 @@ export interface GameObject {
   copyGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string };
   /** Regeneration shields made this turn (CR 701.19a); each replaces one destruction. */
   regenShields?: number;
+  /** The shields among regenShields with a "When it regenerates this way" rider (Matopi Golem), oldest first; the rest have none. */
+  regenRiders?: RegenRider[];
+  /** How many times it regenerated (a shield or a static regeneration replaced its destruction) during `turn` (Spiny Starfish). */
+  regenerated?: { turn: number; n: number };
   /** Quarum Trench Gnomes: "If target Plains is tapped for mana, it produces colorless mana instead of white mana" (indefinitely, CR 614.1a): each such effect on this permanent. */
   manaReplaced?: { from: ManaType; to: ManaType }[];
   /** "Prevent the next N damage that would be dealt to it this turn": what's left of such shields (CR 615.7). */
@@ -1235,6 +1239,20 @@ export interface PendingTrigger {
   ifCond?: StaticCondition;
   /** "Target ... of an opponent's choice" (TargetSpec.chosenBy "opponent"): the opponent its controller chose to choose that target. */
   targetChooser?: PlayerId;
+}
+
+/** A regeneration shield's "When it regenerates this way, ..." (CR 603.7): the delayed trigger it makes when it's used. */
+export interface RegenRider {
+  /** Its delayed trigger's instructions; none for `control`. */
+  body?: AbilityBody;
+  /** Debt of Loyalty: `controller` gains control of the permanent as the shield is used, for the rest of the game (rulings). */
+  control?: true;
+  controller: PlayerId;
+  sourceId: ObjectId;
+  sourceCardId: string;
+  sourceZc: number;
+  /** "That player": the player the ability that made the shield targeted (Soldevi Sentry), the trigger's event player. */
+  player?: PlayerId;
 }
 
 export interface LastKnown {
@@ -2666,7 +2684,11 @@ export interface Resolving {
       /** The choices each player made this round (one, or `picks`). */
       made: Record<string, string[]>;
       /** The cards each player picked to discard and the permanents to sacrifice. */
-      chosen?: Record<string, { discard?: ObjectId[]; sacrifice?: ObjectId[] }>;
+      chosen?: Record<string, { discard?: ObjectId[]; sacrifice?: ObjectId[]; /** Cards in their graveyard to exile (PunisherOption exileFromGraveyard). */ exile?: ObjectId[]; /** Cards from their hand to put on top of their library (PunisherOption handToTop). */ top?: ObjectId[] }>;
+      /** The player asked which cards of their hand go on top (chooseHandToTop's answer is ResolvingState.scratch.chosen). */
+      topAsked?: PlayerId;
+      /** The player asked which cards of their graveyard to exile (searchLibrary's answer is ResolvingState.scratch.found). */
+      yardAsked?: PlayerId;
       /** The discards and sacrifices are done; `penalty`: how many times the penalty has been run. */
       acted?: boolean;
       penalty?: number;

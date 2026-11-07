@@ -1997,6 +1997,8 @@ export function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] |
     else if ((m = /^ha(?:ve|s) (?:it|~) deal (\d+) damage to (?:them|that player)$/.exec(part))) out.push({ damage: Number(m[1]) });
     // Temporal Extortion: "any player may pay half their life, rounded up": half their own life (CR 107.1a).
     else if ((m = /^pays? half their life, rounded (up|down)$/.exec(part))) out.push({ halfLife: m[1] as "up" | "down" });
+    // Carrion Rats, Carrion Wurm: "any player may exile a card (three cards) from their graveyard": their own (CR 404).
+    else if ((m = new RegExp(`^exiles? (a|${NUM}) cards? from their graveyard$`).exec(part))) out.push({ exileFromGraveyard: m[1] === "a" ? 1 : num(m[1]!) });
     // Combustion Man: "has ~ deal damage to them equal to ~'s power": its power as that player chooses, or as it last
     // existed (CR 608.2h).
     else if (/^has ~ deal damage to them equal to ~'s power$/.test(part)) out.push({ damage: { count: { kind: "power", of: { ref: "self" } } } });

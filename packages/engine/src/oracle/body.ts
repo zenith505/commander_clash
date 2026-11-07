@@ -1404,7 +1404,66 @@ function wholeTextBody(text: string, opts: { spell?: boolean }): AbilityBody | n
  * (CR 704.5m), back under this ability's controller's control (CR 110.2a), attached to a creature chosen at random as this
  * resolves among those it could enchant (CR 303.4f; rulings: not targeted, protection still matters).
  */
+/**
+ * Wand of Ith: "If it's a land card, that player discards it unless they pay 1 life. If it isn't a land card, the player
+ * discards it unless they pay life equal to its mana value.", after "Target player reveals a card at random from their hand":
+ * the life for a land, its mana value otherwise (rulings: an X in its cost is 0, CR 202.3e); no card revealed, nothing.
+ */
+function wandOfIth(sentences: string[], si: number): number | null {
+  const land = /^If it's a land card, that player discards it unless they pay (\d+) life$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+  return land && sentences[si + 2]?.replace(/\.$/, "") === "If it isn't a land card, the player discards it unless they pay life equal to its mana value" ? Number(land[1]) : null;
+}
+
+function wandPunisher(who: PlayerRef, landLife: number): Effect {
+  const discard: Effect[] = [{ type: "discardRevealed" }];
+  return {
+    type: "if",
+    cond: { kind: "revealedIs", filter: { kind: "card", types: ["Land"], text: "land card" } },
+    effects: [{ type: "punisher", who, options: [{ pay: { cost: "", life: landLife } }], effects: discard, penalty: "Discard it" }],
+    otherwise: [{ type: "if", cond: { kind: "revealedIs", filter: { kind: "card", text: "card" } }, effects: [{ type: "punisher", who, options: [{ pay: { cost: "", lifeAmount: { count: { kind: "revealedManaValue" } } } }], effects: discard, penalty: "Discard it" }] }],
+  };
+}
+
 function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell: boolean): { effects: Effect[]; skip: number } | null {
+  // Tainted Specter: "Target player discards a card unless they put a card from their hand on top of their library. If that
+  // player discards a card this way, ~ deals 1 damage to each creature and each player.": their choice of the two (an empty
+  // hand does neither, CR 701.9b), the damage only if a card was discarded (rulings).
+  const orTop = /^(Target player|Target opponent) discards a card unless they put a card from their hand on top of their library$/.exec(s);
+  const ifDiscarded = orTop ? /^If that player discards a card this way, (~ deals \d+ damage to .+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+  if (orTop && ifDiscarded) {
+    const who = parsePlayer(orTop[1]!, ctx);
+    const dmg = attempt(ctx, () => parseOne(ifDiscarded[1]!, ctx));
+    if (who?.ref !== "target" || !dmg || ctx.targets.length !== who.index + 1) return null;
+    return { effects: [{ type: "punisher", who, options: [{ handToTop: 1 }], effects: [{ type: "discard", who: { ref: "punished" }, n: 1 }, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "discardedThisWay" } }, min: 1 }, effects: dmg }], penalty: "Discard a card" }], skip: 1 };
+  }
+  // Sirocco: "Target player reveals their hand. For each blue instant card revealed this way, that player discards that card
+  // unless they pay 4 life.": a punisher for each such card in turn, the life paid as they choose (CR 119.4: only with that
+  // much life), the card discarded otherwise (CR 701.9a).
+  const perCard = /^(?:Target player|Target opponent) reveals their hand$/.test(s) ? /^For each (.+? card) revealed this way, that player discards that card unless they pay (\d+) life$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+  if (perCard) {
+    const filter = parseSearchFilter(perCard[1]!);
+    const shown = attempt(ctx, () => parseOne(s, ctx));
+    const look = shown?.length === 1 && shown[0]!.type === "lookAtHand" && shown[0]!.reveal ? shown[0]! : undefined;
+    if (!filter || look?.type !== "lookAtHand") return null;
+    return { effects: [look, { type: "forEachRevealed", inHand: { who: look.who, filter }, effects: [{ type: "punisher", who: look.who, options: [{ pay: { cost: "", life: Number(perCard[2]) } }], effects: [{ type: "discardRevealed" }], penalty: "Discard it" }] }], skip: 1 };
+  }
+  // Matopi Golem: "Regenerate ~. When it regenerates this way, put a -1/-1 counter on it.": a delayed trigger linked to that
+  // one shield (CR 603.7), "it" being ~; Soldevi Sentry's "that player" is the player its ability targeted.
+  // Debt of Loyalty: "Regenerate target creature. You gain control of that creature if it regenerates this way.": the control
+  // change goes with that one shield, as it's used (rulings).
+  if (s === "Regenerate target creature" && sentences[si + 1]?.replace(/\.$/, "") === "You gain control of that creature if it regenerates this way") {
+    const what = parseObject("target creature", ctx);
+    return what?.ref === "target" ? { effects: [{ type: "regenerate", what, riderControl: true }], skip: 1 } : null;
+  }
+  const regenRider = /^When it regenerates this way, (.+)$/.exec(sentences[si + 1] ?? "");
+  if (ctx.activated && s === "Regenerate ~" && regenRider) {
+    const players = ctx.targets.flatMap((t, i) => (t.kind === "player" ? [i] : []));
+    const thatPlayer = /\bthat player\b/i.test(regenRider[1]!);
+    if (thatPlayer && players.length !== 1) return null;
+    const rider = parseBody(`${regenRider[1]!.charAt(0).toUpperCase()}${regenRider[1]!.slice(1)}.`, { selfIt: true, ...(thatPlayer ? { eventPlayer: true } : {}) });
+    if (!rider || rider.targets.length) return null;
+    return { effects: [{ type: "regenerate", what: { ref: "self" }, rider: { ...rider, text: `When it regenerates this way, ${regenRider[1]}.` }, ...(thatPlayer ? { riderPlayer: players[0]! } : {}) }], skip: 1 };
+  }
   if (spell && s === "Exile all cards from your hand face down" && sentences[si + 1] === "At the beginning of the next end step, return those cards to your hand" && /^(?:then )?draw a card$/i.test(sentences[si + 2] ?? "") && sentences.length === si + 3)
     return { effects: [{ type: "exileFaceDown", from: "hand", who: { ref: "you" }, actor: { ref: "you" } }, { type: "delayed", when: "nextEndStep", effects: [{ type: "returnFaceDownExiled" }, { type: "draw", who: { ref: "you" }, n: 1 }], text: "return those cards to your hand, then draw a card" }], skip: 2 };
   if (ctx.auraCard && /^[Cc]hoose a creature at random ~ can enchant$/.test(s) && sentences[si + 1] === "Return ~ to the battlefield attached to that creature" && sentences.length === si + 2)
@@ -9599,6 +9658,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const who = parsePlayer(theyReveal[1]!, ctx);
       if (!who) return null;
       effects.push({ type: "revealTop", randomFromHand: true, who });
+      const wand = wandOfIth(sentences, si);
+      if (wand) {
+        effects.push(wandPunisher(who, wand));
+        si += 2;
+        continue;
+      }
       // Planeswalker's Mischief: "If it's an instant or sorcery card, exile it. You may cast it without paying its mana cost
       // for as long as it remains exiled. At the beginning of the next end step, if you haven't cast it, return it to its
       // owner's hand.": the revealed card, by its characteristics in the hand (CR 608.2h); the permission is the ability's

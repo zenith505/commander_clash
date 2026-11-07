@@ -5636,7 +5636,10 @@ export function castProblem(
   if (specs.length) {
     // A spell's colors are its card's (CR 702.16b: protection stops spells of that color). Before its optional costs
     // are announced, it can be cast if it has legal targets with them paid or without (CR 702.33g).
-    const any = () => hasLegalTargetsFor(s, specs, pid, sq) || (!choices && !!spell && hasGatedTargets(specs) && hasLegalTargetsFor(s, castTimeTargets(d, spellTargetSpecs(d, modes, ALL_PAID)), pid, sq));
+    // Kicker not announced yet (planCast's "can it be cast at all"): kicked counts too, as with Expel the Unworthy, whose
+    // kicked target is any creature (CR 601.2b, 702.33g).
+    const unannounced = !choices ? ALL_PAID : choices.kicks === undefined ? { ...castHow(choices), kicks: [0, 1] } : undefined;
+    const any = () => hasLegalTargetsFor(s, specs, pid, sq) || (!!unannounced && !!spell && hasGatedTargets(specs) && hasLegalTargetsFor(s, castTimeTargets(d, spellTargetSpecs(d, modes, unannounced)), pid, sq));
     const tp = targets ? (targetProblem(s, specs, targets, pid, sq) ?? flagbearerProblem(s, specs, targets, pid, sq, undefined, manySpecs)) : any() ? null : `${d.name} has no legal targets`;
     if (tp) return tp;
   }
@@ -12207,11 +12210,14 @@ function finishCombatDamage(s: GameState): boolean {
  */
 function legendGroups(s: GameState): ObjectId[][] {
   const exempt = s.battlefield.flatMap((id) => (abilitiesOf(s, obj(s, id)).noLegendRule ?? []).map((filter) => ({ filter, you: controllerOf(s, obj(s, id)) })));
+  // Brothers Yamazaki: the names exactly two permanents on the battlefield have, when one of them says so.
+  const nameOf = (id: ObjectId) => characteristics(s, obj(s, id)).name;
+  const twoNames = new Set(s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).noLegendRuleIfTwo).map(nameOf).filter((n) => s.battlefield.filter((id) => nameOf(id) === n).length === 2));
   const groups = new Map<string, ObjectId[]>();
   for (const id of s.battlefield) {
     const o = obj(s, id);
     const c = characteristics(s, o);
-    if (!c.supertypes.includes("Legendary") || exempt.some((x) => objectMatches(s, x.filter, o, x.you, false))) continue;
+    if (!c.supertypes.includes("Legendary") || twoNames.has(c.name) || exempt.some((x) => objectMatches(s, x.filter, o, x.you, false))) continue;
     const key = `${c.controller}:${c.name}`;
     groups.set(key, [...(groups.get(key) ?? []), id]);
   }

@@ -1,6 +1,6 @@
 # Roadmap
 
-30,386 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,395 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,665 of
 9,979 (96%).
 
@@ -2378,7 +2378,7 @@ line blocks.
    removed this way" (Thief of Blood: loyalty too, players' counters stay, rulings); "When you cast ~, each player
    sacrifices X creatures. ~ enters with two +1/+1 counters on it for each creature sacrificed this way" (Gluttonous
    Hellkite: those actually sacrificed, rulings); "Enchanted creature's owner shuffles it into their library" (Watery
-   Grasp's waterbend ability). +10, 30,386 of 31,936.
+   Grasp's waterbend ability). +10, 30,395 of 31,936 with B138.
    Out after round 300 (looked at, not done): World War Hulk ("The next red or green creature spell you cast this turn
    can be cast without paying its mana cost": an alternative cost offered only to the next such spell) and Savage
    Summoning ("The next creature spell you cast this turn can be cast as though it had flash. That spell can't be
@@ -6449,6 +6449,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   random one returned to its owner's hand). Tyrannical Pitlord was done here too but dropped: Lane A's round 298 did it
   (and Dauntless Bodyguard). Bots cast Soulblast only when the total power kills a player.
   Browser tests for Voltage Surge's sacrifice and Soulblast. +9 (30,362 of 31,936 with round 298).
+- Round B138 (least played first, from the skip lists): Ruin in Their Wake (a basic land card searched for, put onto
+  the battlefield tapped if you control a land named Wastes, otherwise into your hand), Brothers Yamazaki ("if there
+  are exactly two permanents named ~ on the battlefield, the legend rule doesn't apply to them", CR 704.5j, and each other
+  creature named Brothers Yamazaki gets +2/+2 and haste), Kindle the Carnage (discard at random, damage equal to its mana value to each creature, "you may
+  repeat this process any number of times", asked after each pass while you have cards in hand), Invoke the Ancients (two
+  Spirit tokens, then a counter of your choice for each of them, asked token by token), Miasma Demon ("you may discard
+  any number of cards; when you do, up to that many target creatures each get -2/-2", a reflexive trigger, CR 603.12),
+  Calibrated Blast (revealed until a nonland card, those put on the bottom in a random order, then a reflexive trigger
+  for that card's mana value, CR 603.12), Tajuru Paragon (kicked: reveal the top six and take a card that shares a
+  creature type with it, its own types counted as it is on the battlefield), Batroc the Leaper (damage to each of "up to X targets", X the times it was multikicked, CR 702.33c), Expel the
+  Unworthy ("if this spell was kicked, instead choose target creature": the unkicked target is skipped when kicked and
+  the other way round, CR 702.33g; castable when only the kicked target exists, CR 601.2b). Bots repeat Kindle the Carnage
+  only while they control no creature and an opponent does. Browser tests for Invoke the Ancients' two counter choices,
+  Kindle the Carnage's repeat prompt and Expel the Unworthy kicked and unkicked. +9 (30,385 of 31,936 with B137 and
+  round 299).
+- Out after round B138 (looked at, not done): Kodama of the Center Tree (soulshift X counted from the Spirits on the
+  battlefield just before it died, Spirits dying with it included, CR 603.10a), Lantern Flare (X in its cleave cost).
 - Out after round B136 (looked at, not done): Forgotten Lore (an opponent chooses again each time you pay {G}),
   Infinite Authority (a delayed trigger that checks "if that creature was destroyed this way").
 - Out after round B135 (looked at, not done): Tariff (a punisher whose cost is the chosen creature's own mana cost),

@@ -1,6 +1,6 @@
 # Roadmap
 
-30,385 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,394 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,659 of
 9,979 (96%).
 
@@ -6423,6 +6423,21 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   random one returned to its owner's hand). Tyrannical Pitlord was done here too but dropped: Lane A's round 298 did it
   (and Dauntless Bodyguard). Bots cast Soulblast only when the total power kills a player.
   Browser tests for Voltage Surge's sacrifice and Soulblast. +9 (30,362 of 31,936 with round 298).
+- Round B138 (least played first, from the skip lists): Ruin in Their Wake (a basic land card searched for, put onto
+  the battlefield tapped if you control a land named Wastes, otherwise into your hand), Brothers Yamazaki ("if there
+  are exactly two permanents named ~ on the battlefield, the legend rule doesn't apply to them", CR 704.5j, and each other
+  creature named Brothers Yamazaki gets +2/+2 and haste), Kindle the Carnage (discard at random, damage equal to its mana value to each creature, "you may
+  repeat this process any number of times", asked after each pass while you have cards in hand), Invoke the Ancients (two
+  Spirit tokens, then a counter of your choice for each of them, asked token by token), Miasma Demon ("you may discard
+  any number of cards; when you do, up to that many target creatures each get -2/-2", a reflexive trigger, CR 603.12),
+  Calibrated Blast (revealed until a nonland card, those put on the bottom in a random order, then a reflexive trigger
+  for that card's mana value, CR 603.12), Tajuru Paragon (kicked: reveal the top six and take a card that shares a
+  creature type with it, its own types counted as it is on the battlefield), Batroc the Leaper (damage to each of "up to X targets", X the times it was multikicked, CR 702.33c), Expel the
+  Unworthy ("if this spell was kicked, instead choose target creature": the unkicked target is skipped when kicked and
+  the other way round, CR 702.33g; castable when only the kicked target exists, CR 601.2b). Bots repeat Kindle the Carnage
+  only while they control no creature and an opponent does. Browser tests for Invoke the Ancients' two counter choices,
+  Kindle the Carnage's repeat prompt and Expel the Unworthy kicked and unkicked. +9 (30,385 of 31,936 with B137 and
+  round 299).
 - Round B139 (least played first, from the skip lists): Cytoshape and Polymorphous Rush (a creature on the battlefield,
   anyone's, chosen as the spell resolves without targeting, CR 608.2d; the targets become copies of it until end of turn,
   CR 707.2), Burning of Xinye (you destroy four lands you control of your choice, then the target opponent four of theirs,
@@ -6436,12 +6451,14 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Obstinate Familiar and Pursuit of Knowledge (optional draw replacements, CR 614.1a: "Skip this draw" and "Put a study
   counter on ~ instead" beside the plain draw). Bots answer the forms, bring Mister Immortal back from exile, put study
   counters until there are three and skip a draw only with five or fewer cards left in the library. Browser tests for
-  each new prompt and button. +9 (30,385 of 31,936 with round 299 and B137).
+  each new prompt and button. +9 (30,394 of 31,936 with B138).
 - Out after round B139 (looked at, not done): Tourach's Chant and Thelon's Chant (the player who put a land onto the
   battlefield, not its controller, rulings: not tracked), Jötun Grunt (cumulative upkeep paid in pairs of cards from one
   graveyard), Meddle ("if target spell has only one target and that target is a creature": a condition on the spell's
   targets as it resolves), Drafna's Restoration, Sutured Ghoul, Twinning Glass and Pardic Dragon, still out for the
   reasons in the earlier lists.
+- Out after round B138 (looked at, not done): Kodama of the Center Tree (soulshift X counted from the Spirits on the
+  battlefield just before it died, Spirits dying with it included, CR 603.10a), Lantern Flare (X in its cleave cost).
 - Out after round B136 (looked at, not done): Forgotten Lore (an opponent chooses again each time you pay {G}),
   Infinite Authority (a delayed trigger that checks "if that creature was destroyed this way").
 - Out after round B135 (looked at, not done): Tariff (a punisher whose cost is the chosen creature's own mana cost),

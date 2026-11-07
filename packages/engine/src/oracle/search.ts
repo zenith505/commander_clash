@@ -180,6 +180,8 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   // Conjurer's Mantle: "a card that shares a creature type with that creature" (the trigger's subject), bound as the look
   // resolves.
   if (p === "card that shares a creature type with that creature") return { kind: "card", types: [], notTypes: [], notColors: [], sharesTypeWithSubjectCreature: true, text: p };
+  // Tajuru Paragon: "a card that shares a creature type with it" in its enters trigger (read as "with ~"): with the source.
+  if (p === "card that shares a creature type with ~") return { kind: "card", types: [], notTypes: [], notColors: [], sharesTypeWithSelf: true, text: "card that shares a creature type with ~" };
   // Radagast the Brown: "a creature card that doesn't share a creature type with a creature you control", bound as the look
   // resolves.
   if (p === "creature card that doesn't share a creature type with a creature you control") return { kind: "card", types: ["Creature"], notTypes: [], notColors: [], notKinOfYourCreatures: true, text: p };

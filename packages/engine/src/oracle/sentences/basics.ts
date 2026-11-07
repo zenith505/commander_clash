@@ -949,6 +949,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // your graveyard", chosen then.
     if (players && refs.size === 0 && allEffects(inner).every((y) => ["draw", "discard", "createToken", "loseLife", "gainLife", "loseGame", "untapUpTo"].includes(y.type) || (y.type === "chooseFromGraveyard" && y.dest === "exile" && !y.who)))
       return [{ type: "delayed", when, effects: inner, text: m[1]! }];
+    // Horn of Plenty: "that player draws a card at the beginning of the next end step": the trigger's player (who cast the
+    // spell), remembered by the delayed trigger as its event player (CR 603.7), at the next end step to begin.
+    if (ctx.eventPlayer && when === "nextEndStep" && refs.size === 0 && /^[Tt]hat player draws /.test(m[1]!) && allEffects(inner).every((y) => y.type === "draw" && y.who.ref === "eventPlayer"))
+      return [{ type: "delayed", when, effects: inner, text: m[1]!, event: { player: { ref: "eventPlayer" } } }];
     if (!players || refs.size !== 1 || when === "yourNextUpkeep") return null;
     const [ref] = refs;
     // "Target creature you control gets +2/+2 until end of turn. Return it to its owner's hand at the beginning of the next
@@ -1133,8 +1137,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Anurid Scavenger: "sacrifice ~ unless you put a card from your graveyard on the bottom of your library": any card,
   // chosen as it resolves; with an empty graveyard it can't be done (see canDoNow), so it's sacrificed.
-  if ((m = /^[Ss]acrifice (~|it) unless you put a card from your graveyard on the bottom of your library$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined)))
-    return [{ type: "may", effects: [{ type: "chooseFromGraveyard", n: 1, dest: "libraryBottom" }], otherwise: [sacrificeSelf], keep: true, text: "Put a card from your graveyard on the bottom of your library to keep ~" }];
+  // Gurzigost: "unless you put two cards ...": fewer isn't doing it (CR 609.3), so with one card it's sacrificed.
+  if ((m = /^[Ss]acrifice (~|it) unless you put (a card|two cards|three cards) from your graveyard on the bottom of your library$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined)))
+    return [{ type: "may", effects: [{ type: "chooseFromGraveyard", n: m[2] === "a card" ? 1 : num(m[2]!.split(" ")[0]!), dest: "libraryBottom" }], otherwise: [sacrificeSelf], keep: true, text: `Put ${m[2]} from your graveyard on the bottom of your library to keep ~` }];
   // Deep Spawn: "sacrifice ~ unless you mill two cards": with fewer cards in the library, milling two can't be chosen
   // (CR 701.13b), so it's sacrificed.
   if ((m = /^[Ss]acrifice (~|it) unless you mill (a|two|three) cards?$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {

@@ -6402,6 +6402,15 @@ function linkExile(out: CompiledCard) {
   // "Target creature card exiled with ~" (Dino DNA, The Darkness Crystal): linked to the one ability that exiles cards
   // (CR 607.2a), or to its replacement effect that exiles them (The Darkness Crystal's, already linked).
   const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
+  // Mindreaver: "target spell with the same name as a card exiled with ~": the cards its one exile instruction (heroic's
+  // "exile the top three cards of target player's library") exiled (CR 607.2a).
+  if (bodies.some((b) => b.targets.some((t) => t.nameLinkedExile))) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
+    const others = all.some((e) => ["exile", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong"].includes(e.type) || (e.type === "search" && e.dest.zone === "exile") || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile));
+    if (others || out.spell || tops.length !== 1 || out.exileInsteadOfDying) out.unsupported.push("(names a card exiled with it that it can't link to one exile ability)");
+    else tops[0]!.linked = true;
+  }
   if (bodies.some((b) => b.targets.some((t) => t.linkedExile))) {
     const all = bodies.flatMap((b) => allEffects(b.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");
     // Bronzebeak Foragers: "exile ... until ~ leaves the battlefield" when that's its only exile ability.

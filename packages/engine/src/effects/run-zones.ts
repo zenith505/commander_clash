@@ -3791,6 +3791,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       return;
     case "noCombatDamage":
+      if (e.asUnblocked) {
+        for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") o.unblockedDamageTurn = s.turn;
+        return;
+      }
       for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") e.combat ? (o.noCombatDamageCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0 }) : (o.noCombatDamageTurn = s.turn);
       return;
     case "animateDead": {

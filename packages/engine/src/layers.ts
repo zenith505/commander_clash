@@ -1503,6 +1503,11 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
     if (spec && !objectMatches(s, spec, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) continue;
     if (a.lesserPowerThanSource && !(c.power < (chars.get(e.sourceId!)?.power ?? -Infinity))) continue;
     if (topMv !== undefined && (c.manaValue ?? 0) !== topMv) continue;
+    if (a.sharesColorWithTop) {
+      const top = s.objects[s.players[you]?.library[0] ?? ""];
+      const topColors = top ? defOf(s, top).colors : [];
+      if (!c.colors.some((col) => topColors.includes(col))) continue;
+    }
     if (a.sharesWithAttached) {
       const hostId = s.objects[e.sourceId!]?.attachedTo;
       const host = hostId ? chars.get(hostId) : undefined;

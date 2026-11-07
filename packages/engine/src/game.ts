@@ -7581,7 +7581,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           : c.kind === "exileFromGraveyard" && c.process
           ? "a card an opponent owns from exile"
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
-    const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? (c.untap ? "untap" : "tap") : c.kind === "reveal" ? (c.orControl ? "behold" : "reveal") : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && (c.linked || c.process) ? "put into its owner's graveyard" : "exile";
+    const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? (c.untap ? "untap" : "tap") : c.kind === "reveal" ? (c.orControl ? "behold" : "reveal") : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && (c.linked || c.process) ? "put into its owner's graveyard" : c.kind === "exileFromGraveyard" && c.toBottom ? "put on the bottom of your library" : "exile";
     const chosen = given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     // "Discard a card at random": nothing to choose (CR 701.9b).
     if (c.kind === "discard" && c.random) {
@@ -7977,6 +7977,13 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
     else {
       const ids = c.kind === "exileFromGraveyard" && c.top ? topGraveyardCards(s, p.id, c.n, c.filter) : (choices.exileCards ?? []);
       if (!ids.length) continue;
+      // Battlefield Scrounger: on the bottom of the library, the first chosen nearest the top (CR 401.4).
+      if (c.kind === "exileFromGraveyard" && c.toBottom) {
+        log(s, `${p.name} puts ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard on the bottom of their library.`);
+        for (const id of ids) moveObject(s, id, "library");
+        closeZoneBatch(s);
+        continue;
+      }
       // "The exiled card's power" (Corpse Lunge): the one card exiled, as it was in the graveyard (CR 608.2h).
       if (c.kind === "exileFromGraveyard" && !c.top && c.n === 1 && ids.length === 1 && !costs.some((x) => x.kind === "sacrifice")) {
         const o = obj(s, ids[0]!);
@@ -11391,7 +11398,7 @@ export function unblockedCandidates(s: GameState): Map<PlayerId, ObjectId[]> {
   const out = new Map<PlayerId, ObjectId[]>();
   const fs = s.step === "firstStrikeDamage";
   for (const at of attackers(s)) {
-    if (!at.blockedBy || at.attacking === undefined || !characteristics(s, at).unblockedDamage || !dealsDamageThisStep(s, at, fs) || combatDamageOf(s, at) <= 0) continue;
+    if (!at.blockedBy || at.attacking === undefined || !characteristics(s, at).unblockedDamage || at.unblockedDamageTurn === s.turn || !dealsDamageThisStep(s, at, fs) || combatDamageOf(s, at) <= 0) continue;
     const banded = at.blockedBy.some((id) => s.objects[id] && objHasKeyword(s, obj(s, id), "Banding"));
     const who = banded ? at.attacking : controllerOf(s, at);
     out.set(who, [...(out.get(who) ?? []), at.id]);
@@ -11476,7 +11483,7 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
     let dmg = combatDamageOf(s, at);
     if (dmg <= 0) continue;
     // "As though it weren't blocked": all of it to the player it's attacking, none to blockers (CR 510.1b; rulings).
-    const unblocked = s.unblockedChoice?.turn === s.turn && s.unblockedChoice.step === s.step && s.unblockedChoice.ids.includes(at.id);
+    const unblocked = (s.unblockedChoice?.turn === s.turn && s.unblockedChoice.step === s.step && s.unblockedChoice.ids.includes(at.id)) || at.unblockedDamageTurn === s.turn;
     // To the player or planeswalker it attacks; nothing if that planeswalker has left combat (CR 506.4c).
     const target = attackedRecipient(s, at);
     if (!at.blockedBy || unblocked) {

@@ -851,6 +851,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         if (d.exileCards !== undefined) continue;
         const what = c.filter?.text ?? "card";
         const candidates = s.players[HUMAN]!.graveyard.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
+        if (c.toBottom) return setCostPick({ activate: d, kind: "exileCards", label: cardOf(s, d.objectId).name, what: `put ${c.n} cards from your graveyard on the bottom of your library`, n: c.n, candidates, chosen: [] });
         return setCostPick({ activate: d, kind: "exileCards", label: cardOf(s, d.objectId).name, what: `exile from your graveyard ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
       }
       if (c.kind === "reveal" && !c.orControl) {

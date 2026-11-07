@@ -615,6 +615,8 @@ export interface TargetSpec {
   owner?: "you" | "opponent";
   /** For "card": a card in exile linked to the source instead ("target creature card exiled with ~", CR 607.2a). */
   linkedExile?: true;
+  /** For "spell": "target spell with the same name as a card exiled with ~" (Mindreaver): a face-up spell named like one of the cards still exiled by the source's linked ability (CR 607.2a), the source as it was when the ability was activated, also once it's been sacrificed for the cost; a face-down spell has no name (CR 708.2). */
+  nameLinkedExile?: true;
   /**
    * For "card": a face-up card in exile instead, whoever exiled it ("target exiled card with flashback you own", Runic
    * Repetition; "target face-up exiled card", Pull from Eternity; CR 406.3). `owner` as for a graveyard.
@@ -1274,6 +1276,12 @@ export type ObjRef =
        * name (CR 708.2a), so it shares one with nothing.
        */
       sameName?: { filter: TargetSpec; of?: true };
+      /**
+       * Moratorium Stone: "Exile target nonland card from a graveyard, all other cards from graveyards with the same name as
+       * that card, and all permanents with that name": also every other card in any graveyard and every permanent with the
+       * target card's name as this resolves; a face-down permanent has no name (CR 708.2a). Nothing if the target is gone.
+       */
+      sameNameYardsAndPermanents?: true;
       /**
        * Radiance: "target creature and each other creature that shares a color with it" (Wojek Siren): also every other
        * permanent matching `filter` that has at least one of the target's colors as this resolves; a colorless target
@@ -1983,6 +1991,8 @@ export type Affects =
       greatestManaValue?: true;
       /** Konda's Banner: "Creatures that share a color with equipped creature", "... a creature type ...": with what the source is attached to, as it is then; none while unattached. */
       sharesWithAttached?: "color" | "creatureType";
+      /** Crown of Convergence: "creatures you control that share a color with that card", the top card of its controller's library (its colors there); a colorless card or creature shares none (rulings). */
+      sharesColorWithTop?: true;
     };
 
 /** A static ability that generates a continuous effect (CR 604.1, 611.3). */
@@ -2487,7 +2497,8 @@ export type Effect =
       /** `lastKnown`: "Destroy target artifact. That artifact deals damage ..." (Goblin Tinkerer): the target as it last existed on the battlefield once this has moved it (CR 608.2h). */
       /** `grantSource`: "Blazing Torch deals 2 damage" in an ability it gave: that permanent, as it last existed if it's gone (CR 608.2h). */
       /** `amassed`: "the Army you amassed deals damage ..." (Widespread Brutality): the amassed Army (CR 701.47c), if it's still on the battlefield. */
-      by?: "subject" | "attached" | "castSpell" | "created" | "amassed" | { target: number; lastKnown?: true } | { ref: "grantSource"; id?: ObjectId; zc?: number };
+      /** `exiled` (with `target`): "Exile target creature card from a graveyard. That card deals damage ..." (Selfless Exorcist): the card in exile this resolution put there, its owner controlling it (CR 108.4a). */
+      by?: "subject" | "attached" | "castSpell" | "created" | "amassed" | { target: number; lastKnown?: true; exiled?: true } | { ref: "grantSource"; id?: ObjectId; zc?: number };
       /** "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal goes there (CR 120.4a). */
       excessToController?: true;
       /** "And an additional 1 damage to each green creature" (Kaervek's Hex): a recipient in both `to` and `also` is dealt the two amounts added up, as one. */
@@ -2959,6 +2970,8 @@ export type Effect =
   | { type: "putAllOnBottom"; filter: TargetSpec }
   /** "Put the cards in your hand on the bottom of your library in any order, then draw that many cards" (Teferi's Puzzle Box, Mindmoil). */
   | { type: "handToBottomDraw"; who: PlayerRef }
+  /** Crown of Convergence: "Put the top card of your library on the bottom of your library": nobody looks at it (CR 401.2). */
+  | { type: "topToBottom" }
   | { type: "tap"; what: ObjRef; /** "Where X is the number of Islands tapped this way" follows (Monsoon): how many it tapped (Count "tappedThisWay"). */ noteTapped?: true; /** Breaking Wave: "Simultaneously untap all tapped creatures and tap all untapped creatures": each of `what` that's tapped untaps and each untapped one taps, at once. */ swap?: true }
   /** "Turn target face-down creature face up" (CR 708.8): with no cost paid; see turnFaceUpByEffect. */
   /**
@@ -3043,7 +3056,7 @@ export type Effect =
   /** "Look at target face-down creature" (Smoke Teller): the card it is, shown to this ability's controller only (CR 708.5). */
   | { type: "lookAtFaceDown"; what: ObjRef }
   /** "~ assigns no combat damage this turn" (CR 510.1). */
-  | { type: "noCombatDamage"; what: ObjRef; /** "This combat" rather than "this turn" (Master of Cruelties). */ combat?: true }
+  | { type: "noCombatDamage"; what: ObjRef; /** "This combat" rather than "this turn" (Master of Cruelties). */ combat?: true; /** Gurzigost: instead, it assigns its combat damage this turn as though it weren't blocked (CR 510.1c), decided as the effect resolved (rulings), so no choice is left for the damage step. */ asUnblocked?: true }
   | { type: "untap"; what: ObjRef }
   /**
    * "Untap up to seven lands" (Palinchron, Snap): its controller chooses as it resolves, among any player's tapped lands
@@ -6473,7 +6486,7 @@ export type AdditionalCost =
    * `linked`: "Put a card exiled with ~ into its owner's graveyard" (Jester's Scepter): one of the cards the source's
    * linked exile took (CR 607.2a), moved to its owner's graveyard, chosen in CostChoices.exileCards.
    */
-  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true; linked?: true; /** "Put a card an opponent owns from exile into that player's graveyard" (the Eldrazi processors): any card an opponent owns in exile, chosen in CostChoices.exileCards. */ process?: true }
+  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true; linked?: true; /** "Put three cards from your graveyard on the bottom of your library" (Battlefield Scrounger): the chosen cards go to the bottom of your library, in the order chosen (CR 401.4), not into exile. */ toBottom?: true; /** "Put a card an opponent owns from exile into that player's graveyard" (the Eldrazi processors): any card an opponent owns in exile, chosen in CostChoices.exileCards. */ process?: true }
   /** Ninjutsu (CR 702.49a): "Return an unblocked attacker you control to hand". */
   | { kind: "returnToHand"; filter: TargetSpec; n: number; unblockedAttacker?: boolean; x?: true }
   /**

@@ -1186,6 +1186,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (e.gainThatMany) gainLife(s, ctx.controller, shuffled.filter(([pid]) => pid === ctx.controller).reduce((a, [, n]) => a + n, 0));
       return;
     }
+    case "topToBottom": {
+      // Crown of Convergence: the one card moves without anyone looking at it; with one card or none nothing changes.
+      const lib = player(s, ctx.controller).library;
+      if (lib.length < 2) return;
+      log(s, `${player(s, ctx.controller).name} puts the top card of their library on the bottom.`);
+      moveObject(s, lib[0]!, "library");
+      return;
+    }
     case "handToBottomDraw": {
       // Teferi's Puzzle Box, Mindmoil: the whole hand goes on the bottom in the order its owner chooses (CR 401.4), then
       // that many cards are drawn, which can be some of them if the library was short.

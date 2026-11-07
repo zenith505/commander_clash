@@ -269,6 +269,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     // "That creature enters with X additional +1/+1 counters on it, where X is the number of ingredient counters on ~"
     // (Communal Brewing): X counted as the trigger resolves (rulings), with ~'s last known counters if it has left.
     return ctx.castSpell && (m[1] !== "X" || ctx.whereX) ? [{ type: "spellEntersWith", counter: counterKind(m[m.length - 1]!), n: m[1] === "an" ? 1 : amt(m[1]!) }] : null;
+  // Gluttonous Hellkite: "When you cast ~, each player sacrifices X creatures. ~ enters with two +1/+1 counters on it for
+  // each creature sacrificed this way": the creatures actually sacrificed, not X (rulings); the spell enters with them if
+  // it resolves (CR 614.1c), even if the trigger resolved while it was still on the stack.
+  if (ctx.selfCastSpell && (m = new RegExp(`^~ enters with (an?|two|three) ${COUNTER} counters? on it for each creature sacrificed this way$`).exec(s)))
+    return [{ type: "spellEntersWith", counter: counterKind(m[2]!), n: { count: { kind: "sacrificedThisWayCount" }, ...(/^an?$/.test(m[1]!) ? {} : { times: num(m[1]!) }) } }];
   // Torgal, A Fine Hound: "that creature enters with an additional +1/+1 counter on it for each Dog and/or Wolf you
   // control": counted as the trigger resolves, like X above.
   if ((m = new RegExp(`^[Tt]hat creature enters with an additional ${COUNTER} counter on it for each (.+)$`).exec(s))) {
@@ -1112,6 +1117,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[2]!, ctx);
     if (!what || isGroup(what)) return null;
     return [{ type: "removeCounters", what, counter: m[1]!, n: "allButOne" }, ...(/gain 1 life/.test(s) ? [{ type: "gainLife" as const, who: { ref: "you" as const }, n: { count: { kind: "countersRemovedThisWay" as const } } }] : [])];
+  }
+  // Mutated Cultist: "remove all counters from up to one target permanent or opponent": every kind on that permanent, or
+  // every counter that player has (CR 122.1), counted for "for each counter removed this way".
+  if (/^[Rr]emove all counters from up to one target permanent or opponent$/.test(s)) {
+    const i = addTarget(ctx, { kind: "any", types: [...PERMANENT_TYPES], opponent: true, optional: true, text: "target permanent or opponent" });
+    return [{ type: "removeAllCounters", what: { ref: "target", index: i } }, { type: "loseAllCounters", who: { ref: "target", index: i }, counted: true }];
   }
   // "Remove all counters from target permanent" (every kind), "Remove all counters from that creature".
   if ((m = /^Remove all counters from (~|it|that creature|enchanted creature|target .+|up to one target .+)$/i.exec(s))) {

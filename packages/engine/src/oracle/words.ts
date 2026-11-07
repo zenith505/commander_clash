@@ -35,6 +35,8 @@ export const ALL_COLORS: ManaType[] = ["W", "U", "B", "R", "G"];
 
 /** A mana cost we can pay: no X, no snow, nothing unusual. */
 export const plainMana = (cost: string) => parseManaCost(cost).supported && !parseManaCost(cost).hasX;
+/** A mana cost with an {X} in it, every symbol understood ("{X}{X}{W}"). */
+export const xMana = (cost: string) => parseManaCost(cost).supported && parseManaCost(cost).hasX;
 
 export const sacrificeSelf: Effect = { type: "sacrifice", what: { ref: "self" } };
 

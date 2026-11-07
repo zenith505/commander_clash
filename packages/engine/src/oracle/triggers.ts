@@ -4048,8 +4048,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const moreCond: StaticCondition | null = castCond ? castCond : thatMore ? { kind: "opponentMore", what: thatMore[1] as "lands" | "creatures", subjectController: true } : activeMore ? { kind: "opponentMore", what: activeMore[1] as "lands" | "creatures", activePlayer: true } : defMore ? { kind: "opponentMore", what: (defMore[1] ?? defMore[2]) as "lands" | "creatures" | "hand", eventPlayer: true } : null;
   // Deathbringer Regent: "When ~ enters, if you cast it from your hand and there are five or more other creatures on the
   // battlefield": both, the first about how it entered (see ifCastFromHand).
-  const fromHandAnd = intervening && /^When ~ enters$/.test(intervening[1]!) ? /^you cast it from your hand and (.+)$/.exec(intervening[2]!) : null;
-  if (fromHandAnd) intervening![3] = `if you cast it from your hand, ${intervening![3]}`;
+  // Ran and Shaw: "When ~ enter, if you cast them and there are three or more Dragon and/or Lesson cards in your
+  // graveyard": the same, about whether it was cast at all.
+  const fromHandAnd = intervening && /^When ~ enters$/.test(intervening[1]!) ? /^you cast (?:it|them)( from your hand)? and (.+)$/.exec(intervening[2]!) : null;
+  if (fromHandAnd) intervening![3] = `if you cast it${fromHandAnd[1] ?? ""}, ${intervening![3]}`;
   // Momentum Rumbler: "Whenever ~ attacks, if it doesn't have first strike, ...", "... if it has first strike, ...": its
   // keywords as it triggers and resolves (CR 603.4).
   // Guardian of the Ages: "When a creature attacks you or a planeswalker you control, if ~ has defender, it loses defender
@@ -4085,7 +4087,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Razor Pendulum: "At the beginning of each player's end step, if that player has 5 or less life": the active player's.
   const thatLife = eachStep ? /^that player has (\d+) or less life$/.exec(eachStep) : null;
   const activeCond: StaticCondition | null = thatControlsCond?.kind === "control" && thatControlsCond.who === "you" && !thatControlsCond.other ? { ...thatControlsCond, who: "eventPlayer" } : thatTypes ? { kind: "amount", amount: { count: { kind: "basicLandTypes", whose: { ref: "eventPlayer" } } }, min: num(thatTypes[1]!) } : thatLife ? { kind: "amount", amount: { count: { kind: "life", who: { ref: "eventPlayer" } } }, max: Number(thatLife[1]) } : null;
-  const ifCond = otherLand ? ({ kind: "subjectControllerOtherLandEntered" } as const) : activeCond ? activeCond : subjSizeCond ? subjSizeCond : subjCounterCond ? subjCounterCond : diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? (handAnd ? (handAndCond ? { kind: "allOf" as const, conds: [{ kind: "eventPlayerHand" as const, ...handCond }, handAndCond] } : null) : ({ kind: "eventPlayerHand", ...handCond } as const)) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  const ifCond = otherLand ? ({ kind: "subjectControllerOtherLandEntered" } as const) : activeCond ? activeCond : subjSizeCond ? subjSizeCond : subjCounterCond ? subjCounterCond : diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? (handAnd ? (handAndCond ? { kind: "allOf" as const, conds: [{ kind: "eventPlayerHand" as const, ...handCond }, handAndCond] } : null) : ({ kind: "eventPlayerHand", ...handCond } as const)) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[2]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {

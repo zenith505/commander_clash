@@ -1928,6 +1928,24 @@ export function compile(d: CardDef): CompiledCard {
       else out.entersWithCounters = { counter: "+1/+1", n: { count: { kind: "x" } }, rollD: 6 };
       continue;
     }
+    // Thief of Blood: "As ~ enters, remove all counters from all permanents. ~ enters with a +1/+1 counter on it for each
+    // counter removed this way" (see CompiledCard.entersStealsCounters).
+    if (line === "As ~ enters, remove all counters from all permanents. ~ enters with a +1/+1 counter on it for each counter removed this way." && !isSpell) {
+      out.entersStealsCounters = true;
+      continue;
+    }
+    // Slumbering Trudge: "~ enters with a number of stun counters on it equal to three minus X. If X is 2 or less, it
+    // enters tapped.": the X chosen as it was cast (CR 107.3m), 0 entering any other way (rulings); none below 0 (CR
+    // 107.1b). Both replacements apply as it enters (CR 614.1c).
+    const minusX = /^~ enters with a number of stun counters on it equal to (two|three|four|five) minus X\. If X is (\d+) or less, it enters tapped\.$/.exec(line);
+    if (minusX && !isSpell && num(minusX[1]!) === Number(minusX[2]) + 1 && parseManaCost(d.manaCost).hasX) {
+      if (out.entersWithCounters) out.unsupported.push(raw);
+      else {
+        out.entersWithCounters = { counter: "stun", n: { count: { kind: "x" }, times: -1, plus: num(minusX[1]!) } };
+        out.entersTappedIfXAtMost = Number(minusX[2]);
+      }
+      continue;
+    }
     // Banquet Guests: "~ enters with twice X +1/+1 counters on it": the X chosen, times two (a replacement, CR 614.1c).
     if (line === "~ enters with twice X +1/+1 counters on it." && !isSpell) {
       if (out.entersWithCounters) out.unsupported.push(raw);
@@ -7163,7 +7181,8 @@ function checkCastingLinks(out: CompiledCard) {
 function checkX(d: CardDef, out: CompiledCard) {
   // Or in an additional cost: "As an additional cost to cast this spell, pay X life" (CR 107.3a).
   // Or in its kicker cost, "Kicker {X}" (0 unless it was kicked).
-  const cardX = parseManaCost(d.manaCost).hasX || !!out.additionalCosts?.some((c) => "x" in c && c.x) || !!out.kicker?.costs.some((c) => parseManaCost(c).hasX);
+  // Or in an alternative cost: "Foretell {X}{X}{W}", "Madness {X}{B}{B}" (0 unless that cost was paid, CR 107.3a).
+  const cardX = parseManaCost(d.manaCost).hasX || !!out.additionalCosts?.some((c) => "x" in c && c.x) || !!out.kicker?.costs.some((c) => parseManaCost(c).hasX) || parseManaCost(out.foretell ?? "").hasX || parseManaCost(out.madness ?? "").hasX;
   const bad = (what: string) => out.unsupported.push(what);
   // Glittering Lion: "~ loses "Prevent all damage ..."": one of its own printed static abilities, by its text.
   out.activated = out.activated.filter((a) => {

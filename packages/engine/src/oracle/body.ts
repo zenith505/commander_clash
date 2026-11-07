@@ -18349,11 +18349,20 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
   }
   // The Final Days: "If ~ was cast from a graveyard, instead create X of those tokens, where X is the number of creature
   // cards in your graveyard": the same tokens, counted as it resolves (the "where X" is read after, by the caller).
-  const xTokens = instead && ctx.whereX && /^Create X of those tokens$/.test(t);
+  // Starnheim Unleashed: "If ~ was foretold, create X of those tokens instead": the X announced for its foretell cost
+  // (CR 107.3a), with no "where X" (compile checks the card has a cost with that X).
+  const xTokens = instead && (ctx.whereX || ctx.spell) && /^Create X of those tokens$/.test(t);
   if (xTokens) {
     const prev = previous[0];
     if (previous.length !== 1 || prev?.type !== "createToken" || typeof prev.n !== "number") return null;
     return { effects: [{ ...prev, n: X }], instead };
+  }
+  // From Under the Floorboards: "Create three tapped 2/2 black Zombie creature tokens and you gain 3 life. If ~'s madness
+  // cost was paid, instead create X of those tokens and you gain X life": both, with the X announced for that cost.
+  if (instead && ctx.spell && !ctx.whereX && /^Create X of those tokens and you gain X life$/.test(t)) {
+    const [tok, gain] = previous;
+    if (previous.length !== 2 || tok?.type !== "createToken" || typeof tok.n !== "number" || gain?.type !== "gainLife" || typeof gain.n !== "number" || gain.who.ref !== "you") return null;
+    return { effects: [{ ...tok, n: X }, { ...gain, n: X }], instead };
   }
   // "Copy target instant or sorcery spell you control. If ~ was cast from a graveyard, copy that spell twice instead"
   // (Increasing Vengeance): more copies of the same spell.

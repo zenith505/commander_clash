@@ -1,7 +1,7 @@
 # Roadmap
 
-30,376 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,659 of
+30,386 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,665 of
 9,979 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -197,7 +197,7 @@ line blocks.
    Out after round 175: Detention Sphere (done in round 277) (exiles every permanent with the same name, and returns them all: one exile
    linked to several cards), Tangle Wire (the upkeep player taps one permanent of their choice for each fade counter),
    Steward of the Harvest (gaining the activated abilities of exiled land cards), Agent's Toolkit (done in round 296) (moving one counter of a chosen kind), Heroes in a Half Shell ("one or more
-   ... deal combat damage" with "each of those creatures"), Ran and Shaw ("if you cast them and" a graveyard count),
+   ... deal combat damage" with "each of those creatures"), Ran and Shaw (done in round 300) ("if you cast them and" a graveyard count),
    Unstable Glyphbridge (a creature chosen for each player, then destroy the rest), From the Catacombs (a corpse counter, the initiative and an exile
    replacement together), Loki, God of Mischief (done in round 275), Katsumasa, the
    Animator (done in round 270), Slagstone Refinery (put into a graveyard or exile from the battlefield, one
@@ -271,7 +271,7 @@ line blocks.
    triggered abilities), Alacrian Armory, Deadly Cover-Up, Chandra, Fire Artisan (loyalty counters removed),
    Kusari-Gama, Reap (X targets set by another target), Fearless Swashbuckler (done in round 299) ("a Pirate and a Vehicle attacked"),
    Friendly Rivalry (two differently targeted creatures each dealing damage), Invoke Justice (counters distributed
-   among a target player's creatures), The Eagles Are Coming!, Thief of Blood, Eldrazi Mimic ("base power and
+   among a target player's creatures), The Eagles Are Coming!, Thief of Blood (done in round 300), Eldrazi Mimic ("base power and
    toughness become" another's), Arcbound Javelineer ("Remove X counters" as a cost), Wonderscape Sage (done in round 299) ("unless that
    land had a nonbasic land type"), Tajuru Preserver and Sigarda (sacrifice prevention), Pandemonium (another player
    chooses targets), Curse of Shallow Graves ("that attacking player may"), Namor (blue mana symbols in a cost), Tune
@@ -780,7 +780,7 @@ line blocks.
    with "an instant card and/or a sorcery card", Inversion Behemoth); "each creature you control that didn't attack or
    enter this turn" (The Fifth Doctor). +21 (27,521 of 31,936 with round 205 and Lane B round B35).
    Out after round 206 (looked at, not done): Havengul Laboratory (its back face's "the creature put onto the
-   battlefield with ~"), Briarbridge Patrol ("deals damage to one or more creatures"), Mutated Cultist ("remove all
+   battlefield with ~"), Briarbridge Patrol ("deals damage to one or more creatures"), Mutated Cultist (done in round 300) ("remove all
    counters from target permanent or opponent"), Elminster ("the number of cards looked at while scrying"), Sivitri, Dragon Master (an attack tax paid in life), Obsidian Charmaw ("lands that could produce
    {C}"), Dramatist's Puppet and Quarry Hauler (put or remove a counter of each kind, a choice per kind), Aquamorph
    Entity (its "is turned face up" path).
@@ -843,10 +843,10 @@ line blocks.
    "sacrifice it. If you do, reveal until a creature card. Put that card onto the battlefield, then shuffle ... If that
    creature is a Demon, ..." (Aspiring Champion). +21 (27,692 of 31,936 with round 208 and Lane B rounds B38 and B39).
    Out after round 209 (looked at, not done): Bloodthirsty Adversary (cast copies of several cards from the graveyard:
-   casting from among graveyard cards takes one target only); From Under the Floorboards, Avacyn's Judgment and Welcome
+   casting from among graveyard cards takes one target only); From Under the Floorboards (done in round 300), Avacyn's Judgment and Welcome
    to the Fold (madness {X}: X in an alternative cost from exile); Citizen's Crowbar (a granted ability that sacrifices
-   the Aura's own source); Gluttonous Hellkite (counters for each creature sacrificed by its cast trigger); Insatiable
-   Frugivore ("repeat this process" after an optional exile); Broodguard Elite (warp {X}); Mog, Moogle Warrior (what each
+   the Aura's own source); Gluttonous Hellkite (done in round 300) (counters for each creature sacrificed by its cast trigger); Insatiable
+   Frugivore ("repeat this process" after an optional exile); Broodguard Elite (done in round 300) (warp {X}); Mog, Moogle Warrior (what each
    player discarded decides two effects).
    Round 210 went on from the top: "spells you cast have delve" (Teval, Arbiter of Virtue); "you can't spend mana to cast
    this spell", paid only by convoke and delve (Hogaak, Arisen Necropolis); "the next spell you cast this turn has affinity
@@ -2363,6 +2363,32 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands.
+   Round 300 took cards back off the "Out after round N" lists, most played first: an {X} in an alternative cost (CR
+   107.3a), announced as the card is cast that way: "Warp {X}{G}" (Broodguard Elite) and "Surge {X}{R}" (Fall of the
+   Titans), an {X} the mana cost has too; "Foretell {X}{X}{W}" with "If this spell was foretold, create X of those tokens
+   instead" (Starnheim Unleashed: no X to choose cast from the hand, a browser test of the X prompt when it's cast
+   foretold; the bot casts it with as big an X as it can pay) and "Madness {X}{B}{B}" with "If this spell's madness cost
+   was paid, instead create X of those tokens and you gain X life" (From Under the Floorboards, a browser test), an {X}
+   the mana cost doesn't have; "When ~ enter, if you cast them and there are three or more Dragon and/or Lesson cards in
+   your graveyard" (Ran and Shaw); "remove all counters from up to one target permanent or opponent", a player's
+   counters too, counted for "the next spell you cast this turn costs {1} less to cast for each counter removed this
+   way" (Mutated Cultist; not you, rulings); "~ enters with a number of stun counters on it equal to three minus X. If X
+   is 2 or less, it enters tapped" (Slumbering Trudge: X is 0 when it isn't cast, rulings; never below 0 counters, CR
+   107.1b); "As ~ enters, remove all counters from all permanents. ~ enters with a +1/+1 counter on it for each counter
+   removed this way" (Thief of Blood: loyalty too, players' counters stay, rulings); "When you cast ~, each player
+   sacrifices X creatures. ~ enters with two +1/+1 counters on it for each creature sacrificed this way" (Gluttonous
+   Hellkite: those actually sacrificed, rulings); "Enchanted creature's owner shuffles it into their library" (Watery
+   Grasp's waterbend ability). +10, 30,386 of 31,936.
+   Out after round 300 (looked at, not done): World War Hulk ("The next red or green creature spell you cast this turn
+   can be cast without paying its mana cost": an alternative cost offered only to the next such spell) and Savage
+   Summoning ("The next creature spell you cast this turn can be cast as though it had flash. That spell can't be
+   countered. That creature enters with an additional +1/+1 counter on it": all three for that one spell); Last Night
+   Together ("Only the chosen creatures can attack during that combat phase": whether a target that became illegal still
+   counts as chosen isn't settled by its rulings); Azra Oddsmaker ("choose a creature", not a target, then a this-turn
+   trigger for it); Avacyn's Judgment and Welcome to the Fold (their madness {X} is understood now, but not "X damage
+   divided as you choose among those permanents and/or players instead" or "instead gain control of that creature if
+   its toughness is X or less"); Tameshi, Reality Architect ("Whenever one or more noncreature permanents are returned
+   to hand"); Eldrazi Mimic (base power and toughness becoming another creature's).
    Round 299 took cards back off the "Out after round N" lists, most played first: "Nonblack creatures can't attack you
    unless their controller pays {1} for each creature they control that's attacking you" (Elephant Grass; black ones
    don't pay); "Whenever you cast another spell that has flash" (Slitherwisp: printed or given flash, as it's cast, CR
@@ -2620,7 +2646,7 @@ line blocks.
    Lotus (mana another player adds); Coram, the Undertaker (casting from every graveyard).
    Out after round 274 (looked at, not done): Hatchery Sliver ("Each Sliver spell you cast has replicate": a granted
    replicate beside a spell's own kicker or replicate, two kicker-like costs on one spell, which the cast choices don't
-   have yet); Broodguard Elite ("Warp {X}{G}": an {X} in a warp cost); Cursecloth Wrappings (a graveyard card gaining
+   have yet); Broodguard Elite (done in round 300) ("Warp {X}{G}": an {X} in a warp cost); Cursecloth Wrappings (a graveyard card gaining
    embalm until end of turn); Spectral Searchlight ("That player adds one mana of any color they choose": mana for
    another player from your mana ability); Primordial Mist ("Exile a face-down permanent you control face up" as a
    cost); Toggo, Goblin Weaponsmith (a Rock token whose granted ability sacrifices the Rock by name); Ninja Teen (granted
@@ -3035,7 +3061,7 @@ line blocks.
    and Glorious Protector ask what to exile even when they've already left the battlefield (nothing is exiled then); bots
    give Xantcha and Captive Audience to the opponent with the least life; goading is handled as a layer 6 effect, so
    "goaded creatures" (Bothersome Quasit) waits on the goad as a dependency (CR 613.8). Smaller gaps from round 123:
-   waterbend {X} costs, "whenever you waterbend" (Avatar Aang), Watery Grasp
+   waterbend {X} costs, "whenever you waterbend" (Avatar Aang), Watery Grasp (done in round 300)
    and Aang's Iceberg (other lines) are out; you don't pick what waterbend taps: autopay pays mana first, then taps what
    makes no mana, noncreatures, then the smallest creatures (as for improvise), for ward—waterbend and spells too; bots
    don't waterbend with creatures that could still attack this turn; a draw an opponent's Notion Thief replaces isn't
@@ -3368,7 +3394,7 @@ line blocks.
      Gateway Express ("Each creature you control deals 1 damage to that creature"), Pilfered Proof ("turned face up", a
      Clue in its token replacement), Uneaten Feast (granting "You may cast this card from your graveyard"); Case File
      Auditor's "When ~ enters and whenever you solve a Case" (the engine has a "solved" event for it).
-   - "Enters with a number of counters equal to" still out: "three minus X" (Slumbering Trudge), Ulamog; Kurbis, Marath,
+   - "Enters with a number of counters equal to" still out: "three minus X" (Slumbering Trudge, done in round 300), Ulamog; Kurbis, Marath,
      Dyadrine and Gyrus are blocked on other lines.
    - Dies-return still out: Not Dead After All, Vincent's Limit Break.
    - Several cards from among the top ones: "with total mana value N or less" (Ao, Michelangelo's Technique, Smelting
@@ -3444,7 +3470,7 @@ line blocks.
    Left from the spell keywords round (tap or untap, buyback costs, undaunted, gravestorm, splice, awaken, miracle,
    epic, free casts from hand, timing points, overload leftovers):
    - Overload still out: Dragonshift, Fangs of Kalonia, March of Progress (done in round 277), Winds of Abandon, Break the Ice, Rise and Shine, Spectacular Showdown, Eldritch Immunity, Corporeal Projection, Bail
-     Out (their "each" lines). Fall of the Titans' Surge {X}{R}. Bots never overload Counterflux.
+     Out (their "each" lines). Fall of the Titans' Surge {X}{R} (done in round 300). Bots never overload Counterflux.
    - Splice with a cost that isn't mana (Horobi's Whisper, Hundred-Talon Strike, Torrent of Stone, Veil of Secrecy,
      Roar of Jukai), a second splice line, and splice onto a spell with X, modes, kicker, buyback or another
      alternative cost. Memory Crystal ("buyback costs cost {2} less").
@@ -3510,7 +3536,7 @@ line blocks.
      ("the chosen permanent"), Titan's Presence (a reveal cost), Vulpine Harvester ("their total power"), Sundering
      Archaic (colors spent).
    - "Your team" is "you" (CR 102.4), as is Azra Bladeseeker's "each player on your team", and "Partner with" works (27
-     cards); still out: "each of your teammates" (Imperial Mask), Combo Attack, surge (Fall of the Titans). Pir and other
+     cards); still out: "each of your teammates" (Imperial Mask), Combo Attack, surge (Fall of the Titans, done in round 300). Pir and other
      "Partner with" cards are out on their other lines.
    - "Target ... with mana value X or less, where X is ..." works for the life you gained this turn (Celestine, Moseo);
      still out: damage dealt (Venerable Warsinger), players attacked (Custodi
@@ -3759,7 +3785,7 @@ line blocks.
    Last Ronin's Technique and Turncoat Kunoichi, Melek and Mistbreath Elder, putting cards from a hand on the bottom
    in any order (Arjun, Mindmoil), granting cascade, and the owner's order when several target spells or permanents
    go to the bottom at once (CR 401.4). Left from the
-   earthbend/foretell round: {X} foretell and freerunning costs (Starnheim Unleashed, Monastery Raid),
+   earthbend/foretell round: {X} foretell and freerunning costs (Starnheim Unleashed done in round 300, Monastery Raid),
    "if this spell was cast from exile" conditions on foretell cards (Cosmos Charger), Avatar Kyoshi's "then untap that land", Feral Contest and Mark for
    Death's lures with extra clauses, Kingpin of Crime.
 

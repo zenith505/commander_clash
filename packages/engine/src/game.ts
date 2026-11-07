@@ -1435,7 +1435,28 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // land entering under Blood Moon has lost them (CR 305.7, rulings), so it doesn't enter tapped.
   const printed = characteristics(s, o).hasPrintedAbilities ? compiled : NO_ABILITIES;
   if (!characteristics(s, o).hasPrintedAbilities) withCounters = undefined;
-  if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped) || othersMakeItEnterTapped(s, o)) o.tapped = !othersMakeItEnterUntapped(s, o);
+  // Thief of Blood: every counter on every other permanent comes off as it enters, and it enters with a +1/+1 counter
+  // for each (one replacement effect, CR 614.1c); a player's counters stay (rulings). Permanents entering with it aren't
+  // on the battlefield yet.
+  if (printed.entersStealsCounters) {
+    let stolen = 0;
+    for (const pid of [...s.battlefield]) {
+      const p = s.objects[pid];
+      if (!p || pid === id) continue;
+      const kinds = Object.entries(p.counters).filter(([k, n]) => n > 0 && !countersStay(s, p, k));
+      if (!kinds.length) continue;
+      for (const [k, n] of kinds) {
+        p.counters[k] = 0;
+        stolen += n;
+      }
+      invalidateCharacteristics(s);
+      log(s, `${characteristics(s, p).name} loses all its counters (${kinds.map(([k, n]) => `${n} ${k}`).join(", ")}).`);
+      for (const [k, n] of kinds) countersRemoved(s, p, k, n);
+      for (const [k] of kinds) fireEvent(s, { type: "lastCounterRemoved", id: p.id, counter: k });
+    }
+    if (stolen) withCounters = withCounters?.counter === "+1/+1" ? { ...withCounters, n: withCounters.n + stolen } : { counter: "+1/+1", n: stolen, ...(withCounters ? { also: { counter: withCounters.counter, n: withCounters.n } } : {}) };
+  }
+  if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped) || (printed.entersTappedIfXAtMost !== undefined && (opts.x ?? 0) <= printed.entersTappedIfXAtMost) || othersMakeItEnterTapped(s, o)) o.tapped = !othersMakeItEnterUntapped(s, o);
   // Brimstone Vandal: day from the moment it enters, with neither (CR 731.1, 614.12).
   if (printed.entersDay && !s.dayNight) setDayNight(s, "day");
   // "As a historic permanent you control enters, it becomes a 7/7 Dinosaur creature in addition to its other types"
@@ -5626,7 +5647,10 @@ export function castProblem(
   // "Kicker {X}": X only when it's kicked (CR 107.3a, 601.2b); "X can't be 0" then.
   const kicker = compileCard(d).kicker;
   const kickX = !!choices?.kicks?.some((i) => parseManaCost(kicker?.costs[i] ?? "").hasX);
-  const xp = xProblem(costX || kickX ? parseManaCost("{X}") : parseManaCost(d.manaCost), x);
+  // An {X} in the alternative cost paid, though the mana cost has none: "Foretell {X}{X}{W}" (Starnheim Unleashed),
+  // "Madness {X}{B}{B}" (From Under the Floorboards). X is announced as it's cast (CR 107.3a, rulings).
+  const altX = parseManaCost((free ? madness : undefined) ?? (choices?.alt && !choices.faceDown ? (altCost(d, choices.alt, s, pid, o)?.mana ?? "") : "")).hasX;
+  const xp = xProblem(costX || kickX || altX ? parseManaCost("{X}") : parseManaCost(d.manaCost), x);
   if (xp) return xp;
   if (kickX && (x ?? 0) < (kicker?.xMin ?? 0)) return "X can't be 0";
   // Mind Grind: "X can't be 0", so it can't be cast without paying its mana cost either (rulings, CR 107.3b).
@@ -6769,7 +6793,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const chosen = spell?.modal ? modes : undefined;
   const free = freeCastOf(s, p.id) === id && !madness;
   // X is announced as it's cast (CR 601.2b) and is part of the spell while it's on the stack (CR 107.3a).
-  const hasX = parseManaCost(d.manaCost).hasX || costsHaveX(d, choices) || !!choices?.kicks?.some((i) => parseManaCost(compileCard(d).kicker?.costs[i] ?? "").hasX);
+  // Or in the alternative cost paid: "Foretell {X}{X}{W}", "Madness {X}{B}{B}" (CR 107.3a).
+  const hasX = parseManaCost(d.manaCost).hasX || costsHaveX(d, choices) || !!choices?.kicks?.some((i) => parseManaCost(compileCard(d).kicker?.costs[i] ?? "").hasX) || parseManaCost(madness ?? (choices.alt ? (altCost(d, choices.alt, s, p.id)?.mana ?? "") : "")).hasX;
   const beholdCost = compileCard(d).kicker?.extraCosts?.[0];
   const beheld = kicks?.includes(0) && beholdCost?.kind === "reveal" && beholdCost.orControl && choices.reveal?.length === 1 ? s.objects[choices.reveal[0]!] : undefined;
   s.stack.push({

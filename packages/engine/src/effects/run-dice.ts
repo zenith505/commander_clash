@@ -3,7 +3,7 @@
 import type { Effect } from "../abilities";
 import { abilitiesOf, defOf } from "../cards";
 import { controllerOf } from "../layers";
-import { destroyPermanent, livingPlayers, log, obj, player } from "../game";
+import { destroyPermanent, gainLife, livingPlayers, log, loseLife, obj, player } from "../game";
 import { nextRandom } from "../rng";
 import type { GameState, PlayerId } from "../types";
 import { ResolveCtx, amountNow, ctxSource, objects, players } from "./resolve";
@@ -216,17 +216,20 @@ export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin
   }
   let wins = 0;
   let won = false;
+  let flips = 0;
   // Even "until you lose a flip" ends some time; a long run of wins is cut short where paper Magic would be (CR 732).
   // With Krark's Thumb, each flip of the run keeps a won coin if there is one: a lost flip would only end the run.
   // "Flip three coins": each flip on its own (CR 705.1); with Krark's Thumb each keeps a won coin if there is one.
   for (let i = 0; i < 100; i++) {
     won = heads && (i === 0 || !!e.n) ? true : (i === 0 && first ? first : flip()).some((w) => w);
     fireEvent(s, { type: "coinFlipped", player: who, won });
+    flips++;
     if (won) wins++;
-    if (e.n ? i + 1 >= e.n : !won || !e.untilLose) break;
+    // Squee's Revenge: "that many times or until you lose a flip, whichever comes first".
+    if (e.n ? i + 1 >= e.n || (e.untilLose && !won) : !won || !e.untilLose) break;
   }
-  s.resolving!.flipped = { won, wins, ...(e.n ? { flips: e.n } : {}) };
-  log(s, (e.n ? `${player(s, who).name} flips ${e.n} coins for ${src}: ${wins} won` : e.untilLose ? `${player(s, who).name} flips coins for ${src} until losing a flip: ${wins} won` : `${player(s, who).name} flips a coin for ${src} and ${won ? "wins" : "loses"} the flip`) + `${edgar}.`);
+  s.resolving!.flipped = { won, wins, ...(e.n ? { flips } : {}) };
+  log(s, (e.n && e.untilLose ? `${player(s, who).name} flips up to ${e.n} coins for ${src} until losing a flip: ${wins} won${won ? " (all of them)" : ""}` : e.n ? `${player(s, who).name} flips ${e.n} coins for ${src}: ${wins} won` : e.untilLose ? `${player(s, who).name} flips coins for ${src} until losing a flip: ${wins} won` : `${player(s, who).name} flips a coin for ${src} and ${won ? "wins" : "loses"} the flip`) + `${edgar}.`);
 }
 
 /**
@@ -283,6 +286,50 @@ export function runFlipClashEffect(s: GameState, e: Extract<Effect, { type: "fli
     if (mine && theirs) break;
   }
   log(s, `${player(s, you).name} and ${player(s, them).name} flip coins for ${src} ${rounds + 1} time${rounds ? "s" : ""}: ${player(s, you).name} is dealt ${hurt[you]} damage, ${player(s, them).name} ${hurt[them]}.`);
+}
+
+/**
+ * Game of Chaos (see Effect "gameOfChaos"): its controller flips; winning, they gain the stake and the opponent loses it,
+ * losing the other way round; then the winner of that flip decides whether to flip again, the stake doubling (rulings).
+ * Edgar makes its controller's first flip this turn won; with Krark's Thumb they keep a won coin if there is one. It ends
+ * when the deciding player stops, or when either player has left the game (CR 800.4a).
+ */
+export function runGameOfChaosEffect(s: GameState, e: Extract<Effect, { type: "gameOfChaos" }>, ctx: ResolveCtx, src: string): "paused" | void {
+  const you = ctx.controller;
+  const them = players(s, e.with, ctx)[0];
+  if (them === undefined) return;
+  const sc = (s.resolving!.scratch ??= {});
+  const g = (sc.gameOfChaos ??= { stake: 1, net: 0 });
+  if (g.asked) {
+    g.asked = undefined;
+    const again = sc.may !== false;
+    sc.may = undefined;
+    if (!again) {
+      sc.gameOfChaos = undefined;
+      return void log(s, `${src}: no more flips.`);
+    }
+    g.stake *= 2;
+  }
+  for (let i = 0; i < 60; i++) {
+    if (player(s, you).lost || player(s, them).lost) break;
+    const rig = flipsRigged(s, you);
+    noteFlipped(s, you);
+    const thumb = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === you && !!abilitiesOf(s, obj(s, id)).flipTwo);
+    const won = rig || (thumb ? [nextRandom(s) < 0.5, nextRandom(s) < 0.5] : [nextRandom(s) < 0.5]).some((h) => h);
+    fireEvent(s, { type: "coinFlipped", player: you, won });
+    const [winner, loser] = won ? [you, them] : [them, you];
+    log(s, `${player(s, you).name} ${won ? "wins" : "loses"} the flip for ${src}: ${player(s, winner).name} gains ${g.stake} life and ${player(s, loser).name} loses ${g.stake} life.`);
+    gainLife(s, winner, g.stake);
+    loseLife(s, loser, g.stake);
+    g.net += won ? g.stake : -g.stake;
+    if (player(s, you).lost || player(s, them).lost || player(s, winner).life <= 0 || player(s, loser).life <= 0) break;
+    // The winner decides whether to flip again, for twice the stakes.
+    g.asked = true;
+    const net = winner === you ? g.net : -g.net;
+    s.pending = { kind: "chooseMay", player: winner, source: src, prompt: `flip again for ${g.stake * 2} life (you won this flip; so far this game you're ${net >= 0 ? `up ${net}` : `down ${-net}`} life)`, chaosAgain: { stake: g.stake * 2, net, against: loser } };
+    return "paused";
+  }
+  sc.gameOfChaos = undefined;
 }
 
 /**

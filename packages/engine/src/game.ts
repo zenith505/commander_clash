@@ -1012,7 +1012,7 @@ export function moveObject(
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.chosen?.object ? { chosenObject: { ...o.chosen.object } } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
@@ -1504,6 +1504,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
   for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, ...c });
   if (printed.entersAnchor) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "anchor" });
+  // Dauntless Bodyguard: "As ~ enters, choose another creature you control" (CR 614.12).
+  if (printed.entersChooseObject) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "chosenObject" });
   // As a battle enters, its controller chooses its protector (CR 310.9a).
   if (isType(defOf(s, o), "Battle")) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "protector" });
   if (printed.entersChooseTwoPlayers) for (let i = 0; i < 2; i++) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", pair: true });
@@ -5097,7 +5099,9 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   const tapRad = choice?.kind === "mayTapRad" && !untapped ? choice.n : 0;
   // Kaldring, the Rimestaff: played with that card's own permission, "it enters tapped" (CR 614.1c); with Crucible of
   // Worlds or mayhem too, its player plays it that way instead.
-  const permitTapped = fromZone === "graveyard" && !!o.mayPlay?.tapped && ownGraveyardPlay(s, o, p.id) && !mayhemPlay(s, o) && !landsFromGraveyardNow(s, p.id, o);
+  // Lightstall Inquisitor: "Each land played this way enters tapped", played with that permission (CR 614.1c); with another
+  // permission for it too (Intellect Devourer's), its player plays it that way instead.
+  const permitTapped = (fromZone === "graveyard" && !!o.mayPlay?.tapped && ownGraveyardPlay(s, o, p.id) && !mayhemPlay(s, o) && !landsFromGraveyardNow(s, p.id, o)) || (fromZone === "exile" && !!o.mayPlay?.landTapped && ownExilePermission(s, o, p.id) && !linkedPlayPermission(s, o, p.id) && linkedPlayGrant(s, o, p.id) < 0);
   moveObject(s, id, "battlefield", { controller: p.id, untapped: untapped && !permitTapped, ...(tapRad || permitTapped ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}) });
   s.playingLand = undefined;
   log(s, `${p.name} plays ${d.name}${from}${obj(s, id).tapped ? " (tapped)" : ""}.`);
@@ -9589,6 +9593,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       setProtector(s, o, Number(choice));
       return;
     }
+    if (pend.what === "chosenObject") {
+      // Dauntless Bodyguard: that creature, as the object it is now (CR 400.7); no new one later (rulings).
+      if (!pend.options.includes(choice)) throw new RulesError("choose one of the creatures offered");
+      const c = obj(s, choice);
+      o.chosen = { ...o.chosen, object: { id: c.id, zc: c.zoneChanges ?? 0 } };
+      log(s, `${p.name} chooses ${characteristics(s, c).name} for ${pend.source}.`);
+      invalidateCharacteristics(s);
+      return;
+    }
     if (pend.what === "anchor") {
       if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(" or ")}`);
       o.chosen = { ...o.chosen, anchor: choice };
@@ -9656,7 +9669,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -10284,6 +10297,19 @@ function askEntersChoice(s: GameState): boolean {
       }
       const pairPrompt = o.chosen?.players?.length ? "choose the second of two players" : "choose two players: the first";
       s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "player", options: options.map(String), labels: options.map((x) => (x === you ? `${player(s, x).name} (you)` : player(s, x).name)), objectId: o.id, prompt: c.pair ? pairPrompt : `${c.secret ? "secretly " : ""}choose ${c.except === "you" ? "an opponent" : "a player"}` };
+      return true;
+    }
+    if (c.what === "chosenObject") {
+      // "Choose another creature you control" (Dauntless Bodyguard): one already there, not one entering with it (rulings);
+      // with none, nothing is chosen.
+      const you = controllerOf(s, o);
+      const filter = compileCard(defOf(s, o)).entersChooseObject!;
+      const options = s.battlefield.filter((id) => id !== o.id && !c.together?.includes(id) && controllerOf(s, obj(s, id)) === you && objectMatches(s, filter, obj(s, id), you, false));
+      if (!options.length) {
+        q.shift();
+        continue;
+      }
+      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "chosenObject", options, labels: options.map((id) => characteristics(s, obj(s, id)).name), objectId: o.id, prompt: `choose ${filter.text}` };
       return true;
     }
     if (c.what === "protector") {

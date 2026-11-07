@@ -420,6 +420,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // Eye of Singularity (see ObjRef "sharingName").
   if (/^each permanent with the same name as another permanent, except for basic lands$/i.test(p.trim())) return { ref: "sharingName" };
   if (/^all other permanents with that name$/i.test(p.trim()) && ctx.subject && !ctx.spell && !ctx.targets.length) return { ref: "sharingName", subject: true };
+  // Dauntless Bodyguard: "the chosen creature", chosen as ~ entered (CompiledCard.entersChooseObject, checked in compile.ts);
+  // with a target, it is the target "chosen" (Vengeful Villagers: "choose target creature ...").
+  if (/^the chosen creature$/i.test(p.trim()) && !ctx.spell && !ctx.targets.length) return { ref: "chosenObject" };
   // "Each creature that convoked it" (Venerated Loxodon, CR 702.51a): the creatures tapped to cast it.
   if (/^each creature that convoked (?:it|~)$/i.test(p.trim())) return { ref: "convokers" };
   // Kjeldoran Frostbeast: "all creatures blocking or blocked by ~": the ones in combat with it as this resolves.

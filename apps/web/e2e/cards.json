@@ -6210,6 +6210,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "70973a2d-66e6-4662-ab10-99678775dda1",
+  "name": "Dauntless Bodyguard",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Creature — Human Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "As this creature enters, choose another creature you control.\nSacrifice this creature: The chosen creature gains indestructible until end of turn.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dom",
+  "releasedAt": "2018-04-27",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f1c2dbe2-fbe0-4058-bdf1-91d1b1832786",
   "name": "Dauthi Voidwalker",
   "manaCost": "{B}{B}",
@@ -7392,6 +7423,42 @@
   "set": "ecl",
   "releasedAt": "2026-01-23",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "264efed9-65ab-40ad-877f-c6c25ca0281e",
+  "name": "Edgar, King of Figaro",
+  "manaCost": "{4}{U}{U}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Human Artificer Noble",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Artificer",
+   "Noble"
+  ],
+  "oracleText": "When Edgar enters, draw a card for each artifact you control.\nTwo-Headed Coin — The first time you flip one or more coins each turn, those coins come up heads and you win those flips.",
+  "power": "4",
+  "toughness": "5",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Two-Headed Coin"
+  ],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -9687,6 +9754,34 @@
   "set": "eoe",
   "releasedAt": "2025-08-01",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b6756608-a618-4e26-a090-ea8fc992def1",
+  "name": "Game of Chaos",
+  "manaCost": "{R}{R}{R}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Flip a coin. If you win the flip, you gain 1 life and target opponent loses 1 life, and you decide whether to flip again. If you lose the flip, you lose 1 life and that opponent gains 1 life, and that player decides whether to flip again. Double the life stakes with each flip.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Double"
+  ],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -24727,6 +24822,34 @@
   "set": "vis",
   "releasedAt": "1997-02-03",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3c9f3f26-339e-459e-9847-4e33aafb6f9b",
+  "name": "Squee's Revenge",
+  "manaCost": "{1}{U}{R}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose a number. Flip a coin that many times or until you lose a flip, whichever comes first. If you win all the flips, draw two cards for each flip.",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "apc",
+  "releasedAt": "2001-06-04",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

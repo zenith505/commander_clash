@@ -180,6 +180,12 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
     const mods = parseStaticMods(m[1]!);
     return mods ? { affects: { kind: "paired" }, mods, text: line } : null;
   }
+  // Tyrannical Pitlord: "The chosen creature gets +3/+3 and has flying": the creature chosen as it entered, while it's that
+  // permanent, whoever controls it (rulings).
+  if ((m = /^The chosen creature (gets .+|has .+)$/.exec(text))) {
+    const mods = parseStaticMods(m[1]!);
+    return mods ? { affects: { kind: "chosenObject" }, mods, text: line } : null;
+  }
   // Alms Beast: "Creatures blocking or blocked by ~ have lifelink": while they're in combat with it.
   if ((m = /^Creatures blocking or blocked by ~ (have|get) (.+)$/.exec(text))) {
     const mods = parseStaticMods(`${m[1]} ${m[2]}`);

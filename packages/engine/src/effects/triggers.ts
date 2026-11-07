@@ -2133,10 +2133,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Demonstrate a permanent gives the spell (Silverquill Lecturer): one trigger for each instance (CR 702.144a-b).
     if (spell && !ev.copy) {
       const d = defOf(s, spell);
+      // The Twelfth Doctor: this is the first spell its controller cast this turn from anywhere other than their hand.
+      const firstNotFromHand = spell.castFrom !== "hand" && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && c.from !== "hand").length === 1;
       for (const id of s.battlefield) {
         const p = obj(s, id);
         if (controllerOf(s, p) !== ev.controller) continue;
-        for (const g of abilitiesOf(s, p).spellsHaveDemonstrate ?? []) if (printedMatches(g.filter, d)) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: DEMONSTRATE_BODY, cause: ev.stackId });
+        for (const g of abilitiesOf(s, p).spellsHaveDemonstrate ?? []) if (printedMatches(g.filter, d) && (!g.firstNotFromHand || firstNotFromHand)) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: DEMONSTRATE_BODY, cause: ev.stackId });
       }
     }
     // Cascade a permanent gives the spells its controller casts: the spell's own ability, one for each (CR 702.85a, 702.85c).

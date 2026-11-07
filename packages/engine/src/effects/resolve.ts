@@ -15,7 +15,7 @@ import { COLOR_NAMES } from "./describe";
 import { objectMatches, bindChosen, bindAttachedToSource, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sameNamedAnywhere, sharingName, sharingAColor, sameManaValued, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
-import { runCoinEachEffect, runFlipClashEffect, runEachPlayerFlipsEffect, runFlipEachOpponentEffect, runCoinEffect, runDiceEffect } from "./run-dice";
+import { runGameOfChaosEffect, runCoinEachEffect, runFlipClashEffect, runEachPlayerFlipsEffect, runFlipEachOpponentEffect, runCoinEffect, runDiceEffect } from "./run-dice";
 import { runDungeonsEffect } from "./run-dungeons";
 import { runZonesEffect, suspendExiled } from "./run-zones";
 import { proliferate, runPermanentsEffect } from "./run-permanents";
@@ -378,6 +378,17 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     return b ? [b] : [];
   }
   if (ref.ref === "voted") return votedObjects(s, !!ref.any);
+  // Dauntless Bodyguard: the creature chosen as the source entered, while it's that permanent; Tyrannical Pitlord's
+  // leaves trigger: the choice of the source as it last existed (CR 608.2h): an ability activated by sacrificing it is the
+  // object it was, a leaves-the-battlefield trigger's source the object it became (one zone change later, CR 400.7).
+  if (ref.ref === "chosenObject") {
+    const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    const here = me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);
+    const lk = !here && ctx.sourceId ? s.lastKnown?.[ctx.sourceId] : undefined;
+    const c = here ? me.chosen?.object : lk && (ctx.sourceZc === undefined || lk.zc === ctx.sourceZc || lk.zc + 1 === ctx.sourceZc) ? lk.chosenObject : undefined;
+    const o = c && s.objects[c.id];
+    return o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === c.zc ? [o] : [];
+  }
   // Eye of Singularity: "that name" is the entering permanent's, now, or as it last existed (CR 608.2h).
   if (ref.ref === "sharingName") {
     if (!ref.subject) return sharingName(s);
@@ -1586,6 +1597,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runCoinEachEffect(s, e, ctx, src);
     case "flipClash":
       return runFlipClashEffect(s, e, ctx, src);
+    case "gameOfChaos":
+      return runGameOfChaosEffect(s, e, ctx, src);
     case "eachPlayerFlips":
       return runEachPlayerFlipsEffect(s, e, ctx, src);
     case "flipEachOpponent":

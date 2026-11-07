@@ -661,7 +661,7 @@ line blocks.
    Pestilent Spirit). A browser test clicks through Let's Play a Game's mode menu with and without delirium.
    Out after round 200 (looked at, not done): Enchanter's Bane (a
    punisher whose option sacrifices the target), You Cannot Pass! (done in round B110) (no record of which creatures blocked or were blocked by a legendary creature),
-   Candlekeep Inspiration (cards in exile and graveyard that "have an Adventure"), Convert to Slime (done in round 275), Canoptek Wraith, Mishra's Command, Furygale Flocking, Sentinel Tower, Fishing
+   Candlekeep Inspiration (cards in exile and graveyard that "have an Adventure"), Convert to Slime (done in round 275), Canoptek Wraith, Mishra's Command, Furygale Flocking, Sentinel Tower (done in round 298), Fishing
    Gear, Phyrexian Dreadnought. Soulfire Grand Master, Radiant Scrollwielder and Lo and Li still miss another line;
    Firesong and Sunspeaker's "red instant and sorcery spells" isn't read yet.
    Round 201 went on from the top: "is put into a graveyard from the battlefield or is put into exile from the
@@ -681,7 +681,7 @@ line blocks.
    leaves the game now has the permanents they control but don't own exiled (CR 800.4a), and four regex guards that
    held backspace characters instead of `\b` now work (no card changed). A browser test clicks through Search for
    Blex's picker.
-   Out after round 201 (looked at, not done): Dauntless Bodyguard ("choose another creature you control" as it
+   Out after round 201 (looked at, not done): Dauntless Bodyguard (done in round 298) ("choose another creature you control" as it
    enters), Lord of the Forsaken and Mm'menon (done in round 271), Choco,
    Seeker of Paradise (two different picks from one look), Doomsday Confluence ("choose X" modes tied to X), Scrap
    Welder (targets "with mana value less than X", X set by a sacrifice cost), The Ancient One ("its mana value" about
@@ -762,7 +762,7 @@ line blocks.
    Trebuchet's token got "Ballistic Boulder that's tapped and attacking" as its name and entered untapped. No new prompts.
    +21, 20 of them legal (27,472 of 31,936 with rounds 202 to 204 and Lane B rounds B27 to B34).
    Out after round 205 (looked at, not done): Brimaz, Blight of Oreskos (which spells it means), Osgir, the Reconstructor
-   (an X exile cost and copies of that card), Eivor, The Twelfth Doctor (granting demonstrate), Sigurd, Jarl of Ravensthorpe ("whenever you put a
+   (an X exile cost and copies of that card), Eivor, The Twelfth Doctor (done in round 298) (granting demonstrate), Sigurd, Jarl of Ravensthorpe ("whenever you put a
    lore counter on a Saga"), Ruxa, Patient Professor (done in round 278) ("creatures with no abilities"), The Ruinous Powers ("When you cast
    a spell this way"), Curse of Hospitality ("creatures attacking enchanted player").
    Round 206 went on from the top: "the next spell you cast this turn costs {1} less to cast" (Hardened Berserker,
@@ -2363,6 +2363,25 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands.
+   Round 298 took cards back off the "Out after round N" lists, most played first: "each opponent exiles a card from
+   their hand until ~ leaves the battlefield" (nothing exiled if it has already left, rulings) and "You may play lands and
+   cast spells from among cards exiled with ~. If you cast a spell this way, you may spend mana as though it were mana
+   of any color" (Intellect Devourer); "each opponent exiles a card from their hand and may play that card for as long as it remains exiled. Each
+   spell cast this way costs {1} more to cast. Each land played this way enters tapped." (Lightstall Inquisitor);
+   "Legendary creature spells you cast have convoke" (We Ride at Dawn); "The first spell you cast from anywhere other
+   than your hand each turn has demonstrate" (The Twelfth Doctor); "As ~ enters, choose another creature you control"
+   (CR 614.12c, a new prompt with a browser test; the bot picks its best creature) with "The chosen creature gains
+   indestructible" (Dauntless Bodyguard), "The chosen creature gets +3/+3 and has flying" and "When ~ leaves the
+   battlefield, sacrifice the chosen creature" (Tyrannical Pitlord: only while you still control it, rulings); "Whenever an instant or sorcery spell is cast during your turn,
+   ~ deals damage ... equal to 1 plus the number of instant and sorcery spells cast before that spell this turn" (Sentinel
+   Tower); "Choose a number. Flip a coin that many times or until you lose a flip" (Squee's Revenge: offered 0 to 100, a
+   browser test; the bot picks the number with the best expected draw); Game of Chaos (the winner of each flip decides
+   whether to flip again, the stakes doubling; a browser test of both answers; Edgar, King of Figaro rigs the first flip).
+   +9, COUNT_PLACEHOLDER.
+   Out after round 298 (looked at, not done): Yurlok of Scorch Thrash ("each player adds {B}{R}{G}": a mana ability
+   adding mana to every player's pool, and mana burn that doesn't stack for several Yurloks, rulings); Curse of Bounty
+   ("each opponent attacking that player does the same": an untap for each attacking opponent's own permanents);
+   Enchanter's Bane (still: the enchanted-target's controller's punisher option is sacrificing that one target).
    Round 297 took cards back off the "Out after round N" lists, most played first: "If a Zombie you control would deal
    combat damage to a player, instead that player mills that many cards" and "Whenever one or more cards are put into an
    opponent's graveyard from their library, exile that card and create ..." (Undead Alchemist); "If ~ would deal combat
@@ -2380,7 +2399,7 @@ line blocks.
    from you" (Zidane, Tantalus Thief); "Whenever a permanent card is put into your graveyard from your library, exile
    it with a croak counter on it" and "You may play lands and cast spells from among cards you own in exile with croak
    counters on them" (Grolnok, the Omnivore). +9, 30,324 of 31,936 with B128 to B134.
-   Out after round 297 (looked at, not done): Intellect Devourer ("each opponent exiles a card from their hand until ~
+   Out after round 297 (looked at, not done): Intellect Devourer (done in round 298) ("each opponent exiles a card from their hand until ~
    leaves the battlefield", then casting those cards with mana of any color: next round); The Red Terror ("Whenever a red source you control deals damage to
    one or more permanents and/or players": one trigger per source per damage event, CR 120.3); Archfiend of Spite ("loses
    that much life unless they sacrifice that many permanents", the damaged-by source's controller chooses); Hot Pursuit
@@ -2566,12 +2585,12 @@ line blocks.
    they enter); Abstract Performance (a face-down pile exiled from the library, then a free cast from the other pile);
    Lich's Mirror (a replacement of losing the game); Chains of Mephistopheles (a draw replacement that depends on which
    draw it is in the draw step).
-   Out after round 279 (looked at, not done): Game of Chaos (each next flip's stakes double and the winner or loser
+   Out after round 279 (looked at, not done): Game of Chaos (done in round 298) (each next flip's stakes double and the winner or loser
    decides whether to flip again); Grothama, All-Devouring (done in round 295) (damage dealt to it by each player's sources this turn);
    Lich's Mastery (exile a permanent or a card from hand or graveyard for each 1 life lost); Karn, Living Legacy ("pay
    any amount of mana" plus its emblem); Deathmist Raptor (return it face up or face down).
    Out after round 278 (looked at, not done): Enchanter's Bane (the target enchantment deals the damage, and its
-   controller's punisher option is sacrificing that one target); Squee's Revenge ("choose a number" with no upper bound);
+   controller's punisher option is sacrificing that one target); Squee's Revenge (done in round 298) ("choose a number" with no upper bound);
    Ashiok, Nightmare Muse and Jace, Architect of Thought (their other loyalty abilities); Spectral Searchlight and Radiant
    Lotus (mana another player adds); Coram, the Undertaker (casting from every graveyard).
    Out after round 274 (looked at, not done): Hatchery Sliver ("Each Sliver spell you cast has replicate": a granted
@@ -2600,7 +2619,7 @@ line blocks.
    spell"); Obscuring Aether ("Face-down creature spells you cast cost {1} less": the cost filters see the card, not the
    face-down spell); Backslide ("target creature with a morph ability", megamorph included, CR 702.37b, isn't a target
    filter yet); Ixidron and Illithid Harvester (turning other creatures face down as plain 2/2s or Horrors, as it enters).
-   Out after round 270 (looked at, not done): Dauntless Bodyguard (still no choice of a permanent as something enters);
+   Out after round 270 (looked at, not done): Dauntless Bodyguard (done in round 298) (still no choice of a permanent as something enters);
    Tegwyll's Scouring ("cast as though it had flash by tapping three untapped creatures you control with flying": an
    extra cost only when cast at instant speed); Osgir, the Reconstructor ("Exile an artifact card with mana value X from
    your graveyard" as a cost, then token copies of that card); Agent's Toolkit (done in round 296) (enters with four kinds of counters, then
@@ -2711,7 +2730,7 @@ line blocks.
    ... are sacrificed or destroyed": no event for that pair); Wall of Shards (done in round 275); Night Soil ("Exile two creature cards
    from a single graveyard": a cost that needs a picker over every graveyard); Pull from Eternity (done in round
    272).
-   Out after round 246 (looked at, not done): Dauntless Bodyguard ("As ~ enters, choose another creature you control" and
+   Out after round 246 (looked at, not done): Dauntless Bodyguard (done in round 298) ("As ~ enters, choose another creature you control" and
    "the chosen creature": no choice of a permanent as something enters yet, and it needs a prompt); Urborg (done in round
    270); Consume Spirit ("Spend only black mana on X":
    autopay has no restriction on the mana for X); Catastrophe (done in round 270); Muraganda Petroglyphs (done in round 278) ("creatures with no abilities", a layer dependency on ability-adding effects).
@@ -3024,7 +3043,7 @@ line blocks.
    Urianger Augurelt's Arcanum abilities are out.
    Smaller gaps from round 112: Karn, the Great Creator and Coax from the Blind Eternities only take a card from exile
    (decks have nothing outside the game); "whenever your commander enters" watches the commanders you own; Innocuous
-   Researcher, Horn of the Mark and Landroval ("two or more creatures attack a player") and We Ride at Dawn (its convoke line) are still out; Multiversal Passage's menu
+   Researcher, Horn of the Mark and Landroval ("two or more creatures attack a player") and We Ride at Dawn (done in round 298) (its convoke line) are still out; Multiversal Passage's menu
    asks about paying 2 life before the basic land type (the card chooses the type first; nothing hidden depends on the
    order). Smaller gaps from round 111: the tap picker names its cards in the singular ("click 5 untapped artifact or
    creature of yours"). Smaller gaps from round 110: a bot controlling another player's
@@ -3225,7 +3244,7 @@ line blocks.
    Thrasher, "target opponent exiles a card from their hand", "Cowards can't block Warriors", "target creature can't
    block ~ this turn", Electric Eel):
    - Exiling from hand still out: "you may play that card" or face down (Fiend of the Shadows, Kheru Mind-Eater,
-     Lightstall Inquisitor), "until ~ leaves the battlefield" (Intellect Devourer), Arcane Artisan, Ashiok's -3, Muse
+     Lightstall Inquisitor (done in round 298)), "until ~ leaves the battlefield" (Intellect Devourer (done in round 298)), Arcane Artisan, Ashiok's -3, Muse
      Vessel's second ability, Karn Liberated's -14, Ruthless Negotiation ("if ~ was cast from a graveyard"). Bots
      exile the cards they'd discard, without weighing that exile loses graveyard value they don't have anyway.
    - Bots decide Human Torch's and The Thing's "you may pay {R}{G}{W}{U}" with the usual "may pay" check, not by
@@ -3513,7 +3532,7 @@ line blocks.
    - Coin flips (CR 705) work for "If you win / lose the flip", "until you lose a flip" and "whenever you win a coin
      flip" (25 cards); still out: Krark's Thumb, Edgar's "come up heads" (705.3), heads or tails (Odds // Ends (done in round B129), Mana
      Clash, Two-Headed Giant, Rakdos the Showstopper, Molten Sentry), a flip for each (Mutalith Vortex Beast (done in round 278), Fighting
-     Chance), Fiery Gambit, Game of Chaos, Squee's Revenge, Crooked Scales, Krark the Thumbless, and lines
+     Chance), Fiery Gambit, Game of Chaos (done in round 298), Squee's Revenge (done in round 298), Crooked Scales, Krark the Thumbless, and lines
      that are out for other reasons (Goblin Bangchuckers' "itself", Chance Encounter, Okaun). Bots weigh a flip whose loss costs
      them something as the average of its two outcomes (Bottle of Suleiman), and use "phase out or bounce, else
      sacrifice it" flips (Frenetic Efreet) only to save the permanent.
@@ -5677,7 +5696,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   a browser test); "Sacrifice an Equipment/Aura attached to ~" as an activation cost (Ronin, Shadow Stalker; Faunsbane
   Troll). +13 (29,346 of 31,936 with B86, B87 and rounds 248 and 249).
 - Out after round B88 (looked at, not done): Psychic Rebuttal (copying a spell after it's been countered), Soulblast
-  (an additional cost of sacrificing all creatures you control), Tyrannical Pitlord ("as ~ enters, choose another
+  (an additional cost of sacrificing all creatures you control), Tyrannical Pitlord (done in round 298) ("as ~ enters, choose another
   creature you control"), Spatial Binding (done in round B128) ("can't phase out"), Batroc the Leaper (up to X targets, X the times kicked),
   Miasma Demon (discard any number, then up to that many targets), Gorex, the Tombshell (an optional exile cost that
   reduces the cost), Rasputin Dreamweaver ("if ~ started the turn untapped").

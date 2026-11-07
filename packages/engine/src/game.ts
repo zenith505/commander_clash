@@ -4129,8 +4129,11 @@ export function maxHandSize(s: GameState, pid: PlayerId): number {
     .flatMap((o) => (abilitiesOf(s, o).handSize ?? []).map((h) => ({ h, o })))
     .filter(({ h, o }) => (h.who === "you" ? controllerOf(s, o) === pid : h.who === "chosen" ? o.chosen?.player === pid : opponents(s, controllerOf(s, o)).includes(pid)))
     .filter(({ h, o }) => !h.if || staticConditionNow(s, h.if, o.id, controllerOf(s, o)))
-    .sort((a, b) => a.o.timestamp - b.o.timestamp);
-  for (const { h, o } of mods) n = h.equal ? evalAmount(s, h.equal, { controller: controllerOf(s, o), sourceId: o.id }) : h.set !== undefined ? h.set - (h.minus ? evalAmount(s, h.minus, { controller: controllerOf(s, o), sourceId: o.id }) : 0) : n + (h.plus ?? 0);
+    .map(({ h, o }) => ({ h, o, t: o.timestamp }));
+  // Inspired Idea: a change for the rest of the game from a resolved spell, at its own timestamp (rulings).
+  for (const g of player(s, pid).handSizeForGame ?? []) mods.push({ h: { who: "you", plus: g.plus }, o: undefined as unknown as GameObject, t: g.timestamp });
+  mods.sort((a, b) => a.t - b.t);
+  for (const { h, o } of mods) n = !o ? n + (h.plus ?? 0) : h.equal ? evalAmount(s, h.equal, { controller: controllerOf(s, o), sourceId: o.id }) : h.set !== undefined ? h.set - (h.minus ? evalAmount(s, h.minus, { controller: controllerOf(s, o), sourceId: o.id }) : 0) : n + (h.plus ?? 0);
   return Math.max(0, n);
 }
 
@@ -4248,7 +4251,16 @@ function resolveTop(s: GameState) {
     const played = item.event?.played;
     const playedNow = played && s.objects[played.id];
     const sharesNo = trig?.cast?.sharesTypeWithLinked && played && !sharesTypeWithLinked(s, `${item.sourceId}@${item.sourceZc ?? 0}`, playedNow && (playedNow.zoneChanges ?? 0) === played.zc ? characteristics(s, playedNow).types : playedNow ? defOf(s, playedNow).types : []);
-    if (sharesNo || (still && atYou! < still.min) || (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id, item.subject?.zc))) {
+    // Obscura Ascendancy: the spell's mana value, on the stack or as it last was there (CR 113.7a), still 1 plus the
+    // counters on ~, if it's still the object it was (CR 603.4, rulings).
+    const mvc = trig?.cast?.mvIsSelfCountersPlus;
+    const mvSpell = mvc && item.cause !== undefined ? (s.stack.find((x) => x.id === item.cause && x.kind === "spell") ?? s.castItems?.[item.cause]) : undefined;
+    // Gone, the counters on it as it last existed on the battlefield (CR 603.4, 608.2h).
+    const src = mvc && item.sourceId ? s.objects[item.sourceId] : undefined;
+    const lk = mvc && item.sourceId ? s.lastKnown?.[item.sourceId] : undefined;
+    const srcCounters = src && src.zone === "battlefield" && (src.zoneChanges ?? 0) === (item.sourceZc ?? 0) ? src.counters : lk && lk.zc === (item.sourceZc ?? 0) ? (lk.counters ?? {}) : undefined;
+    const mvNo = !!mvc && (!mvSpell || !srcCounters || spellManaValue(s, mvSpell) !== (srcCounters[mvc.counter] ?? 0) + mvc.plus);
+    if (sharesNo || mvNo || (still && atYou! < still.min) || (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id, item.subject?.zc))) {
       log(s, `${def.name}'s ability does nothing (its "if" condition is no longer true).`); // CR 603.4
       return;
     }

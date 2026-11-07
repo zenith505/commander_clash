@@ -3,7 +3,7 @@ import { cardIdOf, defOf } from "../cards";
 import { log, obj, player } from "../game";
 import { characteristics, controllerOf } from "../layers";
 import type { DamageRule, GameState, ObjectId, PlayerId } from "../types";
-import { ResolveCtx, amountNow, damageRecipients, objects } from "./resolve";
+import { ResolveCtx, amountNow, damageRecipients, objects, players } from "./resolve";
 import { bindChosen, objectMatches, printedMatches } from "./targeting";
 import { addDelayed } from "./run-spells";
 
@@ -120,6 +120,12 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     rule.by = { chosen, filter };
   }
   if (spec.by?.filter) rule.by = { ...rule.by, filter: bindChosen(spec.by.filter, ctx.chosen) };
+  // Encircling Fissure: sources that target player controls; an illegal target gets nothing done (CR 608.2b).
+  if (spec.by?.controllerTarget !== undefined) {
+    const pid = ctx.legal[spec.by.controllerTarget] ? players(s, { ref: "target", index: spec.by.controllerTarget }, ctx)[0] : undefined;
+    if (pid === undefined) return;
+    rule.srcController = pid;
+  }
   if (spec.by?.spellOnly) rule.by = { ...rule.by, spellOnly: true };
   if (spec.by?.notSelf && ctx.sourceId) rule.by = { ...rule.by, not: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0 } };
   // Terrifying Presence: every creature's combat damage but that target's.

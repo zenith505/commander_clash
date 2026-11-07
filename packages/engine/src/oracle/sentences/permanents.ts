@@ -21,6 +21,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return who ? [{ type: "waiveShroud", who }] : null;
   }
   if (/^You have no maximum hand size for the rest of the game$/.test(s)) return [{ type: "noMaxHandSize" }];
+  // Inspired Idea: "Your maximum hand size is reduced by three for the rest of the game" (CR 402.2).
+  const handFor = /^Your maximum hand size is (reduced|increased) by (one|two|three|four|five|\d+) for the rest of the game$/.exec(s);
+  if (handFor) return [{ type: "handSizeForGame", plus: (handFor[1] === "reduced" ? -1 : 1) * num(handFor[2]!) }];
   let m: RegExpExecArray | null;
   // Kolodin, Triumph Caster: "Whenever a Mount you control enters, it becomes saddled until end of turn": the designation
   // saddling gives (CR 702.171b), with no creature having saddled it.

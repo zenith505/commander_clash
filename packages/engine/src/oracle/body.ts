@@ -300,6 +300,18 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boo
     };
     return { type: "floatingTrigger", trigger, until: "endOfTurn", about: ctx!.lastObjectTarget! };
   }
+  // Glyph of Life: "Choose target Wall creature. Whenever that creature is dealt damage by an attacking creature this turn,
+  // you gain that much life.": a delayed trigger about that creature (CR 603.7b-c), once for each attacking creature
+  // dealing it damage, combat damage or not, "that much" the damage that creature dealt; the Wall still takes it (rulings).
+  const byAttacker = ctx?.spell && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many && !after.length && s === "Whenever that creature is dealt damage by an attacking creature this turn, you gain that much life";
+  if (byAttacker) {
+    const trigger: TriggeredAbility = {
+      event: "creatureDealsDamageToSelf",
+      subjectFilter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], combat: "attacking", text: "attacking creature" },
+      body: { targets: [], effects: [{ type: "gainLife", who: { ref: "you" }, n: { count: { kind: "eventAmount" } } }], text: "you gain that much life." },
+    };
+    return { type: "floatingTrigger", trigger, until: "endOfTurn", about: ctx!.lastObjectTarget! };
+  }
   // Vigorous Charge: "Whenever that creature deals combat damage this turn, if this spell was kicked, you gain life equal to
   // that damage": a delayed trigger about the target (CR 603.7b-c), to a player or a creature, each time; whether the spell
   // was kicked is fixed as it's cast (CR 702.33d), so the trigger is made only if it was.
@@ -436,6 +448,24 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boo
   if (nextAttack) {
     const e = floatingTrigger(`This turn, whenever you attack, ${nextAttack[1]!}`, after, ctx);
     return e?.type === "floatingTrigger" ? { ...e, once: true } : e;
+  }
+  // Spiritualize: "Until end of turn, whenever target creature deals damage, you gain that much life." Paladin of Prahv's
+  // forecast: "Whenever target creature deals damage this turn, you gain that much life." Niko Aris: "Up to one target
+  // creature you control can't be blocked this turn. Whenever that creature deals damage this turn, return it to its
+  // owner's hand." A delayed trigger about that creature (CR 603.7b-c), as the object it was (CR 400.7), once for each
+  // damage event it deals, combat or not, to any number of things at once (CR 120.2, 510.2), "that much" the damage
+  // dealt; with no target there's nothing for it to be about, so no trigger is made.
+  const dealsAny = ctx ? /^(?:Until end of turn, whenever (target creature) deals damage|Whenever (target creature|that creature) deals damage this turn), (you gain that much life|return it to its owner's hand)$/.exec(s) : null;
+  if (dealsAny && !after.length) {
+    const who = dealsAny[1] ?? dealsAny[2]!;
+    if (who === "that creature" && (ctx!.lastObjectTarget === undefined || ctx!.targets[ctx!.lastObjectTarget]?.many)) return null;
+    const trigger = parseTrigger(`Whenever ~ deals damage, ${dealsAny[3]!.replace(/\bit\b/, "~")}.`);
+    if (!trigger || trigger === "fail" || trigger.event !== "selfDealsDamage" || trigger.minDamage || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
+    const about = who === "that creature" ? ctx!.lastObjectTarget! : parseObject("target creature", ctx!);
+    const index = typeof about === "number" ? about : about?.ref === "target" ? about.index : undefined;
+    if (index === undefined) return null;
+    const body = { ...trigger.body, text: `${dealsAny[3]!}.`, effects: JSON.parse(JSON.stringify(trigger.body.effects).replaceAll('{"ref":"self"}', '{"ref":"subject"}')) as Effect[] };
+    return { type: "floatingTrigger", trigger: { ...trigger, body }, until: "endOfTurn", about: index };
   }
   const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
   if (!m) return undefined;
@@ -4460,12 +4490,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Anthropede: "you may discard a card or pay {2}. When you do, destroy target Room.": either payment, its controller's
     // choice, or neither; the reflexive trigger (CR 603.12) only once one was paid, its target chosen then.
-    const discardOrPay = /^[Yy]ou may discard a card or pay ((?:\{[0-9WUBRGC]\})+)$/.exec(s);
+    // Nimble Hobbit: "you may sacrifice a Food or pay {2}{W}. When you do, tap target creature an opponent controls.": the
+    // same with a Food of yours, any Food artifact (rulings).
+    const discardOrPay = /^[Yy]ou may (discard a card|sacrifice an? (Food|Clue|Treasure|artifact|creature|land)) or pay ((?:\{[0-9WUBRGC]\})+)$/.exec(s);
     const discardOrPayWhen = discardOrPay && /^When you do, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
     if (discardOrPay && discardOrPayWhen) {
       const reflexive = reflexiveBody(capital(discardOrPayWhen[1]!), ctx);
-      if (!reflexive) return null;
-      effects.push({ type: "punisher", who: { ref: "you" }, options: [{ discard: 1 }, { pay: { cost: discardOrPay[1]! } }], effects: [{ type: "reflexive", body: reflexive }], mode: "ifAny", thenText: discardOrPayWhen[1]! });
+      const sac = discardOrPay[2] ? parseTargetPhrase(`${discardOrPay[2]} you control`) : undefined;
+      if (!reflexive || sac === null || (sac && sac.kind !== "object")) return null;
+      const first: PunisherOption = sac?.kind === "object" ? { sacrifice: { ...sac, text: discardOrPay[2]! } } : { discard: 1 };
+      effects.push({ type: "punisher", who: { ref: "you" }, options: [first, { pay: { cost: discardOrPay[3]! } }], effects: [{ type: "reflexive", body: reflexive }], mode: "ifAny", thenText: discardOrPayWhen[1]! });
       si++;
       continue;
     }

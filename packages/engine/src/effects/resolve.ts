@@ -1413,6 +1413,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "enterTappedUntil":
     case "entersWithCountersThisTurn":
     case "noMaxHandSize":
+    case "handSizeForGame":
     case "counters":
     case "distribute":
     case "lastKnownCounters":

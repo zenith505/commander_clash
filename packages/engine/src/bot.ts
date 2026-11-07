@@ -3081,7 +3081,9 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
   // reflexive destroy, worth about a card with an opponent's permanent to aim it at, nothing without one.
   const ownPun = mode && controller === pid && s.resolving ? allEffects(s.resolving.body.effects).find((x) => x.type === "punisher" && x.who.ref === "you" && x.mode === "ifAny") : undefined;
   const reflex = ownPun?.type === "punisher" && ownPun.effects.length === 1 && ownPun.effects[0]!.type === "reflexive" ? ownPun.effects[0]!.body : undefined;
-  const buys = reflex && reflex.targets.length === 1 && reflex.effects.length === 1 && reflex.effects[0]!.type === "destroy" && s.battlefield.some((id) => opponents(s, pid).includes(controllerOf(s, obj(s, id))) && objectMatches(s, reflex.targets[0]!, obj(s, id), pid, false)) ? 6 : 0;
+  // Nimble Hobbit: "When you do, tap target creature an opponent controls": a little, with an untapped one to tap.
+  const reflexKind = reflex && reflex.targets.length === 1 && reflex.effects.length === 1 ? reflex.effects[0]!.type : undefined;
+  const buys = (reflexKind === "destroy" || reflexKind === "tap") && s.battlefield.some((id) => opponents(s, pid).includes(controllerOf(s, obj(s, id))) && !(reflexKind === "tap" && obj(s, id).tapped) && objectMatches(s, reflex!.targets[0]!, obj(s, id), pid, false)) ? (reflexKind === "destroy" ? 6 : 2) : 0;
   const penalty = mode && pu.losesSource ? sourceWorth : mode ? (controller === pid ? buys : controller === undefined || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.hurts ? hurtCost : doomed ? (doomed.zone === "battlefield" && !objHasKeyword(s, doomed, "Indestructible") ? worth(s, pid, doomed) : 0) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
   const cost = (o: string): number => {
     if (o === "none") return penalty;
@@ -6048,7 +6050,8 @@ function damageThreat(s: GameState, pid: PlayerId): DamageThreat | null {
 /** A body that only prevents or redirects damage this turn (and maybe gains life), which a bot keeps for when damage comes. */
 function shieldBody(body: AbilityBody | undefined): boolean {
   if (!body || body.modal) return false;
-  return body.effects.some((e) => e.type === "damageRule") && body.effects.every((e) => e.type === "damageRule" || (e.type === "gainLife" && e.who.ref === "you"));
+  // Encircling Fissure: its awaken half only when cast for that cost, which the bot doesn't do here.
+  return body.effects.some((e) => e.type === "damageRule") && body.effects.every((e) => e.type === "damageRule" || (e.type === "gainLife" && e.who.ref === "you") || (e.type === "if" && e.cond.kind === "altPaid"));
 }
 
 /**
@@ -6080,6 +6083,7 @@ function shieldValue(s: GameState, pid: PlayerId, body: AbilityBody, t: DamageTh
       v = (me ? t.toMe : 0) + saved(t.creatures);
     } else {
       if (r.by?.target) continue;
+      // Encircling Fissure: aimed at the attacking player (shieldTargets), whose creatures these all are.
       const hits = t.attackers.filter((a) => (!r.by?.choose || objectMatches(s, bindChosen(r.by.choose, chosen), a, pid, false)) && (!r.by?.filter || objectMatches(s, bindChosen(r.by.filter, chosen), a, pid, false)));
       const powers = hits.map((a) => Math.max(0, power(s, a))).sort((a, b) => b - a);
       // A source of one's choice is one attacker: the biggest.
@@ -6105,6 +6109,9 @@ function shieldTargets(s: GameState, pid: PlayerId, body: AbilityBody, t: Damage
     else if (rules.some((r) => r.redirect?.ref === "target" && refCovers(r.redirect, i)) && t.kind === "combat") choice = pick([...t.attackers].sort((a, b) => power(s, b) - power(s, a)).map((a) => ({ kind: "object" as const, id: a.id })).find((x) => legal.some((y) => sameTarget(x, y))));
     else if (rules.some((r) => r.redirect && r.redirect.ref !== "targetController" && refCovers(r.redirect, i))) choice = pick(foe !== undefined ? { kind: "player", id: foe } : undefined);
     else if (rules.some((r) => r.by?.target && refCovers(r.by.target, i)) && t.kind === "stack") choice = pick({ kind: "stack", id: t.item.id });
+    // Encircling Fissure: the player whose creatures threaten it; its awaken land isn't a target unless cast for awaken.
+    else if (rules.some((r) => r.by?.controllerTarget === i)) choice = pick(foe !== undefined ? { kind: "player", id: foe } : undefined);
+    else if (spec.onlyIf?.cond.kind === "altPaid" && !spec.onlyIf.not) choice = { kind: "none" };
     if (!choice) return null;
     out.push(choice);
   }

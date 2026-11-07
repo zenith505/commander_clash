@@ -568,6 +568,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const pid of apnap(s, who)) discardCards(s, pid, rp[pid] ?? [], " at random", false, false, ctx.controller, undefined, tops[pid]);
         return;
       }
+      // Intellect Devourer: "until ~ leaves the battlefield": if it already left, nothing is exiled (CR 610.3b, rulings).
+      const untilMe = e.until === "sourceLeaves" ? objects(s, { ref: "self" }, ctx)[0] : undefined;
+      if (e.until === "sourceLeaves" && !untilMe) return void log(s, `${src} has left the battlefield, so nothing is exiled.`);
       // Each player chooses in APNAP order, then the cards are discarded at the same time (CR 101.4, 701.9b).
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
@@ -620,9 +623,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const pid of apnap(s, who))
           for (const id of sc.chosen![pid] ?? []) {
             if (obj(s, id).zone !== "hand") continue;
-            log(s, `${player(s, pid).name} exiles ${defOf(s, obj(s, id)).name} from their hand.`);
+            log(s, `${player(s, pid).name} exiles ${defOf(s, obj(s, id)).name} from their hand${untilMe ? ` until ${src} leaves the battlefield` : ""}.`);
             moveObject(s, id, "exile");
             const o = obj(s, id);
+            // Intellect Devourer: back to its owner's hand when ~ leaves (CR 610.3), if it's still this object in exile.
+            if (o.zone === "exile" && untilMe) (untilMe.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, hand: true });
+            // Lightstall Inquisitor: its owner may play it while it stays exiled, a spell costing more, a land entering tapped.
+            if (o.zone === "exile" && e.ownerMay) o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, ...(e.ownerMay.more ? { more: e.ownerMay.more } : {}), ...(e.ownerMay.landTapped ? { landTapped: true as const } : {}) };
             // The Eleventh Doctor: its mana value in time counters, and suspend; one with mana value 0 gets none, so it isn't
             // suspended (CR 702.62b, rulings on The Wedding of River Song).
             if (o.zone === "exile" && e.suspendMv) suspendExiled(s, o, defMv(defOf(s, o)));

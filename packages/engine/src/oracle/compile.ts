@@ -1573,6 +1573,12 @@ export function compile(d: CardDef): CompiledCard {
       out.entersChooseTwoPlayers = true;
       continue;
     }
+    // Dauntless Bodyguard, Tyrannical Pitlord: "As ~ enters, choose another creature you control." (CR 614.12): "the chosen
+    // creature" is that permanent; no new one is chosen if it leaves (rulings).
+    if (line === "As ~ enters, choose another creature you control." && !out.entersChooseObject) {
+      out.entersChooseObject = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "another creature you control" };
+      continue;
+    }
     const choosePlayer = /^As (?:~|it) enters, (secretly )?choose (a player|an opponent)\.$/.exec(line);
     if (choosePlayer && !out.entersChoosePlayer) {
       out.entersChoosePlayer = choosePlayer[2] === "a player" ? "player" : "opponent";
@@ -2757,6 +2763,14 @@ export function compile(d: CardDef): CompiledCard {
       else out.playLinkedWhile = { kind: "allOf", conds: [] };
       continue;
     }
+    // Intellect Devourer: "You may play lands and cast spells from among cards exiled with ~. If you cast a spell this way,
+    // you may spend mana as though it were mana of any color to cast it.": the same, with any mana for a spell (CR 609.4b),
+    // its usual timing (rulings).
+    if (line === "You may play lands and cast spells from among cards exiled with ~. If you cast a spell this way, you may spend mana as though it were mana of any color to cast it.") {
+      if (out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
+      else (out.playLinkedWhile = { kind: "allOf", conds: [] }), (out.playLinkedAnyType = true);
+      continue;
+    }
     // Rona, Disciple of Gix: "You may cast spells from among cards exiled with ~": the same, spells only (not lands).
     if (line === "You may cast spells from among cards exiled with ~.") {
       if (out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
@@ -3808,7 +3822,8 @@ export function compile(d: CardDef): CompiledCard {
     // "Noncreature spells you cast have convoke" (Caetus, Sea Tyrant of Segovia), "Multicolored spells you cast have
     // convoke" (Fallaji Wayfarer): the spell has it while it's being cast and paid for (CR 702.51a, 601.2g-h).
     // "Noncreature spells you cast from exile have convoke" (Party Thrasher): those cast from exile.
-    const giveConvoke = /^([A-Z][a-z]+(?: and [a-z]+)?) spells you cast( from exile)? have convoke\.$/.exec(line);
+    // We Ride at Dawn: "Legendary creature spells you cast have convoke": legendary and a creature, both.
+    const giveConvoke = /^([A-Z][a-z]+(?: and [a-z]+| creature)?) spells you cast( from exile)? have convoke\.$/.exec(line);
     if (giveConvoke) {
       const f = parseTargetPhrase(`${giveConvoke[1]!.replace(/ and /g, " or ").toLowerCase()} spell`);
       if (f?.kind !== "spell") out.unsupported.push(raw);
@@ -3845,6 +3860,12 @@ export function compile(d: CardDef): CompiledCard {
       const f = parseTargetPhrase(`${giveDemonstrate[1]!.toLowerCase()} spell`);
       if (f?.kind !== "spell") out.unsupported.push(raw);
       else (out.spellsHaveDemonstrate ??= []).push({ filter: { ...f, text: `${giveDemonstrate[1]!.toLowerCase()} spell` }, text: line });
+      continue;
+    }
+    // The Twelfth Doctor: "The first spell you cast from anywhere other than your hand each turn has demonstrate": only the
+    // first such spell its controller casts in a turn (one cast before it entered counts too), as it's cast (CR 702.144a).
+    if (line === "The first spell you cast from anywhere other than your hand each turn has demonstrate.") {
+      (out.spellsHaveDemonstrate ??= []).push({ filter: { kind: "spell", text: "spell" }, firstNotFromHand: true, text: line });
       continue;
     }
     // "Spells you cast from exile have convoke" (Hoarding Broodlord): cast from exile, checked as they're paid for (CR 601.2g-h).
@@ -6687,9 +6708,11 @@ function linkExile(out: CompiledCard) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     // Nightveil Specter: "that player exiles the top card of their library", the damaged player's card, linked the same.
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && (e.who.ref === "you" || e.who.ref === "eventPlayer") && !e.putAll);
-    const others = all.some((e) => e.type === "exile" || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
-    if (others || out.spell || tops.length !== 1) out.unsupported.push("(plays cards exiled with it that it can't link to one exile ability)");
-    else tops[0]!.linked = true;
+    // Intellect Devourer: "each opponent exiles a card from their hand until ~ leaves the battlefield", linked the same.
+    const fromHands = all.filter((e): e is Extract<Effect, { type: "discard" }> => e.type === "discard" && !!e.exile && !e.ownerMay && !e.suspendMv);
+    const others = all.some((e) => e.type === "exile" || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile && !fromHands.includes(e)));
+    if (others || out.spell || tops.length + fromHands.length !== 1) out.unsupported.push("(plays cards exiled with it that it can't link to one exile ability)");
+    else (tops[0] ?? fromHands[0]!).linked = true;
   }
   // Valakut Exploration: "cards exiled with ~" are the ones its one impulse exiled (CR 607.2a).
   // Court of Locthwain: "cast a spell from among cards exiled with ~" too.
@@ -6716,6 +6739,8 @@ function linkExile(out: CompiledCard) {
     if (chooses.length !== 1 || out.spell || out.entersChoose) out.unsupported.push("(the last chosen player isn't chosen by one triggered ability)");
     else chooses[0]!.keepOnSource = true;
   }
+  // "The chosen creature" is the one chosen as it entered (Dauntless Bodyguard); with no such choice it isn't known.
+  if (!out.entersChooseObject && /"(?:ref|kind)":"chosenObject"/.test(JSON.stringify({ t: out.triggers, a: out.activated, s: out.statics, sp: out.spell ?? null }))) out.unsupported.push("(the chosen creature isn't chosen as it enters)");
   // Shapeshifter: "the last chosen number" is the one chosen as it entered or by its one "you may choose a number"
   // trigger since, kept on the permanent (rulings: one choice each upkeep).
   if (JSON.stringify(out.statics).includes('"selfChosenNumber"')) {

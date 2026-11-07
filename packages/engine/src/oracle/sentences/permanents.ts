@@ -16,6 +16,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Autumn Willow: "Until end of turn, ~ can be the target of spells and abilities controlled by target player as though it
   // didn't have shroud" (CR 702.18a): that player's, until the cleanup step (CR 514.2).
   // (The sentence comes here with "until end of turn" moved to its end.)
+  // Tyrannical Pitlord: "When ~ leaves the battlefield, sacrifice the chosen creature": the one chosen as it entered, only
+  // if the ability's controller controls it then (CR 701.21a, rulings).
+  if (/^[Ss]acrifice the chosen creature$/.test(s) && !ctx.spell && !ctx.targets.length) return [{ type: "sacrifice", what: { ref: "chosenObject" } }];
   if (/^~ can be the target of spells and abilities controlled by target player as though it didn't have shroud until end of turn$/.test(s) && ctx.activated) {
     const who = parsePlayer("target player", ctx);
     return who ? [{ type: "waiveShroud", who }] : null;

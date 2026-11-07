@@ -943,6 +943,8 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // Saproling Infestation: "Whenever a player kicks a spell": casts it with its kicker cost paid (CR 702.33d; once however
   // many times a multikicker was paid).
   line = line.replace(/^Whenever a player kicks a spell, /, "Whenever a player casts a kicked spell, ");
+  // Sentinel Tower: "Whenever an instant or sorcery spell is cast during your turn": by any player (CR 601.2i).
+  line = line.replace(/^Whenever an instant or sorcery spell is cast during your turn, /, "Whenever a player casts an instant or sorcery spell during your turn, ");
   const m = CAST_TRIGGER.exec(line.replace(/ with (mana value|power) (\d+), (\d+), or (\d+),/, (all, key: string, a: string, b: string, c: string) => (Number(b) === Number(a) + 1 && Number(c) === Number(b) + 1 ? ` with ${key} ${a} through ${c},` : all)));
   if (!m) return null;
   let what = m[3]!.replace(/^(?:an?|another) /, "");
@@ -955,7 +957,8 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (duringMain) what = what.replace(/ during your main phase$/, "");
   // "Whenever an opponent casts a spell during your turn" (Voice of Resurgence): only while this ability's controller is
   // the active player.
-  const duringMine = m[1] === "an opponent" && / during your turn$/.test(what);
+  // Sentinel Tower: "Whenever an instant or sorcery spell is cast during your turn" (a player casts it), the same.
+  const duringMine = (m[1] === "an opponent" || m[1] === "a player") && / during your turn$/.test(what);
   if (duringMine) what = what.replace(/ during your turn$/, "");
   // "Whenever you cast a spell while ~ is attacking" (Fire Lord Azula): only while it's an attacking creature as the
   // spell is cast.

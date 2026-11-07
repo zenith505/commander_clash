@@ -892,6 +892,13 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const filter = parseSearchFilter(`${m[1]!.replace(/ and /, " or ")} card`);
     return filter ? count({ kind: "spellsCastThisTurn", filter, eventPlayer: true }) : null;
   }
+  // Sentinel Tower: "the number of instant and sorcery spells cast before that spell this turn", in a cast trigger: every
+  // player's, only those cast before the spell the trigger is about (copies weren't cast, CR 707.10), however many are
+  // cast after it before this resolves.
+  if (ctx?.castSpell && /^instant and sorcery spells cast before that spell this turn$/i.test(p)) {
+    const filter = parseSearchFilter("instant or sorcery card");
+    return filter ? count({ kind: "spellsCastThisTurn", filter, anyone: true, beforeCause: true }) : null;
+  }
   // "Instant and sorcery spells you've cast this turn" (Rionya, Fire Dancer): copies aren't cast (CR 707.10).
   // "For each other instant and sorcery spell you've cast this turn" (Lock and Load, a spell): not its own cast.
   if ((m = /^(other )?((?:instant|sorcery|creature|noncreature|artifact|enchantment)(?: (?:and|or) (?:instant|sorcery|creature|artifact|enchantment))?) spells? you've cast this turn$/i.exec(p)) && (!m[1] || (each && ctx?.spell))) {

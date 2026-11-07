@@ -198,6 +198,9 @@ export function parseCountMod(line: string): CountMod | undefined {
   // Lae'zel, Vlaakith's Champion; Doc Samson: "that many plus one of each of those kinds".
   if (line === "If you would put one or more counters on a creature or planeswalker you control or on yourself, put that many plus one of each of those kinds of counters on that permanent or player instead.")
     return { what: "counters", putter: "you", op: "plusOne", putOn: "creatureOrPlaneswalkerYouControlOrYou" };
+  // Prairie Dog (until end of turn, oracle/sentences/tokens.ts): only +1/+1 counters you put, only on a creature you control.
+  if (line === "If you would put one or more +1/+1 counters on a creature you control, put that many plus one +1/+1 counters on it instead.")
+    return { what: "counters", putter: "you", op: "plusOne", putOn: "creatureYouControl", counter: "+1/+1" };
   if (line === "If you would put one or more counters on a permanent you control, put that many plus one of each of those kinds of counters on that permanent instead.")
     return { what: "counters", putter: "you", op: "plusOne", putOn: "permanentYouControl" };
   if (line === "If an opponent would put one or more counters on a permanent or player, they put half that many of each of those kinds of counters on that permanent or player instead, rounded down.")

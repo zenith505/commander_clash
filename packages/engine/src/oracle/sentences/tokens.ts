@@ -22,9 +22,13 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Kaya, Geist Hunter: "Until end of turn, if one or more tokens would be created under your control, twice that many of
   // those tokens are created instead": a token doubler for the rest of the turn (CR 614.1a, 611.2a). (The body moves a
   // leading "until end of turn" to the end.)
-  if ((m = /^Until end of turn, (if one or more .+ instead)$/.exec(s) ?? /^(If one or more .+ instead) until end of turn$/.exec(s))) {
+  // Prairie Dog: "Until end of turn, if you would put one or more +1/+1 counters on a creature you control, put that many
+  // plus one +1/+1 counters on it instead": the same for counters (rulings: each resolution adds one more, and it applies
+  // to a creature entering with counters too).
+  if ((m = /^Until end of turn, (if (?:one or more|you would put one or more) .+ instead)$/.exec(s) ?? /^(If (?:one or more|you would put one or more) .+ instead) until end of turn$/.exec(s))) {
     const mod = parseCountMod(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)}.`);
-    return mod?.what === "tokens" && mod.who === "you" && (mod.op === "double" || mod.op === "triple") ? [{ type: "countModThisTurn", mod }] : null;
+    const counters = mod?.what === "counters" && "putter" in mod && mod.putter === "you" && mod.putOn === "creatureYouControl";
+    return (mod?.what === "tokens" && mod.who === "you" && (mod.op === "double" || mod.op === "triple")) || counters ? [{ type: "countModThisTurn", mod: mod! }] : null;
   }
 
   // Volrath's Laboratory, Riptide Replicator, Sarpadian Empires, Vol. VII: "Create a 2/2 creature token of the chosen color

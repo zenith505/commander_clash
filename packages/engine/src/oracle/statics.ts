@@ -1880,8 +1880,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
  * sources]": X as written, and what's prevented (CR 615.1).
  */
 export function parsePreventAll(text: string): { subject: string; mod: Extract<Modification, { kind: "preventDamage" }> } | null {
-  const m = /^Prevent all (combat |noncombat )?damage that would be dealt (to and dealt by|to|by) (.+?)(?: by (creatures|artifact creatures|artifact sources|sources of the chosen color))?$/i.exec(text);
+  const m = /^Prevent all (combat |noncombat )?damage that would be dealt (to and dealt by|to|by) (.+?)(?: by (creatures|artifact creatures|artifact sources|sources of the chosen color|spells that target it))?$/i.exec(text);
   if (!m) return null;
+  // Bronze Horse: "prevent all damage that would be dealt to ~ by spells that target it": a spell with ~ among its targets.
+  const targeting = m[4] === "spells that target it";
+  if (targeting && (m[2] !== "to" || m[3] !== "~")) return null;
   // Prismatic Ward: "by sources of the chosen color", the color chosen as its source entered (see layers.ts).
   const chosenColor = m[4] === "sources of the chosen color";
   if (chosenColor && m[2] !== "to") return null;
@@ -1890,7 +1893,7 @@ export function parsePreventAll(text: string): { subject: string; mod: Extract<M
   const combat = m[1] === "combat " ? ("only" as const) : m[1] === "noncombat " ? ("non" as const) : undefined;
   return {
     subject: m[3]!,
-    mod: { kind: "preventDamage", ...(m[2] !== "by" ? { to: true as const } : {}), ...(m[2] !== "to" ? { by: true as const } : {}), ...(combat ? { combat } : {}), ...(fromTypes ? { fromTypes } : {}), ...(chosenColor ? { fromChosenColor: true as const } : {}) },
+    mod: { kind: "preventDamage", ...(m[2] !== "by" ? { to: true as const } : {}), ...(m[2] !== "to" ? { by: true as const } : {}), ...(combat ? { combat } : {}), ...(fromTypes ? { fromTypes } : {}), ...(chosenColor ? { fromChosenColor: true as const } : {}), ...(targeting ? { targetingSpells: true as const } : {}) },
   };
 }
 

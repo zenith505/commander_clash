@@ -485,6 +485,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (!o || o.zone !== "battlefield") return;
         mod.by = { ...mod.by, chosen: { id: o.id, zc: o.zoneChanges ?? 0 } };
       }
+      if (e.toTarget !== undefined) {
+        const t = ctx.targets[e.toTarget];
+        const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+        if (!o || o.zone !== "battlefield") return;
+        mod.to = { ...mod.to, chosen: { id: o.id, zc: o.zoneChanges ?? 0 } };
+      }
       if (e.choose) {
         const chosen = chooseDamageSource(s, ctx, e.choose, src);
         if (chosen === "paused") return "paused";

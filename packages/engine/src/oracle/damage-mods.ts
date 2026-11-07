@@ -134,6 +134,13 @@ export function parseDamageMod(line: string): StaticAbility | null {
     const mod: DamageMod = { op: "counters", counter: toCounters[1], to: { self: true }, text: line };
     return { affects: { kind: "self" }, mods: [{ kind: "damageMod", mod }], text: line };
   }
+  // Force Bubble: "If damage would be dealt to you, put that many depletion counters on ~ instead": a replacement, not
+  // prevention (rulings: the damage is neither dealt nor prevented), the counters on ~ for each source's damage to you.
+  const toCountersYou = /^If damage would be dealt to you, put that many ([a-z]+) counters on ~ instead\.?$/.exec(line);
+  if (toCountersYou) {
+    const mod: DamageMod = { op: "counters", counter: toCountersYou[1]!, to: { players: "you" }, text: line };
+    return { affects: { kind: "self" }, mods: [{ kind: "damageMod", mod }], text: line };
+  }
   const text = line
     .replace(/\.$/, "")
     .replace(/^[A-Z][A-Za-z' -]+ — (?=If )/, "")
@@ -193,9 +200,11 @@ export function parseDamageMod(line: string): StaticAbility | null {
   }
   // Divine Presence: "If a source would deal 4 or more damage to a permanent or player, that source deals 3 damage to that
   // permanent or player instead": the same, any source to anything (a replacement, not prevention, rulings).
-  const setToAny = /^If (a source) would deal (\d+) or more damage to a permanent or player, that source deals (\d+) damage to that permanent or player instead$/.exec(text);
+  // Equal Treatment (for the turn): "If any source would deal 1 or more damage to a permanent or player this turn, it deals 2
+  // damage to that permanent or player instead": 1 raised to 2 as well as more lowered to 2.
+  const setToAny = /^If (a source|any source) would deal (\d+) or more damage to a permanent or player, (?:that source|it) deals (\d+) damage to that permanent or player instead$/.exec(text);
   if (setToAny) {
-    if (Number(setToAny[3]) >= Number(setToAny[2])) return null;
+    if (Number(setToAny[3]) >= Number(setToAny[2]) && !(setToAny[1] === "any source" && setToAny[2] === "1")) return null;
     const mod: DamageMod = { op: "setTo", amount: Number(setToAny[3]), atLeast: Number(setToAny[2]), text: line };
     return { affects: { kind: "self" }, mods: [{ kind: "damageMod", mod }], text: line };
   }
@@ -311,9 +320,17 @@ export function parseDamageModSentence(text: string, ctx: Ctx): Effect[] | null 
     if (next[3]) mod.to = { players: "you" };
     return [{ type: "damageMod", mod, ...(subject ? { bySubject: true as const } : { choose: { kind: "object" as const, text: "source" } }) }];
   }
+  // Kill-Suit Cultist: "The next time damage would be dealt to target creature this turn, destroy that creature instead": a
+  // replacement of the next damage event to it (not prevention: rulings, the damage isn't dealt and nothing that would
+  // happen because of it does; damage that can't be prevented is replaced too).
+  if (/^The next time damage would be dealt to target creature this turn, destroy that creature instead$/.test(t)) {
+    if (until) return null;
+    const toTarget = addTarget(ctx, { kind: "object", types: ["Creature"], text: "target creature" });
+    return [{ type: "damageMod", mod: { op: "destroy", nextTime: true, text }, toTarget }];
+  }
   // "That source deals that damage to you instead" (Jade Monolith) is a redirection (prevention.ts), not an amount.
   if (/, (?:it|that source) deals that damage to .+ instead$/.test(t)) return undefined;
-  if (!/would deal (?:combat |noncombat )?damage\b.*, (?:it|that source) deals |would deal .*, instead it deals /.test(t) && !(until && t === "if a source would deal damage to you, prevent that damage")) return undefined;
+  if (!/would deal (?:combat |noncombat |1 or more )?damage\b.*, (?:it|that source) deals |would deal .*, instead it deals /.test(t) && !(until && t === "if a source would deal damage to you, prevent that damage")) return undefined;
   if (!until) {
     if (!/ this turn(?=,| to )/.test(t)) return undefined;
     t = t.replace(/ this turn(?=,| to )/, "");

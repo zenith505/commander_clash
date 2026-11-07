@@ -2241,6 +2241,8 @@ export interface Chosen {
   players?: PlayerId[];
   /** "Choose odd or even" (Extinction Event). */
   parity?: "odd" | "even";
+  /** "Choose an order for artifacts, creatures, and lands" (Rite of Ruin): the card types in the order chosen. */
+  typeOrder?: string[];
   /** "Choose left or right" (Pramikon, Sky Rampart; Teyo, Geometric Tactician): a direction around the table (CR 101.4: turns pass to the left). */
   direction?: "left" | "right";
   /** "Choose land or nonland" (Abundant Harvest). */
@@ -2751,6 +2753,8 @@ export interface Resolving {
     playLinkedPick?: true;
     /** Fiery Gambit: the flips won so far in a run one may stop, and whether "flip again?" was asked. */
     flipRun?: { wins: number; asked?: true };
+    /** Krark's Thumb on an uncalled flip (Odds): heads and tails, the choice asked (chooseMay yes keeps heads). */
+    thumbUncalled?: true;
     thumbFlip?: true; // Krark's Thumb: one coin won, one lost, the choice asked // "play one of them" (Evercoat Ursine): which one was asked (in `found`)
     cipherCopy?: ObjectId; // the copy of an encoded card offered to cast (CR 702.99a)
     looked?: ObjectId[]; // the top cards a "look at the top N" effect is choosing from

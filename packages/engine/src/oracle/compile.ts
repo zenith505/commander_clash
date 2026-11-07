@@ -1710,6 +1710,15 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Circu, Dimir Lobotomist: "Your opponents can't cast spells with the same name as a card exiled with ~": the names of
     // the cards its exile abilities exiled that are still exiled (CR 607.2a, 201.2).
+    // Cornered Market (CompiledCard.permanentNameBan).
+    if (line === "Players can't cast spells with the same name as a nontoken permanent." && !out.permanentNameBan?.cast) {
+      out.permanentNameBan = { ...out.permanentNameBan, cast: true };
+      continue;
+    }
+    if (line === "Players can't play nonbasic lands with the same name as a nontoken permanent." && !out.permanentNameBan?.lands) {
+      out.permanentNameBan = { ...out.permanentNameBan, lands: true };
+      continue;
+    }
     if (line === "Your opponents can't cast spells with the same name as a card exiled with ~." && !out.linkedNameCastBan) {
       out.linkedNameCastBan = true;
       continue;
@@ -6803,7 +6812,7 @@ function checkCastingLinks(out: CompiledCard) {
     // "Cards exiled with ~" by its cost (Mechtitan Core): an activated ability that exiles other permanents as its cost.
     if (o.type === "returnExiled" && o.fromCost && !exileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
-    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : o.chosen === "landOrNonland" ? needs.add("landOrNonland") : o.chosen === "landType" ? needs.add("landType") : needs.add("creatureType"));
+    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : o.chosen === "landOrNonland" ? needs.add("landOrNonland") : o.chosen === "landType" ? needs.add("landType") : o.chosen === "typeOrder" ? needs.add("typeOrder") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen === true)) needs.add("color");
     if (o.kind === "setColors" && o.chosen === "colors") needs.add("colors");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");

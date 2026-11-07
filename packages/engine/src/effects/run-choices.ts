@@ -6,7 +6,7 @@ import { autoEvidence, livingPlayers, gainLife, inCombatPhase, loseEnergy, proce
 import { abilitiesOf, realDefOf, canBeSacrificed, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import type { Color, GameObject, GameState, ObjectId, PlayerId } from "../types";
-import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, sayBound, spellMatches, targetsMatch } from "./targeting";
+import { bindBound, bindChosen, choiceOptions, objectMatches, TYPE_ORDERS, pickOptions, printedMatches, sayBound, spellMatches, targetsMatch } from "./targeting";
 import { tokenDef } from "./run-tokens";
 import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected, sourceCreatureTypes, ctxSource } from "./resolve";
 import { dealDamageBatch } from "../damage";
@@ -690,6 +690,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         s.pending = { kind: "chooseOption", player: chooser, source: src, what: "cardType", options: e.options ?? [] };
         return "paused";
       }
+      if (e.choice === "typeOrder") {
+        // Rite of Ruin: the order is chosen as it resolves, then each player sacrifices in it (rulings).
+        if (r.chosen?.typeOrder) return;
+        const labels = TYPE_ORDERS.map((o) => o.split(",").map((t) => `${t.toLowerCase()}s`).join(", then "));
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "typeOrder", options: [...TYPE_ORDERS], labels, prompt: "choose an order for artifacts, creatures, and lands: each player sacrifices one of the first, two of the second, then three of the third." };
+        return "paused";
+      }
       if (e.choice === "cardName") {
         // "Choose a nonland card name" (CR 201.4), as it resolves (rulings on Cabal Therapy): asked each time it's reached.
         const sc = (r.scratch ??= {});
@@ -723,8 +730,9 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           }
           return;
         }
-        const range = e.maxHandOf ? { min: e.range.min, max: Math.max(e.range.min, ...players(s, e.maxHandOf, ctx).map((x) => player(s, x).hand.length)) } : e.range;
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: [String(range.min)], numberRange: range, prompt: e.maxHandOf ? `choose a number greater than ${e.range.min - 1} (up to ${range.max}, the cards in that player's hand)` : `choose a number between ${range.min} and ${range.max}` };
+        const bound = e.maxHandOf ?? e.maxLibraryOf;
+        const range = bound ? { min: e.range.min, max: Math.max(e.range.min, ...players(s, bound, ctx).map((x) => player(s, x)[e.maxHandOf ? "hand" : "library"].length)) } : e.range;
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: [String(range.min)], numberRange: range, prompt: bound ? `choose a number greater than ${e.range.min - 1} (up to ${range.max}, the cards in that player's ${e.maxHandOf ? "hand" : "library"})` : `choose a number between ${range.min} and ${range.max}` };
         return "paused";
       }
       if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "colors" ? "colors" : e.choice === "basicLandType" || e.choice === "landType" ? "landType" : e.choice === "keyword" ? "keyword" : e.choice === "parity" ? "parity" : e.choice === "direction" ? "direction" : e.choice === "landOrNonland" ? "landOrNonland" : "type"] === undefined) {

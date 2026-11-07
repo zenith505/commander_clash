@@ -752,7 +752,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           }
         const caster = e.ownerCasts ? pid : ctx.controller;
         sc.untilNonland = { ...(hit ? { hit } : {}), caster, ...(e.restBottom || e.inPlace ? { seen } : {}) };
-        if (!hit) return e.inPlace ? revealedToBottom(s, seen) : bottomRest(s, sc.untilNonland.seen);
+        if (!hit) return e.restStays ? undefined : e.inPlace ? revealedToBottom(s, seen) : bottomRest(s, sc.untilNonland.seen);
         if (e.then === "suspend") {
           suspendExiled(s, obj(s, hit), e.suspend ?? 0);
           return;
@@ -792,6 +792,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         moveObject(s, left, "hand");
         log(s, `${player(s, obj(s, left).owner).name} puts ${defOf(s, obj(s, left)).name} into their hand.`);
       }
+      // Spellshift: the revealed cards stay in the library for the shuffle that follows.
+      if (e.restStays) return;
       return e.inPlace ? revealedToBottom(s, sc.untilNonland.seen ?? []) : bottomRest(s, sc.untilNonland.seen);
     }
     case "discover": {

@@ -2763,7 +2763,7 @@ line blocks.
    Brawler; Augusta, Order Returned; Vault 101: Birthday Party; The First Tyrannic War; Kitt Kanto;
    Daretti, Ingenious Iconoclast (its −6); Expedited Inheritance; Monstrous Emergence; Nyssa of Traken.
    Out after round 231 (looked at, not done): Ecstatic Beauty ("put four time counters on each of those cards that
-   has suspend": counters on the impulsed cards that already have suspend, without granting it); Knowledge Vault
+   has suspend": counters on the impulsed cards that already have suspend, without granting it); Knowledge Vault (done in round B129)
    ("{0}: Sacrifice ~. If you do, discard your hand, then ..." and its leaves trigger putting the cards into the
    graveyard); Yurlok of Scorch Thrash (mana burn, "each player adds {B}{R}{G}"); Tomik, Distinguished Advokist; Storm
    Cauldron; Arlinn, the Pack's Hope; The Temporal Anchor; Chandra, Fire of Kaladesh; Panoptic Mirror; Crafty
@@ -3238,7 +3238,7 @@ line blocks.
      exiled card is a God card"), Invasive Surgery, Kotose, "look at an opponent's hand, then choose any card name"
      (Sorcerous Spyglass, Anointed Peacekeeper), Alpine Moon, Skyseer's Chariot, Cheering Fanatic, Null Chamber, Booby
      Trap, Petrified Hamlet, names another player chooses (Conundrum Sphinx, Petra Sphinx, Vexing Arcanix), random
-     cards from an opponent's hand (Dementia Sliver (done in round B127), Nebuchadnezzar), Mindblaze, Liar's Pendulum, Lammastide
+     cards from an opponent's hand (Dementia Sliver (done in round B127), Nebuchadnezzar), Mindblaze (done in round B129), Liar's Pendulum, Lammastide
      Weave ("its mana value"), "an additional ... for each card named ~" (Growth Cycle, Rune Snag), "as you cast ~"
      (Aether Burst), Sound the Call.
    - Bots name what they've seen: an opponent's commander or permanent for a ban, a graveyard card for Memoricide, the
@@ -3486,7 +3486,7 @@ line blocks.
      to all of one source's damage to one recipient at once, so one order per recipient. Bots' attacks and blocks count
      doublers, halvers and prevention.
    - Coin flips (CR 705) work for "If you win / lose the flip", "until you lose a flip" and "whenever you win a coin
-     flip" (25 cards); still out: Krark's Thumb, Edgar's "come up heads" (705.3), heads or tails (Odds // Ends, Mana
+     flip" (25 cards); still out: Krark's Thumb, Edgar's "come up heads" (705.3), heads or tails (Odds // Ends (done in round B129), Mana
      Clash, Two-Headed Giant, Rakdos the Showstopper, Molten Sentry), a flip for each (Mutalith Vortex Beast (done in round 278), Fighting
      Chance), Fiery Gambit, Game of Chaos, Squee's Revenge, Crooked Scales, Krark the Thumbless, and lines
      that are out for other reasons (Goblin Bangchuckers' "itself", Chance Encounter, Okaun). Bots weigh a flip whose loss costs
@@ -3714,7 +3714,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   forms not parsed yet: per-target amounts, "if it's a green creature, 2 instead"); Desert Nomads (done in round B104) (prevent damage
   from Deserts); Balduvian Fallen (mana spent on a cumulative upkeep payment); Viashino Bey (an attack requirement
   that depends on the declaration itself); Heroism (per-attacker pay-or-prevent); Ogre Enforcer (lethal damage from a
-  single source); Groffskithur ("target card named ~" in a graveyard: a target filter by the source's name); Urborg
+  single source); Groffskithur (done in round B129) ("target card named ~" in a graveyard: a target filter by the source's name); Urborg
   Panther (a cost that sacrifices creatures by name); Sworn Defender and Lesser Werewolf (power-dependent combat
   tricks).
 - Round B2 (ranks 32,230 up to about 31,000, plus some more played cards the same templates cover): prevention of
@@ -6216,6 +6216,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Calculations (cards put into the target player's graveyard from their library this turn), Clay Champion and Bladecoil
   Serpent (for each {G}{G}, {W}{W}, {U}{U}, {B}{B} or {R}{R} spent to cast it, CR 601.2h; Bladecoil's trample and haste
   once, as gaining them again changes nothing, CR 702.19g, 702.10d). +11 (30,252 of 31,936 with B127 and round 296).
+- Round B129 (least played first, from the skip lists): Groffskithur ("target card named ~": a target filter bound to
+  the source's name as it's chosen and as it resolves, CR 201.2), Mindblaze (a nonland card name and a number greater than
+  0 chosen as it resolves, CR 201.4; the number picker stops at the target's library size; the library is revealed and
+  shuffled; a browser test), Rite of Ruin (an order for artifacts, creatures and lands chosen as it resolves from six
+  buttons, then each player sacrifices one, two and three permanents of those types in that order; an artifact creature
+  sacrificed as an artifact is gone for the creatures, rulings; a browser test; bots pick the order that costs opponents
+  most), Eye of Singularity ("each permanent with the same name as another permanent, except for basic lands" as it
+  enters, and "a permanent other than a basic land enters" destroying all other permanents with its name; face-down
+  permanents have no name, CR 708.2), Cornered Market (no spells or lands with the same name as a nontoken permanent,
+  basic lands aside; a face-down spell has no name, CR 708.2), Sengir Nosferatu ("Return an exiled card named Sengir
+  Nosferatu to the battlefield under its owner's control": any one, picked when several are exiled), Knowledge Vault
+  (cards exiled face down with it, CR 607.2a; "{0}: Sacrifice ~. If you do, discard your hand, then put all cards
+  exiled with ~ into their owner's hand", and its leaves trigger), Odds // Ends (a coin no one calls, CR 705.2: heads
+  counters the spell, tails copies it; with Krark's Thumb its controller keeps heads or tails, CR 705.3, with a browser
+  test), Spellshift (counter, then the spell's controller reveals until an instant or sorcery and may cast it free; the
+  other revealed cards stay put until the shuffle), Shorecrasher Elemental (exiled, then returned face down, CR 708.3,
+  turned face up with megamorph). +10 (30,262 of 31,936 with B127, B128 and round 296).
+- Out after round B129 (looked at, not done): Spoils of War, Grenzo's Rebuttal, Peace Talks and Martyr of Bones, still
+  out for the reasons in the earlier lists.
 - Out after round B128 (looked at, not done): Bullseye, Death Dealer and Ion Storm (an activation cost with "or" between
   two costs), Price of Betrayal (counters removed from an opponent, a player, as well as permanents), Bargaining Table
   (X set by the opponent chosen as it's activated), Selective Snare (a creature type chosen as it's cast).
@@ -6381,7 +6400,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   hand ability (bots skip "Exile ~ from your hand" abilities).
 - Out after round B93 (looked at, not done): Bewitching Leechcraft ("If ~ would untap during your untap step, remove a
   +1/+1 counter from it instead": with Freyalise's Winds too, its controller would order the two replacements, CR 616.1),
-  Drafna's Restoration (targets in the graveyard of an earlier target player), Rite of Ruin (an order for three card
+  Drafna's Restoration (targets in the graveyard of an earlier target player), Rite of Ruin (done in round B129) (an order for three card
   types, then three rounds of sacrifices), Tariff (a punisher whose cost is the chosen creature's mana cost), Powerleech (done in round B122)
   and Haunting Wind (done in round B122) ("activates an artifact's ability without {T} in its activation cost", and "that artifact's
   controller"), Fasting (a may skip of the draw step as it would begin), Naked Singularity (a land with two basic land
@@ -6405,12 +6424,12 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B90 (looked at, not done): Twinning Glass (a free cast by a name cast this turn: split and adventure
   names), Threefold Signal (replicate granted to spells, beside a spell's own kicker-like cost), Blade of the Swarm
   (done in round 272), Blaze Commando and Flame Channeler (an instant or sorcery spell dealing damage to
-  anything, once per instruction), Shorecrasher Elemental and Skittish Valesk (returning or turning a permanent face
+  anything, once per instruction), Shorecrasher Elemental (done in round B129) and Skittish Valesk (returning or turning a permanent face
   down), Preferred Selection, Scrying Glass, Hedron Alignment, Ertai's Familiar (done in round B128), Death-Mask Duplicant, Relive the Past (done in round B128).
 - Out after round B89 (looked at, not done): Barbed Foliage ("loses flanking": flanking is a triggered ability granted
   by the keyword, not just a keyword to remove), Brothers Yamazaki (an exception to the legend rule), Rogue Skycaptain
   and Rohgahh of Kher Keep ("an opponent gains control of ~"), Stangg and Dance of the Many (linked tokens that leave
-  with their source), Sengir Nosferatu (a token's ability returns an exiled card named ~), Splintering Wind,
+  with their source), Sengir Nosferatu (done in round B129) (a token's ability returns an exiled card named ~), Splintering Wind,
   Negative Zone Portal, Sol'Kanar the Tainted, Mystic Barrier, Covenant of Minds.
 - Out after round B87 (looked at, not done): Kodama of the Center Tree (soulshift X: a target bounded by a changing
   number), Hide // Seek (the mana value of a card found by the search), Revival Experiment (one card of each permanent
@@ -6425,8 +6444,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (exactly three colors of mana spent on an activation), Scarwood Bandits (an "Unless an opponent pays" lead clause on
   an activated ability).
 - Out after round B84 (looked at, not done): Traveling Plague (an Aura returned from the graveyard needs an attach
-  choice), Spellshift (another player's free cast from revealed cards), Obscura Ascendancy (an intervening "equals"
-  check), Eye of Singularity, Cornered Market and Bazaar of Wonders (name-based filters), Weight of Conscience ("share
+  choice), Spellshift (done in round B129) (another player's free cast from revealed cards), Obscura Ascendancy (an intervening "equals"
+  check), Eye of Singularity (done in round B129), Cornered Market (done in round B129) and Bazaar of Wonders (name-based filters), Weight of Conscience ("share
   a creature type" tap cost), Psychic Theft (done in round B127), Last Rites (done in round B127), Thought Dissector (done in round B127), Mimeofacture, Hakim,
   Guard Dogs, Carry Away, Jandor's Ring.
 - Out after round B83 (looked at, not done): Fighting Chance (a coin flip for each blocking creature), Ersatz Gnomes (done in round B126)

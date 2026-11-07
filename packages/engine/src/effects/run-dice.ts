@@ -124,6 +124,16 @@ export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin
   const thumb = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === who && !!abilitiesOf(s, obj(s, id)).flipTwo);
   const flip = () => (thumb ? [nextRandom(s) < 0.5, nextRandom(s) < 0.5] : [nextRandom(s) < 0.5]);
   // One flip won and one lost: its controller keeps the one they choose, having seen both (rulings).
+  // Odds: an uncalled flip, heads and tails: its controller keeps the one they choose; nothing is won or lost.
+  if (sc.thumbFlip !== undefined && sc.thumbUncalled) {
+    const up = sc.may !== false;
+    sc.thumbFlip = undefined;
+    sc.thumbUncalled = undefined;
+    sc.may = undefined;
+    s.resolving!.flipped = { won: up, wins: up ? 1 : 0 };
+    log(s, `${player(s, who).name} flips two coins for ${src} and keeps ${up ? "heads" : "tails"}.`);
+    return;
+  }
   if (sc.thumbFlip !== undefined) {
     const won = sc.may !== false;
     sc.thumbFlip = undefined;
@@ -139,7 +149,7 @@ export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin
   const edgar = heads ? " (the first coins flipped this turn come up heads)" : "";
   noteFlipped(s, who);
   let first: boolean[] | undefined;
-  if (!e.untilLose && thumb && !e.n && !heads) {
+  if (!e.untilLose && thumb && !e.n && !heads && !e.uncalled) {
     const [a, b] = (first = flip());
     if (a !== b) {
       sc.thumbFlip = true;
@@ -151,12 +161,26 @@ export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin
   // Ral Zarek: flips no one calls, only heads or tails (CR 705.2): no "won" or "lost" events (rulings). With Krark's Thumb
   // each is two coins and one is ignored: the heads one is kept.
   if (e.uncalled) {
+    // Odds: one flip that matters heads or tails: with Krark's Thumb, heads and tails, its controller keeps either.
+    if (thumb && !heads && (e.n ?? 1) === 1) {
+      const [a, b] = flip();
+      if (a !== b) {
+        sc.thumbFlip = true;
+        sc.thumbUncalled = true;
+        sc.may = undefined;
+        s.pending = { kind: "chooseMay", player: who, prompt: "keep heads (Krark's Thumb flipped two coins, heads and tails; No keeps tails)", source: src, thumb: true };
+        return "paused";
+      }
+      s.resolving!.flipped = { won: !!a, wins: a ? 1 : 0 };
+      log(s, `${player(s, who).name} flips two coins for ${src}: both came up ${a ? "heads" : "tails"}.`);
+      return;
+    }
     let up = 0;
     for (let i = 0; i < (e.n ?? 1); i++) if (heads || flip().some((h) => h)) up++;
     // With Edgar they're won flips too (rulings on Edgar, King of Figaro with Ral Zarek).
     if (heads) for (let i = 0; i < (e.n ?? 1); i++) fireEvent(s, { type: "coinFlipped", player: who, won: true });
     s.resolving!.flipped = { won: up > 0, wins: up };
-    log(s, `${player(s, who).name} flips ${e.n ?? 1} coins for ${src}: ${up} came up heads${edgar}.`);
+    log(s, (e.n ?? 1) === 1 ? `${player(s, who).name} flips a coin for ${src}: it comes up ${up ? "heads" : "tails"}${edgar}.` : `${player(s, who).name} flips ${e.n ?? 1} coins for ${src}: ${up} came up heads${edgar}.`);
     return;
   }
   // Fiery Gambit: "Flip a coin until you lose a flip or choose to stop flipping": one flip at a time, asked after each one

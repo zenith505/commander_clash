@@ -5374,7 +5374,7 @@ export function castProblem(
   if (pendFilter && (choices?.faceDown || !printedMatches(pendFilter, d))) return `the spell must be a ${pendFilter.text.replace(/ card$/, "")} spell`;
   // Its mana value as proposed (CR 601.2e): a face-down spell's is 0 (CR 708.2), X is the X chosen (202.3e).
   const proposedCost = parseManaCost(d.manaCost);
-  const limit = castLimitProblem(s, pid, d, choices?.faceDown ? 0 : defMv(d) + (proposedCost.hasX ? (x ?? 0) * xCount(proposedCost) : 0));
+  const limit = castLimitProblem(s, pid, d, choices?.faceDown ? 0 : defMv(d) + (proposedCost.hasX ? (x ?? 0) * xCount(proposedCost) : 0), !!choices?.faceDown);
   if (limit) return limit;
   // Grafdigger's Cage: "Players can't cast spells from graveyards or libraries" (the spell is cast from where the card is,
   // CR 601.2a; a card exiled from a library is cast from exile, rulings). Soulless Jailer: noncreature spells only.
@@ -6785,10 +6785,11 @@ const spliceMana = (s: GameState, ids: ObjectId[] = []) => ids.map((c) => compil
  * `mv`: the proposed spell's mana value, X chosen (CR 601.2e); without it, only whether it can begin to be cast, where a
  * choice still to be made (X) that could lift a mana value ban counts as lifting it (CR 601.3a).
  */
-function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number): string | null {
+function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number, faceDown?: boolean): string | null {
   const epic = player(s, pid).cantCastSpells;
   if (epic) return `${epic}: you can't cast spells for the rest of the game`;
-  const named = nameCastBan(s, pid, d);
+  // A face-down spell has no name (CR 708.2a): Cornered Market doesn't stop it.
+  const named = nameCastBan(s, pid, d, faceDown);
   if (named) return named;
   // "Your opponents can't cast spells this turn" (Silence) and the like.
   for (const c of s.cantCastThisTurn ?? [])

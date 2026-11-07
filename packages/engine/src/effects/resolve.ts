@@ -12,7 +12,7 @@ import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import type { ManaSpent } from "../mana";
 import { COLOR_NAMES } from "./describe";
-import { objectMatches, bindChosen, bindAttachedToSource, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sameNamedAnywhere, sharingAColor, sameManaValued, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource } from "./targeting";
+import { objectMatches, bindChosen, bindAttachedToSource, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sameNamedAnywhere, sharingName, sharingAColor, sameManaValued, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runCoinEachEffect, runFlipClashEffect, runEachPlayerFlipsEffect, runFlipEachOpponentEffect, runCoinEffect, runDiceEffect } from "./run-dice";
@@ -378,6 +378,17 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     return b ? [b] : [];
   }
   if (ref.ref === "voted") return votedObjects(s, !!ref.any);
+  // Eye of Singularity: "that name" is the entering permanent's, now, or as it last existed (CR 608.2h).
+  if (ref.ref === "sharingName") {
+    if (!ref.subject) return sharingName(s);
+    const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+    if (!o) return [];
+    const here = o.zone === "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc;
+    if (here && o.faceDown) return [];
+    const lk = s.lastKnown?.[o.id];
+    const name = here ? characteristics(s, o).name : (lk?.source?.name ?? (lk?.copyKey ? s.cards[lk.copyKey]?.name : undefined) ?? defOf(s, o).name);
+    return sharingName(s, name, here ? o.id : undefined);
+  }
   if (ref.ref === "countersPutThisWay")
     return [...new Set((s.resolving?.countersPutThisWay ?? []).filter((c) => !ref.kind || c.kind === ref.kind).map((c) => c.id))].flatMap((id) => {
       const o = s.objects[id];
@@ -1346,6 +1357,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileSpell":
     case "warpExile":
     case "playExiled":
+    case "returnExiledNamed":
     case "forEachThisWay":
     case "eachMayCounter":
     case "chooseOwnCommander":

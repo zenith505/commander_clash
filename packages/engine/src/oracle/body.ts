@@ -1284,6 +1284,70 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   return body;
 }
 
+/**
+ * Whole rules texts read as one (Mindblaze, Rite of Ruin, Odds, Spellshift): the effects in their order, or null if `text`
+ * is none of them.
+ */
+function wholeTextBody(text: string, opts: { spell?: boolean }): AbilityBody | null {
+  // Mindblaze: the name and the number are chosen as it resolves, then the library is revealed; "exactly the chosen number
+  // of cards with the chosen name" (CR 201.2: a split card's either name), then that player shuffles.
+  if (opts.spell && text.trim() === "Choose a nonland card name and a number greater than 0. Target player reveals their library. If that library contains exactly the chosen number of cards with the chosen name, ~ deals 8 damage to that player. Then that player shuffles.") {
+    const who: PlayerRef = { ref: "target", index: 0 };
+    const named: Amount = { count: { kind: "cardsInLibrary", who, filter: { kind: "card", chosen: "name", text: "card with the chosen name" } } };
+    const chosen: Amount = { count: { kind: "chosenNumber" } };
+    return {
+      targets: [{ kind: "player", text: "target player" }],
+      effects: [
+        { type: "choose", choice: "cardName", names: { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "nonland card" }, purpose: "inLibrary" },
+        { type: "choose", choice: "number", range: { min: 1, max: 1 }, maxLibraryOf: who },
+        { type: "lookAtHand", who, reveal: true, library: true },
+        { type: "if", cond: { kind: "amountsCompare", a: named, atLeast: chosen }, effects: [{ type: "if", cond: { kind: "amountsCompare", a: chosen, atLeast: named }, effects: [{ type: "damage", amount: 8, to: who }] }] },
+        { type: "shuffle", who },
+      ],
+      text,
+    };
+  }
+  // Rite of Ruin: the order is chosen as it resolves; each player then chooses in turn order and the permanents of each type
+  // are sacrificed at once, one type after another (rulings).
+  if (opts.spell && text.trim() === "Choose an order for artifacts, creatures, and lands. Each player sacrifices one permanent of their choice of the first type, sacrifices two of their choice of the second type, then sacrifices three of their choice of the third type.") {
+    const ofType = (i: number): TargetSpec => ({ kind: "object", types: [], notTypes: [], notColors: [], chosen: "typeOrder", orderIndex: i, text: ["permanent of the first type", "permanent of the second type", "permanent of the third type"][i]! });
+    return {
+      targets: [],
+      effects: [{ type: "choose", choice: "typeOrder" }, ...[0, 1, 2].map((i): Effect => ({ type: "pick", who: { ref: "eachPlayer" }, filter: ofType(i), n: i + 1, action: "sacrifice" }))],
+      text,
+    };
+  }
+  // Odds: a flip no one calls (CR 705.2, rulings: no winner or loser), heads or tails; the target is chosen as it's cast.
+  if (opts.spell && text.trim() === "Flip a coin. If it comes up heads, counter target instant or sorcery spell. If it comes up tails, copy that spell and you may choose new targets for the copy.") {
+    const target: TargetSpec = { kind: "spell", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "target instant or sorcery spell" };
+    return {
+      targets: [target],
+      effects: [
+        { type: "flipCoin", uncalled: true },
+        { type: "if", cond: { kind: "wonFlip" }, effects: [{ type: "counterSpell", index: 0 }] },
+        { type: "if", cond: { kind: "wonFlip", lost: true }, effects: [{ type: "copySpell", spell: { target: 0 }, n: 1, newTargets: true }] },
+      ],
+      text,
+    };
+  }
+  // Spellshift: the countered spell's controller (as it last existed, CR 608.2h) reveals in place and may cast the found card
+  // from the library as this resolves; a card not cast is shuffled back with the rest (rulings). An uncounterable spell
+  // stays on the stack and the rest still happens (rulings).
+  if (opts.spell && text.trim() === "Counter target instant or sorcery spell. Its controller reveals cards from the top of their library until they reveal an instant or sorcery card. That player may cast that card without paying its mana cost. Then the player shuffles.") {
+    const who: PlayerRef = { ref: "targetController", index: 0 };
+    return {
+      targets: [{ kind: "spell", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "target instant or sorcery spell" }],
+      effects: [
+        { type: "counterSpell", index: 0 },
+        { type: "exileUntilNonland", who, reveal: true, inPlace: true, restStays: true, then: "castFree", ownerCasts: true, untilTypes: ["Instant", "Sorcery"] },
+        { type: "shuffle", who },
+      ],
+      text,
+    };
+  }
+  return null;
+}
+
 function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfAttacking?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~")
@@ -2708,6 +2772,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       text,
     };
   }
+  const whole = wholeTextBody(text, opts);
+  if (whole) return whole;
   // Reins of Power (see Effect "swapCreatures").
   if (opts.spell && /^Untap all creatures you control and all creatures target opponent controls\. You and that opponent each gain control of all creatures the other controls until end of turn\. Those creatures gain haste until end of turn\.$/.test(text.trim()))
     return { targets: [{ kind: "player", opponent: true, text: "target opponent" }], effects: [{ type: "swapCreatures", who: { ref: "target", index: 0 } }], text };
@@ -5613,7 +5679,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         si = sentences.length;
         continue;
       }
-      const inner: Effect[] | null = back ? (chosenCards ? [{ type: "putOntoBattlefield", what: chosenCards, ...(back[1] ? { tapped: true } : {}) }] : null) : parseOne(capital(sacDo[1]!), ctx);
+      // Knowledge Vault: "Sacrifice ~. If you do, discard your hand, then put all cards exiled with ~ into their owner's hand":
+      // both only if it was sacrificed, the cards its linked ability exiled (CR 607.2a) as it last existed.
+      const vault = sacDo[1]! === "discard your hand, then put all cards exiled with ~ into their owner's hand" ? parseBody("Discard your hand, then put all cards exiled with ~ into their owner's hand.") : null;
+      const inner: Effect[] | null = vault ? (vault.targets.length ? null : vault.effects) : back ? (chosenCards ? [{ type: "putOntoBattlefield", what: chosenCards, ...(back[1] ? { tapped: true } : {}) }] : null) : parseOne(capital(sacDo[1]!), ctx);
       if (!inner) return null;
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: inner });
       continue;
@@ -6065,6 +6134,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // that card in exile (CR 400.7), its owner's; "A spell cast (by an opponent) this way costs {2} more to cast".
     // "Choose an exiled card an opponent owns with a void counter on it. You may play it this turn without paying its
     // mana cost." (Dauthi Voidwalker)
+    // Sengir Nosferatu's Bat (Effect "returnExiledNamed"): the name as written in the quoted ability.
+    const exiledNamed = /^Return an exiled card named ([A-Z][\w'-]*(?: [A-Z][\w'-]*)*) to the battlefield under its owner's control$/.exec(s);
+    if (exiledNamed) {
+      effects.push({ type: "returnExiledNamed", name: exiledNamed[1]! });
+      continue;
+    }
     const voidPick = /^Choose an exiled card an opponent owns with an? ([a-z]+) counter on it$/.exec(s);
     const voidPlay = voidPick && /^You may play (?:it|that card) this turn( without paying its mana cost)?$/.exec(sentences[si + 1] ?? "");
     if (voidPick && voidPlay) {
@@ -13405,6 +13480,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "... then return it to the battlefield tapped under its owner's control" (Eldrazi Confluence): it enters tapped.
     // The Neutrinos: "exile up to one target creature you own, then return it to the battlefield under your control tapped
     // and attacking": attacking what you choose as it enters, in combat only (CR 506.3d, 508.4; rulings).
+    // Shorecrasher Elemental: "Exile ~, then return it to the battlefield face down under its owner's control" (see Effect
+    // "flicker" faceDown).
+    if (/^[Rr]eturn it to the battlefield face down under its owner's control$/.test(s) && effects[effects.length - 1]?.type === "exile" && Object.keys(effects[effects.length - 1]!).length === 2 && (effects[effects.length - 1] as Extract<Effect, { type: "exile" }>).what.ref === "self") {
+      effects[effects.length - 1] = { type: "flicker", what: { ref: "self" }, under: "owner", faceDown: true };
+      continue;
+    }
     const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed| tapped)?(?: under (its owner's|their owner's|their owners'|your) control)?( with an? \+1\/\+1 counter on it| tapped and attacking)?$/.exec(s);
     if (now && effects[effects.length - 1]?.type === "exile") {
       const prev = effects[effects.length - 1] as Extract<Effect, { type: "exile" }>;

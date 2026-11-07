@@ -752,7 +752,7 @@ export function compile(d: CardDef): CompiledCard {
   let spree: { costs: string[]; texts: string[]; lines: string[]; tiered?: true } | undefined;
   // Entwine (CR 702.42a): "You may choose all modes of this spell instead of just the number specified. If you do, you
   // pay an additional [cost]." Mana costs only.
-  let entwine: { cost: string; raw: string } | undefined;
+  let entwine: { cost: string; raw: string; costs?: AdditionalCost[]; text?: string } | undefined;
   // Escalate (CR 702.120a): "For each mode you choose beyond the first as you cast this spell, you pay an additional
   // [cost]": mana, or one cost beyond mana ("Escalate—Discard a card.").
   let escalate: { mana?: string; cost?: AdditionalCost; text: string; raw: string } | "fail" | undefined;
@@ -927,6 +927,15 @@ export function compile(d: CardDef): CompiledCard {
       entwine = { cost: ent[1]!, raw };
       continue;
     }
+    // "Entwine—Sacrifice three lands." (Betrayal of Flesh, Solar Tide): a cost that isn't mana (CR 702.42a, 601.2b).
+    const entOther = isSpell && !entwine && /^Entwine—(.+?)\.?$/.exec(line);
+    if (entOther) {
+      const costs = entOther[1]!.split(", ").map((part) => parseAdditionalCost(part));
+      if (costs.every((c) => c)) {
+        entwine = { cost: "", raw, costs: costs as AdditionalCost[], text: entOther[1]!.replace(/^./, (c) => c.toLowerCase()) };
+        continue;
+      }
+    }
     // Deck construction, not play: the deck checker reads it (deckLimit).
     if (/^A deck can have (?:any number of|up to \w+) cards named ~\.$/.test(line)) continue;
     // Also deck construction: who can be a commander (CR 903.3, deck.ts canBeCommander).
@@ -1098,6 +1107,16 @@ export function compile(d: CardDef): CompiledCard {
     if (splice && isSpell && !out.splice && parseManaCost(splice[2]!).supported && !parseManaCost(splice[2]!).hasX) {
       out.splice = { onto: splice[1] === "Arcane" ? "Arcane" : "instantOrSorcery", mana: splice[2]! };
       continue;
+    }
+    // "Splice onto Arcane—Sacrifice two Mountains." (Torrent of Stone), "—An opponent gains 5 life." (Roar of Jukai): a
+    // splice cost that isn't mana, paid as an additional cost (CR 702.47a, 601.2b, 601.2f-h).
+    const spliceOther = /^Splice onto (Arcane|instant or sorcery)—(.+?)\.?$/.exec(line);
+    if (spliceOther && isSpell && !out.splice) {
+      const costs = spliceOther[2]!.split(", ").map((part) => (/^An opponent gains (\d+) life$/.exec(part) ? ({ kind: "giveLife", n: Number(/(\d+)/.exec(part)![1]) } as AdditionalCost) : parseAdditionalCost(part)));
+      if (costs.every((c) => c)) {
+        out.splice = { onto: spliceOther[1] === "Arcane" ? "Arcane" : "instantOrSorcery", mana: "", costs: costs as AdditionalCost[], text: spliceOther[2]!.replace(/^./, (c) => c.toLowerCase()) };
+        continue;
+      }
     }
     if (/^Splice onto\b/.test(line)) {
       out.unsupported.push(raw);
@@ -4466,6 +4485,12 @@ export function compile(d: CardDef): CompiledCard {
       out.counterShieldRad = true;
       continue;
     }
+    // Rock Hydra: "For each 1 damage that would be dealt to ~, if it has a +1/+1 counter on it, remove a +1/+1 counter from
+    // it and prevent that 1 damage." (CR 615): see dealDamage.
+    if (line === "For each 1 damage that would be dealt to ~, if it has a +1/+1 counter on it, remove a +1/+1 counter from it and prevent that 1 damage.") {
+      out.counterShield = "perOne";
+      continue;
+    }
     // Protean Hydra: "If damage would be dealt to ~, prevent that damage and remove that many +1/+1 counters from it":
     // all of it prevented, even with fewer counters or none (rulings).
     if (/^If damage would be dealt to ~, prevent that damage and remove that many \+1\/\+1 counters from (?:~|it)\.$/.test(line)) {
@@ -6248,7 +6273,10 @@ export function compile(d: CardDef): CompiledCard {
   }
   if (entwine) {
     const modal = out.spell?.modal;
-    if (modal && !modal.costs && modal.max < modal.modes.length) modal.entwine = entwine.cost;
+    if (modal && !modal.costs && modal.max < modal.modes.length) {
+      modal.entwine = entwine.cost;
+      if (entwine.costs) [modal.entwineCosts, modal.entwineText] = [entwine.costs, entwine.text!];
+    }
     else out.unsupported.push(entwine.raw);
   }
   if (striated && striated !== "fail") {
@@ -7032,7 +7060,7 @@ function checkX(d: CardDef, out: CompiledCard) {
   // Spliced, only the card's rules text is added (CR 702.47c): a plain spell, with nothing that depends on how this card
   // itself was cast, and no X (the spell it's spliced onto has its own).
   if (out.splice && (!out.spell || out.spell.modal || usesX(out.spell) || out.kicker || out.altCosts || out.buyback !== undefined || out.fromGraveyard)) {
-    bad(`Splice onto ${out.splice.onto === "Arcane" ? "Arcane" : "instant or sorcery"} ${out.splice.mana}`);
+    bad(`Splice onto ${out.splice.onto === "Arcane" ? "Arcane" : "instant or sorcery"}${out.splice.text ? `—${out.splice.text.replace(/^./, (c) => c.toUpperCase())}.` : ` ${out.splice.mana}`}`);
     delete out.splice;
   }
 }

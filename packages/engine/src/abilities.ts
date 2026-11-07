@@ -5139,6 +5139,10 @@ export interface AbilityBody {
     modes: AbilityBody[];
     costs?: string[];
     entwine?: string;
+    /** "Entwine—Sacrifice three lands." (Betrayal of Flesh): an entwine cost that isn't mana; `entwine` is "" then. */
+    entwineCosts?: AdditionalCost[];
+    /** That cost in words, for the UI ("sacrifice three lands"). */
+    entwineText?: string;
     both?: "teamwork" | "commander" | "kicked" | "control";
     /** "If you control a Wizard as you cast ~, you may choose two instead" (Flame of Anor): both "control", checked as it's cast. */
     bothIf?: StaticCondition;
@@ -7117,7 +7121,7 @@ export interface CompiledCard {
    * damage that can't be prevented still removes them (615.12). "always": Protean Hydra's, with no "while it has" (all
    * damage prevented even with none on it, rulings).
    */
-  counterShield?: true | "always";
+  counterShield?: true | "always" | "perOne";
   /** Bloatfly Swarm's counterShield: then each player gets a rad counter for each +1/+1 counter removed this way. */
   counterShieldRad?: true;
   /**
@@ -8147,7 +8151,14 @@ export interface CompiledCard {
    * "Splice onto Arcane {1}{R}" (CR 702.47a): revealed from your hand as you cast an Arcane spell (or "instant or
    * sorcery" spell), that spell gains this card's rules text and you pay `mana` as an additional cost.
    */
-  splice?: { onto: "Arcane" | "instantOrSorcery"; mana: string };
+  splice?: {
+    onto: "Arcane" | "instantOrSorcery";
+    mana: string;
+    /** "Splice onto Arcane—Sacrifice two Mountains." (Torrent of Stone): a splice cost that isn't mana; `mana` is "" then. */
+    costs?: AdditionalCost[];
+    /** That cost in words, for the log and the UI ("sacrifice two Mountains"). */
+    text?: string;
+  };
   buybackText?: string;
   /** Rebound (CR 702.88). */
   rebound?: boolean;

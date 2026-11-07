@@ -6814,9 +6814,11 @@ export function spliceCandidates(s: GameState, pid: PlayerId, id: ObjectId): Obj
   const o = s.objects[id];
   if (!o || o.faceDown) return [];
   const d = defOf(s, o);
+  const own = compileCard(d).additionalCosts ?? [];
   return player(s, pid).hand.filter((c) => {
     const sp = c !== id ? compileCard(defOf(s, obj(s, c))).splice : undefined;
-    return !!sp && (sp.onto === "Arcane" ? d.subtypes.includes("Arcane") : isType(d, "Instant") || isType(d, "Sorcery"));
+    // A splice cost picking what the spell's own additional cost picks (clashingCosts) isn't offered.
+    return !!sp && (sp.onto === "Arcane" ? d.subtypes.includes("Arcane") : isType(d, "Instant") || isType(d, "Sorcery")) && !clashingCosts([...own, ...(sp.costs ?? [])]);
   });
 }
 
@@ -7396,7 +7398,9 @@ function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choic
     const offers = costModsFor(s, pid, o, d, x).lifeOffers;
     if (new Set(lifeFor).size !== lifeFor.length || lifeFor.some((id) => !offers.some((l) => l.id === id))) return `${d.name} can't pay life for that`;
   }
-  return extraCostProblem(s, pid, o, castExtraCosts(d, { ...choices, objectId: o.id, ...(modes ? { modes } : {}), ...(targets ? { targets } : {}) }, x, s, pid), choices, `cast ${d.name}`);
+  const costs = castExtraCosts(d, { ...choices, objectId: o.id, ...(modes ? { modes } : {}), ...(targets ? { targets } : {}) }, x, s, pid);
+  if (clashingCosts(costs)) return `${d.name} can't be cast with two costs that each pick the same kind of thing`;
+  return extraCostProblem(s, pid, o, costs, choices, `cast ${d.name}`);
 }
 
 /** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
@@ -7426,7 +7430,7 @@ function viaCosts(d: CardDef, choices: { via?: CastFromGraveyardKind; objectId?:
   return graveyardCast(d, choices?.via)?.costs;
 }
 
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use (and Liesa's commander tax in life, from the command zone). */ objectId?: ObjectId; /** Liesa's commander tax in life, worked out before the card left the command zone (castSpell). */ taxLife?: number; /** The way to cast it from a graveyard, found as it was cast (it's on the stack now). */ viaWay?: CastFromGraveyard }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks" | "splice"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use (and Liesa's commander tax in life, from the command zone). */ objectId?: ObjectId; /** Liesa's commander tax in life, worked out before the card left the command zone (castSpell). */ taxLife?: number; /** The way to cast it from a graveyard, found as it was cast (it's on the stack now). */ viaWay?: CastFromGraveyard }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
   // "Escalate—Discard a card": that cost once for each mode beyond the first (CR 702.120a).
   const esc = compileCard(d).spell?.modal?.escalate?.cost;
@@ -7450,7 +7454,7 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   // Liesa, Shroud of Dusk: the commander tax as life, cast from the command zone (commanderTaxLife).
   const taxObj = s && choices?.objectId !== undefined ? s.objects[choices.objectId] : undefined;
   const taxLife = choices?.taxLife ?? (s && pid !== undefined && taxObj?.zone === "command" ? commanderTaxLife(player(s, pid), taxObj, d) : 0);
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : []), ...entwineExtraCosts(d, choices?.modes), ...(s ? spliceExtraCosts(s, choices?.splice) : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   // Phyrexian Purge: so much life for each target chosen (CR 601.2c before 601.2f).
@@ -7461,6 +7465,25 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
 }
 
 const xCost = (c: AdditionalCost) => "x" in c && !!c.x;
+
+/** "Entwine—Sacrifice three lands." (Betrayal of Flesh): paid when every mode is chosen (CR 702.42a, 601.2b). */
+function entwineExtraCosts(d: CardDef, modes?: number[]): AdditionalCost[] {
+  const spell = compileCard(d).spell;
+  return spell?.modal?.entwineCosts && entwined(spell, modes) ? spell.modal.entwineCosts : [];
+}
+
+/** "Splice onto Arcane—Sacrifice two Mountains." (Torrent of Stone): each spliced card's cost beyond mana (CR 702.47a). */
+const spliceExtraCosts = (s: GameState, ids: ObjectId[] = []): AdditionalCost[] => ids.flatMap((c) => (s.objects[c] ? (compileCard(defOf(s, obj(s, c))).splice?.costs ?? []) : []));
+
+/**
+ * Two costs paid with the same kind of pick (two "sacrifice" costs with their own filters): the choices hold one list
+ * for each kind, so such a cast is refused rather than paid wrong. Only splice and entwine costs beyond mana can bring a
+ * second one (Torrent of Stone spliced onto a spell that has a sacrifice cost of its own).
+ */
+export function clashingCosts(costs: AdditionalCost[]): boolean {
+  const keys = costs.filter((c) => "n" in c && costNeedsPick(c)).map(costPickKey);
+  return new Set(keys).size !== keys.length;
+}
 
 /** An activated ability's costs beyond mana with its X announced: "Sacrifice X Squirrels" is X of them (CR 107.3a, 602.2b). */
 export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?: GameObject): AdditionalCost[] {

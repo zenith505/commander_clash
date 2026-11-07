@@ -1451,6 +1451,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
       { type: "preventNext", n, to: { ref: "eachPlayer" } },
     ];
   }
+  // Samite Censer-Bearer: "Prevent the next 1 damage that would be dealt to each creature you control this turn": a shield
+  // on each one there as it resolves (rulings).
+  if ((m = new RegExp(`^Prevent the next ${NUMX} damage that would be dealt to (each creature you control) this turn$`, "i").exec(s))) {
+    const to = parseObject(m[2]!, ctx);
+    return to && "ref" in to && to.ref === "each" ? [{ type: "preventNext", n: amt(m[1]!), to }] : null;
+  }
   // "... dealt to ~ this turn" (Revered Elder), "to you" (Conservator), "to target player or planeswalker" (Noble Vestige),
   // "dealt this turn to target creature you control" (Samite Alchemist), "to enchanted creature" (Fylgja).
   if ((m = new RegExp(`^Prevent the next ${NUMX} damage that would be dealt (?:to (any target|target .+?|~|it|you|enchanted creature|equipped creature) this turn|this turn to (target .+?|~|you))$`, "i").exec(s))) {

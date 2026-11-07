@@ -181,7 +181,26 @@ export function dealDamage(
   // that many +1/+1 counters from ~" (CR 615.5): all of it prevented, as many counters as it has removed (rulings). Combat
   // damage is one event (CR 510.2), so every source's share is prevented once it applies. Damage that can't be prevented
   // is dealt and still removes the counters (615.12, rulings).
-  if ("object" in to && abilitiesOf(s, to.object).counterShield) {
+  // Rock Hydra: "For each 1 damage that would be dealt to ~, if it has a +1/+1 counter on it, remove a +1/+1 counter from
+  // it and prevent that 1 damage" (CR 615): as much as it has counters for is prevented, the rest dealt; damage that can't
+  // be prevented still removes them (rulings). Shields it has came first (dealDamageBatch), the order its controller
+  // would pick (CR 616.1).
+  if ("object" in to && abilitiesOf(s, to.object).counterShield === "perOne") {
+    const o = to.object;
+    const off = Math.min(n, o.counters["+1/+1"] ?? 0);
+    if (off) {
+      o.counters["+1/+1"] = (o.counters["+1/+1"] ?? 0) - off;
+      if (!o.counters["+1/+1"]) delete o.counters["+1/+1"];
+      invalidateCharacteristics(s);
+      log(s, `${off} +1/+1 counter${off === 1 ? " is" : "s are"} removed from ${targetName}.`);
+      countersRemoved(s, o, "+1/+1", off);
+      if (canPreventDamage(s) && !unpreventable(src, !!opts.combat)) {
+        log(s, `${off} damage from ${src.name} to ${targetName} is prevented.`);
+        n -= off;
+        if (n <= 0) return 0;
+      }
+    }
+  } else if ("object" in to && abilitiesOf(s, to.object).counterShield) {
     const o = to.object;
     const event = opts.combat ? `${s.turn}:${s.combatsThisTurn ?? 0}:${s.step}` : undefined;
     const has = o.counters["+1/+1"] ?? 0;
@@ -1171,7 +1190,9 @@ export function damageEstimate(s: GameState, from: GameObject, to: Rec, n: numbe
   if (combat && s.preventCombatDamage && prev) return 0;
   const phantom = "object" in to && s.objects[to.object] ? abilitiesOf(s, obj(s, to.object)).phantom : undefined;
   if ("object" in to && prev && phantom && (phantom !== "whileCounter" || (obj(s, to.object).counters["+1/+1"] ?? 0) > 0)) return 0;
-  if ("object" in to && prev && s.objects[to.object] && (abilitiesOf(s, obj(s, to.object)).counterShield === "always" || (abilitiesOf(s, obj(s, to.object)).counterShield && (obj(s, to.object).counters["+1/+1"] ?? 0) > 0))) return 0;
+  if ("object" in to && prev && s.objects[to.object] && abilitiesOf(s, obj(s, to.object)).counterShield === "perOne") n = Math.max(0, n - (obj(s, to.object).counters["+1/+1"] ?? 0));
+  if (n <= 0) return 0;
+  if ("object" in to && prev && s.objects[to.object] && (abilitiesOf(s, obj(s, to.object)).counterShield === "always" || (abilitiesOf(s, obj(s, to.object)).counterShield === true && (obj(s, to.object).counters["+1/+1"] ?? 0) > 0))) return 0;
   const k = recKey(to);
   const plan = planShields(s, [{ src, to, n, ...(combat ? { combat: true as const } : {}) }], [], true);
   // Lichenthrope's -1/-1 counters instead of the damage count as much as the damage would for a bot's sums.

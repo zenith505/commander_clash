@@ -1646,8 +1646,9 @@ export function parseTargetPhrase(
     extra.chosen = "name";
     p = (p.slice(0, withName.index) + p.slice(withName.index + withName[0].length)).trim();
   }
-  // "Target creature it's blocking" (Tinder Wall): one blocked by the source.
-  const blocked = / (?:it's|~ is) blocking$/.exec(p);
+  // "Target creature it's blocking" (Tinder Wall): one blocked by the source; Whip Vine's "target creature with flying
+  // blocked by ~" the same.
+  const blocked = / (?:it's|~ is) blocking$/.exec(p) ?? (opts.target ? /(?<! or) blocked by ~$/.exec(p) : null);
   if (blocked) {
     extra.blockedBySource = true;
     p = p.slice(0, blocked.index);

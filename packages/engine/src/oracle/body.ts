@@ -1466,6 +1466,12 @@ function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell
   }
   if (spell && s === "Exile all cards from your hand face down" && sentences[si + 1] === "At the beginning of the next end step, return those cards to your hand" && /^(?:then )?draw a card$/i.test(sentences[si + 2] ?? "") && sentences.length === si + 3)
     return { effects: [{ type: "exileFaceDown", from: "hand", who: { ref: "you" }, actor: { ref: "you" } }, { type: "delayed", when: "nextEndStep", effects: [{ type: "returnFaceDownExiled" }, { type: "draw", who: { ref: "you" }, n: 1 }], text: "return those cards to your hand, then draw a card" }], skip: 2 };
+  // Puppet Master: "When enchanted creature dies, return that card to its owner's hand. If that card is returned to its
+  // owner's hand this way, you may pay {U}{U}{U}. If you do, return ~ to its owner's hand.": the payment is offered only if
+  // the creature card went to the hand (rulings); ~ is the Aura card in the graveyard it went to (as Angelic Destiny's).
+  const puppet = ctx.auraCard && si === 0 && sentences.length === 3 && /^[Rr]eturn that card to its owner's hand$/.test(s) && /^If that card is returned to its owner's hand this way, you may pay ((?:\{[0-9WUBRGC]\})+)$/.exec(sentences[1]!);
+  if (puppet && sentences[2] === "If you do, return ~ to its owner's hand")
+    return { effects: [{ type: "bounce", what: { ref: "subjectCard" }, setsDid: true }, { type: "if", cond: { kind: "youDid" }, effects: [{ type: "may", effects: [{ type: "bounce", what: { ref: "selfCard", moved: true } }], pay: { mana: puppet[1]! }, text: `pay ${puppet[1]}. If you do, return ~ to its owner's hand` }] }], skip: 2 };
   if (ctx.auraCard && /^[Cc]hoose a creature at random ~ can enchant$/.test(s) && sentences[si + 1] === "Return ~ to the battlefield attached to that creature" && sentences.length === si + 2)
     return { effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard", moved: true }, attachRandom: true }], skip: 1 };
   return null;

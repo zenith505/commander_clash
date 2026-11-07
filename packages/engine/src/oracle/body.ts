@@ -1966,7 +1966,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Green Slime: "counter target activated or triggered ability from an artifact or enchantment source. If a permanent's
   // ability is countered this way, destroy that permanent." Trickbind: "... activated abilities of that permanent can't be
   // activated this turn." One instruction each, about the countered ability's source (see sentences/spells.ts).
-  text = text.replace(/(^|\. )([Cc]ounter target (?:activated or triggered|activated|triggered) ability[^.]*)\. If a permanent's ability is countered this way, (destroy that permanent|activated abilities of that permanent can't be activated this turn)\./, "$1$2, and if a permanent's ability is countered this way, $3.");
+  text = text.replace(/(^|\. )([Cc]ounter target (?:activated or triggered|activated|triggered) ability[^.]*)\. If a permanent's ability is countered this way, (destroy that permanent|activated abilities of that permanent can't be activated this turn)\./, "$1$2, and if a permanent's ability is countered this way, $3.")
+  // Interdict: "Counter target activated ability from an artifact, creature, enchantment, or land. That permanent's activated
+  // abilities can't be activated this turn.": Trickbind's, from a source of one of those types (the ability is the target,
+  // rulings); "that permanent" is its source, if that's a permanent.
+    .replace(/^Counter target activated ability from an artifact, creature, enchantment, or land\. That permanent's activated abilities can't be activated this turn\./, "Counter target activated ability from an artifact, creature, enchantment, or land source, and if a permanent's ability is countered this way, activated abilities of that permanent can't be activated this turn.");
   // Teferi's Response: "Counter target spell or ability an opponent controls that targets a land you control. If a
   // permanent's ability is countered this way, destroy that permanent.": the same.
   text = text.replace(/(^|\. )([Cc]ounter target spell or ability an opponent controls that targets [^.]+)\. If a permanent's ability is countered this way, (destroy that permanent)\./, "$1$2, and if a permanent's ability is countered this way, $3.");
@@ -5123,7 +5127,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // on ~": the same, about the card exiled (none if you didn't).
     const lastYard0 = effects[effects.length - 1];
     const lastYard = lastYard0?.type === "may" && lastYard0.effects.length === 1 && lastYard0.effects[0]!.type === "chooseFromGraveyard" && lastYard0.effects[0]!.anyGraveyard ? lastYard0.effects[0]! : lastYard0;
-    const yardIs = lastYard?.type === "chooseFromGraveyard" && lastYard.n === 1 && lastYard.dest === "exile" && !lastYard.anyNumber ? (lastYard.upTo ? null : /^If it's an? (.+? card), (.+)$/.exec(s)) ?? (lastYard.anyGraveyard ? /^If an? (.+? card) was exiled this way, (.+)$/.exec(s) : null) : null;
+    // Cellar Door: "Target player puts the bottom card of their library into their graveyard. If it's a creature card, ...":
+    // the card put there, as it is there (CR 701.17a: not a mill).
+    const yardIs = lastYard?.type === "chooseFromGraveyard" && lastYard.n === 1 && lastYard.dest === "exile" && !lastYard.anyNumber ? (lastYard.upTo ? null : /^If it's an? (.+? card), (.+)$/.exec(s)) ?? (lastYard.anyGraveyard ? /^If an? (.+? card) was exiled this way, (.+)$/.exec(s) : null) : lastYard?.type === "bottomToGraveyard" ? /^If it's an? (.+? card), (.+)$/.exec(s) : null;
     if (yardIs) {
       const filter = parseSearchFilter(yardIs[1]!);
       // Lazav, Familiar Stranger: "you may have ~ become a copy of that card until end of turn": the card exiled.
@@ -7785,9 +7791,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Desperate Research: "Choose a card name other than a basic land card name. Reveal the top seven cards of your library
     // and put all of them with that name into your hand. Exile the rest." Every card with the name chosen as it resolves.
     const revealNamed = new RegExp(`^Reveal the top ${NUM} cards of your library and put all of them with that name into your hand$`).exec(s);
-    if (revealNamed && /^Exile the rest\.?$/.test(sentences[si + 1] ?? "") && allEffects(effects).some((x) => x.type === "choose" && x.choice === "cardName")) {
+    // Wood Sage: "... Put the rest into your graveyard."
+    if (revealNamed && /^(?:Exile the rest|Put the rest into your graveyard)\.?$/.test(sentences[si + 1] ?? "") && allEffects(effects).some((x) => x.type === "choose" && x.choice === "cardName")) {
       const n = num(revealNamed[1]!);
-      effects.push({ type: "dig", n, count: n, upTo: false, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "name", text: "card with the chosen name" }, into: "hand", rest: "exile", reveal: true, required: true });
+      effects.push({ type: "dig", n, count: n, upTo: false, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "name", text: "card with the chosen name" }, into: "hand", rest: /^Exile/.test(sentences[si + 1]!) ? "exile" : "graveyard", reveal: true, required: true });
       si++;
       continue;
     }
@@ -12914,13 +12921,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // ones (CR 608.2h). A target that's illegal by then stops the whole ability (rulings), so it never gets here.
     // Cemetery Recruitment: "Return target creature card from your graveyard to your hand. If it's a Zombie card, draw a
     // card.": the card returned, by its printed characteristics (the same in the graveyard and the hand).
+    // Negative Zone Portal: "Exile target card from an opponent's graveyard. If it's a creature card, draw a card.": the
+    // card in exile, the same.
     const wasCard = /^If it(?: was|'s) an? ((?:[a-z]+ )?[A-Za-z]+) card, (.+)$/.exec(s);
     if (wasCard) {
       const i = ctx.targets.length - 1;
       const t = ctx.targets[i];
       const prev = effects[effects.length - 1];
       const filter = parseSearchFilter(`${wasCard[1]!} card`);
-      const moved = /^If it was /.test(s) ? prev?.type === "exile" : prev?.type === "bounce";
+      const moved = prev?.type === "exile" || (/^If it's /.test(s) && prev?.type === "bounce");
       if (!t || t.kind !== "card" || t.many || t.optional || !moved || !prev || !("what" in prev) || prev.what?.ref !== "target" || prev.what.index !== i || !filter) return null;
       // Tamiyo, Seasoned Scholar: "If it's a green card, add one mana of any color": one mana of the color chosen as it
       // resolves, the same as one mana in any combination of colors (CR 106.1b), so one instruction.

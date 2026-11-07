@@ -413,6 +413,8 @@ export function parseObject(p: string, ctx: Ctx, cards = false): ObjRef | null {
 }
 
 function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
+  // Tyrannical Pitlord: "the chosen creature" (compile.ts checks the card chooses one as it enters).
+  if (/^the chosen creature$/i.test(p.trim()) && !ctx.targets.length) return { ref: "chosenCreature" };
   // Sanguine Praetor: "each creature with the same mana value as the sacrificed creature"; Endemic Plague: "all creatures
   // that share a creature type with the sacrificed creature": compared with the creature as it last existed (CR 608.2h).
   const kin = /^(?:each creature|all creatures) (with the same mana value as|that shares? a creature type with) the sacrificed creature$/i.exec(p.trim());

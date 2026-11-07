@@ -195,7 +195,7 @@ const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
  * resolved as its other card type, its subtypes creature types.
  */
 /** An optional additional cost paid like kicker ("you may waterbend {2}", "you may blight 1", "you may behold a Dragon"). */
-const MAY_COST = /^As an additional cost to cast ~, you may (?:waterbend \{\d+\}|blight \d+|behold an? [A-Z][a-z]+(?: creature)?|reveal an? [A-Z][a-z]+ card from your hand|pay (?:\{[^}]+\})+)\.$/m;
+const MAY_COST = /^As an additional cost to cast ~, you may (?:waterbend \{\d+\}|blight \d+|sacrifice an? (?:artifact|creature|land|enchantment)|behold an? [A-Z][a-z]+(?: creature)?|reveal an? [A-Z][a-z]+ card from your hand|pay (?:\{[^}]+\})+)\.$/m;
 /** The Dragons of Tarkir reveal cycle: "As an additional cost to cast this spell, you may reveal a Dragon card from your hand." */
 const MAY_REVEAL = /^As an additional cost to cast ~, you may reveal an? ([A-Z][a-z]+) card from your hand\.$/m;
 const UNSUPPORTED_TYPES = ["Tribal", "Dungeon"];
@@ -1965,6 +1965,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Grifter's Blade: "As this Equipment enters, choose a creature you control it could be attached to. If you do, it
     // enters attached to that creature." (CR 614.12; rulings: one must be chosen if possible).
+    // Tyrannical Pitlord: "As this creature enters, choose another creature you control." (CR 614.12): "the chosen creature"
+    // in its other abilities.
+    if (line === "As ~ enters, choose another creature you control." && d.types.includes("Creature")) {
+      out.entersChooseCreature = true;
+      continue;
+    }
     if (line === "As ~ enters, choose a creature you control it could be attached to. If you do, it enters attached to that creature." && d.subtypes.includes("Equipment")) {
       out.entersAttachedToYours = true;
       continue;
@@ -2185,7 +2191,8 @@ export function compile(d: CardDef): CompiledCard {
       else out.kicker = { costs: [mayPay[1]!], text: `pay ${mayPay[1]}${mayPay[2] ?? ""}`, optional: true, ...(mayPay[2] ? { multi: true } : {}) };
       continue;
     }
-    const mayCost = /^As an additional cost to cast ~, you may (blight \d+|behold an? [A-Z][a-z]+(?: creature)?|reveal an? ([A-Z][a-z]+) card from your hand)\.$/.exec(line);
+    // Voltage Surge: "you may sacrifice an artifact", the same (CR 601.2b), whatever the artifact was.
+    const mayCost = /^As an additional cost to cast ~, you may (blight \d+|sacrifice an? (?:artifact|creature|land|enchantment)|behold an? [A-Z][a-z]+(?: creature)?|reveal an? ([A-Z][a-z]+) card from your hand)\.$/.exec(line);
     if (mayCost) {
       const cost = parseAdditionalCost(mayCost[1]!);
       // The reveal cycle: what it says it depends on ("if you revealed a Dragon card or controlled a Dragon as you cast
@@ -2213,6 +2220,13 @@ export function compile(d: CardDef): CompiledCard {
     // as it's cast (CR 601.2h; rulings: once, not any number of times). Spells only.
     if (extra?.[1] === "sacrifice all permanents you control and discard your hand" && !d.types.some((t) => t !== "Instant" && t !== "Sorcery")) {
       (out.additionalCosts ??= []).push({ kind: "sacrificeAll" }, { kind: "discardHand" });
+      continue;
+    }
+    // Soulblast: "sacrifice all creatures you control" (CR 601.2h): every one, as they are, whatever their number (none
+    // too); "the total power of the sacrificed creatures" counts them as they last existed (CR 608.2h). Spells only.
+    if (extra?.[1] === "sacrifice all creatures you control" && !d.types.some((t) => t !== "Instant" && t !== "Sorcery") && lines.some((l) => l.includes(" equal to the total power of the sacrificed creatures."))) {
+      (out.additionalCosts ??= []).push({ kind: "sacrificeAll", creatures: true });
+      costSacrificedX = "creature";
       continue;
     }
     if (extra) {
@@ -6401,6 +6415,8 @@ export function compile(d: CardDef): CompiledCard {
     out.statics = out.statics.flatMap((st) => (st === cdaPower ? [merged] : st === cdaToughness ? [] : [st]));
   }
   const json = JSON.stringify(out);
+  // "The chosen creature" (Tyrannical Pitlord) only means something on a card that chooses one as it enters.
+  if (!out.entersChooseCreature && /"(?:kind|ref)":"chosenCreature"/.test(json)) out.unsupported.push("(\"the chosen creature\" with no creature chosen as it enters)");
   if (json.includes('"thisAbility":true')) out.unsupported.push("(a copy effect's \"this ability\" outside a triggered or activated ability)");
   if (out.sunburst || json.includes('"kind":"colorsSpent"')) out.countsColors = true;
   // An "enchant player" Aura that only gives the enchanted player more steps or phases on their turn (Paradox Haze, Shadow

@@ -2176,7 +2176,7 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "discard") return `discard ${n(c.n, c.filter?.text ?? "card")}${c.random ? " at random" : ""}`;
   if (c.kind === "returnToHand") return `return ${n(c.n, c.filter.text)} to hand`;
   if (c.kind === "revealHand") return "reveal your hand";
-  if (c.kind === "sacrificeAll") return "sacrifice all permanents you control";
+  if (c.kind === "sacrificeAll") return `sacrifice all ${c.creatures ? "creatures" : "permanents"} you control`;
   if (c.kind === "discardHand") return "discard your hand";
   if (c.kind === "giveLife") return c.each ? `have each other player gain ${c.n} life` : `have an opponent gain ${c.n} life`;
   if (c.kind === "tap") return `${c.untap ? "untap" : "tap"} ${n(c.n, c.filter.text)}`;
@@ -5254,9 +5254,9 @@ function Controls({
         })}
       </div>
     );
-  if (pending?.kind === "chooseOption" && (pending.what === "enchant" || pending.what === "attachHost") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "enchant" || pending.what === "attachHost" || pending.what === "chooseCreature") && pending.player === HUMAN)
     // An Aura put onto the battlefield without being cast: what it enchants (CR 303.4f). Grifter's Blade: the creature
-    // you control it enters attached to (CR 614.12).
+    // you control it enters attached to (CR 614.12). Tyrannical Pitlord: another creature you control, chosen as it enters.
     return (
       <div className="controls enchant-pick">
         <span>

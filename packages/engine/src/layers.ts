@@ -1483,6 +1483,12 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
     const other = pairedWith(s, s.objects[e.sourceId!]!);
     return other && chars.has(other.id) ? [e.sourceId!, other.id] : [];
   }
+  if (a.kind === "chosenCreature") {
+    // Tyrannical Pitlord: the creature chosen as it entered, while it's that permanent (CR 400.7), whoever controls it.
+    const c = s.objects[e.sourceId!]?.chosen?.creature;
+    const o = c ? s.objects[c.id] : undefined;
+    return o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === c!.zc && chars.has(o.id) ? [o.id] : [];
+  }
   if (a.kind === "inCombatWithSelf") {
     // Blocking it, or attacking and blocked by it, while both are in combat (CR 509.1h, 506.4).
     const me = s.objects[e.sourceId!];

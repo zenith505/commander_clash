@@ -265,7 +265,7 @@ export type Count =
   | { kind: "countersRemovedThisWay" }
   /** "Cards exiled with ~": those this object's linked exile took that are still there (CR 607.2a, 400.7). `ever`:
    * "cards have been exiled with ~" (Colfenor's Urn): every card it exiled over the game, wherever it is now (rulings). */
-  | { kind: "linkedExiled"; ever?: true }
+  | { kind: "linkedExiled"; ever?: true; /** "Creature cards exiled with ~" (Negative Zone Portal): only those matching this, as cards in exile. */ filter?: TargetSpec }
   /** "The exiled creature card's power" (Phyrexian Ingester): the power (or toughness) of each creature card its linked
    * exile took that's still there, as it is in exile (rulings: no bonus for a card that isn't a creature card). */
   | { kind: "linkedExiledPT"; stat: "power" | "toughness" }
@@ -1278,6 +1278,8 @@ export type ChosenTarget = Exclude<TargetChoice, { kind: "none" }>;
 export type SpentFor = { sharesCommanderType: true } | { instantOrSorcery: true; color?: Color } | { spell: TargetSpec } | { commander: true };
 
 export type ObjRef =
+  /** Tyrannical Pitlord: "the chosen creature", chosen as the source entered (Chosen.creature), or as it last existed once it's gone (CR 608.2h), while that creature is still that permanent (CR 400.7). */
+  | { ref: "chosenCreature" }
   /** "Each creature that convoked ~" (Lethal Scheme): the `index`th creature tapped to convoke the resolving spell (CR 702.51a), while it's that permanent. */
   | { ref: "convoker"; index: number }
   /** "Each creature that convoked it" (Venerated Loxodon): all of them still on the battlefield, for its enters trigger the permanent's spell's. */
@@ -1997,6 +1999,8 @@ export type Affects =
   | { kind: "paired" }
   /** "Creatures blocking or blocked by ~" (Alms Beast): those in combat with the source now (CR 509.1h). */
   | { kind: "inCombatWithSelf" }
+  /** Tyrannical Pitlord: "the chosen creature", chosen as the source entered (Chosen.creature), while it's still that permanent (CR 400.7), whoever controls it (rulings). */
+  | { kind: "chosenCreature" }
   | {
       kind: "filter";
       types: string[]; // all of these card types, e.g. ["Creature"]
@@ -3105,7 +3109,7 @@ export type Effect =
   | { type: "exileIfDies"; what: ObjRef; ifCreature?: true }
   /** "If a creature would die this turn, exile it instead" (Malicious Malfunction): every creature this turn, ones that enter or become creatures later too (rulings, CR 614.1a). */
   /** Mistcaller: "Until end of turn, if a nontoken creature would enter and it wasn't cast, exile it instead" (GameState.exileUncastTurn). */
-  | { type: "exileUncastThisTurn" }
+  | { type: "exileUncastThisTurn"; /** Hallowed Moonlight: "if a creature would enter": tokens too (GameState.exileUncastAnyTurn). */ tokens?: true }
   | { type: "exileDyingThisTurn"; /** Malicious Eclipse: only creatures the controller's opponents control. */ opponentsOfYou?: true }
   /** "Players can't search libraries this turn" (Shadow of Doubt): GameState.noSearchTurn. */
   | { type: "noSearchThisTurn" }
@@ -3747,6 +3751,8 @@ export type Effect =
   | { type: "noEffect"; text: string }
   /** Count `n` now and keep it for the rest of this resolution (Count notedAmount): one X for several instructions. */
   | { type: "noteAmount"; n: Amount }
+  /** Cellar Door: "Target player puts the bottom card of their library into their graveyard": not a mill (CR 701.17a); the card is ResolvingInfo.yardChosen for "if it's a creature card". */
+  | { type: "bottomToGraveyard"; who: PlayerRef }
   | { type: "mill"; who: PlayerRef; n: Amount; /** Grindstone: "If two cards that share a color were milled this way, repeat this process" (each player's own repeats). */ repeatSharedColor?: true; /** The Tale of Tamiyo: "If two cards that share a card type were milled this way, draw a card and repeat this process". */ repeatSharedTypeDraw?: true }
   /** "That player exiles the top card of their library" (ingest, CR 702.115a): face up (CR 406.3), with no permission to play it. */
   /**
@@ -4821,7 +4827,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature" | /** Mindblaze: a card in that player's library. */ "inLibrary";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther";
+export type EntersOption = /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | /** Tyrannical Pitlord: "As ~ enters, choose another creature you control" (CompiledCard.entersChooseCreature, Chosen.creature). */ "chooseCreature" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -6640,7 +6646,7 @@ export type AdditionalCost =
    * Kaervek's Spite: "sacrifice all permanents you control": every one, nothing to choose; not payable while one of them
    * can't be sacrificed, as the cost couldn't be paid in full (CR 118.3, 601.2h). With none, there's nothing to sacrifice.
    */
-  | { kind: "sacrificeAll" }
+  | { kind: "sacrificeAll"; /** Soulblast: "sacrifice all creatures you control": only creatures (none pays it too). */ creatures?: true }
   /** Kaervek's Spite: "discard your hand": every card in it, the spell itself already on the stack (CR 601.2a); an empty hand pays it. */
   | { kind: "discardHand" }
   /**
@@ -7888,6 +7894,8 @@ export interface CompiledCard {
    * attached to that creature." (CR 614.12): one must be chosen if there is one (rulings); with none, it enters unattached.
    */
   entersAttachedToYours?: true;
+  /** Tyrannical Pitlord: "As ~ enters, choose another creature you control" (CR 614.12): kept as Chosen.creature; "the chosen creature" (Affects/ObjRef "chosenCreature"). */
+  entersChooseCreature?: true;
   /** Liquid Fire: "As an additional cost to cast this spell, choose a number between 0 and 5" (CR 601.2b): chosen as it's cast (CostChoices.number), "the chosen number" as it resolves. */
   castNumber?: { min: number; max: number };
   /** Fasting: "If you would begin your draw step, you may skip that step instead. If you do, you gain 2 life." (CR 614.10): asked as its controller's draw step would begin. */

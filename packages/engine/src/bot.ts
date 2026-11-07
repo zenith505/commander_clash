@@ -844,6 +844,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const n = Math.max(Math.min(max, life > 5 ? 1 : 0), Math.min(max, life - 12, 7));
       return [{ type: "chooseOption", player: pid, choice: String(n) }];
     }
+    // Tyrannical Pitlord: our strongest creature that isn't our commander (it's sacrificed when the Pitlord leaves).
+    if (pend.kind === "chooseOption" && pend.what === "chooseCreature") {
+      const best = [...pend.options].sort((a, b) => Number(obj(s, a).isCommander) - Number(obj(s, b).isCommander) || power(s, obj(s, b)) - power(s, obj(s, a)))[0]!;
+      return [{ type: "chooseOption", player: pid, choice: best }];
+    }
     // Grifter's Blade: on our strongest creature.
     if (pend.kind === "chooseOption" && pend.what === "attachHost") {
       const best = [...pend.options].sort((a, b) => power(s, obj(s, b)) - power(s, obj(s, a)))[0]!;
@@ -3546,6 +3551,12 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
   for (const c of castExtraCosts(d, { via, alt, costOr, objectId: id, ...(modes ? { modes } : {}), ...(buyback ? { buyback } : {}), ...(kicks ? { kicks } : {}), ...(splice?.length ? { splice } : {}) }, x, s, pid)) {
     if (c.kind === "revealHand") continue; // nothing to choose
     // Kaervek's Spite: everything we have, only to finish an opponent at 5 life or less.
+    // Soulblast: all our creatures, only to finish an opponent with their total power.
+    if (c.kind === "sacrificeAll" && c.creatures) {
+      const total = s.battlefield.map((x) => obj(s, x)).filter((o) => controllerOf(s, o) === pid && objIsType(s, o, "Creature")).reduce((n, o) => n + Math.max(0, power(s, o)), 0);
+      if (!targets.some((t) => t.kind === "player" && t.id !== pid && player(s, t.id).life <= total)) return null;
+      continue;
+    }
     if (c.kind === "sacrificeAll" || c.kind === "discardHand") {
       if (!targets.some((t) => t.kind === "player" && t.id !== pid && player(s, t.id).life <= 5)) return null;
       continue;

@@ -127,16 +127,19 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // The name is as short as it can be (Mordor Trebuchet: "named Ballistic Boulder that's tapped and attacking"), since the
   // "i" flag lets [A-Z] match "that's" too.
-  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?(\\d+|X)/(\\d+|X) (.+?) creature tokens?(?: with (.+?))?(?: named ([A-Z][\\w'-]*(?: (?:of |the )?(?!for each\\b)[A-Z][\\w'-]*)*?))?(?: that(?:'s| are) (tapped(?: and attacking(?: that player)?)?|attacking|blocking that creature))?$`, "i").exec(s))) {
+  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?(\\d+|X)/(\\d+|X) (.+?) creature tokens?(?: with (.+?))?(?: named ([A-Z][\\w'-]*(?: (?:of |the )?(?!for each\\b)[A-Z][\\w'-]*)*?))?(?: that(?:'s| are) (tapped(?: and attacking(?: that player)?)?|attacking|blocking that creature|blocking target creature attacking you))?$`, "i").exec(s))) {
     const xx = m[4] === "X" || m[5] === "X";
     // "An X/1 red Phyrexian Horror creature token" (Urabrask's Forge): only its power is X.
     const xPower = m[4] === "X" && m[5] !== "X";
     if (xx && m[4] !== "X") return null;
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     const token = parseToken(xx ? 0 : Number(m[4]), xx && !xPower ? 0 : Number(m[5]), m[6]!, m[7]);
-    const how = `${m[3] ?? ""} ${m[9] ?? ""}`;
+    // (Flash Foliage's target attacks, not the token.)
+    const how = `${m[3] ?? ""} ${m[9] ?? ""}`.replace(/blocking target creature attacking you/, "blocking target");
     // "That's attacking" (Brimaz): attacking, untapped; "that's blocking that creature": blocking the creature it means.
-    const blocking = /blocking that creature/.test(how) ? parseObject("that creature", ctx) : undefined;
+    // Flash Foliage: "that's blocking target creature attacking you": blocking it even if it couldn't legally block it
+    // (rulings), the target chosen as the spell is cast.
+    const blocking = /blocking that creature/.test(how) ? parseObject("that creature", ctx) : /blocking target/.test(how) ? parseObject("target creature attacking you", ctx) : undefined;
     if (/blocking/.test(how) && !blocking) return null;
     // "That's tapped and attacking that player" (Soaring Lightbringer): the player "whenever you attack a player" is about.
     // Seraphic Greatsword: "Whenever equipped creature attacks the player with the most life ..., create ... that's tapped and

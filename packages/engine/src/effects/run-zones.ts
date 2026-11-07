@@ -12,7 +12,7 @@ import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, amountFor, r
 import { attackWhomOptions, createToken, takeAttackWhom, tokenCopies, tokenCopyBatch } from "./run-tokens";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { askWholeGraveyardOrder } from "../graveyard";
+import { askWholeGraveyardOrder, topGraveyardCards } from "../graveyard";
 import { foundWith, newObjects } from "../mutate";
 import { attachTo } from "./run-permanents";
 import { addDelayed, paidUnless, removeCopy } from "./run-spells";
@@ -3399,6 +3399,35 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       shuffle(s, back);
       log(s, `${player(s, card.owner).name} exiles ${defOf(s, card).name} and the top ${e.n} cards of their library in a face-down pile, shuffles it and puts it back on top of their library.`);
       for (const id of back) moveObject(s, id, "library", { top: true });
+      return;
+    }
+    case "topYardSplit": {
+      // Phyrexian Grimoire: the top two cards of the controller's graveyard (CR 404.1); the chooser picks the one exiled,
+      // the other goes to the controller's hand. One card only: it's exiled, nothing more (rulings).
+      const p = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      const top = topGraveyardCards(s, p.id, 2);
+      if (!top.length) return;
+      const chooser = players(s, e.chooser, ctx)[0];
+      let pick = top.length === 1 || chooser === undefined ? top[0]! : undefined;
+      if (!pick) {
+        if (!sc.yardSplit) {
+          sc.yardSplit = true;
+          delete sc.found;
+          s.pending = { kind: "searchLibrary", player: chooser!, source: src, what: `one of the top two cards of ${p.name}'s graveyard`, cards: top, min: 1, max: 1, dig: { looked: top, to: "to exile", rest: `into ${p.name}'s hand` } };
+          return "paused";
+        }
+        sc.yardSplit = undefined;
+        pick = top.find((id) => sc.found?.includes(id)) ?? top[0]!;
+      }
+      if (chooser !== undefined && top.length > 1) log(s, `${player(s, chooser).name} chooses ${defOf(s, obj(s, pick)).name} (${src}).`);
+      log(s, `${src} exiles ${defOf(s, obj(s, pick)).name}.`);
+      moveObject(s, pick, "exile");
+      const other = top.find((id) => id !== pick);
+      if (other && obj(s, other).zone === "graveyard") {
+        log(s, `${p.name} puts ${defOf(s, obj(s, other)).name} into their hand (${src}).`);
+        moveObject(s, other, "hand");
+      }
       return;
     }
     case "linkedToBottom": {

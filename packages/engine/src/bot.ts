@@ -125,6 +125,7 @@ import {
   attackTargetScore,
   discardKeywordKinds,
   auraHostOptions,
+  lastDrawnInHand,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -369,6 +370,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // From an opponent's revealed hand: take their most expensive card.
     // Memoricide's search: every card with the name it can take; from the hand last, which may give that player cards back.
     // Benthic Anomaly: the creature most worth copying (its power and toughness will be the totals anyway).
+    // Phyrexian Grimoire: exile the card its controller would rather have back (the other goes to their hand); our own
+    // pick (no opponent to choose) keeps the better one.
+    if (pend.kind === "searchLibrary" && pend.cards.length === 2 && s.resolving?.body.effects[s.resolving.next]?.type === "topYardSplit") {
+      const ranked = [...pend.cards].sort((a, b) => handWorth(s, b) - handWorth(s, a));
+      return [{ type: "searchLibrary", player: pid, found: [pid === s.resolving.item.controller ? ranked[1]! : ranked[0]!] }];
+    }
     if (pend.kind === "searchLibrary" && pend.what === "one of those creatures to copy") return [{ type: "searchLibrary", player: pid, found: [[...pend.cards].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
     if (pend.kind === "searchLibrary" && pend.zonesOf !== undefined) {
       const rank = (id: string) => (s.objects[id]!.zone === "hand" ? 1 : 0);
@@ -2132,6 +2139,15 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     const picks = to ? onUs.filter((id) => controllerOf(s, obj(s, id)) !== to.id).slice(0, slots) : [];
     return [{ kind: "player", id: target.id }, ...Array.from({ length: slots }, (_, k): TargetChoice => (picks[k] ? { kind: "object", id: picks[k]! } : { kind: "none" }))];
   }
+  // Halfdane: "~'s base power and toughness become equal to the power and toughness of another target creature": the
+  // biggest one there is, whoever controls it.
+  const copyPt = body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "continuous" && body.effects[0]!.what.ref === "self" && body.effects[0]!.mods.length === 1 ? body.effects[0]!.mods[0]! : undefined;
+  if (copyPt?.kind === "setPT" && typeof copyPt.power === "object" && copyPt.power.count?.kind === "power" && copyPt.power.count.of?.ref === "target") {
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const size = (t: TargetChoice) => (t.kind === "object" ? power(s, obj(s, t.id)) * 2 + toughness(s, obj(s, t.id)) : -1);
+    const pick = [...all].sort((a, b) => size(b) - size(a))[0];
+    return pick ? [pick] : null;
+  }
   // Goblin Welder: our own cheapest artifact for a costlier artifact card in our graveyard.
   const weld = body.effects.find((e) => e.type === "weld");
   if (weld?.type === "weld") {
@@ -3894,6 +3910,9 @@ function linkedOwned(s: GameState, sourceId: ObjectId | undefined, pid: PlayerId
 function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
+  // Purgatory: "you may pay {4} and 2 life. If you do, return a card exiled with ~ to the battlefield": only with a card
+  // there to return (CR 607.2a).
+  if (r && e?.type === "may" && e.effects.length && e.effects.every((x) => x.type === "moveLinked")) return linkedCards(s, r.item.sourceId, r.item.sourceZc).length > 0;
   // Neera, Wild Mage: "you may put it on the bottom of its owner's library. If you do, reveal ... until you reveal a nonland
   // card. You may cast that card without paying its mana cost": a cheap spell for a free card worth more on average.
   if (r && e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "causeToBottom") {
@@ -4321,6 +4340,17 @@ function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, 
     const n = Math.min(me.life > 20 ? 5 : me.life > 12 ? 3 : 1, Math.max(1, me.library.length - 1));
     return String(Math.max(r.min, Math.min(r.max, n)));
   }
+  // Shapeshifter: power the number, toughness 7 minus it, kept until our next upkeep: 4/3 while no opponent's creature
+  // could kill it in combat, else 3/4.
+  if (c && JSON.stringify(c.statics).includes('"selfChosenNumber"')) {
+    const big = s.battlefield.some((id) => {
+      const o = obj(s, id);
+      return controllerOf(s, o) !== pid && objIsType(s, o, "Creature") && power(s, o) >= 3;
+    });
+    return String(Math.max(r.min, Math.min(r.max, big ? 3 : 4)));
+  }
+  // Scrying Glass: "exactly the chosen number of cards of the chosen color" in a hand we can't see: one is the likeliest.
+  if (s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "choose" && !!e.maxHandOf)) return String(r.min);
   // A resolving spell's own "choose a number" (Expel the Interlopers).
   const forSpell = s.resolving && card ? groupNumber(s, pid, card) : undefined;
   if (forSpell !== undefined) return String(forSpell);
@@ -4465,9 +4495,11 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
     return [...options].sort((a, b) => score(b) - score(a))[0]!;
   }
   // Darigaaz, the Igniter: damage for each card of the chosen color in the damaged player's hand, so the color most of
-  // the cards they've shown have (their nonland permanents, graveyard and commander), not knowing their hand.
-  if (what === "color" && /cards of that color revealed this way/.test(card?.oracleText ?? "") && s.resolving?.item.event?.player !== undefined) {
-    const them = s.resolving.item.event.player;
+  // the cards they've shown have (their nonland permanents, graveyard and commander), not knowing their hand. Scrying
+  // Glass: the same for the target opponent's hand.
+  const handOf = s.resolving?.item.event?.player ?? (s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "choose" && !!e.maxHandOf) ? (s.resolving.item.targets ?? []).flatMap((t) => (t?.kind === "player" ? [t.id] : []))[0] : undefined);
+  if (what === "color" && /cards of that color revealed this way|cards of the chosen color/.test(card?.oracleText ?? "") && handOf !== undefined) {
+    const them = handOf;
     const shown = new Map<string, number>();
     const add = (d: CardDef) => !isType(d, "Land") && d.colors.forEach((col) => shown.set(COLOR_NAMES[col], (shown.get(COLOR_NAMES[col]) ?? 0) + 1));
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === them) add(defOf(s, obj(s, id)));
@@ -5594,6 +5626,10 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
       const ids = spareEvidence(s, pid, c.n, undefined, [], c.filter);
       if (!ids) return null;
       out.collect = ids;
+    } else if (c.kind === "discard" && c.lastDrawn) {
+      // Jandor's Ring: trade the card just drawn only when it's a land we don't need.
+      const last = lastDrawnInHand(s, pid);
+      if (!last || !isType(defOf(s, obj(s, last)), "Land") || lands(s, pid) < 5) return null;
     } else if (c.kind === "discard" && c.random) {
       if (player(s, pid).hand.length < c.n + 4) return null;
     } else if (c.kind === "discard" && c.sameName) {

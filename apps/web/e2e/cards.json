@@ -7465,6 +7465,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3e1a7146-75d5-499f-8718-303bc6ea139b",
+  "name": "Emberwilde Djinn",
+  "manaCost": "{2}{R}{R}",
+  "cmc": 4,
+  "typeLine": "Creature — Djinn",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Djinn"
+  ],
+  "oracleText": "Flying\nAt the beginning of each player's upkeep, that player may pay {R}{R} or 2 life. If the player does, they gain control of this creature.",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "473da1b6-232b-4428-a66d-30262246b47a",
   "name": "Emeria Shepherd",
   "manaCost": "{5}{W}{W}",
@@ -12615,6 +12647,28 @@
   "commanderLegal": "legal",
   "set": "acr",
   "releasedAt": "2024-07-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "737db899-dcdb-48f9-8d30-cbbce3ae3434",
+  "name": "Jandor's Ring",
+  "manaCost": "{6}",
+  "cmc": 6,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}, {T}, Discard the last card you drew this turn: Draw a card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arn",
+  "releasedAt": "1993-12-17",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -18480,6 +18534,30 @@
   "gameChanger": false
  },
  {
+  "oracleId": "090052a8-9e5b-4024-881f-5f8b65db7aa7",
+  "name": "Phyrexian Grimoire",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact — Book",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Book"
+  ],
+  "oracleText": "{4}, {T}: Target opponent chooses one of the top two cards of your graveyard. Exile that card and put the other one into your hand.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "11173ad3-c007-478f-bce0-d756eac07ccb",
   "name": "Phyrexian Scriptures",
   "manaCost": "{2}{B}{B}",
@@ -18535,6 +18613,39 @@
   "commanderLegal": "legal",
   "set": "csp",
   "releasedAt": "2006-07-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4f5a7b65-b7f4-4bad-acfd-35edfb8f86a7",
+  "name": "Phytohydra",
+  "manaCost": "{2}{G}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Creature — Plant Hydra",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Plant",
+   "Hydra"
+  ],
+  "oracleText": "If damage would be dealt to this creature, put that many +1/+1 counters on it instead.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rav",
+  "releasedAt": "2005-10-07",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -21459,6 +21570,28 @@
   "set": "mps",
   "releasedAt": "2016-09-30",
   "rarity": "special",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ca16b32c-3f1e-4f8d-821a-064f922c45d8",
+  "name": "Scrying Glass",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{3}, {T}: Choose a number greater than 0 and a color. Target opponent reveals their hand. If that opponent reveals exactly the chosen number of cards of the chosen color, you draw a card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "uds",
+  "releasedAt": "1999-06-07",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -2905,6 +2905,8 @@ function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number
   s.resolving?.drawnThisWay?.push(top);
   const drawnCard = obj(s, top);
   if (drawnCard.zone === "hand") drawnCard.drawn = { turn: s.turn, zc: drawnCard.zoneChanges ?? 0 };
+  // Jandor's Ring: each card drawn is the last one drawn until the next (rulings: of several drawn at once, the last).
+  p.lastDrawn = { turn: s.turn, id: top, zc: drawnCard.zoneChanges ?? 0 };
   // Every card drawn is its own draw (CR 121.2), and counts toward "your second card each turn".
   p.draws = p.draws?.turn === s.turn ? { turn: s.turn, n: p.draws.n + 1 } : { turn: s.turn, n: 1 };
   // "Except the first one they draw in each of their draw steps" (Orcish Bowmasters): a card actually drawn, so not a
@@ -3357,6 +3359,16 @@ function advanceStep(s: GameState): void {
   if (s.step === "cleanup") return startNextTurn(s);
   // "There is an additional end step after this step" (Y'shtola Rhul, CR 500.8): only an end step, no cleanup before it
   // (rulings).
+  // "Until the end of your next upkeep" (Halfdane): it ends as that player's next upkeep step ends, the first one after
+  // the step it began in (an additional one, CR 500.8, counts); for a player who left the game, as any upkeep ends
+  // (CR 800.4m).
+  if (s.step === "upkeep") {
+    const ending = s.effects.filter((e) => e.duration === "endOfYourNextUpkeep" && ((e.turnOf === s.activePlayer && (s.turn > (e.sinceTurn ?? 0) || (s.turnLog?.upkeeps ?? 0) > (e.sinceUpkeeps ?? 0))) || (e.turnOf !== undefined && player(s, e.turnOf).lost)));
+    if (ending.length) {
+      s.effects = s.effects.filter((e) => !ending.includes(e));
+      invalidateCharacteristics(s);
+    }
+  }
   // "That player gets an additional upkeep step after this step" (Paradox Haze, CR 500.8).
   if (s.step === "upkeep" && s.extraUpkeeps) {
     s.extraUpkeeps = s.extraUpkeeps > 1 ? s.extraUpkeeps - 1 : undefined;
@@ -6999,6 +7011,13 @@ function permitExiles(s: GameState, key: string): boolean {
   return !!(src && abilitiesOf(s, src).graveyardGrants?.find((g) => g.once)?.way.exile);
 }
 
+/** Jandor's Ring: the last card this player drew this turn, if it's still that card in their hand (CR 400.7). */
+export function lastDrawnInHand(s: GameState, pid: PlayerId): ObjectId | undefined {
+  const l = player(s, pid).lastDrawn;
+  const o = l && l.turn === s.turn ? s.objects[l.id] : undefined;
+  return o && o.zone === "hand" && (o.zoneChanges ?? 0) === l!.zc && player(s, pid).hand.includes(o.id) ? o.id : undefined;
+}
+
 export function permitCosts(s: GameState, key: string): AdditionalCost[] {
   const src = s.objects[key.split("@")[0]!];
   return (src && abilitiesOf(s, src).graveyardGrants?.find((g) => g.once)?.way.costs) ?? [];
@@ -7388,7 +7407,7 @@ export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.energyX
 
 /** Costs paid with objects the player picks; "discard a card at random" and "the top card of your graveyard" aren't. */
 const costNeedsPick = (c: AdditionalCost) =>
-  c.kind === "sacrifice" || c.kind === "craft" || (c.kind === "discard" && !c.random) || c.kind === "returnToHand" || c.kind === "tap" || c.kind === "reveal" || c.kind === "exileFromHand" || (c.kind === "exileFromGraveyard" && !c.top) || c.kind === "removeCounters" || c.kind === "putCounter";
+  c.kind === "sacrifice" || c.kind === "craft" || (c.kind === "discard" && !c.random && !c.lastDrawn) || c.kind === "returnToHand" || c.kind === "tap" || c.kind === "reveal" || c.kind === "exileFromHand" || (c.kind === "exileFromGraveyard" && !c.top) || c.kind === "removeCounters" || c.kind === "putCounter";
 const costPickKey = (c: AdditionalCost): "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "exileCards" | "counters" | "craft" | "counterOn" =>
   c.kind === "exileFromGraveyard" ? "exileCards" : c.kind === "removeCounters" ? "counters" : c.kind === "putCounter" ? "counterOn" : (c.kind as "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "craft");
 
@@ -7513,6 +7532,14 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       }
       if (!others.includes(to)) return "choose an opponent to gain the life";
       if (!canGainLife(s, to)) return `${player(s, to).name} can't gain life`;
+      continue;
+    }
+    // Jandor's Ring: "Discard the last card you drew this turn": that card, while it's still in your hand (rulings).
+    if (c.kind === "discard" && c.lastDrawn) {
+      const last = lastDrawnInHand(s, pid);
+      if (!last) return `you need to discard the last card you drew this turn to ${doing}`;
+      const chosen = choices?.discard;
+      if (chosen?.length && (chosen.length !== 1 || chosen[0] !== last)) return "you discard the last card you drew this turn, not a card of your choice";
       continue;
     }
     // "Exile the top creature card of your graveyard": those cards and no others, nothing to choose (CR 404.1).
@@ -7894,8 +7921,9 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       discarded?.push(...picked.map((id) => cardIdOf(obj(s, id))));
       discardCards(s, p.id, picked, " at random");
     } else if (c.kind === "discard") {
-      discarded?.push(...(choices.discard ?? []).map((id) => cardIdOf(obj(s, id))));
-      discardCards(s, p.id, choices.discard ?? []);
+      const ids = c.lastDrawn ? [lastDrawnInHand(s, p.id)].filter((id): id is ObjectId => !!id) : (choices.discard ?? []);
+      discarded?.push(...ids.map((id) => cardIdOf(obj(s, id))));
+      discardCards(s, p.id, ids);
     }
     else if (c.kind === "reveal" && c.orControl) {
       // Behold (CR 701.4a): a card revealed from the hand or a permanent chosen; "and exile it": that card or permanent,

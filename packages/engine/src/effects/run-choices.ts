@@ -714,8 +714,17 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: ["0"], numberRange: { min: 0, max: most }, prompt: `discard how many cards at random (0 to ${most})?` };
           return "paused";
         }
-        if (r.chosen?.number !== undefined || !e.range) return;
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: [String(e.range.min)], numberRange: e.range, prompt: `choose a number between ${e.range.min} and ${e.range.max}` };
+        if (r.chosen?.number !== undefined || !e.range) {
+          // Shapeshifter: "the last chosen number" is kept on the permanent, while it's still that object (CR 400.7).
+          const me = e.keepOnSource && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+          if (me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) && r.chosen?.number !== undefined) {
+            me.chosen = { ...me.chosen, number: r.chosen.number };
+            invalidateCharacteristics(s);
+          }
+          return;
+        }
+        const range = e.maxHandOf ? { min: e.range.min, max: Math.max(e.range.min, ...players(s, e.maxHandOf, ctx).map((x) => player(s, x).hand.length)) } : e.range;
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: [String(range.min)], numberRange: range, prompt: e.maxHandOf ? `choose a number greater than ${e.range.min - 1} (up to ${range.max}, the cards in that player's hand)` : `choose a number between ${range.min} and ${range.max}` };
         return "paused";
       }
       if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "colors" ? "colors" : e.choice === "basicLandType" || e.choice === "landType" ? "landType" : e.choice === "keyword" ? "keyword" : e.choice === "parity" ? "parity" : e.choice === "direction" ? "direction" : e.choice === "landOrNonland" ? "landOrNonland" : "type"] === undefined) {

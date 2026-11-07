@@ -3323,6 +3323,9 @@ function parseDefinedPT(text: string): Modification | null {
     const c = ok(parseCount(m[1]!, null));
     return c && { kind: "definePT", power: c, toughness: c };
   }
+  // Shapeshifter: "~'s power is equal to the last chosen number and its toughness is equal to 7 minus that number".
+  if ((m = /^~'s power is equal to the last chosen number and its toughness is equal to (\d+) minus that number$/.exec(text)))
+    return { kind: "definePT", power: { count: { kind: "selfChosenNumber" } }, toughness: { count: { kind: "selfChosenNumber" }, times: -1, plus: Number(m[1]) } };
   if ((m = /^~'s power is equal to (.+?) and its toughness is equal to (.+)$/.exec(text))) {
     const p = ok(parseCount(m[1]!, null));
     const same = /^that number(?: (plus|minus) (\d+))?$/.exec(m[2]!);

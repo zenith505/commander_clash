@@ -886,6 +886,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // if it's still there then (rulings, CR 400.7).
   if (ctx.selfCard && !ctx.activated && !ctx.spell && (m = /^[Rr]eturn (?:it|~) to the battlefield( tapped)? under its owner's control at the beginning of their next upkeep$/.exec(s)))
     return [{ type: "delayed", when: "ownersNextUpkeep", each: "selfCard", effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard" }, ...(m[1] ? { tapped: true as const } : {}), owner: true }], text: `return it to the battlefield${m[1] ?? ""} under its owner's control` }];
+  // Plague Reaver: "Discard two cards, Sacrifice ~: Choose target opponent. Return ~ to the battlefield under that player's
+  // control at the beginning of their next upkeep.": a delayed trigger (CR 603.7) about the card in the graveyard now, at
+  // that player's next upkeep; it returns only if it's still there (CR 400.7), and not if that player has left the game
+  // (rulings).
+  if (ctx.activated && !ctx.spell && /^[Rr]eturn ~ to the battlefield under that player's control at the beginning of their next upkeep$/.test(s)) {
+    const who = parsePlayer("that player", ctx);
+    if (who?.ref !== "target") return null;
+    return [{ type: "delayed", when: "ownersNextUpkeep", each: "selfCard", whose: who, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard" }, under: { ref: "eventPlayer" } }], text: "return ~ to the battlefield under that player's control" }];
+  }
   // Casey Jones, Vigilante: "At the beginning of your next upkeep, discard three cards at random.": the same, for your
   // next upkeep (only instructions about you, below).
   if ((m = /^At the beginning of your next upkeep, ([a-z].+)$/.exec(s)) && !/\b(?:if|unless|then|instead)\b|,/.test(m[1]!)) return parseSentence(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)} at the beginning of your next upkeep`, ctx);

@@ -1873,6 +1873,65 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ad1712d8-809f-410c-8b91-ffe6fb8a69a1",
+  "name": "Azorius Guildgate",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Gate",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Gate"
+  ],
+  "oracleText": "This land enters tapped.\n{T}: Add {W} or {U}.",
+  "colors": [],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "rna",
+  "releasedAt": "2019-01-25",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ee3d21b9-58b4-480c-bae3-26de50f1a5c6",
+  "name": "Back for Seconds",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Bargain (You may sacrifice an artifact, enchantment, or token as you cast this spell.)\nReturn up to two target creature cards from your graveyard to your hand. If this spell was bargained, you may put one of those cards with mana value 4 or less onto the battlefield instead of putting it into your hand.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Bargain"
+  ],
+  "commanderLegal": "legal",
+  "set": "woe",
+  "releasedAt": "2023-09-08",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1389c9fa-fec2-4212-a7aa-6dfb318dc202",
   "name": "Bagel and Schmear",
   "manaCost": "{1}",
@@ -3155,6 +3214,37 @@
   "set": "xln",
   "releasedAt": "2017-09-29",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "73c423b7-cab8-4e69-8070-9edbf96a6c2c",
+  "name": "Boros Guildgate",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Gate",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Gate"
+  ],
+  "oracleText": "This land enters tapped.\n{T}: Add {R} or {W}.",
+  "colors": [],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "R",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "grn",
+  "releasedAt": "2018-10-05",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -6399,6 +6489,37 @@
   "commanderLegal": "legal",
   "set": "chk",
   "releasedAt": "2004-10-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "52d14717-0cbc-4d7e-b546-54ea91580338",
+  "name": "Dimir Guildgate",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Gate",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Gate"
+  ],
+  "oracleText": "This land enters tapped.\n{T}: Add {U} or {B}.",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "grn",
+  "releasedAt": "2018-10-05",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -10330,6 +10451,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fa2da325-6859-45bb-b185-35526b01bcc1",
+  "name": "Golgari Guildgate",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Gate",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Gate"
+  ],
+  "oracleText": "This land enters tapped.\n{T}: Add {B} or {G}.",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "grn",
+  "releasedAt": "2018-10-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "09ff28b1-b6c9-48e6-b12e-2f0e644f709f",
   "name": "Gravecrawler",
   "manaCost": "{B}",
@@ -10559,6 +10711,37 @@
   "commanderLegal": "legal",
   "set": "slz",
   "releasedAt": "2026-09-02",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d38476e9-2e47-4c0c-8129-483c0bd09ec0",
+  "name": "Gruul Guildgate",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Gate",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Gate"
+  ],
+  "oracleText": "This land enters tapped.\n{T}: Add {R} or {G}.",
+  "colors": [],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G",
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "rna",
+  "releasedAt": "2019-01-25",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -12432,6 +12615,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "bf75a3d1-f184-4b48-a913-21caee1db084",
+  "name": "Izzet Guildgate",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Gate",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Gate"
+  ],
+  "oracleText": "This land enters tapped.\n{T}: Add {U} or {R}.",
+  "colors": [],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "R",
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "grn",
+  "releasedAt": "2018-10-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cc2b6e58-2d6f-495e-95f3-9496105c4cba",
   "name": "Jace Beleren",
   "manaCost": "{1}{U}{U}",
@@ -12978,6 +13192,45 @@
   "set": "chk",
   "releasedAt": "2004-10-01",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "49da6a78-f3b2-4691-975c-efbb644311f3",
+  "name": "Kamiz, Obscura Oculus",
+  "manaCost": "{1}{W}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Octopus Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Octopus",
+   "Rogue"
+  ],
+  "oracleText": "Whenever you attack, target attacking creature can't be blocked this turn. It connives. Then choose another attacking creature with lesser power. That creature gains double strike until end of turn. (To have a creature connive, draw a card, then discard a card. If you discarded a nonland card, put a +1/+1 counter on that creature.)",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Connive"
+  ],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -17031,6 +17284,46 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e06007cf-dc6e-4b50-93d5-9a7c8ee9c023",
+  "name": "Nine-Fingers Keene",
+  "manaCost": "{1}{B}{G}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Rogue"
+  ],
+  "oracleText": "Menace\nWard—Pay 9 life.\nWhenever Nine-Fingers Keene deals combat damage to a player, look at the top nine cards of your library. You may put a Gate card from among them onto the battlefield. Then if you control nine or more Gates, put the rest into your hand. Otherwise, put the rest on the bottom of your library in a random order.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Menace",
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "00037840-6089-42ec-8c5c-281f9f474504",
   "name": "Nissa, Worldsoul Speaker",
   "manaCost": "{3}{G}",
@@ -17613,6 +17906,37 @@
   "set": "c16",
   "releasedAt": "2016-11-11",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "57b37df5-fee4-4720-931f-f0cb0a8b338c",
+  "name": "Orzhov Guildgate",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Gate",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Gate"
+  ],
+  "oracleText": "This land enters tapped.\n{T}: Add {W} or {B}.",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "rna",
+  "releasedAt": "2019-01-25",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -19611,6 +19935,37 @@
   "commanderLegal": "legal",
   "set": "5dn",
   "releasedAt": "2004-06-04",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "361f534b-39d1-4421-b5a8-d3813c62f86d",
+  "name": "Rakdos Guildgate",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Gate",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Gate"
+  ],
+  "oracleText": "This land enters tapped.\n{T}: Add {B} or {R}.",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "rna",
+  "releasedAt": "2019-01-25",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -21658,6 +22013,37 @@
   "set": "m3c",
   "releasedAt": "2024-06-14",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "75b235d3-595a-4859-be45-9559d8445db5",
+  "name": "Selesnya Guildgate",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Gate",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Gate"
+  ],
+  "oracleText": "This land enters tapped.\n{T}: Add {G} or {W}.",
+  "colors": [],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "grn",
+  "releasedAt": "2018-10-05",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

@@ -12,7 +12,7 @@ import { attackChoices, chooseAuraHosts } from "./run-zones";
 import { cantSearch, searchBarred, toBottom } from "./run-library";
 import type { AuraHost } from "../game";
 import { characteristics, controllerOf } from "../layers";
-import { ResolveCtx, amountCtx, amountNow, apnap, players, runEffect } from "./resolve";
+import { ResolveCtx, amountCtx, amountNow, apnap, players, runEffect, subjectCreatureTypes } from "./resolve";
 
 /** Card names (CR 201): exiling the cards with a name from a player's graveyard, hand and library; revealing until one. */
 export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -340,18 +340,6 @@ export function namesFrom(s: GameState, ref: SameNameRef, ctx: ResolveCtx): stri
   if ("revealed" in ref) return (s.resolving?.revealedFromHandIds ?? []).filter((id) => s.objects[id]?.zone === "hand").map((id) => defOf(s, obj(s, id)).name);
   // "Each card exiled this way" (Haunting Echoes), "the exiled card" (Pick the Brain): those still in exile.
   return (s.resolving?.exiledCards ?? []).filter((id) => s.objects[id]?.zone === "exile").map((id) => defOf(s, obj(s, id)).name);
-}
-
-/** The trigger subject's creature types: as it is on the battlefield, or as it last existed there (CR 608.2h). */
-function subjectCreatureTypes(s: GameState, ctx: ResolveCtx): Set<string> | "all" | undefined {
-  const sub = ctx.subject;
-  const o = sub ? s.objects[sub.id] : undefined;
-  if (!sub || !o) return undefined;
-  if (o.zone === "battlefield" && (o.zoneChanges ?? 0) === sub.zc) return creatureTypesOf(s, o);
-  // A dies trigger's subject is the card in its new zone, one zone change after it left the battlefield.
-  const lk = s.lastKnown?.[o.id];
-  if (!lk?.creatureTypes || (lk.zc !== sub.zc && lk.zc !== sub.zc - 1)) return undefined;
-  return lk.creatureTypes === "all" ? "all" : new Set(lk.creatureTypes);
 }
 
 /** The card types of target `index`: as it is on the battlefield, or as it last existed there (CR 608.2h). */

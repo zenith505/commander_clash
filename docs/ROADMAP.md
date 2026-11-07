@@ -3870,7 +3870,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Ravaging Riftwurm (done in round B104) (more time counters as it's kicked); Loyal Sentry and Abu Ja'far (destroying the creatures in a
   block); Orcish Spy (done in round B104) (looking at the top cards without reordering); Gandalf, Wandering Wizard (done in round B104) ("~'s owner ... and
   draws"); Jaded Response (done in round B104) ("shares a color with a
-  creature you control"); Cruel Calculations (cards put into a graveyard from a library this turn); Chainflail
+  creature you control"); Cruel Calculations (done in round B128) (cards put into a graveyard from a library this turn); Chainflail
   Centipede ("~ or equipped creature attacks, it ..."); Spike Cannibal (done in round B104) (moving every +1/+1 counter); Driftgloom Coyote (done in round B109)
   ("if that creature had power 2 or less" after an exile until).
 - Round B9 (ranks about 19,600 up to about 17,100, the easier templates, plus more played cards the same templates
@@ -4133,7 +4133,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ... Otherwise, sacrifice it"); Ether Well; Gore Vassal; "if ~ attacked or blocked this combat" (Kjeldoran Home
   Guard, that combat only). No new prompt: the clash, "you may" and existing pickers ask. +38 (26,709 with round 187).
 - Skipped there, with reasons: Recross the Paths (its reveal-until-a-land line); Scattering Stroke (mana at your next
-  main phase); Wormfang Newt and Wormfang Turtle ("exile a land you control" and its linked return); Curse Artifact,
+  main phase); Wormfang Newt and Wormfang Turtle (done in round B128) ("exile a land you control" and its linked return); Curse Artifact,
   Mind Whip, Soul Charmer and Nakaya Shade (punishers another player answers); Glittering Lion and Glittering Lynx (done in round B111)
   (losing one static ability until end of turn); Wall of Tombstones and Descendant of Masumaro (upkeep counts set as
   base toughness or added then removed); Lava Storm (old "X or Y" wording with no mode choice); Eternal Flame and
@@ -4322,7 +4322,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   name; "deals 3 damage to you and attacks this turn if able"). +39 (27,089 of 31,936 with Lane A round 195).
 - Skipped there: Hypnox and Realm Razer (an enters exile and a leaves return, close to Wormfang Behemoth's, left for a
   round that checks "if you cast it from your hand" and "under their owners' control"), Gravegouger, Wormfang Newt and
-  Wormfang Turtle (one exile ability the return can't be linked to), Goblin Ski Patrol, Phyrexian Devourer (a power
+  Wormfang Turtle (done in round B128) (one exile ability the return can't be linked to), Goblin Ski Patrol, Phyrexian Devourer (a power
   state trigger), Detention Sphere (left to Lane A, near the top; done in round 277). Known limit: a "*" creature card's power outside the
   battlefield is read from its characteristic-defining ability only where a rule asks for it (cost payments, spells on
   the stack); characteristics() still shows it as 0 there.
@@ -4518,7 +4518,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   +26 (27,547 of 31,936 with B35 and rounds 202 to 206).
 - Out after round B36: North Star (spend mana as though any type for one spell), Silhouette (prevent damage only
   from sources whose spell or ability targets it), Suffocation (damage history of red spells), Oracle of Dust (a card an
-  opponent owns from exile as a cost), Haphazard Bombardment (aim counters), Bladecoil Serpent ("for each {U}{U}
+  opponent owns from exile as a cost), Haphazard Bombardment (aim counters), Bladecoil Serpent (done in round B128) ("for each {U}{U}
   spent"), Wall of Shadows ("spells that can target only Walls"), Fickle Efreet (a delayed flip at end of combat, then
   an opponent gains control), Tam, Mindful First-Year (hexproof from each of its colors; its "becomes all colors"
   line now parses), Dragon's Disciple (reveal a Dragon as it enters), Lamplight Phoenix (collect evidence as a dies
@@ -5628,7 +5628,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Troll). +13 (29,346 of 31,936 with B86, B87 and rounds 248 and 249).
 - Out after round B88 (looked at, not done): Psychic Rebuttal (copying a spell after it's been countered), Soulblast
   (an additional cost of sacrificing all creatures you control), Tyrannical Pitlord ("as ~ enters, choose another
-  creature you control"), Spatial Binding ("can't phase out"), Batroc the Leaper (up to X targets, X the times kicked),
+  creature you control"), Spatial Binding (done in round B128) ("can't phase out"), Batroc the Leaper (up to X targets, X the times kicked),
   Miasma Demon (discard any number, then up to that many targets), Gorex, the Tombshell (an optional exile cost that
   reduces the cost), Rasputin Dreamweaver ("if ~ started the turn untapped").
 - Round B89 (one-line templates from the bottom of the list): Aura moves, "Attach target Aura attached to a creature to
@@ -6179,6 +6179,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Hedge Whisperer, The Blackstaff of Waterdeep and Welcome to . . . // Jurassic Park (a permanent "becomes an N/N ...
   creature" for as long as ~ stays tapped, or for as long as you control ~, CR 611.2b, through the same template). +12
   (30,231 of 31,936 with B125, B126 and rounds 294 and 295).
+- Round B128 (least played first, from the skip lists): Wormfang Newt and Wormfang Turtle ("exile a land you control",
+  returned when it leaves, linked abilities, CR 607.2a; a land that leaves before the exile happens stays exiled), Wormfang
+  Crab (you choose an opponent, who chooses a permanent you control other than ~ and exiles it; a browser test), Wormfang
+  Drake ("sacrifice it unless you exile a creature you control other than ~"; a browser test), Ertai's Familiar ("When ~
+  phases out or leaves the battlefield, mill three cards" and "{U}: Until your next upkeep, ~ can't phase out": a new
+  can't-phase-out effect that stops direct and indirect phasing, CR 702.26d, rulings; bots keep it here once a turn) and
+  Spatial Binding (the same on any target permanent; Teferi's Protection leaves it behind), Corpseweft ("Exile one or more
+  creature cards from your graveyard" as a cost, a 2X/2X token, X can't be 0; a browser test for the X picker, which now
+  starts its search at the minimum X; bots exile the creature cards they don't need there), Relive the Past (three "up to
+  one" targets returned at once as 5/5 Elementals in addition to their types, CR 205.1b; one card isn't offered for
+  two of them, as it would return once all the same, CR 115.3), Cruel
+  Calculations (cards put into the target player's graveyard from their library this turn), Clay Champion and Bladecoil
+  Serpent (for each {G}{G}, {W}{W}, {U}{U}, {B}{B} or {R}{R} spent to cast it, CR 601.2h; Bladecoil's trample and haste
+  once, as gaining them again changes nothing, CR 702.19g, 702.10d). +11 (30,242 of 31,936 with B127).
+- Out after round B128 (looked at, not done): Bullseye, Death Dealer and Ion Storm (an activation cost with "or" between
+  two costs), Price of Betrayal (counters removed from an opponent, a player, as well as permanents), Bargaining Table
+  (X set by the opponent chosen as it's activated), Selective Snare (a creature type chosen as it's cast).
 - Out after round B127 (looked at, not done): Sutured Ghoul (an enters replacement exiling any number of creature cards
   and a characteristic-defining P/T linked to them, CR 607.2a), Goblin Test Pilot (a target chosen at random as it's
   activated), Valleymaker (a mana ability with a sacrifice cost whose mana goes to another player), Escaped Shapeshifter
@@ -6214,7 +6231,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   goes on the stack), Invoke the Ancients (a separate counter choice for each of the two tokens created, rulings).
 - Out after round B118 (looked at, not done): Flying Drone ("another creature with flying entered the battlefield under your
   control this turn": the turn's enter log doesn't keep keywords), Cellar Door ("puts the bottom card of their library into
-  their graveyard": not a mill, CR 701.17a, so it needs a move of its own), Relive the Past (three "up to one" graveyard
+  their graveyard": not a mill, CR 701.17a, so it needs a move of its own), Relive the Past (done in round B128) (three "up to one" graveyard
   targets of different types returned at once, then 5/5 Elementals), Grifter's Blade (an enters choice of a creature to enter
   attached to), Jandor's Ring (the last card you drew this turn isn't tracked).
 - Out after round B117 (looked at, not done): Price of Betrayal (counters removed from a target that may be a player: no
@@ -6247,7 +6264,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   activated ability: chosen by that opponent while it's cast or activated, CR 601.2c, which can't pause yet; only
   triggered abilities ask).
 - Out after round B109 (looked at, not done): Chainer's Torment (done in round B121) (an X/X token that deals X damage to you, each token if
-  several are made, with X fixed as it resolves, rulings), Cruel Calculations (cards put into a graveyard from the library
+  several are made, with X fixed as it resolves, rulings), Cruel Calculations (done in round B128) (cards put into a graveyard from the library
   this turn: only "from hand or library" is counted).
 - Out after round B108 (looked at, not done): Fade Away (for each creature, a payment or a sacrifice, all players' choices
   announced in turn order before any sacrifice, rulings), Crypsis ("protection from creatures your opponents control":
@@ -6333,7 +6350,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B94 (looked at, not done): Forgotten Lore and Shrouded Lore (an opponent chooses a card in your
   graveyard, repeated while you pay, none chosen twice), Graceful Takedown ("any number of target enchanted creatures you
   control and up to one other target creature" each dealing damage), Nahiri's Sacrifice (an additional sacrifice with
-  mana value X, then X divided), Clay Champion (counters for each {G}{G} and each {W}{W} spent), Sutured Ghoul (power and
+  mana value X, then X divided), Clay Champion (done in round B128) (counters for each {G}{G} and each {W}{W} spent), Sutured Ghoul (power and
   toughness from the cards exiled as it enters), Soul Separator (a copy token "except it's 1/1" plus a token with that
   card's power and toughness), Magus of the Mind (play lands and cast spells from among the exiled cards free this turn),
   Hallowed Moonlight ("if a creature would enter and it wasn't cast"), Welcome to the Fold (a madness-paid X changing the
@@ -6366,7 +6383,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   names), Threefold Signal (replicate granted to spells, beside a spell's own kicker-like cost), Blade of the Swarm
   (done in round 272), Blaze Commando and Flame Channeler (an instant or sorcery spell dealing damage to
   anything, once per instruction), Shorecrasher Elemental and Skittish Valesk (returning or turning a permanent face
-  down), Preferred Selection, Scrying Glass, Hedron Alignment, Ertai's Familiar, Death-Mask Duplicant, Relive the Past.
+  down), Preferred Selection, Scrying Glass, Hedron Alignment, Ertai's Familiar (done in round B128), Death-Mask Duplicant, Relive the Past (done in round B128).
 - Out after round B89 (looked at, not done): Barbed Foliage ("loses flanking": flanking is a triggered ability granted
   by the keyword, not just a keyword to remove), Brothers Yamazaki (an exception to the legend rule), Rogue Skycaptain
   and Rohgahh of Kher Keep ("an opponent gains control of ~"), Stangg and Dance of the Many (linked tokens that leave
@@ -6417,7 +6434,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   face's "that many" targets), Lavabrink Floodgates (each player's own may), Lurebound Scarecrow (done in round B112) (a state trigger bound
   to the chosen color), Grim Contest (done in round B113) (each deals damage equal to its toughness to the other: a fight by toughness).
 - Out after round B77 (looked at, not done): Consecrate Land (done in round B122) ("can't be enchanted by other Auras": no rule for it yet),
-  Corpseweft ("Exile one or more creature cards from your graveyard" as a cost, X from how many), Ruin in Their Wake
+  Corpseweft (done in round B128) ("Exile one or more creature cards from your graveyard" as a cost, X from how many), Ruin in Their Wake
   (where a found card goes depends on controlling a land named Wastes, with a "may"), Evangelize ("target creature of an
   opponent's choice": an opponent picks the target).
 - Out after round B76 (looked at, not done): Mind Roots (done in round B112) (a land card discarded this way onto the battlefield: no

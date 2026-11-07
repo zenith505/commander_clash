@@ -258,7 +258,8 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   const hexproof = targeting && c.controller !== controller && !exposed(s, o) && !seesHexproofOf(s, controller, o);
   if (hexproof && objHasKeyword(s, o, "Hexproof")) return false;
   if (hexproof && src && hexproofFrom(c.keywords, src)) return false; // CR 702.11d
-  if (targeting && objHasKeyword(s, o, "Shroud")) return false; // CR 702.18a: not even its controller can target it
+  // CR 702.18a: not even its controller can target it; Autumn Willow: unless shroud is waived for that player this turn.
+  if (targeting && objHasKeyword(s, o, "Shroud") && !o.shroudWaivedFor?.includes(controller)) return false;
   if (targeting && c.untargetable?.some((u) => untargetableBy(u, controller, src))) return false;
   // Protection from the source's color: it can't be targeted (CR 702.16b), enchanted or equipped (702.16c-d). From a
   // player: not by what that player controls (702.16k); the one targeting controls the spell or ability.

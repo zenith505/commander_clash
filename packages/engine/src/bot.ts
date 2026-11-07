@@ -1221,6 +1221,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // "You may pay any amount of {E}" (Galvanic Discharge, Die Young): enough to kill the target if it's another
     // player's creature or planeswalker (all of it if that's not enough), nothing for one of ours.
     // Memories Returning: our best card into our hand; as the opponent, their best card to the bottom.
+    // Struggle for Sanity: the hand's owner keeps its best card (it comes back); its opponent takes the same one away.
+    if (pend.kind === "chooseOption" && pend.what === "struggleExile") {
+      const owner = obj(s, pend.options[0]!).owner;
+      return [{ type: "chooseOption", player: pid, choice: chooseSearch(s, owner, pend.options, 1)[0] ?? pend.options[0]! }];
+    }
+    // Giant Albatross: 2 life for a creature worth keeping, while there's life to spare.
+    if (pend.kind === "chooseOption" && pend.what === "payLifeOrDestroy") {
+      const o = pend.about ? s.objects[pend.about] : undefined;
+      const n = Number(/Pay (\d+) life/.exec(pend.labels?.[0] ?? "")?.[1] ?? 2);
+      const spare = player(s, pid).life - n;
+      return [{ type: "chooseOption", player: pid, choice: o && spare >= 8 && worth(s, pid, o) >= n ? "pay" : "none" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "alternatePick") {
       const owner = obj(s, pend.options[0]!).owner;
       return [{ type: "chooseOption", player: pid, choice: chooseSearch(s, owner, pend.options, 1)[0] ?? pend.options[0]! }];

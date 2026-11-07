@@ -1082,6 +1082,7 @@ export function moveObject(
   o.tapped = false;
   o.damage = 0;
   o.damagedBy = undefined;
+  o.shroudWaivedFor = undefined;
   o.wasDealtDamage = undefined;
   o.wasDealtNoncombatDamage = undefined;
   o.hasDealtDamage = undefined;
@@ -4124,6 +4125,7 @@ function finishCleanup(s: GameState) {
     // CR 514.2, phased-out permanents too; not from a permanent whose damage isn't removed (Ancient Adamantoise).
     if (!(o.zone === "battlefield" && abilitiesOf(s, o).keepsDamage)) o.damage = 0;
     o.damagedBy = undefined;
+    o.shroudWaivedFor = undefined;
     o.wasDealtDamage = undefined;
     o.wasDealtNoncombatDamage = undefined;
     o.deathtouchDamage = false;
@@ -9424,6 +9426,20 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const st = r.scratch?.impulseChoice;
     if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the exiled cards");
     st.pick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "struggleExile") {
+    const st = r.scratch?.struggle;
+    if (!st) throw new RulesError("nothing to choose");
+    st.pick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "payLifeOrDestroy") {
+    const st = r.scratch?.unlessLife;
+    if (!st) throw new RulesError("nothing to choose");
+    st.answer = choice;
     continueResolution(s);
     return;
   }

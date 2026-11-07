@@ -322,7 +322,7 @@ export type Count =
   /** "For each of its colors" (Breathe Your Last): its colors now, or as it last existed on the battlefield (CR 608.2h). */
   | { kind: "colorsOf"; of: ObjRef }
   /** "The damage already dealt to it this turn" (Whipkeeper): all of it, since it became that object, even if regeneration removed it (rulings). */
-  | { kind: "damageDealtToThisTurn"; of: ObjRef }
+  | { kind: "damageDealtToThisTurn"; of: ObjRef; /** Blazing Effigy: "by other sources named ~": only damage from other permanents with the source's name as they dealt it. */ byOtherNamed?: true }
   /** `highest`: "the highest life total among your opponents" (Malignus): the greatest of theirs, not the sum. */
   | { kind: "life"; who: PlayerRef; highest?: true }
   /** "That player's life total as the turn began" (Sengir, the Dark Baron): the trigger's player's (GameState.lifeAsTurnBegan), in the game or not. */
@@ -1402,6 +1402,12 @@ export type ObjRef =
    * while it's still that card in the graveyard (rulings: once it leaves, the game loses track of it).
    */
   | { ref: "diedDamagedBySelf" }
+  /**
+   * Brine Hag, Giant Albatross: "each creature that dealt damage to ~ this turn": the creatures on the battlefield now that
+   * dealt damage to the source this turn as the permanent it was then (TurnLog.damageDealtTo `src`, CR 400.7); a dies
+   * trigger's source as it last existed on the battlefield (CR 603.10a).
+   */
+  | { ref: "damagedSelfThisTurn" }
   /** "All creatures blocking or blocked by ~" (Kjeldoran Frostbeast): the creatures in combat with the source now, none if it left (CR 506.4). */
   | { ref: "inCombatWithSelf"; /** "Each creature it's blocking" (Gomazoa): only the attackers it blocks. */ blocked?: true; /** "~ and each creature it's blocking": the source too, while it's on the battlefield. */ andSelf?: true; /** Trial: "all creatures blocking or blocked by target creature": in combat with that target instead of the source. */ ofTarget?: number; /** Abu Ja'far: "When ~ dies, destroy all creatures blocking or blocked by it": in combat with the source as it last existed on the battlefield (CR 603.10a, 608.2h), and still blocking or attacking. */ lastKnown?: true }
   /** "Each creature blocking it" (Plague Wight; `subject`: the trigger's attacker, Trailblazer's Torch): the creatures blocking the source now, none if it left combat (CR 506.4). */
@@ -2818,7 +2824,9 @@ export type Effect =
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
   /** "Target unblocked attacking creature becomes blocked" (Dazzling Beauty), "Attacking creatures become blocked" (Fog Patch): blocked by no creature (CR 509.1h), its whole band too (CR 702.22i). */
   | { type: "becomeBlocked"; what: ObjRef }
-  | { type: "removeFromCombat"; what: ObjRef; /** "Remove all attacking creatures from combat and untap them" (Illusionist's Gambit): those removed are "them" (ref "created"). */ remember?: true }
+  /** Autumn Willow: "Until end of turn, ~ can be the target of spells and abilities controlled by target player as though it didn't have shroud" (Permanent.shroudWaivedFor). */
+  | { type: "waiveShroud"; who: PlayerRef }
+  | { type: "removeFromCombat"; what: ObjRef; /** "Remove all attacking creatures from combat and untap them" (Illusionist's Gambit): those removed are "them" (ref "created"). */ remember?: true; /** Ydwen Efreet: "Creatures it was blocking that had become blocked by only ~ this combat become unblocked." */ unblockOnly?: true }
   /**
    * "Reselect which player or permanent target attacking creature is attacking" (Misleading Signpost): its controller's
    * choice as it resolves of another player, planeswalker or battle it could attack, ignoring requirements, restrictions
@@ -3306,6 +3314,12 @@ export type Effect =
   /** "Each opponent reveals cards from the top of their library until they reveal a land card, then puts those cards into their graveyard" (Consuming Aberration). */
   /** "Reveal the top card of your library. If it's a land card, put it into your graveyard and repeat this process" (Countryside Crusher): lands one at a time, until a nonland card (left on top) or an empty library. */
   | { type: "revealTopLandsToGraveyard" }
+  /**
+   * Shapeshifter's Marrow: "the player puts the card into their graveyard and ~ becomes a copy of that card": the revealed
+   * card (ResolvingInfo.revealed) goes to its owner's graveyard, and the source, if it's still that permanent, becomes a
+   * copy of it for good (CR 707.2, its printed values).
+   */
+  | { type: "revealedToGraveyardCopySelf" }
   | { type: "revealUntilLandToGraveyard"; who: PlayerRef; /** "Until they reveal X land cards" (Mind Grind): this many land cards; one if left out. */ n?: Amount; /** "Exiles cards from the top of their library until they exile a land card" (Umbris, Fear Manifest): into exile instead, nothing revealed first. */ exile?: true }
   /** "Each opponent exiles cards from the top of their library until that player has exiled cards with total mana value 20 or greater" (Tasha's Hideous Laughter). */
   | { type: "exileUntilTotalMv"; who: PlayerRef; total: number }
@@ -3331,6 +3345,17 @@ export type Effect =
    * chose to the bottom of your library, each from those still revealed; with fewer cards, as far as they go.
    */
   | { type: "alternatePicks"; n: number; steps: ("hand" | "bottom")[] }
+  /**
+   * Struggle for Sanity: "That player exiles a card from it, then you exile a card from it. Repeat this process until all
+   * cards in that hand have been exiled. That player returns the cards they exiled this way to their hand and puts the rest
+   * into their graveyard."
+   */
+  | { type: "struggleForHand"; who: PlayerRef }
+  /**
+   * Giant Albatross: "for each creature ..., destroy that creature unless its controller pays N life": each creature's
+   * controller decides for it in turn (APNAP by controller), then those not paid for are destroyed at once.
+   */
+  | { type: "destroyEachUnlessLife"; what: ObjRef; life: number; noRegen?: true }
   | {
       type: "revealUntil";
       filter: TargetSpec;
@@ -5561,7 +5586,7 @@ export interface TriggeredAbility {
   cast?: { by: "you" | "opponent" | "any" | "enchanted" | "chosen"; spell: TargetSpec; orCopy?: boolean; /** Skyfire Phoenix: "When you cast your commander": the spell is a commander this ability's controller owns (CR 903.3). */ commander?: true; /** With `orCopy`: "Whenever you copy an instant spell" (Kalamax, the Stormsire): only a copy. */ onlyCopy?: true; /** Vesuvan Duplimancy: with `targetsOnly`, that one permanent is the trigger's subject ("that artifact or creature"), as the spell was cast. */ subjectTarget?: true; /** "That targets only ~" (Zada), "... only a single Golem" (Precursor Golem): every target it has is one object, ~ or one matching this (rulings: several targets all naming it count). */ targetsOnly?: "self" | TargetSpec; nth?: number; /** "A spell other than your first spell each turn" (Arcbound Tracker): its caster's second or later spell this turn. */ notFirst?: true; /** `nth` counts only its caster's spells this turn that match `spell` ("their first noncreature spell each turn"). */ nthOfKind?: true; /** Alania: "if it's the first instant spell, the first sorcery spell, or the first Otter spell other than ~ you've cast this turn": the first of any of these kinds (`notSelfName`: not counting spells with this permanent's name). */ firstOfKinds?: { spec: TargetSpec; notSelfName?: true }[]; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** "If the amount of mana spent to cast it was less than its mana value" (Ancient Cellarspawn). */ spentLessThanMv?: true; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "During each opponent's turn" (Wavebreak Hippocamp): not in its caster's own turn. */ opponentsTurn?: true; /** "Their second spell during their turn" (The Council of Four): only while the caster is the active player. */ ownTurn?: true; /** With `ownTurn`, "during your main phase" (Dovin's Acuity): in a main phase of that turn (CR 505.1). */ mainPhase?: true; /** "Whenever an opponent casts a spell during your turn" (Voice of Resurgence): only while this ability's controller is the active player. */ yourTurn?: true; /** "A kicked spell" (Lullmage's Familiar): its kicker cost was paid (CR 702.33d). */ kicked?: true; /** "A spell using teamwork" (Virtual Assistant): its teamwork cost was paid as it was cast (CR 702.194b). */ teamwork?: true; /** "While ~ is attacking" (Fire Lord Azula): only while this permanent is attacking. */ selfAttacking?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** With `targets`, "an Equipment spell or a spell that targets a creature you control" (Danitha, Sword of Hope): a spell matching this triggers it whatever its targets. */ orSpell?: TargetSpec; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true; /** Volo, Guide to Monsters: "a creature spell that doesn't share a creature type with a creature you control or a creature card in your graveyard". */ sharesNoTypeWithYours?: true; /** "A spell they don't own" (Gonti, Night Minister): its owner isn't its caster. */ notOwned?: true; /** Dragonlord Kolaghan: "a ... spell with the same name as a card in their graveyard", as it's cast (after its costs: delve can exile them, rulings). */ nameInCasterYard?: true; /** Circle of Confinement: "a ... spell with the same name as a card exiled with ~" (linked cards still exiled, CR 607.2a). */ nameExiledWithSelf?: true; /** "A creature spell that has an Adventure" (Garenbrig Squire): an adventurer card (CR 715.2). */ adventure?: true; /** "A spell that has convoke", "a creature spell with flying". */ keyword?: string; /** "A spell with {X} in its mana cost" (Zaxara, Unbound Flourishing). */ xInCost?: true; /** "A spell with {H} in its mana cost" (Rage Extractor): one or more Phyrexian mana symbols in its mana cost (CR 107.4f). */ phyrexianInCost?: true; /** "A noncreature spell with one or more blue mana symbols in its mana cost" (Namor the Sub-Mariner): hybrid and Phyrexian symbols of the color count. */ manaSymbol?: Color; /** "A spell with one or more targets" (Voracious Bibliophile): it was cast with at least one target (CR 115.1). */ hasTargets?: true; /** "Using mana produced by Tecutlan": some of the mana spent to cast it came from this permanent (CR 601.2h). */ manaFromSelf?: true; /** "Whenever you play a land or cast a spell": playing a land that matches this (from `from`, if set) triggers it too. */ orPlaysLand?: TargetSpec; /** Faldorn: "or a land you control enters from exile" triggers it too (CR 603.6a). */ orLandEntersFromExile?: true; /** Fire Lord Zuko: "and whenever a permanent you control enters from exile" (CR 603.6a): also triggered by any permanent entering from exile under your control. */ orPermanentEntersFromExile?: true; /** The Lost and the Damned: "Whenever a land you control enters from anywhere other than your hand or you cast a spell from anywhere other than your hand": also triggered by a land entering under your control from anywhere but your hand. */ orLandEntersNotFromHand?: true; /**
    * "If it shares a card type with the exiled card" (Cemetery Protector): the spell or land played shares one with a card
    * this permanent's linked ability exiled (CR 607.2a), an intervening "if" checked again as it resolves (CR 603.4).
-   */ sharesTypeWithLinked?: true };
+   */ sharesTypeWithLinked?: true; /** Voltaic Visionary: "When you play a card exiled with ~": the spell or land was a card this permanent's linked ability exiled (CR 607.2a), played from there. */ fromLinked?: true };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
   /**

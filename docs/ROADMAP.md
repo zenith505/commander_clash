@@ -1,6 +1,6 @@
 # Roadmap
 
-30,180 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,190 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,962 of 4,988 (99%), top 10,000: 9,621 of
 9,979 (96%).
 
@@ -2363,6 +2363,36 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands.
+   Round 294 took the last names from the top no earlier round looked at (rank 24,900 to 31,400): "As long as the top card
+   of your library is an artifact or creature card, ~ has all activated abilities of that card" (Skill Borrower); "the base
+   power and toughness of each creature that dealt damage to it this turn become 0/2" (Brine Hag: TurnLog.damageDealtTo now
+   keeps the permanent that dealt it and its name); "X is 3 plus the amount of damage dealt to ~ this turn by other sources
+   named ~" (Blazing Effigy); "If you lose the flip, remove ~ from combat and it can't block this turn. Creatures it was
+   blocking that had become blocked by only ~ this combat become unblocked" (Ydwen Efreet); "Until end of turn, ~ can be
+   the target of spells and abilities controlled by target player as though it didn't have shroud" (Autumn Willow); "that
+   player reveals the top card of their library. If it's a creature card, the player puts the card into their graveyard and
+   ~ becomes a copy of that card" (Shapeshifter's Marrow); "for each creature that dealt damage to ~ this turn, destroy that
+   creature unless its controller pays 2 life" (Giant Albatross, with a browser test of the payment); "That player exiles a
+   card from it, then you exile a card from it. Repeat this process ..." (Struggle for Sanity, with a browser test); "As long
+   as there are seven or more cards in your graveyard, you may cast the exiled card, and mana of any type can be spent"
+   (Null Summoner, linked to its exile from a hand); "When you play a card exiled with ~, transform ~" (Voltaic Visionary).
+   +10, 30,190 of 31,936 with B123 and B124. After it, every unsupported name has been looked at by some round.
+   Out after round 294 (looked at, not done): Adventurers' Guildhouse, Mountain Stronghold, Unholy Citadel, Seafarer's
+   Quay, Shelkin Brownie ("bands with other"); Oracle en-Vec (chosen creatures attack next turn, the others can't); False
+   Orders, Balduvian Warlord, General Jarkeld (a blocker removed, then blocking another attacker); Takklemaggot; Jötun Grunt
+   (cumulative upkeep paid with cards from a single graveyard each time); Soul Echo; Goblin Artisans; Ice Cauldron (noted
+   mana); Illusionary Mask; Stand or Fall and Camouflage (piles of blockers); Volrath's Curse and Lost in Thought (a cost
+   paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
+   spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (other players' graveyards as yours);
+   Pygmy Hippo; Snowblind (Y counts the toughness the effect changes); Glyph of Delusion and Glyph of Reincarnation
+   (creatures a Wall blocked this turn); Infernal Denizen; Drought and Brutal Suppression (sacrifices added to costs);
+   Delif's Cube and Acidic Dagger (triggers set up on a target for the turn); Worms of the Earth (lands can't enter the
+   battlefield); The Prismatic Piper (a color chosen before the game); False Dawn; Tidal Flats (a payment for each attacking
+   creature); Backdraft (damage dealt by each sorcery spell); Merseine ("pay enchanted creature's mana cost", activated only
+   by that creature's controller); Frankenstein's Monster (a counter chosen for each exiled card as it enters); Cyclopean
+   Tomb; Apocalypse Chime, Golgothian Sylex and City in a Bottle (names first printed in a set); Reflecting Mirror;
+   Extrapolate the Impossible and Golden Wish (cards from outside the game); Search the City; Minamo's Meddling (spliced
+   cards); Ghostly Flame; Steamflogger Boss (Contraptions); Vodalian War Machine (Merfolk tapped to pay its costs).
    Out after round 292 (looked at, not done): Balthier and Fran (a Vehicle "crewed by ~ this turn" attacking in the first
    combat phase); Eriette, the Beguiler (control while an Aura stays attached); The Fourteenth Doctor (Doctor cards put
    into your graveyard from your library this turn); Tahngarth, First Mate (given to an attacking opponent until end of

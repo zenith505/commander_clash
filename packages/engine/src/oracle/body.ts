@@ -13753,6 +13753,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const lastIf = effects[effects.length - 1];
       const selfFlicker = /^exile ~ and return it to the battlefield under its owner's control at the beginning of the next end step$/.test(ifFlip[2]!);
       const sacIt = ifFlip[1] === "lose" && ifFlip[2] === "sacrifice it" && lastIf?.type === "if" && lastIf.cond.kind === "wonFlip" && lastIf.effects.length === 1 && lastIf.effects[0]!.type === "flicker" && lastIf.effects[0]!.what.ref === "self";
+      // Ydwen Efreet: "If you lose the flip, remove ~ from combat and it can't block this turn. Creatures it was blocking that
+      // had become blocked by only ~ this combat become unblocked.": all three if the flip is lost.
+      const ydwen = ifFlip[1] === "lose" && ifFlip[2] === "remove ~ from combat and it can't block this turn" && /^Creatures it was blocking that had become blocked by only ~ this combat become unblocked\.?$/.test(sentences[si + 1] ?? "") && flipped(effects) ? parseOne("~ can't block this turn", ctx) : null;
+      if (ydwen) {
+        effects.push({ type: "if", cond: { kind: "wonFlip", lost: true }, effects: [{ type: "removeFromCombat", what: { ref: "self" }, unblockOnly: true }, ...ydwen] });
+        si++;
+        continue;
+      }
       const inner0 = !flipped(effects) ? null : selfFlicker ? [{ type: "flicker" as const, what: { ref: "self" as const }, under: "owner" as const, at: "nextEndStep" as const }] : sacIt ? [{ type: "sacrifice" as const, what: { ref: "self" as const } }] : parseOne(capital(may ? may[1]! : ifFlip[2]!), ctx);
       const inner = inner0 && may ? [{ type: "may" as const, effects: inner0, text: may[1]! }] : inner0;
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
@@ -16159,6 +16167,25 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       }
       return null;
     }
+    // Struggle for Sanity: "Target opponent reveals their hand. That player exiles a card from it, then you exile a card from
+    // it. Repeat this process until all cards in that hand have been exiled. That player returns the cards they exiled this
+    // way to their hand and puts the rest into their graveyard."
+    if (s === "Target opponent reveals their hand" && sentences[si + 1] === "That player exiles a card from it" && sentences[si + 2] === "You exile a card from it" && sentences[si + 3] === "Repeat this process until all cards in that hand have been exiled" && /^That player returns the cards they exiled this way to their hand and puts the rest into their graveyard\.?$/.test(sentences[si + 4] ?? "")) {
+      const reveal = parseOne(s, ctx);
+      const who = ctx.targets.length && ctx.targets[ctx.targets.length - 1]?.kind === "player" ? { ref: "target" as const, index: ctx.targets.length - 1 } : null;
+      if (!reveal || !who) return null;
+      effects.push(...reveal, { type: "struggleForHand", who });
+      si += 4;
+      continue;
+    }
+    // Shapeshifter's Marrow: "that player reveals the top card of their library. If it's a creature card, the player puts the
+    // card into their graveyard and ~ becomes a copy of that card." (the upkeep's player); a noncreature card stays on top
+    // (rulings).
+    if (/^[Tt]hat player reveals the top card of their library$/.test(s) && ctx.eventPlayer && /^If it's a creature card, the player puts the card into their graveyard and ~ becomes a copy of that card\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "revealTop", who: { ref: "eventPlayer" } }, { type: "if", cond: { kind: "revealedIs", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" } }, effects: [{ type: "revealedToGraveyardCopySelf" }] });
+      si++;
+      continue;
+    }
     // Nascent Metamorph: "target opponent reveals cards from the top of their library until they reveal a creature card. ~
     // becomes a copy of that card until end of turn. Then that player puts all cards revealed this way on the bottom of their
     // library in a random order.": the card found stays in the library and goes on the bottom too (rulings).
@@ -17060,6 +17087,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Creatures destroyed this way can't be regenerated.": the destroy done instead.
       // War Barge: "When ~ leaves the battlefield this turn, destroy that creature. A creature destroyed this way can't be
       // regenerated.": the delayed destroy.
+      // Giant Albatross: "If you do, for each creature ..., destroy that creature unless its controller pays 2 life. A creature
+      // destroyed this way can't be regenerated.": those it destroys.
+      const eachUnless = /^A creature destroyed this way/.test(s) && (prev?.type === "may" || prev?.type === "if") && prev.effects.length === 1 && prev.effects[0]!.type === "destroyEachUnlessLife" ? prev.effects[0] : undefined;
+      if (eachUnless?.type === "destroyEachUnlessLife") {
+        eachUnless.noRegen = true;
+        continue;
+      }
       if (/^A creature destroyed this way/.test(s) && prev?.type === "delayed" && prev.effects.length === 1 && prev.effects[0]!.type === "destroy") {
         prev.effects[0]!.noRegen = true;
         continue;

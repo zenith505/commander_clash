@@ -7691,7 +7691,10 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     // Sphinx of the Chimes: "two nonland cards with the same name" (CR 201.2).
     const alike = c.kind === "discard" && c.sameName;
     const nameOf = (id: ObjectId) => defOf(s, obj(s, id)).name;
-    const full = oneOf ? `${/^[aeiou]/i.test(oneOf.text) ? "an" : "a"} ${oneOf.text} and ${c.n === 2 ? "another card" : `${c.n - 1} other cards`}` : alike ? `${c.n} ${c.filter?.text ?? "card"}s with the same name` : what;
+    // Weight of Conscience, Illuminated Folio: "that share a creature type", "that share a color".
+    const share = (c.kind === "tap" && c.shareCreatureType) || (c.kind === "reveal" && c.shareColor) ? c : undefined;
+    const full0 = oneOf ? `${/^[aeiou]/i.test(oneOf.text) ? "an" : "a"} ${oneOf.text} and ${c.n === 2 ? "another card" : `${c.n - 1} other cards`}` : alike ? `${c.n} ${c.filter?.text ?? "card"}s with the same name` : what;
+    const full = share ? (c.kind === "tap" ? `${c.n} ${c.filter.text.replace(/^(.*?[a-z])( you control)?$/, "$1s$2")} that share a creature type` : `${c.n} cards from your hand that share a color`) : full0;
     // "You may exile any number of blue cards from your hand": none is fine.
     if (c.kind === "exileFromHand" && c.anyNumber) {
       if (chosen && (new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)))) return `choose ${c.filter?.text ?? "card"}s in your hand to exile`;
@@ -7702,13 +7705,63 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       const can = c.kind === "tap" && c.untap ? [...pool, ...untapViaMana(s, pid, o, c)] : pool;
       if (c.n > 0 && (can.length < c.n || !can.some(fits))) return `you need to ${verb} ${full} to ${doing}`;
       if (alike && !pool.some((id) => pool.filter((x) => sameName(nameOf(x), nameOf(id))).length >= c.n)) return `you need to ${verb} ${full} to ${doing}`;
+      if (share && !shareablePick(s, share, pool)) return `you need to ${verb} ${full} to ${doing}`;
       if ((c.kind === "sacrifice" || c.kind === "discard") && c.differentNames && differentlyNamed(s, pool).length < c.n) return `you need to ${verb} ${full}${c.kind === "discard" ? " with different names" : ""} to ${doing}`;
       continue;
     }
     // X can be 0 ("Exile any number of cards from your graveyard", Painbringer): nothing chosen.
     if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || (chosen.length > 0 && !chosen.some(fits))) return `choose ${full} to ${verb}`;
     if (alike && !chosen.every((id) => sameName(nameOf(id), nameOf(chosen[0]!)))) return `choose ${full} to ${verb}`;
+    if (share && !costChoiceShares(s, share, chosen)) return `choose ${full} to ${verb}`;
     if ((c.kind === "sacrifice" || c.kind === "discard") && c.differentNames && !namesDiffer(s, chosen)) return `choose ${full}${c.kind === "discard" ? " with different names" : ""} to ${verb}`;
+  }
+  return null;
+}
+
+/**
+ * "Tap two untapped creatures you control that share a creature type" (Weight of Conscience): the creatures have a creature
+ * type in common, a changeling every one (CR 702.73a). "Reveal two cards from your hand that share a color" (Illuminated
+ * Folio): the cards have a color in common, colorless none (rulings, CR 105.2c); a card in the hand has its printed colors
+ * (a split card both halves', CR 709.4a; a double-faced card its front face's, CR 712.8a).
+ */
+export function costChoiceShares(s: GameState, c: AdditionalCost, ids: ObjectId[]): boolean {
+  if (c.kind === "tap" && c.shareCreatureType) {
+    let common: Set<string> | null = null; // null: every type so far (changelings only)
+    for (const id of ids) {
+      const t = creatureTypesOf(s, obj(s, id));
+      if (t === "all") continue;
+      const mine: Set<string> = t;
+      const prev: Set<string> | null = common;
+      common = prev ? new Set([...prev].filter((x: string) => mine.has(x))) : mine;
+    }
+    return !common || common.size > 0;
+  }
+  if (c.kind === "reveal" && c.shareColor) return (["W", "U", "B", "R", "G"] as Color[]).some((col) => ids.every((id) => defOf(s, obj(s, id)).colors.includes(col)));
+  return true;
+}
+
+/** Is there a pick of `c.n` from `pool` that shares as costChoiceShares asks? Each candidate with the others that share with it. */
+export function shareablePick(s: GameState, c: AdditionalCost, pool: ObjectId[]): ObjectId[] | null {
+  const n = "n" in c ? (c.n as number) : 1;
+  if (c.kind === "reveal" && c.shareColor) {
+    for (const col of ["W", "U", "B", "R", "G"] as Color[]) {
+      const ids = pool.filter((id) => defOf(s, obj(s, id)).colors.includes(col));
+      if (ids.length >= n) return ids.slice(0, n);
+    }
+    return null;
+  }
+  // A creature type in common: some creature's own type (or every type, for changelings only).
+  const types = new Set<string>();
+  let all = 0;
+  for (const id of pool) {
+    const t = creatureTypesOf(s, obj(s, id));
+    if (t === "all") all++;
+    else for (const x of t) types.add(x);
+  }
+  if (all >= n) return pool.filter((id) => creatureTypesOf(s, obj(s, id)) === "all").slice(0, n);
+  for (const ty of types) {
+    const ids = pool.filter((id) => ((t) => t === "all" || t.has(ty))(creatureTypesOf(s, obj(s, id))));
+    if (ids.length >= n) return ids.slice(0, n);
   }
   return null;
 }

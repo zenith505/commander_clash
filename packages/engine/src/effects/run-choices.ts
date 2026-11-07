@@ -834,6 +834,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? evidenceCollected(s, ctx)
             : e.cond.kind === "treasure"
             ? (ctx.treasureSpent ?? 0) > 0
+            : e.cond.kind === "colorsSpentActivated"
+            ? new Set((s.resolving!.item.manaSpentTypes ?? []).filter((m) => "WUBRG".includes(m))).size === e.cond.exactly
             : e.cond.kind === "spent"
             ? spentMeets(e.cond.target === undefined ? ctx.spent : targetSpellSpent(s, ctx, e.cond.target), e.cond.req)
             : e.cond.kind === "revealedColoredSymbols"

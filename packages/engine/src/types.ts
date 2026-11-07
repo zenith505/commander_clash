@@ -1687,7 +1687,7 @@ export interface TurnLog {
   /** Each token created this turn (CR 111.2): who created it and its subtypes then ("Treasure tokens you created"). */
   tokensCreated?: { player: PlayerId; subtypes: string[] }[];
   /** Permanents that entered the battlefield, with their controller, card types and colors as they entered. */
-  entered?: { controller: PlayerId; types: string[]; subtypes?: string[]; colors: Color[]; /** The permanent, for "another" (Éowyn). */ id?: ObjectId; zc?: number; /** A token (Gyome's "nontoken creatures"). */ token?: true }[];
+  entered?: { controller: PlayerId; types: string[]; subtypes?: string[]; colors: Color[]; /** The permanent, for "another" (Éowyn). */ id?: ObjectId; zc?: number; /** A token (Gyome's "nontoken creatures"). */ token?: true; /** It had flying as it entered (Flying Drone's "another creature with flying entered"). */ flying?: true }[];
   /** Noncreature permanents destroyed by a spell or ability: their controller and the destroying spell's or ability's (Cobra Trap). */
   destroyed?: { controller: PlayerId; by: PlayerId }[];
   /** For each player, the creatures (`id@zoneChanges`) that dealt them damage (Inferno Trap). */
@@ -1772,6 +1772,8 @@ export interface TurnLog {
   diedDamaged?: { id: ObjectId; zc: number; by: ObjectId[] }[];
   /** Wolverine, Best There Is: the sources that dealt damage to a creature other than themselves this turn, as `id@zoneChanges`. */
   damagedCreature?: string[];
+  /** Thirsting Axe: the sources that dealt combat damage to a creature this turn, as `id@zoneChanges`. */
+  combatDamagedCreature?: string[];
   /** The sources that dealt damage, as `id@zoneChanges` (a card's name without one), by the player who controlled each as it did. */
   damageSources?: Record<number, string[]>;
   /** The damage each source (`id@zoneChanges`, a card's name without one) dealt to each player this turn (Vessel of the All-Consuming). */
@@ -2464,7 +2466,7 @@ export interface Resolving {
   /** The cards it revealed, for "each green mana symbol in those cards' mana costs" (Phosphorescent Feast). */
   revealedFromHandIds?: ObjectId[];
   /** The land and nonland cards its parleyReveal instruction revealed ("for each nonland card revealed this way"). */
-  parley?: { land: number; nonland: number };
+  parley?: { land: number; nonland: number; /** Their total mana value (Naya Soulbeast). */ mv?: number };
   /** The mana value of the card its last revealUntil instruction found, if it found one (Yuna's Whistle's reflexive X). */
   revealedUntilMv?: number;
   /** How many cards the last revealUntil revealed, the one found included ("the number of cards revealed this way", Madcap Experiment). */

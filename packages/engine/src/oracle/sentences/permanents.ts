@@ -1043,6 +1043,16 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const filter: TargetSpec = { kind: "object", types: ["Artifact", "Creature", "Land"], notTypes: [], notColors: [], tapped: false, controller: "you", text: "untapped artifact, creature, or land they control" };
     return [{ type: "pick", who, filter, n: { count: { kind: "counters", counter: kind, of: { ref: "self" } } }, action: "tap" }];
   }
+  // Haphazard Bombardment: "choose four nonenchantment permanents you don't control and put an aim counter on each of
+  // them": not targeted (rulings: hexproof doesn't stop it), all of them with four or fewer (CR 609.3), then the counters
+  // go on them at once.
+  if (/^[Cc]hoose four nonenchantment permanents you don't control and put an aim counter on each of them$/.test(s)) {
+    const filter: TargetSpec = { kind: "object", types: [], notTypes: ["Enchantment"], notColors: [], controller: "opponent", text: "nonenchantment permanent you don't control" };
+    return [
+      { type: "pick", who: { ref: "you" }, filter, n: 4, action: "choose", anyController: true, prompt: "click four nonenchantment permanents you don't control. An aim counter goes on each of them." },
+      { type: "counters", what: { ref: "created" }, counter: "aim", n: 1 },
+    ];
+  }
   // Zimone's Hypothesis: "Put a +1/+1 counter on a creature": any player's, picked as it resolves, not targeted. Gix's
   // Command: "Put two +1/+1 counters on up to one creature": the same, or none (rulings: chosen as it resolves).
   if ((m = /^Put (a|two|three) \+1\/\+1 counters? on (a|up to one) creature$/i.exec(s)) && (m[1] === "a") === !/counters/.test(s)) {

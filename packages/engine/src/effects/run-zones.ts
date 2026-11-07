@@ -2151,6 +2151,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       } else if (e.exactly !== undefined && cards.length > e.exactly) {
         // Vault 13: exactly that many of them, chosen as it resolves; with that many or fewer, all of them.
         if (!sc.linkedPick) {
+          // Bane Alley Broker: "You may look at cards exiled with ~": whoever controls it as this resolves (rulings).
+          if (e.dest === "hand" && e.exactly === 1 && ctx.sourceId && s.objects[ctx.sourceId] && abilitiesOf(s, s.objects[ctx.sourceId]!).activated.some((a) => a.body.effects.some((x) => x.type === "exileFaceDown" && x.look)))
+            for (const c of cards) if (c.hiddenExile && !c.hiddenExile.seen.includes(p.id)) c.hiddenExile.seen.push(p.id);
           sc.linkedPick = true;
           delete sc.found;
           const ids = cards.map((c) => c.id);
@@ -2278,7 +2281,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     case "destroyRandom": {
       // Metzali: chosen at random as it resolves, then destroyed (an indestructible one is chosen and survives, rulings).
-      const options = s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+      // Haphazard Bombardment: only among those without indestructible (rulings, CR 702.12b), chosen and destroyed with
+      // nothing in between (rulings).
+      const options = s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), ctx.controller, false) && !(e.destroyable && objHasKeyword(s, obj(s, id), "indestructible")));
       if (!options.length) return;
       const id = options[Math.floor(nextRandom(s) * options.length)]!;
       log(s, `${src} chooses ${nameOf(s, id)} at random.`);

@@ -538,6 +538,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // your hand" (Scent of Cinder), or in its reflexive trigger (Invasion of Tarkir).
   if (ctx?.revealedFromHand && /^(?:the number of )?cards? revealed this way$/i.test(p)) return { count: { kind: "revealedFromHand" } };
   // Parley: "for each nonland card revealed this way", "for each land card revealed this way".
+  // Naya Soulbeast: "the total mana value of all cards revealed this way" after parley's reveal.
+  if (ctx?.parley && /^the total mana value of all cards revealed this way$/.test(p)) return { count: { kind: "parleyRevealed", mv: true } };
   if (ctx?.parley && (m = /^(nonland|land) cards? revealed this way$/i.exec(p))) return { count: { kind: "parleyRevealed", ...(m[1]!.toLowerCase() === "land" ? { land: true as const } : {}) } };
   // "The amount of excess damage dealt to that creature this way" (Hell to Pay), "that excess damage" (Contest of Claws):
   // after a damage instruction (CR 120.10).

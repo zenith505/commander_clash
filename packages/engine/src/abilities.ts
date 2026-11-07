@@ -244,7 +244,7 @@ export type Count =
   /** Goblin Charbelcher: "the number of nonland cards revealed this way" after exileUntilNonland "keep": of all the cards revealed (every one, with no land among them, rulings). */
   | { kind: "revealedUntilNonland" }
   /** Parley: "for each nonland card revealed this way" after "each player reveals the top card of their library" (`land`: land cards instead). */
-  | { kind: "parleyRevealed"; land?: true }
+  | { kind: "parleyRevealed"; land?: true; /** Naya Soulbeast: "the total mana value of all cards revealed this way". */ mv?: true }
   | { kind: "bottomedFromHand" }
   /** How many cards "you may choose a nonland card from it" chose (0 or 1): for "If you do" and "If you don't". */
   | { kind: "tookFromHand" }
@@ -783,7 +783,7 @@ export interface TargetSpec {
   /** `attackingYou`: "creatures attacking you", attacking that player and not a planeswalker or battle (CR 506.3, 508.1b). */
   /** "That blocked or was blocked by a Zombie this turn" (Time to Reflect), "by a legendary creature" (You Cannot Pass!): a block declared this turn with a creature that had this creature type or supertype as the block was declared (TurnLog.blocks `aq`/`bq`, rulings). */
   blockedWith?: { subtype?: string; supertype?: string };
-  combat?: /** "Blocked creature" (Warpath): an attacking creature blocked this combat, even with its blockers gone (CR 509.1h); "unblocked": attacking and not blocked (509.1h). */ "blocked" | "unblocked" | /** "Nonattacking, nonblocking creature" (Unlikely Alliance). */ "notInCombat" | /** "Nonattacking creature" (Alarum): not an attacking creature now. */ "notAttacking" | "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "That attacked you this turn" (Jabari's Influence): declared as an attacker of you this turn (not your planeswalker). */ "attackedYouThisTurn" | /** "Creature that blocked this turn" (Sizzling Barrage): declared as a blocker this turn (CR 509.1), even if it's no longer blocking (rulings). */ "blockedThisTurn" | /** "That attacked or blocked this turn" (Gideon's Triumph): either one declared this turn. */ "attackedOrBlockedThisTurn" | /** "That attacked during their controller's last turn" (Halls of Mist): its controller now. */ "attackedLastTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | /** Total War: "that didn't attack", in the declaration that triggered it: not declared as an attacker in this combat (CR 508.1a). */ "didntAttackThisCombat" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking you or a planeswalker you control" (Soul Snare). */ "attackingYouOrYourPlaneswalker" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent" | /** "Attacking your opponents and/or planeswalkers they control" (Roar of Resistance): not a battle. */ "attackingOpponentOrTheirPlaneswalker" | /** "Attacking alone" (Security Bypass): the only attacking creature (CR 506.5). */ "attackingAlone";
+  combat?: /** "Blocked creature" (Warpath): an attacking creature blocked this combat, even with its blockers gone (CR 509.1h); "unblocked": attacking and not blocked (509.1h). */ "blocked" | "unblocked" | /** "Nonattacking, nonblocking creature" (Unlikely Alliance). */ "notInCombat" | /** "Nonattacking creature" (Alarum): not an attacking creature now. */ "notAttacking" | "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "That attacked you this turn" (Jabari's Influence): declared as an attacker of you this turn (not your planeswalker). */ "attackedYouThisTurn" | /** "Creature that blocked this turn" (Sizzling Barrage): declared as a blocker this turn (CR 509.1), even if it's no longer blocking (rulings). */ "blockedThisTurn" | /** "That attacked or blocked this turn" (Gideon's Triumph): either one declared this turn. */ "attackedOrBlockedThisTurn" | /** "That attacked during their controller's last turn" (Halls of Mist): its controller now. */ "attackedLastTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | /** "Didn't deal combat damage to a creature this turn" (Thirsting Axe): as the object it is now (TurnLog.combatDamagedCreature). */ "didntCombatDamageCreatureThisTurn" | /** Total War: "that didn't attack", in the declaration that triggered it: not declared as an attacker in this combat (CR 508.1a). */ "didntAttackThisCombat" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking you or a planeswalker you control" (Soul Snare). */ "attackingYouOrYourPlaneswalker" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent" | /** "Attacking your opponents and/or planeswalkers they control" (Roar of Resistance): not a battle. */ "attackingOpponentOrTheirPlaneswalker" | /** "Attacking alone" (Security Bypass): the only attacking creature (CR 506.5). */ "attackingAlone";
   /**
    * "Target creature that's attacking that player" after "Whenever you attack a player" (Ordruun Mentor, Echoing Assault):
    * attacking that player itself, not a planeswalker or battle (CR 506.3, 508.1b); "eventPlayer" until the trigger knows
@@ -2310,7 +2310,7 @@ export type StaticCondition =
    * entered under your control this turn, as they entered, even if they've left since; with all of `types`, none of
    * `notTypes`, and `subtype`.
    */
-  | { kind: "youEntered"; types: string[]; notTypes?: string[]; subtype?: string; /** "An Angel or Berserker" (Cleaving Reaper): either subtype. */ orSubtype?: string; n: number; /** "another": not the source itself (Éowyn, Shieldmaiden). */ other?: true; /** "Last turn" (Ephara, God of the Polis): during the turn before this one (GameState.lastTurn.creaturesEntered; creatures only). */ lastTurn?: true }
+  | { kind: "youEntered"; types: string[]; notTypes?: string[]; subtype?: string; /** "An Angel or Berserker" (Cleaving Reaper): either subtype. */ orSubtype?: string; n: number; /** "another": not the source itself (Éowyn, Shieldmaiden). */ other?: true; /** "Another creature with flying" (Flying Drone): it had flying as it entered (TurnLog.entered). */ flying?: true; /** "Last turn" (Ephara, God of the Polis): during the turn before this one (GameState.lastTurn.creaturesEntered; creatures only). */ lastTurn?: true }
   /**
    * "If a noncreature permanent under your control was destroyed this turn by a spell or ability an opponent controlled"
    * (Cobra Trap): only an effect that says "destroy" (rulings), not lethal damage or sacrifice.
@@ -3201,7 +3201,7 @@ export type Effect =
    */
   | { type: "secretChooseEach" }
   /** "Choose a creature at random that attacked this turn. Destroy that creature." (Metzali, Tower of Triumph): one of those matching `filter` as it resolves, not targeted. */
-  | { type: "destroyRandom"; filter: TargetSpec }
+  | { type: "destroyRandom"; filter: TargetSpec; /** Haphazard Bombardment: only among those without indestructible (rulings). */ destroyable?: true }
   /** "A creature an opponent controls chosen at random" (Cinderheart Giant): one permanent matching `filter` as it resolves, not targeted, remembered as ObjRef "created" for the next instruction. */
   | { type: "chooseRandom"; filter: TargetSpec }
   | { type: "sacrifice"; what: ObjRef; byController?: true; /** "That player sacrifices that creature" (Lingering Death): only if the trigger's player controls it (CR 701.21a). */ byEventPlayer?: true }
@@ -4963,6 +4963,8 @@ export type SpellCondition =
   | { kind: "evidence" }
   /** "If mana from a Treasure was spent to cast ~" / "to activate this ability" (CR 106.3). */
   | { kind: "treasure" }
+  /** "If exactly three colors of mana were spent to activate this ability" (Paragon of Modernity): its activation's mana (StackItem.manaSpentTypes), colorless not a color. */
+  | { kind: "colorsSpentActivated"; exactly: number }
   /**
    * "If {U} was spent to cast ~", "if at least three red mana was spent to cast ~", "if five or more mana was spent to
    * cast that spell" (CR 601.2h): the mana spent to cast the spell itself, the spell its permanent was, or the spell a cast
@@ -6603,13 +6605,13 @@ export type AdditionalCost =
    * "Tap an untapped creature you control", "tap two untapped Wizards you control" (CR 602.2b). Any of them, summoning
    * sick or not (CR 302.6 is only about {T}). `other`: the ability also has {T}, so its source is already tapped for it.
    */
-  | { kind: "tap"; filter: TargetSpec; n: number; other?: boolean; /** "Untap a tapped creature you control" (Halo Fountain): untapped instead. */ untap?: true; /** "Tap X untapped Knights you control" (Aryel): X is announced as it's activated, and is how many (CR 107.3a). */ x?: true }
+  | { kind: "tap"; filter: TargetSpec; n: number; other?: boolean; /** "Untap a tapped creature you control" (Halo Fountain): untapped instead. */ untap?: true; /** "Tap X untapped Knights you control" (Aryel): X is announced as it's activated, and is how many (CR 107.3a). */ x?: true; /** "Tap two untapped creatures you control that share a creature type" (Weight of Conscience): all of them have one in common, a changeling every one (CR 702.73a). */ shareCreatureType?: true }
   /**
    * "Reveal a Pirate card from your hand" (Daring Buccaneer): the card stays in the hand. `orControl`: "behold an Elf"
    * (CR 701.4a): an Elf card from your hand or an Elf permanent you control. `exile`: "behold a Kithkin and exile it": the
    * card or permanent is exiled, linked to the permanent the spell becomes (CR 607.2q).
    */
-  | { kind: "reveal"; filter: TargetSpec; n: number; orControl?: TargetSpec; exile?: true; /** "Reveal X red cards from your hand" (Martyr of Ashes): X is announced as it's activated, and is how many (CR 107.3a). */ x?: true }
+  | { kind: "reveal"; filter: TargetSpec; n: number; orControl?: TargetSpec; exile?: true; /** "Reveal X red cards from your hand" (Martyr of Ashes): X is announced as it's activated, and is how many (CR 107.3a). */ x?: true; /** "Reveal two cards from your hand that share a color" (Illuminated Folio): all of them have one color in common; colorless isn't a color (rulings, CR 105.2c). */ shareColor?: true }
   /** "Exile a blue card from your hand" (Force of Will's alternative cost): not the spell itself, on the stack by then (CR 601.2a). */
   | {
       kind: "exileFromHand";

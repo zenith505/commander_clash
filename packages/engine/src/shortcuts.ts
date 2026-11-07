@@ -433,6 +433,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     // Whispering Snitch: only the first surveil each turn matters.
     creatureCounterPutters: t.creatureCounterPutters,
     damagedCreature: t.damagedCreature && [...t.damagedCreature].sort(),
+    combatDamagedCreature: t.combatDamagedCreature && [...t.combatDamagedCreature].sort(),
   };
 }
 

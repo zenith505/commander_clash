@@ -48,6 +48,7 @@ import {
   blockWithoutCompany,
   lonelyBlocker,
   tapCostCandidates,
+  shareablePick,
   craftCandidates,
   untapViaMana,
   counterCostCandidates,
@@ -3768,7 +3769,7 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
   // else our least useful one.
   // Eye of Doom: a doom counter (the Eye destroys them later) likewise.
   // Chaos Defiler: one of the chosen is destroyed at random: each opponent's most useful.
-  if ((after?.type === "destroy" && after.what.ref === "created") || (after?.type === "destroyRandomTarget" && after.what.ref === "created") || (after?.type === "damage" && JSON.stringify(after.to) === '{"ref":"created"}') || (after?.type === "counters" && after.what.ref === "created" && after.counter === "doom")) {
+  if ((after?.type === "destroy" && after.what.ref === "created") || (after?.type === "destroyRandomTarget" && after.what.ref === "created") || (after?.type === "damage" && JSON.stringify(after.to) === '{"ref":"created"}') || (after?.type === "counters" && after.what.ref === "created" && (after.counter === "doom" || after.counter === "aim"))) {
     const rank = (id: ObjectId) => (controllerOf(s, obj(s, id)) !== pid ? -1000 - worth(s, pid, obj(s, id)) : worth(s, pid, obj(s, id)));
     return [...options].sort((a, b) => rank(a) - rank(b)).slice(0, count);
   }
@@ -5714,8 +5715,16 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
         .filter((x) => late || !objIsType(s, x, "Creature"))
         .filter((x) => !manaAbilitiesOn(s, x).some((m) => m.tap) || late)
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
-      if (pool.length < c.n) return null;
-      out.tap = [...(out.tap ?? []), ...pool.slice(0, c.n).map((x) => x.id)];
+      // Weight of Conscience: the cheapest ones with a creature type in common.
+      const picked = c.shareCreatureType ? shareablePick(s, c, pool.map((x) => x.id)) : pool.length >= c.n ? pool.slice(0, c.n).map((x) => x.id) : null;
+      if (!picked) return null;
+      out.tap = [...(out.tap ?? []), ...picked];
+    } else if (c.kind === "reveal" && !c.orControl && !c.x) {
+      // A card revealed from the hand stays there (CR 701.20a); Illuminated Folio: two sharing a color.
+      const fits = player(s, pid).hand.filter((x) => x !== o.id && printedMatches(c.filter, defOf(s, obj(s, x))));
+      const picked = c.shareColor ? shareablePick(s, c, fits) : fits.length >= c.n ? fits.slice(0, c.n) : null;
+      if (!picked) return null;
+      out.reveal = picked;
     } else if (c.kind === "collectEvidence") {
       const ids = spareEvidence(s, pid, c.n, undefined, [], c.filter);
       if (!ids) return null;

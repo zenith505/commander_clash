@@ -189,6 +189,7 @@ import {
   blockWithoutCompany,
   showGrantSource,
   sameName,
+  costChoiceShares,
   mayPayUse,
 } from "@cc/engine";
 import { HUMAN, YOU, actAs, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
@@ -451,6 +452,8 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; fac
   sameName?: true;
   /** Ormos, Archive Keeper: no two of the cards picked may share a name. */
   differentNames?: true;
+  /** Weight of Conscience, Illuminated Folio: the cost the picks must share a creature type or a color for (costChoiceShares). */
+  share?: AdditionalCost;
   /** "Untap a tapped creature you control": the permanents picked are untapped, not tapped. */
   untap?: true;
   /** Offering when it can't be cast now without it: no skipping. */
@@ -824,7 +827,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         // "Tap an untapped creature you control": click what to tap (CR 602.2b).
         if (d.tap !== undefined) continue;
         // "Untap a tapped creature you control" (Halo Fountain) likewise, or one to tap for mana first.
-        return setCostPick({ activate: d, kind: "tap", ...(c.untap ? { untap: true as const } : {}), label: cardOf(s, d.objectId).name, what: `${c.untap ? "untap" : "tap"} ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.n === 1 ? c.filter.text : c.filter.text.replace(/([^s])( you control)$/, "$1s$2")}`, n: c.n, candidates: [...tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c), ...(c.untap ? untapViaMana(s, HUMAN, s.objects[d.objectId]!, c) : [])].filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
+        return setCostPick({ activate: d, kind: "tap", ...(c.untap ? { untap: true as const } : {}), ...(c.shareCreatureType ? { share: c } : {}), label: cardOf(s, d.objectId).name, what: `${c.untap ? "untap" : "tap"} ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.n === 1 ? c.filter.text : c.filter.text.replace(/([^s])( you control)$/, "$1s$2")}${c.shareCreatureType ? " that share a creature type" : ""}`, n: c.n, candidates: [...tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c), ...(c.untap ? untapViaMana(s, HUMAN, s.objects[d.objectId]!, c) : [])].filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
       }
       if (c.kind === "exileFromHand" && c.toLibrary) {
         // "Put a card from your hand on top of your library" (Penance): click the cards in your hand.
@@ -860,7 +863,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         // "Reveal X red cards from your hand" (Martyr of Ashes): click the cards in your hand; they stay there.
         if (d.reveal !== undefined) continue;
         const what = c.filter.text;
-        return setCostPick({ activate: d, kind: "reveal", label: cardOf(s, d.objectId).name, what: `reveal ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${c.n > 1 ? plural(what) : what} from your hand`, n: c.n, candidates: s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && printedMatches(c.filter, cardOf(s, id))), chosen: [] });
+        return setCostPick({ activate: d, kind: "reveal", ...(c.shareColor ? { share: c } : {}), label: cardOf(s, d.objectId).name, what: `reveal ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${c.n > 1 ? plural(what) : what} from your hand${c.shareColor ? " that share a color" : ""}`, n: c.n, candidates: s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && printedMatches(c.filter, cardOf(s, id))), chosen: [] });
       }
       if (c.kind !== "sacrifice" && c.kind !== "discard") continue;
       if (c.kind === "discard" && c.random) continue; // the game picks it (CR 701.9b)
@@ -1901,6 +1904,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           {costPick && (costPick.kind === "sacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "offering" || costPick.kind === "tap" || costPick.kind === "conspire" || costPick.kind === "counterOn") && (
             <CostPickBar
               pick={costPick}
+              valid={!costPick.share || costChoiceShares(s, costPick.share, costPick.chosen)}
               onDone={() => finishCostPick(costPick)}
               onSkip={costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "conspire" || (costPick.kind === "offering" && !costPick.required) ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
               onCancel={() => setCostPick(null)}
@@ -1978,7 +1982,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               chosen={costPick.chosen}
               n={costPick.n}
               {...(costPick.min !== undefined ? { min: costPick.min } : {})}
-              valid={(!costPick.oneOf || costPick.chosen.some((id) => printedMatches(costPick.oneOf!, cardOf(s, id)))) && (!costPick.differentNames || namesDiffer(s, costPick.chosen)) && (!costPick.sameName || costPick.chosen.every((id) => sameName(cardOf(s, id).name, cardOf(s, costPick.chosen[0]!).name)))}
+              valid={(!costPick.oneOf || costPick.chosen.some((id) => printedMatches(costPick.oneOf!, cardOf(s, id)))) && (!costPick.differentNames || namesDiffer(s, costPick.chosen)) && (!costPick.sameName || costPick.chosen.every((id) => sameName(cardOf(s, id).name, cardOf(s, costPick.chosen[0]!).name))) && (!costPick.share || costChoiceShares(s, costPick.share, costPick.chosen))}
               onHover={setHover}
               onToggle={(id) =>
                 setCostPick({ ...costPick, chosen: costPick.chosen.includes(id) ? costPick.chosen.filter((x) => x !== id) : [...costPick.chosen, id].slice(-costPick.n) })
@@ -2459,13 +2463,13 @@ function KickPickBar({
 }
 
 /** Sacrificing as an additional cost (CR 601.2h): click the permanents to sacrifice. */
-function CostPickBar({ pick, onDone, onSkip, onCancel }: { pick: CostPick; onDone: () => void; onSkip?: () => void; onCancel: () => void }) {
+function CostPickBar({ pick, valid = true, onDone, onSkip, onCancel }: { pick: CostPick; valid?: boolean; onDone: () => void; onSkip?: () => void; onCancel: () => void }) {
   return (
     <div className="targeting">
       <span>
         <strong>{pick.label}</strong>: {pick.what} (click {pick.n === 1 ? "it" : "them"})
       </span>
-      <button disabled={pick.chosen.length !== pick.n} onClick={onDone}>
+      <button disabled={pick.chosen.length !== pick.n || !valid} onClick={onDone}>
         {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "counterOn" ? `${pick.what.startsWith("blight") ? "Blight" : "Put the counter"} and ${pick.draft ? "cast" : "activate"}` : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
       </button>
       {onSkip && <button onClick={onSkip}>Cast without</button>}

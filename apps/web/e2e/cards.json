@@ -2088,6 +2088,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4993e373-4b76-4582-a789-6a3123e7ca89",
+  "name": "Bane Alley Broker",
+  "manaCost": "{1}{U}{B}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Rogue"
+  ],
+  "oracleText": "{T}: Draw a card, then exile a card from your hand face down.\nYou may look at cards exiled with this creature.\n{U}{B}, {T}: Return a card exiled with this creature to its owner's hand.",
+  "power": "0",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "gtc",
+  "releasedAt": "2013-02-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "38839894-1706-4e11-8310-5ea8dd8866d9",
   "name": "Bane of Bala Ged",
   "manaCost": "{7}",
@@ -11402,6 +11435,32 @@
   }
  },
  {
+  "oracleId": "fc1eb1c9-b22b-41a1-8b13-94a0e758db0f",
+  "name": "Haphazard Bombardment",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, choose four nonenchantment permanents you don't control and put an aim counter on each of them.\nAt the beginning of your end step, if two or more permanents you don't control have an aim counter on them, destroy one of those permanents at random.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dom",
+  "releasedAt": "2018-04-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6c943c9d-090b-41c1-9003-24c91601e589",
   "name": "Harmony of Nature",
   "manaCost": "{2}{G}",
@@ -12104,6 +12163,30 @@
   "set": "mir",
   "releasedAt": "1996-10-08",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0440f85f-8128-4399-9a3d-51f39e196c96",
+  "name": "Illuminated Folio",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact — Book",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Book"
+  ],
+  "oracleText": "{1}, {T}, Reveal two cards from your hand that share a color: Draw a card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -15811,6 +15894,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7663ac7c-1de3-4250-b96a-fae9dbd66a27",
+  "name": "Memnite",
+  "manaCost": "{0}",
+  "cmc": 0,
+  "typeLine": "Artifact Creature — Construct",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Construct"
+  ],
+  "oracleText": "",
+  "power": "1",
+  "toughness": "1",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "som",
+  "releasedAt": "2010-10-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "deeb942b-cf50-43f7-90a9-bdce4e42123a",
   "name": "Memoricide",
   "manaCost": "{3}{B}",
@@ -19173,6 +19283,32 @@
   "commanderLegal": "legal",
   "set": "rav",
   "releasedAt": "2005-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "873e739c-edf4-46a7-9024-5caaf87f507e",
+  "name": "Pick Up the Pace",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever a creature you control that entered this turn attacks, exile the top card of your library.\nYou may play cards exiled with this enchantment as long as you attacked this turn.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -29045,6 +29181,36 @@
   "set": "lgn",
   "releasedAt": "2003-02-03",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "42989c6d-75d9-4ddd-bb9f-f18c0eb005fe",
+  "name": "Weight of Conscience",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature can't attack.\nTap two untapped creatures you control that share a creature type: Exile enchanted creature.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "mor",
+  "releasedAt": "2008-02-01",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

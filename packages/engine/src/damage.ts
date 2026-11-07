@@ -280,6 +280,8 @@ export function dealDamage(
     // was (`src`); Blazing Effigy: its name.
     (((s.turnLog ??= {}).damageDealtTo ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []).push({ controller: src.controller, subtypes: [...src.subtypes], ...(src.spell ? { spell: true as const } : {}), amount: n, name: src.name, ...(srcKey && !src.spell ? { src: srcKey } : {}) });
     if (srcKey && src.id !== o.id && c.types.includes("Creature") && !s.turnLog.damagedCreature?.includes(srcKey)) (s.turnLog.damagedCreature ??= []).push(srcKey);
+    // Thirsting Axe: "if equipped creature didn't deal combat damage to a creature this turn".
+    if (srcKey && opts.combat && c.types.includes("Creature") && !s.turnLog.combatDamagedCreature?.includes(srcKey)) (s.turnLog.combatDamagedCreature ??= []).push(srcKey);
     // "Whenever ~ deals damage to a creature" (combat damage is all dealt before any of it triggers anything), once the
     // excess damage dealt at the same time is known (see dealPlanned).
     if (src.id && c.types.includes("Creature")) {

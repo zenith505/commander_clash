@@ -2234,6 +2234,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Strength of Night: "If ~ was kicked, Zombie creatures you control get an additional +2/+2 until end of turn": a
   // second pump on top of the first.
   text = text.replace(/(\. If ~ was kicked, [A-Z][a-z]+ creatures you control get) an additional ([+-]\d+\/[+-]\d+ until end of turn\.)$/, "$1 $2");
+  // Paragon of Modernity: "~ gets +1/+1 until end of turn. If exactly three colors of mana were spent to activate this
+  // ability, put a +1/+1 counter on it instead.": "it" is ~.
+  text = text.replace(/^(~ gets \+1\/\+1 until end of turn\. If exactly three colors of mana were spent to activate this ability, put a \+1\/\+1 counter on) it (instead\.)$/, "$1 ~ $2");
   // Addle: "Choose a color. Target player reveals their hand and you choose a card of that color from it. That player
   // discards that card.": the color chosen as it resolves, then the card you choose (CR 608.2c).
   text = text.replace(/^Choose a color\. (Target player|Target opponent) reveals their hand and you choose a card of that color from it\. (?=That player discards that card\.$)/, "Choose a color. $1 reveals their hand. You choose a card of the chosen color from it. ");
@@ -17975,6 +17978,9 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   // Mana from a Treasure (CR 106.3) is spent after the targets are chosen (CR 601.2c, 601.2h), so no target can depend on it.
   { re: "mana from a Treasure was spent to cast ~", cond: { kind: "treasure" }, spellOnly: true, noTargets: true },
   { re: "mana from a Treasure was spent to activate this ability", cond: { kind: "treasure" }, activatedOnly: true, noTargets: true },
+  // Paragon of Modernity: "If exactly three colors of mana were spent to activate this ability": colorless isn't a color
+  // (rulings, CR 105.1); the mana is spent after targets are chosen (CR 602.2b, 601.2h).
+  { re: "exactly three colors of mana were spent to activate this ability", cond: { kind: "colorsSpentActivated", exactly: 3 }, activatedOnly: true, noTargets: true },
   // Dragon Whelp: "If this ability has been activated four or more times this turn, sacrifice ~ at the beginning of the
   // next end step": counted as it resolves, activations after it included (rulings).
   { re: "this ability has been activated four or more times this turn", cond: { kind: "activatedTimes", n: 4 }, activatedOnly: true, noTargets: true },

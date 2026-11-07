@@ -561,6 +561,9 @@ export function compile(d: CardDef): CompiledCard {
       // on the stack, rulings).
       .replace(/^(At the beginning of your upkeep, choose one at random)\. Create an? ([a-z]+(?: and [a-z]+)?) creature token with those characteristics\.((?:\n• \d+\/\d+ [A-Z][a-z]+(?: [A-Z][a-z]+)* with [^\n]+)+)$/m, (_, head: string, colors: string, modes: string) =>
         `${head} —${modes.replace(/\n• (\d+\/\d+) ([A-Z][a-z]+(?: [A-Z][a-z]+)*) with ([^\n]+)/g, (_m: string, pt: string, types: string, rest: string) => `\n• Create a ${pt} ${colors} ${types} creature token with ${rest}`)}`)
+      // Bounding Felidar: "put a +1/+1 counter on each other creature you control. You gain 1 life for each of those
+      // creatures": each of them, counters or not (rulings), counted as it resolves.
+      .replace(/(put an? [^.]+ counter on each other creature you control\. You gain \d+ life for each) of those creatures\./g, "$1 other creature you control.")
       // Gargantuan Leech: "~ costs {1} less to cast for each Cave you control and each Cave card in your graveyard": the two
       // reductions together (CR 601.2f).
       .replace(/^(~ costs \{\d+\} less to cast for each )([^.]+?) and each ([^.]+?)\.$/m, "$1$2.\n$1$3.")
@@ -579,6 +582,10 @@ export function compile(d: CardDef): CompiledCard {
       // "If this spell's additional cost was paid" with "you may waterbend", "you may blight 1" or "you may behold a Dragon"
       // as that cost: whether it was paid, like kicker. "If a Dragon was beheld" is the same: whether a Dragon card was
       // revealed or a Dragon chosen for that cost, whatever happens to it later (CR 701.4b, rulings).
+      // Dragon's Fire: "you may reveal a Dragon card from your hand or choose a Dragon you control" is beholding a Dragon
+      // (CR 701.4a), and "if you revealed a Dragon card or chose a Dragon as you cast ~" is whether that cost was paid.
+      .replace(/^As an additional cost to cast ~, you may reveal an? ([A-Z][a-z]+) card from your hand or choose an? \1 you control\.$/m, (_x, what: string) => `As an additional cost to cast ~, you may behold ${/^[AEIOU]/.test(what) ? "an" : "a"} ${what}.`)
+      .replace(/\b([Ii])f you revealed an? ([A-Z][a-z]+) card or chose an? \2 as you cast ~(?=,)/g, (x, i: string, what: string, _i, text: string) => (new RegExp(`^As an additional cost to cast ~, you may behold an? ${what}\\.$`, "m").test(text) ? `${i}f ~ was kicked` : x))
       .replace(/\b([Ii])f ~'s additional cost was paid\b/g, (x, i: string, _i, text: string) => (MAY_COST.test(text) ? `${i}f ~ was kicked` : x))
       // Dragons of Tarkir: "If you revealed a Dragon card or controlled a Dragon as you cast this spell" with "you may reveal a
       // Dragon card from your hand" as an optional additional cost: whether it was paid, like kicker, or you controlled a
@@ -3861,6 +3868,17 @@ export function compile(d: CardDef): CompiledCard {
       else (out.spellsHaveConspire ??= []).push({ filter: { ...f, text: `${giveConspire[1]} spell` }, ...(giveConspire[2] ? { fromExile: true as const } : {}), text: line });
       continue;
     }
+    // Silverquill, the Disputant: "Each instant and sorcery spell you cast has casualty 1"; Anhelo, the Painter: "The first
+    // instant or sorcery spell you cast each turn has casualty 2"; Ashad, the Lone Cyberman: "The first nonlegendary
+    // artifact spell you cast each turn has casualty 2": an instance of casualty for each such spell as it's cast, on top of
+    // any it has (CR 702.153a-b).
+    const giveCasualty = /^(Each|The first) (instant and sorcery|instant or sorcery|nonlegendary artifact) spell you cast( each turn)? has casualty (\d+)\.$/.exec(line);
+    if (giveCasualty && (giveCasualty[1] === "The first") === !!giveCasualty[3] && (giveCasualty[1] === "Each") === (giveCasualty[2] === "instant and sorcery")) {
+      const f = parseTargetPhrase(`${giveCasualty[2]!.replace(" and ", " or ")} spell`);
+      if (f?.kind !== "spell" || !f.types?.length) out.unsupported.push(raw);
+      else (out.spellsHaveCasualty ??= []).push({ filter: { ...f, text: `${giveCasualty[2]} spell` }, n: Number(giveCasualty[4]), ...(giveCasualty[3] ? { firstEachTurn: true as const } : {}), text: line });
+      continue;
+    }
     // Silverquill Lecturer: "Creature spells you cast have demonstrate" (CR 702.144a): the spell's own "when you cast this
     // spell, you may copy it ...", one for each instance (702.144b), while the permanent is there as it's cast.
     const giveDemonstrate = /^([A-Z][a-z]+) spells you cast have demonstrate\.$/.exec(line);
@@ -5087,6 +5105,19 @@ export function compile(d: CardDef): CompiledCard {
     if (line === "During your turn, your opponents can't cast spells or activate abilities of artifacts, creatures, or enchantments.") {
       out.opponentsCantCastYourTurn = true;
       out.opponentsCantActivateYourTurn = true;
+      continue;
+    }
+    // Molten Exhale: "You may cast ~ as though it had flash if you behold a Dragon as an additional cost to cast it": it may
+    // begin to be cast as though it had flash (CR 601.3c), the behold (CR 701.4a) an optional additional cost paid like
+    // kicker, which it then must be cast with when it couldn't be cast at sorcery speed (CompiledCard.flashIfKicked).
+    const flashBehold = /^You may cast ~ as though it had flash if you behold an? ([A-Z][a-z]+) as an additional cost to cast it\.$/.exec(line);
+    if (flashBehold) {
+      const cost = subtypeSet(flashBehold[1]!) ? parseAdditionalCost(`behold ${/^[AEIOU]/.test(flashBehold[1]!) ? "an" : "a"} ${flashBehold[1]}`) : null;
+      if (!cost || out.kicker || !isSpell || d.keywords.includes("Flash") || d.types.includes("Instant")) out.unsupported.push(raw);
+      else {
+        out.kicker = { costs: [""], extraCosts: [cost], text: `behold ${/^[AEIOU]/.test(flashBehold[1]!) ? "an" : "a"} ${flashBehold[1]}`, optional: true };
+        out.flashIfKicked = true;
+      }
       continue;
     }
     // Timely Ward: "You may cast ~ as though it had flash if it targets a commander": one of its targets, as it's cast, is
@@ -7029,6 +7060,8 @@ function checkCastingLinks(out: CompiledCard) {
   permExileCost = false;
   visit([out.costMods, out.activationTaxes]);
   if (out.nameBans || out.protectionFromChosenName) needs.add("cardName");
+  // Seal of the Guildpact: "the chosen colors" are the ones it chose as it entered.
+  if (out.costMods?.some((m) => m.perChosenColor) && !out.entersChoose?.some((c) => c.what === "color" && c.many)) bad = true;
   // Petrified Hamlet: a ban's or a static's chosen name is the one the permanent chose as it entered (its Chosen.name);
   // the choice of a "When ~ enters, choose a land card name" trigger is only kept while that trigger resolves.
   if ((out.nameBans || out.protectionFromChosenName || JSON.stringify(out.statics).includes('"chosen":"name"')) && !out.entersChoose?.some((c) => c.what === "cardName")) bad = true;
@@ -7044,6 +7077,14 @@ function checkCastingLinks(out: CompiledCard) {
   // "The power of the creature tapped this way" needs a "Tap an untapped creature you control" cost (or station's).
   const tapPowIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"stationPower"');
   if (tapPowIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => tapPowIn(ab) && !ab.station && ab.costs?.filter((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x && c.filter.kind === "object" && !!c.filter.types?.includes("Creature")).length !== 1)) bad = true;
+  // Molten Exhale: a cast as though it had flash is checked for its behold once its targets are chosen (castProblem).
+  if (out.flashIfKicked && !out.spell?.targets.length) bad = true;
+  // Dragon's Fire: "the power of that card or creature" is the one beheld for the spell's own optional behold cost.
+  const beheldIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"beheldPower"');
+  if (beheldIn([out.triggers, out.statics, out.activated]) || (beheldIn(out.spell) && !(out.kicker?.optional && out.kicker.extraCosts?.length === 1 && out.kicker.extraCosts[0]!.kind === "reveal" && !!out.kicker.extraCosts[0]!.orControl && out.kicker.extraCosts[0]!.n === 1))) bad = true;
+  // Wonderscape Sage: "that land" is the one land the ability's "Return a land you control to its owner's hand" cost returns.
+  const retLandIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"returnedNonbasicLandType"');
+  if (retLandIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => retLandIn(ab) && ab.costs?.filter((c) => c.kind === "returnToHand" && c.n === 1 && c.filter.kind === "object" && !!c.filter.types?.includes("Land")).length !== 1)) bad = true;
   // Swallow Whole: "the creature tapped to pay ~'s additional cost" needs the spell's one "tap an untapped creature you
   // control" additional cost, and only the spell is about it.
   const costTapIn = (v: unknown) => JSON.stringify(v ?? null).includes('"ref":"costTapped"');

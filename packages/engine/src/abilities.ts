@@ -353,6 +353,8 @@ export type Count =
   | { kind: "milledThisWay"; filter?: TargetSpec }
   /** "The number of rad counters you have", "the total number of rad counters among players" (`who` unset; CR 728). */
   | { kind: "rad"; who?: PlayerRef }
+  /** Lumbering Megasloth: "for each counter among players and permanents": every counter of every kind on each player still in the game and each permanent (CR 122.1). */
+  | { kind: "allCounters" }
   /** "Your speed": 0 if you have none (CR 702.179f). */
   | { kind: "speed" }
   /** "The number of creatures in your party" (CR 700.8): 0 to 4. */
@@ -600,6 +602,8 @@ export type Count =
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
   /** Station's "the tapped creature's power" (CR 702.184a), and "the power of the creature tapped this way" after a "Tap an untapped creature you control" cost (Keldon Battlewagon): as the ability resolves, or as it last existed (rulings on Impelled Giant); never below 0 (CR 107.1b). */
   | { kind: "stationPower" }
+  /** Dragon's Fire: "the power of that card or creature", the Dragon card revealed or the Dragon chosen for its behold cost (CR 701.4a): a permanent's power as the spell resolves, or as it last existed on the battlefield (rulings); a card's in the hand as it resolves, or as it was revealed. */
+  | { kind: "beheldPower" }
   /** How many players took a punisher's penalty this time (Acererak's "for each opponent, you create ... unless"). */
   | { kind: "punished" }
   /** 1 while the condition holds, else 0: "Add {G}{G}. If you've completed a dungeon, add six {G} instead." */
@@ -1854,7 +1858,7 @@ export type Modification =
   | { kind: "ownBlockTax"; n: number; perPlusOne?: true; amount?: Amount }
   /** Hipparion: "~ can't block creatures with power 3 or greater unless you pay {1}": paid as blockers are declared, for each such creature it blocks, its power then (CR 509.1d). */
   | { kind: "ownBlockTaxVs"; n: number; minPower: number }
-  | { kind: "attackTax"; n: number; amount?: Amount; planeswalkers?: true; /** Onakke Oathkeeper: "Creatures can't attack planeswalkers you control unless ...": only attacks on its controller's planeswalkers, not on the player. */ onlyPlaneswalkers?: true; /** A symbol other than generic mana per creature, "{W/P}" (Norn's Annex). */ mana?: string; /** Nils, Discipline Enforcer: each creature with counters on it, {X} for it, X its number of counters (all kinds, rulings). */ perCounter?: true }
+  | { kind: "attackTax"; n: number; amount?: Amount; planeswalkers?: true; /** Onakke Oathkeeper: "Creatures can't attack planeswalkers you control unless ...": only attacks on its controller's planeswalkers, not on the player. */ onlyPlaneswalkers?: true; /** A symbol other than generic mana per creature, "{W/P}" (Norn's Annex). */ mana?: string; /** Nils, Discipline Enforcer: each creature with counters on it, {X} for it, X its number of counters (all kinds, rulings). */ perCounter?: true; /** Elephant Grass: "Nonblack creatures can't attack you unless ...": only attackers that aren't this color as attackers are declared pay it. */ unlessColor?: Color }
   /** "Untap ~ during each other player's untap step" (CR 502.3). */
   | { kind: "untapsDuringOthers" }
   | { kind: "blocksOnlyFlyers" } // "can block only creatures with flying" (a blocking restriction, CR 509.1b)
@@ -2285,7 +2289,7 @@ export type StaticCondition =
   /** "If an opponent was dealt 7 or more damage this turn" (Spinerock Knoll): in total, from any sources (rulings). */
   | { kind: "opponentDealtDamage"; n: number; /** "If you were dealt 4 or more damage this turn" (Boarded Window): `you`. */ you?: true }
   /** "If you attacked with three or more creatures this turn" (Windbrisk Heights): different creatures you declared as attackers. */
-  | { kind: "attackedWith"; n: number; /** "Three or more Merfolk" (Deepway Navigator): of that creature type as they were declared. */ subtype?: string; /** In this combat only, not this turn (Kytheon, Hero of Akros). */ combat?: true; /** "If they were attacked this turn by an Assassin you controlled" (Ramses, Assassin Lord): only attackers declared attacking the event's player, not a planeswalker of theirs (rulings). */ eventPlayer?: true }
+  | { kind: "attackedWith"; n: number; /** "Three or more Merfolk" (Deepway Navigator): of that creature type as they were declared. */ subtype?: string; /** Fearless Swashbuckler: "if a Pirate and a Vehicle attacked this combat": with `combat`, an attacker declared this combat with each of these subtypes, as it was declared (one creature may be both, rulings). */ eachSubtype?: string[]; /** In this combat only, not this turn (Kytheon, Hero of Akros). */ combat?: true; /** "If they were attacked this turn by an Assassin you controlled" (Ramses, Assassin Lord): only attackers declared attacking the event's player, not a planeswalker of theirs (rulings). */ eventPlayer?: true }
   /** Pack tactics: "if you attacked with creatures with total power 6 or greater this combat": their total power as they were declared as attackers (PlayerState.attackPower; AFR release notes). */
   | { kind: "attackPower"; n: number }
   /** "If you lost life last turn" (First Response, Paladin of Atonement): during the turn before this one (GameState.lastTurn). */
@@ -4947,6 +4951,8 @@ export type SpellCondition =
   /** "If the sacrificed creature was suspected" (Agency Coroner): the creature its sacrifice cost sacrificed, as it last
    * existed on the battlefield (CR 608.2h), where being suspected is a designation it had (CR 701.60). */
   | { kind: "sacrificedSuspected" }
+  /** "Unless that land had a nonbasic land type" (Wonderscape Sage): the land a "Return a land you control to its owner's hand" cost returned had a land type other than the basic ones, as it last existed (CR 205.3i, 608.2h). */
+  | { kind: "returnedNonbasicLandType" }
   /** "If the sacrificed creature was legendary" (Nasty End): the same, legendary as it last existed (CR 608.2h). */
   | { kind: "sacrificedLegendary" }
   /** "If the sacrificed creature was a Hamster" (Minsc & Boo): one of its creature types as it last existed. */
@@ -5722,6 +5728,8 @@ export interface TriggeredAbility {
    */ sharesTypeWithLinked?: true; /** Voltaic Visionary: "When you play a card exiled with ~": the spell or land was a card this permanent's linked ability exiled (CR 607.2a), played from there. */ fromLinked?: true };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
+  /** With `perPlayer`: "Whenever you attack the player who has the initiative" (Loot Dispute): only for the player who had the initiative as attackers were declared (CR 726). */
+  toInitiative?: true;
   /**
    * For "permanentDealtExcess" (CR 120.10): which permanents ("a creature or planeswalker an opponent controls", the
    * subject, "that excess damage" its event's amount), `noncombat` for "excess noncombat damage", `oneOrMore` for "one or
@@ -6566,6 +6574,8 @@ export interface CostMod {
   sharesCreatureTypeWithSelf?: true;
   /** "Cost {1} less to cast for each card type they share with cards exiled with ~" (Cemetery Prowler): `n` once for each card type of the spell among them (rulings). */
   perTypeSharedWithLinked?: true;
+  /** Seal of the Guildpact: "for each of the chosen colors it is": `n` once for each of the source's chosen colors (Chosen.colors) the spell is. */
+  perChosenColor?: true;
   /** "Cost {1} less to cast for each card with the same name as that spell in your graveyard" (Locket of Yesterdays): `n` once for each such card in the caster's graveyard, the spell itself not counted (rulings). */
   perSameNameInGraveyard?: true;
   /** Myth Unbound: "Your commander costs {1} less to cast for each time it's been cast from the command zone this game": only a commander owned by the permanent's controller (CR 903.3), `n` once for each time its owner has cast it from the command zone (CR 903.8), whoever casts it (rulings). */
@@ -6984,6 +6994,8 @@ export interface CompiledCard {
   flashIfTargetsYours?: true;
   /** "You may cast ~ as though it had flash if X is 3 or less." (Silver Scrutiny): with the X announced for it at most this (CR 601.3b, 601.2b). */
   flashIfXAtMost?: number;
+  /** Molten Exhale: "You may cast ~ as though it had flash if you behold a Dragon as an additional cost to cast it" (CR 601.3c): cast at instant speed only with its optional `kicker` cost paid. */
+  flashIfKicked?: true;
   /** "As ~ enters, choose a player" / "an opponent" (CR 614.12): kept while it's on the battlefield, as Chosen.player. */
   entersChoosePlayer?: "player" | "opponent";
   /** "As ~ enters, choose another creature you control" (Dauntless Bodyguard, CR 614.12): one of these, not one entering with it (rulings), kept as Chosen.object. */
@@ -7727,6 +7739,12 @@ export interface CompiledCard {
   spellsHaveDemonstrate?: { filter: TargetSpec; text: string; /** The Twelfth Doctor: only the first spell its controller casts each turn from anywhere other than their hand (GameState.castThisTurn). */ firstNotFromHand?: true }[];
   /** "Each noncreature spell you cast has conspire" (Raiding Schemes, Wort, Rassilon): as for spellsHaveConvoke (CR 702.78a). */
   spellsHaveConspire?: { filter: TargetSpec; fromExile?: true; text: string }[];
+  /**
+   * "Each instant and sorcery spell you cast has casualty 1" (Silverquill, the Disputant), "The first instant or sorcery
+   * spell you cast each turn has casualty 2" (Anhelo, the Painter): an instance of casualty N for each (CR 702.153a-b),
+   * as the spell is cast; `firstEachTurn`: only its controller's first spell this turn matching `filter`.
+   */
+  spellsHaveCasualty?: { filter: TargetSpec; n: number; firstEachTurn?: true; text: string }[];
   spellsHaveConvoke?: { filter: TargetSpec; /** "Spells you cast from exile" (Hoarding Broodlord). */ fromExile?: true; /** "The first historic spell you cast each turn" (Peri Brown): only while no other spell matching `filter` was cast by its controller this turn. */ firstEachTurn?: true; text: string }[];
   /** "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126. */
   spellsHaveImprovise?: { filter: TargetSpec; /** "The first nonartifact spell you cast each turn" (The Fifteenth Doctor), as for convoke. */ firstEachTurn?: true; text: string }[];

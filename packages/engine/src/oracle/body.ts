@@ -18287,6 +18287,14 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     if (/^X plus/.test(more[1]!) && !ctx.spell) return null;
     return { effects: [{ ...prev, amount: /^X plus/.test(more[1]!) ? { count: { kind: "x" as const }, plus: Number(more[1]!.slice(7)) } : amt(more[1]!) }], instead };
   }
+  // Dragon's Fire: "If you revealed a Dragon card or chose a Dragon as you cast this spell, ~ deals damage equal to the
+  // power of that card or creature instead" (read as kicked): the same damage, the beheld card's or creature's power
+  // (Amount beheldPower; compile checks the spell's behold cost).
+  if (instead && ctx.spell && /^(?:It|~) deals damage equal to the power of that card or creature$/.test(t)) {
+    const prev = previous[0];
+    if (previous.length !== 1 || prev?.type !== "damage") return null;
+    return { effects: [{ ...prev, amount: { count: { kind: "beheldPower" as const } } }], instead };
+  }
   // Dispelling Exhale: "Counter target spell unless its controller pays {2}. If a Dragon was beheld, counter that spell
   // unless its controller pays {4} instead" (beheld read as kicked): the same counter, a bigger payment.
   const morePay = instead ? /^Counter that spell unless its controller pays (\{\d+\})$/.exec(t) : null;
@@ -18482,6 +18490,14 @@ function parsePutChoice(s: string, ctx: Ctx): Effect[] | null {
  * this turn, checked as it resolves.
  */
 function parseUnlessEntered(s: string, ctx: Ctx): Effect[] | null {
+  // Wonderscape Sage: "Then discard a card unless that land had a nonbasic land type": the land its "Return a land you
+  // control to its owner's hand" cost returned, its land types as it last existed (CR 205.3i, 608.2h; compile.ts checks
+  // the ability has that cost).
+  const land = ctx.activated ? /^(.+) unless that land had a nonbasic land type$/.exec(s) : null;
+  if (land) {
+    const fx = parseOne(land[1]!, ctx);
+    return fx && [{ type: "if", cond: { kind: "returnedNonbasicLandType" }, effects: [], otherwise: fx }];
+  }
   const m = /^(.+) unless ~ entered this turn$/.exec(s);
   if (!m) return null;
   const fx = parseOne(m[1]!, ctx);

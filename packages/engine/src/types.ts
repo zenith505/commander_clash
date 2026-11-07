@@ -953,7 +953,7 @@ export interface Player {
    * one put onto the battlefield attacking not at all (Windbrisk Heights rulings).
    */
   /** How many creatures this player declared as attackers in this turn's latest combat (Kytheon, Hero of Akros: "~ and at least two other creatures attacked this combat"). */
-  attackedCombat?: { turn: number; combat: number; n: number };
+  attackedCombat?: { turn: number; combat: number; n: number; /** The attackers declared then, as "id@zoneChanges" keys into attackedWith's kinds and others. */ keys?: string[] };
   /** The last turn this player ventured into the dungeon (Keen-Eared Sentry, CR 701.49). */
   venturedTurn?: number;
   attackedWith?: { turn: number; keys: string[]; /** Each one's creature types as it was declared ("all" with changeling-like), for "you attacked with three or more Merfolk this turn" (Deepway Navigator). */ kinds?: Record<string, string[] | "all">; /** The players each one was declared attacking, not their planeswalkers (Ramses, Assassin Lord). */ to?: Record<string, PlayerId[]>; /** Each one's other subtypes as it was declared, artifact types such as Spacecraft (Thaumaton Torpedo). */ others?: Record<string, string[]> };
@@ -1106,6 +1106,8 @@ export interface StackItem {
   castNth?: number;
   /** For a spell: its casualty cost was paid (CR 702.153a). */
   casualty?: boolean;
+  /** For a spell: how many instances of casualty were paid, when more than one (CR 702.153b). */
+  casualtyTimes?: number;
   /** For a spell: its conspire cost was paid (CR 702.78a). */
   conspired?: boolean;
   /** For a spell: how many instances of conspire were paid, when more than one (CR 702.78b). */
@@ -1264,6 +1266,8 @@ export interface RegenRider {
 }
 
 export interface LastKnown {
+  /** The subtypes of what a "Return a land you control to its owner's hand" cost returned, as it last existed (Wonderscape Sage). */
+  returnedSubtypes?: string[];
   /** The object it was (a card keeps its id in its new zone): "another permanent card" than the one sacrificed this way. */
   id?: ObjectId;
   counters?: Record<string, number>;
@@ -1357,6 +1361,8 @@ export interface CostChoices {
   returnToHand?: ObjectId[];
   /** The creature sacrificed for casualty (CR 702.153a), if any. */
   casualty?: ObjectId;
+  /** The creatures sacrificed for its other instances of casualty, one each (CR 702.153b; Silverquill, the Disputant's on a spell with its own). */
+  casualtyMore?: ObjectId[];
   /** Cast with a once-each-turn graveyard permission (CastFromGraveyard.permits): which one (Muldrotha's slot for the spell). */
   permit?: string;
   /** Aminatou's Augury: the nonland card type it's cast as, of its own (GameObject.mayPlay.byType); unset, `defaultByType`'s. */

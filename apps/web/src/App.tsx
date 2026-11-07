@@ -1023,7 +1023,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // An alternative cost with X in it: overloaded Street Spasm's {X}{X}{R}{R} (CR 107.3a).
     const altMana = d.alt ? altCost(card, d.alt, s, HUMAN)?.mana : undefined;
     const altX = !!altMana && parseManaCost(altMana).hasX;
-    if (d.x === undefined && ((parseManaCost(card.manaCost).hasX && (!free || parseManaCost(madnessCastOf(s, HUMAN, d.objectId) ?? "").hasX) && !d.via && !d.alt) || altX || costX)) {
+    // A madness cost with an {X} the mana cost doesn't have: "Madness {X}{B}{B}" (From Under the Floorboards).
+    const madnessX = free && parseManaCost(madnessCastOf(s, HUMAN, d.objectId) ?? "").hasX;
+    if (d.x === undefined && ((parseManaCost(card.manaCost).hasX && (!free || madnessX) && !d.via && !d.alt) || altX || costX || madnessX)) {
       // Rottenmouth Viper: with as many sacrificed as X (the ones picked later may differ).
       const plan = (n: number) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, compiled.sacrificedReduction ? { ...kicks, sacrifice: reducingSacrifices(s, d.objectId).slice(0, n) } : kicks);
       // "You may sacrifice one or more creatures" (Plumb the Forbidden): X is how many, none unless you pick more.

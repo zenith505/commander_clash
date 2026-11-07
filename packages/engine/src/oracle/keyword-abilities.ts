@@ -3,7 +3,7 @@ import type { AbilityBody, Amount, CounterKind, ActivatedAbility, TriggeredAbili
 import { CREATURE_TYPES, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import type { CardDef, FaceDownKind } from "../types";
-import { NUM, num, keywordOf, plainMana, sacrificeSelf, pumpSelf, BASIC_TYPES, capital, singular, singularWord } from "./words";
+import { NUM, num, keywordOf, plainMana, xMana, sacrificeSelf, pumpSelf, BASIC_TYPES, capital, singular, singularWord } from "./words";
 import { parseBody, parsePayCost } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseTargetPhrase, pickFilter } from "./targets";
@@ -268,7 +268,7 @@ export function parseCostKeyword(
   // A bestow cost with {X} (Nyxborn Hydra's {X}{G}{G}): X is announced and paid as for the mana cost (CR 107.3a), only when
   // the card's own mana cost has the X its text uses.
   if ((m = /^Bestow(?: |—)(.+?)\.?$/.exec(line))) return /^(\{[^}]+\})+$/.test(m[1]!) && (plainMana(m[1]!) || (plainMana(m[1]!.replace(/\{X\}/g, "")) && parseManaCost(m[1]!).supported && /\{X\}/.test(d.manaCost))) ? { alt: { kind: "bestow", mana: m[1]! } } : "fail";
-  // Madness (CR 702.35a): "Madness—{1}{B}, Pay 1 life" and X madness costs aren't modeled.
+  // Madness (CR 702.35a).
   // Miracle [cost] (CR 702.94a): a mana cost, without an X the mana cost doesn't have.
   if ((m = /^Miracle ((?:\{[^}]+\})+)$/.exec(line))) return parseManaCost(m[1]!).supported && (!/\{X\}/.test(m[1]!) || /\{X\}/.test(d.manaCost)) ? { miracle: m[1]! } : "fail";
   if (/^Miracle\b/.test(line)) return "fail";
@@ -278,7 +278,8 @@ export function parseCostKeyword(
     // "Madness—{2}{B}, Pay 8 life" (Shadowgrange Archfiend): the mana and the life, both paid as it's cast.
     const life = /^((?:\{[^}]+\})+), Pay (\d+) life$/.exec(m[1]!);
     const cost = pay ? pay[2]!.repeat(num(pay[1]!)) : life ? life[1]! : m[1]!;
-    return /^(\{[^}]+\})+$/.test(cost) && plainMana(cost) ? { madness: cost, ...(life ? { madnessLife: Number(life[2]) } : {}) } : "fail";
+    // "Madness {X}{B}{B}" (From Under the Floorboards): X is announced as it's cast for its madness cost (CR 107.3a).
+    return /^(\{[^}]+\})+$/.test(cost) && (plainMana(cost) || (xMana(cost) && !life)) ? { madness: cost, ...(life ? { madnessLife: Number(life[2]) } : {}) } : "fail";
   }
   // Suspend N—[cost] (CR 702.62a).
   if ((m = /^Suspend (\d+)—((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[2]!) ? { suspend: { n: Number(m[1]), cost: m[2]! } } : "fail";
@@ -411,7 +412,8 @@ export function parseCostKeyword(
   if ((m = /^Plot ((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[1]!) && !d.types.includes("Land") ? { plot: m[1]! } : "fail";
   if (/^Plot\b/.test(line)) return "fail";
   // Foretell [cost] (CR 702.143a). An {X} foretell cost isn't modeled.
-  if ((m = /^Foretell ((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[1]!) && !/\{X\}/.test(m[1]!) && !d.types.includes("Land") ? { foretell: m[1]! } : "fail";
+  // "Foretell {X}{X}{W}" (Starnheim Unleashed): X is announced as it's cast for that cost (CR 107.3a, rulings).
+  if ((m = /^Foretell ((?:\{[^}]+\})+)$/.exec(line))) return (plainMana(m[1]!) || xMana(m[1]!)) && !d.types.includes("Land") ? { foretell: m[1]! } : "fail";
   if (/^Foretell\b/.test(line)) return "fail";
   // Impending N—[cost] (CR 702.176a): an alternative cost; paid, it enters with N time counters and isn't a creature while
   // it has one; "At the beginning of your end step, if this permanent's impending cost was paid and it has a time counter
@@ -443,7 +445,8 @@ export function parseCostKeyword(
   // Not "Blitz costs you pay cost {1} less ..." (Henzie "Toolbox" Torre), a static ability about blitz.
   if ((m = /^(Blitz|Warp)(?: |—)(?!costs\b)(.+?)\.?$/.exec(line))) {
     const mana = m[2]!;
-    if (!/^(\{[^}]+\})+$/.test(mana) || !plainMana(mana)) return "fail";
+    // "Warp {X}{G}" (Broodguard Elite): an {X} the mana cost has too, announced as it's cast (CR 107.3a).
+    if (!/^(\{[^}]+\})+$/.test(mana) || !(plainMana(mana) || (m[1] === "Warp" && xMana(mana) && /\{X\}/.test(d.manaCost)))) return "fail";
     if (m[1] === "Blitz") return d.types.includes("Creature") ? { alt: { kind: "blitz", mana } } : "fail";
     return d.types.some((ty) => ["Creature", "Artifact", "Enchantment", "Planeswalker", "Battle"].includes(ty)) ? { alt: { kind: "warp", mana } } : "fail";
   }
@@ -485,7 +488,8 @@ export function parseCostKeyword(
   // Surge [cost] (CR 702.117a): if you've cast another spell this turn (no teammates here); spectacle [cost] (702.137a):
   // if an opponent lost life this turn. Alternative costs, so not with an {X} the mana cost doesn't have.
   if ((m = /^(Surge|Spectacle) ((?:\{[^}]+\})+)$/.exec(line))) {
-    if (!plainMana(m[2]!) || (/\{X\}/.test(m[2]!) && !/\{X\}/.test(d.manaCost))) return "fail";
+    // "Surge {X}{R}" (Fall of the Titans): an {X} the mana cost has too, announced as it's cast (CR 107.3a).
+    if (!(plainMana(m[2]!) || (xMana(m[2]!) && /\{X\}/.test(d.manaCost)))) return "fail";
     return m[1] === "Surge" ? { alt: { kind: "surge", mana: m[2]!, if: { kind: "castAnother" } } } : { alt: { kind: "spectacle", mana: m[2]!, if: { kind: "opponentLostLife" } } };
   }
   if (/^(Surge|Spectacle)\b/.test(line)) return "fail";

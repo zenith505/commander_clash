@@ -2758,11 +2758,11 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     const gain = added - manaValue(cost);
     if (!player(s, pid).hand.some((h) => h !== id && !isType(defOf(s, obj(s, h)), "Land") && mv(s, h) > avail && mv(s, h) <= avail + gain)) return null;
   }
-  let xs: (number | undefined)[] = cost.hasX ? xChoices(availableMana(s, pid) + delveRoom(s, pid, id, { via, alt }) - totalWithoutX(s, pid, id, via), xCount(cost)) : [undefined];
+  let xs: (number | undefined)[] = cost.hasX ? xChoices(availableMana(s, pid) + delveRoom(s, pid, id, { via, alt }) - totalWithoutX(s, pid, id, via, alt), xCount(cost)) : [undefined];
   // With Doubling Cube, the bigger X it pays for first (autopay's planCubeMana pays what the other sources can't).
   if (cost.hasX && !free) {
     const most = xs[0] ?? 0;
-    const cubed = xChoices(cubeMana(s, pid) + delveRoom(s, pid, id, { via, alt }) - totalWithoutX(s, pid, id, via), xCount(cost)).filter((x) => x > most);
+    const cubed = xChoices(cubeMana(s, pid) + delveRoom(s, pid, id, { via, alt }) - totalWithoutX(s, pid, id, via, alt), xCount(cost)).filter((x) => x > most);
     xs = [...cubed, ...xs];
   }
   // "Kicker {X}" (Thieving Skydiver): kicked with as big an X as we can pay, else not kicked.

@@ -451,6 +451,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Gandalf, White Rider: "fifth from the top". Screaming Swarm: "second from the top".
   if (ctx.selfCard && (m = /^[Pp]ut (?:it|~|her|him) (?:from your graveyard )?into (?:its owner's|her owner's|his owner's|~'s owner's|your) library (second|third|fifth) from the top$/.exec(s))) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: m[1] as "second" | "third" | "fifth" }];
   if (!ctx.spell && !ctx.selfCard && /^~'s owner shuffles (?:it|~) into their library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "self" } }];
+  // Watery Grasp: "Enchanted creature's owner shuffles it into their library": the permanent the Aura is attached to as
+  // the ability resolves (CR 701.24c).
+  if (!ctx.spell && /^Enchanted creature's owner shuffles it into their library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "attached" } }];
   // "Shuffle target nontoken permanent you control into its owner's library" (Rishadan Pawnshop): it's put into that
   // library, then that library is shuffled (CR 701.24c).
   if ((m = /^[Ss]huffle (target [^,]+?) into its owner's library$/.exec(s))) {

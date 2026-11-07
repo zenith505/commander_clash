@@ -220,7 +220,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const has = (k: string) => pend.options.find((o) => o === k || o.startsWith(`${k}:`));
       const dredges = pend.options.filter((k) => k.startsWith("dredge:")).map((k) => k.slice("dredge:".length));
       const dredge = dredges.length ? chooseDredge(s, pid, dredges) : undefined;
-      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("archive") ?? has("dig") ?? has("look") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? pend.options.find((k) => k !== "thief" && !k.startsWith("dredge:")) ?? pend.options[0]!;
+      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("archive") ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? pend.options.find((k) => k !== "thief" && !k.startsWith("dredge:")) ?? pend.options[0]!;
       return [{ type: "drawInstead", player: pid, choice: pick }];
     }
     if (pend.kind === "dredge") {

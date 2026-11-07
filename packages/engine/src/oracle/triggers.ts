@@ -29,6 +29,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When ~ is exiled from the battlefield while you're activating a craft ability, (.+)$/, "selfExiledCrafting"],
   [/^When(?:ever)? ~ leaves the battlefield, (.+)$/, "selfLeaves"],
   [/^When you lose control of ~, (.+)$/, "selfLostControl"],
+  [/^Whenever an opponent gains control of a permanent from you, (.+)$/, "opponentGainsControlFromYou"],
   [/^When(?:ever)? ~ is put into (?:a|your) graveyard from the battlefield, (.+)$/, "selfToGraveyard"],
   // Haunt (CR 702.55b-c): it triggers from exile, see "hauntedDies".
   [/^When the creature ~ haunts dies, (.+)$/, "hauntedDies"],
@@ -2392,7 +2393,7 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
       if (!body) return "fail";
       return { event: "batch", batch, body, eventX: true };
     }
-  } else if ((m = /^Whenever (?:an?|(another)) (?:(.+?) )?card (leaves (?:your|an opponent's) graveyard|is put into (?:a|your|an opponent's) graveyard from (?:anywhere(?: other than the battlefield)?|a library|your library))( during your turn)?, (.+)$/.exec(line))) {
+  } else if ((m = /^Whenever (?:an?|(another)) (?:(.+?) )?card (leaves (?:your|an opponent's) graveyard|is put into (?:a|your|an opponent's) graveyard from (?:anywhere(?: other than the battlefield)?|a library|your library|their library))( during your turn)?, (.+)$/.exec(line))) {
     // Measure of Wickedness: "Whenever another card is put into your graveyard from anywhere": not this permanent's own card.
     const another = !!m[1];
     m.splice(1, 1);
@@ -2408,7 +2409,10 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     // Pedantic Learning: "a land card is put into your graveyard from your library", the same (a card goes to its owner's
     // graveyard, CR 400.3).
     if (another && (m[1] || !/^is put into your graveyard from anywhere$/.test(m[2]!))) return "fail";
-    batch = { what: m[2]!.startsWith("leaves") ? "leavesGraveyard" : "toGraveyard", ...(whose ? { whose } : {}), ...(filter ? { filter } : {}), ...(/other than the battlefield$/.test(m[2]!) ? { from: "notBattlefield" as const } : / (?:a|your) library$/.test(m[2]!) ? { from: "library" as const } : {}), each: true, ...(another ? { other: true as const } : {}) };
+    // Undead Alchemist: "a creature card is put into an opponent's graveyard from their library": their own library (a card
+    // goes to its owner's graveyard, CR 400.3), any way.
+    if (/ their library$/.test(m[2]!) && whose !== "opponent") return "fail";
+    batch = { what: m[2]!.startsWith("leaves") ? "leavesGraveyard" : "toGraveyard", ...(whose ? { whose } : {}), ...(filter ? { filter } : {}), ...(/other than the battlefield$/.test(m[2]!) ? { from: "notBattlefield" as const } : / (?:a|your|their) library$/.test(m[2]!) ? { from: "library" as const } : {}), each: true, ...(another ? { other: true as const } : {}) };
     yourTurn = !!m[3];
     rest = m[4]!;
     eachOwner = true;
@@ -2522,6 +2526,20 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   // was ever in your hand).
   if (batch.each && batch.what === "toGraveyard" && batch.whose === "you" && !batch.from && !batch.other && !batch.filter && !yourTurn && /^you may return it to your hand\.?$/.test(rest))
     return { event: "batch", batch, body: { targets: [], effects: [{ type: "may", effects: [{ type: "bounce", what: { ref: "eventGroup" } }], text: "return it to your hand" }], text: rest.replace(/\.$/, "") } };
+  // Undead Alchemist: "Whenever a creature card is put into an opponent's graveyard from their library, exile that card and
+  // create a 2/2 black Zombie creature token": that card, once for each (CR 603.2c), if it's still in the graveyard (CR
+  // 400.7); the token either way (rulings: a second Alchemist's trigger only makes a token).
+  const exileThat = batch.each && batch.what === "toGraveyard" && batch.whose === "opponent" && batch.from === "library" && batch.filter && !batch.other && !yourTurn ? /^exile that card and (create .+)$/.exec(rest) : null;
+  if (exileThat) {
+    const then = parseBody(`${exileThat[1]!.charAt(0).toUpperCase()}${exileThat[1]!.slice(1)}`);
+    if (!then || then.targets.length) return "fail";
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "exile", what: { ref: "eventGroup" } }, ...then.effects], text: rest.replace(/\.$/, "") } };
+  }
+  // Grolnok, the Omnivore: "Whenever a permanent card is put into your graveyard from your library, exile it with a croak
+  // counter on it": that card, once for each (CR 603.2c), still in the graveyard (CR 400.7); the counter on the card in
+  // exile (CR 122.1).
+  const exileCounter = batch.each && batch.what === "toGraveyard" && batch.whose === "you" && batch.from === "library" && batch.filter && !batch.other && !yourTurn ? /^exile it with an? ([a-z]+) counter on it\.?$/.exec(rest) : null;
+  if (exileCounter) return { event: "batch", batch, body: { targets: [], effects: [{ type: "exile", what: { ref: "eventGroup" }, counters: { [exileCounter[1]!]: 1 } }], text: rest.replace(/\.$/, "") } };
   // The objects as a group: not modeled. "Exile the top card of your library. You may play that card ..." (Inti) is about
   // the exiled card, not them.
   const aboutThem = rest.replace(/exile the top card of your library\. (?:Until (?:the end of your next turn|end of turn|your next end step), you may play that card|You may play that card (?:this turn|until the end of your next turn|until your next end step))\.?$/i, "");

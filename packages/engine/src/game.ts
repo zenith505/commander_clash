@@ -3110,8 +3110,18 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   const digs: ObjectId[] = [];
   for (const id of mine((a) => a.drawDig)) if (!digs.some((d) => nameOf(s, d) === nameOf(s, id))) digs.push(id);
   const portal = drawSkipper(s);
-  if (!shields.length && digs.length < 2 && !thief && !portal) return undefined;
+  // Eruth, Asmodeus, Uba Mask: one of each name (two of them do the same thing; the first replaces the draw, CR 614.5).
+  const exilers: ObjectId[] = [];
+  for (const id of drawExilers(s, pid)) if (!exilers.some((d) => nameOf(s, d) === nameOf(s, id))) exilers.push(id);
+  // Archmage Ascension (while it has six quest counters): one of each name, optional.
+  const tutors: ObjectId[] = [];
+  for (const id of mine((a) => a.drawTutor)) if (staticConditionNow(s, abilitiesOf(s, obj(s, id)).drawTutor!, id, pid) && !tutors.some((d) => nameOf(s, d) === nameOf(s, id))) tutors.push(id);
+  if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length) return undefined;
   const out = [...shields];
+  for (const id of exilers) {
+    const a = abilitiesOf(s, obj(s, id)).drawExile!;
+    out.push({ key: `exiles:${id}`, label: `Exile the top ${a.n === 1 ? "card" : `${a.n} cards`} of your library${a.faceDown ? " face down" : ""} instead${a.play ? `; you may play ${a.n === 1 ? "it" : "them"} this turn` : ""} (${nameOf(s, id)})` });
+  }
   for (const id of digs) {
     const a = abilitiesOf(s, obj(s, id));
     out.push({ key: `dig:${id}`, label: `Look at the top ${a.drawDig} cards instead, keep one, the rest ${a.drawDigBottom ? "on the bottom of your library" : "into your graveyard"} (${nameOf(s, id)})` });
@@ -3125,9 +3135,70 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   if (abundance !== undefined) for (const k of ["land", "nonland"]) out.push({ key: `abundance:${k}`, label: `Choose ${k}, reveal until you reveal a ${k} card and put it into your hand (${nameOf(s, abundance)})` });
   if (thief) out.push({ key: "thief", label: `${player(s, thief.controller).name} draws a card instead (${thief.name})` });
   if (portal) out.push({ key: "skip", label: `Skip this draw (${nameOf(s, portal)})` });
+  for (const id of tutors) out.push({ key: `tutor:${id}`, label: `Search your library for a card and put it into your hand instead, then shuffle (${nameOf(s, id)})` });
   // A Notion Thief with nothing else to choose from goes on as before.
-  if (!shields.length && digs.length < 2 && out.length < 2) return undefined;
+  if (!shields.length && !exilers.length && !tutors.length && digs.length < 2 && out.length < 2) return undefined;
+  // Only replacements its player may decline (dredge, Abundance, Archmage Ascension): or none of them, the draw itself.
+  if (out.every((x) => /^(?:dredge|abundance|tutor):/.test(x.key))) out.push({ key: "draw", label: "Draw the card" });
   return out;
+}
+
+/**
+ * Archmage Ascension instead of a draw: `pid` searches their library for a card (any card, so one is found if there's
+ * one, CR 701.23d), puts it into their hand, then shuffles; then the draws after it go on (`left`, `made`). An empty
+ * library finds nothing, and isn't drawn from (CR 704.5b).
+ */
+function tutorInstead(s: GameState, pid: PlayerId, src: ObjectId, left: number, after: "drawStep" | undefined, made: number[]): "paused" | void {
+  const p = player(s, pid);
+  if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+  log(s, `${p.name} searches their library instead of drawing (${nameOf(s, src)}).`);
+  if (!p.library.length) {
+    shuffleLibrary(s, p);
+    return;
+  }
+  s.pending = { kind: "searchLibrary", player: pid, source: nameOf(s, src), what: "a card", cards: [...p.library], min: 1, max: 1, thenDraw: { left, made: [...made], ...(after ? { after } : {}) } };
+  return "paused";
+}
+
+/** Eruth, Asmodeus, Uba Mask (CompiledCard.drawExile): the permanents whose "would draw a card, exile ... instead" applies to `pid`'s draws. */
+function drawExilers(s: GameState, pid: PlayerId): ObjectId[] {
+  return s.battlefield.filter((id) => {
+    const a = abilitiesOf(s, obj(s, id)).drawExile;
+    return !!a && (a.each || controllerOf(s, obj(s, id)) === pid);
+  });
+}
+
+/**
+ * A draw of `pid`'s replaced by exiling the top card or cards of their library (CompiledCard.drawExile, CR 614.1a): face
+ * down for Asmodeus, nobody may look at it (rulings); linked to the permanent (CR 607.2a); with Eruth's or Uba Mask's
+ * permission to play them this turn, Uba Mask's only while it's that Mask. An empty library exiles nothing and loses
+ * nothing (rulings: the draw was replaced, CR 704.5b).
+ */
+function exileInstead(s: GameState, pid: PlayerId, src: ObjectId) {
+  const p = player(s, pid);
+  const o = obj(s, src);
+  const a = abilitiesOf(s, o).drawExile!;
+  const name = nameOf(s, src);
+  if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+  const top = p.library.slice(0, a.n);
+  if (!top.length) {
+    log(s, `${p.name} would draw from an empty library; ${name} replaces it, so nothing happens.`);
+    return;
+  }
+  const zc = o.zoneChanges ?? 0;
+  const at = s.nextTimestamp;
+  const done: ObjectId[] = [];
+  for (const id of top) {
+    moveObject(s, id, "exile");
+    const c = obj(s, id);
+    if (c.zone !== "exile") continue;
+    done.push(id);
+    if (a.faceDown) c.hiddenExile = { by: src, seen: [], label: "Face down", at };
+    if (a.linked) ((s.linkedExile ??= {})[`${src}@${zc}`] ??= []).push({ id, zc: c.zoneChanges ?? 0 });
+    if (a.play) c.mayPlay = { player: pid, zc: c.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(a.play === "whileSource" ? { source: { id: src, zc }, whileSource: true as const } : {}) };
+  }
+  const what = a.faceDown ? (done.length === 1 ? "a card" : `${done.length} cards`) : done.map((id) => nameOf(s, id)).join(" and ");
+  log(s, `${p.name} exiles ${what} from the top of their library${a.faceDown ? " face down" : ""} instead of drawing${a.play ? `, and may play ${done.length === 1 ? "it" : "them"} this turn` : ""} (${name}).`);
 }
 
 /**
@@ -3140,6 +3211,13 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
   if (key === "exile" || key.startsWith("words:")) return applyDrawShield(s, pid, key);
   if (key === "thief") return stealDraw(s, pid, notionThief(s, pid)!);
   if (key === "skip") return skipDraw(s, pid, drawSkipper(s)!);
+  if (key.startsWith("exiles:")) return exileInstead(s, pid, key.slice("exiles:".length));
+  if (key.startsWith("tutor:")) return tutorInstead(s, pid, key.slice("tutor:".length), left, after, made);
+  if (key === "draw") {
+    // None of the optional replacements: the card is drawn (an empty library's own replacements still apply).
+    const one = drawOne(s, pid, { left, made, ...(after ? { after } : {}) });
+    return one === "paused" ? "paused" : undefined;
+  }
   if (key.startsWith("dig:")) return digInstead(s, pid, left, after, made, 0, key.slice("dig:".length)) === "paused" ? "paused" : undefined;
   if (key.startsWith("dredge:")) return dredgeInstead(s, p, key.slice("dredge:".length));
   if (key === "archive") {
@@ -3224,6 +3302,8 @@ function chooseDrawInstead(s: GameState, p: Player, choice: string) {
   if (!pend.options.includes(choice)) throw new RulesError("choose one of the replacement effects");
   if (choice.startsWith("dredge:") && !dredgeOptions(s, p.id).includes(choice.slice("dredge:".length))) throw new RulesError("that card can't be dredged");
   if (choice === "thief" && !notionThief(s, p.id)) throw new RulesError("no Notion Thief replaces that draw");
+  if (choice.startsWith("tutor:") && !s.battlefield.includes(choice.slice("tutor:".length))) throw new RulesError("that permanent no longer replaces the draw");
+  if (choice.startsWith("exiles:") && !drawExilers(s, p.id).includes(choice.slice("exiles:".length))) throw new RulesError("that permanent no longer replaces the draw");
   s.pending = null;
   const made = [...(pend.made ?? [])];
   const done = applyDrawReplacement(s, p.id, choice, pend.left, pend.after, made, pend.archives);
@@ -4480,6 +4560,9 @@ function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false
     const a = abilitiesOf(s, p);
     // Tinybones: during your turn, a face-up card you don't own with a stash counter on it.
     if (a.playCountered && s.activePlayer === pid && o.owner !== pid && !o.faceDown && (o.counters[a.playCountered] ?? 0) > 0) return "anyType";
+    // Grolnok, the Omnivore: any face-up card you own with a croak counter on it, whatever exiled it (rulings), paying as
+    // usual, with the usual timing.
+    if (a.playOwnCountered && o.owner === pid && !o.faceDown && !o.hiddenExile && (o.counters[a.playOwnCountered] ?? 0) > 0 && !how) how = "plain";
     if (!s.linkedExile) continue;
     // Valgavoth's: during its controller's turn, for life.
     const life = !!a.playLinkedForLife && s.activePlayer === pid;
@@ -4643,6 +4726,8 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   if (m.until === "yourNextTurn" && s.activePlayer === pid && s.turn > m.turn) return false;
   // "For as long as Intet remains on the battlefield": that object (CR 400.7).
   if (m.until === "source" && !(m.source && s.objects[m.source.id]?.zone === "battlefield" && (s.objects[m.source.id]!.zoneChanges ?? 0) === m.source.zc)) return false;
+  // Uba Mask: "this turn", and only while it's still that Mask (CR 400.7).
+  if (m.whileSource && !(m.source && s.objects[m.source.id]?.zone === "battlefield" && (s.objects[m.source.id]!.zoneChanges ?? 0) === m.source.zc)) return false;
   // "For as long as you control ~" (Lightning, Security Sergeant): that object, controlled by that player.
   if (m.until === "whileControlled" && !stillControlsSource(s, m)) return false;
   // "During your next turn" (Galvanic Relay): not the turn it was exiled (rulings).
@@ -9101,6 +9186,16 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
     nextOpeningAction(s);
     return;
   }
+  if (pend?.kind === "searchLibrary" && pend.thenDraw && pend.player === p.id) {
+    // Archmage Ascension: the card found goes into the hand, the library is shuffled, and the draws go on.
+    if (found.length !== Math.min(pend.max, pend.cards.length) || found.some((id) => !pend.cards.includes(id) || !p.library.includes(id))) throw new RulesError(`find ${pend.what}`);
+    s.pending = null;
+    for (const id of found) moveObject(s, id, "hand");
+    log(s, `${p.name} puts a card from their library into their hand.`);
+    shuffleLibrary(s, p);
+    continueDraws(s, p.id, pend.thenDraw.left, pend.thenDraw.after, pend.thenDraw.made);
+    return;
+  }
   const r = s.resolving;
   if (pend?.kind !== "searchLibrary" || pend.player !== p.id || !r) throw new RulesError("you aren't searching a library");
   if (new Set(found).size !== found.length || found.some((id) => !pend.cards.includes(id))) throw new RulesError(`those cards aren't ${pend.what}`);
@@ -10406,13 +10501,18 @@ export function arbiterStopsAttacks(s: GameState, pid: PlayerId): string | null 
   return o ? `${characteristics(s, o).name}: opponents who cast a spell this turn can't attack with creatures` : null;
 }
 
+/** Frenzied Saddlebrute (CompiledCard.hasteVsYourOpponents): the players whose opponents any creature may attack as though it had haste. */
+function hasteVsOpponentsOf(s: GameState): PlayerId[] {
+  return [...new Set(s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).hasteVsYourOpponents).map((id) => controllerOf(s, obj(s, id))))];
+}
+
 export function potentialAttackers(s: GameState, pid: PlayerId) {
   const opps = opponents(s, pid);
   if (arbiterStopsAttacks(s, pid)) return [];
   return creaturesOf(s, pid).filter(
     (o) =>
       !o.tapped &&
-      (!isSummoningSick(s, o) || characteristics(s, o).attackAsThoughHaste) && // CR 302.6
+      (!isSummoningSick(s, o) || characteristics(s, o).attackAsThoughHaste || (hasteVsOpponentsOf(s).length > 0 && opps.some((d) => !attackProblem(s, o, d)))) && // CR 302.6
       !objIsType(s, o, "Battle") && // a battle can't attack, even one that's also a creature (rulings)
       (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender || (characteristics(s, o).attackDespiteDefenderVs && opps.some((d) => attackedYouLastTurn(s, d, pid)))) &&
       !characteristics(s, o).cantAttack &&
@@ -10586,6 +10686,14 @@ export function nearestOpponent(s: GameState, pid: PlayerId, side: "left" | "rig
 
 export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, planeswalker = false, /** The planeswalker or battle attacked. */ attacked?: ObjectId): string | null {
   const c = characteristics(s, o);
+  // Frenzied Saddlebrute: a summoning-sick creature may attack an opponent of a Saddlebrute's controller, or a planeswalker
+  // such an opponent controls, as though it had haste (rulings: any creature, it doesn't gain haste); not a battle, nor
+  // anyone else (CR 302.6).
+  if (isSummoningSick(s, o) && !c.attackAsThoughHaste) {
+    const isBattle = !!attacked && !!s.objects[attacked] && objIsType(s, obj(s, attacked), "Battle") && !objIsType(s, obj(s, attacked), "Planeswalker");
+    const whose = attacked !== undefined && s.objects[attacked] ? controllerOf(s, obj(s, attacked)) : defender;
+    if (isBattle || !hasteVsOpponentsOf(s).some((p) => p !== whose && opponents(s, p).includes(whose))) return `${c.name} has summoning sickness`;
+  }
   // Pramikon, Teyo: only the nearest opponent in each direction that applies, and their planeswalkers, not a battle; two
   // directions that pick different players leave nothing to attack (rulings).
   for (const side of attackDirections(s)) {
@@ -12021,6 +12129,13 @@ function roleSBAs(s: GameState): boolean {
  * continuously since their turn began (CR 302.6), and it leaves combat (CR 506.4), as does one that stopped being a creature.
  */
 export function syncControl(s: GameState) {
+  // Every permanent whose control changes now, with its controller before (Zidane, Tantalus Thief: one that changes at
+  // the same time still looks back at who controlled it, rulings).
+  const before: Record<ObjectId, PlayerId> = {};
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (o.seenController !== undefined && o.seenController !== controllerOf(s, o)) before[id] = o.seenController;
+  }
   for (const id of s.battlefield) {
     const o = obj(s, id);
     const now = controllerOf(s, o);
@@ -12033,7 +12148,7 @@ export function syncControl(s: GameState) {
     else if (o.seenController !== now) {
       const was = o.seenController;
       o.seenController = now;
-      fireEvent(s, { type: "controlChanged", id: o.id, from: was });
+      fireEvent(s, { type: "controlChanged", id: o.id, from: was, before });
       loseRingBearer(s, o.id); // CR 701.54a
       o.controlledSinceTurn = s.turn;
       if (o.attacking !== undefined || o.blocking !== undefined) {

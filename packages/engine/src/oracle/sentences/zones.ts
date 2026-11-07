@@ -1727,6 +1727,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Bag of Holding: "Return all cards exiled with ~ to their owner's hand": the ones its discard trigger exiled (CR 607.2a).
     // Connecting the Dots: "Put all cards exiled with ~ into their owners' hands": the same, face down ones too.
     if (/^Return all cards exiled with ~ to their owner's hand$|^Put all cards exiled with ~ into their (?:owners' hands|owner's hand)$/.test(s)) return [{ type: "moveLinked", dest: "hand" }];
+    // Asmodeus the Archfiend: "... and you lose that much life": as many as were returned (face-down ones too).
+    if (/^Return all cards exiled with ~ to their owner's hand and you lose that much life$/.test(s)) return [{ type: "moveLinked", dest: "hand" }, { type: "loseLife", who: { ref: "you" }, n: { count: { kind: "movedLinkedThisWay" } } }];
     // Ethereal Forager: "return an instant or sorcery card exiled with ~ to its owner's hand": one of them, chosen as it
     // resolves.
     if (/^Return an instant or sorcery card exiled with ~ to its owner's hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", one: true, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } }];

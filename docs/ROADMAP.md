@@ -1,7 +1,7 @@
 # Roadmap
 
-30,241 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,641 of
+30,250 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,649 of
 9,979 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -505,7 +505,7 @@ line blocks.
    miracle), Coram, Brimaz, Mindleech Mass (done in round 273), Requiem Monolith, Behemoth of
    Vault 0, Abigale (loses all abilities, keyword counters), Once Upon a Time (done in round 275), Tasigur, Hazezon, Corrupted
    Shapeshifter, Balor (its modes), Unbreathing Horde ("for each other Zombie you control and each Zombie card in your
-   graveyard"), Undead Alchemist, Auntie Ool (done in round 266),
+   graveyard"), Undead Alchemist (done in round 297), Auntie Ool (done in round 266),
    Chaos Defiler (random choice among chosen permanents), Onakke Oathkeeper.
    Round 193 went on from the top: "whenever you cast a spell this turn" as a Saga chapter (Showdown of the Skalds,
    Origin of Thor: "deals damage equal to its power to each opponent" too), "if you do, it becomes plotted" (Kellan
@@ -568,7 +568,7 @@ line blocks.
    Death-Dweller ("put a deathtouch counter on either of them"), Myth Unbound (done in round 296) (a trigger in the command zone), Siona,
    Captain of the Pyleas ("becomes attached"), Soul Diviner (a chosen counter kind), Icingdeath, Frost Tyrant (its token
    is named like part of it), Toggo, Goblin Weaponsmith (a quoted ability inside a quoted ability), Domineering Will,
-   Immerwolf, Frenzied Saddlebrute.
+   Immerwolf, Frenzied Saddlebrute (done in round 297).
    Round 196 went on from the top: "amass Orcs 5, mill five cards, then" (Sauron, Lord of the Rings), "Add X {G} or X
    {W}" (Brigid, Clachan's Heart), "target opponent reveals cards ... until they reveal a land card. Put that card onto
    the battlefield tapped under your control and the rest into their graveyard" (Sméagol, Helpful Guide), "choose target
@@ -709,7 +709,7 @@ line blocks.
    Assassin Lord (done in round 265), Kros, Defense Contractor (no record of who put
    counters on a creature), Glorious Purpose (the sixth
    plan counter), Loot Dispute (attacking the player who has the initiative), Rhys, the Evermore (done in round 276; remove any number of
-   counters), Bladegriff Prototype (a target the damaged player chooses), Zidane, Tantalus Thief ("an
+   counters), Bladegriff Prototype (a target the damaged player chooses), Zidane, Tantalus Thief (done in round 297) ("an
    opponent gains control of a permanent from you"), Tameshi, Reality Architect (noncreature permanents returned to
    hand), Obeka, Splitter of Seconds (done in round 265).
    Round 203 went on from the top: storied and the enduring story (CR 702.195: Balin, Bifur, Bombur, Dáin, Fíli, Kíli,
@@ -901,7 +901,7 @@ line blocks.
    The Kenriths' Royal Funeral (a cost cut counted from linked exiled cards); Suppression Ray ("choose up to that many
    creatures tapped this way"); Baba Lysaga, Night Witch ("sacrifice up to three permanents" as a cost, then card types
    among them); Dargo, the Shipwrecker (optional sacrifices as a cost that cut it); Curse of Misfortunes (a Curse not
-   sharing a name with one attached to that player); Archmage Ascension (a "would draw" replacement by a search);
+   sharing a name with one attached to that player); Archmage Ascension (done in round 297) (a "would draw" replacement by a search);
    Eumidian Wastewaker ("discard a card or sacrifice a permanent", then counting lands put into graveyards this way);
    Plasma Caster ("target creature that's blocking equipped creature"); Curie, Emergent Intelligence (base power and a
    copy with an extra ability); Spry and Mighty (done in round 296) (the difference between two chosen creatures' powers); Eventide's Shadow
@@ -1267,12 +1267,12 @@ line blocks.
    Apprentice's Folly). +16 (28,647 of 31,936 with B64).
    Out after round 226 (looked at, not done): Ixhel, Scion of Atraxa (done in round 273; each poisoned opponent's face-down exiled card,
    playable with mana of any color); Firkraag, Cunning Instigator ("if that creature had to attack this combat");
-   Waterbender's Restoration (waterbend {X} as an additional cost); Eruth, Tormented Prophet and Uba Mask (every draw
+   Waterbender's Restoration (waterbend {X} as an additional cost); Eruth, Tormented Prophet and Uba Mask (done in round 297) (every draw
    replaced, alongside dredge and the other draw replacements, CR 616.1); Hofri Ghostforge and Timothar, Baron of Bats
    (a token's granted ability linked to the card the trigger exiled, rulings); Anrakyr the Traveller (cast an artifact
    spell from hand or graveyard for life during a trigger's resolution); Crabomination (done in round 267; a card at random from the
    graveyard and from the hand, then cast one of the three); Winnowing (each player's sacrifice by the creature types of
-   a creature you chose for them); Grolnok, the Omnivore (a card trigger for each permanent card milled, croak counters,
+   a creature you chose for them); Grolnok, the Omnivore (done in round 297) (a card trigger for each permanent card milled, croak counters,
    playing them from exile); Coram, the Undertaker (lands and spells from every graveyard, cards you don't own);
    Territorial Hellkite (done in round 266); Boreas Charger (an opponent who controls
    more lands, a search for the difference); Eivor, Wolf-Kissed ("a Saga card and/or a land card" from among the milled
@@ -1511,7 +1511,7 @@ line blocks.
    black instead", and a reveal by the count of colored mana symbols); Benevolent Blessing (done in round 277) (protection that doesn't
    remove your own Auras and Equipment already attached, an exception to CR 702.16); Scion of the Ur-Dragon (becomes a copy of a card in
    your graveyard until end of turn); Sidisi, Regent of the Mire (done in round
-   266); Undead Alchemist (combat damage replaced by a mill, and a trigger that exiles the milled card).
+   266); Undead Alchemist (done in round 297) (combat damage replaced by a mill, and a trigger that exiles the milled card).
    Round 240 (top of the list, now done): "Until end of turn, you may look at the top card of your library any time,
    and you may play lands and cast spells from the top of your library" (The Belligerent); "All Forests and all
    Saprolings are 1/1 green Saproling creatures and Forest lands in addition to their other types" (Life and Limb,
@@ -2363,6 +2363,31 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands.
+   Round 297 took cards back off the "Out after round N" lists, most played first: "If a Zombie you control would deal
+   combat damage to a player, instead that player mills that many cards" and "Whenever one or more cards are put into an
+   opponent's graveyard from their library, exile that card and create ..." (Undead Alchemist); "If ~ would deal combat
+   damage to a player, instead put that many +1/+1 counters on ~ and that player mills that many cards" (Szadek, Lord of
+   Secrets: when prevention applies too, the damaged player chooses the order, CR 616.1 and the rulings, with a browser
+   test); draws replaced by exiling cards, as one more choice among the draw replacements (CR 616.1): "exile the top two
+   cards of your library instead. You may play those cards this turn" (Eruth, Tormented Prophet, with a browser test
+   against Notion Thief), "exile the top card of your library face down instead" and "Return all cards exiled with ~ to
+   their owner's hand and you lose that much life" (Asmodeus the Archfiend), "that player exiles that card face up
+   instead" and "Each player may play lands and cast spells from among cards they exiled with ~ this turn" (Uba Mask);
+   "if you would draw a card, you may instead search your library for a card" while it has six quest counters, and "if
+   you drew two or more cards this turn" (Archmage Ascension, with a browser test of the search); "All creatures can attack
+   your opponents and planeswalkers your opponents control as though those creatures had haste" (Frenzied Saddlebrute:
+   checked for each defender, so not the Saddlebrute's controller or their planeswalkers, nor battles; CR 302.6, 508.1a); "Whenever an opponent gains control of a permanent
+   from you" (Zidane, Tantalus Thief); "Whenever a permanent card is put into your graveyard from your library, exile
+   it with a croak counter on it" and "You may play lands and cast spells from among cards you own in exile with croak
+   counters on them" (Grolnok, the Omnivore). +9, 30,250 of 31,936.
+   Out after round 297 (looked at, not done): Intellect Devourer (Lane B's round B128 works on "exiles a card from their
+   hand until ~ leaves the battlefield"; next round); The Red Terror ("Whenever a red source you control deals damage to
+   one or more permanents and/or players": one trigger per source per damage event, CR 120.3); Archfiend of Spite ("loses
+   that much life unless they sacrifice that many permanents", the damaged-by source's controller chooses); Hot Pursuit
+   (suspect, goad as long as it remains, then control of every goaded and/or suspected creature); Urianger Augurelt and
+   The Temporal Anchor (cards exiled face down by a look, then played until end of turn or during your turn, with a cost
+   cut; scry's "choose to put on the bottom"). Known limit: a Fog-style "prevent all combat damage" is applied before
+   damage replacements, so it still beats Undead Alchemist's and Szadek's mill without asking.
    Round 296 took cards back off the "Out after round N" lists, most played first: "As ~ enters, choose two colors" (two
    different ones, CR 614.12, asked one at a time) and "you gain 1 life for each of the chosen colors it is" (Tablet of the
    Guilds, with a browser test); "Your commander costs {1} less to cast for each time it's been cast from the command zone
@@ -2384,7 +2409,7 @@ line blocks.
    up-to sacrifice cost or its picker); Fisher's Talent (a level's token replacement that the next level replaces again,
    Fish to Shark to Octopus); Archelos, Lagoon Mystic (other permanents entering tapped or untapped, on every way a
    permanent enters); Curse of Misfortunes (a Curse searched for and put onto the battlefield attached to the enchanted
-   player, by name among the Curses attached to them); Undead Alchemist and Szadek, Lord of Secrets (Lane B's round B125
+   player, by name among the Curses attached to them); Undead Alchemist and Szadek, Lord of Secrets (done in round 297) (Lane B's round B125
    damage-replacement changes merged while this round ran: next round).
    Round 295 took cards back off the "Out after round N" lists, most played first: "the amount of damage dealt to ~ this
    turn by sources they controlled" for each player (Grothama, All-Devouring: TurnLog damage by the source's controller);
@@ -2402,7 +2427,7 @@ line blocks.
    Out after round 295 (looked at, not done): Dragon's Fire (the Dragon card revealed or the Dragon chosen as the additional
    cost isn't recorded on the spell, for its power as it resolves or its last known power, rulings); Incinerator of the
    Guilty ("collect evidence X", X chosen as the trigger resolves: no prompt for it); Spectral Searchlight (another player
-   chooses the color of the mana); Undead Alchemist and Szadek, Lord of Secrets (left while Lane B's round B125 changes the
+   chooses the color of the mana); Undead Alchemist and Szadek, Lord of Secrets (done in round 297) (left while Lane B's round B125 changes the
    damage replacements); Canoptek Wraith, Professor Hojo, Karn, Living Legacy, Tegwyll's Scouring and Eumidian Wastewaker
    (still out, for the reasons in their earlier notes).
    Round 294 took the last names from the top no earlier round looked at (rank 24,900 to 31,400): "As long as the top card
@@ -2487,7 +2512,7 @@ line blocks.
    exiled a card isn't tracked); Blim, Comedic Genius ("permanents they control but don't own"); The Beamtown Bullies
    ("Target opponent whose turn it is puts ... onto the battlefield under their control"); Forger's Foundry (an exile as it
    resolves chosen as mana is spent).
-   Out after round 286 (looked at, not done): Undead Alchemist and Szadek, Lord of Secrets (damage replaced by milling,
+   Out after round 286 (looked at, not done): Undead Alchemist and Szadek, Lord of Secrets (done in round 297) (damage replaced by milling,
    ordered with prevention and other replacements, CR 616.1); Turtles Forever (a search of your library and outside the
    game); Panglacial Wurm (cast from your library while searching it).
    Out after round 285 (looked at, not done): Koh, the Face Stealer, Rex, Cyber-Hound, Symbiote Spider-Man, Idris, Soul of
@@ -2582,7 +2607,7 @@ line blocks.
    "move a counter" of a kind chosen).
    Out after round 269 (looked at, not done): Brimaz, Blight of Oreskos ("a Phyrexian creature or artifact creature
    spell": how the words group isn't settled enough to compile honestly); Summoner's Sending (done in round 270).
-   Out after round 268 (looked at, not done): Eruth, Tormented Prophet ("If you would draw a card, exile the top two cards
+   Out after round 268 (looked at, not done): Eruth, Tormented Prophet (done in round 297) ("If you would draw a card, exile the top two cards
    of your library instead": a draw replacement that has to join the choice among the other draw replacements, CR 616.1,
    and the draws a resolution counts); Quintorius Kand's −6 ("You may play those cards this turn" about the cards its own
    "any number of target cards" exile took); Archelos, Lagoon Mystic (an untapped Archelos makes permanents put onto the
@@ -2595,7 +2620,7 @@ line blocks.
    number from 1 to 5, flip that many coins, and "if you won five flips this way" free casting from hand this turn).
    Out after round 266 (looked at, not done): Moxite Refinery ("Remove X counters from an artifact or creature you
    control": X counters of any kinds from one permanent, a cost the counter picker can't limit to one permanent yet).
-   Out after round 265 (looked at, not done): Undead Alchemist and Szadek, Lord of Secrets ("If a Zombie you control
+   Out after round 265 (looked at, not done): Undead Alchemist and Szadek, Lord of Secrets (done in round 297) ("If a Zombie you control
    would deal combat damage to a player, instead that player mills that many cards": a replacement, not a prevention,
    so it applies to damage that can't be prevented and the player orders it with the damage shields, CR 616.1; the
    damage rules only prevent or redirect yet); The Ninth Doctor's trigger resolving outside an upkeep (an upkeep skipped
@@ -2786,7 +2811,7 @@ line blocks.
    Leader, Super-Genius; the ones skipped since round 173: Radagast the Brown, Quicksilver Elemental, Secret of
    Bloodbending, Chiss-Goria, Forge Tyrant, Molecule Man (done in round 274), Confiscation Coup (done in round 273), Zoyowa Lava-Tongue, Role Reversal (done in round 273), Craig Boone, Novac Guard, Spelltwine, Ultimate Magic: Meteor, Spectral Searchlight, Rat King,
    Verminister; and from before round 172: Grindstone, Moritte of the
-   Frost, Reyhan, Last of the Abzan, Herigast, Erupting Nullkite (done in round 274), Mazemind Tome, Asmodeus the Archfiend, Temporal
+   Frost, Reyhan, Last of the Abzan, Herigast, Erupting Nullkite (done in round 274), Mazemind Tome, Asmodeus the Archfiend (done in round 297), Temporal
    Extortion, Hot Pursuit, Reidane, God of the Worthy, Long River Lurker, Psychic Paper,
    Dream-Thief's Bandana (done in round 273), Chandra, Legacy of Fire (done in round 267), Theoretical Duplication,
    Calamity, Galloping Inferno, Sam, Loyal Attendant, Crystalline Giant,

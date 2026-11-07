@@ -161,6 +161,7 @@ export function canonicalKeyword(text: string): string | undefined {
   if (q === "arcane") return "Protection from Arcane";
   if (q === "the chosen player") return CHOSEN_PLAYER_PROTECTION;
   if (q === "the chosen card type") return CHOSEN_TYPE_PROTECTION;
+  if (q === "each mana value of the chosen quality") return CHOSEN_PARITY_PROTECTION;
   if (q === "creatures of the chosen type") return CHOSEN_CREATURE_TYPE_PROTECTION;
   // Samite Elder: "each of that permanent's colors", the same (its one target's colors as it resolves).
   if (q === "each of that creature's colors" || q === "each of that permanent's colors") return TARGET_COLORS_PROTECTION;
@@ -273,6 +274,11 @@ export const TARGET_COLORS_PROTECTION = "Protection from each of that creature's
  * none for a colorless spell (rulings).
  */
 export const CAST_SPELL_COLORS_PROTECTION = "Protection from each of that spell's colors";
+/**
+ * Lavabrink Venturer: "~ has protection from each mana value of the chosen quality": bound as "Protection from odd mana
+ * values" or "... even ...", the quality chosen as it entered (CR 614.12, 702.16a); with no choice made, none (rulings).
+ */
+export const CHOSEN_PARITY_PROTECTION = "Protection from each mana value of the chosen quality";
 /** "Protection from the chosen card type" (Serra's Emissary): the card type chosen as the source entered (CR 702.16a). */
 export const CHOSEN_TYPE_PROTECTION = "Protection from the chosen card type";
 /**
@@ -286,9 +292,11 @@ export const CARD_TYPE_PLURAL: Record<string, string> = { Artifact: "artifacts",
  * Keywords with "the chosen color" filled in; without a choice, that protection is dropped. `identity`: the colors in the
  * color identity of the commanders of the effect's controller, undefined if they have none.
  */
-export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[], cardType?: string, creatureType?: string, chosenKeywords?: readonly string[], ownColors?: readonly string[], landType?: string) =>
+export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[], cardType?: string, creatureType?: string, chosenKeywords?: readonly string[], ownColors?: readonly string[], landType?: string, parity?: "odd" | "even") =>
   keywords.flatMap((k) =>
-    k === OWN_COLORS_HEXPROOF || k === OWN_COLORS_PROTECTION
+    k === CHOSEN_PARITY_PROTECTION
+      ? parity ? [`Protection from ${parity} mana values`] : []
+      : k === OWN_COLORS_HEXPROOF || k === OWN_COLORS_PROTECTION
       ? (ownColors ?? []).filter((c) => COLOR_WORD[c]).map((c) => `${k === OWN_COLORS_HEXPROOF ? "Hexproof" : "Protection"} from ${COLOR_WORD[c]}`)
       : k === CHOSEN_KEYWORDS
       ? [...(chosenKeywords ?? [])]
@@ -344,6 +352,10 @@ export function protectedFrom(keywords: readonly string[], src: SourceQuality, h
     if (PROTECTION_TYPES[q] && src.types?.includes(PROTECTION_TYPES[q])) return true;
     // "Protection from mana value 3 or less" (Reaver Titan), "... 3 or greater" (Mistmeadow Skulk): an object with no mana
     // cost has mana value 0 (CR 202.3a), a spell's counts its X (CR 202.3e, rulings on Reaver Titan).
+    // Lavabrink Venturer's chosen quality: a source with an odd (even) mana value; zero is even, a token that isn't a copy
+    // has mana value 0, and a spell's counts its X (rulings, CR 202.3).
+    if (q === "odd mana values" && (src.manaValue ?? 0) % 2 === 1) return true;
+    if (q === "even mana values" && (src.manaValue ?? 0) % 2 === 0) return true;
     const mv = /^mana value (\d+) or (less|greater)$/.exec(q);
     if (mv && (mv[2] === "less" ? (src.manaValue ?? 0) <= Number(mv[1]) : (src.manaValue ?? 0) >= Number(mv[1]))) return true;
     const st = creatureTypeOfPlural(q);

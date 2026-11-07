@@ -769,6 +769,8 @@ export interface TargetSpec {
   mvAtMostCounters?: CounterKind;
   /** "As long as that player controls three or fewer lands" (Sheltering Prayers): its controller controls at most this many lands. */
   controllersLandsAtMost?: number;
+  /** "Creature whose controller controls an Island" (Dwarven Sea Clan, Seasinger): its controller controls a permanent of this subtype. */
+  controllerControlsSubtype?: string;
   /** "A creature whose controller has eight or more cards in their graveyard" (Lullmage's Domination). */
   controllersGraveyardAtLeast?: number;
   /**
@@ -2495,7 +2497,7 @@ export type TimingWindow = "upkeep" | "draw" | "end" | "afterUpkeep" | "combat" 
  * combat damage step", "only after combat" (CR 506.8a-b, d-e): without "during combat", the point is the one in the
  * turn's first combat phase, so the windows run from the start of the turn, or after that first combat.
  */
-export type TurnPoint = "beforeCombat" | "beforeAttackers" | "beforeBlockers" | "beforeDamage" | "afterCombat";
+export type TurnPoint = "beforeCombat" | "beforeAttackers" | "beforeBlockers" | "beforeDamage" | /** "Before the end of combat step" (Dwarven Sea Clan). */ "beforeEndCombat" | "afterCombat";
 
 export type Effect =
   /** `also`: more recipients dealt the same damage at the same time ("to each creature and each player", CR 120.3). */
@@ -2627,7 +2629,7 @@ export type Effect =
    */
   | { type: "grantFlashback"; what?: ObjRef; each?: TargetSpec; /** The Grim Captain's Locker: "Until end of turn, each creature card in your graveyard gains "Escape—{3}{B}, Exile four other cards from your graveyard."": escape with this cost instead of flashback (CR 702.138a). */ escape?: { /** Left out: the card's own mana cost (Confession Dial: "The escape cost is equal to its mana cost plus ..."). */ mana?: string; exile: number }; /** Case of the Uneaten Feast: "Creature cards in your graveyard gain "You may cast this card from your graveyard" until end of turn": that permission instead of flashback. */ cast?: true }
   /** "Return the exiled card to the battlefield under its owner's control": the cards this object's linked exile took (CR 607.2a). */
-  | { type: "returnLinked"; dest: "battlefield" | "hand" | /** Gravegouger: "return the exiled cards to their owner's graveyard". */ "graveyard"; /** "Under your control" (Prowling Geistcatcher): the ability's controller's, not their owners'. */ yours?: true; /** The Princess Takes Flight's chapter III: its source is still the object whose chapter I exiled them (not one that left). */ here?: true; /** Pyxis of Pandemonium: "Each player turns face up all cards they own exiled with ~, then puts all permanent cards among them onto the battlefield": every linked card is turned face up (CR 406.3) and only the permanent cards return, from an activated ability whose source may have just been sacrificed for its cost. */ permanentCards?: true }
+  | { type: "returnLinked"; dest: "battlefield" | "hand" | /** Gravegouger: "return the exiled cards to their owner's graveyard". */ "graveyard"; /** "Under your control" (Prowling Geistcatcher): the ability's controller's, not their owners'. */ yours?: true; /** The Princess Takes Flight's chapter III: its source is still the object whose chapter I exiled them (not one that left). */ here?: true; /** Pyxis of Pandemonium: "Each player turns face up all cards they own exiled with ~, then puts all permanent cards among them onto the battlefield": every linked card is turned face up (CR 406.3) and only the permanent cards return, from an activated ability whose source may have just been sacrificed for its cost. */ permanentCards?: true; /** Realm Razer: "to the battlefield tapped". */ tapped?: true }
   /**
    * "The exiled card's owner creates an X/X blue Illusion creature token, where X is the mana value of the exiled card"
    * (Skyclave Apparition): the cards this object's linked exile took (CR 607.2a) that are still in exile. Each of their
@@ -2952,6 +2954,12 @@ export type Effect =
       attachToCreated?: true;
       /** "Attached to ~" (Magnetic Snuffler): an Equipment attached to the source creature, still the same object on the battlefield; else unattached (rulings). */
       attachToSource?: true;
+      /**
+       * Infectious Rage: "choose a creature at random ~ can enchant. Return ~ to the battlefield attached to that creature":
+       * an Aura put onto the battlefield attached to a creature chosen at random among those it could enchant (CR 303.4f,
+       * not targeted: shroud and hexproof don't matter, protection does, rulings); with none, it stays put (CR 303.4g).
+       */
+      attachRandom?: true;
       /** Craft (CR 702.167c): the cards its activation's cost exiled (StackItem.costExiled) are linked to the permanent it becomes, "the exiled cards used to craft it". */
       linkCostExiled?: true;
       /** "Face down ... It's a Forest land" (Yedora, Grave Gardener): face down as a Forest land (FaceDownKind "forest"); "They're 2/2 Cyberman artifact creatures" (The Cyber-Controller): "cyberman". */
@@ -5813,7 +5821,7 @@ export interface TriggeredAbility {
    * `leaves`: "leaves the battlefield", wherever it went, not only into a graveyard (CR 603.6c, 603.10a); `notDies` with it:
    * "without dying" (anywhere but a graveyard, CR 700.4).
    */
-  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; /** "Whenever enchanted creature or another modified creature you control dies" (One with the Kami): the creature it was attached to as it died, or one matching `filter`. */ orAttached?: true; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; /** "Whenever a creature blocking ~ dies" (Baneclaw Marauder): one blocking the source as it last existed. */ blockingSelf?: true; /** "Whenever a token created with ~ leaves the battlefield" (Dance of Many): a token this object's abilities created (CR 607.2). */ createdWithSelf?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform; "is returned to its owner's hand", Justice, Vance Astrovik). */ toZones?: ("graveyard" | "exile" | "hand" | "command")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind; /** "If it wasn't sacrificed" (Urza's Miter): not when its controller sacrificed it (CR 701.21a). */ notSacrificed?: true };
+  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; /** "Whenever enchanted creature or another modified creature you control dies" (One with the Kami): the creature it was attached to as it died, or one matching `filter`. */ orAttached?: true; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; /** "Whenever a creature blocking ~ dies" (Baneclaw Marauder): one blocking the source as it last existed. */ blockingSelf?: true; /** "Whenever a token created with ~ leaves the battlefield" (Dance of Many): a token this object's abilities created (CR 607.2). */ createdWithSelf?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform; "is returned to its owner's hand", Justice, Vance Astrovik). */ toZones?: ("graveyard" | "exile" | "hand" | "command")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind; /** "If it wasn't sacrificed" (Urza's Miter): not when its controller sacrificed it (CR 701.21a). */ notSacrificed?: true; /** "If it was attacking or blocking alone" (Thijarian Witness, CR 506.5): as it left the battlefield (LastKnown aloneIn). */ aloneInCombat?: true };
   /**
    * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
    * went. The card is the subject ("exile it").
@@ -6597,6 +6605,13 @@ export type AdditionalCost =
     }
   /** "Reveal your hand" (Land Grant): all of it, whatever is in it (rulings: even if it's revealed already). */
   | { kind: "revealHand" }
+  /**
+   * Kaervek's Spite: "sacrifice all permanents you control": every one, nothing to choose; not payable while one of them
+   * can't be sacrificed, as the cost couldn't be paid in full (CR 118.3, 601.2h). With none, there's nothing to sacrifice.
+   */
+  | { kind: "sacrificeAll" }
+  /** Kaervek's Spite: "discard your hand": every card in it, the spell itself already on the stack (CR 601.2a); an empty hand pays it. */
+  | { kind: "discardHand" }
   /**
    * "Have an opponent gain 3 life" (Invigorate: the caster picks which, CostChoices.lifeTo), "have each other player gain
    * 6 life" (`each`; Reverent Silence).

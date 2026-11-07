@@ -134,7 +134,7 @@ import { prepareSpellOf } from "./prepare";
 import { castingBody, castTimeTargets, compileCard } from "./oracle";
 import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PendingDecision, type PlayerId, type StackItem } from "./types";
 import { evalAmount } from "./amounts";
-import { CHOSEN_HEXPROOF, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION } from "./keywords";
+import { CHOSEN_HEXPROOF, CHOSEN_PARITY_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
 import { damageEstimate } from "./damage";
 import { blightOptions, removableCounters } from "./counters";
@@ -3482,6 +3482,11 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
   const d = defOf(s, obj(s, id));
   for (const c of castExtraCosts(d, { via, alt, costOr, objectId: id, ...(modes ? { modes } : {}), ...(buyback ? { buyback } : {}), ...(kicks ? { kicks } : {}) }, x, s, pid)) {
     if (c.kind === "revealHand") continue; // nothing to choose
+    // Kaervek's Spite: everything we have, only to finish an opponent at 5 life or less.
+    if (c.kind === "sacrificeAll" || c.kind === "discardHand") {
+      if (!targets.some((t) => t.kind === "player" && t.id !== pid && player(s, t.id).life <= 5)) return null;
+      continue;
+    }
     if (c.kind === "forage") {
       const f = forageChoice(s, pid, obj(s, id), [...targeted].map(String));
       if (!f) return null;
@@ -4407,8 +4412,13 @@ const TURNABOUT_TAP = "Tap all its untapped permanents of the chosen type";
  * quality whose creatures are worth more to opponents than to us; as a permanent enters (Ashling's Prerogative, Gollum),
  * the quality of most of our own creature cards' mana values.
  */
-function chooseParity(s: GameState, pid: PlayerId): string {
+function chooseParity(s: GameState, pid: PlayerId, card?: CardDef): string {
   const odd = (n: number) => Math.abs(n) % 2 === 1;
+  // Lavabrink Venturer: protection from the quality most of the opponents' creatures have (tokens' mana value is 0, even).
+  if (card && JSON.stringify(compileCard(card).statics).includes(CHOSEN_PARITY_PROTECTION)) {
+    const theirs = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) !== pid && objIsType(s, o, "Creature"));
+    return theirs.filter((o) => odd(characteristics(s, o).manaValue ?? 0)).length > theirs.length / 2 ? "odd" : "even";
+  }
   const r = s.resolving;
   if (r) {
     const f = allEffects(r.body.effects).map((e) => ("what" in e && e.what && typeof e.what === "object" && "filter" in e.what ? e.what.filter : "filter" in e ? e.filter : undefined)).find((x): x is TargetSpec => !!x && typeof x === "object" && !!(x as TargetSpec).parity);
@@ -4434,7 +4444,7 @@ function edictTypeScore(s: GameState, pid: PlayerId, ty: string): number {
 const edictsChosenType = (s: GameState) => !!s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "pick" && e.action === "sacrifice" && e.filter.chosen === "cardType");
 
 function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardDef | undefined, options: string[]): string {
-  if (what === "parity") return chooseParity(s, pid);
+  if (what === "parity") return chooseParity(s, pid, card);
   // Order of Succession: the direction whose next player has the best creature for us to take (someone takes ours
   // either way).
   if (what === "direction" && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "successionControl")) {

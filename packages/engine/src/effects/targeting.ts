@@ -175,6 +175,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.equalsChosen && (spec.equals === undefined || !spec.equalsChosen.some((k) => (k === "manaValue" ? defMv(defOf(s, o)) : c.types.includes("Creature") ? c[k] : undefined) === spec.equals))) return false;
   if (spec.mvAtMostControllersGraveyard && defMv(defOf(s, o)) > (s.players[c.controller]?.graveyard.length ?? 0)) return false;
   if (spec.mvAtMostCounters && defMv(defOf(s, o)) > (o.counters[spec.mvAtMostCounters] ?? 0)) return false;
+  if (spec.controllerControlsSubtype !== undefined && !s.battlefield.some((id) => { const x = view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!); return x.controller === c.controller && x.subtypes.includes(spec.controllerControlsSubtype!); })) return false;
   if (spec.controllersGraveyardAtLeast !== undefined && (s.players[c.controller]?.graveyard.length ?? 0) < spec.controllersGraveyardAtLeast) return false;
   if (spec.controllersLandsAtMost !== undefined && s.battlefield.filter((id) => { const x = view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!); return x.controller === c.controller && x.types.includes("Land"); }).length > spec.controllersLandsAtMost) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(defOf(s, o).manaCost)) return false;

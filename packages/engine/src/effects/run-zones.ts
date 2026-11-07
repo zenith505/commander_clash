@@ -73,6 +73,24 @@ function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObjec
 }
 
 /**
+ * Infectious Rage (attachRandom): each Aura's host, a creature chosen at random among those it could enchant as it enters
+ * under that player's control (CR 303.4f; not targeted, so shroud and hexproof don't matter, rulings). One with no such
+ * creature has none, and stays where it is (CR 303.4g).
+ */
+function randomAuraHosts(s: GameState, cards: GameObject[], under: (o: GameObject) => PlayerId, src: string): Map<ObjectId, AuraHost> {
+  const out = new Map<ObjectId, AuraHost>();
+  for (const o of cards) {
+    if (!defOf(s, o).subtypes.includes("Aura")) continue;
+    const options = auraHostOptions(s, o, under(o)).filter((h) => "attachTo" in h && s.objects[h.attachTo]?.zone === "battlefield" && objIsType(s, obj(s, h.attachTo), "Creature"));
+    if (!options.length) continue;
+    const host = options[Math.floor(nextRandom(s) * options.length)]!;
+    log(s, `${src} chooses ${auraHostName(s, host)} at random.`);
+    out.set(o.id, host);
+  }
+  return out;
+}
+
+/**
  * Auras this effect puts onto the battlefield without their being cast (CR 303.4f): the player each one enters under
  * chooses what it enchants, as it enters, among what's on the battlefield before any of them move (Replenish rulings);
  * with nothing legal it stays where it is (303.4g). One Aura at a time, in the order given; no question when only one
@@ -2213,7 +2231,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return;
       }
       // Under their owners' control; an Aura's owner chooses what it enchants (CR 303.4f, Oblivion Ring rulings).
-      return returnFromExile(s, cards, (c) => (e.yours ? ctx.controller : c.owner), src);
+      return returnFromExile(s, cards, (c) => (e.yours ? ctx.controller : c.owner), src, undefined, e.tapped);
     }
     case "pick":
       return pickPermanents(s, e, ctx, src);
@@ -2809,7 +2827,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const types = here ? creatureTypesOf(s, subj!) : lk && (lk.zc === ctx.subject!.zc || lk.zc === ctx.subject!.zc - 1) && lk.creatureTypes ? (lk.creatureTypes === "all" ? ("all" as const) : new Set(lk.creatureTypes)) : undefined;
         kin = (h) => !!types && objIsType(s, h, "Creature") && shareCreatureType(types, creatureTypesOf(s, h));
       }
-      const hosts = e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted || e.attachToCreated || e.attachToSource ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src, undefined, undefined, undefined, kin);
+      const hosts = e.attachRandom ? randomAuraHosts(s, entering, under, src) : e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted || e.attachToCreated || e.attachToSource ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src, undefined, undefined, undefined, kin);
       if (hosts === "paused") return "paused";
       // "Put a +1/+1 counter on it": the permanents these cards became (CR 400.7), like tokens just created.
       if (s.resolving) s.resolving.created = [];

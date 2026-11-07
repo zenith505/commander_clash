@@ -1430,6 +1430,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (notSacrificed) bodyText = bodyText.slice(notSacrificed[0].length);
   // "If it had a counter on it", "if it had one or more counters on it": as it last existed, so it can't change.
   // "If it had a -1/-1 counter on it" (Blowfly Infestation): of that kind.
+  // Thijarian Witness: "if it was attacking or blocking alone" (CR 506.5): as it last existed (CR 603.10a), so it can't
+  // change. "Exile it and investigate": the card in the graveyard, if it's still there (CR 400.7), then a Clue either way.
+  const alone = !attached && !leaves && /^if it was attacking or blocking alone, /.exec(bodyText);
+  if (alone) bodyText = bodyText.slice(alone[0].length).replace(/^exile it and investigate\.$/, "exile it. Investigate.");
   const hadCounter = !attached && new RegExp(`^if it had (?:a counter|one or more counters|counters|an? ${COUNTER} counter|one or more ${COUNTER} counters) on it, `).exec(bodyText);
   const hadKindOf = hadCounter ? (hadCounter[1] ?? hadCounter[2]) : undefined;
   if (hadCounter) bodyText = bodyText.slice(hadCounter[0].length);
@@ -1562,6 +1566,7 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
       ...(notDies ? { notDies: true as const } : {}),
       ...(hadCounter ? { hadCounter: hadKindOf ?? (true as const) } : {}),
       ...(notSacrificed ? { notSacrificed: true as const } : {}),
+      ...(alone ? { aloneInCombat: true as const } : {}),
     },
     body,
   };

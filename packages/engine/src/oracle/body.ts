@@ -1,5 +1,5 @@
 import { parseFromTop } from "./compile";
-import { ANY_COUNTER, NON_AURA_ENCHANTMENT, allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type PunisherOption, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification, type DamageRuleSpec, type CounterKind, type TriggeredAbility } from "../abilities";
+import { ANY_COUNTER, NON_AURA_ENCHANTMENT, allEffects, refCovers, type SearchDest, type AbilityBody, type TokenSpec, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type PunisherOption, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification, type DamageRuleSpec, type CounterKind, type TriggeredAbility } from "../abilities";
 import { substituteX } from "../amounts";
 import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS, plainMana, BASIC_TYPES } from "./words";
 import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_LANDWALK, CHOSEN_PROTECTION, CREATURE_TYPES, SUPPORTED_KEYWORDS, TARGET_PLAYER_PROTECTION, THAT_PLAYER_PROTECTION } from "../keywords";
@@ -1337,6 +1337,21 @@ function wholeTextBody(text: string, opts: { spell?: boolean }): AbilityBody | n
       text,
     };
   }
+  // Grip of Phyresis: control of the Equipment for the rest of the game (layer 2), then a 0/0 Germ it's attached to (CR
+  // 701.3a), all as it resolves, so the Germ is a 0/0 only before state-based actions are next checked (rulings, CR 704.3);
+  // an Equipment with no toughness boost leaves a Germ that dies, the Equipment still yours.
+  if (opts.spell && text.trim() === "Gain control of target Equipment, then create a 0/0 black Phyrexian Germ creature token and attach that Equipment to it.") {
+    const germ: TokenSpec = { name: "Phyrexian Germ", power: 0, toughness: 0, colors: ["B"], types: ["Creature"], subtypes: ["Phyrexian", "Germ"], keywords: [] };
+    return {
+      targets: [{ kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Equipment"], text: "target Equipment" }],
+      effects: [
+        { type: "continuous", what: { ref: "target", index: 0 }, mods: [{ kind: "control" }], duration: "game" },
+        { type: "createToken", who: { ref: "you" }, n: 1, token: germ },
+        { type: "attach", what: { ref: "created" }, source: { ref: "target", index: 0 } },
+      ],
+      text,
+    };
+  }
   // Rite of Ruin: the order is chosen as it resolves; each player then chooses in turn order and the permanents of each type
   // are sacrificed at once, one type after another (rulings).
   if (opts.spell && text.trim() === "Choose an order for artifacts, creatures, and lands. Each player sacrifices one permanent of their choice of the first type, sacrifices two of their choice of the second type, then sacrifices three of their choice of the third type.") {
@@ -1375,6 +1390,25 @@ function wholeTextBody(text: string, opts: { spell?: boolean }): AbilityBody | n
       text,
     };
   }
+  return null;
+}
+
+/**
+ * Multi-sentence wordings read together, kept out of parseBodyText (whose size the type checker limits).
+ * Ignorant Bliss: "Exile all cards from your hand face down. At the beginning of the next end step, return those cards to
+ * your hand, then draw a card.": your own hand exiled face down (CR 406.3), a delayed trigger at the next end step (CR
+ * 603.7; cast during an end step, the next turn's, rulings) returning the cards still exiled (CR 400.7). The splitter reads
+ * ", then draw a card" as an instruction of its own.
+ * Infectious Rage: "When enchanted creature dies, choose a creature at random ~ can enchant. Return ~ to the battlefield
+ * attached to that creature.": the Aura's card in the graveyard, put there by state-based actions after the creature died
+ * (CR 704.5m), back under this ability's controller's control (CR 110.2a), attached to a creature chosen at random as this
+ * resolves among those it could enchant (CR 303.4f; rulings: not targeted, protection still matters).
+ */
+function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell: boolean): { effects: Effect[]; skip: number } | null {
+  if (spell && s === "Exile all cards from your hand face down" && sentences[si + 1] === "At the beginning of the next end step, return those cards to your hand" && /^(?:then )?draw a card$/i.test(sentences[si + 2] ?? "") && sentences.length === si + 3)
+    return { effects: [{ type: "exileFaceDown", from: "hand", who: { ref: "you" }, actor: { ref: "you" } }, { type: "delayed", when: "nextEndStep", effects: [{ type: "returnFaceDownExiled" }, { type: "draw", who: { ref: "you" }, n: 1 }], text: "return those cards to your hand, then draw a card" }], skip: 2 };
+  if (ctx.auraCard && /^[Cc]hoose a creature at random ~ can enchant$/.test(s) && sentences[si + 1] === "Return ~ to the battlefield attached to that creature" && sentences.length === si + 2)
+    return { effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard", moved: true }, attachRandom: true }], skip: 1 };
   return null;
 }
 
@@ -11392,6 +11426,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (who?.ref !== "target") return null;
       effects.push({ type: "exileFaceDown", from: "hand", who, actor: who }, { type: "delayed", when: "playersNextTurnEndStep", whose: who, effects: [{ type: "returnFaceDownExiled" }], text: "that player returns those cards to their hand" });
       si++;
+      continue;
+    }
+    const multi = sentenceRun(s, sentences, si, ctx, !!opts.spell);
+    if (multi) {
+      effects.push(...multi.effects);
+      si += multi.skip;
       continue;
     }
     // Last Rites: "You choose a nonland card from it for each card discarded this way. That player discards those cards.": as

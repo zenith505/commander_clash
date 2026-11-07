@@ -359,6 +359,8 @@ function diesMatches(
   if (d.damagedBySelf && !dying.o.damagedBy?.includes(srcId)) return false;
   if (d.damagedByEquipped && (!attachedTo || !dying.o.damagedBy?.includes(attachedTo))) return false;
   if (d.blockingSelf && !dying.o.blocking?.includes(srcId)) return false;
+  // Thijarian Witness: attacking or blocking alone as it left (CR 506.5), noted then (LastKnown aloneIn).
+  if (d.aloneInCombat && !s.lastKnown?.[dying.o.id]?.aloneIn) return false;
   // Dance of Many: a token this object created, as the object it is now (CR 400.7).
   if (d.createdWithSelf) return dying.o.createdWith?.id === srcId && dying.o.createdWith.zc === (s.objects[srcId]?.zoneChanges ?? 0);
   if (srcId === dying.o.id) {

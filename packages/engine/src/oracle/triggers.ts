@@ -2901,6 +2901,8 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", /** Old One Eye: "At the beginning of your first main phase" (CR 505.1a). */ "yourFirstMain", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut", "youSacrifice", "opponentGainsLife", /** Deathless Knight. */ "youGainLife"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
+  // Fasting: "When you draw a card, destroy ~.": "when" triggers each time like "whenever" (CR 603.2).
+  if (/^When you draw a card, /.test(raw)) return parseTrigger(raw.replace(/^When you draw a card, /, "Whenever you draw a card, "));
   // Eye of Singularity: "a permanent other than a basic land" is a nonbasic permanent: only lands are basic (CR 205.4c).
   if (/^Whenever a permanent other than a basic land enters, /.test(raw)) return parseTrigger(raw.replace(/^Whenever a permanent other than a basic land enters, /, "Whenever a nonbasic permanent enters, "));
   // Bladegriff Prototype: "destroy target nonland permanent of that player's choice that one of your opponents controls":

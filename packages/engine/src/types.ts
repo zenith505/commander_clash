@@ -798,6 +798,8 @@ export interface Player {
   handSizeForGame?: { plus: number; timestamp: number }[];
   /** "You have no maximum hand size for as long as you control ~" (The Great Synthesis): while they control that object (CR 611.2b). */
   noMaxHandSizeWhile?: { id: ObjectId; zc: number }[];
+  /** Stromgald Spy: "play with their hand revealed for as long as ~ remains on the battlefield" (CR 402.3, 611.2b): while that object is. */
+  handRevealedWhile?: { id: ObjectId; zc: number }[];
   /** "You have no maximum hand size until your next turn" (Enter the Infinite): until that player's next turn begins. */
   noMaxHandSizeUntilNextTurn?: true;
   /**
@@ -1005,6 +1007,8 @@ export type Step =
 
 export interface StackItem {
   id: string;
+  /** Liquid Fire: the number chosen as it was cast (CostChoices.number), "the chosen number" as it resolves; copied with it (CR 707.10). */
+  chosenNumber?: number;
   /** "Target spell can't be countered" (Vexing Shusher): from then on, while it's this stack object (CR 101.2). */
   uncounterable?: true;
   kind: "spell" | "ability";
@@ -1392,6 +1396,8 @@ export interface CostChoices {
   lifeTo?: PlayerId;
   /** Assist (CR 702.132a): the other player asked to help pay for the generic mana in its total cost. */
   assist?: PlayerId;
+  /** Liquid Fire: "As an additional cost to cast this spell, choose a number between 0 and 5" (CR 601.2b): the number (CompiledCard.castNumber). */
+  number?: number;
   /** How much of that generic mana they pay, from their mana pool: set by the game once they've chosen. */
   assisted?: number;
 }
@@ -1476,7 +1482,7 @@ export type PendingDecision =
    * mana value N or more, or none to decline. `not`: a card that can't be one of them.
    */
   | { kind: "collectEvidence"; player: PlayerId; n: number; source: string; not?: ObjectId }
-  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** Fiery Gambit: "flip again?" after this many flips won in a row, more doing nothing more past `enough`. */ flipAgain?: { wins: number; enough: number }; /** Game of Chaos: "flip again?" for the winner of the last flip, the next flip's life stakes, and what the game has given this player so far (for bots). */ chaosAgain?: { stake: number; net: number; against: PlayerId }; /** What declining means, shown after the question (Fandaniel: "If you don't, you lose 4 life."), or what doing it means (The Second Doctor). */ otherwise?: string; /** One target of a "may" asked about each of its targets (Effect "may" `eachTarget`). */ eachTarget?: true; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** The payment is this permanent's cumulative upkeep (CR 702.24a): mana "only to pay cumulative upkeep costs" pays it (mayPayUse). */ upkeepOf?: ObjectId; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true; /** Lim-Dûl's Vault: the cards looked at, shown with the question. */ vault?: ObjectId[]; /** Krark's Thumb: one of the two coins was won and one lost; yes keeps the won flip, no the lost one. */ thumb?: true; /** Odric: pay `pay` for the blocks `chooser` declared for this player, or have them choose again (rulings). */ blockTax?: { chooser: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[]; remaining: PlayerId[] } }
+  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** Fiery Gambit: "flip again?" after this many flips won in a row, more doing nothing more past `enough`. */ flipAgain?: { wins: number; enough: number }; /** What declining means, shown after the question (Fandaniel: "If you don't, you lose 4 life."), or what doing it means (The Second Doctor). */ otherwise?: string; /** One target of a "may" asked about each of its targets (Effect "may" `eachTarget`). */ eachTarget?: true; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** The payment is this permanent's cumulative upkeep (CR 702.24a): mana "only to pay cumulative upkeep costs" pays it (mayPayUse). */ upkeepOf?: ObjectId; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true; /** Lim-Dûl's Vault: the cards looked at, shown with the question. */ vault?: ObjectId[]; /** Krark's Thumb: one of the two coins was won and one lost; yes keeps the won flip, no the lost one. */ thumb?: true; /** Odric: pay `pay` for the blocks `chooser` declared for this player, or have them choose again (rulings). */ blockTax?: { chooser: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[]; remaining: PlayerId[] }; /** Game of Chaos: "flip again?" for the winner of the last flip, the next flip's life stakes, and what the game has given this player so far (for bots). */ chaosAgain?: { stake: number; net: number; against: PlayerId }; /** Fasting: skip the draw step that would begin, with the permanent `from` (the ones in `declined` were declined already)? */ skipDraw?: { from: ObjectId; declined: ObjectId[] } }
   /**
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
@@ -2622,6 +2628,8 @@ export interface Resolving {
     feud?: { step: number; looked?: ObjectId[]; asked?: true; put: ObjectId[] };
     /** Whirlwind Denial: the spells and abilities still to ask about, in order, and those not paid for. */
     denial?: { queue: string[]; unpaid: string[] };
+    /** Cut the Tethers: the permanents still to ask about, owner by owner in APNAP order, and the ones not paid for. */
+    tethers?: { queue: { id: ObjectId; zc: number }[]; unpaid: { id: ObjectId; zc: number }[] };
     /** Sword-Point Diplomacy's "for each of those cards": the revealed cards still to do, the one being done (ResolvingInfo.revealed), the step of its instructions, and the card its controller chose to do next. */
     eachRevealed?: { left: ObjectId[]; current?: ObjectId; step: number; next?: ObjectId };
     /** A search's cards put on top "in any order" (Goblin Recruiter) have been ordered. */

@@ -511,6 +511,8 @@ const checkableMay = (e: Effect): boolean =>
   // "You may have target opponent draw a card. If you do, copy that spell." (Alania): done if that player is still a legal
   // target with a card to draw.
   (e.type === "draw" && e.who.ref === "target" && !("n" in e.who && e.who.n) && e.n === 1) ||
+  // Stromgald Spy: "you may have defending player play with their hand revealed ... If you do, ~ assigns no combat damage".
+  e.type === "revealHandWhile" ||
   // "You may have that player lose 2 life. If you do, you gain 2 life." (Bloodchief Ascension): one player, who can lose
   // life now (CR 119.8).
   (e.type === "loseLife" && (e.who.ref === "eventPlayer" || (e.who.ref === "target" && !("n" in e.who && e.who.n))) && typeof e.n === "number" && e.n > 0) ||
@@ -1291,8 +1293,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // to target opponent chosen at random": a triggered ability's one target, picked at random among the legal ones as the
   // ability is put on the stack, so players can respond knowing it (rulings).
   // Witch Hunt: "target opponent chosen at random gains control of ~". (Not "chosen at random from among ...".)
-  const random = /\btarget [a-z ]+? chosen at random(?=[.,]| (?!from\b))/.exec(text);
-  if (random && !opts.spell && !opts.activated && !opts.activatedAbility) {
+  const random = /\btarget(?: [a-z ]+?)? chosen at random(?=[.,]| (?!from\b))/.exec(text);
+  // Goblin Test Pilot: an activated ability's, picked as it's activated (game.ts activateAbility).
+  if (random && !opts.spell && !opts.activatedAbility) {
     if ((text.match(/chosen at random/g) ?? []).length !== 1 || (text.match(/\btarget\b/g) ?? []).length !== 1) return null;
     const body = parseBodyText(text.replace(" chosen at random", ""), opts);
     const t = body?.targets.length === 1 ? body.targets[0]! : undefined;
@@ -1311,6 +1314,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   if (body && /each of that (?:creature|permanent)'s colors/.test(text) && (body.targets.length !== 1 || body.targets[0]!.kind !== "object")) return null;
   // Opal Titan: "each of that spell's colors" is only a cast trigger's spell.
   if (body && /each of that spell's colors/.test(text) && !opts.castSpell) return null;
+  // Evershrike: "Return ~ from your graveyard to the battlefield. You may put an Aura card ... onto the battlefield attached
+  // to it. If you don't, exile ~.": the permanent it became, one zone change later (CR 400.7), not the card it was.
+  if (body && /^Return ~ from your graveyard to the battlefield\. You may put an Aura card [^.]+ attached to (?:it|~)\. If you don't, exile ~\.$/.test(text)) {
+    const [back, put, ifNot] = body.effects;
+    if (body.effects.length !== 3 || back?.type !== "putOntoBattlefield" || back.what.ref !== "selfCard" || put?.type !== "putFromHand" || !put.attachToSelf || !put.may || ifNot?.type !== "if" || ifNot.cond.kind !== "youDid" || ifNot.effects.length || ifNot.otherwise?.length !== 1 || ifNot.otherwise[0]!.type !== "exile") return null;
+    const { attachToSelf: _, ...rest } = put;
+    return { ...body, effects: [back, { ...rest, attachToReturned: true }, { ...ifNot, otherwise: [{ ...ifNot.otherwise[0]!, what: { ref: "selfCard", returned: true } }] }] };
+  }
   return body;
 }
 
@@ -2664,6 +2675,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Firebender Ascension: "Put a quest counter on ~. Then if it has four or more quest counters on it, you may copy that
   // ability": the same check of ~'s counters as it resolves.
   text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if it has ([a-z]+) or more \2 counters on it, (you may copy that ability\.)/, "$1 If there are $3 or more $2 counters on ~, $4");
+  // Liquid Fire: "~ deals X damage to target creature and 5 minus X damage to that creature's controller, where X is the
+  // chosen number": the number chosen as it was cast, not an X of its own (sentences/basics.ts).
+  text = text.replace(/^~ deals X damage to target creature and (\d+) minus X damage to that creature's controller, where X is the chosen number\.$/, "~ deals the chosen number of damage to target creature and $1 minus the chosen number of damage to that creature's controller.");
+  // Evershrike: "Return ~ from your graveyard to the battlefield. You may put an Aura card with mana value X or less from
+  // your hand onto the battlefield attached to it.": "it" is ~, back on the battlefield (rulings).
+  text = text.replace(/^(Return ~ from your graveyard to the battlefield\. You may put an Aura card [^.]+? from your hand onto the battlefield attached to) it\./, "$1 ~.");
+  // Fasting: "Put a hunger counter on ~. Then destroy ~ if it has five or more hunger counters on it.": the counter first,
+  // then the count, as it resolves (rulings).
+  text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then (destroy|sacrifice) ~ if it has ([a-z]+) or more \2 counters on it\.$/, "$1 Then if it has $4 or more $2 counters on it, $3 ~.");
   text = text.replace(/((?:^|\. | and )[Pp]ut an? [a-z]+ counter on ~\. If there are [a-z]+ or more [a-z]+ counters on ~, (?:you may )?remove all [a-z]+ counters from ~ and transform) it\.$/, "$1 ~.");
   text = text.replace(/^Choose (up to one target [a-z]+), then (airbend|exile|destroy) all other ([a-z]+)\./, (_, t: string, verb: string, what: string) => `Choose ${t}. ${verb.charAt(0).toUpperCase()}${verb.slice(1)} all other ${what}.`);
   // "Transform ~, then untap it" (Westvale Abbey): the same permanent, now its back face (CR 712.18).
@@ -4235,6 +4255,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const d = fx?.length === 1 ? fx[0] : undefined;
       if (d?.type !== "delayed" || d.when !== "nextEndStep" || !d.of || d.effects.length !== 1 || d.effects[0]!.type !== "sacrifice" || d.effects[0]!.what.ref !== "subject") return null;
       effects.push({ ...d, effects: [...d.effects, { type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "gainLife", who: { ref: "you" }, n: { count: { kind: "toughness", of: { ref: "sacrificed" } } } }] }], text: "Sacrifice it. If you do, you gain life equal to its toughness" });
+      si++;
+      continue;
+    }
+    // Shifty Doppelganger: "At the beginning of the next end step, sacrifice that creature. If you do, return this card to the
+    // battlefield.": the card its cost exiled, only if that creature was sacrificed then (rulings: not if it's gone).
+    if (s === "At the beginning of the next end step, sacrifice that creature" && sentences[si + 1]?.replace(/\.$/, "") === "If you do, return ~ to the battlefield" && opts.activated && /^You may put a creature card from your hand onto the battlefield\. If you do, that creature gains haste until end of turn\. /.test(text)) {
+      const fx = parseOne(s, ctx);
+      const d = fx?.length === 1 ? fx[0] : undefined;
+      if (d?.type !== "delayed" || d.when !== "nextEndStep" || d.of?.ref !== "created" || d.effects.length !== 1 || d.effects[0]!.type !== "sacrifice" || d.effects[0]!.what.ref !== "subject") return null;
+      effects.push({ ...d, withSource: true, effects: [...d.effects, { type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard", exiledAsCost: true } }] }], text: "Sacrifice that creature. If you do, return ~ to the battlefield" });
       si++;
       continue;
     }
@@ -16585,6 +16615,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         .replace(/^Have (it|that creature) connive$/, (_, w: string) => (w === "it" && (ctx.selfIt || ctx.selfCard) ? "~ connives" : `${w === "it" ? "It" : "That creature"} connives`))
         // "You may have target opponent discard a card", "you may have that player lose 1 life": that player does it, if
         // you choose (the choice is yours, CR 608.2d).
+        // Stromgald Spy: "you may have defending player play with their hand revealed for as long as ~ remains ...".
+        .replace(/^Have (defending player|target player|target opponent|that player) play with their hand revealed /, (_, who: string) => `${who.charAt(0).toUpperCase()}${who.slice(1)} plays with their hand revealed `)
         .replace(/^Have (target player|target opponent|that player|its controller|each opponent) (discard|lose|draw|mill|sacrifice|gain) /, (_, who: string, verb: string) => `${who.charAt(0).toUpperCase()}${who.slice(1)} ${verb}s `)
         // "You may have target creature get -2/-2 until end of turn", "... it gain reach", "... Ally creatures you control
         // gain first strike", "... enchanted creature fight target creature": they do it, if you choose (CR 608.2d).

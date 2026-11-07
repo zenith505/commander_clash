@@ -2712,7 +2712,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const self = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me : undefined;
       // Holy Avenger: the trigger's creature, if it's still on the battlefield as that object (CR 400.7).
       const subject = e.attachToSubject ? objects(s, { ref: "subject" }, ctx).find((o) => o.zone === "battlefield") : undefined;
-      const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: p.id })), src, e.attachToSelf ? (self?.id ?? null) : e.attachToSubject ? (subject?.id ?? null) : undefined);
+      // Evershrike: the permanent the source card became as this returned it (CR 400.7).
+      const returned = e.attachToReturned ? objects(s, { ref: "selfCard", returned: true }, ctx)[0] : undefined;
+      const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: p.id })), src, e.attachToSelf ? (self?.id ?? null) : e.attachToReturned ? (returned?.id ?? null) : e.attachToSubject ? (subject?.id ?? null) : undefined);
       if (hosts === "paused") return "paused";
       // "That creature gains haste": the permanents these cards became (CR 400.7), like tokens just created.
       if (s.resolving) s.resolving.created = [];

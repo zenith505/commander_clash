@@ -1,6 +1,6 @@
 # Roadmap
 
-30,343 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,353 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,657 of
 9,979 (96%).
 
@@ -2377,7 +2377,7 @@ line blocks.
    Tower); "Choose a number. Flip a coin that many times or until you lose a flip" (Squee's Revenge: offered 0 to 100, a
    browser test; the bot picks the number with the best expected draw); Game of Chaos (the winner of each flip decides
    whether to flip again, the stakes doubling; a browser test of both answers; Edgar, King of Figaro rigs the first flip).
-   +9, 30,343 of 31,936 with B135.
+   +9, 30,353 of 31,936 with B135 and B136.
    Out after round 298 (looked at, not done): Yurlok of Scorch Thrash ("each player adds {B}{R}{G}": a mana ability
    adding mana to every player's pool, and mana burn that doesn't stack for several Yurloks, rulings); Curse of Bounty
    ("each opponent attacking that player does the same": an untap for each attacking opponent's own permanents);
@@ -4470,14 +4470,14 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Zombie cards from all graveyards", Durkwood Tracker's bite of an attacking creature. +19 (27,265 of 31,936 with main and Lane A round 199).
 - Known limits there: bots don't activate Painbringer (an X cost they skip) and may value Baki's Curse at 0.
 - Out after round B31: Ekundu Cyclops (an attack requirement that depends on the declaration itself, like Viashino
-  Bey), Taste of Paradise (optional additional costs, Lane A's round 197 template; left to it), Liquid Fire (a number
-  chosen as a cost), Goblin Test Pilot (a random target for an activated ability), Emberwilde Djinn ("pay {R}{R} or 2
+  Bey), Taste of Paradise (optional additional costs, Lane A's round 197 template; left to it), Liquid Fire (done in round B136) (a number
+  chosen as a cost), Goblin Test Pilot (done in round B136) (a random target for an activated ability), Emberwilde Djinn ("pay {R}{R} or 2
   life"), Carrion Wurm ("any player may exile three", done in round B132), Matopi Golem (a regeneration shield's rider, done in
   round B132), Taunt (a rule
   bound to a target player), Goblin Sappers ("destroy it and ~ at end of combat"), Curtain of Light (done in round B110), Dazzling Beauty (done in round B110) and
   Trap Runner (done in round B110) ("becomes blocked" by an effect), Kill-Suit Cultist (done in round B135) (a destroy-instead damage shield), Rock Jockey,
   Explosion of Riches, Power Pack, Cinderheart Giant (done in round B116) (chosen at random as it resolves, not targeted), Juju Bubble ("play
-  a card"), Curse Artifact, Erithizon (done in round B110) (a target chosen by the defending player), Selfless Exorcist (done in round B126), Cut the Tethers.
+  a card"), Curse Artifact, Erithizon (done in round B110) (a target chosen by the defending player), Selfless Exorcist (done in round B126), Cut the Tethers (done in round B136).
 - Round B32 (harder skipped cards, least played first): "you may pay ... If you do ... Otherwise, ..." (Spitting
   Slug), "each permanent with fading you control" (Parallax Inhibitor), "a land with a trap counter on it" as a
   sacrifice cost (Trap Digger), "If it doesn't have rampage, that creature gains rampage 2" (Rapid Fire; rampage as a
@@ -4867,7 +4867,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Shieldmage Advocate), "Sacrifice a Room" (Intruding Soulrager), and "creatures that have -1/-1 counters on them"
   (Grind // Dust). +26 (28,231 of 31,936 with rounds 217 to 221).
 - Out after round B49 (looked at, not done): Anthropede (done in round B127) ("discard a card or pay {2}" as one cost choice), Retribution
-  and Barrin's Spite (the targets' controller chooses one of them), Goblin Test Pilot (a random target as it's
+  and Barrin's Spite (the targets' controller chooses one of them), Goblin Test Pilot (done in round B136) (a random target as it's
   activated), Ley Line (done in round B110) and Mausoleum Turnkey (done in round B110) (another player chooses the target), Tamanoa and Molten Lavamancer (done in round B122)
   (noncombat or noncreature damage triggers), Venser's Diffusion (a target among suspended cards), Nivmagus Elemental
   (exile an instant or sorcery spell you control as a cost), Warbringer (equip costs less: Lane A round 217 does it),
@@ -6367,6 +6367,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Grave Consequences' graveyard pick and Void's number. +10 (30,325 of 31,936).
 - Known gap from round B135: with two Force Bubbles (a copy), the first one takes all the damage; its controller should
   choose which one does each time (rulings).
+- Round B136 (least played first, from the skip lists): Fasting (a hunger counter each upkeep, destroyed at five; "if
+  you would begin your draw step, you may skip that step instead" asked as the step would begin, CR 614.10, the life
+  gained only if you skip; "when you draw a card" read as "whenever", CR 603.2), Heat Wave (nonblue creatures blocking
+  your creatures cost their controller 1 life each, paid as blocks are declared, CR 509.1d-f; refused without the life,
+  CR 119.4; the Block button names it), Stromgald Spy ("you may have defending player play with their hand revealed for
+  as long as ~ remains on the battlefield", then no combat damage), Liquid Fire (a number from 0 to 5 chosen as an
+  additional cost, CR 601.2b, X to the creature and 5 minus X to its controller; a number picker as you cast it), Grifter's
+  Blade (enters attached to a creature you control it could be attached to, CR 614.12, a choice only with two or more),
+  Goblin Test Pilot (any target chosen at random as the ability is activated), Dreams of the Dead
+  ("if the creature would leave the battlefield, exile it instead"), Evershrike (returned from the graveyard, an Aura card
+  with mana value up to X put onto the battlefield attached to it, else it's exiled: the returned Evershrike, a new object,
+  CR 400.7), Shifty Doppelganger (the exiled card returns only if the creature put onto the battlefield was sacrificed at
+  the next end step), Cut the Tethers (each Spirit's owner, in APNAP order, pays {3} for each or it returns to hand, all
+  the unpaid ones at once). Bots skip the draw with three or more cards in hand, pay Heat Wave's life only staying at 10
+  or more, never reveal a hand for Stromgald Spy, pick Liquid Fire's number to just kill the creature, don't activate
+  Goblin Test Pilot, and cast Cut the Tethers only when opponents own more Spirits. Browser tests for Fasting's skip (yes
+  and no), Heat Wave's Block button, Liquid Fire's number, Grifter's Blade's creature and Stromgald Spy's reveal. +10
+  (30,335 of 31,936).
+- Out after round B136 (looked at, not done): Forgotten Lore (an opponent chooses again each time you pay {G}),
+  Infinite Authority (a delayed trigger that checks "if that creature was destroyed this way").
 - Out after round B135 (looked at, not done): Tariff (a punisher whose cost is the chosen creature's own mana cost),
   Words of War (a target chosen as a draw is replaced), Gloom (a tax on activated abilities, mana abilities too),
   Delaying Shield (its first line compiles now; still out: "you lose 1 life unless you pay {1}{W}" for each counter removed).
@@ -6390,7 +6410,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   two costs; Ion Storm done in round B132), Price of Betrayal (counters removed from an opponent, a player, as well as permanents), Bargaining Table
   (X set by the opponent chosen as it's activated), Selective Snare (a creature type chosen as it's cast).
 - Out after round B127 (looked at, not done): Sutured Ghoul (an enters replacement exiling any number of creature cards
-  and a characteristic-defining P/T linked to them, CR 607.2a), Goblin Test Pilot (a target chosen at random as it's
+  and a characteristic-defining P/T linked to them, CR 607.2a), Goblin Test Pilot (done in round B136) (a target chosen at random as it's
   activated), Valleymaker (a mana ability with a sacrifice cost whose mana goes to another player), Escaped Shapeshifter
   (a layer 6 ability-adding effect that depends on what opponents' creatures have, CR 613.8), Snowblind (Y counted from
   the toughness the effect itself changes), Sirocco (a punisher per revealed card, done in round B132), Nivmagus Elemental (exiling a spell
@@ -6399,15 +6419,15 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B126 (looked at, not done): Kill-Suit Cultist ("the first time damage would be dealt to that creature
   this turn, destroy it instead": a destroy-instead damage replacement ordered with prevention, CR 616.1, that the damage
   pipeline doesn't offer yet).
-- Out after round B125 (looked at, not done): Cut the Tethers (a punisher for each Spirit paid by its owner, all returned
-  at once: keepRest has no mana payment), Liquid Fire (a number chosen as an additional cost as it's cast, CR 601.2b: no
+- Out after round B125 (looked at, not done): Cut the Tethers (done in round B136) (a punisher for each Spirit paid by its owner, all returned
+  at once: keepRest has no mana payment), Liquid Fire (done in round B136) (a number chosen as an additional cost as it's cast, CR 601.2b: no
   cast-time number choice yet), Preferred Selection (the two cards looked at are held across a "you may sacrifice ~ and
   pay" choice), Thelon's Chant and Tourach's Chant (the player who put it onto the battlefield isn't tracked), Wand of Ith
   and Tainted Specter (a payment or a library-top choice for the revealed or discarded card; both done in round B132).
 - Out after round B123 (looked at, not done): Misfortune, Library of Lat-Nam and Fatal Lore (an opponent chooses the mode
-  as the spell is cast, CR 700.2e), Kheru Lich Lord (a returned card's abilities and its exile replacement), Fasting (an
+  as the spell is cast, CR 700.2e), Kheru Lich Lord (a returned card's abilities and its exile replacement), Fasting (done in round B136) (an
   optional draw-step skip with a counter rider), Matopi Golem and Skeleton Scavengers (a rider on one regeneration
-  shield, a choice among shields; done in round B132), Thirsting Axe (combat damage dealt to creatures this turn isn't tracked), Heat Wave (a
+  shield, a choice among shields; done in round B132), Thirsting Axe (combat damage dealt to creatures this turn isn't tracked), Heat Wave (done in round B136) (a
   block tax paid in life), Rohgahh of Kher Keep (payment to keep the Kobolds, then control of all of them to an opponent),
   Evangelize and Echo Chamber (a target an opponent chooses for your spell or ability).
 - Out after round B122 (looked at, not done): Tamanoa and Briarbridge Patrol (once for each damage event, which a spell
@@ -6425,16 +6445,16 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B118 (looked at, not done): Flying Drone ("another creature with flying entered the battlefield under your
   control this turn": the turn's enter log doesn't keep keywords), Cellar Door ("puts the bottom card of their library into
   their graveyard": not a mill, CR 701.17a, so it needs a move of its own), Relive the Past (done in round B128) (three "up to one" graveyard
-  targets of different types returned at once, then 5/5 Elementals), Grifter's Blade (an enters choice of a creature to enter
+  targets of different types returned at once, then 5/5 Elementals), Grifter's Blade (done in round B136) (an enters choice of a creature to enter
   attached to), Jandor's Ring (the last card you drew this turn isn't tracked).
 - Out after round B117 (looked at, not done): Price of Betrayal (counters removed from a target that may be a player: no
   player counters as a target yet), Barroom Brawl (the copy's controller, the opponent to the left, "that player"),
   Pit Automaton (a delayed trigger on the next exhaust ability activated).
 - Out after round B116 (looked at, not done): Earthbind (an Aura gaining a static ability with the timestamp of the gain,
-  CR 613.7a, after an intervening if on the enchanted creature), Goblin Test Pilot (a target chosen at random as an
+  CR 613.7a, after an intervening if on the enchanted creature), Goblin Test Pilot (done in round B136) (a target chosen at random as an
   activated ability is activated: activation always lets the player choose), Thijarian Witness (done in round B131) ("if it was attacking or
   blocking alone" as it died, CR 506.5, with other creatures dying at the same time).
-- Out after round B115 (looked at, not done): Cut the Tethers (a punisher for each Spirit that returns only the ones
+- Out after round B115 (looked at, not done): Cut the Tethers (done in round B136) (a punisher for each Spirit that returns only the ones
   their owners didn't pay for), Song of Blood (done in round B127) (a delayed attack trigger whose bonus counts the creature cards milled as
   it resolved), Expel the Unworthy (a kicker that changes what the spell can target), Kill-Suit Cultist (done in round B135) and Goblin
   Psychopath (damage replaced by a destroy or redirected, ordered with other shields, CR 616.1, as Lichenthrope).
@@ -6518,8 +6538,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (omen counters off for each creature card put into your graveyard), Biolume Egg ("When you sacrifice ~, return it ...
   transformed"), Wumpus Aberration, Roving Actuator, Kianne, Dean of Substance, Chong and Lily, Nomads, Soul Ransom ("Only
   your opponents may activate this ability"), Grinning Totem, Failure // Comply (Comply's chosen name), Musician, Soul
-  Sculptor ("until a player casts a creature spell"), Heat Wave (a block cost per creature), Bane Alley Broker, Essence of
-  the Wild, Dreams of the Dead, Ludevic, Necrogenius. Bot gap: bots don't use Carrionette from the graveyard.
+  Sculptor ("until a player casts a creature spell"), Heat Wave (done in round B136) (a block cost per creature), Bane Alley Broker, Essence of
+  the Wild, Dreams of the Dead (done in round B136), Ludevic, Necrogenius. Bot gap: bots don't use Carrionette from the graveyard.
 - Out after round B97 (looked at, not done): Wall of Caltrops, Nature's Blessing, Master of the Hunt and the "bands with
   other legendary creatures" lands (banding), Shield Dancer (a combat damage redirection to its source), Mirror-Shield
   Hoplite (copy a backup ability), Speedball (new targets for that spell), Bill Ferny (done in round 272), Elemental Expressionist (a granted replacement and exile trigger), Wormfang Drake and Wormfang Crab (returns
@@ -6533,7 +6553,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Elemental (done in round B114) (creatures blocking or blocked by it as it last existed, rulings, when it has left the battlefield), Stromgald
   Spy (play with that hand revealed for as long as it remains), Bone Mask and Mourner's Shield (damage prevented by a
   source of your choice, then exile that many / sharing a color with the imprinted card), Soltari Guerrillas (redirect the
-  next combat damage to an opponent), Shifty Doppelganger (return the exiled card at end step if the creature was
+  next combat damage to an opponent), Shifty Doppelganger (done in round B136) (return the exiled card at end step if the creature was
   sacrificed), Noxious Vapors (one card of each color chosen), Gauntlets of Chaos (exchange of control sharing a type).
 - Out after round B95 (looked at, not done): Enduring Renewal, Breathstealer's Crypt, Zur's Weirding and Chains of
   Mephistopheles (draw replacements that would have to be ordered with the existing draw replacements, CR 616.1), Wheel
@@ -6556,7 +6576,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Drafna's Restoration (targets in the graveyard of an earlier target player), Rite of Ruin (done in round B129) (an order for three card
   types, then three rounds of sacrifices), Tariff (a punisher whose cost is the chosen creature's mana cost), Powerleech (done in round B122)
   and Haunting Wind (done in round B122) ("activates an artifact's ability without {T} in its activation cost", and "that artifact's
-  controller"), Fasting (a may skip of the draw step as it would begin), Naked Singularity (a land with two basic land
+  controller"), Fasting (done in round B136) (a may skip of the draw step as it would begin), Naked Singularity (a land with two basic land
   types, as Reality Twist), Harsh Judgment and Aegis of Honor (an instant or sorcery's damage redirected to its
   controller), Peace Talks ("this turn and next turn"), Stronghold Gambit, Grenzo's Rebuttal, Planar Overlay (done in round B114), Worldpurge,
   Call to Arms.
@@ -6567,7 +6587,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   and Consume Spirit ("Spend only black mana on X" on a spell, with cost reductions), Emblazoned Golem (one mana of each
   color on X), Fatal Lore (an opponent chooses the mode), Echo Chamber (an opponent chooses the target), Butcher Orgg and
   Cunning Giant (combat damage assigned to other creatures).
-- Out after round B91 (looked at, not done): Goblin Test Pilot (a target chosen at random as an activated ability is
+- Out after round B91 (looked at, not done): Goblin Test Pilot (done in round B136) (a target chosen at random as an activated ability is
   activated: the activation, the bots and the UI would all need to leave the target to chance), Flying Drone (a colored
   activation cost reduction, "if another creature with flying entered the battlefield under your control this turn"),
   Suppress (done in round B127) (a hand exiled face down until the end step of that player's next turn), Yare ("target creature defending
@@ -6618,7 +6638,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cost and an "or" ward cost).
 - Out after round B79 (looked at, not done): Aquamorph Entity (a choice as it's turned face up: the special action
   can't pause yet), Volrath's Laboratory and Riptide Replicator (tokens of the chosen color and creature type), Barbed
-  Foliage ("loses flanking" has to remove the trigger), Sunglasses of Urza, Knight of Valor, Grifter's Blade, Halfdane,
+  Foliage ("loses flanking" has to remove the trigger), Sunglasses of Urza, Knight of Valor, Grifter's Blade (done in round B136), Halfdane,
   Bronze Horse (done in round B135), Mister Immortal (activated from exile), Wall of Deceit (done in round 271) and Backslide (turn a creature face down),
   Sarkhan's Whelp (done in round B105), Dredging Claw, Defiant Vanguard (done in round B108). Known gaps: Dormant Gomazoa doesn't trigger when a spell's target is
   changed to you; a non-mana echo cost (Echo—discard) doesn't count as "echo cost is paid".

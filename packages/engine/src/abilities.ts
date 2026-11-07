@@ -1371,7 +1371,7 @@ export type ObjRef =
    */
   /** "All other tokens created with ~" (Faerie Artisans): the tokens on the battlefield this object's abilities created, not those created as this resolves (rulings: each Artisans only its own). */
   | { ref: "tokensCreatedWithSelf" }
-  | { ref: "selfCard"; moved?: true; yours?: true; /** Craft's "Return this card" (CR 702.167a): the card its own cost exiled, still in exile and still that object (CR 400.7j). */ exiledAsCost?: true }
+  | { ref: "selfCard"; moved?: true; yours?: true; /** Evershrike: the card its ability returned to the battlefield, the permanent it became (one zone change later, CR 400.7). */ returned?: true; /** Craft's "Return this card" (CR 702.167a): the card its own cost exiled, still in exile and still that object (CR 400.7j). */ exiledAsCost?: true }
   /** "Create a 0/0 Fractal creature token. Put X +1/+1 counters on it": the token(s) this ability just created. */
   | { ref: "created" }
   /** "The amassed Army" (CR 701.47c): the Army chosen by this ability's amass, or by the one whose reflexive trigger this is. */
@@ -1844,6 +1844,8 @@ export type Modification =
   /** Ghostly Prison: {n} per attacker; Sphere of Safety: {X}, a count (`amount`), attacking your planeswalkers too. */
   /** "Creatures can't block unless their controller pays {1} for each of those creatures" (Archangel of Tithes, CR 509.1d). */
   | { kind: "blockTax"; n: number }
+  /** Heat Wave: creatures not of `notColor` blocking creatures this permanent's controller controls cost `n` life each (CR 509.1d). */
+  | { kind: "blockLifeTax"; n: number; notColor: Color }
   /** "Enchanted creature can't attack unless its controller pays {3}" (Brainwash), "~ can't attack unless you pay {1} for each +1/+1 counter on it" (Phyrexian Marauder): what attacking with this creature costs, whoever it attacks (CR 508.1g-h). */
   /**
    * Exalted Dragon: "~ can't attack unless you sacrifice a land"; Leviathan: "... two Islands"; Floodtide Serpent: "...
@@ -2896,7 +2898,7 @@ export type Effect =
       once?: true;
     }
   | { type: "putFromHand"; who?: PlayerRef; /** With `any`: "a creature card and/or a land card" (Yuna's Decision): up to one card for each of these, each card put matching a different one, all put at once. */ oneOfEach?: TargetSpec[]; /** "Put all land cards from it onto the battlefield" (Manabond): every card in the hand that fits, no choice. */ all?: true; /** Aura swap (CR 702.65a): "You may exchange this permanent with an Aura card in your hand": an Aura card that could enchant what the source enchants, put onto the battlefield attached to it as the source returns to your hand; nothing if either half can't be done (702.65b). */ auraSwap?: true; /** "If that card is an enchantment card, it enters tapped and attacking" (Summoner's Grimoire): `tapped` and `attacking` only for a card matching this. */ onlyIf?: TargetSpec; /** "Whenever equipped creature deals combat damage, you may put an Aura card from your hand onto the battlefield attached to it" (Holy Avenger): only to the trigger's creature, still on the battlefield as the same object (CR 400.7, 303.4f). */ attachToSubject?: true; /** "If it's an Equipment, attach it to ~" (The Invincible Iron Man): after it enters, an Equipment put this way is attached to the source, still on the battlefield as the same object, if it could be (CR 701.3a-b). */ equipToSelf?: true; /** "And attach ~ to it" (Deathrender): the source Equipment, still on the battlefield as the same object, to the creature it became (CR 701.3). */ attachSelf?: true; /** "Look at defending player's hand. You may put a creature card from it onto the battlefield under your control tapped and attacking that player or a planeswalker they control" (Zara): a card from that player's hand, attacking only them or a planeswalker of theirs. */ fromHandOf?: PlayerRef; filter?: TargetSpec; tapped?: boolean; /** "With a finality counter on it" (Kastral, the Windcrested): it enters with these (CR 122.6). */ counters?: Record<string, number>; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon), "up to X" (Worldsoul's Rage). */ upTo?: Amount; /** "From your hand and/or graveyard" (Worldsoul's Rage): cards from either, together. */ orGraveyard?: true; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand"; /** "If you do, draw a card and repeat this process" (Cultivator Colossus): after each card put, a draw, then again until you put none (rulings). */ drawRepeat?: true; /** "Each manifest two cards from their hands" (Kozilek, the Broken Reality): exactly this many (all with fewer), face down (CR 701.40a). */ manifest?: number; /** With `manifest`: "Cloak a card from your hand" (Vannifar, Evolved Enigma): cloaked instead, so with ward {2} (CR 701.58a). */ cloak?: true;
-    /** "Onto the battlefield attached to ~" (Danitha, Benalia's Hope): an Aura only onto the source, if it could enchant it, or it stays where it is (CR 303.4f-g); an Equipment attached to it if it could be, else unattached (rulings, CR 301.5c). */ attachToSelf?: true }
+    /** "Onto the battlefield attached to ~" (Danitha, Benalia's Hope): an Aura only onto the source, if it could enchant it, or it stays where it is (CR 303.4f-g); an Equipment attached to it if it could be, else unattached (rulings, CR 301.5c). */ attachToSelf?: true; /** Evershrike: attached to the permanent the source card became as this ability returned it (ObjRef selfCard `returned`). */ attachToReturned?: true }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
    * ... under their owners' control". All at once. Never Auras: those need a choice of what they enchant (CR 303.4f).
@@ -4089,6 +4091,8 @@ export type Effect =
    * turn order; then all those not paid for are countered at the same time (rulings).
    */
   | { type: "counterOpponentsStackUnless"; unless: UnlessPays }
+  /** Cut the Tethers: "For each Spirit, return it to its owner's hand unless that player pays {3}": each owner asked about each of theirs in APNAP order, then the ones not paid for returned at once. */
+  | { type: "bounceEachUnless"; filter: TargetSpec; unless: UnlessPays }
   /** "Target spell can't be countered" (Vexing Shusher): that spell, a copy too, while it's on the stack (CR 101.2). */
   | { type: "spellUncounterable"; index: number }
   /**
@@ -4507,6 +4511,8 @@ export type Effect =
   | { type: "cantPlayLands"; who: PlayerRef }
   /** War Cadence: "This turn, creatures can't block unless their controller pays {X} for each blocking creature they control" (GameState.blockTaxes). */
   | { type: "blockTaxThisTurn"; n: Amount }
+  /** Stromgald Spy: "defending player plays with their hand revealed for as long as ~ remains on the battlefield" (CR 402.3, 611.2b; Player.handRevealedWhile). */
+  | { type: "revealHandWhile"; who: PlayerRef }
   /**
    * "Until your next turn, spells with the chosen name can't be cast and lands with the chosen name can't be played"
    * (Conjurer's Ban; `lands`), "Opponents can't cast spells with the chosen name until your next turn" (Academic
@@ -4832,7 +4838,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature" | /** Mindblaze: a card in that player's library. */ "inLibrary";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther";
+export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -7927,6 +7933,15 @@ export interface CompiledCard {
   countsAsNamed?: string;
   /** "Skip your draw step." (CR 614.10): its controller's draw steps don't happen. */
   skipDrawStep?: boolean;
+  /**
+   * Grifter's Blade: "As this Equipment enters, choose a creature you control it could be attached to. If you do, it enters
+   * attached to that creature." (CR 614.12): one must be chosen if there is one (rulings); with none, it enters unattached.
+   */
+  entersAttachedToYours?: true;
+  /** Liquid Fire: "As an additional cost to cast this spell, choose a number between 0 and 5" (CR 601.2b): chosen as it's cast (CostChoices.number), "the chosen number" as it resolves. */
+  castNumber?: { min: number; max: number };
+  /** Fasting: "If you would begin your draw step, you may skip that step instead. If you do, you gain 2 life." (CR 614.10): asked as its controller's draw step would begin. */
+  maySkipDraw?: { gain: number };
   /**
    * Freyalise's Winds: "If a permanent with a wind counter on it would untap during its controller's untap step, remove all
    * wind counters from it instead." (a replacement effect, CR 614.1a): any permanent's, the counters of this kind.

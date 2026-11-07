@@ -13,11 +13,12 @@ import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCos
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
-import { flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
+import { legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
+import { canAttachTo } from "./effects/run-permanents";
 import { rollDice } from "./effects/run-dice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, enchantableBy, everyCreatureType, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
@@ -1506,6 +1507,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (printed.entersAnchor) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "anchor" });
   // Dauntless Bodyguard: "As ~ enters, choose another creature you control" (CR 614.12).
   if (printed.entersChooseObject) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "chosenObject" });
+  if (printed.entersAttachedToYours) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "attachHost" });
   // As a battle enters, its controller chooses its protector (CR 310.9a).
   if (isType(defOf(s, o), "Battle")) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "protector" });
   if (printed.entersChooseTwoPlayers) for (let i = 0; i < 2; i++) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", pair: true });
@@ -4103,8 +4105,9 @@ function beginStep(s: GameState, step: Step): void {
         log(s, `${player(s, ap).name} skips their draw step.`);
         return advanceStep(s);
       }
-      if (!draw(s, ap, 1, "drawStep")) return; // CR 504.1 (no one skips in multiplayer, CR 103.8c); dredge may replace it
-      drawStepDrawn(s); // "at the beginning of the draw step" triggers after it (CR 504.2)
+      // Fasting: "If you would begin your draw step, you may skip that step instead" (CR 614.10): asked first.
+      if (askSkipDraw(s, [])) return;
+      if (!drawStepDraw(s)) return;
       break;
     case "end":
       // "Until your next end step, you may play that card" (Yasmin Khan): over as that player's next end step begins; one
@@ -4989,6 +4992,8 @@ export function cantPlayYet(s: GameState, o: GameObject): { player: PlayerId; ca
 /** Whether `pid`'s hand is revealed (to `viewer`): "players play with their hands revealed", Telepathy (CR 402.3). */
 export function handRevealed(s: GameState, pid: PlayerId, viewer: PlayerId): boolean {
   if (pid === viewer) return true;
+  // Stromgald Spy: for as long as that object remains on the battlefield (CR 611.2b).
+  if (player(s, pid).handRevealedWhile?.some((w) => s.objects[w.id]?.zone === "battlefield" && (s.objects[w.id]!.zoneChanges ?? 0) === w.zc)) return true;
   return s.battlefield.some((id) => {
     const r = abilitiesOf(s, obj(s, id)).revealHands;
     return r === "players" || (r === "opponents" && controllerOf(s, obj(s, id)) !== pid);
@@ -5361,6 +5366,9 @@ export function castProblem(
     }
   }
   if (o.faceDown && !choices?.faceDown) return "a face-down card can't be cast";
+  // Liquid Fire: the number is chosen as it's cast (CR 601.2b), one in the range.
+  const castNumber = compileCard(defOf(s, o)).castNumber;
+  if (castNumber && choices?.number !== undefined && (!Number.isInteger(choices.number) || choices.number < castNumber.min || choices.number > castNumber.max)) return `choose a number between ${castNumber.min} and ${castNumber.max} for ${defOf(s, o).name}`;
   if ((choices?.alt === "prototype" || choices?.prototyped) && !o.prototyped) {
     // Cast prototyped, only its alternative characteristics are looked at (CR 718.3a).
     if (!altCost(defOf(s, o), "prototype")) return `${defOf(s, o).name} doesn't have prototype`;
@@ -6573,6 +6581,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     if (problem) throw new RulesError(problem);
     o.bestowed = true; // an Aura spell with enchant creature from the moment it's cast (CR 702.103b)
   }
+  // Liquid Fire: the number is part of casting it (CR 601.2b).
+  const castNumber = compileCard(defOf(s, o)).castNumber;
+  if (castNumber && choices.number === undefined) throw new RulesError(`choose a number between ${castNumber.min} and ${castNumber.max} for ${defOf(s, o).name}`);
   const madness = madnessCastOf(s, p.id, id);
   const suspended = s.pending?.kind === "castFree" && s.pending.how === "suspend" && s.pending.objectId === id;
   const d = defOf(s, o);
@@ -6754,11 +6765,12 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     kind: "spell",
     objectId: id,
     controller: p.id,
-    description: hasX ? `${d.name} (X=${x ?? 0})` : d.name,
+    description: hasX ? `${d.name} (X=${x ?? 0})` : compileCard(d).castNumber && choices.number !== undefined ? `${d.name} (chose ${choices.number})` : d.name,
     body,
     targets: specs.length ? stampTargets(s, targets) : undefined,
     modes: chosen,
     ...(hasX ? { x: x ?? 0 } : {}),
+    ...(compileCard(d).castNumber && choices.number !== undefined ? { chosenNumber: choices.number } : {}),
     ...(kicks ? { kicked: kicks } : {}),
     ...(byControl ? { kickedByControl: true as const } : {}),
     // Swallow Whole: the creature tapped for its "tap an untapped creature you control" additional cost (ObjRef costTapped).
@@ -8513,6 +8525,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (typeof fit === "string") return fit;
     [body, targets] = [fit.body, fit.targets];
   }
+  // Goblin Test Pilot: "any target chosen at random" is picked by the game as it's activated (rulings), not by the player.
+  if (body.targets.length === 1 && body.targets[0]!.random && !targets?.length) targets = undefined;
   if (body.targets.length) {
     const src = sourceQuality(s, id);
     const tp = targets ? (targetProblem(s, body.targets, targets, pid, src, id) ?? flagbearerProblem(s, body.targets, targets, pid, src, id, manySpecs)) : hasLegalTargetsFor(s, body.targets, pid, src, id) ? null : "no legal targets";
@@ -8858,6 +8872,15 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab && activatedCosts(ab, x, o).some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
   if (ab?.costs?.some((c) => c.kind === "forage") && !costs?.sacrifice?.length && !costs?.exileCards?.length) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose how to forage: three cards in your graveyard to exile, or a Food to sacrifice");
   let body = ab ? settleDivided(s, withModes(ab.body, modes), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
+  // Goblin Test Pilot: "any target chosen at random", as part of activating it, each legal target with an equal chance
+  // (rulings); players can respond knowing it.
+  if (body?.targets.length === 1 && body.targets[0]!.random) {
+    const legal = legalTargets(s, body.targets[0]!, p.id, undefined, sourceQuality(s, id), id);
+    if (!legal.length) throw new RulesError(`${d.name}'s ability has no legal targets`);
+    const pick = legal[Math.floor(nextRandom(s) * legal.length)]!;
+    log(s, `${d.name}'s ability targets ${pick.kind === "player" ? player(s, pick.id).name : nameOf(s, pick.id)}, chosen at random.`);
+    targets = [pick];
+  }
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
   if (manySlot(body.targets) >= 0) {
@@ -9602,6 +9625,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       sacrificedInstead(s, o, choice, entry?.enters);
       return;
     }
+    if (pend.what === "attachHost") {
+      if (!attachHostOptions(s, o).includes(choice)) throw new RulesError("choose a creature offered");
+      enterAttachedTo(s, o, choice);
+      if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
+      return;
+    }
     if (pend.what === "tribute") {
       // Tribute (CR 702.104a): the chosen opponent decides next, still as it enters.
       o.tribute = { to: Number(choice) };
@@ -10087,6 +10116,8 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  // A creature for an Equipment to enter attached to is chosen as it enters, with an objectId (askEntersChoice).
+  if (pend.what === "attachHost") throw new RulesError("nothing to attach");
   if (pend.what === "enchant") {
     // What an Aura entering without being cast enchants, chosen as it enters (CR 303.4f).
     const sc = (r.scratch ??= {});
@@ -10251,6 +10282,19 @@ function sacrificedInstead(s: GameState, o: GameObject, id: ObjectId | ObjectId[
  * Ask for the next "as ~ enters, choose ..." choice still to be made. It's made as the permanent
  * enters (CR 614.12), so before state-based actions and before its enters triggers go on the stack.
  */
+/** Grifter's Blade: the creatures its controller controls it could be attached to as it enters (CR 301.5c, 701.3b). */
+export function attachHostOptions(s: GameState, o: GameObject): ObjectId[] {
+  const you = controllerOf(s, o);
+  return s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === you && objIsType(s, obj(s, id), "Creature") && canAttachTo(s, o, obj(s, id)));
+}
+
+/** It enters attached to that creature (CR 614.12): part of how it enters, not an attach afterwards. */
+function enterAttachedTo(s: GameState, o: GameObject, host: ObjectId) {
+  o.attachedTo = host;
+  invalidateCharacteristics(s);
+  log(s, `${defOf(s, o).name} enters attached to ${nameOf(s, host)}.`);
+}
+
 function askEntersChoice(s: GameState): boolean {
   const q = s.entersChoices;
   while (q?.length) {
@@ -10302,6 +10346,20 @@ function askEntersChoice(s: GameState): boolean {
       }
       const own = compileCard(defOf(s, o)).amplifyFilter;
       s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "reveal", what: own ? own.text : "card that shares a creature type with it", options, count: one ? 1 : options.length, min: 0, objectId: o.id, ...(one ? { prompt: `you may reveal ${/^[AEIOU]/.test(own!.text) ? "an" : "a"} ${own!.text} from your hand (a +1/+1 counter): click it, then reveal.` } : own ? { prompt: `reveal any number of other ${own.text}s from your hand (a +1/+1 counter for each): click them, then reveal.` } : {}) };
+      return true;
+    }
+    if (c.what === "attachHost") {
+      // Grifter's Blade: a creature its controller controls that it could be attached to (CR 301.5c), one of them if
+      // there's one (rulings), else it stays unattached. Only one: no choice to ask about.
+      const you = controllerOf(s, o);
+      const options = attachHostOptions(s, o);
+      if (options.length <= 1) {
+        q.shift();
+        if (options.length) enterAttachedTo(s, o, options[0]!);
+        if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
+        continue;
+      }
+      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "attachHost", options, labels: options.map((id) => defOf(s, obj(s, id)).name), objectId: o.id, prompt: "choose a creature you control for it to enter attached to" };
       return true;
     }
     if (c.what === "controlOpponent") {
@@ -10527,6 +10585,27 @@ function askEntersChoice(s: GameState): boolean {
   return false;
 }
 
+/** The draw step's draw (CR 504.1; no one skips it in multiplayer, CR 103.8c): false when dredge or the like paused it. */
+function drawStepDraw(s: GameState): boolean {
+  if (!draw(s, s.activePlayer, 1, "drawStep")) return false; // dredge may replace it
+  drawStepDrawn(s); // "at the beginning of the draw step" triggers after it (CR 504.2)
+  return true;
+}
+
+/**
+ * Fasting: "If you would begin your draw step, you may skip that step instead. If you do, you gain 2 life." Its
+ * controller chooses as the step would begin (rulings, CR 614.10); with two of them, each one declined asks about the
+ * next, and skipping with one is the whole step (CR 616.1). True when it asked.
+ */
+function askSkipDraw(s: GameState, declined: ObjectId[]): boolean {
+  const ap = s.activePlayer;
+  const from = s.battlefield.find((id) => !declined.includes(id) && controllerOf(s, obj(s, id)) === ap && abilitiesOf(s, obj(s, id)).maySkipDraw);
+  if (!from) return false;
+  const gain = abilitiesOf(s, obj(s, from)).maySkipDraw!.gain;
+  s.pending = { kind: "chooseMay", player: ap, prompt: `skip your draw step and gain ${gain} life`, source: nameOf(s, from), skipDraw: { from, declined } };
+  return true;
+}
+
 /** "You may ...": the resolving spell or ability's controller says whether to do it. */
 function chooseMay(s: GameState, p: Player, yes: boolean) {
   const pend = s.pending;
@@ -10538,6 +10617,19 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     continueResolution(s);
     return;
   }
+  if (pend?.kind === "chooseMay" && pend.player === p.id && pend.skipDraw) {
+    const { from, declined } = pend.skipDraw;
+    s.pending = null;
+    if (yes) {
+      const gain = s.objects[from]?.zone === "battlefield" ? (abilitiesOf(s, obj(s, from)).maySkipDraw?.gain ?? 0) : 0;
+      log(s, `${p.name} skips their draw step (${nameOf(s, from)}).`);
+      gainLife(s, p.id, gain);
+      return advanceStep(s);
+    }
+    if (askSkipDraw(s, [...declined, from])) return;
+    if (drawStepDraw(s)) runStateBasedActions(s);
+    return;
+  }
   if (pend?.kind === "chooseMay" && pend.player === p.id && pend.blockTax) {
     const bt = pend.blockTax;
     const chooser = player(s, bt.chooser);
@@ -10547,9 +10639,12 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
       s.pending = chooser.lost ? { kind: "declareBlockers", player: p.id, remaining: bt.remaining } : { kind: "declareBlockers", player: chooser.id, remaining: bt.remaining, defender: p.id };
       return;
     }
-    const paid = spendFromPool(s, p.id, parseManaCost(pend.pay!.mana!), "other", 0, payableLife(s, p.id));
-    if (!paid) throw new RulesError(`blocking costs ${pend.pay!.mana}: add the mana first`);
-    log(s, `${p.name} pays ${pend.pay!.mana} to block.`);
+    const life = pend.pay?.life ?? 0;
+    if (life && payableLife(s, p.id) < life) throw new RulesError(`you can't pay ${life} life`); // CR 119.4
+    const paid = pend.pay?.mana ? spendFromPool(s, p.id, parseManaCost(pend.pay.mana), "other", 0, payableLife(s, p.id) - life) : null;
+    if (pend.pay?.mana && !paid) throw new RulesError(`blocking costs ${pend.pay.mana}: add the mana first`);
+    payLife(s, p.id, (paid?.lifePaid ?? 0) + life);
+    log(s, `${p.name} pays ${describePay(pend.pay!)} to block.`);
     blocksDeclared(s, chooser, p, bt.blocks, bt.remaining);
     return;
   }
@@ -10834,6 +10929,28 @@ export function blockCost(s: GameState, n: number, blockers: ObjectId[] = [], bl
   const total = (n ? per * n : 0) + own + vs;
   return total ? `{${total}}` : "";
 }
+
+/**
+ * Heat Wave: the life these blocks cost (CR 509.1d): for each permanent with "Nonblue creatures can't block creatures you
+ * control unless their controller pays 1 life for each blocking creature they control", that much for each nonblue
+ * blocker that blocks one or more creatures its controller controls.
+ */
+export function blockLifeCost(s: GameState, blocks: { blocker: ObjectId; attacker: ObjectId }[]): number {
+  let total = 0;
+  for (const id of s.battlefield) {
+    const taxes = characteristics(s, obj(s, id)).blockLifeTax;
+    if (!taxes.length) continue;
+    const you = controllerOf(s, obj(s, id));
+    for (const tax of taxes) {
+      const blockers = new Set(blocks.filter((b) => s.objects[b.attacker]?.zone === "battlefield" && controllerOf(s, obj(s, b.attacker)) === you && s.objects[b.blocker]?.zone === "battlefield" && !characteristics(s, obj(s, b.blocker)).colors.includes(tax.notColor)).map((b) => b.blocker));
+      total += tax.n * blockers.size;
+    }
+  }
+  return total;
+}
+
+/** Heat Wave: could some block cost life now? */
+export const blocksMayCostLife = (s: GameState): boolean => s.battlefield.some((id) => characteristics(s, obj(s, id)).blockLifeTax.length > 0);
 
 /** Could blocking cost `pid` mana now: every block (Archangel of Tithes), or one of their creatures' own (Qal Sisma Behemoth, Hipparion)? */
 export function blocksMayCost(s: GameState, pid: PlayerId): boolean {
@@ -11541,29 +11658,36 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   };
   // When every block costs mana (Archangel of Tithes), no requirement makes a creature block: nothing obliges paying a
   // cost to block (CR 509.1c).
-  const taxed = !!blockCost(s, 1);
+  // Heat Wave's life too (CR 509.1c), wherever it applies.
+  const taxed = !!blockCost(s, 1) || blocksMayCostLife(s);
   const req = taxed || ((earlier + seen.size >= limit || mineEarlier + seen.size >= mineLimit) && blocks.some(obeys)) ? null : blockRequirementProblem(s, p.id, blocks);
   if (req) throw new RulesError(req);
   // Block costs are totalled and paid, with mana abilities activated first (CR 509.1d-f).
   const tax = blockCost(s, seen.size, [...seen.keys()], blocks);
+  // Heat Wave: life, paid with the mana (CR 509.1d-f); only with that much life (CR 119.4).
+  const life = blockLifeCost(s, blocks);
+  const both = [tax, life ? `${life} life` : ""].filter(Boolean).join(" and ");
+  if (life && payableLife(s, p.id) < life) throw new RulesError(`blocking with ${seen.size === 1 ? "this creature" : `these ${seen.size} creatures`} costs ${life} life, and ${p.name} can't pay it`);
   // Odric: the blocks' controller chooses whether to pay their cost; if they don't, another set must be proposed (rulings).
-  if (tax && p.id !== chooser.id) {
+  if (both && p.id !== chooser.id) {
     s.pending = {
       kind: "chooseMay",
       player: p.id,
-      prompt: `pay ${tax} for the blocks ${chooser.name} chose (${blocks.map((b) => `${nameOf(s, b.blocker)} blocks ${nameOf(s, b.attacker)}`).join(", ")})`,
+      prompt: `pay ${both} for the blocks ${chooser.name} chose (${blocks.map((b) => `${nameOf(s, b.blocker)} blocks ${nameOf(s, b.attacker)}`).join(", ")})`,
       source: "Blocking",
-      pay: { mana: tax },
+      pay: { ...(tax ? { mana: tax } : {}), ...(life ? { life } : {}) },
       blockTax: { chooser: chooser.id, blocks, remaining: pend.remaining },
     };
-    log(s, `${chooser.name} chooses blocks for ${p.name}, which cost ${tax}.`);
+    log(s, `${chooser.name} chooses blocks for ${p.name}, which cost ${both}.`);
     return;
   }
   if (tax) {
-    const paid = spendFromPool(s, p.id, parseManaCost(tax), "other", 0, payableLife(s, p.id));
+    const paid = spendFromPool(s, p.id, parseManaCost(tax), "other", 0, payableLife(s, p.id) - life);
     if (!paid) throw new RulesError(`blocking with ${seen.size === 1 ? "this creature" : `these ${seen.size} creatures`} costs ${tax}: add the mana first`);
-    log(s, `${p.name} pays ${tax} to block.`);
+    payLife(s, p.id, paid.lifePaid ?? 0);
   }
+  if (life) payLife(s, p.id, life);
+  if (both) log(s, `${p.name} pays ${both} to block.`);
   blocksDeclared(s, chooser, p, blocks, pend.remaining);
 }
 

@@ -722,8 +722,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Return target creature card from your graveyard to the battlefield. ... If it would leave the battlefield, exile it
   // instead of putting it anywhere else." (Whip of Erebos): a replacement effect for as long as it's that permanent (CR
   // 614.1a, 400.7), from the resolved ability, so it doesn't go away if the permanent loses its abilities.
-  if ((m = /^If (it|that creature) would leave the battlefield, exile it instead of putting it anywhere else$/.exec(s))) {
-    const what = parseObject(m[1]!, ctx);
+  // Dreams of the Dead: "If the creature would leave the battlefield, ...": the one it returned.
+  if ((m = /^If (it|that creature|the creature) would leave the battlefield, exile it instead of putting it anywhere else$/.exec(s))) {
+    const what = parseObject(m[1] === "the creature" ? "that creature" : m[1]!, ctx);
     return what && (what.ref === "created" || (what.ref === "target" && !what.n)) ? [{ type: "exileIfLeaves", what }] : null;
   }
   // "Target creature can't be regenerated this turn", "It can't be regenerated this turn", "A creature dealt damage this

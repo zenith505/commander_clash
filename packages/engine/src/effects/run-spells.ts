@@ -956,6 +956,43 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       for (const id of st.unpaid) if (s.stack.some((x) => x.id === id)) counterOnStack(s, ctx, id, src);
       return;
     }
+    case "bounceEachUnless": {
+      // Cut the Tethers: each of them, its owner asked (rulings on such "for each" punishers: APNAP order, CR 101.4), each
+      // owner about each of theirs; then the ones not paid for return to their owners' hands at the same time. One that
+      // has left the battlefield meanwhile isn't asked about.
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.tethers) {
+        const order = s.turnOrder;
+        const start = order.indexOf(s.activePlayer);
+        const apnap = order.map((_, k) => order[(start + k) % order.length]!).filter((p) => !player(s, p).lost);
+        const hit = s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+        sc.tethers = { queue: apnap.flatMap((p) => hit.filter((id) => obj(s, id).owner === p).map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 }))), unpaid: [] };
+        sc.paid = undefined;
+      }
+      const st = sc.tethers;
+      while (st.queue.length) {
+        const { id, zc } = st.queue[0]!;
+        const o = s.objects[id];
+        if (o?.zone !== "battlefield" || (o.zoneChanges ?? 0) !== zc) {
+          st.queue.shift();
+          continue;
+        }
+        const paid = paidUnless(s, ctx, o.owner, e.unless, src, `${defOf(s, o).name} (or it returns to your hand)`);
+        if (paid === "paused") return paid;
+        sc.paid = undefined;
+        st.queue.shift();
+        if (paid) log(s, `${player(s, o.owner).name} pays for ${defOf(s, o).name}.`);
+        else st.unpaid.push({ id, zc });
+      }
+      sc.tethers = undefined;
+      for (const { id, zc } of st.unpaid) {
+        const o = s.objects[id];
+        if (o?.zone !== "battlefield" || (o.zoneChanges ?? 0) !== zc) continue;
+        log(s, `${defOf(s, o).name} returns to ${player(s, o.owner).name}'s hand.`);
+        moveObject(s, id, "hand");
+      }
+      return;
+    }
     case "spellEntersWith": {
       // Only the spell that was cast (a copy isn't), while it's still that spell on the stack (CR 400.7).
       const item = s.stack.find((x) => x.id === ctx.cause);

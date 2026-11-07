@@ -170,6 +170,8 @@ export interface Characteristics {
   attackTaxUnlessColor: { n: number; color: Color }[];
   /** Generic mana per creature blocking, whoever controls it (Archangel of Tithes, CR 509.1d). */
   blockTax: number;
+  /** Heat Wave: life for each creature not of the color blocking a creature this permanent's controller controls. */
+  blockLifeTax: { n: number; notColor: Color }[];
   /** Generic mana to attack with this creature, whoever it attacks (Brainwash, Phyrexian Marauder). */
   ownAttackTax: number;
   /** Generic mana to block with this creature (Qal Sisma Behemoth, Oppressive Rays). */
@@ -400,6 +402,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     attackTaxCountersPlaneswalkers: 0,
     attackTaxUnlessColor: [],
     blockTax: 0,
+    blockLifeTax: [],
     ownAttackTax: 0,
     ownBlockTax: 0,
     ownBlockTaxVs: [],
@@ -1826,6 +1829,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "blockTax":
       c.blockTax += m.n;
+      return;
+    case "blockLifeTax":
+      c.blockLifeTax = [...c.blockLifeTax, { n: m.n, notColor: m.notColor }];
       return;
     case "ownAttackCost":
       c.ownAttackCosts = [...c.ownAttackCosts, { action: m.action, filter: m.filter, n: m.n }];

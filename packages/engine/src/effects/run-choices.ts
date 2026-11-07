@@ -19,7 +19,7 @@ import { cardNameOptions } from "../names";
 import { voteWins } from "./run-votes";
 import { defMv, sameName } from "../faces";
 import { putCounters } from "../counters";
-import { CREATURE_TYPES } from "../keywords";
+import { CREATURE_TYPES, LAND_TYPES } from "../keywords";
 import { nextRandom } from "../rng";
 import { fireEvent } from "./triggers";
 
@@ -967,6 +967,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? e.cond.alt === "mayhem"
               ? s.resolving!.item.kind === "spell" && s.objects[s.resolving!.item.objectId ?? ""]?.castVia === "mayhem"
               : (s.resolving!.item.kind === "spell" ? s.objects[s.resolving!.item.objectId ?? ""]?.castAlt : ctx.event?.castAlt) === e.cond.alt
+            : e.cond.kind === "returnedNonbasicLandType"
+            ? !!ctx.lki?.returnedSubtypes?.some((t) => LAND_TYPES.has(t) && !["Plains", "Island", "Swamp", "Mountain", "Forest"].includes(t))
             : e.cond.kind === "sacrificedSuspected"
             ? !!ctx.sacrificed?.[0]?.suspected
             : e.cond.kind === "sacrificedLegendary"

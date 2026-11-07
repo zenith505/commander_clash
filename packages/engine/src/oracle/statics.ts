@@ -609,6 +609,10 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // the tax is added (CR 601.2f), so in effect the tax is {1} a time (rulings).
   if ((m = /^Your commander costs \{(\d+)\} less to cast for each time it's been cast from the command zone this game$/.exec(text)))
     return { costMod: { who: "all", filter: { kind: "spell", text: "your commander" }, n: -Number(m[1]), perOwnCommanderCast: true, text: line } };
+  // Seal of the Guildpact: "Each spell you cast costs {1} less to cast for each of the chosen colors it is": the colors
+  // chosen as it entered (compile.ts checks it chooses them) that the spell is; generic mana only (rulings, CR 601.2f).
+  if ((m = /^Each spell you cast costs \{(\d+)\} less to cast for each of the chosen colors it is$/.exec(text)))
+    return { costMod: { who: "you", filter: { kind: "spell", text: "spells" }, n: -Number(m[1]), perChosenColor: true, text: line } };
   // Cemetery Prowler: "Spells you cast cost {1} less to cast for each card type they share with cards exiled with ~"
   // (linked in compile.ts).
   if ((m = /^Spells you cast cost \{(\d+)\} less to cast for each card type they share with cards exiled with ~$/.exec(text)))
@@ -1408,6 +1412,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Kytheon, Hero of Akros: "if ~ and at least two other creatures attacked this combat": declared as attackers, also ones
   // that have left the battlefield since; not ones put onto the battlefield attacking (rulings, CR 508.1).
   if ((m = new RegExp(`^~ and at least ${NUM} other creatures attacked this combat$`).exec(text))) return { kind: "allOf", conds: [{ kind: "self", is: "attackedThisCombat" }, { kind: "attackedWith", n: num(m[1]!) + 1, combat: true }] };
+  // Fearless Swashbuckler: "if a Pirate and a Vehicle attacked this combat": declared as attackers this combat, as they
+  // were then (layers.ts attackedWith); one creature that's both is enough (rulings).
+  if ((m = /^an? ([A-Z][a-z]+) and an? ([A-Z][a-z]+) attacked this combat$/.exec(text)) && [m[1]!, m[2]!].every((st) => subtypeSet(st)) && m[1] !== m[2])
+    return { kind: "attackedWith", n: 1, combat: true, eachSubtype: [m[1]!, m[2]!] };
   // Lurker: "unless it attacked or blocked this turn": declared as an attacker or blocker this turn (CR 508.1, 509.1).
   if (/^~ didn't attack or block this turn$/.test(text)) return { kind: "self", is: "attackedOrBlockedThisTurn", not: true };
   // Inferno Hellion: "if ~ attacked or blocked this turn", the same.
@@ -3069,6 +3077,10 @@ function parseStaticLine(line: string): StaticAbility | null {
     const filter: TargetSpec = { ...spec, controller: "you", text: one };
     return { affects: { kind: "self" }, mods: [{ kind: "ownAttackCost", action: ownCost[1] === "return" ? "bounce" : "sacrifice", filter, n }], text: line };
   }
+  // Elephant Grass: "Nonblack creatures can't attack you unless their controller pays {2} for each creature they control
+  // that's attacking you": only the nonblack attackers cost {2} each, their colors as attackers are declared (CR 508.1g-h).
+  const colorTax = /^Non(white|blue|black|red|green) creatures can't attack you unless their controller pays \{(\d+)\} for each creature they control that's attacking you$/.exec(text);
+  if (colorTax) return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: Number(colorTax[2]), unlessColor: COLOR_WORDS[colorTax[1]!]! }], text: line };
   // Nils, Discipline Enforcer: each creature with counters on it, {X} for it (CR 508.1g-h), X all its counters (rulings).
   const counterTax = /^Each creature with one or more counters on it can't attack you( or planeswalkers you control)? unless its controller pays \{X\}, where X is the number of counters on that creature$/.exec(text);
   if (counterTax) return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: 0, perCounter: true, ...(counterTax[1] ? { planeswalkers: true as const } : {}) }], text: line };

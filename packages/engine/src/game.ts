@@ -5997,7 +5997,9 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       // itself if it's cast from there (it's on the stack as its cost is determined, rulings).
       const names = d.name.split(" // ");
       const same = m.perSameNameInGraveyard ? s.players[pid]!.graveyard.filter((id) => id !== o.id && defOf(s, obj(s, id)).name.split(" // ").some((x) => names.includes(x))).length : undefined;
-      const n = m.perOwnCommanderCast ? m.n * (player(s, o.owner).commanderCasts[o.id] ?? 0) : same !== undefined ? m.n * same : shared ? m.n * d.types.filter((t) => shared.has(t)).length : m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: m.timesForCaster ? pid : c.controller, sourceId: src.id })) : m.n;
+      // Seal of the Guildpact: once for each color chosen as it entered that the spell is.
+      const chosenColors = m.perChosenColor ? (src.chosen?.colors ?? []).filter((col) => d.colors.includes(col)).length : undefined;
+      const n = chosenColors !== undefined ? m.n * chosenColors : m.perOwnCommanderCast ? m.n * (player(s, o.owner).commanderCasts[o.id] ?? 0) : same !== undefined ? m.n * same : shared ? m.n * d.types.filter((t) => shared.has(t)).length : m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: m.timesForCaster ? pid : c.controller, sourceId: src.id })) : m.n;
       if (n > 0) more += n;
       else less -= n;
     }
@@ -6479,6 +6481,22 @@ const ALL_PAID: CastHow = { kicks: [0, 1], bargained: true, teamwork: true, gift
  */
 export const castDef = (s: GameState, id: ObjectId, alt?: AltCostKind): CardDef =>
   alt === "mutate" && !obj(s, id).mutating ? mutatingDef(defOf(s, obj(s, id)), obj(s, id).owner) : alt === "bestow" ? bestowedDef(defOf(s, obj(s, id))) : alt === "prototype" ? prototypedDef(defOf(s, obj(s, id))) : alt === "overload" && !obj(s, id).overloaded ? overloadedDef(defOf(s, obj(s, id))) : alt === "cleave" && !obj(s, id).cleaved ? cleavedDef(defOf(s, obj(s, id))) : defOf(s, obj(s, id));
+
+/**
+ * Slitherwisp's "a spell that has flash": printed flash, "this spell has flash as long as ..." (CompiledCard.flashIf), or
+ * Teferi, Mage of Zhalfir's "Creature cards you own that aren't on the battlefield have flash"; not a permission to cast
+ * it "as though it had flash" (rulings on Slitherwisp, CR 702.8a).
+ */
+export function spellHasFlash(s: GameState, pid: PlayerId, o: GameObject): boolean {
+  const d = defOf(s, o);
+  if (d.keywords.includes("Flash")) return true;
+  const own = compileCard(d).flashIf;
+  if (own && staticConditionNow(s, own, "", pid)) return true;
+  return s.battlefield.some((id) => {
+    const p = obj(s, id);
+    return controllerOf(s, p) === o.owner && !!abilitiesOf(s, p).flashOwned?.some((spec) => printedMatches(spec, d));
+  });
+}
 
 /**
  * "You may cast sorcery spells as though they had flash" (Hypersonic Dragon), "... spells ..." (Vedalken Orrery): a
@@ -8102,6 +8120,8 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
           // "The mana value of the returned creature" (Scarlet Spider): as it last existed (rulings, CR 608.2h); face
           // down, 0 (CR 708.2).
           returned.manaValue = obj(s, id).faceDown ? 0 : defMv(defOf(s, obj(s, id)));
+          // Wonderscape Sage: "that land had a nonbasic land type", its land types as it last existed (CR 608.2h).
+          returned.returnedSubtypes = [...characteristics(s, obj(s, id)).subtypes];
         }
         log(s, `${p.name} returns ${nameOf(s, id)} to ${player(s, obj(s, id).owner).name === p.name ? "their" : "its owner's"} hand.`);
         moveObject(s, id, "hand");
@@ -10737,6 +10757,9 @@ function attackTaxParts(s: GameState, defender: PlayerId, planeswalker: boolean,
     generic += planeswalker ? c.attackTaxPlaneswalkers : c.attackTax;
     generic += counters * (planeswalker ? c.attackTaxCountersPlaneswalkers : c.attackTaxCounters);
     mana.push(...(planeswalker ? c.attackTaxManaPlaneswalkers : c.attackTaxMana));
+    // Elephant Grass: attacking the player, not their planeswalkers, by an attacker that isn't that color.
+    const a = attacker !== undefined ? s.objects[attacker] : undefined;
+    if (!planeswalker) for (const t of c.attackTaxUnlessColor) if (!a || !characteristics(s, a).colors.includes(t.color)) generic += t.n;
   }
   // "Until your next turn, creatures can't attack you unless ..." (Summon: Yojimbo): the defender's own effects.
   for (const t of s.players[defender]?.attackTaxUntil ?? []) if (!planeswalker || t.planeswalkers) generic += t.n;
@@ -11237,7 +11260,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   }
   if (attacks.length) p.attackedWith = { turn: s.turn, keys: [...new Set([...w, ...keys])], kinds, ...(Object.keys(to).length ? { to } : {}), ...(Object.keys(others).length ? { others } : {}) };
   // Declared as attackers in this combat; not ones put onto the battlefield attacking (Kytheon rulings, CR 508.4).
-  p.attackedCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0, n: attacks.length };
+  p.attackedCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0, n: attacks.length, ...(attacks.length ? { keys } : {}) };
   s.attackersThisTurn = (s.attackersThisTurn ?? 0) + attacks.length;
   // Pack tactics: their power as they attack, statics for attacking creatures counted; a power below 0 adds nothing.
   p.attackPower = { turn: s.turn, n: attacks.reduce((n, a) => n + Math.max(0, power(s, obj(s, a.attacker))), 0) };

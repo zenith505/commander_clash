@@ -221,6 +221,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Iridescent Hornbeetle: "for each +1/+1 counter you've put on creatures under your control this turn", as they were
   // put, even on creatures that have left since (rulings).
   if (each && /^\+1\/\+1 counter you've put on creatures under your control this turn$/.test(p)) return { count: { kind: "plusOnesPutThisTurn", byYou: true, onYours: true, creature: true } };
+  // Lumbering Megasloth: "for each counter among players and permanents": all of them, every kind (CR 122.1).
+  if (each && /^counter among players and permanents$/i.test(p)) return { count: { kind: "allCounters" } };
   // Vault 12: The Necropolis: "the total number of rad counters among players" (CR 728, 122.1), every player's together.
   if (/^the total number of rad counters among players$/i.test(p)) return { count: { kind: "rad" } };
   // Mariposa Military Base: "for each rad counter you have" (CR 122.1), yours only.

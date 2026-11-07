@@ -166,6 +166,8 @@ export interface Characteristics {
   /** Nils, Discipline Enforcer: how many times each attacker with counters on it pays {X}, X its counters; and for planeswalkers. */
   attackTaxCounters: number;
   attackTaxCountersPlaneswalkers: number;
+  /** Elephant Grass: generic mana per attacking creature that isn't this color ("Nonblack creatures can't attack you unless ..."). */
+  attackTaxUnlessColor: { n: number; color: Color }[];
   /** Generic mana per creature blocking, whoever controls it (Archangel of Tithes, CR 509.1d). */
   blockTax: number;
   /** Generic mana to attack with this creature, whoever it attacks (Brainwash, Phyrexian Marauder). */
@@ -396,6 +398,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     attackTaxManaPlaneswalkers: [],
     attackTaxCounters: 0,
     attackTaxCountersPlaneswalkers: 0,
+    attackTaxUnlessColor: [],
     blockTax: 0,
     ownAttackTax: 0,
     ownBlockTax: 0,
@@ -1195,7 +1198,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "attackedWith": {
       if (cond.combat) {
         const c = s.players[you]?.attackedCombat;
-        return c?.turn === s.turn && c.combat === (s.combatsThisTurn ?? 0) && c.n >= cond.n;
+        if (!(c?.turn === s.turn && c.combat === (s.combatsThisTurn ?? 0) && c.n >= cond.n)) return false;
+        // Fearless Swashbuckler: an attacker with each subtype, its creature types (changeling's all) or other subtypes
+        // (Vehicle, CR 205.3g) as it was declared.
+        const w = s.players[you]?.attackedWith;
+        const has = (k: string, st: string) => (CREATURE_TYPES.has(st) ? w?.kinds?.[k] === "all" || !!(w?.kinds?.[k] as string[] | undefined)?.includes(st) : !!w?.others?.[k]?.includes(st));
+        return !cond.eachSubtype || (w?.turn === s.turn && cond.eachSubtype.every((st) => (c.keys ?? []).some((k) => has(k, st))));
       }
       const w = s.players[you]?.attackedWith;
       // Ramses, Assassin Lord: only the ones declared attacking the event's player.
@@ -1841,6 +1849,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
         return;
       }
       const n = m.amount !== undefined ? Math.max(0, num(m.amount)) : m.n;
+      if (m.unlessColor) {
+        c.attackTaxUnlessColor = [...c.attackTaxUnlessColor, { n, color: m.unlessColor }];
+        return;
+      }
       if (!m.onlyPlaneswalkers) c.attackTax += n;
       if (m.planeswalkers || m.onlyPlaneswalkers) c.attackTaxPlaneswalkers += n;
       if (m.mana) c.attackTaxMana = [...c.attackTaxMana, m.mana];

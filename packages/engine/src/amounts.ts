@@ -561,6 +561,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.players[pid]!.poison ?? 0), 0);
     case "rad":
       return (c.who ? refPlayers(s, c.who, ctx) : s.players.filter((p) => !p.lost).map((p) => p.id)).reduce((n, pid) => n + (s.players[pid]!.rad ?? 0), 0);
+    case "allCounters":
+      return (
+        s.players.filter((p) => !p.lost).reduce((n, p) => n + Math.max(0, p.poison ?? 0) + Math.max(0, p.energy ?? 0) + Math.max(0, p.experience ?? 0) + Math.max(0, p.rad ?? 0), 0) +
+        s.battlefield.reduce((n, id) => n + Object.values(s.objects[id]!.counters).reduce((a, k) => a + Math.max(0, k ?? 0), 0), 0)
+      );
     case "speed":
       return s.players[ctx.controller]?.speed ?? 0; // CR 702.179f
     case "punished":
@@ -1426,6 +1431,8 @@ function describeCount(c: Count): string {
       return "poison counters";
     case "rad":
       return "rad counters";
+    case "allCounters":
+      return "counters among players and permanents";
     case "speed":
       return "speed";
     case "punished":

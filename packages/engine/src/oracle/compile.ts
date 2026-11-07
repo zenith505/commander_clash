@@ -561,6 +561,9 @@ export function compile(d: CardDef): CompiledCard {
       // on the stack, rulings).
       .replace(/^(At the beginning of your upkeep, choose one at random)\. Create an? ([a-z]+(?: and [a-z]+)?) creature token with those characteristics\.((?:\n• \d+\/\d+ [A-Z][a-z]+(?: [A-Z][a-z]+)* with [^\n]+)+)$/m, (_, head: string, colors: string, modes: string) =>
         `${head} —${modes.replace(/\n• (\d+\/\d+) ([A-Z][a-z]+(?: [A-Z][a-z]+)*) with ([^\n]+)/g, (_m: string, pt: string, types: string, rest: string) => `\n• Create a ${pt} ${colors} ${types} creature token with ${rest}`)}`)
+      // Bounding Felidar: "put a +1/+1 counter on each other creature you control. You gain 1 life for each of those
+      // creatures": each of them, counters or not (rulings), counted as it resolves.
+      .replace(/(put an? [^.]+ counter on each other creature you control\. You gain \d+ life for each) of those creatures\./g, "$1 other creature you control.")
       // Gargantuan Leech: "~ costs {1} less to cast for each Cave you control and each Cave card in your graveyard": the two
       // reductions together (CR 601.2f).
       .replace(/^(~ costs \{\d+\} less to cast for each )([^.]+?) and each ([^.]+?)\.$/m, "$1$2.\n$1$3.")
@@ -7001,6 +7004,8 @@ function checkCastingLinks(out: CompiledCard) {
   permExileCost = false;
   visit([out.costMods, out.activationTaxes]);
   if (out.nameBans || out.protectionFromChosenName) needs.add("cardName");
+  // Seal of the Guildpact: "the chosen colors" are the ones it chose as it entered.
+  if (out.costMods?.some((m) => m.perChosenColor) && !out.entersChoose?.some((c) => c.what === "color" && c.many)) bad = true;
   // Petrified Hamlet: a ban's or a static's chosen name is the one the permanent chose as it entered (its Chosen.name);
   // the choice of a "When ~ enters, choose a land card name" trigger is only kept while that trigger resolves.
   if ((out.nameBans || out.protectionFromChosenName || JSON.stringify(out.statics).includes('"chosen":"name"')) && !out.entersChoose?.some((c) => c.what === "cardName")) bad = true;
@@ -7016,6 +7021,9 @@ function checkCastingLinks(out: CompiledCard) {
   // "The power of the creature tapped this way" needs a "Tap an untapped creature you control" cost (or station's).
   const tapPowIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"stationPower"');
   if (tapPowIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => tapPowIn(ab) && !ab.station && ab.costs?.filter((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x && c.filter.kind === "object" && !!c.filter.types?.includes("Creature")).length !== 1)) bad = true;
+  // Wonderscape Sage: "that land" is the one land the ability's "Return a land you control to its owner's hand" cost returns.
+  const retLandIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"returnedNonbasicLandType"');
+  if (retLandIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => retLandIn(ab) && ab.costs?.filter((c) => c.kind === "returnToHand" && c.n === 1 && c.filter.kind === "object" && !!c.filter.types?.includes("Land")).length !== 1)) bad = true;
   // Swallow Whole: "the creature tapped to pay ~'s additional cost" needs the spell's one "tap an untapped creature you
   // control" additional cost, and only the spell is about it.
   const costTapIn = (v: unknown) => JSON.stringify(v ?? null).includes('"ref":"costTapped"');

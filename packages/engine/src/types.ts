@@ -951,7 +951,7 @@ export interface Player {
    * one put onto the battlefield attacking not at all (Windbrisk Heights rulings).
    */
   /** How many creatures this player declared as attackers in this turn's latest combat (Kytheon, Hero of Akros: "~ and at least two other creatures attacked this combat"). */
-  attackedCombat?: { turn: number; combat: number; n: number };
+  attackedCombat?: { turn: number; combat: number; n: number; /** The attackers declared then, as "id@zoneChanges" keys into attackedWith's kinds and others. */ keys?: string[] };
   /** The last turn this player ventured into the dungeon (Keen-Eared Sentry, CR 701.49). */
   venturedTurn?: number;
   attackedWith?: { turn: number; keys: string[]; /** Each one's creature types as it was declared ("all" with changeling-like), for "you attacked with three or more Merfolk this turn" (Deepway Navigator). */ kinds?: Record<string, string[] | "all">; /** The players each one was declared attacking, not their planeswalkers (Ramses, Assassin Lord). */ to?: Record<string, PlayerId[]>; /** Each one's other subtypes as it was declared, artifact types such as Spacecraft (Thaumaton Torpedo). */ others?: Record<string, string[]> };
@@ -1260,6 +1260,8 @@ export interface RegenRider {
 }
 
 export interface LastKnown {
+  /** The subtypes of what a "Return a land you control to its owner's hand" cost returned, as it last existed (Wonderscape Sage). */
+  returnedSubtypes?: string[];
   /** The object it was (a card keeps its id in its new zone): "another permanent card" than the one sacrificed this way. */
   id?: ObjectId;
   counters?: Record<string, number>;

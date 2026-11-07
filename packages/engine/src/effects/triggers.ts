@@ -3,7 +3,7 @@ import { defMv, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import { isRealKicker, type AbilityBody, type BatchTrigger, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
-import { checkAscend, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, conspireGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
+import { checkAscend, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, spellHasFlash, conspireGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, modeRange, withModes } from "../modes";
 import { compileCard, compileGranted } from "../oracle";
@@ -1671,7 +1671,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "Whenever you attack a player": once for each player the matching creatures attack (CR 508.3e).
         if (t.perPlayer) {
           for (const p of s.turnOrder)
-            if (hit.filter(([x]) => obj(s, x).attacking === p && !obj(s, x).attackingPermanent).length >= (t.minAttackers ?? 1))
+            if ((!t.toInitiative || s.initiative === p) && hit.filter(([x]) => obj(s, x).attacking === p && !obj(s, x).attackingPermanent).length >= (t.minAttackers ?? 1))
               add(o, ev.controller, (_, tt) => same(tt), list, undefined, undefined, undefined, undefined, undefined, { player: p });
           // Rigo: each planeswalker attacked too, its controller as "that player".
           if (t.perWalker)
@@ -2236,7 +2236,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.adventure && !(spell && s.cards[spell.cardId]?.layout === "adventure")) return false;
         // "A spell that has convoke": printed, or given by "spells you cast have convoke" (rulings on Joyful Stormsculptor:
         // whether or not any creatures were tapped for it).
-        if (t.cast.keyword === "Cascade" ? !hasCascade : t.cast.keyword && !(spell && (defOf(s, spell).keywords.includes(t.cast.keyword) || (t.cast.keyword === "Convoke" && hasConvoke(s, ev.controller, spell))))) return false;
+        if (t.cast.keyword === "Cascade" ? !hasCascade : t.cast.keyword && !(spell && (defOf(s, spell).keywords.includes(t.cast.keyword) || (t.cast.keyword === "Convoke" && hasConvoke(s, ev.controller, spell)) || (t.cast.keyword === "Flash" && spellHasFlash(s, ev.controller, spell))))) return false;
         // As the spell is on the stack: its mana value with X (CR 202.3e), its power from a "*" ability (604.3).
         const spec = bindBound(s, bindChosen(t.cast.spell, o.chosen), { controller: you, sourceId: o.id });
         return orSpell || (item?.objectId ? spellMatches(s, spec, item) : printedMatches(spec, ev.card));

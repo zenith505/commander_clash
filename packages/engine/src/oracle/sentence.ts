@@ -30,6 +30,9 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
   // "You may reveal a creature card ... from among them and put it onto the battlefield" (Loot, Exuberant Explorer): the
   // same as putting it there, revealed.
   s = s.replace(/^You may reveal (an? .+?) from among them and put it onto the battlefield$/, "You may put $1 from among them onto the battlefield");
+  // Radagast the Brown: "You may reveal a creature card that doesn't share a creature type with a creature you control from
+  // among those cards and put it into your hand": the same as "from among them".
+  s = s.replace(/^(You may reveal a creature card that doesn't share a creature type with a creature you control) from among those cards (and put it into your hand)$/, "$1 from among them $2");
   // "Onto the battlefield tapped and attacking" (Winota): attacking as it enters, during combat (CR 508.4).
   const attacking = dig.into === undefined && / from among them onto the battlefield tapped and attacking$/.test(s);
   if (attacking) s = s.replace(/ tapped and attacking$/, " tapped");

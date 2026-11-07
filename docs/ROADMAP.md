@@ -1,7 +1,7 @@
 # Roadmap
 
-30,199 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,962 of 4,988 (99%), top 10,000: 9,621 of
+30,208 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,630 of
 9,979 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -71,7 +71,7 @@ line blocks.
    you control three or more permanents you don't own", face-down cards you may cast), Cyber Conversion (done in round 271), Sothera, the Supervoid (each opponent chooses a creature to
    exile, a card exiled with it returns), Tempt with Mayhem (each opponent may copy a spell they don't control, then
    you copy it for each who did), Sin, Unending Cataclysm (removing counters from any number of permanents as it
-   enters), Doors of Durin (reveal the top card, then trample or hexproof until your next turn by what you control),
+   enters), Doors of Durin (done in round 295) (reveal the top card, then trample or hexproof until your next turn by what you control),
    Goldberry, River-Daughter ("a counter of each kind not on ~", "one or more counters"), Sauron's Ransom (an opponent
    makes a face-down pile and a face-up pile, which the UI would have to hide), Tromokratis ("can't be blocked unless
    all creatures defending player controls block it", CR 509.1c). Out after round 163: Gale, Waterdeep Prodigy (cast
@@ -157,7 +157,7 @@ line blocks.
    "if that creature has two or more +1/+1 counters ... instead"), Admiral Brass, Unsinkable (done in round 275). Round 171 went down the list to Hunter's Blowgun (rank
    7,721), skipping over the cards still listed by `npm run popular`.
    Out after round 172: Primal Growth ("Kicker—Sacrifice a creature": a kicker that isn't mana needs its own cast
-   choice and prompt), Plague Reaver ("return it to the battlefield under that player's control at the
+   choice and prompt), Plague Reaver (done in round 295) ("return it to the battlefield under that player's control at the
    beginning of their next upkeep": a delayed return under an opponent's control), Elenda, Saint of Dusk (its second
    sentence, "an additional +5/+5 as long as", is a static of its own). Round 172 took the cards from the list below
    that parse with small pieces (Tainted Remedy, Balan, Marcus, Serra the Benevolent, Oblivion Stone, Curator's Ward
@@ -175,7 +175,7 @@ line blocks.
    Avarice Totem, Kitsune, Djinn of Infinite Deceits, Modify Memory and others), "you may sacrifice an artifact or
    discard a card", "the discarded card's mana value", "shuffle your library" and "target creature other than this
    creature".
-   Out after round 174: Radagast the Brown and Conjurer's Mantle ("a card that shares a creature type with" a
+   Out after round 174: Radagast the Brown (done in round 295) and Conjurer's Mantle (done in round 295) ("a card that shares a creature type with" a
    creature, among the cards looked at), Quicksilver Elemental (gaining a creature's activated abilities), Secret of
    Bloodbending (controlling a player), Chiss-Goria, Forge Tyrant (granting affinity for artifacts), Molecule Man
    (done in round 274), Confiscation Coup (done in round 273; paying energy equal to the target's mana value), Zoyowa Lava-Tongue and
@@ -186,8 +186,8 @@ line blocks.
    Valentin, Dean of the Vein (a reflexive trigger from a replacement), Spider-Verse ("from anywhere other than your
    hand"), Captain America, First Avenger (unattaching an Equipment as a cost), Desert Warfare, Soulfire Eruption,
    Círdan the Shipwright (secret council for players), Dragonlord
-   Kolaghan, Back for Seconds (bargain's "instead"), Sanctuary Warden (removing a counter from a chosen permanent as a
-   cost), Kamiz, Obscura Oculus, Commander Liara Portyr, Bre of Clan Stoutarm, Lich's Mastery, Thunderwave,
+   Kolaghan, Back for Seconds (done in round 295) (bargain's "instead"), Sanctuary Warden (removing a counter from a chosen permanent as a
+   cost), Kamiz, Obscura Oculus (done in round 295), Commander Liara Portyr, Bre of Clan Stoutarm, Lich's Mastery, Thunderwave,
    Contamination, Amzu, Swarm's Hunger, Ravenous Rotbelly, Luxurious Locomotive and Subterranean Schooner ("crewed it"), Gwen Stacy ("for as long as you control ~"),
    Relic Amulet ("that much"), Hankyu (a granted ability with its own counters), Topography Tracker (an explore
    replacement). Round 174 went down the list from Myojin of Cryptic Dreams to Detention Sphere (rank 8,455), then took
@@ -564,7 +564,7 @@ line blocks.
    bottom of its owner's library" (The Cauldron of Eternity), "for each legendary creature and planeswalker you control"
    (Mobilized District) and "you may exile this card from your graveyard. If you do / When you do" as a spell is cast
    (Kozilek's Return, Ugin's Binding).
-   Out after round 195 (looked at, not done): Tablet of the Guilds (two colors chosen), Puca's Covenant, Call of the
+   Out after round 195 (looked at, not done): Tablet of the Guilds (two colors chosen), Puca's Covenant (done in round 295), Call of the
    Death-Dweller ("put a deathtouch counter on either of them"), Myth Unbound (a trigger in the command zone), Siona,
    Captain of the Pyleas ("becomes attached"), Soul Diviner (a chosen counter kind), Icingdeath, Frost Tyrant (its token
    is named like part of it), Toggo, Goblin Weaponsmith (a quoted ability inside a quoted ability), Domineering Will,
@@ -586,7 +586,7 @@ line blocks.
    Sidisi, Regent of the Mire (done in round 266), Unidentified
    Hovership ("the exiled card's owner manifests dread"), Geth's Summons, Sphinx of Foresight (opening-hand reveal),
    Eruth, Tranquil Frillback (done in round 267), Yusri, Blitzball Stadium, Underdark Rift,
-   Colfenor's Urn, Dragon's Fire, Leonin Arbiter, Sigurd, Protection Racket, Sin Prodder, Osgir, Nine-Fingers Keene,
+   Colfenor's Urn, Dragon's Fire, Leonin Arbiter, Sigurd, Protection Racket, Sin Prodder, Osgir, Nine-Fingers Keene (done in round 295),
    Phyrexian Processor. Smaller gap: Rakdos, the Showstopper with Krark's Thumb keeps heads for your own creatures and
    tails for the others without asking.
    Round 197 went on from the top: blight N as a cost (CR 701.68: Gristle Glutton, Sting-Slinger, Spiral into
@@ -2363,6 +2363,25 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands.
+   Round 295 took cards back off the "Out after round N" lists, most played first: "the amount of damage dealt to ~ this
+   turn by sources they controlled" for each player (Grothama, All-Devouring: TurnLog damage by the source's controller);
+   "you may reveal the top card of your library. If a creature card is revealed this way, put it onto the battlefield
+   tapped and attacking. Until your next turn, it gains trample if you control a Dwarf and hexproof if you control an Elf",
+   checked as it resolves, the new creature counting (Doors of Durin, rulings); bargained, "put one of the returned cards
+   with mana value 4 or less onto the battlefield instead", chosen as it resolves (Back for Seconds, with a browser test);
+   "Return ~ to the battlefield under that player's control at the beginning of their next upkeep" (Plague Reaver: a
+   delayed trigger at the target player's upkeep, CR 603.7); "a card that shares a creature type with that creature" and
+   "a creature card that doesn't share a creature type with a creature you control" among the cards looked at (Conjurer's
+   Mantle, Radagast the Brown); "Then if you control nine or more Gates, put the rest into your hand" (Nine-Fingers Keene,
+   with a browser test); a dies trigger's "card with mana value less than or equal to the number of counters on that
+   creature", counted from its last known information, CR 608.2h (Puca's Covenant); "choose another attacking creature
+   with lesser power" after the target connived (Kamiz, Obscura Oculus, with a browser test). +9, 30,208 of 31,936 with B125.
+   Out after round 295 (looked at, not done): Dragon's Fire (the Dragon card revealed or the Dragon chosen as the additional
+   cost isn't recorded on the spell, for its power as it resolves or its last known power, rulings); Incinerator of the
+   Guilty ("collect evidence X", X chosen as the trigger resolves: no prompt for it); Spectral Searchlight (another player
+   chooses the color of the mana); Undead Alchemist and Szadek, Lord of Secrets (left while Lane B's round B125 changes the
+   damage replacements); Canoptek Wraith, Professor Hojo, Karn, Living Legacy, Tegwyll's Scouring and Eumidian Wastewaker
+   (still out, for the reasons in their earlier notes).
    Round 294 took the last names from the top no earlier round looked at (rank 24,900 to 31,400): "As long as the top card
    of your library is an artifact or creature card, ~ has all activated abilities of that card" (Skill Borrower); "the base
    power and toughness of each creature that dealt damage to it this turn become 0/2" (Brine Hag: TurnLog.damageDealtTo now
@@ -2500,7 +2519,7 @@ line blocks.
    Lich's Mirror (a replacement of losing the game); Chains of Mephistopheles (a draw replacement that depends on which
    draw it is in the draw step).
    Out after round 279 (looked at, not done): Game of Chaos (each next flip's stakes double and the winner or loser
-   decides whether to flip again); Grothama, All-Devouring (damage dealt to it by each player's sources this turn);
+   decides whether to flip again); Grothama, All-Devouring (done in round 295) (damage dealt to it by each player's sources this turn);
    Lich's Mastery (exile a permanent or a card from hand or graveyard for each 1 life lost); Karn, Living Legacy ("pay
    any amount of mana" plus its emblem); Deathmist Raptor (return it face up or face down).
    Out after round 278 (looked at, not done): Enchanter's Bane (the target enchantment deals the damage, and its
@@ -2563,7 +2582,7 @@ line blocks.
    control" as an additional cost, the damage that card's or creature's power: a new cast-time choice for the UI and bots,
    and the chosen Dragon's last known power); Soul Immolation (blight X as an additional cost, X capped by the greatest
    toughness among your creatures: putCounter costs have no X yet).
-   Out after round 261 (looked at, not done): Doors of Durin (a "may reveal the top card" whose creature card enters tapped
+   Out after round 261 (looked at, not done): Doors of Durin (done in round 295) (a "may reveal the top card" whose creature card enters tapped
    and attacking, then trample and hexproof by the Dwarves and Elves you control as it resolves: putOntoBattlefield has no
    attacking option and no conditional keyword grant yet); Falco Spara, Pactweaver (casting from the top of your library
    with "remove a counter from a creature you control" as an additional cost: a cost choice for the cast, the autopay and
@@ -2634,7 +2653,7 @@ line blocks.
    life, then look at that many cards" inside an entwined mode); Lukka, Coppercoat Outcast (cards exiled this way gaining
    "You may cast ~ from exile as long as you control a Lukka planeswalker").
    Out after round 248 (looked at, not done): Unidentified Hovership (done in round 273; "the exiled card's owner manifests dread": each
-   owner of the linked exiled cards, rulings, and manifest dread for a player who isn't its controller); Plague Reaver
+   owner of the linked exiled cards, rulings, and manifest dread for a player who isn't its controller); Plague Reaver (done in round 295)
    ("Return ~ to the battlefield under that player's control at the beginning of their next upkeep": no instruction yet
    puts a card onto the battlefield under another player's control, and bots have no sense for giving it away);
    Osteomancer Adept (casting creature spells from your graveyard by foraging); Tangle Wire ("that player taps an untapped
@@ -2648,7 +2667,7 @@ line blocks.
    "the chosen creature": no choice of a permanent as something enters yet, and it needs a prompt); Urborg (done in round
    270); Consume Spirit ("Spend only black mana on X":
    autopay has no restriction on the mana for X); Catastrophe (done in round 270); Muraganda Petroglyphs (done in round 278) ("creatures with no abilities", a layer dependency on ability-adding effects).
-   Out after round 245 (looked at, not done): Back for Seconds (bargained: one of the returned target cards onto the
+   Out after round 245 (looked at, not done): Back for Seconds (done in round 295) (bargained: one of the returned target cards onto the
    battlefield instead of into the hand, chosen as it resolves); World War Hulk (chapter I's "the next red or green
    creature spell you cast this turn can be cast without paying its mana cost" and chapter III's doubled power and
    toughness); Jace, Architect of Thought (+1 needs an "until your next turn" attack trigger for opponents' creatures,

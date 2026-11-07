@@ -518,7 +518,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.notNamedAny?.some((n) => sameName(d.name, n))) return false;
   if (spec.namedAny && !spec.namedAny.some((n) => sameName(d.name, n))) return false;
   if (spec.notNamedAsYours) return false; // not worked out yet
-  if (spec.sharesTypeWithAttached) return false; // bound where it's used (dig)
+  if (spec.sharesTypeWithAttached || spec.sharesTypeWithSubjectCreature || spec.notKinOfYourCreatures) return false; // bound where it's used (dig)
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
   if (spec.noManaAbility && (compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
@@ -908,7 +908,9 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
   // Venerable Warsinger: "with mana value X or less, where X is the amount of damage ~ dealt to that player": the trigger's
   // damage, known as it's put on the stack.
   const eventBound = (t: TargetSpec) => t.bound?.amount.count.kind === "eventAmount";
-  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || t.total?.rolled || castBound(t) || tappedBound(t) || subjectBound(t) || amassedBound(t) || colorsBound(t) || spentBound(t) || eventBound(t);
+  // Puca's Covenant: "the number of counters on that creature" in a dies trigger, as it last existed (ctx.lki).
+  const subjectCountersBound = (t: TargetSpec) => t.bound?.amount.count.kind === "counters" && t.bound.amount.count.of.ref === "subject";
+  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || t.total?.rolled || castBound(t) || tappedBound(t) || subjectBound(t) || subjectCountersBound(t) || amassedBound(t) || colorsBound(t) || spentBound(t) || eventBound(t);
   if (!body.targets.some(unsettled) && !body.modal?.modes.some((m) => m.targets?.some(unsettled))) return body;
   const settle = (t: TargetSpec): TargetSpec => {
     if (t.divided?.amount && !t.divided.settled) t = { ...t, divided: { ...t.divided, total: evalAmount(s, t.divided.amount, ctx), settled: true as const } };
@@ -943,6 +945,10 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
       const n = (ctx.lki?.[key] ?? 0) + (bound!.amount.plus ?? 0);
       const word = key === "toughness" ? "toughness" : "mana value";
       t = { ...rest, [key]: { ...rest[key], max: rest[key]?.max === undefined ? n : Math.min(rest[key]!.max!, n) }, text: rest.text.replace(/ with lesser (?:mana value|toughness)$/, ` with ${word} ${n < 0 && key === "manaValue" ? "less than 0" : `${n} or less`}`) };
+    }
+    if (subjectCountersBound(t) && ctx.lki) {
+      const n = bindBound(s, t, ctx);
+      t = { ...n, text: n.text.replace(/ with mana value less than or equal to the number of counters on that creature$/, ` with mana value ${n.manaValue?.max ?? 0} or less`) };
     }
     if (tappedBound(t) && ctx.tapped !== undefined) {
       const { bound, ...rest } = t;

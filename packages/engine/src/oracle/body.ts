@@ -3734,6 +3734,68 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "eachExilesPermanentsOrHand", n });
       continue;
     }
+    // Doors of Durin: "scry 2, then you may reveal the top card of your library. If a creature card is revealed this way, put
+    // it onto the battlefield tapped and attacking. Until your next turn, it gains trample if you control a Dwarf and
+    // hexproof if you control an Elf." Revealing is optional, but a creature card revealed must be put onto the battlefield:
+    // one choice, whether to put a creature card on top onto the battlefield (a noncreature card stays on top either way).
+    // It attacks a player or planeswalker its controller chooses (CR 508.4). Each keyword is decided as this resolves,
+    // counting the creature just put onto the battlefield (rulings), and lasts until your next turn (CR 611.2a).
+    if (/^[Yy]ou may reveal the top card of your library$/.test(s) && /^If a creature card is revealed this way, put it onto the battlefield tapped and attacking$/.test(sentences[si + 1] ?? "")) {
+      const gains = /^Until your next turn, it gains ([a-z]+) if you control an? ([A-Z][a-z]+) and ([a-z]+) if you control an? ([A-Z][a-z]+)\.?$/.exec(sentences[si + 2] ?? "");
+      const kws = gains ? [gains[1]!, gains[3]!].map((k) => canonicalKeyword(k)) : [];
+      if (!gains || kws.some((k) => !k) || ![gains[2]!, gains[4]!].every((t) => CREATURE_TYPES.has(t))) return null;
+      effects.push({ type: "dig", n: 1, count: 1, upTo: true, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, into: "battlefield", tapped: true, attacking: true, rest: "keep", reveal: true });
+      for (const [kw, sub] of [[kws[0]!, gains[2]!], [kws[1]!, gains[4]!]] as const) {
+        const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [sub], text: sub };
+        effects.push({ type: "if", cond: { kind: "state", cond: { kind: "control", who: "you", filter, min: 1 } }, effects: [{ type: "continuous", what: { ref: "created" }, mods: [{ kind: "addKeywords", keywords: [kw] }], duration: "yourNextTurn" }] });
+      }
+      si += 2;
+      continue;
+    }
+    // Back for Seconds: "Return up to two target creature cards from your graveyard to your hand. If ~ was bargained, you may
+    // put one of those cards with mana value 4 or less onto the battlefield instead of putting it into your hand." Bargained
+    // (as it was cast, a copy too, rulings): up to one of them that's still a legal target goes onto the battlefield, the
+    // controller's choice, even none (rulings); the rest to the hand.
+    const bargainOne = ctx.spell && /^If ~ was bargained, you may put one of those cards with mana value (\d+) or less onto the battlefield instead of putting it into your hand\.?$/.exec(sentences[si + 1] ?? "");
+    if (bargainOne && /^Return up to (?:two|three) target creature cards from your graveyard to your hand$/.test(s)) {
+      const back = parseOne(s, ctx);
+      const ret = back?.length === 1 && back[0]!.type === "bounce" ? back[0] : undefined;
+      if (ret?.type !== "bounce" || ret.what.ref !== "target") return null;
+      const onto: TargetSpec = { kind: "card", types: ["Creature"], notTypes: [], notColors: [], manaValue: { max: Number(bargainOne[1]) }, text: `creature card with mana value ${bargainOne[1]} or less` };
+      effects.push({ type: "if", cond: { kind: "bargained" }, effects: [{ type: "returnOneElsewhere", what: ret.what, onto }, { type: "putOntoBattlefield", what: { ref: "chosenFromYard" } }], otherwise: [ret] });
+      si++;
+      continue;
+    }
+    // Nine-Fingers Keene: "look at the top nine cards of your library. You may put a Gate card from among them onto the
+    // battlefield. Then if you control nine or more Gates, put the rest into your hand. Otherwise, put the rest on the bottom
+    // of your library in a random order." One look; where the rest go is decided after the Gate is put onto the battlefield,
+    // counting it (and even with none put there, rulings).
+    const lookGate = /^[Ll]ook at the top (\w+) cards of your library$/.exec(s);
+    const gateRest = lookGate && /^You may put an? ([A-Z][a-z]+) card from among them onto the battlefield$/.exec(sentences[si + 1] ?? "");
+    const gateIf = gateRest && /^Then if you control (\w+) or more ([A-Z][a-z]+)s, put the rest into your hand$/.exec(sentences[si + 2] ?? "");
+    if (lookGate && gateRest && gateIf && gateIf[2] === gateRest[1] && /^Otherwise, put the rest on the bottom of your library in a random order\.?$/.test(sentences[si + 3] ?? "")) {
+      const n = NUMBER_WORDS[lookGate[1]!] ?? Number(lookGate[1]);
+      const min = NUMBER_WORDS[gateIf[1]!] ?? Number(gateIf[1]);
+      const sub = gateRest[1]!;
+      if (!n || !min) return null;
+      const perm: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [sub], text: sub };
+      effects.push({ type: "dig", n, count: 1, upTo: true, filter: { kind: "card", types: [], notTypes: [], notColors: [], subtypes: [sub], text: `${sub} card` }, into: "battlefield", rest: "bottom", random: true, reveal: false, restToHandIf: { kind: "control", who: "you", filter: perm, min } });
+      si += 3;
+      continue;
+    }
+    // Kamiz, Obscura Oculus: "target attacking creature can't be blocked this turn. It connives. Then choose another attacking
+    // creature with lesser power. That creature gains double strike until end of turn." Chosen as this resolves, not
+    // targeted, with less power than the target has then (after conniving); none if there's no such creature.
+    if (/^Choose another attacking creature with lesser power$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && ctx.targets[ctx.lastObjectTarget]!.combat === "attacking") {
+      const then = parseOne(sentences[si + 1]?.replace(/\.$/, "") ?? "", ctx);
+      const idx = ctx.lastObjectTarget;
+      // "That creature" is the one chosen, not the target ("it" before).
+      const gains = then?.length === 1 && then[0]!.type === "continuous" && /^That creature gains [a-z ]+ until end of turn\.?$/.test(sentences[si + 1] ?? "") ? then[0] : undefined;
+      if (gains?.type !== "continuous") return null;
+      effects.push({ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], combat: "attacking", text: "attacking creature with lesser power" }, n: 1, action: "choose", otherThanTarget: idx, lesserPowerThanTarget: idx }, { ...gains, what: { ref: "created" } });
+      si++;
+      continue;
+    }
     // An Aura token and what it has, said in the next sentence ("... attached to another target creature. That token has
     // enchant creature and "..."", The Rani): one instruction creating it (see parseTokensSentence). Without its enchant
     // ability the line isn't understood.

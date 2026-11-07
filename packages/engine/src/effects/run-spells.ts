@@ -202,7 +202,16 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       // Phytotitan: the card in the graveyard now (CR 400.7), at its owner's next upkeep.
       if (e.when === "ownersNextUpkeep") {
-        if (e.each === "selfCard") for (const card of objects(s, { ref: "selfCard" }, ctx)) addDelayed(s, "playersNextUpkeep", ctx.controller, card, body, undefined, card.owner);
+        // Plague Reaver: "at the beginning of their next upkeep", `whose` (the target opponent), who is the delayed trigger's
+        // event player ("that player"); none if they've left the game (rulings).
+        const whose = e.whose ? players(s, e.whose, ctx)[0] : undefined;
+        if (e.whose && whose === undefined) return;
+        if (e.each === "selfCard")
+          // An activated ability's "Sacrifice ~" cost put the card there after it was activated (CR 400.7).
+          for (const card of objects(s, { ref: "selfCard", ...(e.whose ? { moved: true as const } : {}) }, ctx)) {
+            addDelayed(s, "playersNextUpkeep", ctx.controller, card, body, undefined, whose ?? card.owner);
+            if (whose !== undefined) s.delayed![s.delayed!.length - 1]!.event = { player: whose };
+          }
         return;
       }
       if (e.of && e.each !== "selfCard") {

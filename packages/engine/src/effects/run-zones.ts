@@ -175,7 +175,10 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const options2 = e.leaving ? pickLeaving(s, e, options1, pid, ctx) : options1;
     // Feast of Worms: "another land": not the target, if it survived (an indestructible one).
     const other = e.otherThanTarget !== undefined ? objects(s, { ref: "target", index: e.otherThanTarget }, ctx).map((o) => o.id) : [];
-    const options = other.length ? options2.filter((id) => !other.includes(id)) : options2;
+    const options3 = other.length ? options2.filter((id) => !other.includes(id)) : options2;
+    // Kamiz, Obscura Oculus: "with lesser power" than the target, as it is now (after it connived).
+    const than = e.lesserPowerThanTarget !== undefined ? objects(s, { ref: "target", index: e.lesserPowerThanTarget }, ctx).find((o) => o.zone === "battlefield") : undefined;
+    const options = e.lesserPowerThanTarget === undefined ? options3 : than ? options3.filter((id) => power(s, obj(s, id)) < power(s, than)) : [];
     // "Sacrifice any number of other creatures": as many as they like, asked even with only one.
     if (e.anyNumber) {
       if (!options.length) {
@@ -2295,6 +2298,29 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     }
     case "empowerJace":
       return empowerJace(s, e.n, ctx, src);
+    case "returnOneElsewhere": {
+      const sc = (s.resolving!.scratch ??= {});
+      const cards = objects(s, e.what, ctx).filter((o) => o.zone === "graveyard");
+      if (!sc.found) {
+        const options = cards.filter((o) => printedMatches(e.onto, defOf(s, o))).map((o) => o.id);
+        if (options.length) {
+          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: `up to one ${e.onto.text}`, cards: options, min: 0, max: 1, dig: { looked: options, to: "to put onto the battlefield instead of into your hand", rest: "go to your hand" } };
+          return "paused";
+        }
+        sc.found = [];
+      }
+      const chosen = sc.found.find((id) => cards.some((o) => o.id === id));
+      sc.found = undefined;
+      s.resolving!.chosenFromYard = chosen ? { id: chosen, zc: obj(s, chosen).zoneChanges ?? 0 } : undefined;
+      // The rest go to the hand first: the chosen card enters as it would have with them all moving at once, the others
+      // already gone from the graveyard.
+      for (const o of cards) {
+        if (o.id === chosen) continue;
+        log(s, `${src} returns ${defOf(s, o).name} from the graveyard to its owner's hand.`);
+        moveObject(s, o.id, "hand");
+      }
+      return;
+    }
     case "bounce": {
       // "If you win, return ~ to its owner's hand": a resolving spell goes from the stack to its owner's hand as part of
       // its resolution, never to the graveyard (Release the Ants rulings, CR 608.2n).
@@ -2733,7 +2759,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         return;
       }
-      const under = (o: GameObject) => (e.owner ? o.owner : ctx.controller);
+      const toPlayer = e.under ? players(s, e.under, ctx).find((p) => !player(s, p).lost) : undefined;
+      if (e.under && toPlayer === undefined) return;
+      const under = (o: GameObject) => (toPlayer !== undefined ? toPlayer : e.owner ? o.owner : ctx.controller);
       if (e.faceDown) {
         // Yedora: face down as a Forest land, whatever the card is (CR 708.2a); not an Aura there, so it enchants nothing.
         // The Cyber-Controller: face down as 2/2 Cyberman artifact creatures, all at once; which cards they are is hidden

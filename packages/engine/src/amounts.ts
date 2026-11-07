@@ -884,9 +884,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const lk = self && self.zone !== "battlefield" && ctx.sourceZc !== undefined ? s.lastKnown?.[self.id] : undefined;
       const key = lk && (lk.zc === ctx.sourceZc! - 1 || lk.zc === ctx.sourceZc) ? `${self!.id}@${lk.zc}` : o ? `${o.id}@${o.zoneChanges ?? 0}` : undefined;
       // Blazing Effigy: by other sources with its name, as it last existed (CR 608.2h).
+      // Grothama: the player this is being worked out for (PlayerRef eachOne).
+      const eachOne = c.byEachOne ? ctx.players?.({ ref: "eachOne" })[0] : undefined;
       const named = c.byOtherNamed ? (lk?.source?.name ?? (o ? characteristics(s, o).name : self ? defOf(s, self).name : undefined)) : undefined;
       if (c.byOtherNamed && !named) return 0;
-      return key ? (s.turnLog?.damageDealtTo?.[key] ?? []).filter((d) => !c.byOtherNamed || (d.name === named && d.src !== key)).reduce((n, d) => n + (d.amount ?? 0), 0) : 0;
+      return key ? (s.turnLog?.damageDealtTo?.[key] ?? []).filter((d) => (!c.byOtherNamed || (d.name === named && d.src !== key)) && (!c.byEachOne || d.controller === eachOne)).reduce((n, d) => n + (d.amount ?? 0), 0) : 0;
     }
     case "toxicValue": {
       const o = refObjects(s, c.of, ctx)[0];

@@ -171,6 +171,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Mill
   if ((m = new RegExp(`^Mill ${NUMX} cards?$`, "i").exec(s))) return [{ type: "mill", who: { ref: "you" }, n: amt(m[1]!) }];
+  // Cellar Door: "Target player puts the bottom card of their library into their graveyard" (not a mill, CR 701.17a).
+  if ((m = /^(Target player) puts the bottom card of their library into their graveyard$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "bottomToGraveyard", who }] : null;
+  }
   if ((m = new RegExp(`^(.+?) mills? ${NUMX} cards?$`, "i").exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "mill", who, n: amt(m[2]!) }] : null;
@@ -856,15 +861,18 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // opponent's). Green Slime: "... from an artifact or enchantment source" (its source as it is, or as it last existed).
   // Then "If a permanent's ability is countered this way, destroy that permanent" (Green Slime), "... activated abilities
   // of that permanent can't be activated this turn" (Trickbind), joined to it by body.ts.
-  if ((m = /^Counter target (activated or triggered ability|activated ability|triggered ability)(?: (you don't control)| from an? (artifact|enchantment|creature|land|noncreature)(?: or (artifact|enchantment|creature|land))? source)?(?:, and if a permanent's ability is countered this way, (destroy that permanent|activated abilities of that permanent can't be activated this turn))?(?: unless its controller pays (.+))?$/i.exec(s)) && (m[2] || m[3] || m[5])) {
+  if ((m = /^Counter target (activated or triggered ability|activated ability|triggered ability)(?: (you don't control)| from an? (artifact|enchantment|creature|land|noncreature|artifact, creature, enchantment,)(?: or (artifact|enchantment|creature|land))? source)?(?:, and if a permanent's ability is countered this way, (destroy that permanent|activated abilities of that permanent can't be activated this turn))?(?: unless its controller pays (.+))?$/i.exec(s)) && (m[2] || m[3] || m[5])) {
     // Ayesha Tanaka: "... from an artifact source unless that ability's controller pays {W}" (body.ts made it "its").
     const unless = m[6] === undefined ? undefined : parseUnlessPays(m[6], ctx);
     if (unless === null || (unless && m[5])) return null;
     // Dissonant Wave: "... from a noncreature source": none of that type (abilitySourceIs).
     if (m[3] === "noncreature" && m[4]) return null;
-    const from = m[3] === "noncreature" ? [] : [m[3], m[4]].filter((x): x is string => !!x).map((x) => x[0]!.toUpperCase() + x.slice(1));
+    // Interdict: "from an artifact, creature, enchantment, or land" source.
+    const four = m[3] === "artifact, creature, enchantment,";
+    if (four && m[4] !== "land") return null;
+    const from = m[3] === "noncreature" ? [] : four ? ["Artifact", "Creature", "Enchantment", "Land"] : [m[3], m[4]].filter((x): x is string => !!x).map((x) => x[0]!.toUpperCase() + x.slice(1));
     const abilityFrom = m[3] === "noncreature" ? { notTypes: ["Creature"] } : from.length ? { types: from } : undefined;
-    const spec: TargetSpec = { ...stackSpec(m[1]!), ...(m[2] ? { controller: "opponent" as const } : {}), ...(abilityFrom ? { abilityFrom } : {}), text: `target ${m[1]!.toLowerCase()}${m[2] ? " you don't control" : m[3] === "noncreature" ? " from a noncreature source" : from.length ? ` from an ${from.join(" or ").toLowerCase()} source` : ""}` };
+    const spec: TargetSpec = { ...stackSpec(m[1]!), ...(m[2] ? { controller: "opponent" as const } : {}), ...(abilityFrom ? { abilityFrom } : {}), text: `target ${m[1]!.toLowerCase()}${m[2] ? " you don't control" : m[3] === "noncreature" ? " from a noncreature source" : four ? " from an artifact, creature, enchantment, or land" : from.length ? ` from an ${from.join(" or ").toLowerCase()} source` : ""}` };
     return [{ type: "counterSpell", index: addTarget(ctx, spec), ...(m[5] ? { thenSource: m[5] === "destroy that permanent" ? ("destroy" as const) : ("cantActivate" as const) } : {}), ...(unless ? { unless } : {}) }];
   }
   // Verdant Command: "Counter target loyalty ability of a planeswalker": an activated ability with a loyalty symbol in

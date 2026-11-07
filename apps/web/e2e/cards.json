@@ -7367,6 +7367,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7237d607-2613-4786-96d6-55792c2e02b9",
+  "name": "Dragon's Fire",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, you may reveal a Dragon card from your hand or choose a Dragon you control.\nDragon's Fire deals 3 damage to target creature or planeswalker. If you revealed a Dragon card or chose a Dragon as you cast this spell, Dragon's Fire deals damage equal to the power of that card or creature instead.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "j25",
+  "releasedAt": "2024-11-15",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5d144825-594a-454b-9276-fe92e87c19c0",
   "name": "Drake Familiar",
   "manaCost": "{1}{U}",
@@ -15447,6 +15473,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c6932bcf-d66b-42c1-8ca4-6a4573e0f6bf",
+  "name": "Light 'Em Up",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Casualty 2 (As you cast this spell, you may sacrifice a creature with power 2 or greater. When you do, copy this spell and you may choose a new target for the copy.)\nLight 'Em Up deals 2 damage to target creature or planeswalker.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Casualty"
+  ],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1718a442-b878-4690-b608-a013de3d79fc",
   "name": "Light-Paws, Emperor's Voice",
   "manaCost": "{1}{W}",
@@ -17206,6 +17260,34 @@
   "set": "leg",
   "releasedAt": "1994-06-01",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "82aa1402-4b1c-4343-aba5-dd3271cc1ac5",
+  "name": "Molten Exhale",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "You may cast this spell as though it had flash if you behold a Dragon as an additional cost to cast it. (To behold a Dragon, choose a Dragon you control or reveal a Dragon card from your hand.)\nMolten Exhale deals 4 damage to target creature or planeswalker.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Behold"
+  ],
+  "commanderLegal": "legal",
+  "set": "tdm",
+  "releasedAt": "2025-04-11",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -23896,6 +23978,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "66deb3f3-0314-427e-9cb8-6befa365ae94",
+  "name": "Silverquill, the Disputant",
+  "manaCost": "{2}{W}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Elder Dragon",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elder",
+   "Dragon"
+  ],
+  "oracleText": "Flying, vigilance\nEach instant and sorcery spell you cast has casualty 1. (As you cast that spell, you may sacrifice a creature with power 1 or greater. When you do, copy the spell and you may choose new targets for the copy.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "sos",
+  "releasedAt": "2026-04-24",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "44e0ffa3-8915-4c1f-8f1a-4aeea1365f07",
   "name": "Simian Spirit Guide",
   "manaCost": "{2}{R}",
@@ -24725,6 +24845,32 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2026-08-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "18d4c57b-e2bf-47a0-8823-c4a79498a7ff",
+  "name": "Soulblast",
+  "manaCost": "{3}{R}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, sacrifice all creatures you control.\nSoulblast deals damage to any target equal to the total power of the sacrificed creatures.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "10e",
+  "releasedAt": "2007-07-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -29688,6 +29834,32 @@
   "commanderLegal": "legal",
   "set": "mom",
   "releasedAt": "2023-04-21",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1779af8e-38fc-4043-b5fa-ee16a7ea840c",
+  "name": "Voltage Surge",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, you may sacrifice an artifact.\nVoltage Surge deals 2 damage to target creature or planeswalker. If this spell's additional cost was paid, Voltage Surge deals 4 damage instead.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

@@ -821,6 +821,18 @@ export function moveObject(
       to = "exile";
     }
   }
+  // Hallowed Moonlight: "Until end of turn, if a creature would enter and it wasn't cast, exile it instead" (CR 614.1a): a
+  // token too (it's put into exile instead and ceases to exist, rulings: tokens are never cast), and a copy of a creature
+  // spell (a copy isn't cast, CR 707.10), which ceases to exist anywhere but the stack (CR 707.10a). A spell that was cast
+  // isn't affected, whatever zone it was cast from (rulings).
+  if (to === "battlefield" && s.exileUncastAnyTurn === s.turn && fromZone !== "battlefield" && fromZone !== "phasedOut" && fromZone !== "merged" && (fromZone !== "stack" || o.spellCopy) && entersAsCreature(s, o, opts.controller ?? o.controller, opts.faceDown, opts.entersAs)) {
+    log(s, `${opts.faceDown ? "The face-down card" : defOf(s, o).name}${o.isToken || o.spellCopy ? " (a token)" : ""} is exiled instead of entering: it wasn't cast (this turn).`);
+    if (o.spellCopy) {
+      delete s.objects[id];
+      return;
+    }
+    to = "exile";
+  }
   // Cosmic Intervention: "If a permanent you control would be put into a graveyard from the battlefield this turn, exile it
   // instead" (CR 614.1a), with a delayed trigger to return it (below). With other replacements that would exile it, its
   // controller applies this one first (CR 616.1), the one that brings it back.
@@ -5616,7 +5628,11 @@ export function castProblem(
   // Silver Scrutiny: begun as though it had flash when an X it could be cast with is small enough (CR 601.3b), then only
   // with that X announced (601.2b); before X is announced it counts as 0.
   const smallX = compileCard(d).flashIfXAtMost !== undefined && (x ?? 0) <= compileCard(d).flashIfXAtMost!;
-  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid));
+  // Molten Exhale: begun as though it had flash when there's a Dragon to behold (CR 601.3c), then only with it beheld
+  // (its targets chosen, the cast is all announced: compile requires a target).
+  const beholdFlashCost = compileCard(d).flashIfKicked ? compileCard(d).kicker?.extraCosts?.[0] : undefined;
+  const beholdFlash = beholdFlashCost?.kind === "reveal" && (!!choices?.kicks?.includes(0) || (!targets && !!s.objects[id] && beholdCandidates(s, pid, s.objects[id]!, beholdFlashCost).length > 0));
+  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || beholdFlash || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid));
   // Offering (CR 702.48a): with a permanent sacrificed for it; before its costs are chosen, when there's one to sacrifice.
   const offered = !!compileCard(d).offering && (choices ? choices.offering !== undefined : offeringCandidates(s, pid, id).length > 0);
   if (!free && !instantSpeed && !offered && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
@@ -5695,7 +5711,7 @@ export function castProblem(
   if (via && x && manaX && via.mana && !parseManaCost(via.mana).hasX && !costX) return "X is 0 unless the cost you pay has {X}";
   const ap = additionalCostProblem(s, pid, o, choices, x ?? 0, spell?.modal ? modes : undefined, targets);
   if (ap) return ap;
-  const cp = casualtyProblem(s, pid, d, choices) ?? bargainProblem(s, pid, id, d, choices) ?? offeringProblem(s, pid, id, d, choices) ?? evidenceCastProblem(s, pid, o, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? harmonizeProblem(s, pid, choices, convoke) ?? giftProblem(s, pid, d, choices);
+  const cp = casualtyProblem(s, pid, d, choices, o) ?? bargainProblem(s, pid, id, d, choices) ?? offeringProblem(s, pid, id, d, choices) ?? evidenceCastProblem(s, pid, o, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? harmonizeProblem(s, pid, choices, convoke) ?? giftProblem(s, pid, d, choices);
   if (cp) return cp;
   const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets, modes });
   if (typeof cost === "string") return cost;
@@ -6061,7 +6077,9 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       // itself if it's cast from there (it's on the stack as its cost is determined, rulings).
       const names = d.name.split(" // ");
       const same = m.perSameNameInGraveyard ? s.players[pid]!.graveyard.filter((id) => id !== o.id && defOf(s, obj(s, id)).name.split(" // ").some((x) => names.includes(x))).length : undefined;
-      const n = m.perOwnCommanderCast ? m.n * (player(s, o.owner).commanderCasts[o.id] ?? 0) : same !== undefined ? m.n * same : shared ? m.n * d.types.filter((t) => shared.has(t)).length : m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: m.timesForCaster ? pid : c.controller, sourceId: src.id })) : m.n;
+      // Seal of the Guildpact: once for each color chosen as it entered that the spell is.
+      const chosenColors = m.perChosenColor ? (src.chosen?.colors ?? []).filter((col) => d.colors.includes(col)).length : undefined;
+      const n = chosenColors !== undefined ? m.n * chosenColors : m.perOwnCommanderCast ? m.n * (player(s, o.owner).commanderCasts[o.id] ?? 0) : same !== undefined ? m.n * same : shared ? m.n * d.types.filter((t) => shared.has(t)).length : m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: m.timesForCaster ? pid : c.controller, sourceId: src.id })) : m.n;
       if (n > 0) more += n;
       else less -= n;
     }
@@ -6545,6 +6563,22 @@ export const castDef = (s: GameState, id: ObjectId, alt?: AltCostKind): CardDef 
   alt === "mutate" && !obj(s, id).mutating ? mutatingDef(defOf(s, obj(s, id)), obj(s, id).owner) : alt === "bestow" ? bestowedDef(defOf(s, obj(s, id))) : alt === "prototype" ? prototypedDef(defOf(s, obj(s, id))) : alt === "overload" && !obj(s, id).overloaded ? overloadedDef(defOf(s, obj(s, id))) : alt === "cleave" && !obj(s, id).cleaved ? cleavedDef(defOf(s, obj(s, id))) : defOf(s, obj(s, id));
 
 /**
+ * Slitherwisp's "a spell that has flash": printed flash, "this spell has flash as long as ..." (CompiledCard.flashIf), or
+ * Teferi, Mage of Zhalfir's "Creature cards you own that aren't on the battlefield have flash"; not a permission to cast
+ * it "as though it had flash" (rulings on Slitherwisp, CR 702.8a).
+ */
+export function spellHasFlash(s: GameState, pid: PlayerId, o: GameObject): boolean {
+  const d = defOf(s, o);
+  if (d.keywords.includes("Flash")) return true;
+  const own = compileCard(d).flashIf;
+  if (own && staticConditionNow(s, own, "", pid)) return true;
+  return s.battlefield.some((id) => {
+    const p = obj(s, id);
+    return controllerOf(s, p) === o.owner && !!abilitiesOf(s, p).flashOwned?.some((spec) => printedMatches(spec, d));
+  });
+}
+
+/**
  * "You may cast sorcery spells as though they had flash" (Hypersonic Dragon), "... spells ..." (Vedalken Orrery): a
  * permanent `pid` controls lets them cast this card any time they could cast an instant (CR 702.8a). It's a spell then,
  * so it's matched as one.
@@ -6792,6 +6826,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const free = freeCastOf(s, p.id) === id && !madness;
   // X is announced as it's cast (CR 601.2b) and is part of the spell while it's on the stack (CR 107.3a).
   const hasX = parseManaCost(d.manaCost).hasX || costsHaveX(d, choices) || !!choices?.kicks?.some((i) => parseManaCost(compileCard(d).kicker?.costs[i] ?? "").hasX);
+  const beholdCost = compileCard(d).kicker?.extraCosts?.[0];
+  const beheld = kicks?.includes(0) && beholdCost?.kind === "reveal" && beholdCost.orControl && choices.reveal?.length === 1 ? s.objects[choices.reveal[0]!] : undefined;
   s.stack.push({
     id: `s${s.nextId++}`,
     kind: "spell",
@@ -6807,6 +6843,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     ...(byControl ? { kickedByControl: true as const } : {}),
     // Swallow Whole: the creature tapped for its "tap an untapped creature you control" additional cost (ObjRef costTapped).
     ...(choices.tap?.length === 1 && s.objects[choices.tap[0]!] && compileCard(d).additionalCosts?.some((c) => c.kind === "tap" && c.n === 1 && !c.untap) ? { stationed: { id: choices.tap[0]!, zc: s.objects[choices.tap[0]!]!.zoneChanges ?? 0, power: power(s, s.objects[choices.tap[0]!]!) } } : {}),
+     // Dragon's Fire: the Dragon card revealed or the Dragon chosen for its behold cost (Amount beheldPower, CR 701.4a).
+    ...(beheld ? { stationed: { id: beheld.id, zc: beheld.zoneChanges ?? 0, power: beheld.zone === "battlefield" ? power(s, beheld) : cardPT(s, beheld, "power") } } : {}),
   });
   const item = s.stack[s.stack.length - 1]!;
   const stackId = item.id;
@@ -6860,8 +6898,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if ((choices.alt === "alternative" && altCost(d, "alternative")?.webSlinging) || choices.alt === "grantedWebSlinging") o.webSlung = returned;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
   if (choices.casualty) {
-    log(s, `${p.name} sacrifices ${nameOf(s, choices.casualty)} (casualty).`);
-    moveObject(s, choices.casualty, "graveyard", { sacrificed: true, cost: true });
+    // Each instance paid sacrifices its own creature, all at once (CR 702.153b, 601.2h).
+    const victims = [choices.casualty, ...(choices.casualtyMore ?? [])];
+    log(s, `${p.name} sacrifices ${victims.map((v) => nameOf(s, v)).join(" and ")} (casualty).`);
+    for (const v of victims) moveObject(s, v, "graveyard", { sacrificed: true, cost: true });
+    if (victims.length > 1) item.casualtyTimes = victims.length;
     item.casualty = true;
     closeZoneBatch(s);
   }
@@ -7323,10 +7364,32 @@ function kickProblem(d: CardDef, kicks?: number[]): string | null {
   return null;
 }
 
-/** Creatures `pid` could sacrifice for this card's casualty N: creatures they control with power N or greater (CR 702.153a). */
-export function casualtyCandidates(s: GameState, pid: PlayerId, d: CardDef): ObjectId[] {
-  const n = compileCard(d).casualty;
-  if (n === undefined) return [];
+/**
+ * The instances of casualty `pid` casting this card gives it, their N's: its own, then one for each "... spell you cast
+ * has casualty N" of a permanent they control (Silverquill, the Disputant), each paid separately (CR 702.153a-b). `o` is
+ * the card being cast (for "the first ... spell you cast each turn").
+ */
+export function casualtyInstances(s: GameState, pid: PlayerId, d: CardDef, o?: GameObject): number[] {
+  const own = compileCard(d).casualty;
+  return [...(own !== undefined ? [own] : []), ...casualtyGranted(s, pid, d, o)];
+}
+
+/** The N's of the instances of casualty permanents `pid` controls give this card as they cast it. */
+export function casualtyGranted(s: GameState, pid: PlayerId, d: CardDef, o?: GameObject): number[] {
+  const out: number[] = [];
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== pid) continue;
+    for (const g of abilitiesOf(s, p).spellsHaveCasualty ?? []) if (printedMatches(g.filter, d) && (!g.firstEachTurn || (!!o && firstOfKindThisTurn(s, pid, o, g.filter)))) out.push(g.n);
+  }
+  return out;
+}
+
+/** Creatures `pid` could sacrifice for this card's casualty N: creatures they control with power N or greater (CR 702.153a); with several instances, the least N. */
+export function casualtyCandidates(s: GameState, pid: PlayerId, d: CardDef, card?: GameObject): ObjectId[] {
+  const ns = casualtyInstances(s, pid, d, card);
+  if (!ns.length) return [];
+  const n = Math.min(...ns);
   return s.battlefield.filter((id) => {
     const o = obj(s, id);
     return controllerOf(s, o) === pid && objIsType(s, o, "Creature") && power(s, o) >= n && canSacrificeForCost(s, o);
@@ -7455,7 +7518,7 @@ function bargainProblem(s: GameState, pid: PlayerId, spell: ObjectId, d: CardDef
   if (id === undefined) return null;
   if (!compileCard(d).bargain) return `${d.name} doesn't have bargain`;
   if (!bargainCandidates(s, pid, spell).includes(id)) return "bargain sacrifices an artifact, enchantment, or token you control";
-  if (choices?.sacrifice?.includes(id) || choices?.casualty === id) return `${nameOf(s, id)} is already being sacrificed`;
+  if (choices?.sacrifice?.includes(id) || choices?.casualty === id || choices?.casualtyMore?.includes(id)) return `${nameOf(s, id)} is already being sacrificed`;
   return null;
 }
 
@@ -7475,7 +7538,7 @@ function offeringProblem(s: GameState, pid: PlayerId, spell: ObjectId, d: CardDe
   const filter = compileCard(d).offering;
   if (!filter) return `${d.name} doesn't have offering`;
   if (!offeringCandidates(s, pid, spell).includes(id)) return `offering sacrifices ${/^[AEIOU]/i.test(filter.text) ? "an" : "a"} ${filter.text} you control`;
-  if (choices?.sacrifice?.includes(id) || choices?.casualty === id || choices?.bargain === id) return `${nameOf(s, id)} is already being sacrificed`;
+  if (choices?.sacrifice?.includes(id) || choices?.casualty === id || choices?.casualtyMore?.includes(id) || choices?.bargain === id) return `${nameOf(s, id)} is already being sacrificed`;
   return null;
 }
 
@@ -7536,13 +7599,22 @@ function evidenceCastProblem(s: GameState, pid: PlayerId, o: GameObject, d: Card
   return evidenceProblem(s, pid, n, choices.evidence, o.id, taken);
 }
 
-function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: CostChoices): string | null {
+function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: CostChoices, card?: GameObject): string | null {
   const id = choices?.casualty;
-  if (id === undefined) return null;
-  const n = compileCard(d).casualty;
-  if (n === undefined) return `${d.name} doesn't have casualty`;
-  if (!casualtyCandidates(s, pid, d).includes(id)) return `casualty ${n} sacrifices a creature you control with power ${n} or greater`;
-  if (choices?.sacrifice?.includes(id)) return `${nameOf(s, id)} is already being sacrificed`;
+  if (id === undefined) return choices?.casualtyMore?.length ? "casualty's first creature is missing" : null;
+  const ns = casualtyInstances(s, pid, d, card);
+  if (!ns.length) return `${d.name} doesn't have casualty`;
+  const ids = [id, ...(choices?.casualtyMore ?? [])];
+  if (new Set(ids).size !== ids.length) return "each instance of casualty sacrifices a different creature";
+  if (ids.length > ns.length) return `${d.name} has casualty only ${ns.length === 1 ? "once" : `${ns.length} times`}`;
+  for (const x of ids) {
+    if (!casualtyCandidates(s, pid, d, card).includes(x)) return `casualty ${Math.min(...ns)} sacrifices a creature you control with power ${Math.min(...ns)} or greater`;
+    if (choices?.sacrifice?.includes(x)) return `${nameOf(s, x)} is already being sacrificed`;
+  }
+  // Each instance is paid by its own creature (CR 702.153b): the most powerful ones for the greatest N's.
+  const want = [...ns].sort((a, b) => a - b).slice(0, ids.length).sort((a, b) => b - a);
+  const have = ids.map((x) => power(s, obj(s, x))).sort((a, b) => b - a);
+  if (have.some((p, i) => p < want[i]!)) return `those creatures can't pay casualty ${want.slice(0, ids.length).join(" and ")}`;
   return null;
 }
 
@@ -7772,8 +7844,8 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     }
     // Kaervek's Spite: every permanent you control, so not with one that can't be sacrificed (CR 118.3).
     if (c.kind === "sacrificeAll") {
-      const stuck = s.battlefield.map((id) => obj(s, id)).find((x) => controllerOf(s, x) === pid && !canSacrificeForCost(s, x));
-      if (stuck) return `${defOf(s, stuck).name} can't be sacrificed, so you can't sacrifice all your permanents to ${doing}`;
+      const stuck = s.battlefield.map((id) => obj(s, id)).find((x) => controllerOf(s, x) === pid && (!c.creatures || objIsType(s, x, "Creature")) && !canSacrificeForCost(s, x));
+      if (stuck) return `${defOf(s, stuck).name} can't be sacrificed, so you can't sacrifice all your ${c.creatures ? "creatures" : "permanents"} to ${doing}`;
       continue;
     }
     if (c.kind === "discardHand") continue; // an empty hand pays it too
@@ -8170,6 +8242,8 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
           // "The mana value of the returned creature" (Scarlet Spider): as it last existed (rulings, CR 608.2h); face
           // down, 0 (CR 708.2).
           returned.manaValue = obj(s, id).faceDown ? 0 : defMv(defOf(s, obj(s, id)));
+          // Wonderscape Sage: "that land had a nonbasic land type", its land types as it last existed (CR 608.2h).
+          returned.returnedSubtypes = [...characteristics(s, obj(s, id)).subtypes];
         }
         log(s, `${p.name} returns ${nameOf(s, id)} to ${player(s, obj(s, id).owner).name === p.name ? "their" : "its owner's"} hand.`);
         moveObject(s, id, "hand");
@@ -8275,9 +8349,17 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       log(s, `${p.name} mills ${n === 1 ? "a card" : `${n} cards`}.`);
       for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard", { milled: true });
     } else if (c.kind === "sacrificeAll") {
-      // Kaervek's Spite: all of them at once (CR 701.21a), as they are now.
-      const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p.id);
-      log(s, ids.length ? `${p.name} sacrifices all their permanents: ${ids.map((id) => nameOf(s, id)).join(", ")}.` : `${p.name} has no permanents to sacrifice.`);
+      // Kaervek's Spite: all of them at once (CR 701.21a), as they are now. Soulblast: all creatures, each as it last
+      // existed for "the total power of the sacrificed creatures" (CR 608.2h).
+      const what = c.creatures ? "creatures" : "permanents";
+      const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p.id && (!c.creatures || objIsType(s, obj(s, id), "Creature")));
+      log(s, ids.length ? `${p.name} sacrifices all their ${what}: ${ids.map((id) => nameOf(s, id)).join(", ")}.` : `${p.name} has no ${what} to sacrifice.`);
+      if (c.creatures)
+        for (const id of ids) {
+          const o = obj(s, id);
+          const ch = characteristics(s, o);
+          sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), types: [...ch.types], subtypes: [...ch.subtypes], colors: [...ch.colors] });
+        }
       for (const id of ids) moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
       closeZoneBatch(s);
     } else if (c.kind === "discardHand") {
@@ -10898,6 +10980,9 @@ function attackTaxParts(s: GameState, defender: PlayerId, planeswalker: boolean,
     generic += planeswalker ? c.attackTaxPlaneswalkers : c.attackTax;
     generic += counters * (planeswalker ? c.attackTaxCountersPlaneswalkers : c.attackTaxCounters);
     mana.push(...(planeswalker ? c.attackTaxManaPlaneswalkers : c.attackTaxMana));
+    // Elephant Grass: attacking the player, not their planeswalkers, by an attacker that isn't that color.
+    const a = attacker !== undefined ? s.objects[attacker] : undefined;
+    if (!planeswalker) for (const t of c.attackTaxUnlessColor) if (!a || !characteristics(s, a).colors.includes(t.color)) generic += t.n;
   }
   // "Until your next turn, creatures can't attack you unless ..." (Summon: Yojimbo): the defender's own effects.
   for (const t of s.players[defender]?.attackTaxUntil ?? []) if (!planeswalker || t.planeswalkers) generic += t.n;
@@ -11420,7 +11505,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   }
   if (attacks.length) p.attackedWith = { turn: s.turn, keys: [...new Set([...w, ...keys])], kinds, ...(Object.keys(to).length ? { to } : {}), ...(Object.keys(others).length ? { others } : {}) };
   // Declared as attackers in this combat; not ones put onto the battlefield attacking (Kytheon rulings, CR 508.4).
-  p.attackedCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0, n: attacks.length };
+  p.attackedCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0, n: attacks.length, ...(attacks.length ? { keys } : {}) };
   s.attackersThisTurn = (s.attackersThisTurn ?? 0) + attacks.length;
   // Pack tactics: their power as they attack, statics for attacking creatures counted; a power below 0 adds nothing.
   p.attackPower = { turn: s.turn, n: attacks.reduce((n, a) => n + Math.max(0, power(s, obj(s, a.attacker))), 0) };

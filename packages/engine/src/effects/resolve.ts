@@ -373,15 +373,6 @@ export function subjectCreatureTypes(s: GameState, ctx: ResolveCtx): Set<string>
 }
 
 export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
-  if (ref.ref === "chosenCreature") {
-    // Tyrannical Pitlord: what it chose as it entered, or as it last existed once it has left (CR 608.2h); a leaves trigger's
-    // source is the object it became, one zone change later (CR 400.7).
-    const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-    const lk = ctx.sourceId ? s.lastKnown?.[ctx.sourceId] : undefined;
-    const c = src?.zone === "battlefield" && (ctx.sourceZc === undefined || (src.zoneChanges ?? 0) === ctx.sourceZc) ? src.chosen?.creature : lk && (ctx.sourceZc === undefined || lk.zc + 1 === ctx.sourceZc) ? lk.chosenCreature : undefined;
-    const o = c ? s.objects[c.id] : undefined;
-    return o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === c!.zc ? [o] : [];
-  }
   if (ref.ref === "castSpell") return []; // only counted (amounts.ts)
   if (ref.ref === "ringBearer") {
     const b = ringBearer(s, ctx.controller);

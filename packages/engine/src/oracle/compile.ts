@@ -1965,12 +1965,6 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Grifter's Blade: "As this Equipment enters, choose a creature you control it could be attached to. If you do, it
     // enters attached to that creature." (CR 614.12; rulings: one must be chosen if possible).
-    // Tyrannical Pitlord: "As this creature enters, choose another creature you control." (CR 614.12): "the chosen creature"
-    // in its other abilities.
-    if (line === "As ~ enters, choose another creature you control." && d.types.includes("Creature")) {
-      out.entersChooseCreature = true;
-      continue;
-    }
     if (line === "As ~ enters, choose a creature you control it could be attached to. If you do, it enters attached to that creature." && d.subtypes.includes("Equipment")) {
       out.entersAttachedToYours = true;
       continue;
@@ -6460,8 +6454,6 @@ export function compile(d: CardDef): CompiledCard {
     out.statics = out.statics.flatMap((st) => (st === cdaPower ? [merged] : st === cdaToughness ? [] : [st]));
   }
   const json = JSON.stringify(out);
-  // "The chosen creature" (Tyrannical Pitlord) only means something on a card that chooses one as it enters.
-  if (!out.entersChooseCreature && /"(?:kind|ref)":"chosenCreature"/.test(json)) out.unsupported.push("(\"the chosen creature\" with no creature chosen as it enters)");
   if (json.includes('"thisAbility":true')) out.unsupported.push("(a copy effect's \"this ability\" outside a triggered or activated ability)");
   if (out.sunburst || json.includes('"kind":"colorsSpent"')) out.countsColors = true;
   // An "enchant player" Aura that only gives the enchanted player more steps or phases on their turn (Paradox Haze, Shadow

@@ -5254,9 +5254,9 @@ function Controls({
         })}
       </div>
     );
-  if (pending?.kind === "chooseOption" && (pending.what === "enchant" || pending.what === "attachHost" || pending.what === "chooseCreature") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "enchant" || pending.what === "attachHost") && pending.player === HUMAN)
     // An Aura put onto the battlefield without being cast: what it enchants (CR 303.4f). Grifter's Blade: the creature
-    // you control it enters attached to (CR 614.12). Tyrannical Pitlord: another creature you control, chosen as it enters.
+    // you control it enters attached to (CR 614.12).
     return (
       <div className="controls enchant-pick">
         <span>

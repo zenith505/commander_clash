@@ -33,8 +33,6 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Thirsting Axe: "sacrifice it" about equipped creature (triggers.ts rewrites it): the creature it's attached to as this
   // resolves, only if you control it (CR 701.21a).
   if (/^[Ss]acrifice equipped creature$/.test(s)) return [{ type: "sacrifice", what: { ref: "attached" } }];
-  // Tyrannical Pitlord: "sacrifice the chosen creature": only while you control it (CR 701.21a, rulings).
-  if (/^[Ss]acrifice the chosen creature$/.test(s)) return [{ type: "sacrifice", what: { ref: "chosenCreature" } }];
   // Lingering Death: "that player sacrifices enchanted creature" ("that creature", the enchanted creature, in a trigger at
   // the beginning of a step of its controller's): that player, if they still control it (CR 701.21a).
   if (ctx.eventPlayer && /^[Tt]hat player sacrifices enchanted creature$/.test(s)) return [{ type: "sacrifice", what: { ref: "attached" }, byEventPlayer: true }];

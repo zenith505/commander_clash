@@ -1278,8 +1278,6 @@ export type ChosenTarget = Exclude<TargetChoice, { kind: "none" }>;
 export type SpentFor = { sharesCommanderType: true } | { instantOrSorcery: true; color?: Color } | { spell: TargetSpec } | { commander: true };
 
 export type ObjRef =
-  /** Tyrannical Pitlord: "the chosen creature", chosen as the source entered (Chosen.creature), or as it last existed once it's gone (CR 608.2h), while that creature is still that permanent (CR 400.7). */
-  | { ref: "chosenCreature" }
   /** "Each creature that convoked ~" (Lethal Scheme): the `index`th creature tapped to convoke the resolving spell (CR 702.51a), while it's that permanent. */
   | { ref: "convoker"; index: number }
   /** "Each creature that convoked it" (Venerated Loxodon): all of them still on the battlefield, for its enters trigger the permanent's spell's. */
@@ -2001,8 +1999,6 @@ export type Affects =
   | { kind: "paired" }
   /** "Creatures blocking or blocked by ~" (Alms Beast): those in combat with the source now (CR 509.1h). */
   | { kind: "inCombatWithSelf" }
-  /** Tyrannical Pitlord: "the chosen creature", chosen as the source entered (Chosen.creature), while it's still that permanent (CR 400.7), whoever controls it (rulings). */
-  | { kind: "chosenCreature" }
   | {
       kind: "filter";
       types: string[]; // all of these card types, e.g. ["Creature"]
@@ -4829,7 +4825,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature" | /** Mindblaze: a card in that player's library. */ "inLibrary";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | /** Tyrannical Pitlord: "As ~ enters, choose another creature you control" (CompiledCard.entersChooseCreature, Chosen.creature). */ "chooseCreature" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther";
+export type EntersOption = /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -7913,8 +7909,6 @@ export interface CompiledCard {
    * attached to that creature." (CR 614.12): one must be chosen if there is one (rulings); with none, it enters unattached.
    */
   entersAttachedToYours?: true;
-  /** Tyrannical Pitlord: "As ~ enters, choose another creature you control" (CR 614.12): kept as Chosen.creature; "the chosen creature" (Affects/ObjRef "chosenCreature"). */
-  entersChooseCreature?: true;
   /** Liquid Fire: "As an additional cost to cast this spell, choose a number between 0 and 5" (CR 601.2b): chosen as it's cast (CostChoices.number), "the chosen number" as it resolves. */
   castNumber?: { min: number; max: number };
   /** Fasting: "If you would begin your draw step, you may skip that step instead. If you do, you gain 2 life." (CR 614.10): asked as its controller's draw step would begin. */

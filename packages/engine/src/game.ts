@@ -1025,7 +1025,7 @@ export function moveObject(
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.creature ? { chosenCreature: { ...o.chosen.creature } } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
@@ -1518,7 +1518,6 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, ...c });
   if (printed.entersAnchor) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "anchor" });
   if (printed.entersAttachedToYours) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "attachHost" });
-  if (printed.entersChooseCreature) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "chooseCreature" });
   // As a battle enters, its controller chooses its protector (CR 310.9a).
   if (isType(defOf(s, o), "Battle")) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "protector" });
   if (printed.entersChooseTwoPlayers) for (let i = 0; i < 2; i++) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", pair: true });
@@ -9580,12 +9579,6 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       sacrificedInstead(s, o, choice, entry?.enters);
       return;
     }
-    if (pend.what === "chooseCreature") {
-      if (!pend.options.includes(choice)) throw new RulesError("choose a creature offered");
-      creatureChosen(s, o, choice);
-      if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
-      return;
-    }
     if (pend.what === "attachHost") {
       if (!attachHostOptions(s, o).includes(choice)) throw new RulesError("choose a creature offered");
       enterAttachedTo(s, o, choice);
@@ -10069,7 +10062,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   // A creature for an Equipment to enter attached to is chosen as it enters, with an objectId (askEntersChoice).
-  if (pend.what === "attachHost" || pend.what === "chooseCreature") throw new RulesError("nothing to attach");
+  if (pend.what === "attachHost") throw new RulesError("nothing to attach");
   if (pend.what === "enchant") {
     // What an Aura entering without being cast enchants, chosen as it enters (CR 303.4f).
     const sc = (r.scratch ??= {});
@@ -10247,19 +10240,6 @@ function enterAttachedTo(s: GameState, o: GameObject, host: ObjectId) {
   log(s, `${defOf(s, o).name} enters attached to ${nameOf(s, host)}.`);
 }
 
-/** Tyrannical Pitlord: the other creatures its controller controls as it enters. */
-export function chooseCreatureOptions(s: GameState, o: GameObject): ObjectId[] {
-  const you = controllerOf(s, o);
-  return s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === you && objIsType(s, obj(s, id), "Creature"));
-}
-
-/** "The chosen creature" is that permanent (CR 400.7), as long as it stays on the battlefield. */
-function creatureChosen(s: GameState, o: GameObject, id: ObjectId) {
-  o.chosen = { ...o.chosen, creature: { id, zc: obj(s, id).zoneChanges ?? 0 } };
-  invalidateCharacteristics(s);
-  log(s, `${player(s, controllerOf(s, o)).name} chooses ${nameOf(s, id)} for ${defOf(s, o).name}.`);
-}
-
 function askEntersChoice(s: GameState): boolean {
   const q = s.entersChoices;
   while (q?.length) {
@@ -10325,19 +10305,6 @@ function askEntersChoice(s: GameState): boolean {
         continue;
       }
       s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "attachHost", options, labels: options.map((id) => defOf(s, obj(s, id)).name), objectId: o.id, prompt: "choose a creature you control for it to enter attached to" };
-      return true;
-    }
-    if (c.what === "chooseCreature") {
-      // Tyrannical Pitlord: another creature its controller controls, not one entering with it (rulings); with none, nothing
-      // is chosen. The choice doesn't use the stack (rulings).
-      const options = chooseCreatureOptions(s, o).filter((id) => !c.together?.includes(id));
-      if (options.length <= 1) {
-        q.shift();
-        if (options.length) creatureChosen(s, o, options[0]!);
-        if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
-        continue;
-      }
-      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "chooseCreature", options, labels: options.map((id) => defOf(s, obj(s, id)).name), objectId: o.id, prompt: "choose another creature you control" };
       return true;
     }
     if (c.what === "controlOpponent") {

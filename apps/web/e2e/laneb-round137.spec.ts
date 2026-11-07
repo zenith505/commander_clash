@@ -1,26 +1,8 @@
-// Lane B round B137 in the browser: Tyrannical Pitlord's creature chosen as it enters (CR 614.12), Voltage Surge's
-// "you may sacrifice an artifact" offered like kicker (CR 601.2b), and Soulblast's "sacrifice all creatures you control"
-// as it's cast (their total power, CR 608.2h).
+// Lane B round B137 in the browser: Voltage Surge's "you may sacrifice an artifact" offered like kicker (CR 601.2b), and
+// Soulblast's "sacrifice all creatures you control" as it's cast (their total power, CR 608.2h).
 import { expect, test } from "@playwright/test";
 import { LANDS, idsOf, one, open, pageErrors, scene } from "./scene";
-import { card, clickPlayer, controls, resolveUntil } from "./ui";
-
-test("Tyrannical Pitlord: pick which of your two creatures gets +3/+3 and flying", async ({ page }) => {
-  const s = scene({ hand: ["Tyrannical Pitlord"], board: ["Grizzly Bears", "Hill Giant", ...LANDS] });
-  const [bears, giant] = [one(s, "Grizzly Bears"), one(s, "Hill Giant")];
-  await open(page, s);
-  await card(page, "Tyrannical Pitlord", s).click();
-  const st = await resolveUntil(page, (x) => x.pending?.kind === "chooseOption" && x.pending.what === "chooseCreature");
-  expect(st.pending?.kind === "chooseOption" && st.pending.options.sort()).toEqual([bears, giant].sort());
-  const bar = controls(page);
-  await expect(bar).toContainText("choose another creature you control");
-  await bar.getByRole("button", { name: "Grizzly Bears" }).click();
-  const pitlord = one(s, "Tyrannical Pitlord");
-  const after = await resolveUntil(page, (x) => !x.pending && x.stack.length === 0 && x.objects[pitlord]!.zone === "battlefield");
-  expect(after.objects[pitlord]!.chosen?.creature?.id).toBe(bears);
-  await expect(page.locator(`[data-obj="${bears}"]`).first()).toContainText("5/5");
-  expect(pageErrors(page)).toEqual([]);
-});
+import { card, clickPlayer, resolveUntil } from "./ui";
 
 test("Voltage Surge: sacrifice an artifact as you cast it, and it deals 4 damage to Ana's Hill Giant", async ({ page }) => {
   const s = scene({ hand: ["Voltage Surge"], board: [...LANDS, "Mind Stone"] }, [{ board: ["Hill Giant"] }]);

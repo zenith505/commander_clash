@@ -3,8 +3,8 @@
 // cost, their total power as they last existed, CR 608.2h), Interdict (an activated ability from an artifact, creature,
 // enchantment or land countered, and its source's abilities stopped), Wood Sage, Flash Foliage (a token put onto the
 // battlefield blocking), Cellar Door (the bottom card into the graveyard, not a mill, CR 701.17a), Mana Vortex (a cast
-// trigger and a state trigger, CR 603.8), Tyrannical Pitlord (another creature chosen as it enters, CR 614.12) and
-// Negative Zone Portal (cards exiled with it, CR 607.2a).
+// trigger and a state trigger, CR 603.8) and Negative Zone Portal (cards exiled
+// with it, CR 607.2a).
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
@@ -19,7 +19,6 @@ const woodSage = card("Wood Sage", "Creature — Human Druid", "{G}{U}", { power
 const foliage = card("Flash Foliage", "Instant", "{2}{G}", { oracleText: "Cast this spell only during combat after blockers are declared.\nCreate a 1/1 green Saproling creature token that's blocking target creature attacking you.\nDraw a card." });
 const cellarDoor = card("Cellar Door", "Artifact", "{2}", { oracleText: "{3}, {T}: Target player puts the bottom card of their library into their graveyard. If it's a creature card, you create a 2/2 black Zombie creature token." });
 const vortex = card("Mana Vortex", "Enchantment", "{1}{U}{U}", { oracleText: "When you cast this spell, counter it unless you sacrifice a land.\nAt the beginning of each player's upkeep, that player sacrifices a land of their choice.\nWhen there are no lands on the battlefield, sacrifice this enchantment." });
-const pitlord = card("Tyrannical Pitlord", "Creature — Demon", "{4}{B}{B}", { power: "6", toughness: "6", keywords: ["Flying", "Trample"], oracleText: "Flying, trample\nAs this creature enters, choose another creature you control.\nThe chosen creature gets +3/+3 and has flying.\nWhen this creature leaves the battlefield, sacrifice the chosen creature." });
 const portal = card("Negative Zone Portal", "Artifact", "{2}", { oracleText: "{2}, {T}: Exile target card from an opponent's graveyard. If it's a creature card, draw a card.\nAt the beginning of your upkeep, if there are four or more creature cards exiled with this artifact, flip a coin. If you lose the flip, sacrifice this artifact and return a card exiled with it at random to its owner's hand." });
 
 // Helpers' cards.
@@ -29,8 +28,6 @@ const zombify = card("Zombify", "Sorcery", "{3}{B}", { oracleText: "Return targe
 const relic = card("Test Relic", "Artifact", "{1}");
 const pinger = card("Test Pinger", "Artifact", "{1}", { oracleText: "{1}: This artifact deals 1 damage to any target.\n{T}: Add {C}." });
 const walker = card("Test Walker", "Legendary Planeswalker — Testwalker", "{3}", { loyalty: "3", oracleText: "+1: You gain 1 life." });
-const unsummon = card("Unsummon", "Instant", "{U}", { oracleText: "Return target creature to its owner's hand." });
-const murder = card("Test Destroy", "Instant", "{1}", { oracleText: "Destroy target creature." });
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -66,7 +63,7 @@ const named = (s: GameState, name: string) => s.battlefield.filter((id) => chara
 const zone = (s: GameState, id: string) => s.objects[id]?.zone;
 
 describe("B137 cards compile", () => {
-  it("all of them", () => supported(moonlight, surge, soulblast, interdict, woodSage, foliage, cellarDoor, vortex, pitlord, portal));
+  it("all of them", () => supported(moonlight, surge, soulblast, interdict, woodSage, foliage, cellarDoor, vortex, portal));
 });
 
 describe("Hallowed Moonlight: creatures that weren't cast are exiled instead of entering (CR 614.1a)", () => {
@@ -286,66 +283,6 @@ describe("Mana Vortex", () => {
     invalidateCharacteristics(s0);
     const s = settle(act(s0, { type: "passPriority", player: ap }));
     expect(zone(s, v)).toBe("graveyard");
-  });
-});
-
-describe("Tyrannical Pitlord: another creature chosen as it enters (CR 614.12)", () => {
-  it("the chosen creature gets +3/+3 and flying, even under another player's control, and is sacrificed when it leaves", () => {
-    const { s: s0, ap, ids, opp } = setup([pitlord, unsummon]);
-    const a = putOnBattlefield(s0, ap, bear({ name: "Bear A" }));
-    const b = putOnBattlefield(s0, ap, bear({ name: "Bear B" }));
-    let s = castIt(s0, ap, ids[0]!, [], { me: [ap] });
-    expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap, what: "chooseCreature" });
-    expect(s.pending?.kind === "chooseOption" && s.pending.options).toEqual(expect.arrayContaining([a, b]));
-    expect(s.pending?.kind === "chooseOption" && s.pending.options).not.toContain(ids[0]!);
-    s = settle(act(s, { type: "chooseOption", player: ap, choice: b }));
-    expect(pt(s, b)).toBe("5/5");
-    expect(characteristics(s, s.objects[b]!).keywords).toContain("Flying");
-    expect(pt(s, a)).toBe("2/2");
-    // Bounced: the leaves trigger sacrifices the chosen creature.
-    s = castIt(s, ap, ids[1]!, [tgt(ids[0]!)]);
-    expect(zone(s, ids[0]!)).toBe("hand");
-    expect(zone(s, b)).toBe("graveyard");
-    expect(zone(s, a)).toBe("battlefield");
-    void opp;
-  });
-
-  it("a lone other creature is chosen with no question; with none, nothing is chosen", () => {
-    const { s: s0, ap, ids } = setup([pitlord, murder]);
-    const a = putOnBattlefield(s0, ap, bear({ name: "Bear A" }));
-    let s = castIt(s0, ap, ids[0]!, [], { me: [ap] });
-    expect(s.pending).toBeFalsy();
-    expect(pt(s, a)).toBe("5/5");
-    s = castIt(s, ap, ids[1]!, [tgt(ids[0]!)]);
-    expect(zone(s, a)).toBe("graveyard");
-
-    const g = setup([pitlord]);
-    const t = castIt(g.s, g.ap, g.ids[0]!, [], { me: [g.ap] });
-    expect(zone(t, g.ids[0]!)).toBe("battlefield");
-    expect(t.objects[g.ids[0]!]!.chosen?.creature).toBeUndefined();
-  });
-
-  it("not sacrificed if another player controls it as the trigger resolves (rulings)", () => {
-    const { s: s0, ap, ids, opp } = setup([pitlord, murder]);
-    const a = putOnBattlefield(s0, ap, bear({ name: "Bear A" }));
-    let s = castIt(s0, ap, ids[0]!, [], { me: [ap] });
-    // Another player takes the chosen creature: it keeps the bonus.
-    s.objects[a]!.controller = opp;
-    invalidateCharacteristics(s);
-    expect(controllerOf(s, s.objects[a]!)).toBe(opp);
-    expect(pt(s, a)).toBe("5/5");
-    s = castIt(s, ap, ids[1]!, [tgt(ids[0]!)]);
-    expect(zone(s, ids[0]!)).toBe("graveyard");
-    expect(zone(s, a)).toBe("battlefield");
-  });
-
-  it("bots choose their strongest creature", () => {
-    const { s: s0, ap, ids } = setup([pitlord]);
-    putOnBattlefield(s0, ap, bear({ name: "Bear A" }));
-    const big = putOnBattlefield(s0, ap, bear({ name: "Big Bear", power: "4", toughness: "4" }));
-    let s = castIt(s0, ap, ids[0]!, [], { me: [ap] });
-    s = run(s, botActions(s, ap));
-    expect(s.objects[ids[0]!]!.chosen?.creature?.id).toBe(big);
   });
 });
 

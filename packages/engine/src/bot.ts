@@ -844,11 +844,6 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const n = Math.max(Math.min(max, life > 5 ? 1 : 0), Math.min(max, life - 12, 7));
       return [{ type: "chooseOption", player: pid, choice: String(n) }];
     }
-    // Tyrannical Pitlord: our strongest creature that isn't our commander (it's sacrificed when the Pitlord leaves).
-    if (pend.kind === "chooseOption" && pend.what === "chooseCreature") {
-      const best = [...pend.options].sort((a, b) => Number(obj(s, a).isCommander) - Number(obj(s, b).isCommander) || power(s, obj(s, b)) - power(s, obj(s, a)))[0]!;
-      return [{ type: "chooseOption", player: pid, choice: best }];
-    }
     // Grifter's Blade: on our strongest creature.
     if (pend.kind === "chooseOption" && pend.what === "attachHost") {
       const best = [...pend.options].sort((a, b) => power(s, obj(s, b)) - power(s, obj(s, a)))[0]!;

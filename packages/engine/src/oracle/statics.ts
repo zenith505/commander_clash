@@ -1543,7 +1543,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Thaumaton Torpedo: "you attacked with a Spacecraft this turn": an artifact type, as it was declared (CR 205.3g).
   if (/^you attacked with a Spacecraft this turn$/.test(text)) return { kind: "attackedWith", n: 1, subtype: "Spacecraft" };
   if ((m = new RegExp(`^you attacked with creatures with total power ${NUM} or greater this combat$`).exec(text))) return { kind: "attackPower", n: num(m[1]!) };
-  if ((m = new RegExp(`^you've drawn ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) };
+  // Archmage Ascension: "if you drew two or more cards this turn", the same.
+  if ((m = new RegExp(`^you(?:'ve drawn| drew) ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) };
   // "If you've drawn more than one card this turn" (Proft's Eidetic Memory): two or more.
   if ((m = new RegExp(`^you've drawn more than ${NUM} cards? this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) + 1 };
   // Even the Score: "if an opponent has drawn four or more cards this turn", the same as "drew".

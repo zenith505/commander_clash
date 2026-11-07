@@ -1721,9 +1721,11 @@ export interface DamageMod {
    * `times` multiplies by `n` (double, triple); `half` halves, rounded down (`up`: rounded up); `plus` / `minus` add or
    * take away `amount`; `allBut`: all but `n` of it; `prevent`: all of it.
    */
-  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo" | /** "Put that many -1/-1 counters on it instead" (Lichenthrope, Phytohydra, CR 614.1a): none of it is dealt; `counter`s go on the holder. */ "counters" | /** "Destroy that creature instead" (Kill-Suit Cultist): none of it is dealt; the creature it would be dealt to is destroyed (rulings). */ "destroy";
+  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo" | /** "Put that many -1/-1 counters on it instead" (Lichenthrope, Phytohydra, CR 614.1a): none of it is dealt; `counter`s go on the holder. */ "counters" | /** "Destroy that creature instead" (Kill-Suit Cultist): none of it is dealt; the creature it would be dealt to is destroyed (rulings). */ "destroy" | /** Undead Alchemist: the damaged player mills that many cards instead. */ "mill";
   /** With op "counters": the kind put on the permanent instead of the damage (Force Bubble's depletion counters go on the holder, though the damage would be dealt to you). */
   counter?: CounterKind;
+  /** With op "mill" or "counters" (Szadek, Lord of Secrets): the player the damage would have been dealt to mills that many cards instead. */
+  mill?: true;
   n?: number;
   amount?: Amount;
   up?: true;
@@ -5194,6 +5196,8 @@ export type TriggerEvent =
    * another player gained control of it; the player who lost control controls the trigger (Khârn rulings).
    */
   | "selfLostControl"
+  /** "Whenever an opponent gains control of a permanent from you" (Zidane, Tantalus Thief): once for each permanent (rulings). */
+  | "opponentGainsControlFromYou"
   /** "Whenever a creature an opponent controls is dealt excess damage" (CR 120.10): see TriggeredAbility.excess. */
   | "permanentDealtExcess"
   | "selfBecomesTapped" // "Whenever ~ becomes tapped": it changed from untapped to tapped (CR 701.26a)
@@ -7452,6 +7456,21 @@ export interface CompiledCard {
    * your hand and the rest into your graveyard." (CR 614.1a): how many it looks at; each draw of several separately (rulings).
    */
   drawDig?: number;
+  /**
+   * Archmage Ascension: "As long as ~ has six or more quest counters on it, if you would draw a card, you may instead search
+   * your library for a card, put that card into your hand, then shuffle" (CR 614.1a): while this holds, each draw.
+   */
+  drawTutor?: StaticCondition;
+  /** Frenzied Saddlebrute: "All creatures can attack your opponents and planeswalkers your opponents control as though those creatures had haste." */
+  hasteVsYourOpponents?: true;
+  /**
+   * "If you would draw a card, exile the top two cards of your library instead. You may play those cards this turn." (Eruth,
+   * Tormented Prophet, CR 614.1a): `n` cards from the top instead of each draw; `faceDown` (Asmodeus the Archfiend), nobody
+   * may look at them; `linked` to this permanent (CR 607.2a); `each`: any player's draws (Uba Mask), not only its
+   * controller's; `play`: the drawing player may play them this turn, or ("whileSource") this turn while it's still this
+   * permanent (Uba Mask's next line).
+   */
+  drawExile?: { n: number; faceDown?: true; linked?: true; each?: true; play?: "thisTurn" | "whileSource" };
   /** Tomorrow, Azami's Familiar: drawDig's other cards go on the bottom of the library in any order, not into the graveyard. */
   drawDigBottom?: true;
   /** "If you would draw a card while your library has no cards in it, you win the game instead." (Laboratory Maniac, CR 614.1a) */
@@ -8033,6 +8052,8 @@ export interface CompiledCard {
    * timing (rulings), mana of any type (CR 609.4b).
    */
   playCountered?: CounterKind;
+  /** "You may play lands and cast spells from among cards you own in exile with croak counters on them" (Grolnok, the Omnivore): any time it's allowed, paying as usual. */
+  playOwnCountered?: CounterKind;
   /**
    * "You may play lands from the top of your library" (Courser of Kruphix), "you may cast creature spells from the top
    * of your library" (Garruk's Horde): its controller may play the top card of their library (CR 401.5).

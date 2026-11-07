@@ -438,7 +438,7 @@ type ShieldOp =
   | { kind: "prevent"; to: Rec; n: number; srcName: string; toName: string; rule?: string; src?: DamageSource; card?: string }
   | { kind: "redirect"; to: Rec; shield: string; n: number; srcName: string; fromName: string; toName: string; card: string; rule?: boolean }
   /** A damage amount replacement or a prevention effect that changes the amount (see DamageMod): `from` became `n`. */
-  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** Damage to a player: who. */ player?: PlayerId; /** A "next time" one, used up now. */ once?: string; /** Lichenthrope: the counters put on `id` instead, by `by`. */ counters?: { id: ObjectId; counter: string; by: PlayerId }; /** Kill-Suit Cultist: the creature destroyed instead. */ destroy?: ObjectId }
+  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** Damage to a player: who. */ player?: PlayerId; /** A "next time" one, used up now. */ once?: string; /** Lichenthrope: the counters put on `id` instead, by `by`. */ counters?: { id: ObjectId; counter: string; by: PlayerId }; /** Kill-Suit Cultist: the creature destroyed instead. */ destroy?: ObjectId ; /** Undead Alchemist, Szadek: `player` mills `from - n` cards instead. */ mill?: true }
   /** The Mindskinner's additional effect (CR 615.5): each opponent of `by` mills `n` cards, even if the damage couldn't be prevented (615.12). */
   | { kind: "mill"; by: PlayerId; n: number; card: string; /** `by` mills it themselves (Angel of Suffering). */ self?: true; /** Gloom Surgeon: `by` exiles that many from the top of their library instead (not a mill, CR 701.17a). */ exile?: true }
   /** Khârn the Betrayer's additional effect (CR 615.5): `to` gains control of it, after any prevention. */
@@ -748,7 +748,9 @@ function modLabel(s: GameState, m: LiveMod): string {
     : d.op === "minus" ? (d.prevent ? `Prevent ${modExtra(s, m)} of it` : `Take ${modExtra(s, m)} away`)
     : d.op === "allBut" ? `Prevent all but ${d.n} of it`
     : d.op === "raiseTo" || d.op === "setTo" ? `Make it ${modExtra(s, m)}`
+    : d.op === "counters" && d.mill ? `Put that many ${d.counter} counters on ${m.card} and mill that many cards instead`
     : d.op === "counters" ? `Put that many ${d.counter} counters on ${d.to?.self ? "it" : m.card} instead`
+    : d.op === "mill" ? "Mill that many cards instead"
     : d.op === "destroy" ? "Destroy it instead"
     : "Prevent it";
   return `${what} (${m.card})`;
@@ -901,6 +903,22 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
           }
         }
       }
+      // Undead Alchemist, Szadek: damage to a player replaced by a mill isn't prevented (CR 614.1a). When a "prevent all
+      // damage" effect or protection would apply to it too, the player being dealt it chooses which applies first (CR
+      // 616.1, rulings on Szadek); choosing the mill takes the damage on to the amount replacements and prevention shields
+      // below (where it's ordered with those). A bot prevents it.
+      const millSwap = "player" in to && prev(e) ? allMods.find((m) => m.mod.mill && modApplies(s, m, e, true)) : undefined;
+      if (millSwap && "player" in to) {
+        const prevents = allRules.some((r) => preventsAll(r) && !(e.applied ?? []).includes(r.id) && ruleCovers(s, r, to) && ruleTakes(s, r, e)) || preventedAll(s, e) || playerProtectedFrom(s, to.player, e.src.controller, e.src);
+        if (prevents) {
+          const i = choose({ player: to.player, prompt: `Damage from ${e.src.name} to ${toName}: which applies first?`, labels: ["Prevent the damage", modLabel(s, millSwap)] });
+          if (i === null) return { ask, ops, final, used: next };
+          if (i === 1) {
+            incoming.push(e);
+            continue;
+          }
+        }
+      }
       // The Mindskinner's prevention can't prevent damage that can't be prevented, but its additional effect still
       // happens, once for each such effect (CR 615.12, 615.12a); the damage is dealt.
       if (!prev(e)) for (const r of allRules.filter((r) => r.mill && ruleCovers(s, r, to) && ruleTakes(s, r, e))) ops.push({ kind: "mill", by: r.controller, n: e.n * (r.millSelf ?? 1), card: cardName(s, r), ...(r.millSelf ? { self: true as const } : {}), ...(r.exileTop ? { exile: true as const } : {}) });
@@ -1011,7 +1029,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         const before = at[i]!;
         at[i] = modAmount(s, m, before);
         seen[i]!.add(m.key);
-        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}), ...toPlayer(to), ...(m.mod.op === "counters" && m.holder ? { counters: { id: m.holder.id, counter: m.mod.counter!, by: m.mod.you } } : {}), ...(m.mod.op === "destroy" && "object" in to ? { destroy: to.object } : {}) });
+        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}), ...toPlayer(to), ...(m.mod.op === "counters" && m.holder ? { counters: { id: m.holder.id, counter: m.mod.counter!, by: m.mod.you } } : {}), ...(m.mod.op === "destroy" && "object" in to ? { destroy: to.object } : {}), ...(m.mod.mill && "player" in to ? { mill: true as const } : {}) });
       }
     };
     // How much of the damage a shield takes from each source's: `pick` chooses one at a time, among the options in the
@@ -1121,8 +1139,10 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
           if ("mod" in o) {
             const before = at.reduce((a, n) => a + n, 0);
             applyMod(o.mod, at, seen);
+            // Undead Alchemist's and Szadek's milling (and Szadek's counters) instead count as much as the damage would.
+            if (o.mod.mod.mill) swapped += before - at.reduce((a, n) => a + n, 0);
             // Force Bubble's depletion counters bring its sacrifice nearer: better than the damage, worse than preventing it.
-            if (o.mod.mod.op === "counters") swapped += (before - at.reduce((a, n) => a + n, 0)) * (o.mod.mod.counter === "-1/-1" ? 1.5 : o.mod.mod.counter === "+1/+1" ? -0.5 : 0.5);
+            else if (o.mod.mod.op === "counters") swapped += (before - at.reduce((a, n) => a + n, 0)) * (o.mod.mod.counter === "-1/-1" ? 1.5 : o.mod.mod.counter === "+1/+1" ? -0.5 : 0.5);
             // Kill-Suit Cultist: the creature destroyed is worse for its controller than any damage to it.
             if (o.mod.mod.op === "destroy" && before > at.reduce((a, n) => a + n, 0) && "object" in to) swapped += controllerOf(s, obj(s, to.object)) === who ? 100 : -100;
           } else taken.push(allocate(o.shield, at, () => 0)!);
@@ -1342,9 +1362,16 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
         log(s, `${op.card}: ${op.from} damage from ${op.srcName} to ${op.toName} isn't dealt; it's destroyed instead.`);
       } else if (op.counters) {
         swapLater.push({ ...op.counters, n: op.from - op.n });
-        log(s, `${op.card}: ${op.from} damage from ${op.srcName} is replaced by ${op.from - op.n} ${op.counters.counter} counter${op.from - op.n === 1 ? "" : "s"}.`);
-      } else if (op.prevent) log(s, `${op.from - op.n} damage from ${op.srcName} to ${op.toName} is prevented (${op.card}).`);
+        log(s, `${op.card}: ${op.from} damage from ${op.srcName}${op.mill ? ` to ${op.toName}` : ""} is replaced by ${op.from - op.n} ${op.counters.counter} counter${op.from - op.n === 1 ? "" : "s"}${op.mill ? " and a mill" : ""}.`);
+      } else if (op.mill) log(s, `${op.card}: ${op.from} damage from ${op.srcName} to ${op.toName} is replaced by a mill.`);
+      else if (op.prevent) log(s, `${op.from - op.n} damage from ${op.srcName} to ${op.toName} is prevented (${op.card}).`);
       else log(s, `${op.card}: ${op.srcName} deals ${op.n} damage to ${op.toName} instead of ${op.from}.`);
+      if (op.mill && op.player !== undefined && !player(s, op.player).lost && op.from - op.n > 0) {
+        const p = player(s, op.player);
+        const n = millCount(s, op.player, op.from - op.n);
+        for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard", { milled: true });
+        log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"} (${op.card}).`);
+      }
     } else if (op.kind === "mill") {
       for (const pid of op.self ? (player(s, op.by).lost ? [] : [op.by]) : turnOrderFrom(s, s.activePlayer).filter((q) => q !== op.by && !player(s, q).lost)) {
         const p = player(s, pid);

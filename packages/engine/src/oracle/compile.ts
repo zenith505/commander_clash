@@ -2731,6 +2731,12 @@ export function compile(d: CardDef): CompiledCard {
       else out.playCountered = stash[1]!;
       continue;
     }
+    const croak = /^You may play lands and cast spells from among cards you own in exile with ([a-z]+) counters on them\.$/.exec(line);
+    if (croak) {
+      if (out.playOwnCountered) out.unsupported.push(raw);
+      else out.playOwnCountered = croak[1]!;
+      continue;
+    }
     // Evendo Brushrazer: "During your turn, as long as you've sacrificed a nontoken permanent this turn, you may play cards
     // exiled with ~."
     // Theater of Horrors: "During your turn, if an opponent lost life this turn, you may play lands and cast spells from
@@ -3242,6 +3248,45 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead.") {
       out.drawTwoInstead = true;
+      continue;
+    }
+    // Archmage Ascension: "As long as ~ has six or more quest counters on it, if you would draw a card, you may instead
+    // search your library for a card, put that card into your hand, then shuffle." An optional replacement of each draw,
+    // one at a time (rulings, CR 614.1a), while the condition holds. See drawReplacementChoices in game.ts.
+    const tutor = /^As long as (~ has [a-z]+ or more [a-z]+ counters on it), if you would draw a card, you may instead search your library for a card, put that card into your hand, then shuffle\.$/.exec(line);
+    if (tutor) {
+      const cond = parseStaticCondition(tutor[1]!, { affects: { kind: "self" }, mods: [], text: line });
+      if (!cond || out.drawTutor) out.unsupported.push(raw);
+      else out.drawTutor = cond;
+      continue;
+    }
+    // Frenzied Saddlebrute: "All creatures can attack your opponents and planeswalkers your opponents control as though
+    // those creatures had haste" (CR 302.6). See attackProblem in game.ts.
+    if (line === "All creatures can attack your opponents and planeswalkers your opponents control as though those creatures had haste.") {
+      out.hasteVsYourOpponents = true;
+      continue;
+    }
+    // Eruth, Tormented Prophet: "If you would draw a card, exile the top two cards of your library instead. You may play
+    // those cards this turn." Asmodeus the Archfiend: "If you would draw a card, exile the top card of your library face
+    // down instead" (linked to its last ability, CR 607.2a). Uba Mask: "If a player would draw a card, that player exiles
+    // that card face up instead" (the top card of their library), with its next line's permission. Each draw separately;
+    // an empty library exiles nothing and loses nothing (rulings, CR 614.1a, 614.6). See drawExiles in game.ts.
+    if (line === "If you would draw a card, exile the top two cards of your library instead. You may play those cards this turn." && !out.drawExile) {
+      out.drawExile = { n: 2, play: "thisTurn" };
+      continue;
+    }
+    if (line === "If you would draw a card, exile the top card of your library face down instead." && !out.drawExile) {
+      out.drawExile = { n: 1, faceDown: true, linked: true };
+      continue;
+    }
+    if (line === "If a player would draw a card, that player exiles that card face up instead." && !out.drawExile) {
+      out.drawExile = { n: 1, each: true, linked: true };
+      continue;
+    }
+    // Uba Mask: "Each player may play lands and cast spells from among cards they exiled with ~ this turn": each card its
+    // replacement exiled, by the player who exiled it, during that turn and while it's that Mask (rulings).
+    if (line === "Each player may play lands and cast spells from among cards they exiled with ~ this turn." && out.drawExile?.each && !out.drawExile.play) {
+      out.drawExile = { ...out.drawExile, play: "whileSource" };
       continue;
     }
     if (line === "If you would draw a card, draw two cards instead.") {

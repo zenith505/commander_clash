@@ -1961,8 +1961,10 @@ export function parseAffected(subject: string): Affects | null {
     return { kind: "filter", types: [], spec: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Equipment"], anyOf, text: `Equipment named ${names.join(", ")}` } };
   }
   // "Creatures named Lightning Rager can't attack you ..." (Rite of the Raging Storm): any player's, by their name.
-  const named = /^Creatures named ([A-Z][A-Za-z' -]+)$/.exec(x);
-  if (named) return { kind: "filter", types: ["Creature"], spec: { kind: "object", named: named[1]!, text: `creature named ${named[1]}` } };
+  // Brothers Yamazaki: "Each other creature named ~ gets +2/+2 and has haste" (read as "Other creatures named ..."): anyone's,
+  // not the source itself.
+  const named = /^(Other c|C)reatures named ([A-Z][A-Za-z' -]+)$/.exec(x);
+  if (named) return { kind: "filter", types: ["Creature"], ...(named[1] === "Other c" ? { other: true } : {}), spec: { kind: "object", named: named[2]!, text: `${named[1] === "Other c" ? "other " : ""}creature named ${named[2]}` } };
   // "Commander creatures you control get +2/+2", "Commanders you control have ward {2}" (CR 903.3): any player's.
   if (/^Commanders? (?:creatures )?you control$/.test(x))
     return { kind: "filter", types: x.includes("creatures") ? ["Creature"] : [], controller: "you", spec: { kind: "object", commander: true, text: "commander" } };

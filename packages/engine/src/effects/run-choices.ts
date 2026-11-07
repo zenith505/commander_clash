@@ -219,8 +219,14 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       sc.may = undefined;
       if (again === false) return;
       if (again === true) log(s, `${player(s, ctx.controller).name} repeats the process.`);
+      // Kindle the Carnage: each pass discards anew, "that card" being only this pass's (the random pick is redone).
+      if (e.needsHand) {
+        sc.randomPicks = undefined;
+        s.resolving!.discarded = undefined;
+        s.resolving!.discardedAll = undefined;
+      }
       for (const inner of e.effects) if (runEffect(s, inner, ctx) === "paused") return "paused";
-      if (!player(s, ctx.controller).library.length) return;
+      if (!(e.needsHand ? player(s, ctx.controller).hand : player(s, ctx.controller).library).length) return;
       s.pending = { kind: "chooseMay", player: ctx.controller, prompt: `repeat: ${e.text}`, source: src, repeat: true };
       return "paused";
     }
@@ -307,6 +313,26 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     case "either": {
       // The controller picks one as it resolves (CR 608.2d), and only that one happens.
       const sc = (s.resolving!.scratch ??= {});
+      // Invoke the Ancients: one choice for each permanent created, "it" being that one; one that's gone is skipped.
+      if (e.eachCreated) {
+        const r = s.resolving!;
+        const st = (sc.eitherEach ??= { ids: [...(r.created ?? [])], done: 0 });
+        for (; st.done < st.ids.length; st.done++) {
+          const id = st.ids[st.done]!;
+          if (s.objects[id]?.zone !== "battlefield") continue;
+          if (sc.either === undefined) {
+            const n = st.ids.length > 1 ? ` (${st.done + 1} of ${st.ids.length})` : "";
+            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: e.labels.map((_, i) => String(i)), labels: e.labels.map((l) => l.replace(/~/g, src)), prompt: `choose one for ${defOf(s, obj(s, id)).name}${n}`, about: id };
+            return "paused";
+          }
+          r.created = [id];
+          for (const inner of e.options[sc.either] ?? []) runEffect(s, inner, ctx);
+          sc.either = undefined;
+        }
+        r.created = st.ids;
+        sc.eitherEach = undefined;
+        return;
+      }
       if (sc.either === undefined) {
         // "Return an enchantment card ... or unlock a locked door": an option that can't be done can't be chosen (CR 608.2d).
         const can = e.labels.map((_, i) => i).filter((i) => !e.onlyDoable || canDoNow(s, e.options[i]!, ctx));

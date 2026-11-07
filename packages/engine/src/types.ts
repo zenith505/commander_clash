@@ -2654,6 +2654,8 @@ export interface Resolving {
     toTop?: Record<string, ObjectId[]>;
     /** The cards each player discards at random, picked before they're asked about Library of Leng. */
     randomPicks?: Record<string, ObjectId[]>;
+    /** Effect "either" with eachCreated (Invoke the Ancients): the permanents created, and how many are done. */
+    eitherEach?: { ids: ObjectId[]; done: number };
     venture?: string; // the dungeon or room chosen while venturing (CR 701.49a-b)
     arranged?: { top: ObjectId[]; away: ObjectId[] };
     /** Teferi's Puzzle Box: how many cards the hand put on the bottom (then drawn). */

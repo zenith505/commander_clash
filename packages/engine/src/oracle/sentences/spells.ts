@@ -332,6 +332,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref !== "you" ? [{ type: "discard", who, n: num(m[2]!), exile: true }] : null;
   }
+  // Intellect Devourer: "each opponent exiles a card from their hand until ~ leaves the battlefield": each chooses their own
+  // card (CR 701.9b, as above), returned to its owner's hand when ~ leaves (CR 610.3); a permanent's ability only.
+  if ((m = /^([Ee]ach opponent) exiles a card from their hand until ~ leaves the battlefield$/.exec(s)) && !ctx.spell) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "discard", who, n: 1, exile: true, until: "sourceLeaves" }] : null;
+  }
   // Ego Drain: "Exile a card from your hand": one of your choice, the same way.
   if ((m = /^Exile (a|two|three) cards? from your hand$/.exec(s))) return [{ type: "discard", who: { ref: "you" }, n: num(m[1]!), exile: true }];
   if ((m = new RegExp(`^(.+?) discards? ${NUMX} cards?( at random)?$`, "i").exec(s))) {

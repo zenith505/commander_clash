@@ -311,6 +311,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "chooseMay" && pend.thumb) return [{ type: "chooseMay", player: pid, yes: true }];
     // Fiery Gambit: flip again until more wins do nothing more (each flip risks the whole spell).
+    // Game of Chaos: having just won, flip again only to win back what the game has cost us, or for a chance to finish the
+    // opponent, and only while losing the next stake wouldn't kill us.
+    if (pend.kind === "chooseMay" && pend.chaosAgain) {
+      const { stake, net, against } = pend.chaosAgain;
+      const safe = player(s, pid).life > stake;
+      return [{ type: "chooseMay", player: pid, yes: safe && (net < 0 || player(s, against).life <= stake) }];
+    }
     if (pend.kind === "chooseMay" && pend.flipAgain) return [{ type: "chooseMay", player: pid, yes: pend.flipAgain.wins < pend.flipAgain.enough }];
     // Rona, Tolarian Obliterator: a land exiled from a hand at random, ours to put onto the battlefield.
     if (pend.kind === "chooseMay" && pend.card && s.resolving?.body.effects[s.resolving.next]?.type === "exileRandomThenPlay") return [{ type: "chooseMay", player: pid, yes: true }];
@@ -938,6 +945,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "protector") {
       const guard = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Creature")).reduce((n, id) => n + Math.max(0, toughness(s, obj(s, id))), 0);
       const pick = [...pend.options].sort((a, b) => guard(Number(a)) - guard(Number(b)))[0]!;
+      return [{ type: "chooseOption", player: pid, choice: pick }];
+    }
+    // Dauntless Bodyguard, Tyrannical Pitlord: our most valuable other creature, the one most worth protecting or pumping.
+    if (pend.kind === "chooseOption" && pend.what === "chosenObject") {
+      const pick = [...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) + mv(s, b) - (worth(s, pid, obj(s, a)) + mv(s, a)))[0]!;
       return [{ type: "chooseOption", player: pid, choice: pick }];
     }
     if (pend.kind === "chooseOption" && pend.what === "tributePay") return [{ type: "chooseOption", player: pid, choice: payTribute(s, pend.objectId!) ? "pay" : "no" }];
@@ -4435,6 +4447,17 @@ function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, 
   if (s.resolving && /^Discard any number of cards at random\./.test(card?.oracleText ?? "")) {
     const attackers = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && obj(s, id).attacking !== undefined);
     return String(attackers && r.max <= 3 ? r.max : r.min);
+  }
+  // Squee's Revenge: "flip a coin that many times or until you lose a flip": two cards for each flip, only if all are won,
+  // so the number with the most cards expected (2n x p^n, p a half, three quarters with Krark's Thumb), the smaller on a
+  // tie, and not more than the library can give.
+  const untilLoss = s.resolving ? allEffects(s.resolving.body.effects).find((e) => e.type === "flipCoin" && !!e.nAmount && !!e.untilLose) : undefined;
+  if (untilLoss) {
+    const p = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).flipTwo) ? 0.75 : 0.5;
+    const most = Math.min(r.max, Math.max(r.min, Math.floor((player(s, pid).library.length - 1) / 2)));
+    let best = Math.max(r.min, Math.min(1, most));
+    for (let n = best; n <= most; n++) if (2 * n * p ** n > 2 * best * p ** best + 1e-9) best = n;
+    return String(best);
   }
   // Yusri, Fortune's Flame: "choose a number between 1 and 5. Flip that many coins": each coin is a card won or 2 damage
   // lost, and only five won lets us cast from hand for free; all five while that much damage is safe, fewer as life runs

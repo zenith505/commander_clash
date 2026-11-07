@@ -1112,7 +1112,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "spellsCastThisTurn": {
       // "Other": the resolving spell's own cast is its castNth'th; a copy wasn't cast (CR 707.10).
       const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : c.notSource && ctx.sourceId ? s.objects[ctx.sourceId]?.castNth : undefined;
-      const cast = (s.castThisTurn ?? []).filter((x, i) => i !== self && (c.anyone || (c.opponents ? opponents(s, ctx.controller).includes(x.player) : x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller))) && !(c.notFromHand && x.from === "hand") && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!))));
+      // Sentinel Tower: before the spell whose cast triggered this ability.
+      const before = c.beforeCause ? (ctx.cause ? s.castItems?.[ctx.cause]?.castNth : undefined) ?? 0 : Infinity;
+      const cast = (s.castThisTurn ?? []).filter((x, i) => i !== self && i < before && (c.anyone || (c.opponents ? opponents(s, ctx.controller).includes(x.player) : x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller))) && !(c.notFromHand && x.from === "hand") && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!))));
       if (c.cardTypes) return new Set(cast.flatMap((x) => x.types ?? s.cards[x.card]?.types ?? [])).size;
       const n = cast.length;
       return c.beyondFirst ? Math.max(0, n - 1) : n;

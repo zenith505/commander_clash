@@ -1436,6 +1436,30 @@ function wandPunisher(who: PlayerRef, landLife: number): Effect {
 }
 
 function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell: boolean): { effects: Effect[]; skip: number } | null {
+  // Lightstall Inquisitor: "each opponent exiles a card from their hand and may play that card for as long as it remains
+  // exiled. Each spell cast this way costs {1} more to cast. Each land played this way enters tapped.": each chooses their
+  // own card (CR 701.9b); its owner may play it with its usual timing (rulings), paying {1} more for a spell (CR 601.2f),
+  // and a land they play this way enters tapped (CR 614.1c).
+  const lightstall = /^[Ee]ach opponent exiles a card from their hand and may play that card for as long as it remains exiled$/.test(s) ? /^Each spell cast this way costs \{(\d+)\} more to cast$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+  if (lightstall && sentences[si + 2]?.replace(/\.$/, "") === "Each land played this way enters tapped") {
+    return { effects: [{ type: "discard", who: { ref: "eachOpponent" }, n: 1, exile: true, ownerMay: { more: Number(lightstall[1]), landTapped: true } }], skip: 2 };
+  }
+  // Game of Chaos (Effect "gameOfChaos"): the whole spell, its one target the opponent.
+  if (s === "Flip a coin" && sentences.slice(si + 1).map((x) => x.replace(/\.$/, "")).join("|") === "If you win the flip, you gain 1 life and target opponent loses 1 life, and you decide whether to flip again|If you lose the flip, you lose 1 life and that opponent gains 1 life, and that player decides whether to flip again|Double the life stakes with each flip" && spell && !ctx.targets.length) {
+    const index = addTarget(ctx, { kind: "player", opponent: true, text: "target opponent" });
+    return { effects: [{ type: "gameOfChaos", with: { ref: "target", index } }], skip: sentences.length - si - 1 };
+  }
+  // Squee's Revenge: "Choose a number. Flip a coin that many times or until you lose a flip, whichever comes first. If you
+  // win all the flips, draw two cards for each flip.": the number chosen as it resolves (CR 608.2d), any whole number;
+  // it's offered up to 100, past which winning every flip can't happen in practice (as CR 732 shortcuts loops). The run
+  // stops at the first lost flip, and only an unbroken run draws: two cards for each flip.
+  if (s === "Choose a number" && sentences[si + 1]?.replace(/\.$/, "") === "Flip a coin that many times or until you lose a flip, whichever comes first" && sentences[si + 2]?.replace(/\.$/, "") === "If you win all the flips, draw two cards for each flip" && spell) {
+    return { effects: [
+      { type: "choose", choice: "number", range: { min: 0, max: 100 }, prompt: "choose a number of coin flips: if you win them all, draw two cards for each flip (0 to 100)" },
+      { type: "flipCoin", nAmount: { count: { kind: "chosenNumber" } }, untilLose: true },
+      { type: "if", cond: { kind: "wonFlip" }, effects: [{ type: "draw", who: { ref: "you" }, n: { count: { kind: "flipsWon" }, times: 2 } }] },
+    ], skip: 2 };
+  }
   // Tainted Specter: "Target player discards a card unless they put a card from their hand on top of their library. If that
   // player discards a card this way, ~ deals 1 damage to each creature and each player.": their choice of the two (an empty
   // hand does neither, CR 701.9b), the damage only if a card was discarded (rulings).

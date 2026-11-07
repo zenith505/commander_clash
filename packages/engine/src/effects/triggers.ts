@@ -145,7 +145,7 @@ export type TriggerSourceEvent =
   /** An Aura or Equipment became attached to `host`: entering attached, or attached by an effect (CR 701.3a). */
   | { type: "attached"; id: ObjectId; host: ObjectId }
   /** Another player gained control of it; `from` lost control (CR 603.2, "When you lose control of ~"). */
-  | { type: "controlChanged"; id: ObjectId; from: PlayerId }
+  | { type: "controlChanged"; id: ObjectId; from: PlayerId; /** The controllers before of all the permanents whose control changed at the same time. */ before?: Record<ObjectId, PlayerId> }
   | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; /** It was destroyed, by anything (CR 701.8a, 704.5g-h). */ destroyed?: true; /** Sacrificed for this creature's exploit (CR 702.110a). */ exploitedBy?: { id: ObjectId; zc: number }; /** Exiled as a craft material (CR 702.167a). */ crafted?: true; /** Sacrificed while its controller cast a spell with emerge (Foul Emissary). */ emerged?: true; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
@@ -797,6 +797,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "controlChanged") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") add(o, ev.from, (e) => e === "selfLostControl");
+    // Zidane, Tantalus Thief: "Whenever an opponent gains control of a permanent from you": the permanents of the player who
+    // lost it, as they were controlled before this change (rulings: Zidane itself too, when it changes at the same time).
+    if (o?.zone === "battlefield" && opponents(s, ev.from).includes(controllerOf(s, o)))
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        if ((ev.before?.[id] ?? controllerOf(s, w)) === ev.from) add(w, ev.from, (e) => e === "opponentGainsControlFromYou");
+      }
   } else if (ev.type === "attached") {
     // "Whenever an Aura becomes attached to ~" (Brood Keeper): the host's controller's trigger, about the Aura.
     const o = s.objects[ev.id];

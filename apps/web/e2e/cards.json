@@ -1313,6 +1313,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5966c464-5f63-4c71-9317-e2ca79da5aba",
+  "name": "Archmage Ascension",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of each end step, if you drew two or more cards this turn, you may put a quest counter on this enchantment.\nAs long as this enchantment has six or more quest counters on it, if you would draw a card, you may instead search your library for a card, put that card into your hand, then shuffle.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "zen",
+  "releasedAt": "2009-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7c521612-21c6-4c4b-b10e-66e70928609b",
   "name": "Ardenn, Intrepid Archaeologist",
   "manaCost": "{2}{W}",
@@ -7988,6 +8014,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a0380b63-58ef-4545-beec-6ad307bbc21b",
+  "name": "Eruth, Tormented Prophet",
+  "manaCost": "{1}{U}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "If you would draw a card, exile the top two cards of your library instead. You may play those cards this turn.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5def9f38-0a0b-4e8d-9f9d-29dcb46520b4",
   "name": "Esper Sentinel",
   "manaCost": "{W}",
@@ -10124,6 +10185,30 @@
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "73e7a2ad-d11c-4867-b97d-f971809da778",
+  "name": "Glacial Chasm",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "Cumulative upkeep—Pay 2 life. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nWhen this land enters, sacrifice a land.\nCreatures you control can't attack.\nPrevent all damage that would be dealt to you.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Cumulative upkeep"
+  ],
+  "commanderLegal": "legal",
+  "set": "v12",
+  "releasedAt": "2012-08-31",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": true
  },
  {
   "oracleId": "e65a8ab8-84a7-4fe2-b009-ceb87bec6b4e",
@@ -18038,6 +18123,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f8dab16e-1d50-443e-9431-8b6f1cf61c9c",
+  "name": "Notion Thief",
+  "manaCost": "{2}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Human Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Rogue"
+  ],
+  "oracleText": "Flash\nIf an opponent would draw a card except the first one they draw in each of their draw steps, instead that player skips that draw and you draw a card.",
+  "power": "3",
+  "toughness": "1",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-04-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": true
+ },
+ {
   "oracleId": "acc74d59-f587-46a2-a90b-865f721d494d",
   "name": "Nulltread Gargantuan",
   "manaCost": "{1}{G}{U}",
@@ -25571,6 +25691,43 @@
   "commanderLegal": "legal",
   "set": "bbd",
   "releasedAt": "2018-06-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c40c823c-5954-457a-81a6-02683da57f7f",
+  "name": "Szadek, Lord of Secrets",
+  "manaCost": "{3}{U}{U}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Legendary Creature — Vampire",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vampire"
+  ],
+  "oracleText": "Flying\nIf Szadek would deal combat damage to a player, instead put that many +1/+1 counters on Szadek and that player mills that many cards.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "rav",
+  "releasedAt": "2005-10-07",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

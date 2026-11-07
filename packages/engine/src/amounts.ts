@@ -314,8 +314,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.differentManaValues) return new Set(refPlayers(s, c.who, ctx).flatMap((pid) => s.players[pid]!.hand.map((id) => defMv(defOf(s, s.objects[id]!))))).size;
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (f ? s.players[pid]!.hand.filter((id) => printedMatches(f, defOf(s, s.objects[id]!))).length : s.players[pid]!.hand.length), 0);
     }
-    case "cardsInLibrary":
-      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.library.length, 0);
+    case "cardsInLibrary": {
+      // Mindblaze: "cards with the chosen name" in that library, the name chosen as it resolves.
+      const f = c.filter && bindChosen(c.filter, ctx.chosen);
+      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (f ? s.players[pid]!.library.filter((id) => printedMatches(f, defOf(s, s.objects[id]!))).length : s.players[pid]!.library.length), 0);
+    }
     case "handMoreThanYou": {
       const theirs = refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.hand.length, 0);
       const yours = s.players[ctx.controller]!.hand.length;

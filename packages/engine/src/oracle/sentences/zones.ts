@@ -1714,6 +1714,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (/^Exile all cards from your hand face down$/i.test(s)) return [{ type: "exileFaceDown", from: "hand" }];
     if (/^Exile a card from your hand face down$/i.test(s)) return [{ type: "exileFaceDown", from: "handCard" }];
     if (/^Put all cards exiled with ~ into their owners?'s? graveyards?$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard" }];
+    // Knowledge Vault: "When ~ leaves the battlefield, put all cards exiled with it into their owner's graveyard".
+    if (/^Put all cards exiled with it into their owners?'s? graveyards?$/i.test(s) && ctx.selfCard) return [{ type: "moveLinked", dest: "graveyard" }];
     // Underworld Sentinel: "When ~ dies, put all cards exiled with it onto the battlefield": under the control of the
     // ability's controller, who puts them there (its rulings).
     if (/^Put all cards exiled with (?:it|~) onto the battlefield$/i.test(s) && ctx.selfCard) return [{ type: "moveLinked", dest: "battlefield" }];

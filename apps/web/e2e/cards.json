@@ -16007,6 +16007,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "31f3a9f3-881e-4dc9-b71d-5d1fc86477bf",
+  "name": "Mindblaze",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose a nonland card name and a number greater than 0. Target player reveals their library. If that library contains exactly the chosen number of cards with the chosen name, Mindblaze deals 8 damage to that player. Then that player shuffles.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b259f4e4-04a9-40e0-85e9-34b4b74ee388",
   "name": "Minds Aglow",
   "manaCost": "{U}",
@@ -17560,6 +17586,68 @@
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "82922f3a-a444-49cf-b136-f30a3c85f791",
+  "name": "Odds // Ends",
+  "manaCost": "{U}{R} // {3}{R}{W}",
+  "cmc": 7,
+  "typeLine": "Instant // Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Flip a coin. If it comes up heads, counter target instant or sorcery spell. If it comes up tails, copy that spell and you may choose new targets for the copy.",
+  "colors": [
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dis",
+  "releasedAt": "2006-05-05",
+  "rarity": "rare",
+  "layout": "split",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Odds",
+    "manaCost": "{U}{R}",
+    "typeLine": "Instant",
+    "supertypes": [],
+    "types": [
+     "Instant"
+    ],
+    "subtypes": [],
+    "oracleText": "Flip a coin. If it comes up heads, counter target instant or sorcery spell. If it comes up tails, copy that spell and you may choose new targets for the copy.",
+    "colors": [
+     "U",
+     "R"
+    ]
+   },
+   {
+    "name": "Ends",
+    "manaCost": "{3}{R}{W}",
+    "typeLine": "Instant",
+    "supertypes": [],
+    "types": [
+     "Instant"
+    ],
+    "subtypes": [],
+    "oracleText": "Target player sacrifices two attacking creatures of their choice.",
+    "colors": [
+     "W",
+     "R"
+    ]
+   }
+  ]
  },
  {
   "oracleId": "ade898df-14a5-460b-94f6-1f3f74d3ff95",
@@ -21001,6 +21089,32 @@
   "set": "mmq",
   "releasedAt": "1999-10-04",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d0dd0586-d89e-40e9-863d-9c390bee117a",
+  "name": "Rite of Ruin",
+  "manaCost": "{5}{R}{R}",
+  "cmc": 7,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose an order for artifacts, creatures, and lands. Each player sacrifices one permanent of their choice of the first type, sacrifices two of their choice of the second type, then sacrifices three of their choice of the third type.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "avr",
+  "releasedAt": "2012-05-04",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

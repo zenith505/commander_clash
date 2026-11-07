@@ -298,6 +298,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Sepulchral Primordial: each opponent's creature card comes back under our control.
     if (pend.kind === "chooseMay" && pend.eachTarget) return [{ type: "chooseMay", player: pid, yes: true }];
     // Krark's Thumb: keep the won flip.
+    // Odds with Krark's Thumb: heads counters the target, tails copies it: heads against an opponent's spell, tails for ours.
+    if (pend.kind === "chooseMay" && pend.thumb && s.resolving?.scratch?.thumbUncalled) {
+      const t = s.resolving.item.targets?.[0];
+      const spell = t?.kind === "stack" ? s.stack.find((x) => x.id === t.id) : undefined;
+      return [{ type: "chooseMay", player: pid, yes: !spell || spell.controller !== pid }];
+    }
     if (pend.kind === "chooseMay" && pend.thumb) return [{ type: "chooseMay", player: pid, yes: true }];
     // Fiery Gambit: flip again until more wins do nothing more (each flip risks the whole spell).
     if (pend.kind === "chooseMay" && pend.flipAgain) return [{ type: "chooseMay", player: pid, yes: pend.flipAgain.wins < pend.flipAgain.enough }];
@@ -4356,6 +4362,8 @@ function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, 
   }
   // Scrying Glass: "exactly the chosen number of cards of the chosen color" in a hand we can't see: one is the likeliest.
   if (s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "choose" && !!e.maxHandOf)) return String(r.min);
+  // Mindblaze: a Commander deck has one of each nonland card, so one is the number.
+  if (s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "choose" && !!e.maxLibraryOf)) return String(r.min);
   // A resolving spell's own "choose a number" (Expel the Interlopers).
   const forSpell = s.resolving && card ? groupNumber(s, pid, card) : undefined;
   if (forSpell !== undefined) return String(forSpell);
@@ -4430,6 +4438,13 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
         .filter((p) => p !== pid && !player(s, p).lost && nearestOpponent(s, p, side) === pid)
         .reduce((n, p) => n + s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === p && objIsType(s, o, "Creature")).reduce((m, o) => m + Math.max(0, power(s, o)), 0), 0);
     return threat("right") < threat("left") ? "right" : "left";
+  }
+  // Rite of Ruin: the order costing opponents the most and us the least, each player losing the cheapest of what they have of
+  // each type, one, two, then three of them (a permanent of two of the types counted for both: a rough guess).
+  if (what === "typeOrder") {
+    const loss = (p: PlayerId, ty: string, n: number) => s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === p && characteristics(s, o).types.includes(ty)).map((o) => Math.max(1, worth(s, pid, o))).sort((a, b) => a - b).slice(0, n).reduce((a, b) => a + b, 0);
+    const score = (order: string) => order.split(",").reduce((v, ty, i) => v + s.turnOrder.filter((p) => !player(s, p).lost).reduce((m, p) => m + (p === pid ? -1.5 : 1) * loss(p, ty, i + 1), 0), 0);
+    return [...options].sort((a, b) => score(b) - score(a))[0]!;
   }
   // Abundant Harvest: a land while short of lands (fewer than five on the battlefield and in hand), else a spell.
   if (what === "landOrNonland") {
@@ -4596,6 +4611,14 @@ function chooseCardName(s: GameState, pid: PlayerId, pend: Extract<PendingDecisi
     return most(tally(seen)) ?? pend.options[0]!;
   }
   if (pend.purpose === "guessHand") return most(tally(me.hand)) ?? pend.options[0]!;
+  // Mindblaze: a card in that library. Ours we know; another player's, a card of theirs not yet seen anywhere (one they
+  // have shown is out of their library in a singleton deck) is all there is to go on.
+  if (pend.purpose === "inLibrary") {
+    const who = pend.of ?? pid;
+    if (who === pid) return best(me.library, value) ?? pend.options[0]!;
+    const seen = new Set([...s.battlefield.filter((id) => obj(s, id).owner === who), ...player(s, who).graveyard, ...player(s, who).command, ...player(s, who).exile.filter((id) => !obj(s, id).faceDown)].map((id) => nameOf(obj(s, id))));
+    return pend.options.find((n) => !seen.has(n) && !mine.has(n)) ?? pend.options[0]!;
+  }
   if (pend.purpose === "find") return best(me.library, value) ?? pend.options[0]!;
   // The Clone Saga: our biggest creature that can attack this turn, else the biggest one.
   if (pend.purpose === "ownCreature") {

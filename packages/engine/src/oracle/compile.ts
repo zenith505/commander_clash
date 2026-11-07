@@ -3843,6 +3843,17 @@ export function compile(d: CardDef): CompiledCard {
       else (out.spellsHaveConspire ??= []).push({ filter: { ...f, text: `${giveConspire[1]} spell` }, ...(giveConspire[2] ? { fromExile: true as const } : {}), text: line });
       continue;
     }
+    // Silverquill, the Disputant: "Each instant and sorcery spell you cast has casualty 1"; Anhelo, the Painter: "The first
+    // instant or sorcery spell you cast each turn has casualty 2"; Ashad, the Lone Cyberman: "The first nonlegendary
+    // artifact spell you cast each turn has casualty 2": an instance of casualty for each such spell as it's cast, on top of
+    // any it has (CR 702.153a-b).
+    const giveCasualty = /^(Each|The first) (instant and sorcery|instant or sorcery|nonlegendary artifact) spell you cast( each turn)? has casualty (\d+)\.$/.exec(line);
+    if (giveCasualty && (giveCasualty[1] === "The first") === !!giveCasualty[3] && (giveCasualty[1] === "Each") === (giveCasualty[2] === "instant and sorcery")) {
+      const f = parseTargetPhrase(`${giveCasualty[2]!.replace(" and ", " or ")} spell`);
+      if (f?.kind !== "spell" || !f.types?.length) out.unsupported.push(raw);
+      else (out.spellsHaveCasualty ??= []).push({ filter: { ...f, text: `${giveCasualty[2]} spell` }, n: Number(giveCasualty[4]), ...(giveCasualty[3] ? { firstEachTurn: true as const } : {}), text: line });
+      continue;
+    }
     // Silverquill Lecturer: "Creature spells you cast have demonstrate" (CR 702.144a): the spell's own "when you cast this
     // spell, you may copy it ...", one for each instance (702.144b), while the permanent is there as it's cast.
     const giveDemonstrate = /^([A-Z][a-z]+) spells you cast have demonstrate\.$/.exec(line);

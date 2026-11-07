@@ -3366,9 +3366,10 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   }
   if (extra) {
     // Casualty: a token or a cheap creature for a copy of the spell (CR 702.153a).
-    const victim = casualtyCandidates(s, pid, castDef(s, id, alt))
+    // Not the permanent giving it casualty (Silverquill, the Disputant): that would take the copy away.
+    const victim = casualtyCandidates(s, pid, castDef(s, id, alt), obj(s, id))
       .map((x) => obj(s, x))
-      .filter((o) => !o.isCommander && !extra.sacrifice?.includes(o.id) && !(targets ?? []).some((t) => t.kind === "object" && t.id === o.id))
+      .filter((o) => !o.isCommander && !abilitiesOf(s, o).spellsHaveCasualty && !extra.sacrifice?.includes(o.id) && !(targets ?? []).some((t) => t.kind === "object" && t.id === o.id))
       .filter((o) => o.isToken || worth(s, pid, o) <= 3)
       .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
     if (victim) extra.casualty = victim.id;

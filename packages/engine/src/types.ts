@@ -1102,6 +1102,8 @@ export interface StackItem {
   castNth?: number;
   /** For a spell: its casualty cost was paid (CR 702.153a). */
   casualty?: boolean;
+  /** For a spell: how many instances of casualty were paid, when more than one (CR 702.153b). */
+  casualtyTimes?: number;
   /** For a spell: its conspire cost was paid (CR 702.78a). */
   conspired?: boolean;
   /** For a spell: how many instances of conspire were paid, when more than one (CR 702.78b). */
@@ -1355,6 +1357,8 @@ export interface CostChoices {
   returnToHand?: ObjectId[];
   /** The creature sacrificed for casualty (CR 702.153a), if any. */
   casualty?: ObjectId;
+  /** The creatures sacrificed for its other instances of casualty, one each (CR 702.153b; Silverquill, the Disputant's on a spell with its own). */
+  casualtyMore?: ObjectId[];
   /** Cast with a once-each-turn graveyard permission (CastFromGraveyard.permits): which one (Muldrotha's slot for the spell). */
   permit?: string;
   /** Aminatou's Augury: the nonland card type it's cast as, of its own (GameObject.mayPlay.byType); unset, `defaultByType`'s. */

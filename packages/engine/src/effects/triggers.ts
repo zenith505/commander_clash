@@ -3,7 +3,7 @@ import { defMv, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import { isRealKicker, type AbilityBody, type BatchTrigger, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
-import { checkAscend, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, spellHasFlash, conspireGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
+import { checkAscend, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, spellHasFlash, conspireGranted, casualtyGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, modeRange, withModes } from "../modes";
 import { compileCard, compileGranted } from "../oracle";
@@ -2130,6 +2130,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const n = Math.min(paid, conspireGranted(s, ev.controller, spell));
       for (let i = 0; i < n; i++) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CONSPIRE_BODY, cause: ev.stackId });
     }
+    // Casualty a permanent gave the spell (Silverquill, the Disputant): the spell's own "when you cast this spell, if a
+    // casualty cost was paid for it, copy it", one for each instance paid (CR 702.153a-b): its printed one first (its
+    // own trigger above), then the grants still there as it becomes cast (sacrificing the giver takes its grant away, as
+    // for conspire).
+    if (spell && item?.casualty && !ev.copy) {
+      const paid = (item.casualtyTimes ?? 1) - (compileCard(defOf(s, spell)).casualty !== undefined ? 1 : 0);
+      const n = Math.min(paid, casualtyGranted(s, ev.controller, defOf(s, spell), spell).length);
+      for (let i = 0; i < n; i++) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASUALTY_BODY, cause: ev.stackId });
+    }
     // Demonstrate a permanent gives the spell (Silverquill Lecturer): one trigger for each instance (CR 702.144a-b).
     if (spell && !ev.copy) {
       const d = defOf(s, spell);
@@ -3048,6 +3057,7 @@ function speedTrigger(s: GameState, loser: PlayerId) {
 }
 
 const DEMONSTRATE_BODY: AbilityBody = { targets: [], effects: [{ type: "may", effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true, demonstrate: true }], text: "copy ~ (an opponent you choose then copies it too)" }], text: "Demonstrate: you may copy ~. If you do, choose an opponent to also copy it. Players may choose new targets for their copies." };
+const CASUALTY_BODY: AbilityBody = { targets: [], effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true }], text: "Casualty: copy ~. You may choose new targets for the copy." };
 const CONSPIRE_BODY: AbilityBody = { targets: [], effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true }], text: "Conspire: copy ~. You may choose new targets for the copy." };
 const STORM_BODY: AbilityBody = { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "storm", newTargets: true }], text: "Storm: copy ~ for each other spell cast before it this turn." };
 const CASCADE_BODY: AbilityBody = { targets: [], effects: [{ type: "cascade" }], text: "Cascade: exile cards from the top of your library until you exile a cheaper nonland card. You may cast it without paying its mana cost." };

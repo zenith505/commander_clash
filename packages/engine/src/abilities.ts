@@ -7727,6 +7727,12 @@ export interface CompiledCard {
   spellsHaveDemonstrate?: { filter: TargetSpec; text: string; /** The Twelfth Doctor: only the first spell its controller casts each turn from anywhere other than their hand (GameState.castThisTurn). */ firstNotFromHand?: true }[];
   /** "Each noncreature spell you cast has conspire" (Raiding Schemes, Wort, Rassilon): as for spellsHaveConvoke (CR 702.78a). */
   spellsHaveConspire?: { filter: TargetSpec; fromExile?: true; text: string }[];
+  /**
+   * "Each instant and sorcery spell you cast has casualty 1" (Silverquill, the Disputant), "The first instant or sorcery
+   * spell you cast each turn has casualty 2" (Anhelo, the Painter): an instance of casualty N for each (CR 702.153a-b),
+   * as the spell is cast; `firstEachTurn`: only its controller's first spell this turn matching `filter`.
+   */
+  spellsHaveCasualty?: { filter: TargetSpec; n: number; firstEachTurn?: true; text: string }[];
   spellsHaveConvoke?: { filter: TargetSpec; /** "Spells you cast from exile" (Hoarding Broodlord). */ fromExile?: true; /** "The first historic spell you cast each turn" (Peri Brown): only while no other spell matching `filter` was cast by its controller this turn. */ firstEachTurn?: true; text: string }[];
   /** "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126. */
   spellsHaveImprovise?: { filter: TargetSpec; /** "The first nonartifact spell you cast each turn" (The Fifteenth Doctor), as for convoke. */ firstEachTurn?: true; text: string }[];

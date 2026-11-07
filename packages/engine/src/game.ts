@@ -5631,7 +5631,7 @@ export function castProblem(
   if (via && x && manaX && via.mana && !parseManaCost(via.mana).hasX && !costX) return "X is 0 unless the cost you pay has {X}";
   const ap = additionalCostProblem(s, pid, o, choices, x ?? 0, spell?.modal ? modes : undefined, targets);
   if (ap) return ap;
-  const cp = casualtyProblem(s, pid, d, choices) ?? bargainProblem(s, pid, id, d, choices) ?? offeringProblem(s, pid, id, d, choices) ?? evidenceCastProblem(s, pid, o, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? harmonizeProblem(s, pid, choices, convoke) ?? giftProblem(s, pid, d, choices);
+  const cp = casualtyProblem(s, pid, d, choices, o) ?? bargainProblem(s, pid, id, d, choices) ?? offeringProblem(s, pid, id, d, choices) ?? evidenceCastProblem(s, pid, o, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? harmonizeProblem(s, pid, choices, convoke) ?? giftProblem(s, pid, d, choices);
   if (cp) return cp;
   const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets, modes });
   if (typeof cost === "string") return cost;
@@ -6810,8 +6810,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if ((choices.alt === "alternative" && altCost(d, "alternative")?.webSlinging) || choices.alt === "grantedWebSlinging") o.webSlung = returned;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
   if (choices.casualty) {
-    log(s, `${p.name} sacrifices ${nameOf(s, choices.casualty)} (casualty).`);
-    moveObject(s, choices.casualty, "graveyard", { sacrificed: true, cost: true });
+    // Each instance paid sacrifices its own creature, all at once (CR 702.153b, 601.2h).
+    const victims = [choices.casualty, ...(choices.casualtyMore ?? [])];
+    log(s, `${p.name} sacrifices ${victims.map((v) => nameOf(s, v)).join(" and ")} (casualty).`);
+    for (const v of victims) moveObject(s, v, "graveyard", { sacrificed: true, cost: true });
+    if (victims.length > 1) item.casualtyTimes = victims.length;
     item.casualty = true;
     closeZoneBatch(s);
   }
@@ -7273,10 +7276,32 @@ function kickProblem(d: CardDef, kicks?: number[]): string | null {
   return null;
 }
 
-/** Creatures `pid` could sacrifice for this card's casualty N: creatures they control with power N or greater (CR 702.153a). */
-export function casualtyCandidates(s: GameState, pid: PlayerId, d: CardDef): ObjectId[] {
-  const n = compileCard(d).casualty;
-  if (n === undefined) return [];
+/**
+ * The instances of casualty `pid` casting this card gives it, their N's: its own, then one for each "... spell you cast
+ * has casualty N" of a permanent they control (Silverquill, the Disputant), each paid separately (CR 702.153a-b). `o` is
+ * the card being cast (for "the first ... spell you cast each turn").
+ */
+export function casualtyInstances(s: GameState, pid: PlayerId, d: CardDef, o?: GameObject): number[] {
+  const own = compileCard(d).casualty;
+  return [...(own !== undefined ? [own] : []), ...casualtyGranted(s, pid, d, o)];
+}
+
+/** The N's of the instances of casualty permanents `pid` controls give this card as they cast it. */
+export function casualtyGranted(s: GameState, pid: PlayerId, d: CardDef, o?: GameObject): number[] {
+  const out: number[] = [];
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== pid) continue;
+    for (const g of abilitiesOf(s, p).spellsHaveCasualty ?? []) if (printedMatches(g.filter, d) && (!g.firstEachTurn || (!!o && firstOfKindThisTurn(s, pid, o, g.filter)))) out.push(g.n);
+  }
+  return out;
+}
+
+/** Creatures `pid` could sacrifice for this card's casualty N: creatures they control with power N or greater (CR 702.153a); with several instances, the least N. */
+export function casualtyCandidates(s: GameState, pid: PlayerId, d: CardDef, card?: GameObject): ObjectId[] {
+  const ns = casualtyInstances(s, pid, d, card);
+  if (!ns.length) return [];
+  const n = Math.min(...ns);
   return s.battlefield.filter((id) => {
     const o = obj(s, id);
     return controllerOf(s, o) === pid && objIsType(s, o, "Creature") && power(s, o) >= n && canSacrificeForCost(s, o);
@@ -7405,7 +7430,7 @@ function bargainProblem(s: GameState, pid: PlayerId, spell: ObjectId, d: CardDef
   if (id === undefined) return null;
   if (!compileCard(d).bargain) return `${d.name} doesn't have bargain`;
   if (!bargainCandidates(s, pid, spell).includes(id)) return "bargain sacrifices an artifact, enchantment, or token you control";
-  if (choices?.sacrifice?.includes(id) || choices?.casualty === id) return `${nameOf(s, id)} is already being sacrificed`;
+  if (choices?.sacrifice?.includes(id) || choices?.casualty === id || choices?.casualtyMore?.includes(id)) return `${nameOf(s, id)} is already being sacrificed`;
   return null;
 }
 
@@ -7425,7 +7450,7 @@ function offeringProblem(s: GameState, pid: PlayerId, spell: ObjectId, d: CardDe
   const filter = compileCard(d).offering;
   if (!filter) return `${d.name} doesn't have offering`;
   if (!offeringCandidates(s, pid, spell).includes(id)) return `offering sacrifices ${/^[AEIOU]/i.test(filter.text) ? "an" : "a"} ${filter.text} you control`;
-  if (choices?.sacrifice?.includes(id) || choices?.casualty === id || choices?.bargain === id) return `${nameOf(s, id)} is already being sacrificed`;
+  if (choices?.sacrifice?.includes(id) || choices?.casualty === id || choices?.casualtyMore?.includes(id) || choices?.bargain === id) return `${nameOf(s, id)} is already being sacrificed`;
   return null;
 }
 
@@ -7486,13 +7511,22 @@ function evidenceCastProblem(s: GameState, pid: PlayerId, o: GameObject, d: Card
   return evidenceProblem(s, pid, n, choices.evidence, o.id, taken);
 }
 
-function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: CostChoices): string | null {
+function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: CostChoices, card?: GameObject): string | null {
   const id = choices?.casualty;
-  if (id === undefined) return null;
-  const n = compileCard(d).casualty;
-  if (n === undefined) return `${d.name} doesn't have casualty`;
-  if (!casualtyCandidates(s, pid, d).includes(id)) return `casualty ${n} sacrifices a creature you control with power ${n} or greater`;
-  if (choices?.sacrifice?.includes(id)) return `${nameOf(s, id)} is already being sacrificed`;
+  if (id === undefined) return choices?.casualtyMore?.length ? "casualty's first creature is missing" : null;
+  const ns = casualtyInstances(s, pid, d, card);
+  if (!ns.length) return `${d.name} doesn't have casualty`;
+  const ids = [id, ...(choices?.casualtyMore ?? [])];
+  if (new Set(ids).size !== ids.length) return "each instance of casualty sacrifices a different creature";
+  if (ids.length > ns.length) return `${d.name} has casualty only ${ns.length === 1 ? "once" : `${ns.length} times`}`;
+  for (const x of ids) {
+    if (!casualtyCandidates(s, pid, d, card).includes(x)) return `casualty ${Math.min(...ns)} sacrifices a creature you control with power ${Math.min(...ns)} or greater`;
+    if (choices?.sacrifice?.includes(x)) return `${nameOf(s, x)} is already being sacrificed`;
+  }
+  // Each instance is paid by its own creature (CR 702.153b): the most powerful ones for the greatest N's.
+  const want = [...ns].sort((a, b) => a - b).slice(0, ids.length).sort((a, b) => b - a);
+  const have = ids.map((x) => power(s, obj(s, x))).sort((a, b) => b - a);
+  if (have.some((p, i) => p < want[i]!)) return `those creatures can't pay casualty ${want.slice(0, ids.length).join(" and ")}`;
   return null;
 }
 

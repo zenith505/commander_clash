@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { attackProblem, attackTaxOf, spellCost } from "../src/game";
+import { attackProblem, attackTaxOf, castProblem, spellCost } from "../src/game";
 import { applyAction, invalidateCharacteristics, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -53,6 +53,9 @@ const fearlessSwashbuckler = (): CardDef => ({"oracleId":"6a6cdb3e-c850-4b3c-bf4
 const wonderscapeSage = (): CardDef => ({"oracleId":"99994c36-21ec-4a28-b850-d3f2ba8b7f19","name":"Wonderscape Sage","manaCost":"{1}{U}","cmc":2,"typeLine":"Creature — Moonfolk Wizard","supertypes":[],"types":["Creature"],"subtypes":["Moonfolk","Wizard"],"oracleText":"Flying\n{T}, Return a land you control to its owner's hand: Draw a card. Then discard a card unless that land had a nonbasic land type.","power":"1","toughness":"3","colors":["U"],"colorIdentity":["U"],"keywords":["Flying"],"imageUrl":"https://cards.scryfall.io/normal/front/6/4/64dd6309-110d-44a0-a227-34a20e33ebdc.jpg?1783911411","artUrl":"https://cards.scryfall.io/art_crop/front/6/4/64dd6309-110d-44a0-a227-34a20e33ebdc.jpg?1783911411","commanderLegal":"legal","set":"m3c","releasedAt":"2024-06-14","rarity":"rare","layout":"normal","gameChanger":false} as CardDef);
 const boundingFelidar = (): CardDef => ({"oracleId":"b00f316d-7c82-40e6-80e5-9f36434590a3","name":"Bounding Felidar","manaCost":"{5}{W}","cmc":6,"typeLine":"Creature — Cat Beast Mount","supertypes":[],"types":["Creature"],"subtypes":["Cat","Beast","Mount"],"oracleText":"Whenever this creature attacks while saddled, put a +1/+1 counter on each other creature you control. You gain 1 life for each of those creatures.\nSaddle 2 (Tap any number of other creatures you control with total power 2 or more: This Mount becomes saddled until end of turn. Saddle only as a sorcery.)","power":"4","toughness":"7","colors":["W"],"colorIdentity":["W"],"keywords":["Saddle"],"imageUrl":"https://cards.scryfall.io/normal/front/8/9/8925279f-c16a-43b4-b791-ce450157275b.jpg?1783911859","artUrl":"https://cards.scryfall.io/art_crop/front/8/9/8925279f-c16a-43b4-b791-ce450157275b.jpg?1783911859","commanderLegal":"legal","set":"otj","releasedAt":"2024-04-19","rarity":"uncommon","layout":"normal","gameChanger":false} as CardDef);
 const lootDispute = (): CardDef => ({"oracleId":"7c885698-69f2-44b5-abfe-9a2833822794","name":"Loot Dispute","manaCost":"{3}{R}","cmc":4,"typeLine":"Enchantment","supertypes":[],"types":["Enchantment"],"subtypes":[],"oracleText":"When this enchantment enters, you take the initiative and create a Treasure token.\nWhenever you attack the player who has the initiative, create a Treasure token.\nLoud Ruckus — Whenever you complete a dungeon, create a 5/5 red Dragon creature token with flying.","colors":["R"],"colorIdentity":["R"],"keywords":["Loud Ruckus","Treasure"],"imageUrl":"https://cards.scryfall.io/normal/front/0/6/0669a2bb-11c7-45d8-9299-09246ff4e72c.jpg?1783922503","artUrl":"https://cards.scryfall.io/art_crop/front/0/6/0669a2bb-11c7-45d8-9299-09246ff4e72c.jpg?1783922503","commanderLegal":"legal","set":"clb","releasedAt":"2022-06-10","rarity":"rare","layout":"normal","gameChanger":false} as CardDef);
+const silverquillTheDisputant = (): CardDef => ({"oracleId":"66deb3f3-0314-427e-9cb8-6befa365ae94","name":"Silverquill, the Disputant","manaCost":"{2}{W}{B}","cmc":4,"typeLine":"Legendary Creature — Elder Dragon","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Elder","Dragon"],"oracleText":"Flying, vigilance\nEach instant and sorcery spell you cast has casualty 1. (As you cast that spell, you may sacrifice a creature with power 1 or greater. When you do, copy the spell and you may choose new targets for the copy.)","power":"4","toughness":"4","colors":["B","W"],"colorIdentity":["B","W"],"keywords":["Flying","Vigilance"],"imageUrl":"https://cards.scryfall.io/normal/front/1/7/1742c9cd-5ba0-4335-9999-acc7f9d4f73c.jpg?1783903631","artUrl":"https://cards.scryfall.io/art_crop/front/1/7/1742c9cd-5ba0-4335-9999-acc7f9d4f73c.jpg?1783903631","commanderLegal":"legal","set":"sos","releasedAt":"2026-04-24","rarity":"mythic","layout":"normal","gameChanger":false} as CardDef);
+const anheloThePainter = (): CardDef => ({"oracleId":"d3c3f293-6790-4dce-900a-8af0464c2572","name":"Anhelo, the Painter","manaCost":"{U}{B}{R}","cmc":3,"typeLine":"Legendary Creature — Vampire Assassin","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Vampire","Assassin"],"oracleText":"Deathtouch\nThe first instant or sorcery spell you cast each turn has casualty 2. (As you cast that spell, you may sacrifice a creature with power 2 or greater. When you do, copy the spell and you may choose new targets for the copy.)","power":"1","toughness":"3","colors":["B","R","U"],"colorIdentity":["B","R","U"],"keywords":["Deathtouch"],"imageUrl":"https://cards.scryfall.io/normal/front/4/6/462e887d-6b91-4b31-9487-2780ffe8943f.jpg?1783923381","artUrl":"https://cards.scryfall.io/art_crop/front/4/6/462e887d-6b91-4b31-9487-2780ffe8943f.jpg?1783923381","commanderLegal":"legal","set":"ncc","releasedAt":"2022-04-29","rarity":"mythic","layout":"normal","gameChanger":false} as CardDef);
+const ashadTheLoneCyberman = (): CardDef => ({"oracleId":"f3902dfd-6d09-425f-8446-a68cae2eea50","name":"Ashad, the Lone Cyberman","manaCost":"{1}{U}{B}{R}","cmc":4,"typeLine":"Legendary Artifact Creature — Cyberman","supertypes":["Legendary"],"types":["Artifact","Creature"],"subtypes":["Cyberman"],"oracleText":"The first nonlegendary artifact spell you cast each turn has casualty 2. (As you cast it, you may sacrifice a creature with power 2 or greater. When you do, copy it. A copy of an artifact spell becomes a token.)\nWhenever you sacrifice another creature, put a +1/+1 counter on Ashad.","power":"3","toughness":"3","colors":["B","R","U"],"colorIdentity":["B","R","U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/2/d/2dc19e32-4f78-492f-8586-54ad4ae6fcec.jpg?1783914640","artUrl":"https://cards.scryfall.io/art_crop/front/2/d/2dc19e32-4f78-492f-8586-54ad4ae6fcec.jpg?1783914640","commanderLegal":"legal","set":"who","releasedAt":"2023-10-13","rarity":"rare","layout":"normal","gameChanger":false} as CardDef);
 
 describe("Elephant Grass: black creatures can't attack you; nonblack ones cost {2} each", () => {
   it("only the nonblack attacker pays, and only to attack the Grass's controller", () => {
@@ -242,5 +245,60 @@ describe("Loot Dispute: whenever you attack the player who has the initiative, c
     s1.initiative = opponentsOf(s1, ap1)[2]!;
     s = attack(s1, ap1, [bear1], opp1);
     expect(treasures(s, ap1)).toBe(0);
+  });
+});
+
+describe("granted casualty: Silverquill, the Disputant; Anhelo, the Painter; Ashad, the Lone Cyberman", () => {
+  const gain = (name = "Test Gain") => card(name, "Instant", "{0}", { oracleText: "You gain 3 life." });
+  const ownCasualty = card("Test Casualty Gain", "Instant", "{0}", { oracleText: "Casualty 1\nYou gain 3 life." });
+  const castWith = (s: GameState, pid: PlayerId, id: string, choices: Parameters<typeof planCast>[7]) => drain(run(s, planCast(s, pid, id, undefined, undefined, "auto", undefined, choices)));
+  const elf = (n = "Test Elf") => card(n, "Creature — Elf", "{G}", { power: "1", toughness: "1" });
+  it("Silverquill: an instant you cast has casualty 1; sacrificing a creature copies it", () => {
+    supported(silverquillTheDisputant(), anheloThePainter(), ashadTheLoneCyberman());
+    const { s: s0, ap, ids } = setup([gain()]);
+    putOnBattlefield(s0, ap, silverquillTheDisputant());
+    const e = putOnBattlefield(s0, ap, elf());
+    const s = castWith(s0, ap, ids[0]!, { casualty: e });
+    expect(zone(s, e)).toBe("graveyard");
+    expect(s.players[ap]!.life).toBe(46);
+  });
+  it("a spell with its own casualty has two instances with Silverquill, each paid by its own creature (CR 702.153b)", () => {
+    const { s: s0, ap, ids } = setup([ownCasualty]);
+    putOnBattlefield(s0, ap, silverquillTheDisputant());
+    const [a, b, c] = [elf("Test Elf A"), elf("Test Elf B"), elf("Test Elf C")].map((d) => putOnBattlefield(s0, ap, d));
+    expect(castProblem(s0, ap, ids[0]!, undefined, undefined, undefined, undefined, undefined, { casualty: a!, casualtyMore: [b!, c!] })).toMatch(/only 2 times/);
+    expect(castProblem(s0, ap, ids[0]!, undefined, undefined, undefined, undefined, undefined, { casualty: a!, casualtyMore: [a!] })).toMatch(/different creature/);
+    const s = castWith(s0, ap, ids[0]!, { casualty: a!, casualtyMore: [b!] });
+    expect([zone(s, a!), zone(s, b!), zone(s, c!)]).toEqual(["graveyard", "graveyard", "battlefield"]);
+    // The spell and two copies.
+    expect(s.players[ap]!.life).toBe(49);
+  });
+  it("sacrificing Silverquill itself pays the cost but takes its casualty away, so there's no copy", () => {
+    const { s: s0, ap, ids } = setup([gain()]);
+    const sq = putOnBattlefield(s0, ap, silverquillTheDisputant());
+    const s = castWith(s0, ap, ids[0]!, { casualty: sq });
+    expect(zone(s, sq)).toBe("graveyard");
+    expect(s.players[ap]!.life).toBe(43);
+  });
+  it("Anhelo: only the first instant or sorcery spell each turn has casualty 2", () => {
+    const { s: s0, ap, ids } = setup([gain("Test Gain A"), gain("Test Gain B")]);
+    putOnBattlefield(s0, ap, anheloThePainter());
+    const small = putOnBattlefield(s0, ap, elf());
+    const big = putOnBattlefield(s0, ap, card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    expect(castProblem(s0, ap, ids[0]!, undefined, undefined, undefined, undefined, undefined, { casualty: small })).toMatch(/power 2 or greater/);
+    let s = castWith(s0, ap, ids[0]!, { casualty: big });
+    expect(s.players[ap]!.life).toBe(46);
+    const bear2 = putOnBattlefield(s, ap, card("Test Bear 2", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    expect(castProblem(s, ap, ids[1]!, undefined, undefined, undefined, undefined, undefined, { casualty: bear2 })).toMatch(/doesn't have casualty/);
+  });
+  it("Ashad: the first nonlegendary artifact spell each turn has casualty 2; the copy becomes a token", () => {
+    const rock = card("Test Rock", "Artifact", "{0}");
+    const { s: s0, ap, ids } = setup([rock]);
+    putOnBattlefield(s0, ap, ashadTheLoneCyberman());
+    const big = putOnBattlefield(s0, ap, card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    const s = castWith(s0, ap, ids[0]!, { casualty: big });
+    const rocks = s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]?.name.startsWith("Test Rock"));
+    expect(rocks).toHaveLength(2);
+    expect(rocks.filter((id) => s.objects[id]!.isToken)).toHaveLength(1);
   });
 });

@@ -406,6 +406,8 @@ export interface GameObject {
   noRegenTurn?: number;
   /** "~ assigns no combat damage this turn": the turn (CR 510.1). */
   noCombatDamageTurn?: number;
+  /** Gurzigost: "You may have ~ assign its combat damage this turn as though it weren't blocked", chosen as it resolved (rulings): the turn. */
+  unblockedDamageTurn?: number;
   /** "~ assigns no combat damage this combat" (Master of Cruelties): the turn and its combat phase (GameState.combatsThisTurn). */
   noCombatDamageCombat?: { turn: number; combat: number };
   /**

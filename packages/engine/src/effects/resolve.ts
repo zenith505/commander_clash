@@ -4,7 +4,7 @@ import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness }
 import { addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, draw, endTheCombatPhase, endTheTurn, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
 import { compileCard } from "../oracle";
-import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LANDWALK, SACRIFICED_LANDWALK, landwalkLand, CHOSEN_SNOW_LANDWALK, chosenLandwalk, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, TARGET_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION } from "../keywords";
+import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LANDWALK, SACRIFICED_LANDWALK, landwalkLand, CHOSEN_SNOW_LANDWALK, chosenLandwalk, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, TARGET_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION, CAST_SPELL_COLORS_PROTECTION } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, shieldChoicesPossible, ShieldQuestionPause, withShieldAnswers, type DamageSource } from "../damage";
 import { RulesError, type CardDef, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ManaType, type ObjectId, type PlayerId, type StackItem, type TriggerEventInfo } from "../types";
@@ -12,7 +12,7 @@ import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import type { ManaSpent } from "../mana";
 import { COLOR_NAMES } from "./describe";
-import { objectMatches, bindChosen, bindAttachedToSource, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sharingAColor, sameManaValued, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource } from "./targeting";
+import { objectMatches, bindChosen, bindAttachedToSource, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sameNamedAnywhere, sharingAColor, sameManaValued, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runCoinEachEffect, runFlipClashEffect, runEachPlayerFlipsEffect, runFlipEachOpponentEffect, runCoinEffect, runDiceEffect } from "./run-dice";
@@ -419,6 +419,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
       if (ctx.legal[i] && t?.kind === "object" && !(ref.notYours && controllerOf(s, obj(s, t.id)) === ctx.controller) && !(ref.with && !objectMatches(s, ref.with, obj(s, t.id), ctx.controller, false))) out.push(obj(s, t.id));
     }
     if (ref.sameName && out[0]) out.push(...sameNamed(s, out[0], ref.sameName, ctx.controller));
+    if (ref.sameNameYardsAndPermanents && out[0]) out.push(...sameNamedAnywhere(s, out[0]));
     if (ref.sharesColor && out[0]) out.push(...sharingAColor(s, out[0], ref.sharesColor, ctx.controller));
     if (ref.sameMv && out[0]) out.push(...sameManaValued(s, out[0], ref.sameMv, ctx.controller));
     if (ref.attachedToo) {
@@ -1020,6 +1021,15 @@ function targetColors(s: GameState, ctx: ResolveCtx): Color[] {
   return s.lastKnown?.[t.id]?.source?.colors ?? [];
 }
 
+/** The colors of the spell that triggered this cast trigger: as it is on the stack, or as it last existed there (its colors as cast). */
+function castSpellColors(s: GameState, ctx: ResolveCtx): Color[] {
+  const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+  if (!item) return [];
+  const o = item.objectId !== undefined ? s.objects[item.objectId] : undefined;
+  if (o?.zone === "stack" && s.stack.some((x) => x.id === ctx.cause)) return characteristics(s, o).colors;
+  return item.castColors ?? [];
+}
+
 /** The player chosen for the source as it entered ("the chosen player"), as the ability was activated or as it is now. */
 export function chosenPlayerOf(s: GameState, ctx: ResolveCtx): PlayerId | undefined {
   if (ctx.lki?.chosenPlayer !== undefined) return ctx.lki.chosenPlayer;
@@ -1087,6 +1097,9 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
         : // Éowyn: "protection from each of that creature's colors": its target's, as it last existed if it has left (rulings).
           m.kind === "addKeywords" && m.keywords.includes(TARGET_COLORS_PROTECTION)
         ? { ...m, keywords: m.keywords.flatMap((k) => (k !== TARGET_COLORS_PROTECTION ? [k] : targetColors(s, ctx).map((c) => `Protection from ${COLOR_NAMES[c].toLowerCase()}`))) }
+        : // Opal Titan: "protection from each of that spell's colors": the triggering spell's, as it last existed on the stack.
+          m.kind === "addKeywords" && m.keywords.includes(CAST_SPELL_COLORS_PROTECTION)
+        ? { ...m, keywords: m.keywords.flatMap((k) => (k !== CAST_SPELL_COLORS_PROTECTION ? [k] : castSpellColors(s, ctx).map((c) => `Protection from ${COLOR_NAMES[c].toLowerCase()}`))) }
         : // "Gains protection from the chosen player" (Guardian Archon): the player chosen for its source.
           m.kind === "addKeywords" && m.keywords.includes(CHOSEN_PLAYER_PROTECTION)
         ? { ...m, keywords: m.keywords.flatMap((k) => (k !== CHOSEN_PLAYER_PROTECTION ? [k] : chosenPlayerOf(s, ctx) !== undefined ? [protectionFromPlayer(chosenPlayerOf(s, ctx)!)] : [])) }
@@ -1523,6 +1536,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "drawnPayOrTop":
     case "shuffle":
     case "handToBottomDraw":
+    case "topToBottom":
     case "shuffleIntoLibrary":
     case "shuffleSpell":
     case "taintedPact":

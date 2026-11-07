@@ -1213,6 +1213,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Éowyn: "protection from each of that creature's colors" is the colors of the ability's one target (TARGET_COLORS_PROTECTION).
   // Samite Elder: "each of that permanent's colors" likewise.
   if (body && /each of that (?:creature|permanent)'s colors/.test(text) && (body.targets.length !== 1 || body.targets[0]!.kind !== "object")) return null;
+  // Opal Titan: "each of that spell's colors" is only a cast trigger's spell.
+  if (body && /each of that spell's colors/.test(text) && !opts.castSpell) return null;
   return body;
 }
 
@@ -1938,6 +1940,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // to the number of loyalty counters on him and gains indestructible. He's still a planeswalker.": the number locked in
   // as it resolves (rulings, CR 608.2h), like Gideon Jura's "becomes a 6/6 ... creature that's still a planeswalker".
   text = text.replace(/^Until end of turn, ~ becomes an? ([A-Z][a-z]+(?: [A-Z][a-z]+)*) creature with power and toughness each equal to the number of loyalty counters on ~ and gains indestructible\. (?:He|She|It)'s still a planeswalker\./, "Until end of turn, ~ becomes an X/X $1 creature with indestructible that's still a planeswalker, where X is the number of loyalty counters on it.");
+  // Veiled Sentry: "it becomes an Illusion creature with power and toughness each equal to that spell's mana value": the
+  // mana value of the spell that triggered it as it was cast, remembered if it has left the stack (rulings), locked in as
+  // this resolves (CR 608.2h).
+  text = text.replace(/^(~|[Ii]t) becomes an? ([A-Z][a-z]+) creature with power and toughness each equal to that spell's mana value\.$/, "~ becomes an X/X $2 creature, where X is that spell's mana value.");
+  // Horn of Plenty: "they may pay {1}. If the player does, they draw a card at the beginning of the next end step": the
+  // player who cast the spell decides and pays (CR 603.5, 608.2d), then draws at the next end step to begin.
+  text = text.replace(/^they may pay (\{\d+\})\. If the player does, they draw a card at the beginning of the next end step\.$/, "that player may pay $1. If they do, that player draws a card at the beginning of the next end step.");
   // Drag the Canal: "If a creature died this turn, you gain 2 life, surveil 2, then investigate": the same three
   // instructions in order, all under the condition.
   text = text.replace(/(you gain \d+ life, surveil \d+), then (investigate)\./, "$1, and $2.");

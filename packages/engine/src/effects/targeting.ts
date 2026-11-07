@@ -42,6 +42,15 @@ export function sameNamed(s: GameState, t: GameObject, group: NonNullable<Extrac
     .filter((o) => o.id !== t.id && !o.faceDown && sameName(characteristics(s, o).name, name) && (!group.of || controllerOf(s, o) === whose) && objectMatches(s, group.filter, o, controller, false));
 }
 
+/** Moratorium Stone: the other cards in every graveyard and the permanents with the name of `t`, a card in a graveyard, now. */
+export function sameNamedAnywhere(s: GameState, t: GameObject): GameObject[] {
+  if (t.zone !== "graveyard") return [];
+  const name = characteristics(s, t).name;
+  const yards = s.players.flatMap((p) => p.graveyard.map((id) => obj(s, id))).filter((o) => o.id !== t.id && sameName(characteristics(s, o).name, name));
+  const perms = s.battlefield.map((id) => obj(s, id)).filter((o) => !o.faceDown && sameName(characteristics(s, o).name, name));
+  return [...yards, ...perms];
+}
+
 /** Mists of Lórien: the other permanents matching `group.filter` with `t`'s mana value now (CR 202.3; 0 face down, 708.2). */
 export function sameManaValued(s: GameState, t: GameObject, group: NonNullable<Extract<ObjRef, { ref: "target" }>["sameMv"]>, controller: PlayerId): GameObject[] {
   if (t.zone !== "battlefield") return [];
@@ -1145,6 +1154,14 @@ export function lesserPowerOk(s: GameState, spec: TargetSpec, t: TargetChoice, s
   if (spec.crewedSource && t.kind === "object" && !saddledSource(s, t.id, sourceId, sourceZc, "crewedBy")) return false;
   // "Target card exiled with ~": one of the cards linked to the source (CR 607.2a).
   if (spec.linkedExile && t.kind === "object" && !linkedCards(s, sourceId, sourceZc).some((l) => l.id === t.id)) return false;
+  // Mindreaver: "target spell with the same name as a card exiled with ~".
+  if (spec.nameLinkedExile) {
+    const item = t.kind === "stack" ? (s.stack.find((x) => x.id === t.id) ?? (s.resolving?.item.id === t.id ? s.resolving.item : undefined)) : undefined;
+    const sp = item?.objectId ? s.objects[item.objectId] : undefined;
+    if (!sp || sp.faceDown) return false;
+    const name = characteristics(s, sp).name;
+    if (!linkedCards(s, sourceId, sourceZc).some((l) => { const c = s.objects[l.id]!; return !c.faceDown && sameName(name, defOf(s, c).name); })) return false;
+  }
   if (spec.blockedBySource && t.kind === "object") {
     const me = sourceId ? s.objects[sourceId] : undefined;
     if (!me) return false;

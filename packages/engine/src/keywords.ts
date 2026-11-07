@@ -164,6 +164,8 @@ export function canonicalKeyword(text: string): string | undefined {
   if (q === "creatures of the chosen type") return CHOSEN_CREATURE_TYPE_PROTECTION;
   // Samite Elder: "each of that permanent's colors", the same (its one target's colors as it resolves).
   if (q === "each of that creature's colors" || q === "each of that permanent's colors") return TARGET_COLORS_PROTECTION;
+  // Opal Titan: "each of that spell's colors", the spell that triggered it (CAST_SPELL_COLORS_PROTECTION).
+  if (q === "each of that spell's colors") return CAST_SPELL_COLORS_PROTECTION;
   if (q === "each color that's not in your commander's color identity") return IDENTITY_PROTECTION;
   if (q === "each color among permanents you control") return YOURS_COLORS_PROTECTION;
   if (q === "each of its colors") return OWN_COLORS_PROTECTION;
@@ -265,6 +267,12 @@ export function protectionFromCardTypes(types: readonly string[]): string[] {
  * resolves with the colors of the ability's one target, as it last existed if it has left (rulings).
  */
 export const TARGET_COLORS_PROTECTION = "Protection from each of that creature's colors";
+/**
+ * "It becomes a 4/4 Giant creature with protection from each of that spell's colors" (Opal Titan): filled in as it
+ * resolves with the colors of the spell that triggered it, as it is on the stack or as it last existed there (CR 608.2h);
+ * none for a colorless spell (rulings).
+ */
+export const CAST_SPELL_COLORS_PROTECTION = "Protection from each of that spell's colors";
 /** "Protection from the chosen card type" (Serra's Emissary): the card type chosen as the source entered (CR 702.16a). */
 export const CHOSEN_TYPE_PROTECTION = "Protection from the chosen card type";
 /**

@@ -1,7 +1,7 @@
 # Roadmap
 
-30,334 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,649 of
+30,343 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,657 of
 9,979 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2377,7 +2377,7 @@ line blocks.
    Tower); "Choose a number. Flip a coin that many times or until you lose a flip" (Squee's Revenge: offered 0 to 100, a
    browser test; the bot picks the number with the best expected draw); Game of Chaos (the winner of each flip decides
    whether to flip again, the stakes doubling; a browser test of both answers; Edgar, King of Figaro rigs the first flip).
-   +9, COUNT_PLACEHOLDER.
+   +9, 30,343 of 31,936 with B135.
    Out after round 298 (looked at, not done): Yurlok of Scorch Thrash ("each player adds {B}{R}{G}": a mana ability
    adding mana to every player's pool, and mana burn that doesn't stack for several Yurloks, rulings); Curse of Bounty
    ("each opponent attacking that player does the same": an untap for each attacking opponent's own permanents);

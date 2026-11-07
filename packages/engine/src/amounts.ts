@@ -149,6 +149,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.x ?? 0;
     case "chosenNumber":
       return ctx.chosen?.number ?? 0;
+    case "selfChosenNumber": {
+      // Shapeshifter: none chosen (not on the battlefield) is 0 (CR 107.2).
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      return o?.chosen?.number ?? 0;
+    }
     case "crewedSource": {
       // The source as the object it is now or, gone, as it last was (CR 400.7, 608.2h); each creature counted once.
       const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -1226,6 +1231,8 @@ function describeCount(c: Count): string {
       return "X";
     case "chosenNumber":
       return "the chosen number";
+    case "selfChosenNumber":
+      return "the last chosen number";
     case "permanents":
       return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.counterKinds ? "kinds of counters among " : ""}${c.differentNames ? "differently named " : ""}${c.other || c.otherThanAffected ? "other " : ""}${c.filter.text.replace(/^target /, "")}${c.differentManaValues ? " (different mana values)" : ""}${c.differentPowers ? " (different powers)" : ""}`;
     case "cardsInHand":

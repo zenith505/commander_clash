@@ -861,6 +861,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       }
       if (c.kind !== "sacrifice" && c.kind !== "discard") continue;
       if (c.kind === "discard" && c.random) continue; // the game picks it (CR 701.9b)
+      if (c.kind === "discard" && c.lastDrawn) continue; // Jandor's Ring: the last card drawn, nothing to choose
       if (d[c.kind] !== undefined) continue;
       const candidates =
         c.kind === "sacrifice"

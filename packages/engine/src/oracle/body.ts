@@ -2604,6 +2604,26 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       text,
     };
   }
+  // Phyrexian Grimoire (see Effect "topYardSplit"): the opponent is targeted, the cards aren't (rulings).
+  if (opts.activated && text.trim() === "Target opponent chooses one of the top two cards of your graveyard. Exile that card and put the other one into your hand.")
+    return { targets: [{ kind: "player", opponent: true, text: "target opponent" }], effects: [{ type: "topYardSplit", chooser: { ref: "target", index: 0 } }], text };
+  // Scrying Glass: the number and the color are chosen as it resolves, then the opponent reveals (rulings); "exactly" the
+  // chosen number of cards of the chosen color in their hand (CR 105.1: five colors).
+  if (opts.activated && text.trim() === "Choose a number greater than 0 and a color. Target opponent reveals their hand. If that opponent reveals exactly the chosen number of cards of the chosen color, you draw a card.") {
+    const opp: PlayerRef = { ref: "target", index: 0 };
+    const ofColor: Amount = { count: { kind: "cardsInHand", who: opp, filter: { kind: "object", notTypes: [], notColors: [], chosen: "color", text: "card of the chosen color" } } };
+    const chosen: Amount = { count: { kind: "chosenNumber" } };
+    return {
+      targets: [{ kind: "player", opponent: true, text: "target opponent" }],
+      effects: [
+        { type: "choose", choice: "number", range: { min: 1, max: 1 }, maxHandOf: opp },
+        { type: "choose", choice: "color" },
+        { type: "lookAtHand", who: opp, reveal: true },
+        { type: "if", cond: { kind: "amountsCompare", a: ofColor, atLeast: chosen }, effects: [{ type: "if", cond: { kind: "amountsCompare", a: chosen, atLeast: ofColor }, effects: [{ type: "draw", who: { ref: "you" }, n: 1 }] }] },
+      ],
+      text,
+    };
+  }
   // Reins of Power (see Effect "swapCreatures").
   if (opts.spell && /^Untap all creatures you control and all creatures target opponent controls\. You and that opponent each gain control of all creatures the other controls until end of turn\. Those creatures gain haste until end of turn\.$/.test(text.trim()))
     return { targets: [{ kind: "player", opponent: true, text: "target opponent" }], effects: [{ type: "swapCreatures", who: { ref: "target", index: 0 } }], text };
@@ -6377,6 +6397,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       }
       if (!who || who.ref === "you" || !options || !then || then.some((e) => pauses(e))) return null;
       effects.push({ type: "punisher", who, options, effects: then, thenText: thatThen[1]!.replace(/^you (\w+)/, (_, v: string) => `${v}s`).replace(/^return that card (.+?) under your control/, "returns that card $1 under their control").replace(/\.$/, "") });
+      si++;
+      continue;
+    }
+    // Emberwilde Djinn: "At the beginning of each player's upkeep, that player may pay {R}{R} or 2 life. If the player
+    // does, they gain control of ~": either payment, their choice, then what it buys; nothing if they pay neither.
+    const eitherPay = thatMay && /^((?:\{[WUBRGC0-9]\})+) or (\d+) life$/.exec(thatMay[2]!);
+    const eitherDo = eitherPay && /^If (?:the player|that player|they) (?:does|do), (.+?)\.?$/.exec(sentences[si + 1] ?? "");
+    if (eitherPay && eitherDo && ctx.eventPlayer && /^that player$/i.test(thatMay![1]!)) {
+      const then = parseOne(capital(eitherDo[1]!.replace(/^they gain control of ~$/, "that player gains control of ~")), ctx);
+      if (!then || then.some((e) => pauses(e))) return null;
+      effects.push({ type: "punisher", who: { ref: "eventPlayer" }, options: [{ pay: { cost: eitherPay[1]! } }, { pay: { cost: "", life: Number(eitherPay[2]) } }], effects: then, mode: "ifAny", thenText: eitherDo[1]! });
       si++;
       continue;
     }

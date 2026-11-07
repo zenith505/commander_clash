@@ -417,7 +417,7 @@ type ShieldOp =
   | { kind: "prevent"; to: Rec; n: number; srcName: string; toName: string; rule?: string; src?: DamageSource; card?: string }
   | { kind: "redirect"; to: Rec; shield: string; n: number; srcName: string; fromName: string; toName: string; card: string; rule?: boolean }
   /** A damage amount replacement or a prevention effect that changes the amount (see DamageMod): `from` became `n`. */
-  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** Damage to a player: who. */ player?: PlayerId; /** A "next time" one, used up now. */ once?: string }
+  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** Damage to a player: who. */ player?: PlayerId; /** A "next time" one, used up now. */ once?: string; /** Lichenthrope: the counters put on `id` instead, by `by`. */ counters?: { id: ObjectId; counter: string; by: PlayerId } }
   /** The Mindskinner's additional effect (CR 615.5): each opponent of `by` mills `n` cards, even if the damage couldn't be prevented (615.12). */
   | { kind: "mill"; by: PlayerId; n: number; card: string; /** `by` mills it themselves (Angel of Suffering). */ self?: true; /** Gloom Surgeon: `by` exiles that many from the top of their library instead (not a mill, CR 701.17a). */ exile?: true }
   /** Khârn the Betrayer's additional effect (CR 615.5): `to` gains control of it, after any prevention. */
@@ -710,6 +710,7 @@ function modAmount(s: GameState, m: LiveMod, n: number): number {
   if (d.op === "allBut") return Math.min(n, d.n ?? 0);
   if (d.op === "raiseTo") return Math.max(n, modExtra(s, m));
   if (d.op === "setTo") return modExtra(s, m);
+  // Lichenthrope: none of it is dealt; the counters are put instead (see the "modify" op).
   return 0;
 }
 
@@ -722,6 +723,7 @@ function modLabel(s: GameState, m: LiveMod): string {
     : d.op === "minus" ? (d.prevent ? `Prevent ${modExtra(s, m)} of it` : `Take ${modExtra(s, m)} away`)
     : d.op === "allBut" ? `Prevent all but ${d.n} of it`
     : d.op === "raiseTo" || d.op === "setTo" ? `Make it ${modExtra(s, m)}`
+    : d.op === "counters" ? `Put that many ${d.counter} counters on it instead`
     : "Prevent it";
   return `${what} (${m.card})`;
 }
@@ -850,6 +852,29 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     const toName = nameOf(to);
     let incoming: DamageEvent[] = [];
     for (const e of here) {
+      // Phytohydra, Lichenthrope: damage replaced by counters isn't prevented (CR 614.1a). When a "prevent all damage"
+      // effect, protection or a shield counter would apply to it too, the permanent's controller chooses which applies
+      // first (CR 616.1, rulings on Phytohydra); choosing the counters takes the damage past them, to the amount
+      // replacements and prevention shields below. A bot wants +1/+1 counters and not -1/-1 counters.
+      const swap = "object" in to && prev(e) ? allMods.find((m) => m.mod.op === "counters" && modApplies(s, m, e, true)) : undefined;
+      if (swap && "object" in to) {
+        const o = obj(s, to.object);
+        const prevents =
+          allRules.some((r) => preventsAll(r) && !(e.applied ?? []).includes(r.id) && ruleCovers(s, r, to) && ruleTakes(s, r, e)) ||
+          preventedAll(s, e) ||
+          protectedFrom(characteristics(s, o).keywords, e.src, protectionHolder(s, o)) ||
+          (counters.get(o.id) ?? o.counters.shield ?? 0) > 0;
+        if (prevents) {
+          const labels = [`Put the ${swap.mod.counter} counters on it (${swap.card})`, "Prevent the damage"];
+          const order = swap.mod.counter === "+1/+1" ? [0, 1] : [1, 0];
+          const i = choose({ player: chooserOf(to), prompt: `Damage from ${e.src.name} to ${toName}: which applies first?`, labels: order.map((k) => labels[k]!) });
+          if (i === null) return { ask, ops, final, used: next };
+          if (order[i] === 0) {
+            incoming.push(e);
+            continue;
+          }
+        }
+      }
       // The Mindskinner's prevention can't prevent damage that can't be prevented, but its additional effect still
       // happens, once for each such effect (CR 615.12, 615.12a); the damage is dealt.
       if (!prev(e)) for (const r of allRules.filter((r) => r.mill && ruleCovers(s, r, to) && ruleTakes(s, r, e))) ops.push({ kind: "mill", by: r.controller, n: e.n * (r.millSelf ?? 1), card: cardName(s, r), ...(r.millSelf ? { self: true as const } : {}), ...(r.exileTop ? { exile: true as const } : {}) });
@@ -960,7 +985,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         const before = at[i]!;
         at[i] = modAmount(s, m, before);
         seen[i]!.add(m.key);
-        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}), ...toPlayer(to) });
+        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}), ...toPlayer(to), ...(m.mod.op === "counters" && m.holder ? { counters: { id: m.holder.id, counter: m.mod.counter!, by: m.mod.you } } : {}) });
       }
     };
     // How much of the damage a shield takes from each source's: `pick` chooses one at a time, among the options in the
@@ -1064,12 +1089,17 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         const at = [...left];
         const seen = done.map((x) => new Set(x));
         const taken: number[][] = [];
+        // Lichenthrope's -1/-1 counters are worse than the damage they replace (they stay), Phytohydra's +1/+1 better.
+        let swapped = 0;
         for (const o of order) {
-          if ("mod" in o) applyMod(o.mod, at, seen);
-          else taken.push(allocate(o.shield, at, () => 0)!);
+          if ("mod" in o) {
+            const before = at.reduce((a, n) => a + n, 0);
+            applyMod(o.mod, at, seen);
+            if (o.mod.mod.op === "counters") swapped += (before - at.reduce((a, n) => a + n, 0)) * (o.mod.mod.counter === "-1/-1" ? 1.5 : -0.5);
+          } else taken.push(allocate(o.shield, at, () => 0)!);
         }
         const used = taken.reduce((a, t) => a + t.reduce((x, y) => x + y, 0), 0);
-        return { key: JSON.stringify([at, taken]), score: at.reduce((a, n, i) => a + n * (1 + harm(incoming[i]!, to, who) / 100), 0) + used / 1000 };
+        return { key: JSON.stringify([at, taken]), score: at.reduce((a, n, i) => a + n * (1 + harm(incoming[i]!, to, who) / 100), 0) + swapped + used / 1000 };
       };
       while (total() > 0 && !paused) {
         opts = opts.filter((o) => live(o, left, done));
@@ -1141,7 +1171,10 @@ export function damageEstimate(s: GameState, from: GameObject, to: Rec, n: numbe
   if ("object" in to && prev && phantom && (phantom !== "whileCounter" || (obj(s, to.object).counters["+1/+1"] ?? 0) > 0)) return 0;
   if ("object" in to && prev && s.objects[to.object] && (abilitiesOf(s, obj(s, to.object)).counterShield === "always" || (abilitiesOf(s, obj(s, to.object)).counterShield && (obj(s, to.object).counters["+1/+1"] ?? 0) > 0))) return 0;
   const k = recKey(to);
-  return planShields(s, [{ src, to, n, ...(combat ? { combat: true as const } : {}) }], [], true).final.filter((e) => recKey(e.to) === k).reduce((a, e) => a + e.n, 0);
+  const plan = planShields(s, [{ src, to, n, ...(combat ? { combat: true as const } : {}) }], [], true);
+  // Lichenthrope's -1/-1 counters instead of the damage count as much as the damage would for a bot's sums.
+  const minus = "object" in to ? plan.ops.reduce((a, op) => a + (op.kind === "modify" && op.counters?.counter === "-1/-1" && op.counters.id === to.object ? op.from - op.n : 0), 0) : 0;
+  return plan.final.filter((e) => recKey(e.to) === k).reduce((a, e) => a + e.n, 0) + minus;
 }
 
 /**
@@ -1233,6 +1266,8 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
   // Vigor's +1/+1 counters, put once the damage is prevented.
   const plusOnesLater: { id: ObjectId; n: number; by: PlayerId }[] = [];
   const countersLater: { id: ObjectId; counter: string; by: PlayerId; card: string }[] = [];
+  // Lichenthrope's and Phytohydra's counters, put instead of the damage.
+  const swapLater: { id: ObjectId; counter: string; by: PlayerId; n: number }[] = [];
   // Phyrexian Vindicator's reflexive triggers: one for each source permanent in this damage event, with all it prevented.
   const reflectLater = new Map<ObjectId, { n: number; by: PlayerId; body: AbilityBody }>();
   // Inkshield's tokens, one for each 1 damage each rule prevented, created together once the damage is prevented.
@@ -1265,7 +1300,10 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     } else if (op.kind === "shieldCounter") useShieldCounter(s, obj(s, op.id), `${op.srcName} dealing damage to it`);
     else if (op.kind === "modify") {
       if (op.once) usedMods.add(op.once);
-      if (op.prevent) log(s, `${op.from - op.n} damage from ${op.srcName} to ${op.toName} is prevented (${op.card}).`);
+      if (op.counters) {
+        swapLater.push({ ...op.counters, n: op.from - op.n });
+        log(s, `${op.card}: ${op.from} damage from ${op.srcName} is replaced by ${op.from - op.n} ${op.counters.counter} counter${op.from - op.n === 1 ? "" : "s"}.`);
+      } else if (op.prevent) log(s, `${op.from - op.n} damage from ${op.srcName} to ${op.toName} is prevented (${op.card}).`);
       else log(s, `${op.card}: ${op.srcName} deals ${op.n} damage to ${op.toName} instead of ${op.from}.`);
     } else if (op.kind === "mill") {
       for (const pid of op.self ? (player(s, op.by).lost ? [] : [op.by]) : turnOrderFrom(s, s.activePlayer).filter((q) => q !== op.by && !player(s, q).lost)) {
@@ -1320,6 +1358,11 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     if (n > 0 && o.zone === "battlefield") withPutter(by, () => putCounters(s, o, "+1/+1", n));
   }
   if (plusOnesLater.length) invalidateCharacteristics(s);
+  for (const { id, counter, by, n } of swapLater) {
+    const o = obj(s, id);
+    if (n > 0 && o.zone === "battlefield") withPutter(by, () => putCounters(s, o, counter, n));
+  }
+  if (swapLater.length) invalidateCharacteristics(s);
   for (const { id, counter, by, card } of countersLater) {
     const o = s.objects[id];
     if (!o || o.zone !== "battlefield") continue;

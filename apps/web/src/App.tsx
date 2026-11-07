@@ -82,6 +82,8 @@ import {
   attackCost,
   attackTaxPer,
   blockCost,
+  blockLifeCost,
+  blocksMayCostLife,
   blockProblem,
   blockRequirementProblem,
   maxBlocks,
@@ -393,6 +395,8 @@ type CastDraft = {
   reveal?: string[];
   /** Which way to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
   costOr?: number;
+  /** Liquid Fire: the number chosen as an additional cost (CR 601.2b). */
+  number?: number;
   /** Creatures tapped for teamwork; empty when it isn't paid. */
   teamwork?: string[];
   /** Cast using harmonize: the creature tapped for it, or null for none (CR 702.180a-b). */
@@ -421,6 +425,8 @@ type EvidencePick = { label: string; n: number; candidates: string[]; optional: 
 
 /** Choosing how to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
 type CostOrPick = { draft: CastDraft; label: string; options: string[] };
+/** Liquid Fire: "As an additional cost to cast this spell, choose a number between 0 and 5" (CR 601.2b). */
+type NumberPick = { draft: CastDraft; label: string; min: number; max: number };
 
 /** How to forage for an ability's cost (CR 701.61a): exile three cards from your graveyard or sacrifice a Food. */
 type ForagePick = { label: string } & ({ activate: ActivateDraft; draft?: undefined } | { draft: CastDraft; activate?: undefined });
@@ -566,6 +572,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [buybackPick, setBuybackPick] = useState<BuybackPick | null>(null);
   const [giftPick, setGiftPick] = useState<GiftPick | null>(null);
   const [costOrPick, setCostOrPick] = useState<CostOrPick | null>(null);
+  const [numberPick, setNumberPick] = useState<NumberPick | null>(null);
   const [foragePick, setForagePick] = useState<ForagePick | null>(null);
   const [costPick, setCostPick] = useState<CostPick | null>(null);
   const [delvePick, setDelvePick] = useState<DelvePick | null>(null);
@@ -612,7 +619,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const attackablePlaneswalker = (id: string) => !!s && !!aim && opponentWalkers.includes(id) && !attackProblem(s, s.objects[aim]!, defenderOf(id), true);
 
   // Space passes priority (or resolves); Escape cancels targeting or closes the ability menu.
-  const picking = !!(xPick || kickPick || costPick || costOrPick || foragePick || delvePick || dividing || giftPick || buybackPick);
+  const picking = !!(xPick || kickPick || costPick || costOrPick || numberPick || foragePick || delvePick || dividing || giftPick || buybackPick);
   const keys = useRef({ s, pending, targeting, modePick, tapPick, picking, dispatch });
   keys.current = { s, pending, targeting, modePick, tapPick, picking, dispatch };
   useEffect(() => {
@@ -627,6 +634,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         setKickPick(null);
         setCostPick(null);
         setCostOrPick(null);
+        setNumberPick(null);
         setForagePick(null);
         setGiftPick(null);
         setAim(null);
@@ -778,7 +786,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const body = withModes(ab.body, modes);
     // "Any number of target ...": an "up to" target for each there could be (CR 601.2c).
     const offered = offerTargets(s, body.targets, HUMAN, x ?? 0, sourceQuality(s, objectId), objectId);
-    if (offered.length) return setTargeting({ mode: "activate", objectId, index, specs: offered, chosen: skipped(offered, []), label, modes, x });
+    // Goblin Test Pilot: "any target chosen at random", which the game picks as it's activated.
+    if (offered.length && !body.targets.some((t) => t.random)) return setTargeting({ mode: "activate", objectId, index, specs: offered, chosen: skipped(offered, []), label, modes, x });
     continueActivate({ objectId, index, modes, x, ...(pick ? { pick } : {}) });
   }
 
@@ -983,6 +992,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (splices.length) return setCostPick({ draft: d, kind: "splice", label: card.name, what: "splice onto it any number of cards from your hand", n: splices.length, min: 0, candidates: splices, chosen: [] });
     if (d.buyback === undefined && compiled.buyback !== undefined) return setBuybackPick({ draft: d, label: card.name, cost: compiled.buyback, ...(compiled.buybackText ? { text: compiled.buybackText } : {}) });
     if (d.costOr === undefined && compiled.costOr) return setCostOrPick({ draft: d, label: card.name, options: compiled.costOr.map((c) => c.text) });
+    if (d.number === undefined && compiled.castNumber) return setNumberPick({ draft: d, label: card.name, ...compiled.castNumber });
     // Gift: you may promise an opponent a gift as you cast it (CR 702.174a), announced with the other costs (601.2b).
     if (d.gift === undefined && compiled.gift && opps.length) return setGiftPick({ draft: d, label: card.name, what: compiled.gift.what, options: opps });
     // Cast without paying its mana cost, X is 0 (CR 107.3b); not so for "pay X life" and the like, an X in an
@@ -1142,6 +1152,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...(d.conspire?.length ? { conspire: d.conspire } : {}),
       ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}),
       ...(d.lifeTo !== undefined ? { lifeTo: d.lifeTo } : {}),
+      ...(d.number !== undefined ? { number: d.number } : {}),
       ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}),
       ...(d.discard?.length ? { discard: d.discard } : {}),
       ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}),
@@ -1863,6 +1874,28 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 </button>
               ))}
               <button className="ghost" onClick={() => setForagePick(null)}>
+                Cancel
+              </button>
+            </div>
+          )}
+          {numberPick && (
+            <div className="targeting">
+              <span>
+                <strong>{numberPick.label}</strong>: as an additional cost, choose a number
+              </span>
+              {Array.from({ length: numberPick.max - numberPick.min + 1 }, (_, i) => numberPick.min + i).map((n) => (
+                <button
+                  key={n}
+                  data-number={n}
+                  onClick={() => {
+                    setNumberPick(null);
+                    continueCast({ ...numberPick.draft, number: n });
+                  }}
+                >
+                  {n}
+                </button>
+              ))}
+              <button className="ghost" onClick={() => setNumberPick(null)}>
                 Cancel
               </button>
             </div>
@@ -5003,8 +5036,11 @@ function Controls({
     // Odric, Master Tactician: choosing another player's blocks; they decide whether to pay what blocking costs.
     const defender = pending.defender ?? HUMAN;
     const theirs = defender !== HUMAN ? s.players[defender]!.name : null;
-    const blockTaps = blockTax ? (theirs ? [] : planMana(s, HUMAN, parseManaCost(blockTax))) : [];
-    const needed = alone ?? lonely ?? (blockCost(s, 1) ? null : blockRequirementProblem(s, defender, list));
+    // Heat Wave: life for some blocks, paid with them (CR 509.1d); only with that much life to pay (CR 119.4).
+    const blockLife = blockLifeCost(s, list);
+    const blockTaps = blockTax || blockLife ? (theirs ? [] : blockLife && s.players[HUMAN]!.life < blockLife ? null : blockTax ? planMana(s, HUMAN, parseManaCost(blockTax)) : []) : [];
+    const blockPay = [blockTax, blockLife ? `${blockLife} life` : ""].filter(Boolean).join(" and ");
+    const needed = alone ?? lonely ?? (blockCost(s, 1) || blocksMayCostLife(s) ? null : blockRequirementProblem(s, defender, list));
     return (
       <div className="controls">
         <span>
@@ -5020,7 +5056,7 @@ function Controls({
         </span>
         <button
           disabled={!!needed || !blockTaps}
-          title={blockTax && !blockTaps ? `Blocking costs ${blockTax} and you can't pay it` : undefined}
+          title={blockPay && !blockTaps ? `Blocking costs ${blockPay} and you can't pay it` : undefined}
           onClick={() =>
             dispatch([
               ...(blockTaps ?? []),
@@ -5032,7 +5068,7 @@ function Controls({
             ])
           }
         >
-          {Object.keys(blocks).length ? `Block with ${Object.keys(blocks).length}${blockTax ? (theirs ? ` (${theirs} may pay ${blockTax})` : ` (pay ${blockTax})`) : ""}` : "No blocks"}
+          {Object.keys(blocks).length ? `Block with ${Object.keys(blocks).length}${blockPay ? (theirs ? ` (${theirs} may pay ${blockPay})` : ` (pay ${blockPay})`) : ""}` : "No blocks"}
         </button>
       </div>
     );
@@ -5218,8 +5254,9 @@ function Controls({
         })}
       </div>
     );
-  if (pending?.kind === "chooseOption" && pending.what === "enchant" && pending.player === HUMAN)
-    // An Aura put onto the battlefield without being cast: what it enchants (CR 303.4f).
+  if (pending?.kind === "chooseOption" && (pending.what === "enchant" || pending.what === "attachHost") && pending.player === HUMAN)
+    // An Aura put onto the battlefield without being cast: what it enchants (CR 303.4f). Grifter's Blade: the creature
+    // you control it enters attached to (CR 614.12).
     return (
       <div className="controls enchant-pick">
         <span>

@@ -363,6 +363,16 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       return;
     }
+    case "revealHandWhile": {
+      // "For as long as ~ remains on the battlefield": nothing once it has left (CR 611.2b).
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!me || me.zone !== "battlefield" || (me.zoneChanges ?? 0) !== (ctx.sourceZc ?? 0)) return;
+      for (const pid of players(s, e.who, ctx)) {
+        (player(s, pid).handRevealedWhile ??= []).push({ id: me.id, zc: me.zoneChanges ?? 0 });
+        log(s, `${player(s, pid).name} plays with their hand revealed for as long as ${src} remains on the battlefield.`);
+      }
+      return;
+    }
     case "blockTaxThisTurn": {
       const n = Math.max(0, evalAmount(s, e.n, amountCtx(s, ctx)));
       s.blockTaxes = [...(s.blockTaxes ?? []).filter((b) => b.turn === s.turn), { turn: s.turn, n }];

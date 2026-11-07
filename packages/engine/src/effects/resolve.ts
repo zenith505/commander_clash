@@ -128,6 +128,7 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
     ...(spellObjects.some((c) => c !== null) ? { spellObjects } : {}),
     ...(nth !== undefined ? { nth } : {}),
     ...(item.countersRemoved !== undefined ? { countersRemoved: item.countersRemoved } : {}),
+    ...(item.chosenNumber !== undefined ? { chosen: { number: item.chosenNumber } } : {}),
   };
   return continueResolution(s);
 }
@@ -462,6 +463,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     // rulings): one zone change after the trigger, or none if it was already there.
     // Craft's "Return this card": the card the ability's own cost exiled, one zone change after it was activated (CR 400.7j).
     if (ref.exiledAsCost) return o && o.zone === "exile" && ctx.sourceZc !== undefined && (o.zoneChanges ?? 0) === ctx.sourceZc + 1 ? [o] : [];
+    // Evershrike: the permanent the card became as this returned it to the battlefield (CR 400.7).
+    if (ref.returned) return o && o.zone === "battlefield" && ctx.sourceZc !== undefined && (o.zoneChanges ?? 0) === ctx.sourceZc + 1 ? [o] : [];
     if (ref.moved) return o && o.zone === "graveyard" && ctx.sourceZc !== undefined && ((o.zoneChanges ?? 0) === ctx.sourceZc || (o.zoneChanges ?? 0) === ctx.sourceZc + 1) && (!ref.yours || o.owner === ctx.controller) ? [o] : [];
     // The card a leaves-the-battlefield trigger came from, in its new zone, while it's still that object (CR 400.7).
     // A merged permanent's other cards too, for an ability triggered by its leaving (CR 730.3c).
@@ -1170,6 +1173,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "turnRules":
     case "landManaUntilEndOfTurn":
     case "blockTaxThisTurn":
+    case "revealHandWhile":
     case "flashUntilNextTurn":
     case "opponentsHandOnlyUntilNextTurn":
     case "graveyardCastThisTurn":
@@ -1515,6 +1519,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "dismissStack":
     case "counterOpponentsStack":
     case "counterOpponentsStackUnless":
+    case "bounceEachUnless":
     case "changeTarget":
     case "newTargets":
     case "controlSpell":

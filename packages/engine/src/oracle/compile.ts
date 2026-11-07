@@ -1963,6 +1963,19 @@ export function compile(d: CardDef): CompiledCard {
       out.exileSelfOnResolve = true;
       continue;
     }
+    // Grifter's Blade: "As this Equipment enters, choose a creature you control it could be attached to. If you do, it
+    // enters attached to that creature." (CR 614.12; rulings: one must be chosen if possible).
+    if (line === "As ~ enters, choose a creature you control it could be attached to. If you do, it enters attached to that creature." && d.subtypes.includes("Equipment")) {
+      out.entersAttachedToYours = true;
+      continue;
+    }
+    // Liquid Fire: "As an additional cost to cast this spell, choose a number between 0 and 5" (CR 601.2b): chosen as it's
+    // cast, kept by the spell (StackItem.chosenNumber), "the chosen number" as it resolves (rulings).
+    const castNumber = isSpell ? /^As an additional cost to cast ~, choose a number between (\d+) and (\d+)\.$/.exec(line) : null;
+    if (castNumber) {
+      out.castNumber = { min: Number(castNumber[1]), max: Number(castNumber[2]) };
+      continue;
+    }
     // "As an additional cost to cast this spell, (you may) waterbend {5}" (CR 701.67a): a cost paid like kicker, part of
     // which tapped artifacts and creatures can pay. "If this spell's additional cost was paid" reads as kicked.
     const waterbendCost = /^As an additional cost to cast ~, (you may )?waterbend \{(\d+)\}\.$/.exec(line);
@@ -4413,6 +4426,13 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Skip your draw step.") {
       out.skipDrawStep = true;
+      continue;
+    }
+    // Fasting: "If you would begin your draw step, you may skip that step instead. If you do, you gain 2 life.": chosen
+    // as the step would begin (rulings, CR 614.10), its controller's draw steps only.
+    const maySkipDraw = /^If you would begin your draw step, you may skip that step instead\. If you do, you gain (\d+) life\.$/.exec(line);
+    if (maySkipDraw) {
+      out.maySkipDraw = { gain: Number(maySkipDraw[1]) };
       continue;
     }
     // Gibbering Descent: "Hellbent — Skip your upkeep step if you have no cards in hand.": checked as the step would start

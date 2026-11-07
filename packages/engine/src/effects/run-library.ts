@@ -140,6 +140,23 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library (total mana value ${total}).`);
       }
       return;
+    case "bottomToGraveyard": {
+      // Cellar Door: the bottom card, put into its owner's graveyard; it isn't milled (CR 701.17a), so "whenever a card is
+      // milled" doesn't see it. "If it's a creature card": that card, as it is there (nothing with an empty library).
+      s.resolving!.yardChosen = [];
+      for (const pid of players(s, e.who, ctx)) {
+        const p = player(s, pid);
+        const id = p.library[p.library.length - 1];
+        if (id === undefined) {
+          log(s, `${p.name} has no cards in their library to put into their graveyard.`);
+          continue;
+        }
+        moveObject(s, id, "graveyard");
+        log(s, `${p.name} puts ${defOf(s, obj(s, id)).name}, the bottom card of their library, into their graveyard.`);
+        if (obj(s, id).zone === "graveyard") s.resolving!.yardChosen.push(id);
+      }
+      return;
+    }
     case "mill":
       if (e.repeatSharedTypeDraw) {
         // The Tale of Tamiyo: mill two; while the two share a card type (not a supertype or subtype, rulings), as they are

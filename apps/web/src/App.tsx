@@ -108,6 +108,7 @@ import {
   hasConvoke,
   autoCrew,
   casualtyCandidates,
+  casualtyInstances,
   spliceCandidates,
   splicedBodies,
   withSplices,
@@ -193,6 +194,7 @@ import {
   sameName,
   costChoiceShares,
   mayPayUse,
+  canActAtSorcerySpeed,
 } from "@cc/engine";
 import { HUMAN, YOU, actAs, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
@@ -383,8 +385,10 @@ type CastDraft = {
   prototyped?: true;
   /** Cards exiled from your graveyard for delve (CR 702.66a). */
   delve?: string[];
-  /** The creature sacrificed for casualty, or none (CR 702.153a). */
+  /** The creatures sacrificed for casualty, one for each instance paid, or none (CR 702.153a-b). */
   casualty?: string[];
+  /** No more instances of casualty are to be paid (the last pick was skipped). */
+  casualtyDone?: boolean;
   /** The artifact, enchantment, or token sacrificed for bargain, or none (CR 702.166a). */
   bargain?: string[];
   /** The permanent sacrificed for offering, or none (CR 702.48a). */
@@ -935,7 +939,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (pick.faceUp) continueFaceUp({ ...pick.faceUp, [pick.kind]: pick.chosen });
     else if (pick.activate) continueActivate({ ...pick.activate, [pick.kind]: pick.chosen });
     else if (pick.setsX && s) continueCast({ ...pick.draft, [pick.kind]: pick.chosen, x: manaValue(parseManaCost(cardOf(s, pick.chosen[0]!).manaCost)) });
-    else if (pick.kind === "conspire" && pick.draft) {
+    else if (pick.kind === "casualty" && pick.draft) {
+      // Each instance of casualty is its own pick (CR 702.153b): add this creature to the ones already chosen.
+      const before = pick.draft.casualty ?? [];
+      continueCast({ ...pick.draft, casualty: [...before, ...pick.chosen], ...(pick.chosen.length ? {} : { casualtyDone: true }) });
+    } else if (pick.kind === "conspire" && pick.draft) {
       // Each instance of conspire is its own pick (CR 702.78b): add this pair to the ones already chosen.
       const before = pick.draft.conspire ?? [];
       continueCast({ ...pick.draft, conspire: [...before, ...pick.chosen], ...(pick.chosen.length ? {} : { conspireDone: true }) });
@@ -978,6 +986,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // The Dragons of Tarkir reveal cycle: with a Dragon of yours on the battlefield, revealing one adds nothing (rulings).
     const ifControl = compiled.kicker?.ifControl;
     if (d.kicks === undefined && ifControl && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === HUMAN && objectMatches(s, ifControl, s.objects[id]!, HUMAN, false))) return continueCast({ ...d, kicks: [] });
+    // Molten Exhale: beholding is the price of casting it at instant speed (CR 601.3c), nothing to ask when it needn't be.
+    if (d.kicks === undefined && compiled.flashIfKicked && canActAtSorcerySpeed(s, HUMAN)) return continueCast({ ...d, kicks: [] });
     if (d.kicks === undefined && compiled.kicker && !compiled.kicker.required)
       return setKickPick({ draft: d, label: card.name, costs: compiled.kicker.costs, multi: !!compiled.kicker.multi, name: kickerName(compiled.kicker), chosen: [], ...(compiled.kicker.text ? { text: compiled.kicker.text } : {}) });
     // Inscriptions: one mode, or any number of them when kicked (CR 601.2b).
@@ -1116,11 +1126,30 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const named = c.kind === "discard" && c.differentNames ? " with different names" : "";
       return setCostPick({ draft: d, kind: key, label: card.name, what: `${verb} ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${c.n > 1 ? plural(what) : what}${named}`, n: c.n, candidates, chosen: [], ...(c.kind === "sacrifice" && c.exile ? { exile: true as const } : {}), ...(c.kind === "discard" && c.differentNames ? { differentNames: true as const } : {}) });
     }
-    // Casualty N: you may sacrifice a creature with power N or greater as you cast it (CR 702.153a).
-    if (d.casualty === undefined && compiled.casualty !== undefined) {
-      const candidates = casualtyCandidates(s, HUMAN, card).filter((id) => !d.sacrifice?.includes(id));
+    // Casualty N: you may sacrifice a creature with power N or greater as you cast it (CR 702.153a); its own and the ones
+    // permanents give it (Silverquill, the Disputant), asked again for each further instance (each paid separately, 702.153b).
+    const casualties = casualtyInstances(s, HUMAN, card, s.objects[d.objectId]);
+    const casualtyPaid = d.casualty?.length ?? 0;
+    if (casualties.length && !d.casualtyDone && casualtyPaid < casualties.length && (d.casualty === undefined || casualtyPaid > 0)) {
+      // Only creatures that still leave each chosen one an instance it can pay: the strongest for the greatest N's.
+      const fits = (ids: string[]) => {
+        const want = [...casualties].sort((a, b) => a - b).slice(0, ids.length).sort((a, b) => b - a);
+        const have = ids.map((id) => power(s, s.objects[id]!)).sort((a, b) => b - a);
+        return have.every((p, i) => p >= want[i]!);
+      };
+      const before = d.casualty ?? [];
+      const candidates = casualtyCandidates(s, HUMAN, card, s.objects[d.objectId]).filter((id) => !d.sacrifice?.includes(id) && !before.includes(id) && fits([...before, id]));
+      const ns = [...casualties].sort((a, b) => b - a).join(" and ");
       if (candidates.length)
-        return setCostPick({ draft: d, kind: "casualty", label: card.name, what: `casualty ${compiled.casualty}: you may sacrifice a creature with power ${compiled.casualty} or greater to copy it`, n: 1, candidates, chosen: [] });
+        return setCostPick({
+          draft: d,
+          kind: "casualty",
+          label: card.name,
+          what: casualties.length === 1 ? `casualty ${casualties[0]}: you may sacrifice a creature with power ${casualties[0]} or greater to copy it` : `casualty ${ns} (instance ${casualtyPaid + 1} of ${casualties.length}): you may sacrifice ${casualtyPaid ? "another" : "a"} creature with enough power for another copy`,
+          n: 1,
+          candidates,
+          chosen: [],
+        });
     }
     // Bargain: you may sacrifice an artifact, enchantment, or token as you cast it (CR 702.166a).
     if (d.bargain === undefined && compiled.bargain) {
@@ -1144,7 +1173,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     const choices = {
       ...kicks,
-      ...(d.casualty?.length ? { casualty: d.casualty[0]! } : {}),
+      ...(d.casualty?.length ? { casualty: d.casualty[0]!, ...(d.casualty.length > 1 ? { casualtyMore: d.casualty.slice(1) } : {}) } : {}),
       ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}),
       ...(d.offering?.length ? { offering: d.offering[0]! } : {}),
       ...(d.evidence?.length ? { evidence: d.evidence } : {}),
@@ -2176,7 +2205,7 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "discard") return `discard ${n(c.n, c.filter?.text ?? "card")}${c.random ? " at random" : ""}`;
   if (c.kind === "returnToHand") return `return ${n(c.n, c.filter.text)} to hand`;
   if (c.kind === "revealHand") return "reveal your hand";
-  if (c.kind === "sacrificeAll") return "sacrifice all permanents you control";
+  if (c.kind === "sacrificeAll") return `sacrifice all ${c.creatures ? "creatures" : "permanents"} you control`;
   if (c.kind === "discardHand") return "discard your hand";
   if (c.kind === "giveLife") return c.each ? `have each other player gain ${c.n} life` : `have an opponent gain ${c.n} life`;
   if (c.kind === "tap") return `${c.untap ? "untap" : "tap"} ${n(c.n, c.filter.text)}`;

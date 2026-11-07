@@ -8,7 +8,7 @@ import type { Amount, AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from ".
 import { ANY_COUNTER } from "./abilities";
 import { defOf } from "./cards";
 import { compileCard } from "./oracle";
-import { bindChosen, isSuspended, objectMatches, printedMatches, ringBearer, spellManaValue, spellPT } from "./effects";
+import { bindChosen, cardPT, isSuspended, objectMatches, printedMatches, ringBearer, spellManaValue, spellPT } from "./effects";
 import { characteristics, controllerOf, staticConditionNow, type Characteristics } from "./layers";
 import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from "./mana";
 import { STARTING_LIFE, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ObjectId, type PlayerId, type TriggerEventInfo } from "./types";
@@ -335,7 +335,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "linkedExiled": {
       const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const linked = src ? (s.linkedExile?.[`${src.id}@${src.zoneChanges ?? 0}`] ?? []) : [];
-      return c.ever ? linked.length : linked.filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).length;
+      if (c.ever) return linked.length;
+      return linked.filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc && (!c.filter || (!s.objects[l.id]!.faceDown && printedMatches(c.filter, defOf(s, s.objects[l.id]!))))).length;
     }
     case "linkedExiledMv": {
       const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -561,6 +562,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.players[pid]!.poison ?? 0), 0);
     case "rad":
       return (c.who ? refPlayers(s, c.who, ctx) : s.players.filter((p) => !p.lost).map((p) => p.id)).reduce((n, pid) => n + (s.players[pid]!.rad ?? 0), 0);
+    case "allCounters":
+      return (
+        s.players.filter((p) => !p.lost).reduce((n, p) => n + Math.max(0, p.poison ?? 0) + Math.max(0, p.energy ?? 0) + Math.max(0, p.experience ?? 0) + Math.max(0, p.rad ?? 0), 0) +
+        s.battlefield.reduce((n, id) => n + Object.values(s.objects[id]!.counters).reduce((a, k) => a + Math.max(0, k ?? 0), 0), 0)
+      );
     case "speed":
       return s.players[ctx.controller]?.speed ?? 0; // CR 702.179f
     case "punished":
@@ -895,6 +901,17 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       // As it last existed on the battlefield (CR 608.2h), if that's recorded; else as it was tapped.
       const lk = s.lastKnown?.[st.id];
       return Math.max(0, lk && lk.zc === st.zc ? lk.power : st.power);
+    }
+    case "beheldPower": {
+      // A permanent's power as the spell resolves, or as it last existed on the battlefield (CR 608.2h, rulings); a card
+      // still in the hand, its power there (CR 604.3); one gone from there, as it was revealed.
+      const st = ctx.stationed;
+      const o = st && s.objects[st.id];
+      if (!st) return 0;
+      if (o && (o.zoneChanges ?? 0) === st.zc && o.zone === "battlefield") return characteristics(s, o).power;
+      if (o && (o.zoneChanges ?? 0) === st.zc && o.zone === "hand") return cardPT(s, o, "power");
+      const lk = s.lastKnown?.[st.id];
+      return lk && lk.zc === st.zc ? lk.power : st.power;
     }
     case "damageDealtToThisTurn": {
       // Whipkeeper: dealt to that object this turn, regenerated or not; prevented damage wasn't dealt (rulings).
@@ -1426,6 +1443,10 @@ function describeCount(c: Count): string {
       return "poison counters";
     case "rad":
       return "rad counters";
+    case "allCounters":
+      return "counters among players and permanents";
+    case "beheldPower":
+      return "the beheld card's power";
     case "speed":
       return "speed";
     case "punished":

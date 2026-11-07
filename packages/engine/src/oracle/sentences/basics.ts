@@ -1095,7 +1095,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Blood Funnel: "Whenever you cast a noncreature spell, counter that spell unless you sacrifice a creature": you choose as
   // the trigger resolves; with no creature, or choosing not to, the spell is countered (as with Bog Elemental's).
-  if (ctx.castSpell && (m = /^Counter (?:it|that spell) unless you sacrifice an? (creature|artifact|land|enchantment)$/i.exec(s))) {
+  // Mana Vortex: "When you cast ~, counter it unless you sacrifice a land": the same for the spell itself, as the trigger
+  // resolves on top of it (rulings).
+  if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^Counter (?:it|that spell) unless you sacrifice an? (creature|artifact|land|enchantment)$/i.exec(s))) {
     const filter = parseTargetPhrase(m[1]!);
     if (filter?.kind !== "object") return null;
     return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, text: m[1]! }, n: 1, action: "sacrifice" }], otherwise: [{ type: "counterCause" }], keep: true, text: `Sacrifice a ${m[1]} so that spell isn't countered` }];

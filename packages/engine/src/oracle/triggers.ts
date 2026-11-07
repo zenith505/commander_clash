@@ -1042,7 +1042,8 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // "A spell that has convoke" (Joyful Stormsculptor), "a creature spell with flying", "with infect": the spell as it
   // was cast; convoke from another permanent's "spells you cast have convoke" too (game.ts hasConvoke).
   // "A spell with cascade" (Aurora Phoenix): printed or given to it as it's cast (effects/triggers.ts hasCascade).
-  const kwM = !pw ? / (?:with|that has) (convoke|flying|infect|cascade|mutate)$/.exec(what) : null;
+  // Slitherwisp: "another spell that has flash": flash it has, not "as though it had flash" (rulings; effects/triggers.ts spellHasFlash).
+  const kwM = !pw ? / (?:with|that has) (convoke|flying|infect|cascade|mutate|flash)$/.exec(what) : null;
   if (kwM) what = what.slice(0, kwM.index);
   // Garenbrig Squire: "a creature spell that has an Adventure": an adventurer card cast as the creature (CR 715.2, 715.3).
   const advM = !pw && !kwM ? / that has an Adventure$/.exec(what) : null;
@@ -2016,6 +2017,10 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   line = line.replace(/^Whenever you attack with at least (two|three|four) creatures that have ((?:[a-z ]+, )+and\/or [a-z]+), /, "Whenever you attack with $1 or more creatures with $2, ");
   // Rigo, Streetwise Mentor: "Whenever you attack a player or planeswalker with one or more creatures with power 1 or
   // less": once for each player and each planeswalker those creatures attack (CR 508.3a, 508.3e), not a battle.
+  // Loot Dispute: "Whenever you attack the player who has the initiative": once, for that player, if they had the
+  // initiative as attackers were declared (CR 726, 508.3e); not their planeswalkers or battles.
+  const toInitiative = /^Whenever you attack the player who has the initiative, /.test(line);
+  if (toInitiative) line = line.replace(/^Whenever you attack the player who has the initiative, /, "Whenever you attack a player, ");
   const youAttackAPlayer = /^Whenever you attack a player( or planeswalker)?( with one or more [^,]+)?, /.exec(line);
   const perWalker = !!youAttackAPlayer?.[1];
   if (youAttackAPlayer) {
@@ -2303,7 +2308,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     const filter: TargetSpec = group ?? { kind: "object", types: ["Creature"], text: "creature" };
     body = { ...body, effects: [...body.effects, { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", fromGroup: true }], text: `return one of those ${phrase} to its owner's hand` }], text: `${body.text} You may return one of those ${phrase} to its owner's hand.` };
   }
-  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(exactly ? { exactAttackers: true as const } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}), ...(perWalker ? { perWalker: true as const } : {}), ...(selfOrCommander ? { selfOrCommander: true as const } : {}), ...(selfAnd ? { selfAnd } : {}), ...(minTotalPower ? { minTotalPower } : {}) };
+  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(exactly ? { exactAttackers: true as const } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}), ...(toInitiative ? { toInitiative: true as const } : {}), ...(perWalker ? { perWalker: true as const } : {}), ...(selfOrCommander ? { selfOrCommander: true as const } : {}), ...(selfAnd ? { selfAnd } : {}), ...(minTotalPower ? { minTotalPower } : {}) };
 }
 
 /** "Other creatures you control", "tokens you control", "artifacts and/or creatures you control": what a batch trigger counts. */
@@ -2423,7 +2428,8 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     // Dreadhound: "a creature card is put into a graveyard from a library", any library, any way (not only milled).
     // Pedantic Learning: "a land card is put into your graveyard from your library", the same (a card goes to its owner's
     // graveyard, CR 400.3).
-    if (another && (m[1] || !/^is put into your graveyard from anywhere$/.test(m[2]!))) return "fail";
+    // Planar Void: "another card is put into a graveyard from anywhere": any graveyard, not its own card.
+    if (another && (m[1] || !/^is put into (?:your|a) graveyard from anywhere$/.test(m[2]!))) return "fail";
     // Undead Alchemist: "a creature card is put into an opponent's graveyard from their library": their own library (a card
     // goes to its owner's graveyard, CR 400.3), any way.
     if (/ their library$/.test(m[2]!) && whose !== "opponent") return "fail";
@@ -2541,6 +2547,11 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   // was ever in your hand).
   if (batch.each && batch.what === "toGraveyard" && batch.whose === "you" && !batch.from && !batch.other && !batch.filter && !yourTurn && /^you may return it to your hand\.?$/.test(rest))
     return { event: "batch", batch, body: { targets: [], effects: [{ type: "may", effects: [{ type: "bounce", what: { ref: "eventGroup" } }], text: "return it to your hand" }], text: rest.replace(/\.$/, "") } };
+  // Planar Void: "Whenever another card is put into a graveyard from anywhere, exile that card": that card, once for each
+  // (CR 603.2c), if it's still in the graveyard (CR 400.7). Not for its own card or the cards put there with it (rulings:
+  // it isn't on the battlefield then, no look back, CR 603.10a).
+  if (batch.each && batch.what === "toGraveyard" && !batch.whose && !batch.from && batch.other && !batch.filter && !yourTurn && /^exile that card\.?$/.test(rest))
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "exile", what: { ref: "eventGroup" } }], text: rest.replace(/\.$/, "") } };
   // Undead Alchemist: "Whenever a creature card is put into an opponent's graveyard from their library, exile that card and
   // create a 2/2 black Zombie creature token": that card, once for each (CR 603.2c), if it's still in the graveyard (CR
   // 400.7); the token either way (rulings: a second Alchemist's trigger only makes a token).
@@ -4798,7 +4809,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Olivia, Crimson Bride's grant: "When you don't control a legendary Vampire, exile this creature": the same as "When you
   // control no legendary Vampires" (CR 603.8), the creature itself counting if it's one.
   const stLine = line.replace(/^(When ~ has [a-z ]+ counters) on ~, (transform ~\.)$/, "$1 on it, $2").replace(/^When you don't control an? ((?:legendary )?[A-Z][a-z]+), /, "When you control no $1s, ");
-  const st = new RegExp(`^When (you control no .+?|there are no creatures on the battlefield|no creatures are on the battlefield|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or (?:more|less) life|an opponent has ${NUM} or less life|a player has no cards in hand|(?:you|an opponent) controls? an? (?:[A-Z][a-z]+|creature with (?:power|toughness) ${NUM} or (?:greater|less))|~ has [a-z ]+), (.+)$`).exec(stLine);
+  // Mana Vortex: "When there are no lands on the battlefield, sacrifice ~", the same as for creatures (CR 603.8).
+  const st = new RegExp(`^When (you control no .+?|there are no creatures on the battlefield|there are no lands on the battlefield|no creatures are on the battlefield|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or (?:more|less) life|an opponent has ${NUM} or less life|a player has no cards in hand|(?:you|an opponent) controls? an? (?:[A-Z][a-z]+|creature with (?:power|toughness) ${NUM} or (?:greater|less))|~ has [a-z ]+), (.+)$`).exec(stLine);
   if (st) {
     const state = parseStaticCondition(st[1]!.replace(/^no creatures are on the battlefield$/, "there are no creatures on the battlefield"), { affects: { kind: "self" }, mods: [], text: "" });
     const body = state && parseBody(st[st.length - 1]!, { selfIt: true });

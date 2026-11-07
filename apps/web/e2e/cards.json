@@ -10805,6 +10805,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "435c8d98-9fa3-40d8-9b7c-32474099e08e",
+  "name": "Grave Consequences",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player may exile any number of cards from their graveyard. Then each player loses 1 life for each card in their graveyard.\nDraw a card.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "jud",
+  "releasedAt": "2002-05-27",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "09ff28b1-b6c9-48e6-b12e-2f0e644f709f",
   "name": "Gravecrawler",
   "manaCost": "{B}",
@@ -28894,6 +28920,34 @@
   "set": "gtc",
   "releasedAt": "2013-02-01",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fdb28fd3-70fb-43c3-b367-9cf0d2c46e06",
+  "name": "Void",
+  "manaCost": "{3}{B}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose a number. Destroy all artifacts and creatures with mana value equal to that number. Then target player reveals their hand and discards all nonland cards with mana value equal to the number.",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ema",
+  "releasedAt": "2016-06-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

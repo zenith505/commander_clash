@@ -190,7 +190,7 @@ export interface Characteristics {
    */
   untargetable?: (Untargetable & { of: PlayerId })[];
   /** "Prevent all damage that would be dealt to / by ~" (CR 615.1). */
-  preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; /** Prismatic Ward: only from sources of these colors (the chosen one). */ fromColors?: string[]; plusOnes?: true; thatMany?: true; oneEach?: true; reflect?: AbilityBody; /** With plusOnes or reflect: the ability's controller and source. */ you?: PlayerId; from?: ObjectId }[];
+  preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; /** Bronze Horse: only from a spell targeting it. */ targetingSpells?: true; /** Prismatic Ward: only from sources of these colors (the chosen one). */ fromColors?: string[]; plusOnes?: true; thatMany?: true; oneEach?: true; reflect?: AbilityBody; /** With plusOnes or reflect: the ability's controller and source. */ you?: PlayerId; from?: ObjectId }[];
   /** Damage amount replacements this permanent's static abilities make (see DamageMod): `you` is the ability's controller, `from` its source. */
   damageMods?: (DamageMod & { you: PlayerId; from: ObjectId })[];
   /** The damage it would deal can't be prevented (CR 615.12): all of it, or only its combat damage. */

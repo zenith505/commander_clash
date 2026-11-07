@@ -499,6 +499,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Watchers of the Dead: the cards to keep (the rest are exiled), those we can use there first, then the dearest.
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "keep")
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => Number(usefulInGraveyard(s, b)) - Number(usefulInGraveyard(s, a)) || mv(s, b) - mv(s, a)).slice(0, pend.max) }];
+    // Grave Consequences: "Then each player loses 1 life for each card in their graveyard": every card we have no use for
+    // there, or all of them when that life would hurt.
+    const perCard = pend.kind === "searchLibrary" && pend.fromGraveyard === "exile" && s.resolving ? s.resolving.body.effects.slice(s.resolving.next ?? 0).some((x) => x.type === "loseLife" && typeof x.n === "object" && x.n.count.kind === "cardsInGraveyard") : false;
+    if (pend.kind === "searchLibrary" && perCard) {
+      const keep = player(s, pid).life - pend.cards.length > 10 ? pend.cards.filter((id) => usefulInGraveyard(s, id)) : [];
+      return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => !keep.includes(id)).slice(0, pend.max) }];
+    }
     // Exiling cards from our own graveyard: the ones we have no use for there, the cheapest first.
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile")
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => Number(usefulInGraveyard(s, a)) - Number(usefulInGraveyard(s, b)) || mv(s, a) - mv(s, b)).slice(0, pend.min) }];
@@ -5004,6 +5011,10 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
       if (ab.body.effects.some((e) => e.type === "redirectNext")) continue; // only in a combat it would lose (chooseRedirect)
       if (shieldBody(ab.body)) continue; // only when damage is coming (chooseDamageShield)
+      // Sworn Defender: its power and toughness set from a creature in combat with it, which bots don't weigh.
+      if (ab.body.targets.some((t) => t.blockingSource) && ab.body.effects.some((e) => e.type === "continuous" && e.what.ref === "self" && e.mods.some((m) => (m.kind === "setPower" && typeof m.power === "object") || (m.kind === "setToughness" && typeof m.toughness === "object")))) continue;
+      // Prairie Dog's "until end of turn, ... that many plus one +1/+1 counters": bots don't plan their counters ahead.
+      if (ab.body.effects.some((e) => e.type === "countModThisTurn" && e.mod.what === "counters")) continue;
       if (ab.body.effects.some((e) => e.type === "nextDrawInstead") && !(only && s.step === "upkeep" && s.activePlayer === pid)) continue; // only for the draw step's draw (chooseTimed)
       // Metzali's "Choose a creature at random that attacked this turn. Destroy that creature.": only when none of them are
       // ours and there is one.

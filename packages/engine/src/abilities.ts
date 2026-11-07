@@ -1719,9 +1719,9 @@ export interface DamageMod {
    * `times` multiplies by `n` (double, triple); `half` halves, rounded down (`up`: rounded up); `plus` / `minus` add or
    * take away `amount`; `allBut`: all but `n` of it; `prevent`: all of it.
    */
-  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo" | /** "Put that many -1/-1 counters on it instead" (Lichenthrope, Phytohydra, CR 614.1a): none of it is dealt; `counter`s go on the holder. */ "counters" | /** "Instead that player mills that many cards" (Undead Alchemist, CR 614.1a): none of it is dealt; see `mill`. */ "mill";
-  /** With op "counters": the kind put on the permanent instead of the damage. */
-  counter?: "+1/+1" | "-1/-1";
+  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo" | /** "Put that many -1/-1 counters on it instead" (Lichenthrope, Phytohydra, CR 614.1a): none of it is dealt; `counter`s go on the holder. */ "counters" | /** "Destroy that creature instead" (Kill-Suit Cultist): none of it is dealt; the creature it would be dealt to is destroyed (rulings). */ "destroy" | /** Undead Alchemist: the damaged player mills that many cards instead. */ "mill";
+  /** With op "counters": the kind put on the permanent instead of the damage (Force Bubble's depletion counters go on the holder, though the damage would be dealt to you). */
+  counter?: CounterKind;
   /** With op "mill" or "counters" (Szadek, Lord of Secrets): the player the damage would have been dealt to mills that many cards instead. */
   mill?: true;
   n?: number;
@@ -1747,7 +1747,7 @@ export interface DamageMod {
    * its chosen player), `objects` (a permanent matching it, "you" being the ability's controller), `self` (the permanent
    * with the ability), `chosenPermanents` (a permanent the chosen player controls). Missing: any permanent or player.
    */
-  to?: { players?: "all" | "you" | "opponents" | "enchanted" | "chosen"; objects?: TargetSpec; self?: true; chosenPermanents?: true; /** "another permanent you control": not the permanent with the ability. */ other?: true; /** A resolved effect's "that player" and the permanents they control. */ player?: PlayerId; permanentsOf?: PlayerId };
+  to?: { players?: "all" | "you" | "opponents" | "enchanted" | "chosen"; objects?: TargetSpec; self?: true; chosenPermanents?: true; /** "another permanent you control": not the permanent with the ability. */ other?: true; /** A resolved effect's "that player" and the permanents they control. */ player?: PlayerId; permanentsOf?: PlayerId; /** A resolved effect's target creature, as the object it was (Kill-Suit Cultist, CR 400.7). */ chosen?: { id: ObjectId; zc: number } };
   combat?: "only" | "non";
   /** The Rollercrusher Ride: "while there are four or more card types among cards in your graveyard". */
   while?: StaticCondition;
@@ -1882,7 +1882,7 @@ export type Modification =
    * dealt to and dealt by ~ this turn" (CR 615.1): `to` and/or `by` it; `combat` "only" or "non" (noncombat);
    * `fromTypes`: only damage from sources with all these card types ("by creatures", "by artifact sources").
    */
-  | { kind: "preventDamage"; to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; /** Prismatic Ward: only damage from sources of the color chosen as the static ability's source entered (none chosen: none prevented). */ fromChosenColor?: true; /** "Put a +1/+1 counter on that creature for each 1 damage prevented this way" (Vigor, CR 615.5): the ability's controller puts them. */ plusOnes?: true; /** With plusOnes, "put that many +1/+1 counters on ~" (Anti-Venom): as many as the damage, even if it can't be prevented (CR 615.12). */ thatMany?: true; /** With plusOnes, "prevent that damage and put a +1/+1 counter on ~" (Ironscale Hydra): one counter for each source's damage, even if it can't be prevented (rulings, CR 615.12). */ oneEach?: true; /** "When damage is prevented this way, ..." (Phyrexian Vindicator): a reflexive trigger of its source, "that much" being the damage prevented in the event (CR 603.12). */ reflect?: AbilityBody }
+  | { kind: "preventDamage"; to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; /** "By spells that target it" (Bronze Horse): only a spell's damage while that spell has the permanent as a target. */ targetingSpells?: true; /** Prismatic Ward: only damage from sources of the color chosen as the static ability's source entered (none chosen: none prevented). */ fromChosenColor?: true; /** "Put a +1/+1 counter on that creature for each 1 damage prevented this way" (Vigor, CR 615.5): the ability's controller puts them. */ plusOnes?: true; /** With plusOnes, "put that many +1/+1 counters on ~" (Anti-Venom): as many as the damage, even if it can't be prevented (CR 615.12). */ thatMany?: true; /** With plusOnes, "prevent that damage and put a +1/+1 counter on ~" (Ironscale Hydra): one counter for each source's damage, even if it can't be prevented (rulings, CR 615.12). */ oneEach?: true; /** "When damage is prevented this way, ..." (Phyrexian Vindicator): a reflexive trigger of its source, "that much" being the damage prevented in the event (CR 603.12). */ reflect?: AbilityBody }
   /** "If a source you control would deal damage ..., it deals double that damage instead" (a replacement effect, CR 614.1a). */
   | { kind: "damageMod"; mod: DamageMod }
   /** "Damage that would be dealt by ~ can't be prevented" (CR 615.12); `combat`: combat damage only (Questing Beast). */
@@ -4507,7 +4507,7 @@ export type Effect =
    * would deal damage ... this turn" (Overblaze: `byTarget`), "until your next turn, if a source would deal damage to that
    * player or a permanent that player controls" (Lightning, Army of One: `toPlayer`). Its amounts are counted as it resolves.
    */
-  | { type: "damageMod"; mod: DamageMod; until?: "yourNextTurn"; byTarget?: number; toPlayer?: PlayerRef; /** "A source of your choice", chosen as it resolves (CR 609.7a). */ choose?: TargetSpec; /** "That creature": the trigger's subject. */ bySubject?: true }
+  | { type: "damageMod"; mod: DamageMod; until?: "yourNextTurn"; byTarget?: number; /** "Would be dealt to target creature" (Kill-Suit Cultist): this ability's target `toTarget`, as the object it is. */ toTarget?: number; toPlayer?: PlayerRef; /** "A source of your choice", chosen as it resolves (CR 609.7a). */ choose?: TargetSpec; /** "That creature": the trigger's subject. */ bySubject?: true }
   /** "If ~ was kicked, ...", with "... instead" as `otherwise` being what it does when it wasn't. */
   | { type: "if"; cond: SpellCondition; effects: Effect[]; otherwise?: Effect[] }
   /**
@@ -6784,8 +6784,9 @@ export type CountMod =
        * Only counters put on these (Lae'zel: "on a creature or planeswalker you control or on yourself", Doc Samson: "on a
        * permanent you control"); unset = any permanent or player.
        */
-      putOn?: "creatureOrPlaneswalkerYouControlOrYou" | "permanentYouControl";
-      counter?: undefined;
+      putOn?: "creatureOrPlaneswalkerYouControlOrYou" | "permanentYouControl" | /** Prairie Dog: "on a creature you control". */ "creatureYouControl";
+      /** Prairie Dog: only counters of this kind ("+1/+1 counters"); unset = any kind. */
+      counter?: CounterKind;
       on?: undefined;
       who?: undefined;
       other?: undefined;

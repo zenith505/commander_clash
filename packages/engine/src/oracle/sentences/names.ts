@@ -89,10 +89,12 @@ export function parseNamesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // "Target player reveals their hand and discards all Trap cards" (Trapfinder's Trick): every card like that there.
   // Tsabo's Decree: "... discards all creature cards of the chosen type" (after "Choose a creature type"): the type
   // chosen as it resolves.
-  if ((m = /^(Target player|Target opponent) reveals their hand and discards all (.+?) cards( of the chosen type)?$/.exec(s))) {
+  // Void: "... discards all nonland cards with mana value equal to the chosen number" (after "Choose a number"): the number
+  // chosen as it resolves.
+  if ((m = /^(Target player|Target opponent) reveals their hand and discards all (.+?) cards( of the chosen type| with mana value equal to the chosen number)?$/.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     const base = parseSearchFilter(`${m[2]} card`);
-    const filter = base && m[3] ? { ...base, chosen: "type" as const, text: `${base.text} of the chosen type` } : base;
+    const filter = base && m[3] === " of the chosen type" ? { ...base, chosen: "type" as const, text: `${base.text} of the chosen type` } : base && m[3] ? { ...base, chosen: "number" as const, equalsChosen: ["manaValue" as const], text: `${base.text} with mana value equal to the chosen number` } : base;
     return who && filter ? [{ type: "lookAtHand", who, reveal: true }, { type: "discard", who, n: 0, hand: true, filter }] : null;
   }
   // Mind Extraction: "Target player reveals their hand and discards all cards of each of the sacrificed creature's colors":

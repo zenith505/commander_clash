@@ -2246,6 +2246,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Addle: "Choose a color. Target player reveals their hand and you choose a card of that color from it. That player
   // discards that card.": the color chosen as it resolves, then the card you choose (CR 608.2c).
   text = text.replace(/^Choose a color\. (Target player|Target opponent) reveals their hand and you choose a card of that color from it\. (?=That player discards that card\.$)/, "Choose a color. $1 reveals their hand. You choose a card of the chosen color from it. ");
+  // Void: "Choose a number. Destroy all artifacts and creatures with mana value equal to that number. Then target player
+  // reveals their hand and discards all nonland cards with mana value equal to the number.": chosen as it resolves (the
+  // target as it's cast, rulings), 0 included. No Commander card has a mana value over 16, so any number above 20 does the
+  // same as 20: nothing.
+  text = text.replace(/^Choose a number\. (Destroy all artifacts and creatures with mana value equal to) that number\. Then (target player reveals their hand and discards all nonland cards with mana value equal to) the number\.$/, "Choose a number between 0 and 20. $1 the chosen number. Then $2 the chosen number.");
+  // Kheru Lich Lord: "Exile that card at the beginning of your next end step" after a creature card returned at random: the
+  // permanent it became, as "it" (CR 400.7). (Its trigger is at your upkeep, so your next end step is this turn's.)
+  text = text.replace(/(return a creature card at random from your graveyard to the battlefield\. It gains [^.]+\.) Exile that card at the beginning of your next end step\./, "$1 Exile it at the beginning of your next end step.");
   // Persecute: "Choose a color. Target player reveals their hand and discards all cards of that color.": the chosen one.
   text = text.replace(/^(Choose a color\. (?:Target player|Target opponent) reveals their hand and discards all cards of) that color\.$/, "$1 the chosen color.");
   // Undergrowth: "Prevent all combat damage that would be dealt this turn. If this spell's additional cost was paid (read as
@@ -18547,6 +18555,9 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
   // Elemental Appeal: "Create a 7/1 ... token ... Exile it at the beginning of the next end step. If this spell was kicked,
   // that creature gets +7/+0 until end of turn": the delayed exile is about those tokens and leaves them "it" too.
   if (last?.type === "delayed" && last.each === "created" && (ctx.lastCreated || ctx.lastCreatedAny)) return;
+  // Kheru Lich Lord: "... to the battlefield. It gains .... Exile it at the beginning of your next end step. If it would
+  // leave the battlefield, exile it instead ...": the delayed exile of the permanent put there leaves it "it" too.
+  if (last?.type === "delayed" && last.of?.ref === "created" && ctx.lastPut) return;
   // A clash moves no permanents: "those creatures" after it are still the tokens before it (Gilt-Leaf Ambush).
   if (last?.type === "clash") return;
 
@@ -18563,6 +18574,9 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
       (put?.type === "putFromHand" && !put.any) ||
       // "Put a land card from their graveyard onto the battlefield tapped under your control. It gains ..." (Realmbreaker).
       (put?.type === "chooseFromGraveyard" && put.dest === "battlefield" && put.youChoose === true && put.n === 1 && !put.upTo && put.who?.ref !== "eachPlayer") ||
+      // Kheru Lich Lord: one creature card at random from the graveyard onto the battlefield ("It gains flying, trample, and
+      // haste").
+      (put?.type === "randomFromGraveyard" && put.dest === "battlefield" && put.n === undefined && !put.from) ||
       // One card searched for and put onto the battlefield (Vision Quest's "it gains haste").
       (put?.type === "search" && put.n === 1 && !put.others && put.dest.zone === "battlefield" && put.who === undefined && put.library === undefined);
     // "Put a +1/+1 counter on a creature you control. It gains vigilance and trample until end of turn" (Season of

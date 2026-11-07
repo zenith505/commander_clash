@@ -406,6 +406,8 @@ export interface GameObject {
   noRegenTurn?: number;
   /** "~ assigns no combat damage this turn": the turn (CR 510.1). */
   noCombatDamageTurn?: number;
+  /** Gurzigost: "You may have ~ assign its combat damage this turn as though it weren't blocked", chosen as it resolved (rulings): the turn. */
+  unblockedDamageTurn?: number;
   /** "~ assigns no combat damage this combat" (Master of Cruelties): the turn and its combat phase (GameState.combatsThisTurn). */
   noCombatDamageCombat?: { turn: number; combat: number };
   /**
@@ -888,6 +890,8 @@ export interface Player {
   drewFromEmptyLibrary: boolean;
   /** Cards drawn in turn `turn`, for "whenever you draw your second card each turn". */
   draws?: { turn: number; n: number };
+  /** The last card this player drew, in turn `turn`, as the object it became in their hand (Jandor's Ring's "the last card you drew this turn"). */
+  lastDrawn?: { turn: number; id: ObjectId; zc: number };
   /** The names of the creatures that have dealt this player combat damage this game (Gollum, Obsessed Stalker). */
   combatDamagedByNames?: string[];
   /** How many spells of each English name this player has cast this game (copies aren't cast): Approach of the Second Sun. */
@@ -1376,11 +1380,14 @@ export interface ContinuousEffect {
    * as `turnOf`'s next turn begins (CR 611.2b), or when it would have for a player who left (CR 800.4m);
    * "endOfYourNextTurn" in the cleanup step of `turnOf`'s next turn after `sinceTurn` (CR 514.2); "yourNextUpkeep" as
    * the upkeep of `turnOf`'s next turn after `sinceTurn` begins; "controllersNextUntap" as the untap step of `turnOf`'s
-   * next turn after `sinceTurn` begins.
+   * next turn after `sinceTurn` begins; "endOfYourNextUpkeep" as the first upkeep step of `turnOf`'s after the one it
+   * began in (a later turn's, or a later one of turn `sinceTurn` past its `sinceUpkeeps` upkeeps, CR 500.8) ends.
    */
-  duration: "endOfTurn" | /** "Until end of combat": it ends as the combat phase ends (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "yourNextUpkeep" | "controllersNextUntap" | "whileTapped" | "whileControlled";
+  duration: "endOfTurn" | /** "Until end of combat": it ends as the combat phase ends (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "yourNextUpkeep" | /** "Until the end of your next upkeep" (Halfdane). */ "endOfYourNextUpkeep" | "controllersNextUntap" | "whileTapped" | "whileControlled";
   turnOf?: PlayerId;
   sinceTurn?: number;
+  /** With "endOfYourNextUpkeep": the upkeep steps begun in turn `sinceTurn` when it began (TurnLog.upkeeps). */
+  sinceUpkeeps?: number;
   /**
    * "For as long as ~ remains tapped" (CR 611.2b): it ends when that object (`zc` as it was) untaps, leaves the
    * battlefield or phases out (CR 702.26f); `controller`: "for as long as you control ~" too.
@@ -2801,6 +2808,8 @@ export interface Resolving {
     faceDownBottom?: ObjectId[];
     /** moveLinked with `one`: the card is being chosen. */
     linkedPick?: true;
+    /** Phyrexian Grimoire: the opponent's pick of the top two cards has been asked (answer in `found`). */
+    yardSplit?: true;
     linkedCopyPick?: true;
     /** Benthic Anomaly: the creatures chosen so far (one for each opponent), and whether the one to copy is being asked. */
     perOpponent?: { picked: ObjectId[]; copyPick?: true };

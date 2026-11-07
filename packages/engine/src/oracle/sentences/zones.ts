@@ -760,6 +760,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Anurid Scavenger: "sacrifice ~ unless you put a card from your graveyard on the bottom of your library": any card,
   // chosen as it resolves (not targeted).
   if (/^[Pp]ut a card from your graveyard on the bottom of your library$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, dest: "libraryBottom" }];
+  // Crown of Convergence: "Put the top card of your library on the bottom of your library".
+  if (/^[Pp]ut the top card of your library on the bottom of your library$/.test(s)) return [{ type: "topToBottom" }];
   // Stream of Thought: "You shuffle up to four cards from your graveyard into your library": not targeted, chosen as it
   // resolves (rulings), put into the library, which is then shuffled (CR 701.24a), even with none chosen.
   if ((m = /^You shuffle up to (one|two|three|four|five) cards from your graveyard into your library$/.exec(s))) return [{ type: "chooseFromGraveyard", n: num(m[1]!), upTo: true, dest: "libraryBottom" }, { type: "shuffle", who: { ref: "you" } }];
@@ -820,6 +822,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // as it resolves, all at the same time, the one card if they have only one (rulings).
   if ((m = /^[Ee]ach player returns (an?|two|three) land cards? from their graveyard to the battlefield$/.exec(s)))
     return [{ type: "chooseFromGraveyard", n: num(m[1]!.replace(/^an?$/, "one")), dest: "battlefield", filter: { kind: "card", types: ["Land"], notTypes: [], notColors: [], text: "land card" }, who: { ref: "eachPlayer" } }];
+  // Moratorium Stone: "Exile target nonland card from a graveyard, all other cards from graveyards with the same name as that
+  // card, and all permanents with that name": one target, and the rest by its name as this resolves; nothing if it's gone.
+  if ((m = /^Exile (target [a-z ]*card from a graveyard), all other cards from graveyards with the same name as that card, and all permanents with that name$/.exec(s))) {
+    const fx = parseZonesSentence(`Exile ${m[1]}`, ctx);
+    const one = fx?.length === 1 ? fx[0] : undefined;
+    if (one?.type !== "exile" || one.what.ref !== "target" || one.what.n || Object.keys(one).some((k) => !["type", "what"].includes(k))) return null;
+    return [{ type: "exile", what: { ...one.what, sameNameYardsAndPermanents: true } }];
+  }
   // Echoing Return: "Return target creature card and all other cards with the same name as that card from your graveyard to
   // your hand": all at once; nothing if the target is gone (rulings).
   if ((m = /^Return (target .+? card) and all other cards with the same name as that card from your graveyard to your hand$/.exec(s))) {
@@ -1720,6 +1730,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Ethereal Forager: "return an instant or sorcery card exiled with ~ to its owner's hand": one of them, chosen as it
     // resolves.
     if (/^Return an instant or sorcery card exiled with ~ to its owner's hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", one: true, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } }];
+    // Purgatory: "return a card exiled with ~ to the battlefield": one of them, chosen as it resolves, under the control of
+    // the player who puts it there, the ability's controller (CR 110.2a; rulings: even if an opponent took Purgatory).
+    if (/^Return a card exiled with ~ to the battlefield$/.test(s)) return [{ type: "moveLinked", dest: "battlefield", one: true }];
     // Roads Go Ever, Ever On: "Put a card exiled with this Saga into its owner's hand": one of them, chosen as it resolves.
     if (/^Put a card exiled with ~ into its owner's hand$/.test(s)) return [{ type: "moveLinked", dest: "hand", one: true }];
     // Currency Converter: one of them, chosen as it resolves.

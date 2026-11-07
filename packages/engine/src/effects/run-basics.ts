@@ -244,7 +244,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const all = [...parts(e.to), ...(e.also ?? []).flatMap((to) => parts(to).map((x) => (alsoN === undefined ? x : { ...x, n: alsoN })))];
       const host = e.by === "attached" ? objects(s, { ref: "attached" }, ctx)[0] : undefined;
       const made = e.by === "created" ? objects(s, { ref: "created" }, ctx) : e.by === "amassed" ? objects(s, { ref: "amassed" }, ctx) : [];
-      const by = typeof e.by === "object" && "ref" in e.by ? grantSourceSource(s, e.by) : e.by === "subject" ? subjectSource(s, ctx) : e.by === "castSpell" ? castSpellSource(s, ctx) : e.by === "created" || e.by === "amassed" ? (made.length === 1 && made[0]!.zone === "battlefield" ? objectSource(s, made[0]!) : undefined) : e.by === "attached" ? (host?.zone === "battlefield" ? objectSource(s, host) : undefined) : e.by ? targetSource(s, ctx, e.by.target, e.by.lastKnown) : ctxSource(s, ctx);
+      const by = typeof e.by === "object" && "ref" in e.by ? grantSourceSource(s, e.by) : e.by === "subject" ? subjectSource(s, ctx) : e.by === "castSpell" ? castSpellSource(s, ctx) : e.by === "created" || e.by === "amassed" ? (made.length === 1 && made[0]!.zone === "battlefield" ? objectSource(s, made[0]!) : undefined) : e.by === "attached" ? (host?.zone === "battlefield" ? objectSource(s, host) : undefined) : e.by ? targetSource(s, ctx, e.by.target, e.by.lastKnown, e.by.exiled) : ctxSource(s, ctx);
       if (!by) return;
       const from = { ...by, ...(e.unpreventable || (e.unpreventableX !== undefined && (ctx.x ?? 0) >= e.unpreventableX) || (e.unpreventableIf && staticConditionNow(s, e.unpreventableIf, ctx.sourceId ?? "", ctx.controller, undefined, undefined, ctx.sourceZc)) ? { unpreventable: "all" as const } : {}) };
       // All dealt at once: lifelink is one life-gain event (CR 119.10).
@@ -1151,8 +1151,15 @@ function grantSourceSource(s: GameState, by: { id?: string; zc?: number }): Dama
   const ref = { object: o.id, zc: lk.zc };
   return lk.source ? { ...lk.source, controller: lk.controller, ref } : cardSource((lk.copyKey && s.cards[lk.copyKey]) || defOf(s, o), lk.controller, ref);
 }
-function targetSource(s: GameState, ctx: ResolveCtx, index: number, lastKnown?: true): DamageSource | undefined {
+function targetSource(s: GameState, ctx: ResolveCtx, index: number, lastKnown?: true, exiled?: true): DamageSource | undefined {
   const o = ctx.legal[index] ? objects(s, { ref: "target", index }, ctx)[0] : undefined;
+  // Selfless Exorcist: the card this resolution exiled, still that object in exile (CR 400.7), its owner its controller
+  // (CR 108.4a).
+  if (exiled) {
+    const t = ctx.targets[index];
+    if (!o || t?.kind !== "object" || o.zone !== "exile" || t.zc === undefined || (o.zoneChanges ?? 0) !== t.zc + 1) return undefined;
+    return { ...objectSource(s, o), controller: o.owner, ref: { object: o.id, zc: o.zoneChanges ?? 0 } };
+  }
   if (o?.zone === "battlefield") return objectSource(s, o);
   // Moved off the battlefield by this resolution, on its last move: as it last existed there (CR 608.2h).
   const lk = lastKnown && o ? s.lastKnown?.[o.id] : undefined;

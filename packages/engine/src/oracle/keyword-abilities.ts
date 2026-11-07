@@ -841,6 +841,9 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     const filter = parseSearchFilter(m[1]!);
     return filter ? { kind: "exileFromGraveyard", n: 1, filter } : null;
   }
+  // Battlefield Scrounger: "Put three cards from your graveyard on the bottom of your library": chosen as for an exile,
+  // put on the bottom in the order chosen (CR 401.4).
+  if ((m = new RegExp(`^put (${NUM.slice(1, -1)}) cards from your graveyard on the bottom of your library$`, "i").exec(text))) return { kind: "exileFromGraveyard", n: num(m[1]!), toBottom: true };
   // Despoiler of Souls: "Exile two other creature cards from your graveyard", the same.
   if ((m = new RegExp(`^exile (${NUM.slice(1, -1)}|X) (?:other )?(.+?) from your graveyard$`, "i").exec(text)) && (m[1] !== "X" || allowX)) {
     const filter = parseSearchFilter(m[1] === "X" ? m[2]!.replace(/cards$/, "card") : m[2]!);

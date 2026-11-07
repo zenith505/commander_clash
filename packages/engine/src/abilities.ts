@@ -125,6 +125,8 @@ export type Count =
   | { kind: "crewedSource"; saddled?: true }
   /** "Choose a number between 0 and 13. Each player sacrifices that many creatures" (By Invitation Only): the number chosen (Chosen.number). */
   | { kind: "chosenNumber" }
+  /** Shapeshifter: "the last chosen number": the number chosen for the object with the ability (GameObject.chosen), as it entered or later (Effect "choose" `onSource`); 0 when there's none (CR 107.2). */
+  | { kind: "selfChosenNumber" }
   /** "Whenever you cast a spell with {X} in its mana cost, put X +1/+1 counters on ~" (Nev, the Practical Dean): the X that cast spell was cast with (CR 107.3a). */
   | { kind: "castSpellX" }
   /** "The number of times that spell was kicked" (Rumbling Aftershocks): its kicker costs paid as it was cast, multikicker's each time (CR 702.33d). */
@@ -617,6 +619,8 @@ export interface TargetSpec {
   owner?: "you" | "opponent";
   /** For "card": a card in exile linked to the source instead ("target creature card exiled with ~", CR 607.2a). */
   linkedExile?: true;
+  /** For "spell": "target spell with the same name as a card exiled with ~" (Mindreaver): a face-up spell named like one of the cards still exiled by the source's linked ability (CR 607.2a), the source as it was when the ability was activated, also once it's been sacrificed for the cost; a face-down spell has no name (CR 708.2). */
+  nameLinkedExile?: true;
   /**
    * For "card": a face-up card in exile instead, whoever exiled it ("target exiled card with flashback you own", Runic
    * Repetition; "target face-up exiled card", Pull from Eternity; CR 406.3). `owner` as for a graveyard.
@@ -1281,6 +1285,12 @@ export type ObjRef =
        */
       sameName?: { filter: TargetSpec; of?: true };
       /**
+       * Moratorium Stone: "Exile target nonland card from a graveyard, all other cards from graveyards with the same name as
+       * that card, and all permanents with that name": also every other card in any graveyard and every permanent with the
+       * target card's name as this resolves; a face-down permanent has no name (CR 708.2a). Nothing if the target is gone.
+       */
+      sameNameYardsAndPermanents?: true;
+      /**
        * Radiance: "target creature and each other creature that shares a color with it" (Wojek Siren): also every other
        * permanent matching `filter` that has at least one of the target's colors as this resolves; a colorless target
        * shares a color with nothing, and none are affected if the target is illegal (rulings, CR 608.2b).
@@ -1693,7 +1703,9 @@ export interface DamageMod {
    * `times` multiplies by `n` (double, triple); `half` halves, rounded down (`up`: rounded up); `plus` / `minus` add or
    * take away `amount`; `allBut`: all but `n` of it; `prevent`: all of it.
    */
-  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo";
+  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo" | /** "Put that many -1/-1 counters on it instead" (Lichenthrope, Phytohydra, CR 614.1a): none of it is dealt; `counter`s go on the holder. */ "counters";
+  /** With op "counters": the kind put on the permanent instead of the damage. */
+  counter?: "+1/+1" | "-1/-1";
   n?: number;
   amount?: Amount;
   up?: true;
@@ -1993,6 +2005,8 @@ export type Affects =
       greatestManaValue?: true;
       /** Konda's Banner: "Creatures that share a color with equipped creature", "... a creature type ...": with what the source is attached to, as it is then; none while unattached. */
       sharesWithAttached?: "color" | "creatureType";
+      /** Crown of Convergence: "creatures you control that share a color with that card", the top card of its controller's library (its colors there); a colorless card or creature shares none (rulings). */
+      sharesColorWithTop?: true;
     };
 
 /** A static ability that generates a continuous effect (CR 604.1, 611.3). */
@@ -2497,7 +2511,8 @@ export type Effect =
       /** `lastKnown`: "Destroy target artifact. That artifact deals damage ..." (Goblin Tinkerer): the target as it last existed on the battlefield once this has moved it (CR 608.2h). */
       /** `grantSource`: "Blazing Torch deals 2 damage" in an ability it gave: that permanent, as it last existed if it's gone (CR 608.2h). */
       /** `amassed`: "the Army you amassed deals damage ..." (Widespread Brutality): the amassed Army (CR 701.47c), if it's still on the battlefield. */
-      by?: "subject" | "attached" | "castSpell" | "created" | "amassed" | { target: number; lastKnown?: true } | { ref: "grantSource"; id?: ObjectId; zc?: number };
+      /** `exiled` (with `target`): "Exile target creature card from a graveyard. That card deals damage ..." (Selfless Exorcist): the card in exile this resolution put there, its owner controlling it (CR 108.4a). */
+      by?: "subject" | "attached" | "castSpell" | "created" | "amassed" | { target: number; lastKnown?: true; exiled?: true } | { ref: "grantSource"; id?: ObjectId; zc?: number };
       /** "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal goes there (CR 120.4a). */
       excessToController?: true;
       /** "And an additional 1 damage to each green creature" (Kaervek's Hex): a recipient in both `to` and `also` is dealt the two amounts added up, as one. */
@@ -2639,6 +2654,12 @@ export type Effect =
    * the source (CR 607.2a), each owner choosing the order of theirs (rulings).
    */
   | { type: "linkedToBottom" }
+  /**
+   * Phyrexian Grimoire: "Target opponent chooses one of the top two cards of your graveyard. Exile that card and put the
+   * other one into your hand." `chooser` picks among the top two (CR 404.1: the graveyard's order); with only one card
+   * there, it's exiled and nothing goes to the hand (rulings).
+   */
+  | { type: "topYardSplit"; chooser: PlayerRef }
   /**
    * Triumph of Saint Katherine: "exile it and the top six cards of your library in a face-down pile. If you do, shuffle
    * that pile and put it back on top of your library": the card (its source, still that object in the graveyard, CR 400.7) and the
@@ -2974,6 +2995,8 @@ export type Effect =
   | { type: "putAllOnBottom"; filter: TargetSpec }
   /** "Put the cards in your hand on the bottom of your library in any order, then draw that many cards" (Teferi's Puzzle Box, Mindmoil). */
   | { type: "handToBottomDraw"; who: PlayerRef }
+  /** Crown of Convergence: "Put the top card of your library on the bottom of your library": nobody looks at it (CR 401.2). */
+  | { type: "topToBottom" }
   | { type: "tap"; what: ObjRef; /** "Where X is the number of Islands tapped this way" follows (Monsoon): how many it tapped (Count "tappedThisWay"). */ noteTapped?: true; /** Breaking Wave: "Simultaneously untap all tapped creatures and tap all untapped creatures": each of `what` that's tapped untaps and each untapped one taps, at once. */ swap?: true }
   /** "Turn target face-down creature face up" (CR 708.8): with no cost paid; see turnFaceUpByEffect. */
   /**
@@ -3058,7 +3081,7 @@ export type Effect =
   /** "Look at target face-down creature" (Smoke Teller): the card it is, shown to this ability's controller only (CR 708.5). */
   | { type: "lookAtFaceDown"; what: ObjRef }
   /** "~ assigns no combat damage this turn" (CR 510.1). */
-  | { type: "noCombatDamage"; what: ObjRef; /** "This combat" rather than "this turn" (Master of Cruelties). */ combat?: true }
+  | { type: "noCombatDamage"; what: ObjRef; /** "This combat" rather than "this turn" (Master of Cruelties). */ combat?: true; /** Gurzigost: instead, it assigns its combat damage this turn as though it weren't blocked (CR 510.1c), decided as the effect resolved (rulings), so no choice is left for the damage step. */ asUnblocked?: true }
   | { type: "untap"; what: ObjRef }
   /**
    * "Untap up to seven lands" (Palinchron, Snap): its controller chooses as it resolves, among any player's tapped lands
@@ -3530,7 +3553,7 @@ export type Effect =
    * though it were goaded" (not goaded, Kardur).
    */
   | { type: "ungoad"; what: ObjRef }
-  | { type: "continuous"; /** With duration "game": "until ~ is cast from exile" (Shattered Seraph), the card this ability's cost exiled (ContinuousEffect.untilCast). */ untilCastFromExile?: true; /** With duration "game": "until a player casts a creature spell" (Soul Sculptor, ContinuousEffect.untilCreatureSpell). */ untilCreatureSpellCast?: true; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | /** "Until your next upkeep" (Erhnam Djinn). */ "yourNextUpkeep" | /** "Until its controller's next untap step" (Orcish Farmer): the affected permanent's controller as it resolves. */ "controllersNextUntap" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** With `giveTo`: "If they do, ..." after it (Stiltzkin, Moogle Merchant): whether that player gained control of it is what "if you do" asks. */ setsDid?: true; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind; /** "For as long as that creature is enchanted" (Rootwater Matriarch): only to those enchanted now, each until it has no Aura attached (rulings). */ whileEnchanted?: true; /** Inferno of the Star Mounts: note ~'s power just before this applies (ResolvingState.powerBefore), for a "powerBecame" condition after it. */ notePower?: true }
+  | { type: "continuous"; /** With duration "game": "until ~ is cast from exile" (Shattered Seraph), the card this ability's cost exiled (ContinuousEffect.untilCast). */ untilCastFromExile?: true; /** With duration "game": "until a player casts a creature spell" (Soul Sculptor, ContinuousEffect.untilCreatureSpell). */ untilCreatureSpellCast?: true; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | /** "Until your next upkeep" (Erhnam Djinn). */ "yourNextUpkeep" | /** "Until the end of your next upkeep" (Halfdane): as that upkeep step ends. */ "endOfYourNextUpkeep" | /** "Until its controller's next untap step" (Orcish Farmer): the affected permanent's controller as it resolves. */ "controllersNextUntap" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** With `giveTo`: "If they do, ..." after it (Stiltzkin, Moogle Merchant): whether that player gained control of it is what "if you do" asks. */ setsDid?: true; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind; /** "For as long as that creature is enchanted" (Rootwater Matriarch): only to those enchanted now, each until it has no Aura attached (rulings). */ whileEnchanted?: true; /** Inferno of the Star Mounts: note ~'s power just before this applies (ResolvingState.powerBefore), for a "powerBecame" condition after it. */ notePower?: true }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).
@@ -4710,7 +4733,7 @@ export type Effect =
    * PlayerRef "chosenPlayer" `nth` is that player. `prompt`: what the player is chosen for.
    */
   | { type: "choosePlayer"; prompt: string }
-  | { type: "choose"; choice: ChoiceKind; /** With "opponent": "Choose an opponent at random" (Vial Smasher the Fierce): one still in the game, as it resolves. */ random?: true; /** With "opponent": "choose an opponent at random that ~ didn't attack during your last combat" (Territorial Hellkite): not the player this source attacked in its controller's combat before the one going on (GameObject.attackedInCombat, Player.combatsBegun); none chosen if there's no other. */ notAttackedLastCombat?: true; /** With "opponent" and `random`: "choose a player at random" (Wildfire Devils): any player still in the game, you too. */ anyPlayer?: true; /** With "opponent": kept on the source permanent (GameObject.chosen.player) for its "the last chosen player" (Triarch Stalker; set by compile.ts). */ keepOnSource?: true; /** With "opponent": "Choose an opponent." a second time in the same ability (Sylvan Offering): chosen anew, "that player" after it being the new one. */ again?: true; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. "opponents": "an opponent with the most life among your opponents" (The Master, Gallifrey's End). */ mostLife?: true | "opponents" | /** Loxodon Peacekeeper: "a player with the lowest life total", any player, you too. */ "least"; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose; /** "Choose a number between 0 and 10" (Expel the Interlopers): any whole number in it, into Chosen.number. */ range?: { min: number; max: number }; /** With "number": "Discard any number of cards at random" (Rites of Initiation): from 0 to the cards in its controller's hand as it resolves, into Chosen.number. */ upToHand?: true };
+  | { type: "choose"; choice: ChoiceKind; /** With "opponent": "Choose an opponent at random" (Vial Smasher the Fierce): one still in the game, as it resolves. */ random?: true; /** With "opponent": "choose an opponent at random that ~ didn't attack during your last combat" (Territorial Hellkite): not the player this source attacked in its controller's combat before the one going on (GameObject.attackedInCombat, Player.combatsBegun); none chosen if there's no other. */ notAttackedLastCombat?: true; /** With "opponent" and `random`: "choose a player at random" (Wildfire Devils): any player still in the game, you too. */ anyPlayer?: true; /** With "opponent": kept on the source permanent (GameObject.chosen.player) for its "the last chosen player" (Triarch Stalker; set by compile.ts). With "number": GameObject.chosen.number, "the last chosen number" (Shapeshifter). */ keepOnSource?: true; /** With "opponent": "Choose an opponent." a second time in the same ability (Sylvan Offering): chosen anew, "that player" after it being the new one. */ again?: true; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. "opponents": "an opponent with the most life among your opponents" (The Master, Gallifrey's End). */ mostLife?: true | "opponents" | /** Loxodon Peacekeeper: "a player with the lowest life total", any player, you too. */ "least"; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose; /** "Choose a number between 0 and 10" (Expel the Interlopers): any whole number in it, into Chosen.number. */ range?: { min: number; max: number }; /** With `range`: "Choose a number greater than 0" (Scrying Glass), offered up to the cards in this player's hand (at least `range.min`): a greater number could never match what they reveal, so it is left out. */ maxHandOf?: PlayerRef; /** With "number": "Discard any number of cards at random" (Rites of Initiation): from 0 to the cards in its controller's hand as it resolves, into Chosen.number. */ upToHand?: true };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
 /** "keyword": "gains your choice of flying, vigilance, deathtouch, or haste", from the options listed (CR 608.2d). */
@@ -6500,7 +6523,7 @@ export type AdditionalCost =
   /** `other`: "sacrifice another creature", not the ability's source. */
   | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; /** With `other`: the source itself may be sacrificed if it's one of these ("another creature or an artifact"). */ selfIf?: TargetSpec; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up"; /** "Exile a creature you control" (The Soul Stone): chosen the same way, but exiled, not sacrificed (CR 701.21a doesn't apply). */ exile?: true; /** "You may sacrifice one or more creatures" (Plumb the Forbidden): X may be 0, and is how many. */ optional?: true; /** "Sacrifice a creature you control with mana value X other than ~" (Sidisi, Regent of the Mire): X announced as it's activated (CR 107.3a, 602.2b), then one with that mana value. */ mvX?: true; /** "Sacrifice a Swamp and a Forest" (Jarad): `n` permanents, each matching a different one of these (a land that's both is either, not both; rulings). */ oneOfEach?: TargetSpec[]; /** "Sacrifice three artifact tokens with different names" (Transmutation Font): no two with the same name. */ differentNames?: true }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
-  | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec; /** "Discard a card with mana value X" (Kozilek, the Great Distortion): X is announced as it's activated (CR 107.3a), and `filter` gets that mana value. */ mvX?: true; /** "Discard two nonland cards with the same name" (Sphinx of the Chimes): all of the `n` cards share a name (CR 201.2). */ sameName?: true; /** "Discard three cards with different names" (Ormos, Archive Keeper): no two with the same name. */ differentNames?: true }
+  | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec; /** "Discard a card with mana value X" (Kozilek, the Great Distortion): X is announced as it's activated (CR 107.3a), and `filter` gets that mana value. */ mvX?: true; /** "Discard two nonland cards with the same name" (Sphinx of the Chimes): all of the `n` cards share a name (CR 201.2). */ sameName?: true; /** "Discard three cards with different names" (Ormos, Archive Keeper): no two with the same name. */ differentNames?: true; /** "Discard the last card you drew this turn" (Jandor's Ring): that card only, while it's still in your hand (rulings); nothing to choose. */ lastDrawn?: true }
   | { kind: "payLife"; n: number; x?: true; /** Phyrexian Purge: "costs 3 life more to cast for each target": `n` for each target chosen (CR 601.2c, 601.2f). */ perTarget?: true }
   /** Nissa, Worldsoul Speaker's alternative cost: "pay eight {E}" (CR 107.14: lose that many energy counters). */
   | { kind: "payEnergy"; n: number }
@@ -6509,7 +6532,7 @@ export type AdditionalCost =
    * `linked`: "Put a card exiled with ~ into its owner's graveyard" (Jester's Scepter): one of the cards the source's
    * linked exile took (CR 607.2a), moved to its owner's graveyard, chosen in CostChoices.exileCards.
    */
-  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true; linked?: true; /** "Put a card an opponent owns from exile into that player's graveyard" (the Eldrazi processors): any card an opponent owns in exile, chosen in CostChoices.exileCards. */ process?: true }
+  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true; linked?: true; /** "Put three cards from your graveyard on the bottom of your library" (Battlefield Scrounger): the chosen cards go to the bottom of your library, in the order chosen (CR 401.4), not into exile. */ toBottom?: true; /** "Put a card an opponent owns from exile into that player's graveyard" (the Eldrazi processors): any card an opponent owns in exile, chosen in CostChoices.exileCards. */ process?: true }
   /** Ninjutsu (CR 702.49a): "Return an unblocked attacker you control to hand". */
   | { kind: "returnToHand"; filter: TargetSpec; n: number; unblockedAttacker?: boolean; x?: true }
   /**

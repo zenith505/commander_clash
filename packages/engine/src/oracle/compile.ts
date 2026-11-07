@@ -6459,6 +6459,15 @@ function linkExile(out: CompiledCard) {
   // "Target creature card exiled with ~" (Dino DNA, The Darkness Crystal): linked to the one ability that exiles cards
   // (CR 607.2a), or to its replacement effect that exiles them (The Darkness Crystal's, already linked).
   const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
+  // Mindreaver: "target spell with the same name as a card exiled with ~": the cards its one exile instruction (heroic's
+  // "exile the top three cards of target player's library") exiled (CR 607.2a).
+  if (bodies.some((b) => b.targets.some((t) => t.nameLinkedExile))) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
+    const others = all.some((e) => ["exile", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong"].includes(e.type) || (e.type === "search" && e.dest.zone === "exile") || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile));
+    if (others || out.spell || tops.length !== 1 || out.exileInsteadOfDying) out.unsupported.push("(names a card exiled with it that it can't link to one exile ability)");
+    else tops[0]!.linked = true;
+  }
   if (bodies.some((b) => b.targets.some((t) => t.linkedExile))) {
     const all = bodies.flatMap((b) => allEffects(b.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");
     // Bronzebeak Foragers: "exile ... until ~ leaves the battlefield" when that's its only exile ability.
@@ -6540,6 +6549,13 @@ function linkExile(out: CompiledCard) {
   if (out.statics.some((st) => st.affects.kind === "filter" && st.affects.spec?.chosen === "attackingPlayer")) {
     const chooses = out.triggers.flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "choose" }> => e.type === "choose" && e.choice === "opponent");
     if (chooses.length !== 1 || out.spell || out.entersChoose) out.unsupported.push("(the last chosen player isn't chosen by one triggered ability)");
+    else chooses[0]!.keepOnSource = true;
+  }
+  // Shapeshifter: "the last chosen number" is the one chosen as it entered or by its one "you may choose a number"
+  // trigger since, kept on the permanent (rulings: one choice each upkeep).
+  if (JSON.stringify(out.statics).includes('"selfChosenNumber"')) {
+    const chooses = out.triggers.flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "choose" }> => e.type === "choose" && e.choice === "number" && !!e.range);
+    if (chooses.length !== 1 || out.spell || out.activated.length || out.entersChoose?.length !== 1 || out.entersChoose[0]!.what !== "number") out.unsupported.push("(the last chosen number isn't chosen as it enters and by one triggered ability)");
     else chooses[0]!.keepOnSource = true;
   }
   // Circu: both of its "exile the top card of target player's library" triggers are linked to its ban (CR 607.2a).

@@ -587,6 +587,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const a = { ref: "target" as const, index: ctx.lastObjectTarget };
     return [{ type: "damage", amount: { count: { kind: "manaValue", of: a } }, to: { ref: "self" }, by: { target: a.index, lastKnown: true } }];
   }
+  // Selfless Exorcist: "Exile target creature card from a graveyard. That card deals damage equal to its power to ~": the
+  // card in exile is the source (its owner controls it, CR 108.4a), its power there (a characteristic-defining ability
+  // works in every zone, CR 604.3, rulings); nothing if it didn't get to exile.
+  if (/^That card deals damage equal to its power to ~$/.test(s) && ctx.exiledTarget !== undefined && ctx.exiledTarget === ctx.targets.length - 1) {
+    const spec = ctx.targets[ctx.exiledTarget]!;
+    if (spec.kind !== "card" || spec.many || spec.types?.join() !== "Creature" || spec.text !== "target creature card from a graveyard") return null;
+    const a = { ref: "target" as const, index: ctx.exiledTarget };
+    return [{ type: "damage", amount: { count: { kind: "power", of: a } }, to: { ref: "self" }, by: { target: a.index, exiled: true } }];
+  }
   // Dizzying Gaze: "{R}: Enchanted creature deals 1 damage to target creature with flying": damage from the creature the
   // Aura enchants as the ability resolves (as it last existed if the Aura has left, CR 608.2h), not from the Aura.
   if ((m = /^Enchanted creature deals (\d+) damage to (target creature(?: with [a-z]+)?)$/.exec(s)) && !ctx.spell && ctx.activated) {
@@ -948,6 +957,10 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Jester's Scepter: "Counter target spell if it has the same name as that card", the card put into a graveyard for the
   // cost; any spell can be targeted (rulings).
   if (/^Counter target spell if it has the same name as that card$/i.test(s) && ctx.activated && ctx.costLinked) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifCostCardName: true }];
+  // Mindreaver: "Counter target spell with the same name as a card exiled with ~": named like one of the cards its linked
+  // ability exiled (CR 607.2a), checked as it's activated and as it resolves (CR 608.2b).
+  if (/^Counter target spell with the same name as a card exiled with ~$/.test(s) && ctx.activated && !ctx.spell)
+    return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", nameLinkedExile: true, text: "target spell with the same name as a card exiled with ~" }) }];
   // "Counter target spell with mana value 4 or less", "... with mana value X" (Spell Blast: the X it's cast with).
   // "Counter up to one target creature spell" (Repel Intruders): none at all is fine too (CR 115.6).
   // "Counter target spell with the chosen name" (Declaration of Naught): the name chosen as its source entered.

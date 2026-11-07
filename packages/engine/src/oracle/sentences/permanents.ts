@@ -32,7 +32,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // permanent (CR 611.2a, 105.3); a permanent spell's new color stays with the permanent it becomes (CR 112.4, 400.7a).
   // Blind Seer, Eight-and-a-Half-Tails: "... becomes the color of your choice / white until end of turn" (rulings: the
   // permanent a spell becomes keeps it until end of turn). Vodalian Mystic: "Target instant or sorcery spell becomes ...".
-  if ((m = /^[Tt]arget (spell or permanent|instant or sorcery spell) becomes (white|blue|black|red|green|the chosen color)( until end of turn)?$/.exec(s))) {
+  // Ersatz Gnomes: "Target spell becomes colorless": likewise, the permanent it becomes staying colorless (rulings).
+  if ((m = /^[Tt]arget (spell or permanent|instant or sorcery spell|spell) becomes (white|blue|black|red|green|the chosen color|colorless)( until end of turn)?$/.exec(s)) && (m[1] === "spell" ? m[2] === "colorless" && !m[3] : true)) {
     const perm = m[1] === "spell or permanent" ? parseTargetPhrase("permanent") : undefined;
     const spell: TargetSpec | null = perm ? { kind: "spell", types: [], notTypes: [], notColors: [], orPermanent: perm, text: "target spell or permanent" } : parseTargetPhrase(m[1]!);
     const mods = parseBecomes(m[2]!);
@@ -730,6 +731,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(`all Equipment attached to ${m[1]}`, ctx);
     return what ? [{ type: "unattach", what }] : null;
   }
+  // Gurzigost: "You may have ~ assign its combat damage this turn as though it weren't blocked": chosen as this resolves,
+  // not as the damage is assigned (rulings), all of it to the player or planeswalker it's attacking (CR 510.1c).
+  if (/^(?:~ assigns|[Hh]ave ~ assign) its combat damage this turn as though it weren't blocked$/.test(s)) return [{ type: "noCombatDamage", what: { ref: "self" }, asUnblocked: true }];
   // "~ assigns no combat damage this turn" (CR 510.1): the Laccoliths, Ophidian.
   if ((m = /^(.+?) assigns no combat damage this (turn|combat)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
@@ -799,6 +803,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // trigger's creature's as it resolves, locked in then (layer 7b; rulings, CR 608.2h).
   if (/^~'s base power and toughness become equal to that creature's power and toughness until end of turn$/.test(s) && ctx.subject && !ctx.subjectIt)
     return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPT", power: { count: { kind: "power", of: { ref: "subject" } } }, toughness: { count: { kind: "toughness", of: { ref: "subject" } } } }], duration: "endOfTurn" }];
+  // Halfdane: "~'s base power and toughness become equal to the power and toughness of target creature other than ~ until
+  // the end of your next upkeep" (read as "another target creature"): that creature's as this resolves, locked in then (CR 608.2h), in layer 7b (CR 613.4b).
+  if ((m = /^~'s base power and toughness become equal to the power and toughness of (another target creature) until the end of your next upkeep$/.exec(s)) && !ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    if (what?.ref !== "target" || what.n) return null;
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPT", power: { count: { kind: "power", of: what } }, toughness: { count: { kind: "toughness", of: what } } }], duration: "endOfYourNextUpkeep" }];
+  }
   // Galion, Elvenking's Butler: "choose up to one other target creature you control. Its base power and toughness become
   // equal to ~'s power and toughness until end of turn"; Exuberant Wolfbear: "you may have the base power and toughness of
   // target Human you control become equal to ~'s power and toughness until end of turn"; Unruly Krasis: "... become X/X

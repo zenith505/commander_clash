@@ -2564,6 +2564,12 @@ export function parseStatic(line: string): StaticAbility | null {
   // as layers 4 and 5 leave them (CR 613.1d-e) when the P/T change applies (layer 7c). Sharing two colors is still +1/+1.
   const banner = /^Creatures that share a (color|creature type) with equipped creature get ([+-]\d+)\/([+-]\d+)\.$/.exec(line);
   if (banner) return { affects: { kind: "filter", types: ["Creature"], sharesWithAttached: banner[1] === "color" ? "color" : "creatureType" }, mods: [{ kind: "modifyPT", power: Number(banner[2]), toughness: Number(banner[3]) }], text: line };
+  // Crown of Convergence: "As long as the top card of your library is a creature card, creatures you control that share a
+  // color with that card get +1/+1": its colors as it is there, checked continuously (CR 611.3a); a colorless card or
+  // creature shares no color (rulings, CR 105.2c).
+  const crown = /^As long as the top card of your library is a creature card, creatures you control that share a color with that card get ([+-]\d+)\/([+-]\d+)\.$/.exec(line);
+  if (crown)
+    return { affects: { kind: "filter", types: ["Creature"], controller: "you", sharesColorWithTop: true }, mods: [{ kind: "modifyPT", power: Number(crown[1]), toughness: Number(crown[2]) }], condition: { kind: "topCardIs", filter: { kind: "object", types: ["Creature"], text: "creature card" } }, text: line };
   const st = parseStaticLine(line) ?? parseTransform(line);
   if (st) return lookBackGrant(st);
   // Angry Mob: "During your turn, ~'s power and toughness are each equal to 2 plus the number of Swamps your opponents
@@ -3341,6 +3347,9 @@ function parseDefinedPT(text: string): Modification | null {
     const c = ok(parseCount(m[1]!, null));
     return c && { kind: "definePT", power: c, toughness: c };
   }
+  // Shapeshifter: "~'s power is equal to the last chosen number and its toughness is equal to 7 minus that number".
+  if ((m = /^~'s power is equal to the last chosen number and its toughness is equal to (\d+) minus that number$/.exec(text)))
+    return { kind: "definePT", power: { count: { kind: "selfChosenNumber" } }, toughness: { count: { kind: "selfChosenNumber" }, times: -1, plus: Number(m[1]) } };
   if ((m = /^~'s power is equal to (.+?) and its toughness is equal to (.+)$/.exec(text))) {
     const p = ok(parseCount(m[1]!, null));
     const same = /^that number(?: (plus|minus) (\d+))?$/.exec(m[2]!);

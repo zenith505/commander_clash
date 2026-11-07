@@ -1265,6 +1265,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Éowyn: "protection from each of that creature's colors" is the colors of the ability's one target (TARGET_COLORS_PROTECTION).
   // Samite Elder: "each of that permanent's colors" likewise.
   if (body && /each of that (?:creature|permanent)'s colors/.test(text) && (body.targets.length !== 1 || body.targets[0]!.kind !== "object")) return null;
+  // Opal Titan: "each of that spell's colors" is only a cast trigger's spell.
+  if (body && /each of that spell's colors/.test(text) && !opts.castSpell) return null;
   return body;
 }
 
@@ -1990,6 +1992,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // to the number of loyalty counters on him and gains indestructible. He's still a planeswalker.": the number locked in
   // as it resolves (rulings, CR 608.2h), like Gideon Jura's "becomes a 6/6 ... creature that's still a planeswalker".
   text = text.replace(/^Until end of turn, ~ becomes an? ([A-Z][a-z]+(?: [A-Z][a-z]+)*) creature with power and toughness each equal to the number of loyalty counters on ~ and gains indestructible\. (?:He|She|It)'s still a planeswalker\./, "Until end of turn, ~ becomes an X/X $1 creature with indestructible that's still a planeswalker, where X is the number of loyalty counters on it.");
+  // Veiled Sentry: "it becomes an Illusion creature with power and toughness each equal to that spell's mana value": the
+  // mana value of the spell that triggered it as it was cast, remembered if it has left the stack (rulings), locked in as
+  // this resolves (CR 608.2h).
+  text = text.replace(/^(~|[Ii]t) becomes an? ([A-Z][a-z]+) creature with power and toughness each equal to that spell's mana value\.$/, "~ becomes an X/X $2 creature, where X is that spell's mana value.");
+  // Horn of Plenty: "they may pay {1}. If the player does, they draw a card at the beginning of the next end step": the
+  // player who cast the spell decides and pays (CR 603.5, 608.2d), then draws at the next end step to begin.
+  text = text.replace(/^they may pay (\{\d+\})\. If the player does, they draw a card at the beginning of the next end step\.$/, "that player may pay $1. If they do, that player draws a card at the beginning of the next end step.");
   // Drag the Canal: "If a creature died this turn, you gain 2 life, surveil 2, then investigate": the same three
   // instructions in order, all under the condition.
   text = text.replace(/(you gain \d+ life, surveil \d+), then (investigate)\./, "$1, and $2.");
@@ -2653,6 +2662,26 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     return {
       targets: grasp ? [{ kind: "player", opponent: true, text: "target opponent" }] : [],
       effects: [{ type: "search", n: 1, upTo: false, dest: { zone: "exile", faceDown: true, ...play }, reveal: false, ...(grasp ? { library: { ref: "target", index: 0 } } : {}) }],
+      text,
+    };
+  }
+  // Phyrexian Grimoire (see Effect "topYardSplit"): the opponent is targeted, the cards aren't (rulings).
+  if (opts.activated && text.trim() === "Target opponent chooses one of the top two cards of your graveyard. Exile that card and put the other one into your hand.")
+    return { targets: [{ kind: "player", opponent: true, text: "target opponent" }], effects: [{ type: "topYardSplit", chooser: { ref: "target", index: 0 } }], text };
+  // Scrying Glass: the number and the color are chosen as it resolves, then the opponent reveals (rulings); "exactly" the
+  // chosen number of cards of the chosen color in their hand (CR 105.1: five colors).
+  if (opts.activated && text.trim() === "Choose a number greater than 0 and a color. Target opponent reveals their hand. If that opponent reveals exactly the chosen number of cards of the chosen color, you draw a card.") {
+    const opp: PlayerRef = { ref: "target", index: 0 };
+    const ofColor: Amount = { count: { kind: "cardsInHand", who: opp, filter: { kind: "object", notTypes: [], notColors: [], chosen: "color", text: "card of the chosen color" } } };
+    const chosen: Amount = { count: { kind: "chosenNumber" } };
+    return {
+      targets: [{ kind: "player", opponent: true, text: "target opponent" }],
+      effects: [
+        { type: "choose", choice: "number", range: { min: 1, max: 1 }, maxHandOf: opp },
+        { type: "choose", choice: "color" },
+        { type: "lookAtHand", who: opp, reveal: true },
+        { type: "if", cond: { kind: "amountsCompare", a: ofColor, atLeast: chosen }, effects: [{ type: "if", cond: { kind: "amountsCompare", a: chosen, atLeast: ofColor }, effects: [{ type: "draw", who: { ref: "you" }, n: 1 }] }] },
+      ],
       text,
     };
   }
@@ -6491,6 +6520,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       }
       if (!who || who.ref === "you" || !options || !then || then.some((e) => pauses(e))) return null;
       effects.push({ type: "punisher", who, options, effects: then, thenText: thatThen[1]!.replace(/^you (\w+)/, (_, v: string) => `${v}s`).replace(/^return that card (.+?) under your control/, "returns that card $1 under their control").replace(/\.$/, "") });
+      si++;
+      continue;
+    }
+    // Emberwilde Djinn: "At the beginning of each player's upkeep, that player may pay {R}{R} or 2 life. If the player
+    // does, they gain control of ~": either payment, their choice, then what it buys; nothing if they pay neither.
+    const eitherPay = thatMay && /^((?:\{[WUBRGC0-9]\})+) or (\d+) life$/.exec(thatMay[2]!);
+    const eitherDo = eitherPay && /^If (?:the player|that player|they) (?:does|do), (.+?)\.?$/.exec(sentences[si + 1] ?? "");
+    if (eitherPay && eitherDo && ctx.eventPlayer && /^that player$/i.test(thatMay![1]!)) {
+      const then = parseOne(capital(eitherDo[1]!.replace(/^they gain control of ~$/, "that player gains control of ~")), ctx);
+      if (!then || then.some((e) => pauses(e))) return null;
+      effects.push({ type: "punisher", who: { ref: "eventPlayer" }, options: [{ pay: { cost: eitherPay[1]! } }, { pay: { cost: "", life: Number(eitherPay[2]) } }], effects: then, mode: "ifAny", thenText: eitherDo[1]! });
       si++;
       continue;
     }

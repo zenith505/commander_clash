@@ -5552,7 +5552,11 @@ export function castProblem(
   // Silver Scrutiny: begun as though it had flash when an X it could be cast with is small enough (CR 601.3b), then only
   // with that X announced (601.2b); before X is announced it counts as 0.
   const smallX = compileCard(d).flashIfXAtMost !== undefined && (x ?? 0) <= compileCard(d).flashIfXAtMost!;
-  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid));
+  // Molten Exhale: begun as though it had flash when there's a Dragon to behold (CR 601.3c), then only with it beheld
+  // (its targets chosen, the cast is all announced: compile requires a target).
+  const beholdFlashCost = compileCard(d).flashIfKicked ? compileCard(d).kicker?.extraCosts?.[0] : undefined;
+  const beholdFlash = beholdFlashCost?.kind === "reveal" && (!!choices?.kicks?.includes(0) || (!targets && !!s.objects[id] && beholdCandidates(s, pid, s.objects[id]!, beholdFlashCost).length > 0));
+  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || beholdFlash || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid));
   // Offering (CR 702.48a): with a permanent sacrificed for it; before its costs are chosen, when there's one to sacrifice.
   const offered = !!compileCard(d).offering && (choices ? choices.offering !== undefined : offeringCandidates(s, pid, id).length > 0);
   if (!free && !instantSpeed && !offered && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
@@ -6743,6 +6747,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const free = freeCastOf(s, p.id) === id && !madness;
   // X is announced as it's cast (CR 601.2b) and is part of the spell while it's on the stack (CR 107.3a).
   const hasX = parseManaCost(d.manaCost).hasX || costsHaveX(d, choices) || !!choices?.kicks?.some((i) => parseManaCost(compileCard(d).kicker?.costs[i] ?? "").hasX);
+  const beholdCost = compileCard(d).kicker?.extraCosts?.[0];
+  const beheld = kicks?.includes(0) && beholdCost?.kind === "reveal" && beholdCost.orControl && choices.reveal?.length === 1 ? s.objects[choices.reveal[0]!] : undefined;
   s.stack.push({
     id: `s${s.nextId++}`,
     kind: "spell",
@@ -6757,6 +6763,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     ...(byControl ? { kickedByControl: true as const } : {}),
     // Swallow Whole: the creature tapped for its "tap an untapped creature you control" additional cost (ObjRef costTapped).
     ...(choices.tap?.length === 1 && s.objects[choices.tap[0]!] && compileCard(d).additionalCosts?.some((c) => c.kind === "tap" && c.n === 1 && !c.untap) ? { stationed: { id: choices.tap[0]!, zc: s.objects[choices.tap[0]!]!.zoneChanges ?? 0, power: power(s, s.objects[choices.tap[0]!]!) } } : {}),
+     // Dragon's Fire: the Dragon card revealed or the Dragon chosen for its behold cost (Amount beheldPower, CR 701.4a).
+    ...(beheld ? { stationed: { id: beheld.id, zc: beheld.zoneChanges ?? 0, power: beheld.zone === "battlefield" ? power(s, beheld) : cardPT(s, beheld, "power") } } : {}),
   });
   const item = s.stack[s.stack.length - 1]!;
   const stackId = item.id;

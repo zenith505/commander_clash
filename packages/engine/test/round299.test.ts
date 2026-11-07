@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
 import { attackProblem, attackTaxOf, castProblem, spellCost } from "../src/game";
-import { applyAction, invalidateCharacteristics, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { applyAction, botActions, invalidateCharacteristics, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -56,6 +56,9 @@ const lootDispute = (): CardDef => ({"oracleId":"7c885698-69f2-44b5-abfe-9a28338
 const silverquillTheDisputant = (): CardDef => ({"oracleId":"66deb3f3-0314-427e-9cb8-6befa365ae94","name":"Silverquill, the Disputant","manaCost":"{2}{W}{B}","cmc":4,"typeLine":"Legendary Creature — Elder Dragon","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Elder","Dragon"],"oracleText":"Flying, vigilance\nEach instant and sorcery spell you cast has casualty 1. (As you cast that spell, you may sacrifice a creature with power 1 or greater. When you do, copy the spell and you may choose new targets for the copy.)","power":"4","toughness":"4","colors":["B","W"],"colorIdentity":["B","W"],"keywords":["Flying","Vigilance"],"imageUrl":"https://cards.scryfall.io/normal/front/1/7/1742c9cd-5ba0-4335-9999-acc7f9d4f73c.jpg?1783903631","artUrl":"https://cards.scryfall.io/art_crop/front/1/7/1742c9cd-5ba0-4335-9999-acc7f9d4f73c.jpg?1783903631","commanderLegal":"legal","set":"sos","releasedAt":"2026-04-24","rarity":"mythic","layout":"normal","gameChanger":false} as CardDef);
 const anheloThePainter = (): CardDef => ({"oracleId":"d3c3f293-6790-4dce-900a-8af0464c2572","name":"Anhelo, the Painter","manaCost":"{U}{B}{R}","cmc":3,"typeLine":"Legendary Creature — Vampire Assassin","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Vampire","Assassin"],"oracleText":"Deathtouch\nThe first instant or sorcery spell you cast each turn has casualty 2. (As you cast that spell, you may sacrifice a creature with power 2 or greater. When you do, copy the spell and you may choose new targets for the copy.)","power":"1","toughness":"3","colors":["B","R","U"],"colorIdentity":["B","R","U"],"keywords":["Deathtouch"],"imageUrl":"https://cards.scryfall.io/normal/front/4/6/462e887d-6b91-4b31-9487-2780ffe8943f.jpg?1783923381","artUrl":"https://cards.scryfall.io/art_crop/front/4/6/462e887d-6b91-4b31-9487-2780ffe8943f.jpg?1783923381","commanderLegal":"legal","set":"ncc","releasedAt":"2022-04-29","rarity":"mythic","layout":"normal","gameChanger":false} as CardDef);
 const ashadTheLoneCyberman = (): CardDef => ({"oracleId":"f3902dfd-6d09-425f-8446-a68cae2eea50","name":"Ashad, the Lone Cyberman","manaCost":"{1}{U}{B}{R}","cmc":4,"typeLine":"Legendary Artifact Creature — Cyberman","supertypes":["Legendary"],"types":["Artifact","Creature"],"subtypes":["Cyberman"],"oracleText":"The first nonlegendary artifact spell you cast each turn has casualty 2. (As you cast it, you may sacrifice a creature with power 2 or greater. When you do, copy it. A copy of an artifact spell becomes a token.)\nWhenever you sacrifice another creature, put a +1/+1 counter on Ashad.","power":"3","toughness":"3","colors":["B","R","U"],"colorIdentity":["B","R","U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/2/d/2dc19e32-4f78-492f-8586-54ad4ae6fcec.jpg?1783914640","artUrl":"https://cards.scryfall.io/art_crop/front/2/d/2dc19e32-4f78-492f-8586-54ad4ae6fcec.jpg?1783914640","commanderLegal":"legal","set":"who","releasedAt":"2023-10-13","rarity":"rare","layout":"normal","gameChanger":false} as CardDef);
+
+const dragonsFire = (): CardDef => ({"oracleId":"7237d607-2613-4786-96d6-55792c2e02b9","name":"Dragon's Fire","manaCost":"{1}{R}","cmc":2,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"As an additional cost to cast this spell, you may reveal a Dragon card from your hand or choose a Dragon you control.\nDragon's Fire deals 3 damage to target creature or planeswalker. If you revealed a Dragon card or chose a Dragon as you cast this spell, Dragon's Fire deals damage equal to the power of that card or creature instead.","colors":["R"],"colorIdentity":["R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/3/a/3a06bf6c-1b18-4b00-84a4-d7e36b7ae0c1.jpg?1783908827","artUrl":"https://cards.scryfall.io/art_crop/front/3/a/3a06bf6c-1b18-4b00-84a4-d7e36b7ae0c1.jpg?1783908827","commanderLegal":"legal","set":"j25","releasedAt":"2024-11-15","rarity":"common","layout":"normal","gameChanger":false} as CardDef);
+const moltenExhale = (): CardDef => ({"oracleId":"82aa1402-4b1c-4343-aba5-dd3271cc1ac5","name":"Molten Exhale","manaCost":"{1}{R}","cmc":2,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"You may cast this spell as though it had flash if you behold a Dragon as an additional cost to cast it. (To behold a Dragon, choose a Dragon you control or reveal a Dragon card from your hand.)\nMolten Exhale deals 4 damage to target creature or planeswalker.","colors":["R"],"colorIdentity":["R"],"keywords":["Behold"],"imageUrl":"https://cards.scryfall.io/normal/front/0/a/0ab95aab-a4bf-4131-83a0-2c138b6f20c3.jpg?1783907360","artUrl":"https://cards.scryfall.io/art_crop/front/0/a/0ab95aab-a4bf-4131-83a0-2c138b6f20c3.jpg?1783907360","commanderLegal":"legal","set":"tdm","releasedAt":"2025-04-11","rarity":"common","layout":"normal","gameChanger":false} as CardDef);
 
 describe("Elephant Grass: black creatures can't attack you; nonblack ones cost {2} each", () => {
   it("only the nonblack attacker pays, and only to attack the Grass's controller", () => {
@@ -300,5 +303,67 @@ describe("granted casualty: Silverquill, the Disputant; Anhelo, the Painter; Ash
     const rocks = s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]?.name.startsWith("Test Rock"));
     expect(rocks).toHaveLength(2);
     expect(rocks.filter((id) => s.objects[id]!.isToken)).toHaveLength(1);
+  });
+});
+
+describe("behold for power and for flash (Dragon's Fire, Molten Exhale; CR 701.4a, 601.3c)", () => {
+  const castWith = (s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], choices: Parameters<typeof planCast>[7]) => drain(run(s, planCast(s, pid, id, targets, undefined, "auto", undefined, choices)));
+  const dragon = (n: string, p: number) => card(n, "Creature — Dragon", "{4}{R}", { power: String(p), toughness: String(p), colors: ["R"] });
+  const wall = () => card("Test Wall", "Creature — Wall", "{4}", { power: "0", toughness: "10" });
+  it("Dragon's Fire with a Dragon you control chosen deals that Dragon's power", () => {
+    supported(dragonsFire(), moltenExhale());
+    const { s: s0, ap, ids, opp } = setup([dragonsFire()]);
+    const big = putOnBattlefield(s0, ap, dragon("Test Dragon", 5));
+    const w = putOnBattlefield(s0, opp, wall());
+    const s = castWith(s0, ap, ids[0]!, [tgt(w)], { kicks: [0], reveal: [big] });
+    expect(s.objects[w]!.damage).toBe(5);
+  });
+  it("a Dragon card revealed from your hand: its power; nothing beheld: 3 damage", () => {
+    const { s: s0, ap, ids, opp } = setup([dragonsFire(), dragonsFire(), dragon("Test Dragon Card", 7)]);
+    const w = putOnBattlefield(s0, opp, wall());
+    let s = castWith(s0, ap, ids[0]!, [tgt(w)], { kicks: [0], reveal: [ids[2]!] });
+    expect(s.objects[w]!.damage).toBe(7);
+    expect(zone(s, ids[2]!)).toBe("hand");
+    const w2 = putOnBattlefield(s, opp, wall());
+    s = castWith(s, ap, ids[1]!, [tgt(w2)], {});
+    expect(s.objects[w2]!.damage).toBe(3);
+  });
+  it("the chosen Dragon gone before it resolves: its power as it last existed (rulings)", () => {
+    const { s: s0, ap, ids, opp } = setup([dragonsFire(), kill]);
+    const big = putOnBattlefield(s0, ap, dragon("Test Dragon", 6));
+    const w = putOnBattlefield(s0, opp, wall());
+    let s = run(s0, planCast(s0, ap, ids[0]!, [tgt(w)], undefined, "auto", undefined, { kicks: [0], reveal: [big] }));
+    s = run(s, planCast(s, ap, ids[1]!, [tgt(big)]));
+    s = drain(s);
+    expect(zone(s, big)).toBe("graveyard");
+    expect(s.objects[w]!.damage).toBe(6);
+  });
+  it("a bot beholds its strongest Dragon, and only one stronger than 3", () => {
+    const { s: s0, ap, ids, opp } = setup([dragonsFire()]);
+    putOnBattlefield(s0, ap, dragon("Test Small Dragon", 2));
+    putOnBattlefield(s0, ap, dragon("Test Big Dragon", 6));
+    putOnBattlefield(s0, opp, card("Test Giant", "Creature — Giant", "{4}{G}", { power: "6", toughness: "6" }));
+    let s = s0;
+    for (let i = 0; i < 40 && s.players[ap]!.hand.includes(ids[0]!); i++) {
+      const who = waitingOn(s)!;
+      if (who !== ap) s = act(s, { type: "passPriority", player: who });
+      else for (const a of botActions(s, ap)) if (waitingOn(s) === ap) s = act(s, a);
+    }
+    expect(s.players[ap]!.hand.includes(ids[0]!)).toBe(false);
+    expect(s.log.some((l) => /beholds Test Big Dragon/.test(typeof l === "string" ? l : l.text))).toBe(true);
+  });
+  it("Molten Exhale: at instant speed only with a Dragon beheld; at sorcery speed without", () => {
+    const { s: s0, ap, ids, opp } = setup([moltenExhale(), moltenExhale()]);
+    const w = putOnBattlefield(s0, opp, wall());
+    expect(castProblem(s0, ap, ids[0]!) ?? "").not.toMatch(/sorcery speed/);
+    let s = castWith(s0, ap, ids[0]!, [tgt(w)], {});
+    expect(s.objects[w]!.damage).toBe(4);
+    s = passUntil(s, "beginCombat");
+    expect(castProblem(s, ap, ids[1]!)).toMatch(/sorcery speed/);
+    const d = putOnBattlefield(s, ap, dragon("Test Dragon", 5));
+    expect(castProblem(s, ap, ids[1]!) ?? "").not.toMatch(/sorcery speed/);
+    expect(castProblem(s, ap, ids[1]!, [tgt(w)], undefined, undefined, undefined, undefined, {})).toMatch(/sorcery speed/);
+    s = castWith(s, ap, ids[1]!, [tgt(w)], { kicks: [0], reveal: [d] });
+    expect(s.objects[w]!.damage).toBe(8);
   });
 });

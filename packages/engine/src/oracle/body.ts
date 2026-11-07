@@ -18246,6 +18246,14 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     if (/^X plus/.test(more[1]!) && !ctx.spell) return null;
     return { effects: [{ ...prev, amount: /^X plus/.test(more[1]!) ? { count: { kind: "x" as const }, plus: Number(more[1]!.slice(7)) } : amt(more[1]!) }], instead };
   }
+  // Dragon's Fire: "If you revealed a Dragon card or chose a Dragon as you cast this spell, ~ deals damage equal to the
+  // power of that card or creature instead" (read as kicked): the same damage, the beheld card's or creature's power
+  // (Amount beheldPower; compile checks the spell's behold cost).
+  if (instead && ctx.spell && /^(?:It|~) deals damage equal to the power of that card or creature$/.test(t)) {
+    const prev = previous[0];
+    if (previous.length !== 1 || prev?.type !== "damage") return null;
+    return { effects: [{ ...prev, amount: { count: { kind: "beheldPower" as const } } }], instead };
+  }
   // Dispelling Exhale: "Counter target spell unless its controller pays {2}. If a Dragon was beheld, counter that spell
   // unless its controller pays {4} instead" (beheld read as kicked): the same counter, a bigger payment.
   const morePay = instead ? /^Counter that spell unless its controller pays (\{\d+\})$/.exec(t) : null;

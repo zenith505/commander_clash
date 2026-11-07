@@ -1,4 +1,4 @@
-import { linkedCards, playerProtectedFrom, playerProtection } from "./effects/targeting";
+import { cardPT, linkedCards, playerProtectedFrom, playerProtection } from "./effects/targeting";
 import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
@@ -3591,6 +3591,16 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       const hand = pool.filter((x) => obj(s, x).zone === "hand").sort((a, b) => mv(s, a) - mv(s, b));
       const fits = c.exile ? [...hand, ...field] : [...field, ...hand];
       if (fits.length < c.n) return null;
+      // Dragon's Fire: the strongest Dragon, and only when its power beats the damage dealt without one.
+      const beheldIf = compileCard(defOf(s, obj(s, id))).spell?.effects.find((e) => e.type === "if" && JSON.stringify(e.effects).includes('"kind":"beheldPower"'));
+      if (beheldIf?.type === "if") {
+        const pw = (x: ObjectId) => (obj(s, x).zone === "battlefield" ? power(s, obj(s, x)) : cardPT(s, obj(s, x), "power"));
+        const best = [...field, ...hand].sort((a, b) => pw(b) - pw(a))[0]!;
+        const plain = beheldIf.otherwise?.[0]?.type === "damage" && typeof beheldIf.otherwise[0].amount === "number" ? beheldIf.otherwise[0].amount : 0;
+        if (pw(best) <= plain) return null;
+        out.reveal = [best];
+        continue;
+      }
       out.reveal = fits.slice(0, c.n);
     } else if (c.kind === "reveal") {
       const fits = player(s, pid).hand.filter((x) => x !== id && printedMatches(c.filter, defOf(s, obj(s, x))));

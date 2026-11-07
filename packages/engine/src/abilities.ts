@@ -602,6 +602,8 @@ export type Count =
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
   /** Station's "the tapped creature's power" (CR 702.184a), and "the power of the creature tapped this way" after a "Tap an untapped creature you control" cost (Keldon Battlewagon): as the ability resolves, or as it last existed (rulings on Impelled Giant); never below 0 (CR 107.1b). */
   | { kind: "stationPower" }
+  /** Dragon's Fire: "the power of that card or creature", the Dragon card revealed or the Dragon chosen for its behold cost (CR 701.4a): a permanent's power as the spell resolves, or as it last existed on the battlefield (rulings); a card's in the hand as it resolves, or as it was revealed. */
+  | { kind: "beheldPower" }
   /** How many players took a punisher's penalty this time (Acererak's "for each opponent, you create ... unless"). */
   | { kind: "punished" }
   /** 1 while the condition holds, else 0: "Add {G}{G}. If you've completed a dungeon, add six {G} instead." */
@@ -6984,6 +6986,8 @@ export interface CompiledCard {
   flashIfTargetsYours?: true;
   /** "You may cast ~ as though it had flash if X is 3 or less." (Silver Scrutiny): with the X announced for it at most this (CR 601.3b, 601.2b). */
   flashIfXAtMost?: number;
+  /** Molten Exhale: "You may cast ~ as though it had flash if you behold a Dragon as an additional cost to cast it" (CR 601.3c): cast at instant speed only with its optional `kicker` cost paid. */
+  flashIfKicked?: true;
   /** "As ~ enters, choose a player" / "an opponent" (CR 614.12): kept while it's on the battlefield, as Chosen.player. */
   entersChoosePlayer?: "player" | "opponent";
   /** "As ~ enters, choose another creature you control" (Dauntless Bodyguard, CR 614.12): one of these, not one entering with it (rulings), kept as Chosen.object. */

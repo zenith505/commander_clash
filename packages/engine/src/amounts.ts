@@ -8,7 +8,7 @@ import type { Amount, AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from ".
 import { ANY_COUNTER } from "./abilities";
 import { defOf } from "./cards";
 import { compileCard } from "./oracle";
-import { bindChosen, isSuspended, objectMatches, printedMatches, ringBearer, spellManaValue, spellPT } from "./effects";
+import { bindChosen, cardPT, isSuspended, objectMatches, printedMatches, ringBearer, spellManaValue, spellPT } from "./effects";
 import { characteristics, controllerOf, staticConditionNow, type Characteristics } from "./layers";
 import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from "./mana";
 import { STARTING_LIFE, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ObjectId, type PlayerId, type TriggerEventInfo } from "./types";
@@ -901,6 +901,17 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const lk = s.lastKnown?.[st.id];
       return Math.max(0, lk && lk.zc === st.zc ? lk.power : st.power);
     }
+    case "beheldPower": {
+      // A permanent's power as the spell resolves, or as it last existed on the battlefield (CR 608.2h, rulings); a card
+      // still in the hand, its power there (CR 604.3); one gone from there, as it was revealed.
+      const st = ctx.stationed;
+      const o = st && s.objects[st.id];
+      if (!st) return 0;
+      if (o && (o.zoneChanges ?? 0) === st.zc && o.zone === "battlefield") return characteristics(s, o).power;
+      if (o && (o.zoneChanges ?? 0) === st.zc && o.zone === "hand") return cardPT(s, o, "power");
+      const lk = s.lastKnown?.[st.id];
+      return lk && lk.zc === st.zc ? lk.power : st.power;
+    }
     case "damageDealtToThisTurn": {
       // Whipkeeper: dealt to that object this turn, regenerated or not; prevented damage wasn't dealt (rulings).
       const o = refObjects(s, c.of, ctx)[0];
@@ -1433,6 +1444,8 @@ function describeCount(c: Count): string {
       return "rad counters";
     case "allCounters":
       return "counters among players and permanents";
+    case "beheldPower":
+      return "the beheld card's power";
     case "speed":
       return "speed";
     case "punished":

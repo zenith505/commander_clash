@@ -582,6 +582,10 @@ export function compile(d: CardDef): CompiledCard {
       // "If this spell's additional cost was paid" with "you may waterbend", "you may blight 1" or "you may behold a Dragon"
       // as that cost: whether it was paid, like kicker. "If a Dragon was beheld" is the same: whether a Dragon card was
       // revealed or a Dragon chosen for that cost, whatever happens to it later (CR 701.4b, rulings).
+      // Dragon's Fire: "you may reveal a Dragon card from your hand or choose a Dragon you control" is beholding a Dragon
+      // (CR 701.4a), and "if you revealed a Dragon card or chose a Dragon as you cast ~" is whether that cost was paid.
+      .replace(/^As an additional cost to cast ~, you may reveal an? ([A-Z][a-z]+) card from your hand or choose an? \1 you control\.$/m, (_x, what: string) => `As an additional cost to cast ~, you may behold ${/^[AEIOU]/.test(what) ? "an" : "a"} ${what}.`)
+      .replace(/\b([Ii])f you revealed an? ([A-Z][a-z]+) card or chose an? \2 as you cast ~(?=,)/g, (x, i: string, what: string, _i, text: string) => (new RegExp(`^As an additional cost to cast ~, you may behold an? ${what}\\.$`, "m").test(text) ? `${i}f ~ was kicked` : x))
       .replace(/\b([Ii])f ~'s additional cost was paid\b/g, (x, i: string, _i, text: string) => (MAY_COST.test(text) ? `${i}f ~ was kicked` : x))
       // Dragons of Tarkir: "If you revealed a Dragon card or controlled a Dragon as you cast this spell" with "you may reveal a
       // Dragon card from your hand" as an optional additional cost: whether it was paid, like kicker, or you controlled a
@@ -5075,6 +5079,19 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsCantActivateYourTurn = true;
       continue;
     }
+    // Molten Exhale: "You may cast ~ as though it had flash if you behold a Dragon as an additional cost to cast it": it may
+    // begin to be cast as though it had flash (CR 601.3c), the behold (CR 701.4a) an optional additional cost paid like
+    // kicker, which it then must be cast with when it couldn't be cast at sorcery speed (CompiledCard.flashIfKicked).
+    const flashBehold = /^You may cast ~ as though it had flash if you behold an? ([A-Z][a-z]+) as an additional cost to cast it\.$/.exec(line);
+    if (flashBehold) {
+      const cost = subtypeSet(flashBehold[1]!) ? parseAdditionalCost(`behold ${/^[AEIOU]/.test(flashBehold[1]!) ? "an" : "a"} ${flashBehold[1]}`) : null;
+      if (!cost || out.kicker || !isSpell || d.keywords.includes("Flash") || d.types.includes("Instant")) out.unsupported.push(raw);
+      else {
+        out.kicker = { costs: [""], extraCosts: [cost], text: `behold ${/^[AEIOU]/.test(flashBehold[1]!) ? "an" : "a"} ${flashBehold[1]}`, optional: true };
+        out.flashIfKicked = true;
+      }
+      continue;
+    }
     // Timely Ward: "You may cast ~ as though it had flash if it targets a commander": one of its targets, as it's cast, is
     // a commander (CR 903.3); starting to cast it then needs a commander on the battlefield.
     if (line === "You may cast ~ as though it had flash if it targets a commander.") {
@@ -7032,6 +7049,11 @@ function checkCastingLinks(out: CompiledCard) {
   // "The power of the creature tapped this way" needs a "Tap an untapped creature you control" cost (or station's).
   const tapPowIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"stationPower"');
   if (tapPowIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => tapPowIn(ab) && !ab.station && ab.costs?.filter((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x && c.filter.kind === "object" && !!c.filter.types?.includes("Creature")).length !== 1)) bad = true;
+  // Molten Exhale: a cast as though it had flash is checked for its behold once its targets are chosen (castProblem).
+  if (out.flashIfKicked && !out.spell?.targets.length) bad = true;
+  // Dragon's Fire: "the power of that card or creature" is the one beheld for the spell's own optional behold cost.
+  const beheldIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"beheldPower"');
+  if (beheldIn([out.triggers, out.statics, out.activated]) || (beheldIn(out.spell) && !(out.kicker?.optional && out.kicker.extraCosts?.length === 1 && out.kicker.extraCosts[0]!.kind === "reveal" && !!out.kicker.extraCosts[0]!.orControl && out.kicker.extraCosts[0]!.n === 1))) bad = true;
   // Wonderscape Sage: "that land" is the one land the ability's "Return a land you control to its owner's hand" cost returns.
   const retLandIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"returnedNonbasicLandType"');
   if (retLandIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => retLandIn(ab) && ab.costs?.filter((c) => c.kind === "returnToHand" && c.n === 1 && c.filter.kind === "object" && !!c.filter.types?.includes("Land")).length !== 1)) bad = true;

@@ -192,6 +192,7 @@ import {
   sameName,
   costChoiceShares,
   mayPayUse,
+  canActAtSorcerySpeed,
 } from "@cc/engine";
 import { HUMAN, YOU, actAs, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
@@ -976,6 +977,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // The Dragons of Tarkir reveal cycle: with a Dragon of yours on the battlefield, revealing one adds nothing (rulings).
     const ifControl = compiled.kicker?.ifControl;
     if (d.kicks === undefined && ifControl && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === HUMAN && objectMatches(s, ifControl, s.objects[id]!, HUMAN, false))) return continueCast({ ...d, kicks: [] });
+    // Molten Exhale: beholding is the price of casting it at instant speed (CR 601.3c), nothing to ask when it needn't be.
+    if (d.kicks === undefined && compiled.flashIfKicked && canActAtSorcerySpeed(s, HUMAN)) return continueCast({ ...d, kicks: [] });
     if (d.kicks === undefined && compiled.kicker && !compiled.kicker.required)
       return setKickPick({ draft: d, label: card.name, costs: compiled.kicker.costs, multi: !!compiled.kicker.multi, name: kickerName(compiled.kicker), chosen: [], ...(compiled.kicker.text ? { text: compiled.kicker.text } : {}) });
     // Inscriptions: one mode, or any number of them when kicked (CR 601.2b).

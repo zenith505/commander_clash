@@ -400,6 +400,19 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boo
   // creature attacks this turn, it gains lifelink until end of turn" (Ondu Rising): the same as "This turn, whenever ...
   // attacks, ..." (CR 603.7b), once for each attacking creature (CR 508.3a).
   const attacks = /^Whenever (an? [A-Za-z]+(?: creature)?(?: you control| an opponent controls)?) attacks this turn, (.+)$/.exec(s);
+  // Song of Blood: "Mill four cards. Whenever a creature attacks this turn, it gets +1/+0 until end of turn for each creature
+  // card put into your graveyard this way": the count is of the cards milled as the spell resolved (CR 608.2h), fixed as
+  // the delayed trigger is made (run-spells floatingTrigger `bound`), each attack getting it (rulings).
+  const milledEach = attacks && ctx?.afterMill && !after.length ? /^(it gets \+1\/\+0 until end of turn) for each (creature card) put into your graveyard this way$/.exec(attacks[2]!) : null;
+  if (attacks && milledEach) {
+    const e = floatingTrigger(`This turn, whenever ${attacks[1]!} attacks, ${milledEach[1]!}`, after, ctx);
+    const filter = parseSearchFilter(milledEach[2]!);
+    const fx = e?.type === "floatingTrigger" ? e.trigger.body.effects : undefined;
+    const pump = fx?.length === 1 && fx[0]!.type === "continuous" && fx[0]!.mods.length === 1 ? fx[0]!.mods[0] : undefined;
+    if (!filter || e?.type !== "floatingTrigger" || pump?.kind !== "modifyPT" || pump.power !== 1 || pump.toughness !== 0) return null;
+    pump.power = { count: { kind: "milledThisWay", filter } };
+    return { ...e, bound: true };
+  }
   if (attacks) return floatingTrigger(`This turn, whenever ${attacks[1]!} attacks, ${attacks[2]!}`, after, ctx);
   // "Whenever you gain life this turn, each opponent loses that much life" (Vizkopa Guildmage): the same as "This turn,
   // whenever you gain life, ..." (CR 603.7b), each life gain event once (CR 119.10).
@@ -593,7 +606,8 @@ function namePurpose(rest: string): NamePurpose {
   if (/\breveal the top (?:card|\w+ cards) of your library\b|\bmills a card\b/i.test(rest)) return "guess";
   if (/\breveal a card at random from your hand\b/i.test(rest)) return "guessHand";
   if (/\bcreature with the chosen name deals combat damage\b/i.test(rest)) return "ownCreature";
-  if (/\b(?:reveals (?:their|his or her) hand|graveyard, hand, and library)\b/i.test(rest)) return "theirs";
+  // Dementia Sliver: "Target opponent reveals a card at random from their hand": a card that player has hidden in their hand.
+  if (/\b(?:reveals (?:their|his or her) hand|reveals a card at random from their hand|graveyard, hand, and library)\b/i.test(rest)) return "theirs";
   return "deny";
 }
 
@@ -2071,6 +2085,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // without any of them.
   text = text.replace(/\b(each creature|creatures) that (?:doesn't|don't) have ((?:[a-z ]+, )+or [a-z]+)(?=\.)/g, "$1 without $2");
   text = text.replace(/^Until end of turn, target creature (gets [+-]\d+\/[+-]\d+) and another target creature (gets [+-]\d+\/[+-]\d+)\.$/, "Target creature $1 until end of turn. Another target creature $2 until end of turn.");
+  // Last Rites: "Target player reveals their hand, then you choose a nonland card from it for each card discarded this way.":
+  // two instructions, in order.
+  text = text.replace(/^(Discard any number of cards\. Target player reveals their hand), then you choose (a nonland card from it for each card discarded this way\. That player discards those cards\.)$/, "$1. You choose $2");
   // Stinging Vitriol: "That player reveals their hand. You choose a nonland card from it. They discard that card.": the
   // same as "... That player discards that card.", "they" being that player.
   text = text.replace(/(\. That player reveals their hand\. You choose an? (?:[a-z]+ )?card from it\.) They discard that card\.$/, "$1 That player discards that card.");
@@ -4369,6 +4386,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Anthropede: "you may discard a card or pay {2}. When you do, destroy target Room.": either payment, its controller's
+    // choice, or neither; the reflexive trigger (CR 603.12) only once one was paid, its target chosen then.
+    const discardOrPay = /^[Yy]ou may discard a card or pay ((?:\{[0-9WUBRGC]\})+)$/.exec(s);
+    const discardOrPayWhen = discardOrPay && /^When you do, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
+    if (discardOrPay && discardOrPayWhen) {
+      const reflexive = reflexiveBody(capital(discardOrPayWhen[1]!), ctx);
+      if (!reflexive) return null;
+      effects.push({ type: "punisher", who: { ref: "you" }, options: [{ discard: 1 }, { pay: { cost: discardOrPay[1]! } }], effects: [{ type: "reflexive", body: reflexive }], mode: "ifAny", thenText: discardOrPayWhen[1]! });
+      si++;
+      continue;
+    }
     // Loamcrafter Faun: "you may discard one or more land cards. When you do, return up to that many target nonland
     // permanent cards from your graveyard to your hand." Any number, none too; the reflexive trigger (CR 603.12) has up to
     // as many targets as were discarded, chosen as it's put on the stack.
@@ -5162,7 +5190,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // creature cards only, none too (rulings).
     const maggots = /^[Dd]iscard any number of (creature )?cards$/.exec(s);
     // Rites of Spring: "Discard any number of cards. Search your library for up to that many basic land cards" (see below).
-    if (maggots && (/\bfor each card discarded this way\b/i.test(sentences[si + 1] ?? "") || (!maggots[1] && /^Search your library for up to that many /.test(sentences[si + 1] ?? "")))) {
+    if (maggots && (/\bfor each card discarded this way\b/i.test(sentences[si + 1] ?? "") || (!maggots[1] && /^Search your library for up to that many /.test(sentences[si + 1] ?? "")) || (!maggots[1] && /^Target player reveals their hand$/.test(sentences[si + 1] ?? "") && / from it for each card discarded this way$/.test(sentences[si + 2] ?? "")))) {
       const filter = maggots[1] ? parseSearchFilter("creature card") : undefined;
       if (filter === null) return null;
       effects.push({ type: "discard", who: { ref: "you" }, n: 99, upTo: true, ...(filter ? { filter: { ...filter, text: "creature card" } } : {}) });
@@ -9422,6 +9450,26 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const who = parsePlayer(theyReveal[1]!, ctx);
       if (!who) return null;
       effects.push({ type: "revealTop", randomFromHand: true, who });
+      // Planeswalker's Mischief: "If it's an instant or sorcery card, exile it. You may cast it without paying its mana cost
+      // for as long as it remains exiled. At the beginning of the next end step, if you haven't cast it, return it to its
+      // owner's hand.": the revealed card, by its characteristics in the hand (CR 608.2h); the permission is the ability's
+      // controller's, even after the source has left (rulings); a delayed trigger (CR 603.7) for that card while it's
+      // still exiled as the same object (CR 400.7: cast, it has left exile), an intervening if (CR 603.4).
+      const ifExile = /^If it's an? (.+? card), exile it$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+      if (ifExile && sentences[si + 2]?.replace(/\.$/, "") === "You may cast it without paying its mana cost for as long as it remains exiled" && sentences[si + 3]?.replace(/\.$/, "") === "At the beginning of the next end step, if you haven't cast it, return it to its owner's hand") {
+        const filter = parseSearchFilter(ifExile[1]!);
+        if (!filter) return null;
+        effects.push({ type: "exileRevealedToCast", filter, free: true, returnAtEnd: true });
+        si += 3;
+        continue;
+      }
+      // Dementia Sliver: "Choose a card name. Target opponent reveals a card at random from their hand. If that card has the
+      // chosen name, that player discards it.": the card revealed, by its name as it resolves (CR 201.2), still in that hand.
+      if (sentences[si + 1]?.replace(/\.$/, "") === "If that card has the chosen name, that player discards it" && effects.some((x) => x.type === "choose" && x.choice === "cardName")) {
+        effects.push({ type: "if", cond: { kind: "revealedIs", filter: { kind: "card", chosen: "name", text: "card with the chosen name" } }, effects: [{ type: "discardRevealed" }] });
+        si++;
+        continue;
+      }
       ctx.revealedTop = true;
       continue;
     }
@@ -11220,6 +11268,29 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Suppress: "Target player exiles all cards from their hand face down. At the beginning of the end step of that player's
+    // next turn, that player returns those cards to their hand.": face down, so no one may look at them (CR 406.3); a delayed
+    // trigger (CR 603.7) at that player's end step on a later turn, returning the cards still exiled as the same objects
+    // (CR 400.7).
+    if (opts.spell && s === "Target player exiles all cards from their hand face down" && sentences[si + 1]?.replace(/\.$/, "") === "At the beginning of the end step of that player's next turn, that player returns those cards to their hand") {
+      const who = parsePlayer("target player", ctx);
+      if (who?.ref !== "target") return null;
+      effects.push({ type: "exileFaceDown", from: "hand", who, actor: who }, { type: "delayed", when: "playersNextTurnEndStep", whose: who, effects: [{ type: "returnFaceDownExiled" }], text: "that player returns those cards to their hand" });
+      si++;
+      continue;
+    }
+    // Last Rites: "You choose a nonland card from it for each card discarded this way. That player discards those cards.": as
+    // many as were discarded by the discard before (counted as this begins, CR 608.2h), or every one there is if fewer (CR
+    // 609.3); another player picks them (CR 701.9b).
+    const perDiscarded = /^You choose an? (.+? card) from it for each card discarded this way$/.exec(s);
+    if (perDiscarded) {
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(perDiscarded[1]!);
+      if (prev?.type !== "lookAtHand" || !prev.reveal || !filter || !/^That player discards those cards\.?$/.test(sentences[si + 1] ?? "") || !effects.some((x) => x.type === "discard" && x.who.ref === "you" && x.upTo)) return null;
+      effects.push({ type: "takeFromHand", who: prev.who, filter, action: "discard", n: { count: { kind: "discardedThisWay" } } });
+      si++;
+      continue;
+    }
     // Never Happened: "You choose a nonland card from that player's graveyard or hand and exile it": one card from either.
     const yardOrHand = /^You choose an? (.+?) from that player's graveyard or hand and exile it$/.exec(s);
     if (yardOrHand) {
@@ -11294,6 +11365,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (heist?.type === "takeFromHand" && heist.action === "exile" && !heist.until && ctx.spell && sentences[si + 1]?.replace(/\.$/, "") === "If the gift was promised, you may cast that card for as long as it remains exiled, and mana of any type can be spent to cast it") {
         heist.youMay = { anyType: true, ifGift: true };
         si++;
+        continue;
+      }
+      // Psychic Theft: "You may cast that card for as long as it remains exiled. At the beginning of the next end step, if you
+      // haven't cast the card, return it to its owner's hand.": the spell's controller may cast it with its usual timing and
+      // costs, once (cast, it has left exile, rulings); a delayed trigger (CR 603.7) for that card if it's still exiled as
+      // the same object then (CR 400.7), an intervening if (CR 603.4).
+      if (heist?.type === "takeFromHand" && heist.action === "exile" && !heist.until && ctx.spell && sentences[si + 1]?.replace(/\.$/, "") === "You may cast that card for as long as it remains exiled" && sentences[si + 2]?.replace(/\.$/, "") === "At the beginning of the next end step, if you haven't cast the card, return it to its owner's hand") {
+        heist.youMay = { returnAtEnd: true };
+        si += 2;
         continue;
       }
       // Pick the Brain: "the exiled card" in the sentence after is this one.
@@ -16359,6 +16439,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (/^[Tt]hat player reveals the top card of their library$/.test(s) && ctx.eventPlayer && /^If it's a creature card, the player puts the card into their graveyard and ~ becomes a copy of that card\.?$/.test(sentences[si + 1] ?? "")) {
       effects.push({ type: "revealTop", who: { ref: "eventPlayer" } }, { type: "if", cond: { kind: "revealedIs", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" } }, effects: [{ type: "revealedToGraveyardCopySelf" }] });
       si++;
+      continue;
+    }
+    // Thought Dissector: "Target opponent reveals cards from the top of their library until an artifact card or X cards are
+    // revealed, whichever comes first. If an artifact card is revealed this way, put it onto the battlefield under your
+    // control and sacrifice ~. Put the rest of the revealed cards into that player's graveyard.": at most X cards, the X it
+    // was activated with (CR 107.3a), none with X 0; the artifact enters even if ~ has already left (rulings).
+    if (ctx.activated && /^Target opponent reveals cards from the top of their library until an artifact card or X cards are revealed, whichever comes first$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "If an artifact card is revealed this way, put it onto the battlefield under your control and sacrifice ~" && sentences[si + 2]?.replace(/\.$/, "") === "Put the rest of the revealed cards into that player's graveyard") {
+      const who = parsePlayer("target opponent", ctx);
+      if (who?.ref !== "target") return null;
+      effects.push({ type: "revealUntil", who, yours: true, filter: { kind: "card", types: ["Artifact"], notTypes: [], notColors: [], text: "artifact card" }, found: "battlefield", rest: "graveyard", atMost: X, sacrificeSelfIfFound: true });
+      si += 2;
       continue;
     }
     // Nascent Metamorph: "target opponent reveals cards from the top of their library until they reveal a creature card. ~

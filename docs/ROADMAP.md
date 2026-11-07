@@ -1,7 +1,7 @@
 # Roadmap
 
-30,219 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,630 of
+30,241 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,641 of
 9,979 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -462,7 +462,7 @@ line blocks.
    power" (Tanuki Transplanter), Thada Adel ("search that player's library ... Until end of turn, you may play that
    card").
    Out after round 190 (looked at, not done): Sewer Nemesis (done in Lane B's round B21, left to it), Aether Refinery
-   ("pay one or more {E}"), Emeritus of Ideation ("becomes prepared"), Welcome to . . . // Jurassic Park, Case of the
+   ("pay one or more {E}"), Emeritus of Ideation ("becomes prepared"), Welcome to . . . // Jurassic Park (done in round B127), Case of the
    Uneaten Feast, Cait Sith, Scouring Swarm, Brigid's back face, Bring to
    Light (colors of mana spent), Fractured Powerstone (done in round 274), The Lost and the Damned, Oft-Nabbed Goat (done in round 274; only your
    opponents may activate, and control changes), Radiant Lotus, Brotherhood Headquarters, Maralen, Abstruse
@@ -743,7 +743,7 @@ line blocks.
    be blocked this turn" now means Kappa Cannoneer, not the artifact that entered. No new prompts.
    Out after round 204 (looked at, not done): Codie, Ravenous Codex ("prepared spell" isn't defined yet), Glissa's
    Retriever (a mandatory "exile it. When you do"), Leaves from the Vine (done in round B106) (a type-or-subtype filter), Behold the
-   Unspeakable (a pausing scry inside "Otherwise"), Song of Blood, Indulge // Excess, Harald Unites the Elves, Rent Is
+   Unspeakable (a pausing scry inside "Otherwise"), Song of Blood (done in round B127), Indulge // Excess, Harald Unites the Elves, Rent Is
    Due, Search Elemental, Estinien Varlineau.
    Round 205 went on from the top: "if it's the first time that creature has become tapped this turn" (CR 603.4: Captain
    America, Living Legend), "an opponent attacks one or more planeswalkers you control" (Mila, Crafty Companion) and Lukka,
@@ -2379,7 +2379,7 @@ line blocks.
    test); "choose a counter on a permanent you control. Put a counter of that kind on target permanent you control if it
    doesn't have a counter of that kind on it" (Aven Courier, with a browser test); "each player creates ... for each creature
    card in their graveyard" and "At the beginning of each end step and when ~ leaves the battlefield, destroy all tokens
-   created with ~" (Tombstone Stairwell). +10, 30,209 of 31,936.
+   created with ~" (Tombstone Stairwell). +10, 30,241 of 31,936 with B125 to B127.
    Out after round 296 (looked at, not done): Baba Lysaga, Night Witch ("Sacrifice up to three permanents" as a cost: no
    up-to sacrifice cost or its picker); Fisher's Talent (a level's token replacement that the next level replaces again,
    Fish to Shark to Octopus); Archelos, Lagoon Mystic (other permanents entering tapped or untapped, on every way a
@@ -3238,7 +3238,7 @@ line blocks.
      exiled card is a God card"), Invasive Surgery, Kotose, "look at an opponent's hand, then choose any card name"
      (Sorcerous Spyglass, Anointed Peacekeeper), Alpine Moon, Skyseer's Chariot, Cheering Fanatic, Null Chamber, Booby
      Trap, Petrified Hamlet, names another player chooses (Conundrum Sphinx, Petra Sphinx, Vexing Arcanix), random
-     cards from an opponent's hand (Dementia Sliver, Nebuchadnezzar), Mindblaze, Liar's Pendulum, Lammastide
+     cards from an opponent's hand (Dementia Sliver (done in round B127), Nebuchadnezzar), Mindblaze, Liar's Pendulum, Lammastide
      Weave ("its mana value"), "an additional ... for each card named ~" (Growth Cycle, Rune Snag), "as you cast ~"
      (Aether Burst), Sound the Call.
    - Bots name what they've seen: an opponent's commander or permanent for a ban, a graveyard card for Memoricide, the
@@ -3640,7 +3640,7 @@ line blocks.
      opponent's choice" (Preacher), "isn't of the chosen type" (Callous Oppressor), "other than ~" (Hisoka's Guard),
      attacking/blocked filters (Ice Floe, Whip Vine), "loses all abilities" (Immovable Rod), "when ~ becomes untapped
      or ..." delayed triggers from an activated ability (Coffin Queen, Tawnos's Coffin, The Pandorica), Giant Oyster's counters, Hivis's Dragon filter, Hedge
-     Whisperer and The Blackstaff of Waterdeep's animation.
+     Whisperer and The Blackstaff of Waterdeep's animation (both done in round B127).
    - Entwine with a non-mana cost (Betrayal of Flesh, Solar Tide); the other unsupported entwine cards fail on a mode.
    - Job select (11 of 19): granted quoted abilities that don't compile (Ninja's Blades, Blue Mage's Cane, Summoner's
      Grimoire, Astrologian's Planisphere, Dancer's Chakrams' "other commanders you control"), "for each artifact you
@@ -4096,7 +4096,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   twice: no ruling); Gideon's Triumph (done in round B109) and Inferno Hellion (done in round B106) ("attacked or blocked this turn", and Gideon's "two of
   those creatures instead"); Perilous Predicament (two sacrifices of different
   kinds); Pendrell Flux (pay its mana cost); Experiment Twelve, Printlifter Ooze, Deathmist Raptor, Roshan,
-  Planeswalker's Mischief, Dementia Sliver and Wand of Ith (not looked at in depth).
+  Planeswalker's Mischief (done in round B127), Dementia Sliver (done in round B127) and Wand of Ith (not looked at in depth).
 - Round B17 (harder skipped cards, least played first): the Licids (Calming, Convulsing, Corrupting, Dominating,
   Enraging, Gliding, Leeching, Nurturing, Quickening, Stinging, Tempting and Transmogrifying Licid): "loses this ability
   and becomes an Aura enchantment with enchant creature" as a layer 4 and 6 effect, "You may pay {W} to end this
@@ -4112,7 +4112,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   revealed hand names the cards exiled). +39 (26,617 with round 186).
 - Skipped there, with reasons: Flanking Licid (old wording, "Summon Licid"); Phantasmal Mount (a delayed trigger of ~
   that must also find its target); Kjeldoran Guard ("defending player" in multiplayer); Lifelace and the other Laces (a
-  color change on a spell); Govern the Guildless (forecast and "monocolored"); Gaea's Liege (a conditional
+  color change on a spell); Govern the Guildless (forecast and "monocolored"); Gaea's Liege (done in round B127) (a conditional
   characteristic-defining P/T); Orcish Farmer ("until its controller's next untap step"); Hatchet Bully and Wandering
   Mage (a -1/-1 counter as a cost); Hint of Insanity, Haunting Echoes, Reap Intellect, Pick the Brain and Thought
   Hemorrhage (not looked at in depth).
@@ -4794,7 +4794,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   at end of combat, "before the end of combat step"), Feint (tap the target's blockers, prevent its and their combat
   damage), Blood Oath ("Choose a card type" as a spell instruction), Specter's Shriek (exile a chosen card, then a
   rider about its color), Noggin Whack (reveal three, you choose two), Hiveheart Shaman (a basic land card that doesn't
-  share a land type), Song of Blood (a delayed attack trigger counting milled creature cards), Kemba's Legion (done in round B106), Taunt,
+  share a land type), Song of Blood (done in round B127) (a delayed attack trigger counting milled creature cards), Kemba's Legion (done in round B106), Taunt,
   Battlefield Scrounger (done in round B126), Slayer's Cleaver ("blocked by an Eldrazi if able"), Illuminated Folio (reveal two cards that
   share a color), Nim Devourer (done in round B108), Jabari's Influence (a -1/-0 counter after gaining control), Primordial Ooze (done in round B113), Fathom
   Trawl, Thirsting Axe, Sewer Crocodile, Flying Drone.
@@ -4820,7 +4820,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   instead" (Scorching Lava), "Return target card from an opponent's graveyard to their hand" (Forcemage Advocate,
   Shieldmage Advocate), "Sacrifice a Room" (Intruding Soulrager), and "creatures that have -1/-1 counters on them"
   (Grind // Dust). +26 (28,231 of 31,936 with rounds 217 to 221).
-- Out after round B49 (looked at, not done): Anthropede ("discard a card or pay {2}" as one cost choice), Retribution
+- Out after round B49 (looked at, not done): Anthropede (done in round B127) ("discard a card or pay {2}" as one cost choice), Retribution
   and Barrin's Spite (the targets' controller chooses one of them), Goblin Test Pilot (a random target as it's
   activated), Ley Line (done in round B110) and Mausoleum Turnkey (done in round B110) (another player chooses the target), Tamanoa and Molten Lavamancer (done in round B122)
   (noncombat or noncreature damage triggers), Venser's Diffusion (a target among suspended cards), Nivmagus Elemental
@@ -6185,6 +6185,30 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (counter target spell with the same name as a card its heroic ability exiled, linked abilities, CR 607.2a; face-down
   cards and spells have no name), Horn of Plenty (the caster may pay {1} to draw at the beginning of the next end step,
   a delayed trigger for that player, CR 603.7). +11 (30,219 of 31,936 with B125 and rounds 294 and 295).
+- Round B127 (least played first, from the skip lists): Psychic Theft (an instant or sorcery card you choose from the
+  revealed hand, exiled; you may cast it while it stays exiled, and uncast it goes back to its owner's hand at the
+  beginning of the next end step, a delayed trigger with an intervening if, CR 603.7, 603.4; a browser test of the pick)
+  and Planeswalker's Mischief (the opponent's card revealed at random, exiled if it's an instant or sorcery card, cast
+  without paying its mana cost, returned the same way), Song of Blood (a delayed "whenever a creature attacks this turn"
+  trigger whose +1/+0 counts the creature cards milled as the spell resolved, locked in then, CR 608.2h), Last Rites
+  ("discard any number of cards", then that many nonland cards from the target player's revealed hand, chosen by you;
+  a browser test), Suppress (the target player's hand exiled face down, back at the beginning of the end step of that
+  player's next turn: a new delayed-trigger time, so targeting yourself waits for your next turn, CR 603.7), Thought
+  Dissector (an opponent's library revealed until an artifact card or X cards, the artifact onto the battlefield under
+  your control and ~ sacrificed, the rest into that player's graveyard), Gaea's Liege (a characteristic-defining P/T,
+  CR 604.3a, 613.4b: your Forests, or the defending player's while it attacks, CR 506.2), Anthropede ("you may discard a
+  card or pay {2}. When you do, destroy target Room": one choice of payment, then a reflexive trigger, CR 603.12; a
+  browser test; bots pay to destroy an opponent's Room), Dementia Sliver (the named card revealed at random is discarded),
+  Hedge Whisperer, The Blackstaff of Waterdeep and Welcome to . . . // Jurassic Park (a permanent "becomes an N/N ...
+  creature" for as long as ~ stays tapped, or for as long as you control ~, CR 611.2b, through the same template). +12
+  (30,231 of 31,936 with B125, B126 and rounds 294 and 295).
+- Out after round B127 (looked at, not done): Sutured Ghoul (an enters replacement exiling any number of creature cards
+  and a characteristic-defining P/T linked to them, CR 607.2a), Goblin Test Pilot (a target chosen at random as it's
+  activated), Valleymaker (a mana ability with a sacrifice cost whose mana goes to another player), Escaped Shapeshifter
+  (a layer 6 ability-adding effect that depends on what opponents' creatures have, CR 613.8), Snowblind (Y counted from
+  the toughness the effect itself changes), Sirocco (a punisher per revealed card), Nivmagus Elemental (exiling a spell
+  you control from the stack as a cost), Burning of Xinye ("destroys four lands they control", chosen by each player,
+  isn't parsed).
 - Out after round B126 (looked at, not done): Kill-Suit Cultist ("the first time damage would be dealt to that creature
   this turn, destroy it instead": a destroy-instead damage replacement ordered with prevention, CR 616.1, that the damage
   pipeline doesn't offer yet).
@@ -6224,7 +6248,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   activated ability is activated: activation always lets the player choose), Thijarian Witness ("if it was attacking or
   blocking alone" as it died, CR 506.5, with other creatures dying at the same time).
 - Out after round B115 (looked at, not done): Cut the Tethers (a punisher for each Spirit that returns only the ones
-  their owners didn't pay for), Song of Blood (a delayed attack trigger whose bonus counts the creature cards milled as
+  their owners didn't pay for), Song of Blood (done in round B127) (a delayed attack trigger whose bonus counts the creature cards milled as
   it resolved), Expel the Unworthy (a kicker that changes what the spell can target), Kill-Suit Cultist and Goblin
   Psychopath (damage replaced by a destroy or redirected, ordered with other shields, CR 616.1, as Lichenthrope).
 - Out after round B114 (looked at, not done): Titania's Song (its effect continuing until end of turn after it leaves the
@@ -6357,7 +6381,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B91 (looked at, not done): Goblin Test Pilot (a target chosen at random as an activated ability is
   activated: the activation, the bots and the UI would all need to leave the target to chance), Flying Drone (a colored
   activation cost reduction, "if another creature with flying entered the battlefield under your control this turn"),
-  Suppress (a hand exiled face down until the end step of that player's next turn), Yare ("target creature defending
+  Suppress (done in round B127) (a hand exiled face down until the end step of that player's next turn), Yare ("target creature defending
   player controls" when several players are attacked), Matopi Golem (a trigger when a regeneration shield is used), Rock
   Hydra and Lichenthrope (replacements for each 1 damage, and Rock Hydra's counters removed even if the damage can't be
   prevented), Quenchable Fire ("unless that player pays {U} before that step": a payment any time before the upkeep).
@@ -6386,7 +6410,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B84 (looked at, not done): Traveling Plague (an Aura returned from the graveyard needs an attach
   choice), Spellshift (another player's free cast from revealed cards), Obscura Ascendancy (an intervening "equals"
   check), Eye of Singularity, Cornered Market and Bazaar of Wonders (name-based filters), Weight of Conscience ("share
-  a creature type" tap cost), Psychic Theft, Last Rites, Thought Dissector, Mimeofacture, Hakim,
+  a creature type" tap cost), Psychic Theft (done in round B127), Last Rites (done in round B127), Thought Dissector (done in round B127), Mimeofacture, Hakim,
   Guard Dogs, Carry Away, Jandor's Ring.
 - Out after round B83 (looked at, not done): Fighting Chance (a coin flip for each blocking creature), Ersatz Gnomes (done in round B126)
   (a spell becomes colorless: no rule for changing a spell's color yet), Clash of Elements (the owner's choice decides
@@ -6519,7 +6543,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Collect evidence (CR 701.59) works as an optional additional cost, an alternative cost, an ability's cost and a "you
   may" on resolution; still out: ward—collect evidence (Axebane Ferox), bestow with it (Detective's Phoenix), "collect
   evidence X" (Incinerator of the Guilty, Urgent Necropsy), "if evidence was collected, instead" (Analyze the Pollen,
-  Extract a Confession), and cards blocked by other lines (Cryptex, Polygraph Orb, Hedge Whisperer, Lamplight Phoenix,
+  Extract a Confession), and cards blocked by other lines (Cryptex, Polygraph Orb, Hedge Whisperer (done in round B127), Lamplight Phoenix,
   Memory Vampire, Tenth District Hero, Deadly Cover-Up).
 - Mana from a Treasure (CR 106.3) is tracked; still out: Devour Intellect ("instead" with a choice), Kalain's
   "enters with an additional +1/+1 counter" (that static family isn't supported), Alchemist's Talent (Classes aren't

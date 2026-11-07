@@ -9358,6 +9358,35 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Mimeofacture: "Choose target permanent an opponent controls. Search that player's library for a card with the same
+    // name and put it onto the battlefield under your control. Then that player shuffles.": you search the library of the
+    // target's controller as it resolves (CR 701.23a) for a card with the target's name then (CR 201.2; a face-down one has
+    // none, CR 708.2), which enters under your control.
+    if (/^Choose target permanent an opponent controls$/.test(s) && /^Search that player's library for a card with the same name and put it onto the battlefield under your control\.?$/.test(sentences[si + 1] ?? "") && /^Then that player shuffles\.?$/.test(sentences[si + 2] ?? "") && ctx.spell) {
+      const index = addTarget(ctx, { kind: "object", types: [], notTypes: [], notColors: [], controller: "opponent", text: "target permanent an opponent controls" });
+      effects.push({ type: "search", n: 1, upTo: false, reveal: false, dest: { zone: "battlefield" }, library: { ref: "targetController", index }, sameName: { target: index } });
+      si += 2;
+      continue;
+    }
+    // Clash of Elements: "Choose target nonland permanent. Its owner may put it on top of their library. If they do, ~ deals 2
+    // damage to them. If they didn't put the card on top of their library, they put it on the bottom.": its owner's choice
+    // of the top (and the damage) or the bottom, as it resolves.
+    const ownerTop = ctx.spell && ctx.lastObjectTarget !== undefined && /^Its owner may put it on top of their library$/.test(s) ? /^If they do, ~ deals (\d+) damage to them\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (ownerTop && /^If they didn't put the card on top of their library, they put it on the bottom\.?$/.test(sentences[si + 2] ?? "")) {
+      const index = ctx.lastObjectTarget!;
+      const spec = ctx.targets[index];
+      if (spec?.kind !== "object" || spec.many || spec.optional) return null;
+      effects.push({ type: "putInLibrary", what: { ref: "target", index }, position: "ownersChoice" }, { type: "if", cond: { kind: "putOnTopThisWay" }, effects: [{ type: "damage", amount: num(ownerTop[1]!), to: { ref: "targetOwner", index } }] });
+      si += 2;
+      continue;
+    }
+    // Game Preserve: "each player reveals the top card of their library. If all cards revealed this way are creature cards,
+    // put those cards onto the battlefield under their owners' control.": all at once (CR 608.2f), or none.
+    if (/^[Ee]ach player reveals the top card of their library$/.test(s) && /^If all cards revealed this way are creature cards, put those cards onto the battlefield under their owners' control\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "parleyReveal", allCreaturesEnter: true });
+      si++;
+      continue;
+    }
     // Duskmantle Seer: "Each player reveals the top card of their library, loses life equal to that card's mana value, then
     // puts it into their hand."
     if (/^[Ee]ach player reveals the top card of their library, loses life equal to that card's mana value, then puts it into their hand$/.test(s)) {
@@ -10531,6 +10560,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects[effects.length - 1] = { type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: [], notTypes: [], notColors: [], combat: "blocking", text: "blocking" } }, effects: [{ type: "counters", what: { ref: "target", index }, counter: "+1/+1", n }], otherwise: [last] };
       continue;
     }
+    // Sewers of Estark: "Choose target creature. If it's attacking, it can't be blocked this turn. If it's blocking, prevent
+    // all combat damage that would be dealt this combat by it and each creature it's blocking.": whether it's attacking or
+    // blocking is checked as this resolves, neither doing nothing (rulings, CR 608.2c); the creatures it's blocking then
+    // (CR 509.1h, 611.2c), their combat damage and its own prevented until end of combat (CR 615.1a, 500.5a).
+    const inCombatIf = ctx.spell && si > 0 && /^Choose target creature\.?$/.test(sentences[0] ?? "") ? /^If it's (attacking|blocking), (it can't be blocked this turn|prevent all combat damage that would be dealt this combat by it and each creature it's blocking)$/.exec(s) : null;
+    if (inCombatIf) {
+      const index = ctx.lastObjectTarget;
+      if (index === undefined || ctx.targets[index]?.kind !== "object" || ctx.targets[index]?.many || ctx.targets[index]?.optional) return null;
+      const fx: Effect[] | null = inCombatIf[2] === "it can't be blocked this turn"
+        ? inCombatIf[1] === "attacking" ? parseOne("That creature can't be blocked this turn", ctx) : null
+        : inCombatIf[1] === "blocking" ? [{ type: "continuous", what: { ref: "inCombatWithSelf", ofTarget: index, andSelf: true }, mods: [{ kind: "preventDamage", by: true, combat: "only" }], duration: "endOfCombat" }] : null;
+      if (!fx?.length || (inCombatIf[1] === "attacking" && !fx.every((e) => mentionsTarget(e, index)))) return null;
+      effects.push({ type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: [], notTypes: [], notColors: [], combat: inCombatIf[1] as "attacking" | "blocking", text: inCombatIf[1]! } }, effects: fx });
+      continue;
+    }
     // Depressurize: "Target creature gets -3/-0 until end of turn. Then if that creature's power is 0 or less, destroy it.":
     // its power after the first instruction, as this resolves (CR 608.2c).
     const powerThen = /^(?:Then i|I)f that creature's power is (\d+) or less, destroy it$/.exec(s);
@@ -10946,11 +10990,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Vendilion Clique: "If you do, that player reveals the chosen card, puts it on the bottom of their library, then
       // draws a card."
       const act = /^(?:If you do, )?(?:(that player discards that card|they discard it|that player reveals the chosen card, puts it on the bottom of their library)(?:,? then (?:they )?draws? a card)?|(?:that player exiles|exile) that card)$/i.exec(next);
-      if (!act || (/^If you do, (?:that player exiles|exile)/.test(next) && /^If a /.test(sentences[si + 2] ?? ""))) return null;
+      // Specter's Shriek: "If a nonblack card is exiled this way, ..." after it is about the card exiled (below).
+      const shriek = /^If a nonblack card is exiled this way, exile a card from your hand\.?$/.test(sentences[si + 2] ?? "");
+      if (!act || (/^If you do, (?:that player exiles|exile)/.test(next) && /^If a /.test(sentences[si + 2] ?? "") && !shriek)) return null;
       const bottom = /bottom of their library/.test(act[1] ?? "");
       if (bottom && !/ then draws a card$/.test(next)) return null;
       effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: bottom ? "libraryBottom" : act[1] ? "discard" : "exile", optional: true });
       si++;
+      if (shriek && !act[1]) ctx.exiledFromHand = true;
       const took: Amount = { count: { kind: "tookFromHand" } };
       // "..., then draws a card": that player, only if they discarded.
       if (/ then (?:they )?draws? a card$/.test(next)) effects.push({ type: "if", cond: { kind: "amountNow", amount: took, min: 1 }, effects: [{ type: "draw", who: prev.who, n: 1 }] });
@@ -11095,6 +11142,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // fixed first, then both happen at once.
     if (/^Simultaneously untap all tapped creatures and tap all untapped creatures$/.test(s)) {
       effects.push({ type: "tap", what: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" } }, swap: true });
+      continue;
+    }
+    // Specter's Shriek: "If a nonblack card is exiled this way, exile a card from your hand.": the card just exiled from that
+    // hand, by its color in exile (CR 608.2h); with an empty hand, nothing (rulings). The choice of your card may pause
+    // inside the "if", whose answer is kept (CR 608.2c).
+    if (ctx.exiledFromHand && effects.at(-1)?.type === "takeFromHand" && /^If a nonblack card is exiled this way, exile a card from your hand$/.test(s)) {
+      effects.push({ type: "if", cond: { kind: "exiledFromHandIs", filter: { kind: "card", notColors: ["B"], text: "nonblack card" } }, effects: [{ type: "discard", who: { ref: "you" }, n: 1, exile: true }] });
       continue;
     }
     // Check for Traps: "Exile that card. If an instant card or a card with flash is exiled this way, they lose 1 life.

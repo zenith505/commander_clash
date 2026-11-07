@@ -8,7 +8,7 @@ import { parseCount } from "../counts";
 import { parseBecomes, parseChanges, parseSentence } from "../sentence";
 import { parseAffected, parseExtraBlocks, parseIsA, parseMostStat, parseStaticMods } from "../statics";
 import type { Ctx } from "../body";
-import { canonicalKeyword, CREATURE_TYPES } from "../../keywords";
+import { canonicalKeyword, CREATURE_TYPES, SACRIFICED_LANDWALK } from "../../keywords";
 import { parseGrants } from "../grants";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
@@ -481,6 +481,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // it is now, whatever zone it goes to, for the rest of this turn (CR 603.7c, 400.7), about the creature it targeted.
   if (/^When ~ leaves the battlefield this turn, destroy that creature$/.test(s) && ctx.activated && !ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many)
     return [{ type: "delayed", when: "leaves", of: { ref: "self" }, about: ctx.lastObjectTarget, effects: [{ type: "destroy", what: { ref: "subject" } }], text: "destroy that creature", thisTurn: true }];
+  // Excavator: "{T}, Sacrifice a basic land: Target creature gains landwalk of each of the land types of the sacrificed land
+  // until end of turn.": the land types the cost's land had as it last existed (CR 608.2h, 702.14a).
+  if ((m = /^(Target creature) gains landwalk of each of the land types of the sacrificed land until end of turn$/.exec(s)) && ctx.activated && !ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "addKeywords", keywords: [SACRIFICED_LANDWALK] }], duration: "endOfTurn" }] : null;
+  }
+  // Phantasmal Mount: "{T}: Target creature you control ... When ~ leaves the battlefield this turn, sacrifice that
+  // creature.": the same delayed trigger, its controller sacrificing the creature only if they still control it then (CR
+  // 701.21a), the creature as it was when the ability resolved (CR 400.7).
+  if (/^When ~ leaves the battlefield this turn, sacrifice that creature$/.test(s) && ctx.activated && !ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && ctx.targets[ctx.lastObjectTarget]?.controller === "you" && !ctx.targets[ctx.lastObjectTarget]?.many)
+    return [{ type: "delayed", when: "leaves", of: { ref: "self" }, about: ctx.lastObjectTarget, effects: [{ type: "sacrifice", what: { ref: "subject" } }], text: "sacrifice that creature", thisTurn: true }];
   // Barreling Attack: "When that creature becomes blocked this turn, it gets +1/+1 until end of turn for each creature
   // blocking it": a delayed trigger about the target (CR 603.7), its blockers counted as it resolves (rulings).
   if ((m = /^When that creature becomes blocked this turn, it gets ([+-]\d+)\/([+-]\d+) until end of turn for each creature blocking it$/.exec(s)) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many)
@@ -703,6 +714,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Tamiyo's Compleation (rewritten in body.ts): the enchanted permanent, if it's an Equipment as this resolves (CR 701.3d).
   if (s === "Unattach enchanted permanent if it's an Equipment") return [{ type: "unattach", what: { ref: "attached" }, ifEquipment: true }];
+  // Carry Away: "When this Aura enters, unattach enchanted Equipment.": it stays on the battlefield attached to nothing
+  // (CR 701.3d); its new controller may equip it later (rulings, CR 301.5d).
+  if (/^unattach enchanted Equipment$/i.test(s)) return [{ type: "unattach", what: { ref: "attached" } }];
   // Disarm: "Unattach all Equipment from target creature": they stay on the battlefield, attached to nothing (CR 701.3d).
   // Fulgent Distraction: "Tap two target creatures, then unattach all Equipment from them": from both.
   if ((m = /^Unattach all Equipment from (target creature|them)$/.exec(s))) {

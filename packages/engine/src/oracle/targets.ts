@@ -423,6 +423,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (/^(?:all creatures|each creature) blocking or blocked by ~$/i.test(p.trim()) && !ctx.spell) return { ref: "inCombatWithSelf" };
   // Trial: "all creatures blocking or blocked by target creature": those in combat with the target as this resolves.
   if (/^all creatures blocking or blocked by target creature$/i.test(p.trim())) return { ref: "inCombatWithSelf", ofTarget: addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "target creature" }) };
+  // Feint: "Tap all creatures blocking target attacking creature": those blocking the target as this resolves (CR 509.1h).
+  if (/^all creatures blocking target attacking creature$/i.test(p.trim())) return { ref: "inCombatWithSelf", ofTarget: addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], combat: "attacking", text: "target attacking creature" }) };
   // Plague Wight: "Whenever ~ becomes blocked, each creature blocking it gets -1/-1 until end of turn"; Trailblazer's
   // Torch: "Whenever equipped creature becomes blocked, it deals 2 damage to each creature blocking it": the creatures
   // blocking that attacker as this resolves (CR 509.1h), none once it has left combat (CR 506.4).

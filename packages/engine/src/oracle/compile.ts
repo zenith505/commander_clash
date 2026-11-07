@@ -2,7 +2,7 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { Modification, FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
+import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, SACRIFICED_LANDWALK, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -6684,7 +6684,7 @@ function checkCastingLinks(out: CompiledCard) {
       visit(o.otherwise);
       return;
     }
-    if (((o.ref === "sacrificed" && !o.revealedCost && !effectSac) || o.sharesColorWithSacrificed || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary" || o.kind === "sacrificedSubtype" || o.kind === "sacrificedType" || o.kind === "sacrificedColor") && !canSac) bad = true;
+    if (((o.ref === "sacrificed" && !o.revealedCost && !effectSac) || o.sharesColorWithSacrificed || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary" || o.kind === "sacrificedSubtype" || o.kind === "sacrificedType" || o.kind === "sacrificedColor" || (o.kind === "addKeywords" && (o.keywords as string[]).includes(SACRIFICED_LANDWALK))) && !canSac) bad = true;
     if (o.ref === "sacrificed" && o.exiledCost && !exileCost && !yardExile) bad = true;
     // "The revealed card" needs one card revealed as a cost, and nothing sacrificed or exiled to share the record.
     if (o.ref === "sacrificed" && o.revealedCost && !revealCost) bad = true;

@@ -271,6 +271,8 @@ export interface Characteristics {
   cantTurnFaceUp: boolean;
   /** "Can't transform" (Bound by Moonsilver), nor convert (CR 701.28f). */
   cantTransform: boolean;
+  /** "Can't phase out" (Ertai's Familiar, Spatial Binding). */
+  cantPhaseOut: boolean;
   /** "Can't crew Vehicles" (Revoke Privileges). */
   cantCrew: boolean;
   /** "Can't be equipped" (Goblin Brawler). */
@@ -422,6 +424,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantBeSacrificedBy: [],
     cantTurnFaceUp: false,
     cantTransform: false,
+    cantPhaseOut: false,
     cantCrew: false,
     cantBeEquipped: false,
     enchantedOnlyBy: [],
@@ -675,13 +678,14 @@ function inWindow(s: GameState, w: TimingWindow): boolean {
     case "beforeCombat":
     case "beforeAttackers":
     case "beforeBlockers":
-    case "beforeDamage": {
+    case "beforeDamage":
+    case "beforeEndCombat": {
       // Before that point of the turn's first combat (CR 506.8d): the beginning phase and first main phase, and the steps
       // of that combat before it. With no attackers declared, the declare blockers and combat damage steps are skipped,
       // so the window ends with the declare attackers step (506.8e).
       if (["untap", "upkeep", "draw", "main1"].includes(s.step) && !s.combatsThisTurn) return true;
       if ((s.combatsThisTurn ?? 0) !== 1) return false;
-      const table: Record<Exclude<TurnPoint, "afterCombat">, string[]> = { beforeCombat: [], beforeAttackers: ["beginCombat"], beforeBlockers: ["beginCombat", "declareAttackers"], beforeDamage: ["beginCombat", "declareAttackers", "declareBlockers"] };
+      const table: Record<Exclude<TurnPoint, "afterCombat">, string[]> = { beforeCombat: [], beforeAttackers: ["beginCombat"], beforeBlockers: ["beginCombat", "declareAttackers"], beforeDamage: ["beginCombat", "declareAttackers", "declareBlockers"], beforeEndCombat: ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage"] };
       return table[w].includes(s.step);
     }
     case "afterCombat": // once the turn's first combat phase has ended (CR 506.8d)
@@ -1077,7 +1081,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const selfZc = sourceZc ?? s.objects[sourceId]?.zoneChanges ?? 0;
       // "Last turn": the creatures that entered then, under your control then (Ephara rulings: whatever happened to them since).
       if (cond.lastTurn) return (s.lastTurn?.creaturesEntered ?? []).filter((e) => e.controller === you && !(cond.other && e.id === sourceId && e.zc === selfZc)).length >= cond.n;
-      return (s.turnLog?.entered ?? []).filter((e) => e.controller === you && !(cond.other && e.id === sourceId && e.zc === selfZc) && cond.types.every((ty) => e.types.includes(ty)) && !cond.notTypes?.some((ty) => e.types.includes(ty)) && (!cond.subtype || !!e.subtypes?.includes(cond.subtype) || (!!cond.orSubtype && !!e.subtypes?.includes(cond.orSubtype)))).length >= cond.n;
+      return (s.turnLog?.entered ?? []).filter((e) => e.controller === you && !(cond.other && e.id === sourceId && e.zc === selfZc) && cond.types.every((ty) => e.types.includes(ty)) && !cond.notTypes?.some((ty) => e.types.includes(ty)) && (!cond.flying || !!e.flying) && (!cond.subtype || !!e.subtypes?.includes(cond.subtype) || (!!cond.orSubtype && !!e.subtypes?.includes(cond.orSubtype)))).length >= cond.n;
     }
     case "destroyedByOpponent":
       return (s.turnLog?.destroyed ?? []).some((e) => e.controller === you && e.by !== you);
@@ -1380,6 +1384,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "prepared") return !!src.prepared; // CR 722.3a
       if (cond.is === "token") return !!src.isToken; // Aeve, Progenitor Ooze
       if (cond.is === "dealtDamageThisTurn") return src.zone === "battlefield" && !!src.wasDealtDamage;
+      if (cond.is === "regeneratedThisTurn") return src.zone === "battlefield" && src.regenerated?.turn === s.turn;
       if (cond.is === "hasDealtDamage") return !!src.hasDealtDamage;
       if (cond.is === "hasDealtCombatDamage") return !!src.hasDealtCombatDamage;
       // Whirling Dervish: "if ~ dealt damage to an opponent this turn": this object (CR 400.7), to any opponent (CR 102.3).
@@ -1659,7 +1664,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "addKeywords":
       // "Has protection from the chosen color": the color chosen as the source entered.
       // Empty-Shrine Kannushi: "protection from each color among permanents you control", the colors layer 5 left them.
-      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) || m.keywords.includes(YOURS_COLORS_PROTECTION) || m.keywords.some((k) => k.startsWith(LINKED_CARD_KEYWORD)) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : k === YOURS_COLORS_PROTECTION ? colorsAmongYours(chars, controllerOfInst(e, chars)).map((col) => `Protection from ${COLOR_WORD[col]}`) : k.startsWith(LINKED_CARD_KEYWORD) ? linkedCardKeyword(s, e.sourceId, k.slice(LINKED_CARD_KEYWORD.length)) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors, e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined)) {
+      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) || m.keywords.includes(YOURS_COLORS_PROTECTION) || m.keywords.some((k) => k.startsWith(LINKED_CARD_KEYWORD)) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : k === YOURS_COLORS_PROTECTION ? colorsAmongYours(chars, controllerOfInst(e, chars)).map((col) => `Protection from ${COLOR_WORD[col]}`) : k.startsWith(LINKED_CARD_KEYWORD) ? linkedCardKeyword(s, e.sourceId, k.slice(LINKED_CARD_KEYWORD.length)) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors, e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.parity : undefined)) {
         const key = k.toLowerCase();
         if (/^ward\b/i.test(k)) delete c.wardLost;
         if (!c.keywords.some((x) => sameCI(x, k))) {
@@ -1980,6 +1985,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantBeSacrificed":
     case "cantTurnFaceUp":
     case "cantTransform":
+    case "cantPhaseOut":
     case "cantCrew":
     case "cantBeEquipped":
     case "attackAsThoughHaste":

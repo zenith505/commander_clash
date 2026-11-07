@@ -917,6 +917,11 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         log(s, `${e.types.map((t) => `${t.toLowerCase()}s`).join(" and ")} ${p.name} controls won't untap during their next untap step.`.replace(/^./, (c) => c.toUpperCase()));
       }
       return;
+    case "handSizeForGame":
+      // Inspired Idea: for the rest of the game, its timestamp now (CR 613.7), so a later "maximum hand size is two" wins.
+      (player(s, ctx.controller).handSizeForGame ??= []).push({ plus: e.plus, timestamp: s.nextTimestamp++ });
+      log(s, `${player(s, ctx.controller).name}'s maximum hand size is ${e.plus < 0 ? "reduced" : "increased"} by ${Math.abs(e.plus)} for the rest of the game.`);
+      return;
     case "noMaxHandSize":
       // "For as long as you control ~": nothing if you no longer do (CR 611.2b; rulings on The Great Synthesis).
       if (e.whileControlled) {

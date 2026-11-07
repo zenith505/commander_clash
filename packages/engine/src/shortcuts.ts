@@ -397,6 +397,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     damagedBy: capped(Object.fromEntries(Object.entries(t.damagedBy ?? {}).map(([k, v]) => [k, v.length]))),
     toGraveyard: capped(t.toGraveyard ?? {}),
     toGraveyardFromHandOrLibrary: capped(t.toGraveyardFromHandOrLibrary ?? {}),
+    toGraveyardFromLibrary: capped(t.toGraveyardFromLibrary ?? {}),
     landPlayedNotFromHand: t.landPlayedNotFromHand,
     playedFromExile: t.playedFromExile,
     lorePut: t.lorePut ? [...t.lorePut].sort() : undefined,
@@ -432,6 +433,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     // Whispering Snitch: only the first surveil each turn matters.
     creatureCounterPutters: t.creatureCounterPutters,
     damagedCreature: t.damagedCreature && [...t.damagedCreature].sort(),
+    combatDamagedCreature: t.combatDamagedCreature && [...t.combatDamagedCreature].sort(),
   };
 }
 

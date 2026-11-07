@@ -2,11 +2,11 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { Amount, CounterKind, Modification, FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { canonicalKeyword, LAND_TYPES, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, SACRIFICED_LANDWALK, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
+import { canonicalKeyword, LAND_TYPES, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, SACRIFICED_LANDWALK, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CHOSEN_PARITY_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
-import type { CardDef, ManaType, PlayerId } from "../types";
+import type { CardDef, Color, ManaType, PlayerId } from "../types";
 import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS, capital, singularWord } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
@@ -522,6 +522,8 @@ export function compile(d: CardDef): CompiledCard {
   const isSpell = d.types.includes("Instant") || d.types.includes("Sorcery");
   const spellLines: string[] = [];
   let ascendSpell = false;
+  /** Bane Alley Broker: "You may look at cards exiled with ~." (its face-down exile ability's cards). */
+  let lookLinked: string | undefined;
   /** Banefire: "If X is 5 or more, ... the damage can't be prevented": applied to the spell's damage once it's compiled. */
   let unpreventableX: number | undefined;
   /** Demonfire: "If you have no cards in hand, ... the damage can't be prevented", applied the same way. */
@@ -750,7 +752,7 @@ export function compile(d: CardDef): CompiledCard {
   let spree: { costs: string[]; texts: string[]; lines: string[]; tiered?: true } | undefined;
   // Entwine (CR 702.42a): "You may choose all modes of this spell instead of just the number specified. If you do, you
   // pay an additional [cost]." Mana costs only.
-  let entwine: { cost: string; raw: string } | undefined;
+  let entwine: { cost: string; raw: string; costs?: AdditionalCost[]; text?: string } | undefined;
   // Escalate (CR 702.120a): "For each mode you choose beyond the first as you cast this spell, you pay an additional
   // [cost]": mana, or one cost beyond mana ("Escalate—Discard a card.").
   let escalate: { mana?: string; cost?: AdditionalCost; text: string; raw: string } | "fail" | undefined;
@@ -925,6 +927,15 @@ export function compile(d: CardDef): CompiledCard {
       entwine = { cost: ent[1]!, raw };
       continue;
     }
+    // "Entwine—Sacrifice three lands." (Betrayal of Flesh, Solar Tide): a cost that isn't mana (CR 702.42a, 601.2b).
+    const entOther = isSpell && !entwine && /^Entwine—(.+?)\.?$/.exec(line);
+    if (entOther) {
+      const costs = entOther[1]!.split(", ").map((part) => parseAdditionalCost(part));
+      if (costs.every((c) => c)) {
+        entwine = { cost: "", raw, costs: costs as AdditionalCost[], text: entOther[1]!.replace(/^./, (c) => c.toLowerCase()) };
+        continue;
+      }
+    }
     // Deck construction, not play: the deck checker reads it (deckLimit).
     if (/^A deck can have (?:any number of|up to \w+) cards named ~\.$/.test(line)) continue;
     // Also deck construction: who can be a commander (CR 903.3, deck.ts canBeCommander).
@@ -1096,6 +1107,16 @@ export function compile(d: CardDef): CompiledCard {
     if (splice && isSpell && !out.splice && parseManaCost(splice[2]!).supported && !parseManaCost(splice[2]!).hasX) {
       out.splice = { onto: splice[1] === "Arcane" ? "Arcane" : "instantOrSorcery", mana: splice[2]! };
       continue;
+    }
+    // "Splice onto Arcane—Sacrifice two Mountains." (Torrent of Stone), "—An opponent gains 5 life." (Roar of Jukai): a
+    // splice cost that isn't mana, paid as an additional cost (CR 702.47a, 601.2b, 601.2f-h).
+    const spliceOther = /^Splice onto (Arcane|instant or sorcery)—(.+?)\.?$/.exec(line);
+    if (spliceOther && isSpell && !out.splice) {
+      const costs = spliceOther[2]!.split(", ").map((part) => (/^An opponent gains (\d+) life$/.exec(part) ? ({ kind: "giveLife", n: Number(/(\d+)/.exec(part)![1]) } as AdditionalCost) : parseAdditionalCost(part)));
+      if (costs.every((c) => c)) {
+        out.splice = { onto: spliceOther[1] === "Arcane" ? "Arcane" : "instantOrSorcery", mana: "", costs: costs as AdditionalCost[], text: spliceOther[2]!.replace(/^./, (c) => c.toLowerCase()) };
+        continue;
+      }
     }
     if (/^Splice onto\b/.test(line)) {
       out.unsupported.push(raw);
@@ -1710,6 +1731,15 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Circu, Dimir Lobotomist: "Your opponents can't cast spells with the same name as a card exiled with ~": the names of
     // the cards its exile abilities exiled that are still exiled (CR 607.2a, 201.2).
+    // Cornered Market (CompiledCard.permanentNameBan).
+    if (line === "Players can't cast spells with the same name as a nontoken permanent." && !out.permanentNameBan?.cast) {
+      out.permanentNameBan = { ...out.permanentNameBan, cast: true };
+      continue;
+    }
+    if (line === "Players can't play nonbasic lands with the same name as a nontoken permanent." && !out.permanentNameBan?.lands) {
+      out.permanentNameBan = { ...out.permanentNameBan, lands: true };
+      continue;
+    }
     if (line === "Your opponents can't cast spells with the same name as a card exiled with ~." && !out.linkedNameCastBan) {
       out.linkedNameCastBan = true;
       continue;
@@ -2166,6 +2196,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "As an additional cost to cast this spell, sacrifice a creature." (CR 601.2b, 601.2f-h)
     const extra = /^As an additional cost to cast (?:this spell|~), (.+)\.$/.exec(line);
+    // Kaervek's Spite: "sacrifice all permanents you control and discard your hand": two costs with nothing to choose, paid
+    // as it's cast (CR 601.2h; rulings: once, not any number of times). Spells only.
+    if (extra?.[1] === "sacrifice all permanents you control and discard your hand" && !d.types.some((t) => t !== "Instant" && t !== "Sorcery")) {
+      (out.additionalCosts ??= []).push({ kind: "sacrificeAll" }, { kind: "discardHand" });
+      continue;
+    }
     if (extra) {
       const cost = parseAdditionalCost(extra[1]!, true);
       const or = cost ? null : parseCostOr(extra[1]!);
@@ -2684,6 +2720,21 @@ export function compile(d: CardDef): CompiledCard {
       const cond = parseStaticCondition(playWhile[1]!, { affects: { kind: "self" }, mods: [], text: line });
       if (!cond || out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
       else out.playLinkedWhile = { kind: "allOf", conds: [{ kind: "yourTurn" }, cond] };
+      continue;
+    }
+    // Bane Alley Broker: "You may look at cards exiled with ~.": the cards its face-down exile ability exiled (CR 406.3, 607.2a).
+    if (line === "You may look at cards exiled with ~.") {
+      if (lookLinked) out.unsupported.push(raw);
+      else lookLinked = raw;
+      continue;
+    }
+    // Pick Up the Pace: "You may play cards exiled with ~ as long as you attacked this turn": whenever that holds, with the
+    // usual costs and timing (playing a card is playing a land or casting a spell, CR 305.1, 601.2).
+    const playAsLong = /^You may play cards exiled with ~ as long as (.+)\.$/.exec(line);
+    if (playAsLong) {
+      const cond = parseStaticCondition(playAsLong[1]!, { affects: { kind: "self" }, mods: [], text: line });
+      if (!cond || out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
+      else out.playLinkedWhile = { kind: "allOf", conds: [cond] };
       continue;
     }
     // Nightveil Specter: "You may play lands and cast spells from among cards exiled with ~": always, with the usual
@@ -4479,6 +4530,12 @@ export function compile(d: CardDef): CompiledCard {
       out.counterShieldRad = true;
       continue;
     }
+    // Rock Hydra: "For each 1 damage that would be dealt to ~, if it has a +1/+1 counter on it, remove a +1/+1 counter from
+    // it and prevent that 1 damage." (CR 615): see dealDamage.
+    if (line === "For each 1 damage that would be dealt to ~, if it has a +1/+1 counter on it, remove a +1/+1 counter from it and prevent that 1 damage.") {
+      out.counterShield = "perOne";
+      continue;
+    }
     // Protean Hydra: "If damage would be dealt to ~, prevent that damage and remove that many +1/+1 counters from it":
     // all of it prevented, even with fewer counters or none (rulings).
     if (/^If damage would be dealt to ~, prevent that damage and remove that many \+1\/\+1 counters from (?:~|it)\.$/.test(line)) {
@@ -5052,6 +5109,15 @@ export function compile(d: CardDef): CompiledCard {
       const per = eachConvoked[1] === "two" ? 2 : eachConvoked[1] === "three" ? 3 : 1;
       if (out.entersWithCounters || !out.convoke) out.unsupported.push(raw);
       else out.entersWithCounters = { counter: counterKind(eachConvoked[2]!), n: { count: { kind: "convokedCount" }, ...(per > 1 ? { times: per } : {}) } };
+      continue;
+    }
+    // Clay Champion: "~ enters with three +1/+1 counters on it for each {G}{G} spent to cast it": whole pairs of that color
+    // spent on the spell it was (CR 601.2h), none if it wasn't cast, as it enters (CR 614.1c).
+    const eachPair = new RegExp(`^~ enters with (a|an|two|three) ${COUNTER} counters? on it for each \\{([WUBRG])\\}\\{\\3\\} spent to cast it\\.$`).exec(line);
+    if (eachPair) {
+      const per = eachPair[1] === "two" ? 2 : eachPair[1] === "three" ? 3 : 1;
+      if (out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: counterKind(eachPair[2]!), n: { count: { kind: "spentPairs", color: eachPair[3] as Color }, ...(per > 1 ? { times: per } : {}) } };
       continue;
     }
     // Verazol, the Split Current: "~ enters with a +1/+1 counter on it for each mana spent to cast it": the same, none if
@@ -5952,7 +6018,10 @@ export function compile(d: CardDef): CompiledCard {
       /^(At the beginning of your upkeep) and (whenever you cast an? (?:white|blue|black|red|green) spell), (.+)$/.exec(line) ??
       // Kratos, Stoic Father: "Whenever you attack with one or more Gods and whenever a God dies, ...": an attack and a
       // death are never one event.
-      /^(Whenever you attack with one or more [A-Z][a-z]+s) and (whenever an? [A-Z][a-z]+ dies), (.+)$/.exec(line);
+      /^(Whenever you attack with one or more [A-Z][a-z]+s) and (whenever an? [A-Z][a-z]+ dies), (.+)$/.exec(line) ??
+      // Ertai's Familiar: "When ~ phases out or leaves the battlefield, ...": phasing out isn't leaving the battlefield (CR
+      // 702.26d), so they're never one event.
+      /^When ~ (phases out) or (leaves the battlefield), (.+)$/.exec(line);
     // MACH-1, Swooping Scoundrel: "When ~ enters and whenever you gain life, surveil 1. This ability triggers only once each
     // turn.": one ability, so the two triggers share the once (CR 603.2h; keyed by the effect's text).
     const onceBoth = !!twice && /^When ~ enters and whenever [^,]+, [^."]+\. This ability triggers only once each turn\.$/.test(line);
@@ -5990,6 +6059,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever you create a token, ${effect}`, `Whenever you sacrifice a token, ${effect}`]
             : /^whenever /.test(twice[1]!)
               ? [`When ~ enters, ${effect}`, `W${twice[1]!.slice(1)}, ${effect}`]
+            : /^When ~ phases out or leaves the battlefield, /.test(line)
+              ? [`Whenever ~ phases out, ${effect}`, `When ~ leaves the battlefield, ${effect}`]
             : /^Whenever ~ attacks, blocks, or becomes the target of a spell, /.test(line)
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ blocks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]
             : /^Whenever ~ attacks or becomes the target of a spell(?: an opponent controls)?, /.test(line)
@@ -6130,7 +6201,9 @@ export function compile(d: CardDef): CompiledCard {
     // card." then "Draw a card.": the same, the delayed trigger after another instruction in its paragraph.
     const floatingFirst = tail === undefined && !costSacrificedX && spellLines.length > 1 && /(?:^|\. )(?:Whenever [^,]+ this turn, |Until end of turn, whenever )/.test(spellLines[0]!) && !spellLines.some((l) => l.includes("•"));
     const parts = floatingFirst ? [parseBody(spellLines[0]!, { spell: true }), parseBody(spellLines.slice(1).join(" "), { spell: true })] : [];
-    const joined: AbilityBody | null = parts.length && parts.every((b) => b && !b.targets.length && !b.modal && Object.keys(b).every((k) => k === "targets" || k === "effects" || k === "text")) ? { targets: [], effects: parts.flatMap((b) => b!.effects), text: spellLines.join(" ") } : null;
+    // Spiritualize: "Until end of turn, whenever target creature deals damage, ..." then "Draw a card.": the first
+    // paragraph's targets are the spell's, as long as the rest has none of its own (its indexes stay the same).
+    const joined: AbilityBody | null = parts.length && parts.every((b, i) => b && (i === 0 || !b.targets.length) && !b.modal && Object.keys(b).every((k) => k === "targets" || k === "effects" || k === "text")) ? { targets: parts[0]!.targets, effects: parts.flatMap((b) => b!.effects), text: spellLines.join(" ") } : null;
     const body = floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}) }) : null;
     if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
@@ -6245,7 +6318,10 @@ export function compile(d: CardDef): CompiledCard {
   }
   if (entwine) {
     const modal = out.spell?.modal;
-    if (modal && !modal.costs && modal.max < modal.modes.length) modal.entwine = entwine.cost;
+    if (modal && !modal.costs && modal.max < modal.modes.length) {
+      modal.entwine = entwine.cost;
+      if (entwine.costs) [modal.entwineCosts, modal.entwineText] = [entwine.costs, entwine.text!];
+    }
     else out.unsupported.push(entwine.raw);
   }
   if (striated && striated !== "fail") {
@@ -6273,6 +6349,8 @@ export function compile(d: CardDef): CompiledCard {
   if (out.entersWithCounters?.escaped !== undefined && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   if (out.entersCounterChoice?.escaped && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   checkCastingLinks(out);
+  // Lavabrink Venturer: protection "of the chosen quality" needs odd or even chosen as it enters (CR 614.12).
+  if (JSON.stringify([out.statics, out.triggers, out.activated, out.spell]).includes(CHOSEN_PARITY_PROTECTION) && !out.entersChoose?.some((c) => c.what === "parity")) out.unsupported.push("(protection of a chosen quality with no odd or even chosen as it enters)");
   // Grandeur's "Discard another card named ~": the card's own name (a copy has it too, CR 707.2).
   for (const ab of out.activated)
     if (ab.costs?.some((c) => c.kind === "discard" && c.filter?.named === "~"))
@@ -6289,6 +6367,15 @@ export function compile(d: CardDef): CompiledCard {
   if (cleave && !d.oracleId.endsWith("|cleaved")) {
     const v = compileCard({ ...d, oracleId: `${d.oracleId}|cleaved`, oracleText: cleavedTexts.get(d.oracleId) ?? cleavedText(d.oracleText) });
     if (!out.spell || v.unsupported.length || !v.spell) out.unsupported.push(`Cleave ${cleave.mana}`);
+  }
+  // Bane Alley Broker: its controller may look at the cards its one exile ability exiled face down, as they're exiled (and
+  // as they choose one to return, effects/run-zones.ts).
+  if (lookLinked) {
+    const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects));
+    const faceDown = all.filter((e): e is Extract<Effect, { type: "exileFaceDown" }> => e.type === "exileFaceDown");
+    const others = all.some((e) => e.type === "exile" || e.type === "exileTop" || e.type === "exileGraveyard" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "impulse" || e.type === "exileHand" || (e.type === "discard" && !!e.exile));
+    if (others || out.spell || faceDown.length !== 1 || faceDown[0]!.actor || faceDown[0]!.who) out.unsupported.push(lookLinked);
+    else faceDown[0]!.look = true;
   }
   linkExile(out);
   // "Target ... card not named ~" (Staff of Eden): this card's name (CR 201.5).
@@ -6732,7 +6819,9 @@ function linkExile(out: CompiledCard) {
   }
   // "When this creature is turned face up, exile ..." (Aurelia's Vindicator) is one of its exile abilities too (CR 607.2a).
   // Hoarding Dragon: "search your library for an artifact card, exile it, then shuffle" is its exile ability too.
-  const exiling = (e: Effect): e is Extract<Effect, { type: "exile" | "takeFromHand" | "hideaway" | "discard" | "exileHand" | "search" }> => (e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || (e.type === "discard" && !!e.exile) || e.type === "exileHand" || (e.type === "search" && e.dest.zone === "exile" && !e.others && !e.split)) && !("until" in e && e.until);
+  // Wormfang Newt, Crab and Drake: "exile a land you control", "an opponent chooses a permanent you control ... and exiles
+  // it", "unless you exile a creature you control": a player's pick of a permanent to exile, as it enters.
+  const exiling = (e: Effect): e is Extract<Effect, { type: "exile" | "takeFromHand" | "hideaway" | "discard" | "exileHand" | "search" | "pick" }> => ((e.type === "pick" && e.action === "exile" && !e.linked) || e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || (e.type === "discard" && !!e.exile) || e.type === "exileHand" || (e.type === "search" && e.dest.zone === "exile" && !e.others && !e.split)) && !("until" in e && e.until);
   const exiles0 = [...out.triggers.filter((t) => t.event === "selfEnters" || t.event === "selfTurnedFaceUp").map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter(exiling);
   // "Landfall — Whenever a land you control enters, you may exile target nonland permanent other than ~" (Admonition
   // Angel): with no exile as it enters or in an activated ability, its one other triggered ability that exiles.
@@ -6832,7 +6921,7 @@ function checkCastingLinks(out: CompiledCard) {
     // "Cards exiled with ~" by its cost (Mechtitan Core): an activated ability that exiles other permanents as its cost.
     if (o.type === "returnExiled" && o.fromCost && !exileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
-    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : o.chosen === "landOrNonland" ? needs.add("landOrNonland") : o.chosen === "landType" ? needs.add("landType") : needs.add("creatureType"));
+    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : o.chosen === "landOrNonland" ? needs.add("landOrNonland") : o.chosen === "landType" ? needs.add("landType") : o.chosen === "typeOrder" ? needs.add("typeOrder") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen === true)) needs.add("color");
     if (o.kind === "setColors" && o.chosen === "colors") needs.add("colors");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");
@@ -6955,7 +7044,7 @@ function checkCastingLinks(out: CompiledCard) {
   if (/"kind":"treasureSpent","activated"/.test(JSON.stringify([out.spell, out.triggers, out.statics]))) bad = true;
   // Mana from snow sources spent (CR 107.4h): a spell's or its permanent's enters trigger's; Boreal Outrider's "of that
   // spell's colors" only in a cast trigger's condition.
-  const snowIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"snowSpent"');
+  const snowIn = (v: unknown) => /"kind":"(?:snowSpent|spentPairs)"/.test(JSON.stringify(v ?? null));
   if (out.triggers.some((t) => t.event !== "selfEnters" && snowIn(t.body)) || snowIn(out.statics) || snowIn(out.activated)) bad = true;
   if (JSON.stringify([out.spell, out.triggers.map((t) => ({ ...t, cast: undefined })), out.statics, out.activated, out.entersWithCounters]).includes('"snowOfColors"')) bad = true;
   // "Enters with a counter for each creature of the chosen type": counted once its own "as ~ enters, choose" is answered
@@ -7016,7 +7105,7 @@ function checkX(d: CardDef, out: CompiledCard) {
   // Spliced, only the card's rules text is added (CR 702.47c): a plain spell, with nothing that depends on how this card
   // itself was cast, and no X (the spell it's spliced onto has its own).
   if (out.splice && (!out.spell || out.spell.modal || usesX(out.spell) || out.kicker || out.altCosts || out.buyback !== undefined || out.fromGraveyard)) {
-    bad(`Splice onto ${out.splice.onto === "Arcane" ? "Arcane" : "instant or sorcery"} ${out.splice.mana}`);
+    bad(`Splice onto ${out.splice.onto === "Arcane" ? "Arcane" : "instant or sorcery"}${out.splice.text ? `—${out.splice.text.replace(/^./, (c) => c.toUpperCase())}.` : ` ${out.splice.mana}`}`);
     delete out.splice;
   }
 }

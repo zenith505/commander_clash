@@ -314,8 +314,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.differentManaValues) return new Set(refPlayers(s, c.who, ctx).flatMap((pid) => s.players[pid]!.hand.map((id) => defMv(defOf(s, s.objects[id]!))))).size;
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (f ? s.players[pid]!.hand.filter((id) => printedMatches(f, defOf(s, s.objects[id]!))).length : s.players[pid]!.hand.length), 0);
     }
-    case "cardsInLibrary":
-      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.library.length, 0);
+    case "cardsInLibrary": {
+      // Mindblaze: "cards with the chosen name" in that library, the name chosen as it resolves.
+      const f = c.filter && bindChosen(c.filter, ctx.chosen);
+      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (f ? s.players[pid]!.library.filter((id) => printedMatches(f, defOf(s, s.objects[id]!))).length : s.players[pid]!.library.length), 0);
+    }
     case "handMoreThanYou": {
       const theirs = refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.hand.length, 0);
       const yours = s.players[ctx.controller]!.hand.length;
@@ -505,7 +508,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "manifestedThisWay":
       return s.resolving?.manifestedThisWay ?? 0;
     case "parleyRevealed":
-      return (c.land ? s.resolving?.parley?.land : s.resolving?.parley?.nonland) ?? 0;
+      return (c.mv ? s.resolving?.parley?.mv : c.land ? s.resolving?.parley?.land : s.resolving?.parley?.nonland) ?? 0;
     case "damageThisWay":
       return s.resolving?.damageThisWay ?? 0;
     case "excessThisWay":
@@ -626,7 +629,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "greaterOf":
       return Math.max(evalCount(s, c.of[0], ctx), evalCount(s, c.of[1], ctx));
     case "cardsToGraveyardThisTurn":
-      return refPlayers(s, c.whose, ctx).reduce((n, pid) => n + ((c.fromHandOrLibrary ? s.turnLog?.toGraveyardFromHandOrLibrary : s.cardsToGraveyardThisTurn)?.[pid] ?? 0), 0);
+      return refPlayers(s, c.whose, ctx).reduce((n, pid) => n + ((c.fromLibrary ? s.turnLog?.toGraveyardFromLibrary : c.fromHandOrLibrary ? s.turnLog?.toGraveyardFromHandOrLibrary : s.cardsToGraveyardThisTurn)?.[pid] ?? 0), 0);
     case "chosenCommanderMv":
       return s.resolving?.commanderMv ?? 0;
     case "commandersMv": {
@@ -667,6 +670,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (ctx.kicked ?? []).some((i) => c.which === undefined || i === c.which) ? 1 : 0;
     case "spentWas":
       return spentMeets(ctx.spent, c.req) ? 1 : 0;
+    case "spentPairs":
+      return Math.floor((ctx.spent?.[c.color] ?? 0) / 2);
     case "castSpellModes": {
       // Riku of Many Paths: the modes chosen as it was cast (CR 601.2b), each time a mode was chosen.
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
@@ -874,6 +879,12 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const zc = o.zoneChanges ?? 0;
       const same = ctx.sourceZc === undefined || zc === ctx.sourceZc || (zc === ctx.sourceZc + 1 && o.zone !== "battlefield");
       return same ? (o.mutations ?? 0) : 0;
+    }
+    case "regenerations": {
+      // Spiny Starfish: the times it regenerated this turn, of that object only (CR 400.7).
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!o || o.zone !== "battlefield" || (ctx.sourceZc !== undefined && (o.zoneChanges ?? 0) !== ctx.sourceZc)) return 0;
+      return o.regenerated?.turn === s.turn ? o.regenerated.n : 0;
     }
     case "stationPower": {
       // Its power as the ability resolves, or as it last existed; negative power puts on no counters (rulings).
@@ -1353,7 +1364,7 @@ function describeCount(c: Count): string {
     case "manifestedThisWay":
       return "#cards manifested";
     case "parleyRevealed":
-      return c.land ? "#land cards revealed" : "#nonland cards revealed";
+      return c.mv ? "the total mana value of the cards revealed" : c.land ? "#land cards revealed" : "#nonland cards revealed";
     case "damageThisWay":
       return "the damage dealt";
     case "excessThisWay":
@@ -1463,7 +1474,7 @@ function describeCount(c: Count): string {
     case "greaterOf":
       return `max(${describeCount(c.of[0])}, ${describeCount(c.of[1])})`;
     case "cardsToGraveyardThisTurn":
-      return c.fromHandOrLibrary ? "#cards put into that graveyard from hand or library this turn" : "#cards put into that graveyard this turn";
+      return c.fromLibrary ? "#cards put into that graveyard from library this turn" : c.fromHandOrLibrary ? "#cards put into that graveyard from hand or library this turn" : "#cards put into that graveyard this turn";
     case "commanderCasts":
       return "#times you've cast your commander";
     case "chosenCommanderMv":
@@ -1529,6 +1540,8 @@ function describeCount(c: Count): string {
       return "kicked";
     case "spentWas":
       return "mana spent";
+    case "spentPairs":
+      return `{${c.color}}{${c.color}} spent`;
     case "colorsSpent":
       return "colors of mana spent";
     case "castSpellX":
@@ -1603,6 +1616,8 @@ function describeCount(c: Count): string {
       return c.heads ? "coins that came up heads" : c.lost ? "flips lost" : "flips won";
     case "mutations":
       return "times mutated";
+    case "regenerations":
+      return "times it regenerated this turn";
     default:
       return c.kind;
   }

@@ -46,6 +46,7 @@ import {
   type GameObject,
   type GameState,
   type LastKnown,
+  type RegenRider,
   type StackItem,
   type ManaLot,
   type ManaOrigin,
@@ -686,6 +687,17 @@ function reflectionKey(s: GameState, o: GameObject): string | undefined {
   return key;
 }
 
+/**
+ * "Attacking alone", "blocking alone" (CR 506.5): it's attacking (blocking) and no other creature is, counting those
+ * leaving the battlefield at the same time as it (s.leftTogether, their last known information).
+ */
+function combatAlone(s: GameState, o: GameObject): "attacking" | "blocking" | undefined {
+  const others = [...s.battlefield.filter((id) => id !== o.id).map((id) => ({ attacking: s.objects[id]!.attacking, blocking: s.objects[id]!.blocking })), ...(s.leftTogether ?? []).filter((l) => l.id !== o.id).map((l) => ({ attacking: s.lastKnown?.[l.id]?.attacking, blocking: s.lastKnown?.[l.id]?.blocking }))];
+  if (o.attacking !== undefined) return others.some((x) => x.attacking !== undefined) ? undefined : "attacking";
+  if (o.blocking?.length) return others.some((x) => !!x.blocking?.length) ? undefined : "blocking";
+  return undefined;
+}
+
 /** Move an object between zones. It becomes a new object with no memory of its old one (CR 400.7). */
 /** The name of a permanent whose ability stops this card entering the battlefield from its graveyard or library. */
 export function cantEnterFromHere(s: GameState, o: GameObject, zone: "graveyard" | "library", faceDown = false): string | undefined {
@@ -994,10 +1006,13 @@ export function moveObject(
   // The permanent as it last existed, for "whenever a creature you control with a +1/+1 counter dies".
   const snapshot: GameObject | undefined = fromZone === "battlefield" ? { ...o, counters: lastCounters } : undefined;
   const snapshotKey = cardIdOf(o);
+  // Thijarian Witness: "if it was attacking or blocking alone" (CR 506.5): no other creature attacking (blocking) as it
+  // left, ones leaving at the same time included (they were still in combat then, CR 603.10a).
+  const aloneIn = fromZone === "battlefield" ? combatAlone(s, o) : undefined;
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
@@ -1091,6 +1106,8 @@ export function moveObject(
   o.damagedWalkers = undefined;
   o.deathtouchDamage = false;
   o.regenShields = undefined;
+  o.regenRiders = undefined;
+  o.regenerated = undefined;
   o.preventNext = undefined;
   o.redirectNext = undefined;
   o.activatedThisTurn = undefined;
@@ -1305,6 +1322,11 @@ export function moveObject(
   if (to === "graveyard" && o.zone === "graveyard" && (fromZone === "hand" || fromZone === "library") && !o.isToken) {
     const yards = ((s.turnLog ??= {}).toGraveyardFromHandOrLibrary ??= {});
     yards[o.owner] = (yards[o.owner] ?? 0) + 1;
+    // Cruel Calculations: "cards that were put into target player's graveyard from their library this turn".
+    if (fromZone === "library") {
+      const lib = (s.turnLog.toGraveyardFromLibrary ??= {});
+      lib[o.owner] = (lib[o.owner] ?? 0) + 1;
+    }
   }
   if (fromZone === "battlefield") {
     if (!(s.permanentLeftThisTurn ??= []).includes(lastController)) s.permanentLeftThisTurn.push(lastController); // revolt
@@ -2357,7 +2379,29 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
   // Mossbridge Troll: "If ~ would be destroyed, regenerate it": regenerated with no shield used up (rulings).
   const always = !noRegen && o.noRegenTurn !== s.turn && !!abilitiesOf(s, o).regeneratesInsteadOfDestroyed;
   if (!noRegen && o.noRegenTurn !== s.turn && ((o.regenShields ?? 0) > 0 || always)) {
-    if (!always) o.regenShields! -= 1;
+    if (!always) {
+      // Which shield replaces it is its controller's choice (CR 616.1), made for them: one without a "When it regenerates this
+      // way" rider first, unless the rider only puts +1/+1 counters on it (Skeleton Scavengers); the oldest rider first.
+      const riders = o.regenRiders ?? [];
+      const plain = o.regenShields! - riders.length;
+      const good = (r: RegenRider) => !!r.body?.effects.every((e) => e.type === "counters" && e.counter === "+1/+1" && e.what.ref === "self");
+      const pick = plain > 0 && !riders.some(good) ? -1 : Math.max(0, riders.findIndex(good));
+      o.regenShields! -= 1;
+      if (pick >= 0 && riders.length) {
+        const [r] = riders.splice(pick, 1);
+        if (!riders.length) o.regenRiders = undefined;
+        // Debt of Loyalty: control changes as it regenerates (rulings), with no end (CR 611.2a), in layer 2 (CR 613.1b).
+        if (r!.control) {
+          s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: r!.controller, sourceName: s.cards[r!.sourceCardId]?.name ?? name, duration: "game", affected: [o.id], mods: [{ kind: "control" }] });
+          invalidateCharacteristics(s);
+          log(s, `${player(s, r!.controller).name} gains control of ${name} as it regenerates.`);
+        }
+        // "When it regenerates this way, ...": its delayed trigger (CR 603.7), put on the stack the next time a player would
+        // receive priority (CR 603.3).
+        else if (r!.body) s.triggerQueue.push({ sourceId: r!.sourceId, sourceCardId: r!.sourceCardId, controller: r!.controller, index: -1, sourceZc: r!.sourceZc, body: r!.body, ...(r!.player !== undefined ? { event: { player: r!.player } } : {}) });
+      }
+    }
+    o.regenerated = { turn: s.turn, n: o.regenerated?.turn === s.turn ? o.regenerated.n + 1 : 1 };
     o.damage = 0;
     o.deathtouchDamage = false;
     tapPermanent(s, o);
@@ -4204,8 +4248,11 @@ export function maxHandSize(s: GameState, pid: PlayerId): number {
     .flatMap((o) => (abilitiesOf(s, o).handSize ?? []).map((h) => ({ h, o })))
     .filter(({ h, o }) => (h.who === "you" ? controllerOf(s, o) === pid : h.who === "chosen" ? o.chosen?.player === pid : opponents(s, controllerOf(s, o)).includes(pid)))
     .filter(({ h, o }) => !h.if || staticConditionNow(s, h.if, o.id, controllerOf(s, o)))
-    .sort((a, b) => a.o.timestamp - b.o.timestamp);
-  for (const { h, o } of mods) n = h.equal ? evalAmount(s, h.equal, { controller: controllerOf(s, o), sourceId: o.id }) : h.set !== undefined ? h.set - (h.minus ? evalAmount(s, h.minus, { controller: controllerOf(s, o), sourceId: o.id }) : 0) : n + (h.plus ?? 0);
+    .map(({ h, o }) => ({ h, o, t: o.timestamp }));
+  // Inspired Idea: a change for the rest of the game from a resolved spell, at its own timestamp (rulings).
+  for (const g of player(s, pid).handSizeForGame ?? []) mods.push({ h: { who: "you", plus: g.plus }, o: undefined as unknown as GameObject, t: g.timestamp });
+  mods.sort((a, b) => a.t - b.t);
+  for (const { h, o } of mods) n = !o ? n + (h.plus ?? 0) : h.equal ? evalAmount(s, h.equal, { controller: controllerOf(s, o), sourceId: o.id }) : h.set !== undefined ? h.set - (h.minus ? evalAmount(s, h.minus, { controller: controllerOf(s, o), sourceId: o.id }) : 0) : n + (h.plus ?? 0);
   return Math.max(0, n);
 }
 
@@ -4236,6 +4283,7 @@ function finishCleanup(s: GameState) {
     o.wasDealtNoncombatDamage = undefined;
     o.deathtouchDamage = false;
     o.regenShields = undefined; // "this turn" effects end
+    o.regenRiders = undefined;
     o.preventNext = undefined;
     o.redirectNext = undefined;
     o.saddled = undefined; // "until end of turn" (CR 702.171b)
@@ -4323,7 +4371,16 @@ function resolveTop(s: GameState) {
     const played = item.event?.played;
     const playedNow = played && s.objects[played.id];
     const sharesNo = trig?.cast?.sharesTypeWithLinked && played && !sharesTypeWithLinked(s, `${item.sourceId}@${item.sourceZc ?? 0}`, playedNow && (playedNow.zoneChanges ?? 0) === played.zc ? characteristics(s, playedNow).types : playedNow ? defOf(s, playedNow).types : []);
-    if (sharesNo || (still && atYou! < still.min) || (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id, item.subject?.zc))) {
+    // Obscura Ascendancy: the spell's mana value, on the stack or as it last was there (CR 113.7a), still 1 plus the
+    // counters on ~, if it's still the object it was (CR 603.4, rulings).
+    const mvc = trig?.cast?.mvIsSelfCountersPlus;
+    const mvSpell = mvc && item.cause !== undefined ? (s.stack.find((x) => x.id === item.cause && x.kind === "spell") ?? s.castItems?.[item.cause]) : undefined;
+    // Gone, the counters on it as it last existed on the battlefield (CR 603.4, 608.2h).
+    const src = mvc && item.sourceId ? s.objects[item.sourceId] : undefined;
+    const lk = mvc && item.sourceId ? s.lastKnown?.[item.sourceId] : undefined;
+    const srcCounters = src && src.zone === "battlefield" && (src.zoneChanges ?? 0) === (item.sourceZc ?? 0) ? src.counters : lk && lk.zc === (item.sourceZc ?? 0) ? (lk.counters ?? {}) : undefined;
+    const mvNo = !!mvc && (!mvSpell || !srcCounters || spellManaValue(s, mvSpell) !== (srcCounters[mvc.counter] ?? 0) + mvc.plus);
+    if (sharesNo || mvNo || (still && atYou! < still.min) || (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id, item.subject?.zc))) {
       log(s, `${def.name}'s ability does nothing (its "if" condition is no longer true).`); // CR 603.4
       return;
     }
@@ -5454,7 +5511,7 @@ export function castProblem(
   if (pendFilter && (choices?.faceDown || !printedMatches(pendFilter, d))) return `the spell must be a ${pendFilter.text.replace(/ card$/, "")} spell`;
   // Its mana value as proposed (CR 601.2e): a face-down spell's is 0 (CR 708.2), X is the X chosen (202.3e).
   const proposedCost = parseManaCost(d.manaCost);
-  const limit = castLimitProblem(s, pid, d, choices?.faceDown ? 0 : defMv(d) + (proposedCost.hasX ? (x ?? 0) * xCount(proposedCost) : 0));
+  const limit = castLimitProblem(s, pid, d, choices?.faceDown ? 0 : defMv(d) + (proposedCost.hasX ? (x ?? 0) * xCount(proposedCost) : 0), !!choices?.faceDown);
   if (limit) return limit;
   // Grafdigger's Cage: "Players can't cast spells from graveyards or libraries" (the spell is cast from where the card is,
   // CR 601.2a; a card exiled from a library is cast from exile, rulings). Soulless Jailer: noncreature spells only.
@@ -6842,9 +6899,11 @@ export function spliceCandidates(s: GameState, pid: PlayerId, id: ObjectId): Obj
   const o = s.objects[id];
   if (!o || o.faceDown) return [];
   const d = defOf(s, o);
+  const own = compileCard(d).additionalCosts ?? [];
   return player(s, pid).hand.filter((c) => {
     const sp = c !== id ? compileCard(defOf(s, obj(s, c))).splice : undefined;
-    return !!sp && (sp.onto === "Arcane" ? d.subtypes.includes("Arcane") : isType(d, "Instant") || isType(d, "Sorcery"));
+    // A splice cost picking what the spell's own additional cost picks (clashingCosts) isn't offered.
+    return !!sp && (sp.onto === "Arcane" ? d.subtypes.includes("Arcane") : isType(d, "Instant") || isType(d, "Sorcery")) && !clashingCosts([...own, ...(sp.costs ?? [])]);
   });
 }
 
@@ -6865,10 +6924,11 @@ const spliceMana = (s: GameState, ids: ObjectId[] = []) => ids.map((c) => compil
  * `mv`: the proposed spell's mana value, X chosen (CR 601.2e); without it, only whether it can begin to be cast, where a
  * choice still to be made (X) that could lift a mana value ban counts as lifting it (CR 601.3a).
  */
-function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number): string | null {
+function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number, faceDown?: boolean): string | null {
   const epic = player(s, pid).cantCastSpells;
   if (epic) return `${epic}: you can't cast spells for the rest of the game`;
-  const named = nameCastBan(s, pid, d);
+  // A face-down spell has no name (CR 708.2a): Cornered Market doesn't stop it.
+  const named = nameCastBan(s, pid, d, faceDown);
   if (named) return named;
   // "Your opponents can't cast spells this turn" (Silence) and the like.
   for (const c of s.cantCastThisTurn ?? [])
@@ -7423,7 +7483,9 @@ function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choic
     const offers = costModsFor(s, pid, o, d, x).lifeOffers;
     if (new Set(lifeFor).size !== lifeFor.length || lifeFor.some((id) => !offers.some((l) => l.id === id))) return `${d.name} can't pay life for that`;
   }
-  return extraCostProblem(s, pid, o, castExtraCosts(d, { ...choices, objectId: o.id, ...(modes ? { modes } : {}), ...(targets ? { targets } : {}) }, x, s, pid), choices, `cast ${d.name}`);
+  const costs = castExtraCosts(d, { ...choices, objectId: o.id, ...(modes ? { modes } : {}), ...(targets ? { targets } : {}) }, x, s, pid);
+  if (clashingCosts(costs)) return `${d.name} can't be cast with two costs that each pick the same kind of thing`;
+  return extraCostProblem(s, pid, o, costs, choices, `cast ${d.name}`);
 }
 
 /** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
@@ -7453,7 +7515,7 @@ function viaCosts(d: CardDef, choices: { via?: CastFromGraveyardKind; objectId?:
   return graveyardCast(d, choices?.via)?.costs;
 }
 
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use (and Liesa's commander tax in life, from the command zone). */ objectId?: ObjectId; /** Liesa's commander tax in life, worked out before the card left the command zone (castSpell). */ taxLife?: number; /** The way to cast it from a graveyard, found as it was cast (it's on the stack now). */ viaWay?: CastFromGraveyard }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks" | "splice"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use (and Liesa's commander tax in life, from the command zone). */ objectId?: ObjectId; /** Liesa's commander tax in life, worked out before the card left the command zone (castSpell). */ taxLife?: number; /** The way to cast it from a graveyard, found as it was cast (it's on the stack now). */ viaWay?: CastFromGraveyard }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
   // "Escalate—Discard a card": that cost once for each mode beyond the first (CR 702.120a).
   const esc = compileCard(d).spell?.modal?.escalate?.cost;
@@ -7477,7 +7539,7 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   // Liesa, Shroud of Dusk: the commander tax as life, cast from the command zone (commanderTaxLife).
   const taxObj = s && choices?.objectId !== undefined ? s.objects[choices.objectId] : undefined;
   const taxLife = choices?.taxLife ?? (s && pid !== undefined && taxObj?.zone === "command" ? commanderTaxLife(player(s, pid), taxObj, d) : 0);
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : []), ...entwineExtraCosts(d, choices?.modes), ...(s ? spliceExtraCosts(s, choices?.splice) : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   // Phyrexian Purge: so much life for each target chosen (CR 601.2c before 601.2f).
@@ -7488,6 +7550,25 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
 }
 
 const xCost = (c: AdditionalCost) => "x" in c && !!c.x;
+
+/** "Entwine—Sacrifice three lands." (Betrayal of Flesh): paid when every mode is chosen (CR 702.42a, 601.2b). */
+function entwineExtraCosts(d: CardDef, modes?: number[]): AdditionalCost[] {
+  const spell = compileCard(d).spell;
+  return spell?.modal?.entwineCosts && entwined(spell, modes) ? spell.modal.entwineCosts : [];
+}
+
+/** "Splice onto Arcane—Sacrifice two Mountains." (Torrent of Stone): each spliced card's cost beyond mana (CR 702.47a). */
+const spliceExtraCosts = (s: GameState, ids: ObjectId[] = []): AdditionalCost[] => ids.flatMap((c) => (s.objects[c] ? (compileCard(defOf(s, obj(s, c))).splice?.costs ?? []) : []));
+
+/**
+ * Two costs paid with the same kind of pick (two "sacrifice" costs with their own filters): the choices hold one list
+ * for each kind, so such a cast is refused rather than paid wrong. Only splice and entwine costs beyond mana can bring a
+ * second one (Torrent of Stone spliced onto a spell that has a sacrifice cost of its own).
+ */
+export function clashingCosts(costs: AdditionalCost[]): boolean {
+  const keys = costs.filter((c) => "n" in c && costNeedsPick(c)).map(costPickKey);
+  return new Set(keys).size !== keys.length;
+}
 
 /** An activated ability's costs beyond mana with its X announced: "Sacrifice X Squirrels" is X of them (CR 107.3a, 602.2b). */
 export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?: GameObject): AdditionalCost[] {
@@ -7587,7 +7668,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (c.kind === "removeCounters") {
       // Any mix of the counters on those permanents (CR 602.2b): as many as it says, each one there to remove.
       const pool = counterCostCandidates(s, pid, o, c);
-      const what = `${c.n} ${c.counter ? `${c.counter} ` : ""}counter${c.n === 1 ? "" : "s"} ${c.self ? `from ${d.name}` : `from among ${c.filter.text}`}`;
+      const what = `${c.n} ${counterCostKinds(c)}counter${c.n === 1 ? "" : "s"} ${c.self ? `from ${d.name}` : `from among ${c.filter.text}`}`;
       const chosen = choices?.counters;
       if (!chosen) {
         if (pool.reduce((n, x) => n + x.n, 0) < c.n) return `you need to remove ${what} to ${doing}`;
@@ -7617,6 +7698,13 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       if (p.library.length < c.n) return `you need ${c.n === 1 ? "a card" : `${c.n} cards`} in your library to ${c.exile ? "exile" : "mill"} to ${doing}`;
       continue;
     }
+    // Kaervek's Spite: every permanent you control, so not with one that can't be sacrificed (CR 118.3).
+    if (c.kind === "sacrificeAll") {
+      const stuck = s.battlefield.map((id) => obj(s, id)).find((x) => controllerOf(s, x) === pid && !canSacrificeForCost(s, x));
+      if (stuck) return `${defOf(s, stuck).name} can't be sacrificed, so you can't sacrifice all your permanents to ${doing}`;
+      continue;
+    }
+    if (c.kind === "discardHand") continue; // an empty hand pays it too
     if (c.kind === "giveLife") {
       // A player who can't gain life can't be had gain life to pay a cost (CR 119.7; Invigorate rulings), though a
       // replaced life gain (Sulfuric Vortex's) can. Players who left the game aren't players any more (CR 800.4a).
@@ -7711,7 +7799,10 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     // Sphinx of the Chimes: "two nonland cards with the same name" (CR 201.2).
     const alike = c.kind === "discard" && c.sameName;
     const nameOf = (id: ObjectId) => defOf(s, obj(s, id)).name;
-    const full = oneOf ? `${/^[aeiou]/i.test(oneOf.text) ? "an" : "a"} ${oneOf.text} and ${c.n === 2 ? "another card" : `${c.n - 1} other cards`}` : alike ? `${c.n} ${c.filter?.text ?? "card"}s with the same name` : what;
+    // Weight of Conscience, Illuminated Folio: "that share a creature type", "that share a color".
+    const share = (c.kind === "tap" && c.shareCreatureType) || (c.kind === "reveal" && c.shareColor) ? c : undefined;
+    const full0 = oneOf ? `${/^[aeiou]/i.test(oneOf.text) ? "an" : "a"} ${oneOf.text} and ${c.n === 2 ? "another card" : `${c.n - 1} other cards`}` : alike ? `${c.n} ${c.filter?.text ?? "card"}s with the same name` : what;
+    const full = share ? (c.kind === "tap" ? `${c.n} ${c.filter.text.replace(/^(.*?[a-z])( you control)?$/, "$1s$2")} that share a creature type` : `${c.n} cards from your hand that share a color`) : full0;
     // "You may exile any number of blue cards from your hand": none is fine.
     if (c.kind === "exileFromHand" && c.anyNumber) {
       if (chosen && (new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)))) return `choose ${c.filter?.text ?? "card"}s in your hand to exile`;
@@ -7722,13 +7813,63 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       const can = c.kind === "tap" && c.untap ? [...pool, ...untapViaMana(s, pid, o, c)] : pool;
       if (c.n > 0 && (can.length < c.n || !can.some(fits))) return `you need to ${verb} ${full} to ${doing}`;
       if (alike && !pool.some((id) => pool.filter((x) => sameName(nameOf(x), nameOf(id))).length >= c.n)) return `you need to ${verb} ${full} to ${doing}`;
+      if (share && !shareablePick(s, share, pool)) return `you need to ${verb} ${full} to ${doing}`;
       if ((c.kind === "sacrifice" || c.kind === "discard") && c.differentNames && differentlyNamed(s, pool).length < c.n) return `you need to ${verb} ${full}${c.kind === "discard" ? " with different names" : ""} to ${doing}`;
       continue;
     }
     // X can be 0 ("Exile any number of cards from your graveyard", Painbringer): nothing chosen.
     if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || (chosen.length > 0 && !chosen.some(fits))) return `choose ${full} to ${verb}`;
     if (alike && !chosen.every((id) => sameName(nameOf(id), nameOf(chosen[0]!)))) return `choose ${full} to ${verb}`;
+    if (share && !costChoiceShares(s, share, chosen)) return `choose ${full} to ${verb}`;
     if ((c.kind === "sacrifice" || c.kind === "discard") && c.differentNames && !namesDiffer(s, chosen)) return `choose ${full}${c.kind === "discard" ? " with different names" : ""} to ${verb}`;
+  }
+  return null;
+}
+
+/**
+ * "Tap two untapped creatures you control that share a creature type" (Weight of Conscience): the creatures have a creature
+ * type in common, a changeling every one (CR 702.73a). "Reveal two cards from your hand that share a color" (Illuminated
+ * Folio): the cards have a color in common, colorless none (rulings, CR 105.2c); a card in the hand has its printed colors
+ * (a split card both halves', CR 709.4a; a double-faced card its front face's, CR 712.8a).
+ */
+export function costChoiceShares(s: GameState, c: AdditionalCost, ids: ObjectId[]): boolean {
+  if (c.kind === "tap" && c.shareCreatureType) {
+    let common: Set<string> | null = null; // null: every type so far (changelings only)
+    for (const id of ids) {
+      const t = creatureTypesOf(s, obj(s, id));
+      if (t === "all") continue;
+      const mine: Set<string> = t;
+      const prev: Set<string> | null = common;
+      common = prev ? new Set([...prev].filter((x: string) => mine.has(x))) : mine;
+    }
+    return !common || common.size > 0;
+  }
+  if (c.kind === "reveal" && c.shareColor) return (["W", "U", "B", "R", "G"] as Color[]).some((col) => ids.every((id) => defOf(s, obj(s, id)).colors.includes(col)));
+  return true;
+}
+
+/** Is there a pick of `c.n` from `pool` that shares as costChoiceShares asks? Each candidate with the others that share with it. */
+export function shareablePick(s: GameState, c: AdditionalCost, pool: ObjectId[]): ObjectId[] | null {
+  const n = "n" in c ? (c.n as number) : 1;
+  if (c.kind === "reveal" && c.shareColor) {
+    for (const col of ["W", "U", "B", "R", "G"] as Color[]) {
+      const ids = pool.filter((id) => defOf(s, obj(s, id)).colors.includes(col));
+      if (ids.length >= n) return ids.slice(0, n);
+    }
+    return null;
+  }
+  // A creature type in common: some creature's own type (or every type, for changelings only).
+  const types = new Set<string>();
+  let all = 0;
+  for (const id of pool) {
+    const t = creatureTypesOf(s, obj(s, id));
+    if (t === "all") all++;
+    else for (const x of t) types.add(x);
+  }
+  if (all >= n) return pool.filter((id) => creatureTypesOf(s, obj(s, id)) === "all").slice(0, n);
+  for (const ty of types) {
+    const ids = pool.filter((id) => ((t) => t === "all" || t.has(ty))(creatureTypesOf(s, obj(s, id))));
+    if (ids.length >= n) return ids.slice(0, n);
   }
   return null;
 }
@@ -7786,11 +7927,16 @@ export function untapViaMana(s: GameState, pid: PlayerId, source: GameObject, c:
  * The counters "Remove three counters from among other artifacts, creatures, and planeswalkers you control" can remove:
  * each permanent you control that matches and each kind of counter on it (only `counter`'s kind if the cost names one).
  */
+/** The kind of counter a "remove counters" cost names, for its prompt: "+1/+1 ", "+1/+1 or charge " (Ion Storm), or none. */
+export function counterCostKinds(c: Extract<AdditionalCost, { kind: "removeCounters" }>): string {
+  return c.counter ? `${c.counter} ` : c.counters ? `${c.counters.join(" or ")} ` : "";
+}
+
 export function counterCostCandidates(s: GameState, pid: PlayerId, source: GameObject, c: Extract<AdditionalCost, { kind: "removeCounters" }>): { id: ObjectId; kind: string; n: number }[] {
   return s.battlefield.flatMap((id) => {
     const x = obj(s, id);
     if (controllerOf(s, x) !== pid || (c.other && id === source.id) || (c.self && id !== source.id) || !objectMatches(s, c.filter, x, pid, false)) return [];
-    return Object.entries(x.counters).filter(([k, n]) => n > 0 && (!c.counter || k === c.counter) && !countersStay(s, x, k)).map(([kind, n]) => ({ id, kind, n }));
+    return Object.entries(x.counters).filter(([k, n]) => n > 0 && (!c.counter || k === c.counter) && (!c.counters || c.counters.includes(k)) && !countersStay(s, x, k)).map(([kind, n]) => ({ id, kind, n }));
   });
 }
 
@@ -8056,6 +8202,17 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       const n = millCount(s, p.id, c.n);
       log(s, `${p.name} mills ${n === 1 ? "a card" : `${n} cards`}.`);
       for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard", { milled: true });
+    } else if (c.kind === "sacrificeAll") {
+      // Kaervek's Spite: all of them at once (CR 701.21a), as they are now.
+      const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p.id);
+      log(s, ids.length ? `${p.name} sacrifices all their permanents: ${ids.map((id) => nameOf(s, id)).join(", ")}.` : `${p.name} has no permanents to sacrifice.`);
+      for (const id of ids) moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
+      closeZoneBatch(s);
+    } else if (c.kind === "discardHand") {
+      const ids = [...p.hand];
+      if (!ids.length) log(s, `${p.name} discards their hand (it's empty).`);
+      discarded?.push(...ids.map((id) => cardIdOf(obj(s, id))));
+      discardCards(s, p.id, ids);
     } else if (c.kind === "revealHand") log(s, `${p.name} reveals their hand${p.hand.length ? `: ${p.hand.map((id) => nameOf(s, id)).join(", ")}` : " (it's empty)"}.`);
     else if (c.kind === "giveLife") {
       // Unchosen (a caller that didn't ask), the cost is still paid: by the first opponent who can gain life.
@@ -8300,7 +8457,9 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (cp) return cp;
   }
   const cost = activationCost(s, pid, o, ab, targets, x);
-  const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : null) : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : xProblem(cost, x);
+  // A cost's X (Corpseweft's "one or more creature cards") is chosen as it's activated: asked before that (no X and no
+  // costs chosen, the menu's check), only whether the ability could be activated at all.
+  const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) && !(x === undefined && costs === undefined && !ab.loyaltyX) ? "X can't be 0" : null) : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : xProblem(cost, x);
   if (xp) return xp;
   if (ab.energyX && (x ?? 0) > (p.energy ?? 0)) return `you need ${x} energy`; // CR 107.14
   const due = lessWaterbend(cost, ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), ab, tapCreatures);

@@ -400,13 +400,17 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // decide about one card before the next, knowing the earlier choices).
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
-      const here = (id: ObjectId) => s.objects[id]?.zone === "library";
-      const st = (sc.eachRevealed ??= { left: (r.revealedUntil ?? []).filter(here), step: 0 });
+      const here = (id: ObjectId) => s.objects[id]?.zone === (e.inHand ? "hand" : "library");
+      // Sirocco: the cards of the kind in the hand revealed, as it is now; the player who revealed it decides about each in
+      // turn, so no order is asked for (the cards are alike to the effect).
+      const inHand = e.inHand ? players(s, e.inHand.who, ctx)[0] : undefined;
+      const handCards = inHand !== undefined ? player(s, inHand).hand.filter((id) => printedMatches(e.inHand!.filter, defOf(s, obj(s, id)))) : undefined;
+      const st = (sc.eachRevealed ??= { left: (handCards ?? r.revealedUntil ?? []).filter(here), step: 0 });
       for (;;) {
         if (st.current === undefined) {
           const left = st.left.filter(here);
           if (!left.length) break;
-          if (left.length > 1 && (st.next === undefined || !left.includes(st.next))) {
+          if (left.length > 1 && !e.inHand && (st.next === undefined || !left.includes(st.next))) {
             s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "nextRevealed", options: left, labels: left.map((id) => defOf(s, obj(s, id)).name), prompt: "choose the revealed card to do next" };
             return "paused";
           }
@@ -430,7 +434,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     }
     case "parleyReveal": {
       // Parley: each player reveals the top card of their library, in turn order (CR 101.4); an empty library reveals nothing.
-      const counts = { land: 0, nonland: 0 };
+      const counts = { land: 0, nonland: 0, mv: 0 };
       const revealed: ObjectId[] = [];
       for (const pid of apnap(s, s.turnOrder.filter((p) => !player(s, p).lost))) {
         const p = player(s, pid);
@@ -438,6 +442,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (!id) continue;
         const d = defOf(s, obj(s, id));
         counts[isType(d, "Land") ? "land" : "nonland"]++;
+        counts.mv += defMv(d); // a split card's halves together, a double-faced card's front (CR 709.4, 712.8a)
         revealed.push(id);
         log(s, `${p.name} reveals ${d.name} from the top of their library.`);
       }

@@ -42,6 +42,17 @@ export function sameNamed(s: GameState, t: GameObject, group: NonNullable<Extrac
     .filter((o) => o.id !== t.id && !o.faceDown && sameName(characteristics(s, o).name, name) && (!group.of || controllerOf(s, o) === whose) && objectMatches(s, group.filter, o, controller, false));
 }
 
+/**
+ * Eye of Singularity (ObjRef "sharingName"): each permanent other than a basic land with a name another permanent has now;
+ * with `name`, every permanent with that name but `except`. Face-down permanents have no name (CR 708.2a); two objects
+ * with one name in common have the same name (CR 201.2b).
+ */
+export function sharingName(s: GameState, name?: string, except?: ObjectId): GameObject[] {
+  const named = s.battlefield.map((id) => obj(s, id)).filter((o) => !o.faceDown);
+  if (name !== undefined) return named.filter((o) => o.id !== except && sameName(characteristics(s, o).name, name));
+  return named.filter((o) => !(characteristics(s, o).supertypes.includes("Basic") && characteristics(s, o).types.includes("Land")) && named.some((x) => x.id !== o.id && sameName(characteristics(s, x).name, characteristics(s, o).name)));
+}
+
 /** Moratorium Stone: the other cards in every graveyard and the permanents with the name of `t`, a card in a graveyard, now. */
 export function sameNamedAnywhere(s: GameState, t: GameObject): GameObject[] {
   if (t.zone !== "graveyard") return [];
@@ -139,7 +150,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
     if (!host || (view && !hostChars) || !objectMatches(s, spec.attachedTo, host, controller, false, undefined, hostChars, view)) return false;
   }
   // A choice that was never made: "of the chosen type" matches nothing, "not of the chosen type" everything.
-  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.chosen === "parity" || spec.chosen === "landOrNonland" || spec.chosen === "landType" || spec.chosen === "colorsChosen") return false;
+  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.chosen === "parity" || spec.chosen === "landOrNonland" || spec.chosen === "landType" || spec.chosen === "typeOrder" || spec.chosen === "colorsChosen") return false;
   if (spec.parity?.is && !isParity(spec.parity.of === "power" ? (c.types.includes("Creature") ? c.power : undefined) : defMv(defOf(s, o)), spec.parity)) return false;
   if (spec.noCounters && Object.values(o.counters).some((n) => (n ?? 0) > 0)) return false;
   // Keldon Twilight: "that they controlled since the beginning of the turn": under its controller since before this turn.
@@ -149,7 +160,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.counter && !(spec.counter === ANY_COUNTER ? Object.values(o.counters).some((n) => (n ?? 0) > 0) : (o.counters[spec.counter] ?? 0))) return false;
   if (spec.counterMin && (o.counters[spec.counter!] ?? 0) < spec.counterMin) return false;
   // "With the chosen name": its name now (a copy's is what it copies); a face-down one has none (CR 201.2a, 708.2a).
-  if (spec.sameNameAsCause || (spec.named !== undefined && (o.faceDown || !hasName(c.name, spec.named)))) return false;
+  if (spec.sameNameAsCause || spec.namedAsSource || (spec.named !== undefined && (o.faceDown || !hasName(c.name, spec.named)))) return false;
   if (spec.notNamed !== undefined && !o.faceDown && hasName(c.name, spec.notNamed)) return false;
   if (spec.uniqueNameAmongYours && !o.faceDown && s.battlefield.some((id) => id !== o.id && !s.objects[id]!.faceDown && (spec.uniqueNameAmongYours !== "tokens" || !!s.objects[id]!.isToken) && controllerOf(s, s.objects[id]!) === controller && sameName((view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!)).name, c.name))) return false;
   const hasKw = (k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
@@ -164,6 +175,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.equalsChosen && (spec.equals === undefined || !spec.equalsChosen.some((k) => (k === "manaValue" ? defMv(defOf(s, o)) : c.types.includes("Creature") ? c[k] : undefined) === spec.equals))) return false;
   if (spec.mvAtMostControllersGraveyard && defMv(defOf(s, o)) > (s.players[c.controller]?.graveyard.length ?? 0)) return false;
   if (spec.mvAtMostCounters && defMv(defOf(s, o)) > (o.counters[spec.mvAtMostCounters] ?? 0)) return false;
+  if (spec.controllerControlsSubtype !== undefined && !s.battlefield.some((id) => { const x = view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!); return x.controller === c.controller && x.subtypes.includes(spec.controllerControlsSubtype!); })) return false;
   if (spec.controllersGraveyardAtLeast !== undefined && (s.players[c.controller]?.graveyard.length ?? 0) < spec.controllersGraveyardAtLeast) return false;
   if (spec.controllersLandsAtMost !== undefined && s.battlefield.filter((id) => { const x = view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!); return x.controller === c.controller && x.types.includes("Land"); }).length > spec.controllersLandsAtMost) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(defOf(s, o).manaCost)) return false;
@@ -194,6 +206,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "attackedOrBlockedThisTurn" && o.attacked?.turn !== s.turn && o.blockedTurn !== s.turn) return false;
   if (spec.blockedWith && !blockedWithThisTurn(s, o, spec.blockedWith)) return false;
   if (spec.combat === "didntAttackThisTurn" && o.attacked?.turn === s.turn) return false;
+  if (spec.combat === "didntCombatDamageCreatureThisTurn" && s.turnLog?.combatDamagedCreature?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;
   if (spec.combat === "didntAttackThisCombat" && o.attacked?.turn === s.turn && o.declaredInCombat?.turn === s.turn && o.declaredInCombat.combat === (s.combatsThisTurn ?? 0)) return false;
   if (spec.combat === "attackedLastTurn" && !attackedDuringLastTurn(s, o, c.controller)) return false;
   if (spec.dealtDamageToYou && !s.turnLog?.damagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;
@@ -390,11 +403,16 @@ export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): Target
     return kind === "color" ? { ...rest, colors: [chosen.color] } : { ...rest, notColors: [...(rest.notColors ?? []), chosen.color] };
   if (kind === "colorsChosen" && chosen?.colors?.length) return { ...rest, colors: [...chosen.colors] };
   if (kind === "landType" && chosen?.landType) return { ...rest, subtypes: [...(rest.subtypes ?? []), chosen.landType] };
+  // Rite of Ruin: "the first type" of the order chosen.
+  if (kind === "typeOrder" && chosen?.typeOrder?.[rest.orderIndex ?? 0]) return (({ orderIndex: _, ...r }) => ({ ...r, types: [chosen.typeOrder![rest.orderIndex ?? 0]!] }))(rest);
   if (kind === "attackingPlayer") return { ...rest, attackingWhom: chosen?.player ?? "eventPlayer" };
   return kind === "notType" || kind === "notColor" || kind === "notTypesChosen" ? rest : spec;
 }
 
 /** The names a player can choose from: every creature type (CR 205.3m) or color, but `except`. */
+/** Rite of Ruin's "an order for artifacts, creatures, and lands": each of the six orders. */
+export const TYPE_ORDERS = ["Artifact,Creature,Land", "Artifact,Land,Creature", "Creature,Artifact,Land", "Creature,Land,Artifact", "Land,Artifact,Creature", "Land,Creature,Artifact"];
+
 /** Riot's and unleash's choice (see choiceOptions). */
 export const ENTERS_COUNTER = "+1/+1 counter";
 
@@ -407,6 +425,7 @@ export function choiceOptions(what: ChoiceKind | EntersOption, except?: string):
   if (what === "parity") return ["odd", "even"];
   if (what === "direction") return ["left", "right"];
   if (what === "landOrNonland") return ["land", "nonland"];
+  if (what === "typeOrder") return TYPE_ORDERS;
   if (what === "riot") return [ENTERS_COUNTER, "Haste"];
   if (what === "unleash") return [ENTERS_COUNTER, "No counter"];
   const all = what === "color" || what === "colors" ? Object.values(COLOR_NAMES) : what === "basicLandType" ? ["Plains", "Island", "Swamp", "Mountain", "Forest"] : what === "landType" ? [...LAND_TYPE_LIST] : [...CREATURE_TYPES].sort();
@@ -424,6 +443,7 @@ export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice:
   if (what === "parity") return { ...chosen, parity: choice === "odd" ? "odd" : "even" };
   if (what === "direction") return { ...chosen, direction: choice === "left" ? "left" : "right" };
   if (what === "landOrNonland") return { ...chosen, landOrNonland: choice === "land" ? "land" : "nonland" };
+  if (what === "typeOrder") return { ...chosen, typeOrder: choice.split(",") };
   // "White Citizen": the color and the creature type.
   if (what === "colorAndType") {
     const [word, type] = choice.split(" ");
@@ -527,7 +547,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.notNamed !== undefined && hasName(d.name, spec.notNamed)) return false;
   if (spec.notNamedAny?.some((n) => sameName(d.name, n))) return false;
   if (spec.namedAny && !spec.namedAny.some((n) => sameName(d.name, n))) return false;
-  if (spec.notNamedAsYours) return false; // not worked out yet
+  if (spec.notNamedAsYours || spec.namedAsSource) return false; // not worked out yet
   if (spec.sharesTypeWithAttached || spec.sharesTypeWithSubjectCreature || spec.notKinOfYourCreatures) return false; // bound where it's used (dig)
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
@@ -814,7 +834,11 @@ export function bindBound(s: GameState, spec0: TargetSpec, ctx: AmountCtx): Targ
   // Ancient Hellkite: "target creature defending player controls": the player the source is attacking (CR 506.2), as it is
   // now or as it last existed on the battlefield; none (-1, no one) once it isn't attacking.
   const src = spec3.defendingOfSource && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-  const spec: TargetSpec = spec3.defendingOfSource ? (({ defendingOfSource: _, ...r }) => ({ ...r, controlledBy: (src?.zone === "battlefield" ? src.attacking : ctx.lki?.attacking) ?? -1 }))(spec3) : spec3;
+  const spec4: TargetSpec = spec3.defendingOfSource ? (({ defendingOfSource: _, ...r }) => ({ ...r, controlledBy: (src?.zone === "battlefield" ? src.attacking : ctx.lki?.attacking) ?? -1 }))(spec3) : spec3;
+  // Groffskithur: "target card named ~": the source's name now, or as it last existed on the battlefield (CR 201.2, 608.2h).
+  const me = spec4.namedAsSource && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+  const myName = me ? (me.zone === "battlefield" ? (me.faceDown ? undefined : characteristics(s, me).name) : (s.lastKnown?.[me.id]?.source?.name ?? (ctx.lki?.copyKey ? s.cards[ctx.lki.copyKey]?.name : undefined) ?? defOf(s, me).name)) : undefined;
+  const spec: TargetSpec = spec4.namedAsSource && myName !== undefined ? (({ namedAsSource: _, ...r }) => ({ ...r, named: myName }))(spec4) : spec4;
   if (!spec.bound) return spec;
   const { bound, ...rest } = spec;
   // Power and toughness may be below 0 (CR 107.1b): "power greater than target creature's power" with that at -2 takes a 0.

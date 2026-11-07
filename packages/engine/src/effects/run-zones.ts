@@ -18,7 +18,7 @@ import { attachTo } from "./run-permanents";
 import { addDelayed, paidUnless, removeCopy } from "./run-spells";
 import { toBottom } from "./run-library";
 import { attackDefault, closeZoneBatch, fireEvent, inCombat } from "./triggers";
-import { asFace, defMv, layoutOf, registerFace, sameName, transformedFace } from "../faces";
+import { asFace, defMv, hasName, layoutOf, registerFace, sameName, transformedFace } from "../faces";
 import { meld, meldPartners } from "../meld";
 
 /** A suspended card (CR 702.62b): in exile, with suspend and a time counter on it. */
@@ -73,6 +73,24 @@ function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObjec
 }
 
 /**
+ * Infectious Rage (attachRandom): each Aura's host, a creature chosen at random among those it could enchant as it enters
+ * under that player's control (CR 303.4f; not targeted, so shroud and hexproof don't matter, rulings). One with no such
+ * creature has none, and stays where it is (CR 303.4g).
+ */
+function randomAuraHosts(s: GameState, cards: GameObject[], under: (o: GameObject) => PlayerId, src: string): Map<ObjectId, AuraHost> {
+  const out = new Map<ObjectId, AuraHost>();
+  for (const o of cards) {
+    if (!defOf(s, o).subtypes.includes("Aura")) continue;
+    const options = auraHostOptions(s, o, under(o)).filter((h) => "attachTo" in h && s.objects[h.attachTo]?.zone === "battlefield" && objIsType(s, obj(s, h.attachTo), "Creature"));
+    if (!options.length) continue;
+    const host = options[Math.floor(nextRandom(s) * options.length)]!;
+    log(s, `${src} chooses ${auraHostName(s, host)} at random.`);
+    out.set(o.id, host);
+  }
+  return out;
+}
+
+/**
  * Auras this effect puts onto the battlefield without their being cast (CR 303.4f): the player each one enters under
  * chooses what it enchants, as it enters, among what's on the battlefield before any of them move (Replenish rulings);
  * with nothing legal it stays where it is (303.4g). One Aura at a time, in the order given; no question when only one
@@ -119,6 +137,8 @@ export function pickLeaving(s: GameState, e: Extract<Effect, { type: "pick" }>, 
 
 function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx: ResolveCtx, src: string): "paused" | void {
   const r = s.resolving!;
+  // Rite of Ruin: "of the first type", the order chosen as it resolves.
+  if (e.filter.chosen === "typeOrder") e = { ...e, filter: bindChosen(e.filter, r.chosen) };
   // Martyr's Bond: the card types of the trigger's subject, on the battlefield or as it last existed (CR 608.2h).
   if (e.filter.sharesTypeWithSubject) {
     const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
@@ -1814,6 +1834,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "regenerate":
       for (const o of objects(s, e.what, ctx)) {
         o.regenShields = (o.regenShields ?? 0) + 1;
+        // "When it regenerates this way, ..." (Matopi Golem): this shield's own delayed trigger (CR 603.7), made now; its
+        // source is the ability's (CR 603.7d), "that player" the player the ability targeted (Soldevi Sentry).
+        if (e.rider || e.riderControl) {
+          const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+          const t = e.riderPlayer !== undefined ? ctx.targets[e.riderPlayer] : undefined;
+          (o.regenRiders ??= []).push({ ...(e.rider ? { body: e.rider } : {}), ...(e.riderControl ? { control: true as const } : {}), controller: ctx.controller, sourceId: src?.id ?? o.id, sourceCardId: src ? cardIdOf(src) : cardIdOf(o), sourceZc: ctx.sourceZc ?? src?.zoneChanges ?? o.zoneChanges ?? 0, ...(t?.kind === "player" ? { player: t.id } : {}) });
+        }
         log(s, `${defOf(s, o).name} gets a regeneration shield.`);
       }
       return;
@@ -2124,6 +2151,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       } else if (e.exactly !== undefined && cards.length > e.exactly) {
         // Vault 13: exactly that many of them, chosen as it resolves; with that many or fewer, all of them.
         if (!sc.linkedPick) {
+          // Bane Alley Broker: "You may look at cards exiled with ~": whoever controls it as this resolves (rulings).
+          if (e.dest === "hand" && e.exactly === 1 && ctx.sourceId && s.objects[ctx.sourceId] && abilitiesOf(s, s.objects[ctx.sourceId]!).activated.some((a) => a.body.effects.some((x) => x.type === "exileFaceDown" && x.look)))
+            for (const c of cards) if (c.hiddenExile && !c.hiddenExile.seen.includes(p.id)) c.hiddenExile.seen.push(p.id);
           sc.linkedPick = true;
           delete sc.found;
           const ids = cards.map((c) => c.id);
@@ -2211,7 +2241,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return;
       }
       // Under their owners' control; an Aura's owner chooses what it enchants (CR 303.4f, Oblivion Ring rulings).
-      return returnFromExile(s, cards, (c) => (e.yours ? ctx.controller : c.owner), src);
+      return returnFromExile(s, cards, (c) => (e.yours ? ctx.controller : c.owner), src, undefined, e.tapped);
     }
     case "pick":
       return pickPermanents(s, e, ctx, src);
@@ -2251,7 +2281,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     case "destroyRandom": {
       // Metzali: chosen at random as it resolves, then destroyed (an indestructible one is chosen and survives, rulings).
-      const options = s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+      // Haphazard Bombardment: only among those without indestructible (rulings, CR 702.12b), chosen and destroyed with
+      // nothing in between (rulings).
+      const options = s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), ctx.controller, false) && !(e.destroyable && objHasKeyword(s, obj(s, id), "indestructible")));
       if (!options.length) return;
       const id = options[Math.floor(nextRandom(s) * options.length)]!;
       log(s, `${src} chooses ${nameOf(s, id)} at random.`);
@@ -2807,7 +2839,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const types = here ? creatureTypesOf(s, subj!) : lk && (lk.zc === ctx.subject!.zc || lk.zc === ctx.subject!.zc - 1) && lk.creatureTypes ? (lk.creatureTypes === "all" ? ("all" as const) : new Set(lk.creatureTypes)) : undefined;
         kin = (h) => !!types && objIsType(s, h, "Creature") && shareCreatureType(types, creatureTypesOf(s, h));
       }
-      const hosts = e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted || e.attachToCreated || e.attachToSource ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src, undefined, undefined, undefined, kin);
+      const hosts = e.attachRandom ? randomAuraHosts(s, entering, under, src) : e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted || e.attachToCreated || e.attachToSource ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src, undefined, undefined, undefined, kin);
       if (hosts === "paused") return "paused";
       // "Put a +1/+1 counter on it": the permanents these cards became (CR 400.7), like tokens just created.
       if (s.resolving) s.resolving.created = [];
@@ -3708,6 +3740,17 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return "paused";
       }
       const attack = attackOptions.length > 1 ? attackOptions.find((a) => a.key === sc.attackWhom) : attackOptions[0];
+      // Shorecrasher Elemental: face down, whatever the card is (an Aura too: a 2/2 creature enchants nothing, CR 708.2).
+      if (e.faceDown) {
+        enterTogether(s, () => {
+          for (const c of back) {
+            log(s, `${src} returns a card to the battlefield face down under ${player(s, e.under === "owner" ? c.owner : ctx.controller).name}'s control.`);
+            moveObject(s, c.id, "battlefield", { controller: e.under === "owner" ? c.owner : ctx.controller, faceDown: "morph" });
+          }
+        });
+        s.resolving!.flickeredBack = back.filter((c) => c.zone === "battlefield").map((c) => c.id);
+        return;
+      }
       if (returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped, e.transformed) === "paused") return "paused";
       s.resolving!.flickeredBack = back.filter((c) => c.zone === "battlefield").map((c) => c.id);
       if (attack)
@@ -3872,6 +3915,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (id) log(s, `${p.name}'s card: ${defOf(s, obj(s, id)).name}.`, ctx.controller);
           continue;
         }
+        // Mindblaze: "reveals their library", every card in it, the order unchanged.
+        if (e.library) {
+          log(s, `${p.name} reveals their library: ${p.library.map((id) => defOf(s, obj(s, id)).name).join(", ") || "no cards"}.`);
+          continue;
+        }
         const cards = p.hand.map((id) => defOf(s, obj(s, id)).name).join(", ") || "no cards";
         if (e.reveal) log(s, `${p.name} reveals their hand: ${cards}.`);
         else {
@@ -4016,6 +4064,23 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       o.mayPlay = { player: you, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.free ? { free: true as const } : {}) };
       log(s, `${player(s, you).name} chooses ${defOf(s, o).name} and may play it this turn${e.free ? " without paying its mana cost" : ""}.`);
       return;
+    }
+    case "returnExiledNamed": {
+      // Sengir Nosferatu's Bat: a card in exile with that name (a face-down card has none, CR 708.2a), anyone's (rulings).
+      const sc = (s.resolving!.scratch ??= {});
+      const ok = (id: ObjectId) => s.objects[id]?.zone === "exile" && !obj(s, id).isToken && !obj(s, id).faceDown && !obj(s, id).hiddenExile && hasName(defOf(s, obj(s, id)).name, e.name);
+      const cards = s.turnOrder.flatMap((pid) => player(s, pid).exile).filter(ok);
+      if (!sc.found && cards.length > 1) {
+        s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: `an exiled card named ${e.name}`, cards, min: 1, max: 1, exiled: true, dig: { looked: cards, to: "to return to the battlefield under its owner's control", rest: "stay in exile" } };
+        return "paused";
+      }
+      const id = (sc.found ?? cards).find(ok);
+      sc.found = undefined;
+      if (!id) {
+        log(s, `There's no exiled card named ${e.name} to return.`);
+        return;
+      }
+      return returnFromExile(s, [obj(s, id)], (c) => c.owner, src);
     }
     case "warpExile":
       for (const o of objects(s, { ref: "subject" }, ctx)) {

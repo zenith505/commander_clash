@@ -6,7 +6,7 @@ import { autoEvidence, livingPlayers, gainLife, inCombatPhase, loseEnergy, proce
 import { abilitiesOf, realDefOf, canBeSacrificed, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import type { Color, GameObject, GameState, ObjectId, PlayerId } from "../types";
-import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, sayBound, spellMatches, targetsMatch } from "./targeting";
+import { bindBound, bindChosen, choiceOptions, objectMatches, TYPE_ORDERS, pickOptions, printedMatches, sayBound, spellMatches, targetsMatch } from "./targeting";
 import { tokenDef } from "./run-tokens";
 import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected, sourceCreatureTypes, ctxSource } from "./resolve";
 import { dealDamageBatch } from "../damage";
@@ -690,6 +690,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         s.pending = { kind: "chooseOption", player: chooser, source: src, what: "cardType", options: e.options ?? [] };
         return "paused";
       }
+      if (e.choice === "typeOrder") {
+        // Rite of Ruin: the order is chosen as it resolves, then each player sacrifices in it (rulings).
+        if (r.chosen?.typeOrder) return;
+        const labels = TYPE_ORDERS.map((o) => o.split(",").map((t) => `${t.toLowerCase()}s`).join(", then "));
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "typeOrder", options: [...TYPE_ORDERS], labels, prompt: "choose an order for artifacts, creatures, and lands: each player sacrifices one of the first, two of the second, then three of the third." };
+        return "paused";
+      }
       if (e.choice === "cardName") {
         // "Choose a nonland card name" (CR 201.4), as it resolves (rulings on Cabal Therapy): asked each time it's reached.
         const sc = (r.scratch ??= {});
@@ -723,8 +730,9 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           }
           return;
         }
-        const range = e.maxHandOf ? { min: e.range.min, max: Math.max(e.range.min, ...players(s, e.maxHandOf, ctx).map((x) => player(s, x).hand.length)) } : e.range;
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: [String(range.min)], numberRange: range, prompt: e.maxHandOf ? `choose a number greater than ${e.range.min - 1} (up to ${range.max}, the cards in that player's hand)` : `choose a number between ${range.min} and ${range.max}` };
+        const bound = e.maxHandOf ?? e.maxLibraryOf;
+        const range = bound ? { min: e.range.min, max: Math.max(e.range.min, ...players(s, bound, ctx).map((x) => player(s, x)[e.maxHandOf ? "hand" : "library"].length)) } : e.range;
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: [String(range.min)], numberRange: range, prompt: bound ? `choose a number greater than ${e.range.min - 1} (up to ${range.max}, the cards in that player's ${e.maxHandOf ? "hand" : "library"})` : `choose a number between ${range.min} and ${range.max}` };
         return "paused";
       }
       if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "colors" ? "colors" : e.choice === "basicLandType" || e.choice === "landType" ? "landType" : e.choice === "keyword" ? "keyword" : e.choice === "parity" ? "parity" : e.choice === "direction" ? "direction" : e.choice === "landOrNonland" ? "landOrNonland" : "type"] === undefined) {
@@ -826,6 +834,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? evidenceCollected(s, ctx)
             : e.cond.kind === "treasure"
             ? (ctx.treasureSpent ?? 0) > 0
+            : e.cond.kind === "colorsSpentActivated"
+            ? new Set((s.resolving!.item.manaSpentTypes ?? []).filter((m) => "WUBRG".includes(m))).size === e.cond.exactly
             : e.cond.kind === "spent"
             ? spentMeets(e.cond.target === undefined ? ctx.spent : targetSpellSpent(s, ctx, e.cond.target), e.cond.req)
             : e.cond.kind === "revealedColoredSymbols"
@@ -1295,6 +1305,8 @@ export function punisherLabel(o: PunisherOption): string {
   if ("damage" in o) return `Be dealt ${o.damage} damage`;
   if ("allow" in o) return o.allow;
   if ("halfLife" in o) return `Pay half your life, rounded ${o.halfLife}`;
+  if ("handToTop" in o) return `Put ${o.handToTop === 1 ? "a card" : `${o.handToTop} cards`} from your hand on top of your library`;
+  if ("exileFromGraveyard" in o) return `Exile ${o.exileFromGraveyard === 1 ? "a card" : `${o.exileFromGraveyard} cards`} from your graveyard`;
   if (!o.pay.cost && o.pay.generic === undefined && o.pay.life !== undefined) return `Pay ${o.pay.life} life`;
   return `Pay ${o.pay.cost}${o.pay.life ? ` and ${o.pay.life} life` : ""}`;
 }
@@ -1310,7 +1322,7 @@ export function punisherOptions(s: GameState, e: Extract<Effect, { type: "punish
   }, 0);
   // "Pay 5 life": only with at least that much (CR 119.4, rulings on Dash Hopes).
   // "Unless they discard a nonland card": only with one in hand.
-  return e.options.flatMap((o, i) => (("discard" in o && (o.filter ? p.hand.filter((id) => printedMatches(o.filter!, defOf(s, obj(s, id)))) : p.hand).length < discarding + o.discard) || ("sacrifice" in o && pickOptions(s, { filter: o.sacrifice }, pid, sourceId).length < sacrificing + (o.n ?? 1)) || ("pay" in o && !o.pay.cost && !o.pay.generic && (o.pay.life ?? 0) > payableLife(s, pid)) || ("halfLife" in o && halfOfLife(s, pid, o.halfLife) > payableLife(s, pid)) ? [] : [i]));
+  return e.options.flatMap((o, i) => (("discard" in o && (o.filter ? p.hand.filter((id) => printedMatches(o.filter!, defOf(s, obj(s, id)))) : p.hand).length < discarding + o.discard) || ("sacrifice" in o && pickOptions(s, { filter: o.sacrifice }, pid, sourceId).length < sacrificing + (o.n ?? 1)) || ("pay" in o && !o.pay.cost && !o.pay.generic && (o.pay.life ?? 0) > payableLife(s, pid)) || ("halfLife" in o && halfOfLife(s, pid, o.halfLife) > payableLife(s, pid)) || ("exileFromGraveyard" in o && p.graveyard.length < o.exileFromGraveyard) || ("handToTop" in o && p.hand.length < discarding + o.handToTop) ? [] : [i]));
 }
 
 /** Half a player's life total, rounded as the text says; 0 for a total of 0 or less (CR 107.1a-b). */
@@ -1413,6 +1425,41 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
         sc.chosen = undefined;
         sc.queue = undefined;
       }
+      // Carrion Wurm: which cards of their graveyard they exile (only exactly that many can be, CR 701.13a).
+      const yardN = made.reduce((n, m) => {
+        const o = e.options[Number(m)];
+        return n + (o && "exileFromGraveyard" in o ? o.exileFromGraveyard : 0);
+      }, 0);
+      if (yardN && !mine.exile) {
+        if (pu.yardAsked === pid && sc.found) mine.exile = sc.found;
+        else if (p.graveyard.length <= yardN) mine.exile = [...p.graveyard];
+        else {
+          pu.yardAsked = pid;
+          sc.found = undefined;
+          s.pending = { kind: "searchLibrary", player: pid, source: src, what: yardN === 1 ? "a card" : `${yardN} cards`, cards: [...p.graveyard], min: yardN, max: yardN, fromGraveyard: "exile" };
+          return "paused";
+        }
+        pu.yardAsked = undefined;
+        sc.found = undefined;
+      }
+      // Tainted Specter: which cards of their hand go on top of their library (the last one picked ends on top).
+      const topN = made.reduce((n, m) => {
+        const o = e.options[Number(m)];
+        return n + (o && "handToTop" in o ? o.handToTop : 0);
+      }, 0);
+      if (topN && !mine.top) {
+        const rest = p.hand.filter((id) => !(mine.discard ?? []).includes(id));
+        if (pu.topAsked === pid && sc.chosen?.[pid]) mine.top = sc.chosen[pid]!;
+        else if (rest.length <= topN) mine.top = [...rest];
+        else {
+          pu.topAsked = pid;
+          sc.chosen = undefined;
+          s.pending = { kind: "handToTop", player: pid, count: topN, source: src };
+          return "paused";
+        }
+        pu.topAsked = undefined;
+        sc.chosen = undefined;
+      }
       const sacs = made.flatMap((m) => {
         const o = e.options[Number(m)];
         return o && "sacrifice" in o ? Array.from({ length: o.n ?? 1 }, () => o.sacrifice) : [];
@@ -1439,6 +1486,16 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
       const who = apnap(s, Object.keys(pu.made).map(Number) as PlayerId[]);
       // "Unless that player discards a card": a cost, paid as it resolves (CR 118.12a), so not Library of Leng's.
       for (const pid of who) discardCards(s, pid, (pu.chosen?.[pid]?.discard ?? []).filter((id) => player(s, pid).hand.includes(id)), "", false, false, ctx.controller);
+      for (const pid of who) {
+        const top = (pu.chosen?.[pid]?.top ?? []).filter((id) => player(s, pid).hand.includes(id));
+        for (const id of [...top].reverse()) moveObject(s, id, "library", { top: true });
+        if (top.length) log(s, `${player(s, pid).name} puts ${top.length === 1 ? "a card" : `${top.length} cards`} from their hand on top of their library.`);
+      }
+      for (const pid of who) {
+        const gone = (pu.chosen?.[pid]?.exile ?? []).filter((id) => player(s, pid).graveyard.includes(id));
+        if (gone.length) log(s, `${player(s, pid).name} exiles ${gone.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their graveyard.`);
+        for (const id of gone) moveObject(s, id, "exile");
+      }
       for (const pid of who)
         for (const id of pu.chosen?.[pid]?.sacrifice ?? []) {
           const x = s.objects[id];

@@ -1,6 +1,6 @@
 # Roadmap
 
-30,250 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,324 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,649 of
 9,979 (96%).
 
@@ -431,7 +431,7 @@ line blocks.
    Fixed: "until your next turn" damage effects (Lightning, Army of One) now end when that turn begins; before, they
    came back on every other player's turn.
    Out after round 188 (looked at, not done): Protean Hydra (a trigger on counters removed by any cause), Caustic Bronco
-   (no "saddled" condition), Jared Carthalion (done in round 296), Garland, Royal Kidnapper, Lavabrink Venturer, Earthshape, Sigarda's Splendor ("note your life total"),
+   (no "saddled" condition), Jared Carthalion (done in round 296), Garland, Royal Kidnapper, Lavabrink Venturer (done in round B131), Earthshape, Sigarda's Splendor ("note your life total"),
    Ochre Jelly, Green Sun's Twilight, Industrial Advancement, Froghemoth.
    Round 189 went on from the top: "copy that spell X times" (Storm King's Thunder, with X kept from the Thunder;
    Photon Blast Barrage), "choose one. If ..., (you may) choose both instead" on triggers (SOLDIER Military Program
@@ -2379,9 +2379,9 @@ line blocks.
    checked for each defender, so not the Saddlebrute's controller or their planeswalkers, nor battles; CR 302.6, 508.1a); "Whenever an opponent gains control of a permanent
    from you" (Zidane, Tantalus Thief); "Whenever a permanent card is put into your graveyard from your library, exile
    it with a croak counter on it" and "You may play lands and cast spells from among cards you own in exile with croak
-   counters on them" (Grolnok, the Omnivore). +9, 30,250 of 31,936.
-   Out after round 297 (looked at, not done): Intellect Devourer (Lane B's round B128 works on "exiles a card from their
-   hand until ~ leaves the battlefield"; next round); The Red Terror ("Whenever a red source you control deals damage to
+   counters on them" (Grolnok, the Omnivore). +9, 30,324 of 31,936 with B128 to B134.
+   Out after round 297 (looked at, not done): Intellect Devourer ("each opponent exiles a card from their hand until ~
+   leaves the battlefield", then casting those cards with mana of any color: next round); The Red Terror ("Whenever a red source you control deals damage to
    one or more permanents and/or players": one trigger per source per damage event, CR 120.3); Archfiend of Spite ("loses
    that much life unless they sacrifice that many permanents", the damaged-by source's controller chooses); Hot Pursuit
    (suspect, goad as long as it remains, then control of every goaded and/or suspected creature); Urianger Augurelt and
@@ -2788,7 +2788,7 @@ line blocks.
    Brawler; Augusta, Order Returned; Vault 101: Birthday Party; The First Tyrannic War; Kitt Kanto;
    Daretti, Ingenious Iconoclast (its −6); Expedited Inheritance; Monstrous Emergence; Nyssa of Traken.
    Out after round 231 (looked at, not done): Ecstatic Beauty ("put four time counters on each of those cards that
-   has suspend": counters on the impulsed cards that already have suspend, without granting it); Knowledge Vault
+   has suspend": counters on the impulsed cards that already have suspend, without granting it); Knowledge Vault (done in round B129)
    ("{0}: Sacrifice ~. If you do, discard your hand, then ..." and its leaves trigger putting the cards into the
    graveyard); Yurlok of Scorch Thrash (mana burn, "each player adds {B}{R}{G}"); Tomik, Distinguished Advokist; Storm
    Cauldron; Arlinn, the Pack's Hope; The Temporal Anchor; Chandra, Fire of Kaladesh; Panoptic Mirror; Crafty
@@ -2999,7 +2999,7 @@ line blocks.
    same chosen permanent. Smaller gaps from round 122: Veteran Bodyguard and Weathered Bodyguards are out; autopay
    never forages for mana (on purpose: what to forage is the player's choice; bots do); forage as an instruction and
    "whenever you forage" came in round 248;
-   Nuclear Fallout and the other rad cards with milled-card triggers are out; Alchemist's Gambit, Inspired Idea and
+   Nuclear Fallout and the other rad cards with milled-card triggers are out; Alchemist's Gambit, Inspired Idea (done in round B130) and
    Lantern Flare (cleave with other lines) are out; Dream Harvest (done in round 267) and
    Rumbling Ruin are out; bots separate Liliana of the Veil's piles by a rough worth of each permanent; bots never cast
    Glorious End and end the turn only with nothing of their own on the stack; Arachne's card types leave out Kindred.
@@ -3263,7 +3263,7 @@ line blocks.
      exiled card is a God card"), Invasive Surgery, Kotose, "look at an opponent's hand, then choose any card name"
      (Sorcerous Spyglass, Anointed Peacekeeper), Alpine Moon, Skyseer's Chariot, Cheering Fanatic, Null Chamber, Booby
      Trap, Petrified Hamlet, names another player chooses (Conundrum Sphinx, Petra Sphinx, Vexing Arcanix), random
-     cards from an opponent's hand (Dementia Sliver (done in round B127), Nebuchadnezzar), Mindblaze, Liar's Pendulum, Lammastide
+     cards from an opponent's hand (Dementia Sliver (done in round B127), Nebuchadnezzar), Mindblaze (done in round B129), Liar's Pendulum, Lammastide
      Weave ("its mana value"), "an additional ... for each card named ~" (Growth Cycle, Rune Snag), "as you cast ~"
      (Aether Burst), Sound the Call.
    - Bots name what they've seen: an opponent's commander or permanent for a ban, a graveyard card for Memoricide, the
@@ -3308,7 +3308,7 @@ line blocks.
      (Ebondeath), "and/or" in its cost (Demilich), "rather than paying its mana cost" (Worldheart Phoenix, Scourge of
      Nel Toth), "using its blitz / bestow / mutate / warp ability".
    - Exiling from a graveyard: one player's choice works; "each player exiles a card from their graveyard" (Augusta),
-     "any player may" (Carrion Rats), and "If it's a creature card" after it (Graveyard Shovel) are out.
+     "any player may" (Carrion Rats, done in round B132), and "If it's a creature card" after it (Graveyard Shovel) are out.
    - Triggers still out: "When ~ enters and whenever ..." (Exuberant Fuseling), "another creature you control or a land
      you control" (Long Feng), "they create a Treasure token" (Pain Distributor), "Players can't play lands"
      (Territorial Dispute). "Return a card from your graveyard to your hand" inside modes (Gix's Command, Kairi) and
@@ -3412,7 +3412,7 @@ line blocks.
      during each of your turns" (Zaffai, Vision), named filters (West Coast Expansion's Hero spell).
    - Tap-or-untap variants: Telekinetic Bonds, Tolarian Kraken, Chain Stasis. Berserker's Frenzy ("before combat or
      during combat before blockers are declared"). Arcum's Sleigh and Kjeldoran Guard ("only if defending player
-     controls ..."), Grizzled Wolverine's "only if a creature blocks it", Ashen Ghoul's "creature cards above it".
+     controls ..."), Grizzled Wolverine's "only if a creature blocks it", Ashen Ghoul's "creature cards above it" (done in round B131).
      Coastal Wizard, Lady Sun, Diaochan, Maddening Imp, Norritt, Arcum's Whistle, Blood Frenzy and Berserk are out on
      their other lines.
    Left from the round after cascade ("when you lose control of", face-down exile, attach target Equipment,
@@ -3421,7 +3421,7 @@ line blocks.
      player who lost control controls the trigger). A control change before the first state check of a newly placed
      permanent isn't noticed.
    - Attach target Equipment works (Brass Squire, Kemba, Magnetic Theft and 9 more); still out: Frodo ("with mana value
-     2 or 3"), Grip of Phyresis, Weapons Vendor, Barret, Blacksmith's Talent, Captain America, Cloud's other line,
+     2 or 3"), Grip of Phyresis (done in round B131), Weapons Vendor, Barret, Blacksmith's Talent, Captain America, Cloud's other line,
      Noctis, Raubahn (ward-pay life), Sokka Swordmaster.
    - Harmonize (CR 702.180) works on 8 cards; still out: Glacial Dragonhunt, Nature's Rhythm, Synchronized Charge,
      Songcrafter Mage (granting harmonize). Paradigm works on all 5 cards and demonstrate on all 6.
@@ -3511,7 +3511,7 @@ line blocks.
      to all of one source's damage to one recipient at once, so one order per recipient. Bots' attacks and blocks count
      doublers, halvers and prevention.
    - Coin flips (CR 705) work for "If you win / lose the flip", "until you lose a flip" and "whenever you win a coin
-     flip" (25 cards); still out: Krark's Thumb, Edgar's "come up heads" (705.3), heads or tails (Odds // Ends, Mana
+     flip" (25 cards); still out: Krark's Thumb, Edgar's "come up heads" (705.3), heads or tails (Odds // Ends (done in round B129), Mana
      Clash, Two-Headed Giant, Rakdos the Showstopper, Molten Sentry), a flip for each (Mutalith Vortex Beast (done in round 278), Fighting
      Chance), Fiery Gambit, Game of Chaos, Squee's Revenge, Crooked Scales, Krark the Thumbless, and lines
      that are out for other reasons (Goblin Bangchuckers' "itself", Chance Encounter, Okaun). Bots weigh a flip whose loss costs
@@ -3565,7 +3565,7 @@ line blocks.
      graveyard, copy with haste).
    Left from the delayed-triggers-with-a-duration round ("until end of turn, whenever ...", CR 603.7b):
    - Only cast, dies and combat-damage-to-a-player events can be such a trigger; still out: tapped for mana (High
-     Tide, Bubbling Muck), attacks, blocks, life gain, other damage, Spiritualize and the rest of the 11 unsupported ones.
+     Tide, Bubbling Muck), attacks, blocks, life gain, other damage, Spiritualize (done in round B130) and the rest of the 11 unsupported ones.
    - "Whenever you cast a spell that targets ..." still out: "that targets only ..." (Loki,
      Beamsplitter Mage, Feather), "targets ~" except heroic (Druid of Horns, Speedball), "an Equipment spell or a spell
      that targets" (Danitha, Sword of Hope (done in round B109)), and "those creatures" in the effect (Storm, Windrider; Dack's emblem).
@@ -3579,7 +3579,7 @@ line blocks.
    - Vivid still out: Aurora Awakener, Sanar ("reveal until X permanent/nonland cards"), Prismabasher ("up to X
      target"), Prismatic Undercurrents ("up to X basic land cards"), First Family ("and spells you've cast this turn"),
      General Tazri (done in round B106) ("colors among those creatures"), Happily Ever After.
-   - "Cards drawn this turn" still out: Fists of Flame, Proft's Eidetic Memory ("minus one"), Molten Psyche, Niko Aris,
+   - "Cards drawn this turn" still out: Fists of Flame, Proft's Eidetic Memory ("minus one"), Molten Psyche, Niko Aris (done in round B130),
      Immortus, Elenda and Azor, Deem Inferior and Sylvan Library (other lines).
    - "Differently named" still out: Neriv ("differently named tokens"), Survey Mechan (an activated ability costing
      {X} less), Ellywick's emblem.
@@ -3594,7 +3594,7 @@ line blocks.
    - "For as long as you control ~" still out: "can't become untapped" (Spider-Woman), "you may play that card for
      as long as you control ~" (Lightning, Victor Mancha, Taster of Wares), "with lesser power" / "power less than
      ~'s power" targets (Rangers of Ithilien, Vodalian Mindsinger), Willbreaker, The Wretched, Pyreswipe Hawk
-     (expend), Seasinger.
+     (expend), Seasinger (done in round B131).
    - "Exiles a creature or planeswalker they control with the greatest mana value" (Blot Out, End of the Hunt): the
      sacrifice version works; exiling needs an "exile" pick action and prompt. "The greatest mana value among" cards
      in a graveyard, historic permanents or your commanders (Traverse Eternity, Hapatra, Tangleweave Armor) is out.
@@ -3661,7 +3661,7 @@ line blocks.
      that couldn't attack anyway, and promise a gift only when it turns on something of the spell's own.
    Left from the untap/entwine/distribute/job select/bargain round:
    - "For as long as ~ remains tapped" (27 of 40 legal supported): dynamic target filters (Vedalken Shackles' "power less
-     than or equal to the number of Islands", Old Man of the Sea, Entrancing Lyre's X, Seasinger), "a creature of an
+     than or equal to the number of Islands", Old Man of the Sea, Entrancing Lyre's X, Seasinger (done in round B131)), "a creature of an
      opponent's choice" (Preacher), "isn't of the chosen type" (Callous Oppressor), "other than ~" (Hisoka's Guard),
      attacking/blocked filters (Ice Floe, Whip Vine), "loses all abilities" (Immovable Rod), "when ~ becomes untapped
      or ..." delayed triggers from an activated ability (Coffin Queen, Tawnos's Coffin, The Pandorica), Giant Oyster's counters, Hivis's Dragon filter, Hedge
@@ -3739,7 +3739,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   forms not parsed yet: per-target amounts, "if it's a green creature, 2 instead"); Desert Nomads (done in round B104) (prevent damage
   from Deserts); Balduvian Fallen (mana spent on a cumulative upkeep payment); Viashino Bey (an attack requirement
   that depends on the declaration itself); Heroism (per-attacker pay-or-prevent); Ogre Enforcer (lethal damage from a
-  single source); Groffskithur ("target card named ~" in a graveyard: a target filter by the source's name); Urborg
+  single source); Groffskithur (done in round B129) ("target card named ~" in a graveyard: a target filter by the source's name); Urborg
   Panther (a cost that sacrifices creatures by name); Sworn Defender and Lesser Werewolf (power-dependent combat
   tricks).
 - Round B2 (ranks 32,230 up to about 31,000, plus some more played cards the same templates cover): prevention of
@@ -3918,7 +3918,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Ravaging Riftwurm (done in round B104) (more time counters as it's kicked); Loyal Sentry and Abu Ja'far (destroying the creatures in a
   block); Orcish Spy (done in round B104) (looking at the top cards without reordering); Gandalf, Wandering Wizard (done in round B104) ("~'s owner ... and
   draws"); Jaded Response (done in round B104) ("shares a color with a
-  creature you control"); Cruel Calculations (cards put into a graveyard from a library this turn); Chainflail
+  creature you control"); Cruel Calculations (done in round B128) (cards put into a graveyard from a library this turn); Chainflail
   Centipede ("~ or equipped creature attacks, it ..."); Spike Cannibal (done in round B104) (moving every +1/+1 counter); Driftgloom Coyote (done in round B109)
   ("if that creature had power 2 or less" after an exile until).
 - Round B9 (ranks about 19,600 up to about 17,100, the easier templates, plus more played cards the same templates
@@ -4121,7 +4121,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   twice: no ruling); Gideon's Triumph (done in round B109) and Inferno Hellion (done in round B106) ("attacked or blocked this turn", and Gideon's "two of
   those creatures instead"); Perilous Predicament (two sacrifices of different
   kinds); Pendrell Flux (pay its mana cost); Experiment Twelve, Printlifter Ooze, Deathmist Raptor, Roshan,
-  Planeswalker's Mischief (done in round B127), Dementia Sliver (done in round B127) and Wand of Ith (not looked at in depth).
+  Planeswalker's Mischief (done in round B127), Dementia Sliver (done in round B127) and Wand of Ith (done in round B132).
 - Round B17 (harder skipped cards, least played first): the Licids (Calming, Convulsing, Corrupting, Dominating,
   Enraging, Gliding, Leeching, Nurturing, Quickening, Stinging, Tempting and Transmogrifying Licid): "loses this ability
   and becomes an Aura enchantment with enchant creature" as a layer 4 and 6 effect, "You may pay {W} to end this
@@ -4162,7 +4162,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   permanents); Chisei, Heart of Oceans ("remove a counter from a permanent": a counter of any kind, chosen as it resolves); Demonic Hordes ("of an
   opponent's choice" in multiplayer); Rapid Fire (rampage is a trigger, not a keyword a creature can gain);
   Parallax Inhibitor (fading counters as a keyword); Matopi Golem, Skeleton Scavengers, Soldevi Sentry and Spiny
-  Starfish ("when it regenerates this way": a shield with a rider, and choosing among shields, CR 616.1).
+  Starfish ("when it regenerates this way": a shield with a rider, and choosing among shields, CR 616.1; done in round
+  B132).
 - Round B19 (harder skipped cards, least played first): clash (CR 701.30) as an event: "Whenever you clash", even
   when an opponent's spell started it and won it (Entangling Trap, Rebellion of the Flamekin, rulings), "Whenever you
   clash and win" / "Whenever you win a clash" (Sylvan Echoes, Marvo, Deep Operative with "clash with defending
@@ -4181,7 +4182,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ... Otherwise, sacrifice it"); Ether Well; Gore Vassal; "if ~ attacked or blocked this combat" (Kjeldoran Home
   Guard, that combat only). No new prompt: the clash, "you may" and existing pickers ask. +38 (26,709 with round 187).
 - Skipped there, with reasons: Recross the Paths (its reveal-until-a-land line); Scattering Stroke (mana at your next
-  main phase); Wormfang Newt and Wormfang Turtle ("exile a land you control" and its linked return); Curse Artifact,
+  main phase); Wormfang Newt and Wormfang Turtle (done in round B128) ("exile a land you control" and its linked return); Curse Artifact,
   Mind Whip, Soul Charmer and Nakaya Shade (punishers another player answers); Glittering Lion and Glittering Lynx (done in round B111)
   (losing one static ability until end of turn); Wall of Tombstones and Descendant of Masumaro (upkeep counts set as
   base toughness or added then removed); Lava Storm (old "X or Y" wording with no mode choice); Eternal Flame and
@@ -4203,7 +4204,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Disappear; Domineer; Fulgent Distraction; Songstitcher; Viscerid Drone ("sacrifice a creature and a (snow) Swamp").
   New browser tests: forecast from the hand menu in your upkeep, and Orcish Conscripts' block button. +34 (26,784 with
   rounds 188 and 189).
-- Skipped there, with reasons: Paladin of Prahv (forecast making a delayed "whenever target creature deals damage this
+- Skipped there, with reasons: Paladin of Prahv (done in round B130) (forecast making a delayed "whenever target creature deals damage this
   turn" trigger); Peer Pressure ("controls more creatures of the chosen type than each other player"); Illusionary
   Presence and Talara's Bane (a landwalk / a creature card's toughness chosen from a revealed hand); Flay and Venarian
   Gold (old "discard a card at random. If you can't" / "X sleep counters" wordings); the Clockwork creatures (as in
@@ -4368,9 +4369,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cards from your hand ... return the exiled cards", Saprazzan Bailiff. Also "named" tokens and creatures as costs
   (Jungle Patrol's Wood, Bubbling Cauldron's Festering Newt, Kyscu Drake) and Kookus ("Keeper of Kookus" keeps its
   name; "deals 3 damage to you and attacks this turn if able"). +39 (27,089 of 31,936 with Lane A round 195).
-- Skipped there: Hypnox and Realm Razer (an enters exile and a leaves return, close to Wormfang Behemoth's, left for a
+- Skipped there: Hypnox and Realm Razer (done in round B131) (an enters exile and a leaves return, close to Wormfang Behemoth's, left for a
   round that checks "if you cast it from your hand" and "under their owners' control"), Gravegouger, Wormfang Newt and
-  Wormfang Turtle (one exile ability the return can't be linked to), Goblin Ski Patrol, Phyrexian Devourer (a power
+  Wormfang Turtle (done in round B128) (one exile ability the return can't be linked to), Goblin Ski Patrol, Phyrexian Devourer (a power
   state trigger), Detention Sphere (left to Lane A, near the top; done in round 277). Known limit: a "*" creature card's power outside the
   battlefield is read from its characteristic-defining ability only where a rule asks for it (cost payments, spells on
   the stack); characteristics() still shows it as 0 there.
@@ -4452,7 +4453,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B31: Ekundu Cyclops (an attack requirement that depends on the declaration itself, like Viashino
   Bey), Taste of Paradise (optional additional costs, Lane A's round 197 template; left to it), Liquid Fire (a number
   chosen as a cost), Goblin Test Pilot (a random target for an activated ability), Emberwilde Djinn ("pay {R}{R} or 2
-  life"), Carrion Wurm ("any player may exile three"), Matopi Golem (a regeneration shield's rider), Taunt (a rule
+  life"), Carrion Wurm ("any player may exile three", done in round B132), Matopi Golem (a regeneration shield's rider, done in
+  round B132), Taunt (a rule
   bound to a target player), Goblin Sappers ("destroy it and ~ at end of combat"), Curtain of Light (done in round B110), Dazzling Beauty (done in round B110) and
   Trap Runner (done in round B110) ("becomes blocked" by an effect), Kill-Suit Cultist (a destroy-instead damage shield), Rock Jockey,
   Explosion of Riches, Power Pack, Cinderheart Giant (done in round B116) (chosen at random as it resolves, not targeted), Juju Bubble ("play
@@ -4516,7 +4518,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Desecrator Hag (the card with the greatest power, a tie chosen), Dralnu's Pet (X from the card discarded for
   kicker), Illusionary Presence (a land type chosen each upkeep), Elephant Resurgence (each player's own token
   counting its controller's graveyard), Volcanic Eruption ("the number of Mountains put into a graveyard this way"),
-  Horn of Plenty (done in round B126) (the casting player's may-pay and their delayed draw), Lavabrink Venturer (protection from odd or
+  Horn of Plenty (done in round B126) (the casting player's may-pay and their delayed draw), Lavabrink Venturer (done in round B131) (protection from odd or
   even mana values), Reviving Vapors (life equal to the chosen card's mana value), Mind Maggots (counters per card
   discarded this way), Empty-Shrine Kannushi (done in round B112) (protection from colors among your permanents), Dance of the Skywise
   (becomes a Dragon Illusion that loses all abilities), Chlorophant (threshold granting a second upkeep trigger),
@@ -4566,7 +4568,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   +26 (27,547 of 31,936 with B35 and rounds 202 to 206).
 - Out after round B36: North Star (spend mana as though any type for one spell), Silhouette (prevent damage only
   from sources whose spell or ability targets it), Suffocation (damage history of red spells), Oracle of Dust (a card an
-  opponent owns from exile as a cost), Haphazard Bombardment (aim counters), Bladecoil Serpent ("for each {U}{U}
+  opponent owns from exile as a cost), Haphazard Bombardment (aim counters), Bladecoil Serpent (done in round B128) ("for each {U}{U}
   spent"), Wall of Shadows ("spells that can target only Walls"), Fickle Efreet (a delayed flip at end of combat, then
   an opponent gains control), Tam, Mindful First-Year (hexproof from each of its colors; its "becomes all colors"
   line now parses), Dragon's Disciple (reveal a Dragon as it enters), Lamplight Phoenix (collect evidence as a dies
@@ -4669,7 +4671,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   of phasing out (Divine Smite), Heated Argument, Monoist Circuit-Feeder, "return it ... and it loses all abilities"
   (Retched Wretch), Sudden Reclamation, Mind Bomb (each player discards up to three), Renounce ("sacrifice any number
   of permanents"), "If a card is put into exile this way" (Corpse Appraiser). +30 (27,742 of 31,936 with round 209 and B40).
-- Out after round B41: Nimble Hobbit ("sacrifice a Food or pay {2}{W}": an either cost with a mana payment), Cadaverous
+- Out after round B41: Nimble Hobbit (done in round B130) ("sacrifice a Food or pay {2}{W}": an either cost with a mana payment), Cadaverous
   Bloom and Rasputin (mana abilities with non-tap costs), Bullseye, Lava Burst (done in round B121), Sivvi's Valor, Treacherous Link,
   Kitesail Skirmisher, Bill Ferny (done in round 272), Rayami, Hankyu, Boros Battleshaper, Aura Graft (each needs a new mechanic).
 - Round B42 (harder skipped cards, least played first): the Dragons of Tarkir "you may reveal a Dragon card from your
@@ -4723,7 +4725,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B44: Mana Cache (a mana ability any player may activate), Torrent Elemental (an ability activated
   from exile needs the UI and the bot), Keldon Twilight ("that player sacrifices a creature they controlled since the
   beginning of the turn"), Leshrac's Sigil ("you may pay {B}{B}. If you do, look at that player's hand and choose a
-  card from it": the look sits inside the "if you do"), Rewrite History (done in round 265), Spiny Starfish (counting regenerations), Magmablood Archaic (colors spent on the triggering spell),
+  card from it": the look sits inside the "if you do"), Rewrite History (done in round 265), Spiny Starfish (counting regenerations, done in round B132), Magmablood Archaic (colors spent on the triggering spell),
   Wanderwine Farewell (Kindred), Archery Training and Heartseeker (a granted ability that names the source),
   Stormwild Capridor (prevented damage turned into counters), Awesome Presence (a block cost for each blocker).
 - Round B45 (harder skipped cards, least played first): creatures that dealt damage this turn, as that object
@@ -4815,7 +4817,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "Target player dealt damage by ~ this turn" (Wicked Akuba), "discards a card with that name. If they can't, you draw
   a card" (Brain Pry), "choose two cards from it. Put them on top of that player's library in any order" (Agonizing
   Memories), and "You may put one of those cards on top of your library" (Voda Sea Scavenger). +24 (28,205 of 31,936 with rounds 217 to 221).
-- Out after round B48 (looked at, not done): Dwarven Sea Clan (a target "whose controller controls an Island", damage
+- Out after round B48 (looked at, not done): Dwarven Sea Clan (done in round B131) (a target "whose controller controls an Island", damage
   at end of combat, "before the end of combat step"), Feint (tap the target's blockers, prevent its and their combat
   damage), Blood Oath ("Choose a card type" as a spell instruction), Specter's Shriek (exile a chosen card, then a
   rider about its color), Noggin Whack (reveal three, you choose two), Hiveheart Shaman (a basic land card that doesn't
@@ -4903,7 +4905,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Domination), "if enchanted creature is red" (Ray of Frost), "becomes blocked by one or more colorless creatures"
   (Hedron Blade), "As long as you've surveilled this turn" (Darkblade Agent: surveil now tracked apart from scry),
   "When a source an opponent controls deals damage to you, sacrifice ~" (Awaken the Sky Tyrant). +32 (28,296 of 31,936 with rounds 217 to 221).
-- Out after round B51 (looked at, not done): Backfire ("that much damage" from damage the enchanted creature dealt to
+- Out after round B51 (looked at, not done): Backfire (done in round B130) ("that much damage" from damage the enchanted creature dealt to
   you), Equal Treatment and Well-Laid Plans (damage replacement and prevention between sources), Spin into Myth
   (fateseal), Elderwood Scion (spells that target it cost less), Tidal Control and Quicksilver Dragon (any player may
   activate; changing a spell's only target), Necromancer's Magemark (a replacement for enchanted creatures you control),
@@ -4939,7 +4941,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Watchers of the Dead (done in round B117) (each opponent keeps two cards), Mire's Toll (supported already) (reveal N chosen cards), Dead Reckoning (done in round B113), Victor
   Mancha, Encumbered Reejerey (done in round B112) ("while" trigger conditions), Entrails Feaster (done in round B112), Ichorid (done in round B116), Nether Shadow (done in round B116), Cursed Rack (done in round B104),
   Celestial Kirin (done in round B116), Skyfire Kirin (done in round B116), Lumaret's Favor (done in round B117), Definitely Not a Turtle (done in round B116), Advice from the Fae (done in round B116), Petals of Insight (done in round B116),
-  Rowdy Crew (done in round B116), Thijarian Witness, Riptide Replicator (supported already), Teferi's Response (done in round B116), Dawn Evangel (done in round B116), Earthbind, plus the multi-line
+  Rowdy Crew (done in round B116), Thijarian Witness (done in round B131), Riptide Replicator (supported already), Teferi's Response (done in round B116), Dawn Evangel (done in round B116), Earthbind, plus the multi-line
   or new-mechanic cards in the same range (Oath of Scholars, Oath of Ghouls, Soul of Shandalar, Kenku Artificer, Harsh
   Justice, Bill Potts and others).
 - Round B53 (cards no earlier round wrote down, least played first, EDHREC rank about 22,000 to 19,700):
@@ -4964,7 +4966,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   control a snow land" (Snow Devil). +34 (28,381 of 31,936 with round 222).
 - Out after round B53 (looked at, not done): Clear the Land (done in round B121), Ninja's Kunai and Blazing Torch
   (granted abilities that sacrifice or name the Equipment), Artificer's Hex (done in round B112) (the creature the enchanted Equipment is
-  attached to), Mana Vortex (counter unless you sacrifice, plus a no-lands state trigger), Encircling Fissure
+  attached to), Mana Vortex (counter unless you sacrifice, plus a no-lands state trigger), Encircling Fissure (done in round B130)
   (prevention for a target opponent's creatures), Ancient Hellkite (done in round B112) (a defending-player target), Alluring Siren
   ("attacks you if able"), Warren Weirding (done in round B112) (Kindred), Kami of Jealous Thirst (a colored cost cut), Thaumaton Torpedo (done in round B121)
   ("if you attacked with a Spacecraft this turn"), Detention Vortex (only opponents may activate), West Wind Avatar (done in round B105)
@@ -5014,7 +5016,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature that player or that planeswalker's controller controls" (Searing Blaze: the planeswalker's last known
   controller if it has left), "if you control three or more creatures that share a creature type" (Littjara
   Kinseekers). +18 (28,418 of 31,936 with round 222).
-- Out after round B55 (looked at, not done): Runic Repetition (done in round 272), Lymph Sliver (absorb), Mesmeric
+- Out after round B55 (looked at, not done): Runic Repetition (done in round 272), Lymph Sliver (done in round B130) (absorb), Mesmeric
   Sliver (fateseal), Namor ("attacks a player who has more life than you"), Asgardian Inspiration (a trigger from the
   graveyard on an event that isn't one yet), Old Fat Spider Can't See Me (a damage rule for as long as ~ remains on the
   battlefield), Isu the Abominable (a choice of payment), Etched Slith ("target permanent or opponent"), Reiterating
@@ -5303,7 +5305,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B66 (looked at, not done): Swans of Bryn Argoll (its draws in the middle of damage could be replaced
   by dredge), Szadek, Lord of Secrets (the affected player orders it against prevention), Domri, Chaos Bringer (riot on mana spent from a loyalty
   ability), Dreamshaper Shaman (a nonland permanent card put onto the battlefield: Auras and battles), Qasali Ambusher
-  (flash only for the alternative cost), Debt of Loyalty ("if it regenerates this way"), Murktide Regent (which cards
+  (flash only for the alternative cost), Debt of Loyalty ("if it regenerates this way", done in round B132), Murktide Regent (which cards
   delve exiled), War Tax, Mine Layer, Tatsumasa, the Dragon's Fang, Ride the Avalanche, Light Up the Night, Arachnus
   Spinner (done in round B71), Auratouched Mage, Bludgeon Brawl and Last Light of Durin's Day (searches across zones, cost-time choices or
   granted abilities with their own costs).
@@ -5676,7 +5678,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Troll). +13 (29,346 of 31,936 with B86, B87 and rounds 248 and 249).
 - Out after round B88 (looked at, not done): Psychic Rebuttal (copying a spell after it's been countered), Soulblast
   (an additional cost of sacrificing all creatures you control), Tyrannical Pitlord ("as ~ enters, choose another
-  creature you control"), Spatial Binding ("can't phase out"), Batroc the Leaper (up to X targets, X the times kicked),
+  creature you control"), Spatial Binding (done in round B128) ("can't phase out"), Batroc the Leaper (up to X targets, X the times kicked),
   Miasma Demon (discard any number, then up to that many targets), Gorex, the Tombshell (an optional exile cost that
   reduces the cost), Rasputin Dreamweaver ("if ~ started the turn untapped").
 - Round B89 (one-line templates from the bottom of the list): Aura moves, "Attach target Aura attached to a creature to
@@ -6227,11 +6229,133 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Hedge Whisperer, The Blackstaff of Waterdeep and Welcome to . . . // Jurassic Park (a permanent "becomes an N/N ...
   creature" for as long as ~ stays tapped, or for as long as you control ~, CR 611.2b, through the same template). +12
   (30,231 of 31,936 with B125, B126 and rounds 294 and 295).
+- Round B128 (least played first, from the skip lists): Wormfang Newt and Wormfang Turtle ("exile a land you control",
+  returned when it leaves, linked abilities, CR 607.2a; a land that leaves before the exile happens stays exiled), Wormfang
+  Crab (you choose an opponent, who chooses a permanent you control other than ~ and exiles it; a browser test), Wormfang
+  Drake ("sacrifice it unless you exile a creature you control other than ~"; a browser test), Ertai's Familiar ("When ~
+  phases out or leaves the battlefield, mill three cards" and "{U}: Until your next upkeep, ~ can't phase out": a new
+  can't-phase-out effect that stops direct and indirect phasing, CR 702.26d, rulings; bots keep it here once a turn) and
+  Spatial Binding (the same on any target permanent; Teferi's Protection leaves it behind), Corpseweft ("Exile one or more
+  creature cards from your graveyard" as a cost, a 2X/2X token, X can't be 0; a browser test for the X picker, which now
+  starts its search at the minimum X; bots exile the creature cards they don't need there), Relive the Past (three "up to
+  one" targets returned at once as 5/5 Elementals in addition to their types, CR 205.1b; one card isn't offered for
+  two of them, as it would return once all the same, CR 115.3), Cruel
+  Calculations (cards put into the target player's graveyard from their library this turn), Clay Champion and Bladecoil
+  Serpent (for each {G}{G}, {W}{W}, {U}{U}, {B}{B} or {R}{R} spent to cast it, CR 601.2h; Bladecoil's trample and haste
+  once, as gaining them again changes nothing, CR 702.19g, 702.10d). +11 (30,252 of 31,936 with B127 and round 296).
+- Round B129 (least played first, from the skip lists): Groffskithur ("target card named ~": a target filter bound to
+  the source's name as it's chosen and as it resolves, CR 201.2), Mindblaze (a nonland card name and a number greater than
+  0 chosen as it resolves, CR 201.4; the number picker stops at the target's library size; the library is revealed and
+  shuffled; a browser test), Rite of Ruin (an order for artifacts, creatures and lands chosen as it resolves from six
+  buttons, then each player sacrifices one, two and three permanents of those types in that order; an artifact creature
+  sacrificed as an artifact is gone for the creatures, rulings; a browser test; bots pick the order that costs opponents
+  most), Eye of Singularity ("each permanent with the same name as another permanent, except for basic lands" as it
+  enters, and "a permanent other than a basic land enters" destroying all other permanents with its name; face-down
+  permanents have no name, CR 708.2), Cornered Market (no spells or lands with the same name as a nontoken permanent,
+  basic lands aside; a face-down spell has no name, CR 708.2), Sengir Nosferatu ("Return an exiled card named Sengir
+  Nosferatu to the battlefield under its owner's control": any one, picked when several are exiled), Knowledge Vault
+  (cards exiled face down with it, CR 607.2a; "{0}: Sacrifice ~. If you do, discard your hand, then put all cards
+  exiled with ~ into their owner's hand", and its leaves trigger), Odds // Ends (a coin no one calls, CR 705.2: heads
+  counters the spell, tails copies it; with Krark's Thumb its controller keeps heads or tails, CR 705.3, with a browser
+  test), Spellshift (counter, then the spell's controller reveals until an instant or sorcery and may cast it free; the
+  other revealed cards stay put until the shuffle), Shorecrasher Elemental (exiled, then returned face down, CR 708.3,
+  turned face up with megamorph). +10 (30,262 of 31,936 with B127, B128 and round 296).
+- Round B130 (least played first, from the skip lists): Spiritualize, Paladin of Prahv's forecast and Niko Aris's +1
+  ("whenever target creature deals damage this turn", "until end of turn, whenever target creature deals damage": a
+  delayed trigger about that creature, CR 603.7b-c, for any damage it deals, combat or not, once for each damage event,
+  "that much" the damage it dealt, rulings; Spiritualize's "Draw a card." paragraph after it is the spell's, which does
+  nothing once its only target is gone, CR 608.2b), Glyph of Life ("whenever that creature is dealt damage by an attacking
+  creature this turn": once for each attacking creature dealing it damage, the Wall still taking it, rulings), Nimble
+  Hobbit ("you may sacrifice a Food or pay {2}{W}. When you do, tap target creature an opponent controls", any Food, with
+  a browser test; bots pay with an untapped creature to tap), Obscura Ascendancy (an intervening "if its mana value is
+  equal to 1 plus the number of soul counters on ~", checked again as it resolves, CR 603.4: two mana value 1 spells in a
+  row give one Spirit, rulings), Backfire ("whenever enchanted creature deals damage to you": the Aura's controller only),
+  Inspired Idea ("your maximum hand size is reduced by three for the rest of the game", kept with its timestamp and applied
+  with the static ones in timestamp order, CR 613.11, rulings; cast for its cleave cost, no reduction), Lymph Sliver
+  (absorb 1, "if a source would deal damage to this creature, prevent 1 of that damage", CR 702.64a, for each source),
+  Encircling Fissure (combat damage by creatures target opponent controls, as the damage would be dealt, prevented this
+  turn, rulings; awaken works as before; bots cast it at the attacking player when attacked). A browser test for Nimble
+  Hobbit's Food choice. +10 (30,272 of 31,936 with B127 to B129 and round 296).
+- Round B131 (least played first, from the skip lists): Realm Razer (the exiled lands return tapped, CR 607.2a; if it
+  leaves before its enters ability resolves, the lands stay exiled, rulings), Lavabrink Venturer ("protection from each
+  mana value of the chosen quality", CR 702.16, odd or even chosen as it enters; tokens' mana value 0 is even; bots pick
+  the quality most of the opponents' creatures have), Ignorant Bliss (your hand exiled face down, back at the next end
+  step, then a card drawn; cast during an end step, the next turn's, rulings), Grip of Phyresis (control of the Equipment
+  for the rest of the game, a 0/0 Germ created and the Equipment attached; with an Equipment that gives no toughness the
+  Germ dies and you keep the Equipment, rulings), Infectious Rage (returned attached to a creature chosen at random among
+  those it can enchant, not targeted, protection still matters, CR 303.4f; stays in the graveyard with none), Traveling
+  Plague (the dead creature's controller returns it, under their control, CR 110.2a, choosing what it enchants; no
+  counters), Kaervek's Spite (sacrifice all permanents you control and discard your hand as an additional cost, CR
+  601.2h; can't be cast while a permanent you control can't be sacrificed, CR 118.3; bots cast it only to finish an
+  opponent at 5 life or less), Dwarven Sea Clan and Seasinger ("target creature whose controller controls an Island",
+  checked on activation and resolution; Sea Clan's damage at end of combat as a delayed trigger, CR 603.7c, "activate
+  only before the end of combat step"), Ashen Ghoul ("only if three or more creature cards are above ~": put there after
+  it, rulings), Thijarian Witness ("if it was attacking or blocking alone", CR 506.5, from its last known information,
+  CR 603.10a). Browser tests for Kaervek's Spite, Lavabrink Venturer's choice and Traveling Plague's host choice. +11
+  (30,283 of 31,936 with B130).
+- Round B132 (least played first, from the skip lists): Matopi Golem, Skeleton Scavengers, Soldevi Sentry and Spiny
+  Starfish (a regeneration shield with a rider, "when it regenerates this way", a delayed trigger, CR 603.7; with
+  several shields the controller picks one, CR 616.1, chosen automatically: a riderless one first unless the rider only
+  puts +1/+1 counters on itself; an unused rider ends with its shield at cleanup, CR 701.19a; Starfish counts the
+  regenerations this turn, at the end step only if it regenerated), Debt of Loyalty (control gained only if that shield
+  is used, rulings), Carrion Rats and Carrion Wurm ("any player may exile a card from their graveyard", punisher option
+  that picks the cards; bots pay it to stop the damage only when it's aimed at them), Sirocco (for each blue instant in
+  the revealed hand, pay 4 life or discard it), Wand of Ith (the revealed card: a land costs 1 life, otherwise life equal
+  to its mana value, or discard it), Tainted Specter (put a card from your hand on top of your library, or discard one
+  and take 2 damage if it was discarded; the payer picks the card), Ion Storm ("Remove a +1/+1 counter or a charge
+  counter from a permanent you control", the counter picker offering only those kinds). Browser tests for Carrion Wurm's
+  graveyard pick, Tainted Specter's library-top choice and Ion Storm's counter picker. +11 (30,294 of 31,936).
+- Round B133 (least played first, from the skip lists): Flying Drone ("another creature with flying entered the
+  battlefield under your control this turn", the entered log noting flying), Thirsting Axe ("if equipped creature didn't
+  deal combat damage to a creature this turn, sacrifice it": an intervening if, CR 603.4, and the equipped creature is
+  sacrificed, CR 701.21a), Paragon of Modernity ("if exactly three colors of mana were spent to activate this ability",
+  from the mana paid for the activation; bots don't aim at three colors), Weight of Conscience ("Tap two untapped
+  creatures you control that share a creature type", changelings share every type, CR 702.73a) and Illuminated Folio
+  ("Reveal two cards from your hand that share a color", colorless isn't a color, CR 105.2c; a split card has both
+  colors, CR 709.4a): the cost picker's button waits for a valid pair, Genju of the Fields ("~'s controller gains that
+  much life"), Naya Soulbeast (parley's total mana value, the cast spell enters with that many +1/+1 counters), Haphazard
+  Bombardment (aim counters on four chosen nonenchantment permanents you don't control, not targeted; at your end step one
+  of them destroyed at random among those that can be, rulings), Pick Up the Pace ("a creature you control that entered
+  this turn attacks"; play the exiled cards as long as you attacked this turn), Bane Alley Broker (face-down exile you may
+  look at, CR 406.3, and the return of one of them; a new controller sees them only as that return resolves). Browser
+  tests for both share-cost pickers, Haphazard Bombardment's pick and Bane Alley Broker's return. +10 (30,304 of 31,936).
+- Round B134 (least played first, from the list): splice costs that aren't mana (CR 702.47a, 601.2b, 601.2f-h): Torrent
+  of Stone ("Sacrifice two Mountains", any land with the Mountain subtype, rulings), Hundred-Talon Strike ("Tap an untapped
+  white creature you control"), Roar of Jukai ("An opponent gains 5 life", the opponent picked as for Invigorate), Horobi's
+  Whisper ("Exile four cards from your graveyard") and Veil of Secrecy ("Return a blue creature you control to its
+  owner's hand"), paid with the spell's other costs after its targets; entwine costs that aren't mana (CR 702.42a):
+  Betrayal of Flesh ("Sacrifice three lands") and Solar Tide ("Sacrifice two lands"), the entwine button naming the cost;
+  Samite Censer-Bearer (a shield of 1 on each creature you control as it resolves, rulings), Puppet Master (the creature
+  card back to its owner's hand, then {U}{U}{U} to return the Aura, offered only if the card went to the hand, rulings),
+  Rock Hydra (each 1 damage removes a +1/+1 counter and is prevented while it has one, the rest dealt; damage that can't
+  be prevented still removes them, rulings; its own shields are used first, CR 616.1), Whip Vine ("target creature with
+  flying blocked by ~", kept tapped while the Vine stays tapped). Bots splice or entwine with lands as the cost only with
+  five lands left after, and entwine Solar Tide only when both modes together help them. Browser tests for Torrent of
+  Stone's Mountains picked after the targets and Solar Tide's entwine button. +11 (30,315 of 31,936).
+- Known gap from round B134: a splice or entwine cost that picks the same kind of thing as one of the spell's other costs
+  (Torrent of Stone's Mountains onto an Arcane spell that also sacrifices a creature) isn't offered or is refused as it's
+  cast, though the rules allow paying both.
+- Out after round B133 (looked at, not done): Tamanoa (noncreature sources' damage as one event), Graceful Takedown,
+  Imperiosaur (mana spent only from basic lands), Flaming Gambit (the target player redirects the damage to a creature),
+  Magus of the Arena and Evangelize (a target chosen by an opponent).
+- Out after round B132 (looked at, not done): Bullseye and Death Dealer (still an activation cost with "or" between two
+  costs), Misfortune, Fatal Lore and Library of Lat-Nam (still a mode chosen by an opponent as it's cast, CR 700.2e).
+- Out after round B131 (looked at, not done): Mister Immortal (an ability activated from exile, which neither the UI nor
+  the bots offer).
+- Out after round B130 (looked at, not done): Molten Sentry and Aquamorph Entity (a coin flip or a choice as it enters,
+  or is turned face up, that a creature becoming a copy of it later takes too, rulings: the engine's "enters as" effect
+  isn't copied), Glass Asp, Nafs Asp and Sabertooth Cobra ("unless they pay {2} before that step": a payment any time
+  before a step begins).
+- Out after round B129 (looked at, not done): Spoils of War, Grenzo's Rebuttal, Peace Talks and Martyr of Bones, still
+  out for the reasons in the earlier lists.
+- Out after round B128 (looked at, not done): Bullseye, Death Dealer and Ion Storm (an activation cost with "or" between
+  two costs; Ion Storm done in round B132), Price of Betrayal (counters removed from an opponent, a player, as well as permanents), Bargaining Table
+  (X set by the opponent chosen as it's activated), Selective Snare (a creature type chosen as it's cast).
 - Out after round B127 (looked at, not done): Sutured Ghoul (an enters replacement exiling any number of creature cards
   and a characteristic-defining P/T linked to them, CR 607.2a), Goblin Test Pilot (a target chosen at random as it's
   activated), Valleymaker (a mana ability with a sacrifice cost whose mana goes to another player), Escaped Shapeshifter
   (a layer 6 ability-adding effect that depends on what opponents' creatures have, CR 613.8), Snowblind (Y counted from
-  the toughness the effect itself changes), Sirocco (a punisher per revealed card), Nivmagus Elemental (exiling a spell
+  the toughness the effect itself changes), Sirocco (a punisher per revealed card, done in round B132), Nivmagus Elemental (exiling a spell
   you control from the stack as a cost), Burning of Xinye ("destroys four lands they control", chosen by each player,
   isn't parsed).
 - Out after round B126 (looked at, not done): Kill-Suit Cultist ("the first time damage would be dealt to that creature
@@ -6241,11 +6365,11 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   at once: keepRest has no mana payment), Liquid Fire (a number chosen as an additional cost as it's cast, CR 601.2b: no
   cast-time number choice yet), Preferred Selection (the two cards looked at are held across a "you may sacrifice ~ and
   pay" choice), Thelon's Chant and Tourach's Chant (the player who put it onto the battlefield isn't tracked), Wand of Ith
-  and Tainted Specter (a payment or a library-top choice for the revealed or discarded card).
+  and Tainted Specter (a payment or a library-top choice for the revealed or discarded card; both done in round B132).
 - Out after round B123 (looked at, not done): Misfortune, Library of Lat-Nam and Fatal Lore (an opponent chooses the mode
   as the spell is cast, CR 700.2e), Kheru Lich Lord (a returned card's abilities and its exile replacement), Fasting (an
   optional draw-step skip with a counter rider), Matopi Golem and Skeleton Scavengers (a rider on one regeneration
-  shield, a choice among shields), Thirsting Axe (combat damage dealt to creatures this turn isn't tracked), Heat Wave (a
+  shield, a choice among shields; done in round B132), Thirsting Axe (combat damage dealt to creatures this turn isn't tracked), Heat Wave (a
   block tax paid in life), Rohgahh of Kher Keep (payment to keep the Kobolds, then control of all of them to an opponent),
   Evangelize and Echo Chamber (a target an opponent chooses for your spell or ability).
 - Out after round B122 (looked at, not done): Tamanoa and Briarbridge Patrol (once for each damage event, which a spell
@@ -6262,7 +6386,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   goes on the stack), Invoke the Ancients (a separate counter choice for each of the two tokens created, rulings).
 - Out after round B118 (looked at, not done): Flying Drone ("another creature with flying entered the battlefield under your
   control this turn": the turn's enter log doesn't keep keywords), Cellar Door ("puts the bottom card of their library into
-  their graveyard": not a mill, CR 701.17a, so it needs a move of its own), Relive the Past (three "up to one" graveyard
+  their graveyard": not a mill, CR 701.17a, so it needs a move of its own), Relive the Past (done in round B128) (three "up to one" graveyard
   targets of different types returned at once, then 5/5 Elementals), Grifter's Blade (an enters choice of a creature to enter
   attached to), Jandor's Ring (the last card you drew this turn isn't tracked).
 - Out after round B117 (looked at, not done): Price of Betrayal (counters removed from a target that may be a player: no
@@ -6270,7 +6394,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Pit Automaton (a delayed trigger on the next exhaust ability activated).
 - Out after round B116 (looked at, not done): Earthbind (an Aura gaining a static ability with the timestamp of the gain,
   CR 613.7a, after an intervening if on the enchanted creature), Goblin Test Pilot (a target chosen at random as an
-  activated ability is activated: activation always lets the player choose), Thijarian Witness ("if it was attacking or
+  activated ability is activated: activation always lets the player choose), Thijarian Witness (done in round B131) ("if it was attacking or
   blocking alone" as it died, CR 506.5, with other creatures dying at the same time).
 - Out after round B115 (looked at, not done): Cut the Tethers (a punisher for each Spirit that returns only the ones
   their owners didn't pay for), Song of Blood (done in round B127) (a delayed attack trigger whose bonus counts the creature cards milled as
@@ -6280,14 +6404,14 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   battlefield), Fortunate Few (each player in turn choosing a nonland permanent not already chosen), Magnetic Mountain
   (paying {4} for each of any number of chosen creatures), Equipoise (phasing out the excess, one permanent type after
   another).
-- Out after round B113 (looked at, not done): Kaervek's Spite (sacrificing all permanents you control as an additional
+- Out after round B113 (looked at, not done): Kaervek's Spite (done in round B131) (sacrificing all permanents you control as an additional
   cost: whether it can be paid while one of them can't be sacrificed), Ruin in Their Wake (a "may" between the battlefield
   and your hand only while you control a land named Wastes), Bargaining Table (an opponent chosen as it's activated sets X).
 - Out after round B112 (looked at, not done): Matopi Golem, Skeleton Scavengers and Soldevi Sentry (a rider on a
-  regeneration shield: when several shields could apply, its controller picks which one is used, CR 616.1, which isn't
+  regeneration shield, done in round B132: when several shields could apply, its controller picks which one is used, CR 616.1, which isn't
   tracked per shield yet).
 - Out after round B111 (looked at, not done): Roar of Jukai, Torrent of Stone, Horobi's Whisper and Hundred-Talon Strike
-  (splice costs that aren't mana: sacrificing lands, tapping creatures, exiling cards), Grip of Phyresis (attaching the
+  (splice costs that aren't mana: sacrificing lands, tapping creatures, exiling cards), Grip of Phyresis (done in round B131) (attaching the
   Equipment to the Germ just created), Anti-Magic Aura (done in round B122) ("can't be enchanted by other Auras"). Possessed Portal's skip isn't
   offered against a replacement that applies only to a draw from an empty library, as with Notion Thief.
 - Out after round B110 (looked at, not done): Evangelize, Preacher, Arena, Magus of the Arena, Cuombajj Witches, Diaochan,
@@ -6295,7 +6419,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   activated ability: chosen by that opponent while it's cast or activated, CR 601.2c, which can't pause yet; only
   triggered abilities ask).
 - Out after round B109 (looked at, not done): Chainer's Torment (done in round B121) (an X/X token that deals X damage to you, each token if
-  several are made, with X fixed as it resolves, rulings), Cruel Calculations (cards put into a graveyard from the library
+  several are made, with X fixed as it resolves, rulings), Cruel Calculations (done in round B128) (cards put into a graveyard from the library
   this turn: only "from hand or library" is counted).
 - Out after round B108 (looked at, not done): Fade Away (for each creature, a payment or a sacrifice, all players' choices
   announced in turn order before any sacrifice, rulings), Crypsis ("protection from creatures your opponents control":
@@ -6309,7 +6433,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B106 (looked at, not done): Tamanoa ("Whenever a noncreature source you control deals damage": once for
   each source's damage event, which single-target damage doesn't report as one yet), Mercadia's Downfall (each attacking
   creature's own defending player), Matopi Golem, Skeleton Scavengers, Soldevi Sentry and Debt of Loyalty ("When it
-  regenerates this way": shields with riders need the creature's controller to choose which shield applies, CR 616.1).
+  regenerates this way": shields with riders need the creature's controller to choose which shield applies, CR 616.1;
+  done in round B132).
 - Out after round B105 (looked at, not done): Gloom and Oppressive Rays ("Activated abilities of ... cost {3} more": mana
   abilities too, and the engine taxes only abilities that aren't mana abilities); Briarbridge Patrol ("deals damage to one
   or more creatures": once per damage event, not once per creature); Light of Judgment ("Destroy up to one Equipment
@@ -6323,7 +6448,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   graveyard, not targeted), Pursuit of Knowledge (an optional draw replacement beside dredge and Abundance), Dralnu, Lich
   Lord (damage replaced by sacrificing permanents: the same CR 616.1 order question as Phytohydra), Northampton Farm (its
   exile isn't linked yet, and "each other card" after the one returned), Ancient Hellkite (done in round B112) ("defending player" in an
-  activated ability's target: needs binding as it's activated, like triggers do), Infectious Rage (a random creature it
+  activated ability's target: needs binding as it's activated, like triggers do), Infectious Rage (done in round B131) (a random creature it
   could enchant), Ms. Marvel, Kamala Khan (a gained "base power is equal to" ability that keeps counting, not locked in),
   Araumi of the Dead Tide (encore granted until end of turn).
 - Out after round B102 (looked at, not done): Lichenthrope and Phytohydra (damage replaced by counters: its controller
@@ -6365,7 +6490,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   entered; B98 fixed that: see round B98.)
 - Out after round B96 (looked at, not done): Sword of the Ages and Emrakul's Evangel ("Sacrifice ~ and any number of
   creatures" as a cost: a cost choice of any number of permanents, no picker yet), Tainted Specter ("discards a card
-  unless they put a card from their hand on top of their library": a punisher option with a card from hand), Vortex
+  unless they put a card from their hand on top of their library": a punisher option with a card from hand, done in round
+  B132), Vortex
   Elemental (done in round B114) (creatures blocking or blocked by it as it last existed, rulings, when it has left the battlefield), Stromgald
   Spy (play with that hand revealed for as long as it remains), Bone Mask and Mourner's Shield (damage prevented by a
   source of your choice, then exile that many / sharing a color with the imprinted card), Soltari Guerrillas (redirect the
@@ -6381,7 +6507,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B94 (looked at, not done): Forgotten Lore and Shrouded Lore (an opponent chooses a card in your
   graveyard, repeated while you pay, none chosen twice), Graceful Takedown ("any number of target enchanted creatures you
   control and up to one other target creature" each dealing damage), Nahiri's Sacrifice (an additional sacrifice with
-  mana value X, then X divided), Clay Champion (counters for each {G}{G} and each {W}{W} spent), Sutured Ghoul (power and
+  mana value X, then X divided), Clay Champion (done in round B128) (counters for each {G}{G} and each {W}{W} spent), Sutured Ghoul (power and
   toughness from the cards exiled as it enters), Soul Separator (a copy token "except it's 1/1" plus a token with that
   card's power and toughness), Magus of the Mind (play lands and cast spells from among the exiled cards free this turn),
   Hallowed Moonlight ("if a creature would enter and it wasn't cast"), Welcome to the Fold (a madness-paid X changing the
@@ -6389,7 +6515,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   hand ability (bots skip "Exile ~ from your hand" abilities).
 - Out after round B93 (looked at, not done): Bewitching Leechcraft ("If ~ would untap during your untap step, remove a
   +1/+1 counter from it instead": with Freyalise's Winds too, its controller would order the two replacements, CR 616.1),
-  Drafna's Restoration (targets in the graveyard of an earlier target player), Rite of Ruin (an order for three card
+  Drafna's Restoration (targets in the graveyard of an earlier target player), Rite of Ruin (done in round B129) (an order for three card
   types, then three rounds of sacrifices), Tariff (a punisher whose cost is the chosen creature's mana cost), Powerleech (done in round B122)
   and Haunting Wind (done in round B122) ("activates an artifact's ability without {T} in its activation cost", and "that artifact's
   controller"), Fasting (a may skip of the draw step as it would begin), Naked Singularity (a land with two basic land
@@ -6407,18 +6533,18 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   activated: the activation, the bots and the UI would all need to leave the target to chance), Flying Drone (a colored
   activation cost reduction, "if another creature with flying entered the battlefield under your control this turn"),
   Suppress (done in round B127) (a hand exiled face down until the end step of that player's next turn), Yare ("target creature defending
-  player controls" when several players are attacked), Matopi Golem (a trigger when a regeneration shield is used), Rock
+  player controls" when several players are attacked), Matopi Golem (a trigger when a regeneration shield is used, done in round B132), Rock
   Hydra and Lichenthrope (replacements for each 1 damage, and Rock Hydra's counters removed even if the damage can't be
   prevented), Quenchable Fire ("unless that player pays {U} before that step": a payment any time before the upkeep).
 - Out after round B90 (looked at, not done): Twinning Glass (a free cast by a name cast this turn: split and adventure
   names), Threefold Signal (replicate granted to spells, beside a spell's own kicker-like cost), Blade of the Swarm
   (done in round 272), Blaze Commando and Flame Channeler (an instant or sorcery spell dealing damage to
-  anything, once per instruction), Shorecrasher Elemental and Skittish Valesk (returning or turning a permanent face
-  down), Preferred Selection, Scrying Glass, Hedron Alignment, Ertai's Familiar, Death-Mask Duplicant, Relive the Past.
+  anything, once per instruction), Shorecrasher Elemental (done in round B129) and Skittish Valesk (returning or turning a permanent face
+  down), Preferred Selection, Scrying Glass, Hedron Alignment, Ertai's Familiar (done in round B128), Death-Mask Duplicant, Relive the Past (done in round B128).
 - Out after round B89 (looked at, not done): Barbed Foliage ("loses flanking": flanking is a triggered ability granted
   by the keyword, not just a keyword to remove), Brothers Yamazaki (an exception to the legend rule), Rogue Skycaptain
   and Rohgahh of Kher Keep ("an opponent gains control of ~"), Stangg and Dance of the Many (linked tokens that leave
-  with their source), Sengir Nosferatu (a token's ability returns an exiled card named ~), Splintering Wind,
+  with their source), Sengir Nosferatu (done in round B129) (a token's ability returns an exiled card named ~), Splintering Wind,
   Negative Zone Portal, Sol'Kanar the Tainted, Mystic Barrier, Covenant of Minds.
 - Out after round B87 (looked at, not done): Kodama of the Center Tree (soulshift X: a target bounded by a changing
   number), Hide // Seek (the mana value of a card found by the search), Revival Experiment (one card of each permanent
@@ -6426,15 +6552,15 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   end of turn), Sharkey, Tyrant of the Shire, Woodcaller Automaton, Dancing Sword, Elemental Resonance, Bat Colony.
 - Out after round B86 (looked at, not done): Goblin Maskmaker (cost reduction for face-down spells), Bortuk
   Bonerattle (a destination chosen by mana value against domain), Nick Fury (put onto the battlefield tapped and
-  attacking from the hand), Oath of Mages (a target chosen by another player), Glyph of Life, Mob Mentality,
+  attacking from the hand), Oath of Mages (a target chosen by another player), Glyph of Life (done in round B130), Mob Mentality,
   Breaking // Entering, Darigaaz, Grime Gorger, Naya Soulbeast.
 - Out after round B85 (looked at, not done): Grave Consequences (each player exiles any number from their own
   graveyard, then a count per player), Magus of the Arena (a target chosen by an opponent), Paragon of Modernity
   (exactly three colors of mana spent on an activation), Scarwood Bandits (an "Unless an opponent pays" lead clause on
   an activated ability).
-- Out after round B84 (looked at, not done): Traveling Plague (an Aura returned from the graveyard needs an attach
-  choice), Spellshift (another player's free cast from revealed cards), Obscura Ascendancy (an intervening "equals"
-  check), Eye of Singularity, Cornered Market and Bazaar of Wonders (name-based filters), Weight of Conscience ("share
+- Out after round B84 (looked at, not done): Traveling Plague (done in round B131) (an Aura returned from the graveyard needs an attach
+  choice), Spellshift (done in round B129) (another player's free cast from revealed cards), Obscura Ascendancy (done in round B130) (an intervening "equals"
+  check), Eye of Singularity (done in round B129), Cornered Market (done in round B129) and Bazaar of Wonders (name-based filters), Weight of Conscience ("share
   a creature type" tap cost), Psychic Theft (done in round B127), Last Rites (done in round B127), Thought Dissector (done in round B127), Mimeofacture, Hakim,
   Guard Dogs, Carry Away, Jandor's Ring.
 - Out after round B83 (looked at, not done): Fighting Chance (a coin flip for each blocking creature), Ersatz Gnomes (done in round B126)
@@ -6443,10 +6569,10 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (protection from each of a target permanent's colors).
 - Out after round B82 (looked at, not done): Builder's Bane (destroy X target artifacts: a variable number of
   targets), Burning of Xinye (each player destroys lands of their choice), Sirocco and Wand of Ith (a punisher per
-  revealed card), Stench of Evil (a punisher per land destroyed), Gargantuan Gorilla (a snow Forest sacrifice
+  revealed card, done in round B132), Stench of Evil (a punisher per land destroyed), Gargantuan Gorilla (a snow Forest sacrifice
   condition and a mutual damage ability).
-- Out after round B81 (looked at, not done): Kaervek's Spite (an additional cost of sacrificing all permanents and
-  discarding your hand), Ignorant Bliss, Turn the Tables, Angry Mob (done in round B113), Time to Reflect (done in round B110) (not attempted this round).
+- Out after round B81 (looked at, not done): Kaervek's Spite (done in round B131) (an additional cost of sacrificing all permanents and
+  discarding your hand), Ignorant Bliss (done in round B131), Turn the Tables, Angry Mob (done in round B113), Time to Reflect (done in round B110) (not attempted this round).
 - Out after round B80 (looked at, not done): Gloom Surgeon (prevent combat damage and exile that many cards: a
   prevention with a follow-up action), Marvel Boy, Noh-Varr ("whenever you activate a power-up ability"), Ms. Marvel,
   Elastic Ally ("power greater than its base power"), Whirlwind, Killer Cyclone ("one or more creatures that entered
@@ -6465,13 +6591,13 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   face's "that many" targets), Lavabrink Floodgates (each player's own may), Lurebound Scarecrow (done in round B112) (a state trigger bound
   to the chosen color), Grim Contest (done in round B113) (each deals damage equal to its toughness to the other: a fight by toughness).
 - Out after round B77 (looked at, not done): Consecrate Land (done in round B122) ("can't be enchanted by other Auras": no rule for it yet),
-  Corpseweft ("Exile one or more creature cards from your graveyard" as a cost, X from how many), Ruin in Their Wake
+  Corpseweft (done in round B128) ("Exile one or more creature cards from your graveyard" as a cost, X from how many), Ruin in Their Wake
   (where a found card goes depends on controlling a land named Wastes, with a "may"), Evangelize ("target creature of an
   opponent's choice": an opponent picks the target).
 - Out after round B76 (looked at, not done): Mind Roots (done in round B112) (a land card discarded this way onto the battlefield: no
   effect for cards a discard just moved yet), Mark for Death (done in round B113) ("Other creatures that player controls can't block this
   turn": a can't-block rule for one player's creatures except the target), Ashnod's Cylix (done in round B117) (the target player looks at
-  the top three and chooses which one goes back), Bullseye, Death Dealer and Ion Storm (costs with "or": "sacrifice an
+  the top three and chooses which one goes back), Bullseye, Death Dealer and Ion Storm (Ion Storm done in round B132; costs with "or": "sacrifice an
   artifact or discard a nonland card", "remove a +1/+1 counter or a charge counter").
 - Out after round B75 (looked at, not done): Mishra, Artificer Prodigy (a search for a card with the cast spell's name),
   Titania, Voice of Gaea's ward ("discard a card or pay {2}"), Fog Patch (done in round B110) and Choking Vines (done in round B110) ("become blocked"), Mistform

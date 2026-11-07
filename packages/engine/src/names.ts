@@ -7,7 +7,7 @@ import type { TargetSpec } from "./abilities";
 import { abilitiesOf, defOf } from "./cards";
 import { characteristics, controllerOf } from "./layers";
 import { printedMatches } from "./effects/targeting";
-import { faceDef, hasName } from "./faces";
+import { faceDef, hasName, sameName } from "./faces";
 
 /**
  * An object's name now: a permanent's from its characteristics (a copy has the name it copies, CR 707.2), a card
@@ -65,7 +65,9 @@ export function exiledWithNamed(s: GameState, o: GameObject, name: string): bool
  * "Spells with the chosen name can't be cast" (Meddling Mage), "Your opponents can't cast spells with the chosen name"
  * (Gideon's Intervention): why `pid` can't cast this card, or null. A spell has its card's name (CR 201.2).
  */
-export function nameCastBan(s: GameState, pid: PlayerId, d: CardDef): string | null {
+export function nameCastBan(s: GameState, pid: PlayerId, d: CardDef, faceDown?: boolean): string | null {
+  const market = faceDown ? null : permanentNameBan(s, d, "cast");
+  if (market) return market;
   for (const b of s.namedBansUntil ?? []) if (hasName(d.name, b.name) && (!b.players || b.players.includes(pid))) return `${b.source}: spells named ${d.name} can't be cast${b.players ? " by you" : ""} until ${s.players[b.controller]!.name}'s next turn`;
   // Circu, Dimir Lobotomist: the names of the cards exiled with it, still exiled and face up (a face-down card has none,
   // CR 708.2a); a name in common is the same name (CR 201.2a).
@@ -97,8 +99,22 @@ export function nameActivationBan(s: GameState, o: GameObject, mana: boolean): s
   return null;
 }
 
+/**
+ * Cornered Market (CompiledCard.permanentNameBan): why a spell (`cast`) or a nonbasic land (`lands`) with `d`'s name can't
+ * be cast or played while a nontoken permanent has that name, or null.
+ */
+function permanentNameBan(s: GameState, d: CardDef, what: "cast" | "lands"): string | null {
+  if (what === "lands" && d.supertypes.includes("Basic")) return null;
+  const market = s.battlefield.map((id) => s.objects[id]!).find((o) => !!abilitiesOf(s, o).permanentNameBan?.[what]);
+  if (!market) return null;
+  const twin = s.battlefield.map((id) => s.objects[id]!).find((o) => !o.isToken && !o.faceDown && sameName(characteristics(s, o).name, d.name));
+  return twin ? `${characteristics(s, market).name}: ${what === "cast" ? "spells" : "nonbasic lands"} with the same name as a nontoken permanent (${characteristics(s, twin).name}) can't be ${what === "cast" ? "cast" : "played"}` : null;
+}
+
 /** "Lands with the chosen name can't be played" (Conjurer's Ban): why `pid` can't play this land card, or null. */
 export function nameLandBan(s: GameState, pid: PlayerId, d: CardDef): string | null {
+  const market = permanentNameBan(s, d, "lands");
+  if (market) return market;
   const b = (s.namedBansUntil ?? []).find((x) => x.lands && hasName(d.name, x.name) && (!x.players || x.players.includes(pid)));
   return b ? `${b.source}: lands named ${d.name} can't be played until ${s.players[b.controller]!.name}'s next turn` : null;
 }

@@ -21,6 +21,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return who ? [{ type: "waiveShroud", who }] : null;
   }
   if (/^You have no maximum hand size for the rest of the game$/.test(s)) return [{ type: "noMaxHandSize" }];
+  // Inspired Idea: "Your maximum hand size is reduced by three for the rest of the game" (CR 402.2).
+  const handFor = /^Your maximum hand size is (reduced|increased) by (one|two|three|four|five|\d+) for the rest of the game$/.exec(s);
+  if (handFor) return [{ type: "handSizeForGame", plus: (handFor[1] === "reduced" ? -1 : 1) * num(handFor[2]!) }];
   let m: RegExpExecArray | null;
   // Kolodin, Triumph Caster: "Whenever a Mount you control enters, it becomes saddled until end of turn": the designation
   // saddling gives (CR 702.171b), with no creature having saddled it.
@@ -846,7 +849,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (/^Up to X creatures and\/or planeswalkers you control of your choice phase out$/.test(s))
     return [{ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: [], notTypes: [], notColors: [], anyOf: [{ kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, { kind: "object", types: ["Planeswalker"], notTypes: [], notColors: [], text: "planeswalker" }], text: "creature or planeswalker" }, n: X, action: "choose", upTo: true, prompt: "choose creatures and/or planeswalkers you control to phase out, up to one for each time ~ was kicked" }, { type: "phaseOut", what: { ref: "created" } }];
   if (/^~ and that creature phase out$/.test(s) && ctx.subject && !ctx.subjectIt) return [{ type: "phaseOut", what: { ref: "self" } }, { type: "phaseOut", what: { ref: "subject" } }];
-  if ((m = /^(.+?) phases? out$/i.exec(s))) {
+  if ((m = /^(.+?) phases? out$/i.exec(s)) && !/\bcan't phase out$/.test(s)) {
     const what = parseObject(m[1]!.replace(/^(he|she)$/i, "it"), ctx);
     return what ? [{ type: "phaseOut", what }] : null;
   }
@@ -1039,6 +1042,16 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (!who || !kind) return null;
     const filter: TargetSpec = { kind: "object", types: ["Artifact", "Creature", "Land"], notTypes: [], notColors: [], tapped: false, controller: "you", text: "untapped artifact, creature, or land they control" };
     return [{ type: "pick", who, filter, n: { count: { kind: "counters", counter: kind, of: { ref: "self" } } }, action: "tap" }];
+  }
+  // Haphazard Bombardment: "choose four nonenchantment permanents you don't control and put an aim counter on each of
+  // them": not targeted (rulings: hexproof doesn't stop it), all of them with four or fewer (CR 609.3), then the counters
+  // go on them at once.
+  if (/^[Cc]hoose four nonenchantment permanents you don't control and put an aim counter on each of them$/.test(s)) {
+    const filter: TargetSpec = { kind: "object", types: [], notTypes: ["Enchantment"], notColors: [], controller: "opponent", text: "nonenchantment permanent you don't control" };
+    return [
+      { type: "pick", who: { ref: "you" }, filter, n: 4, action: "choose", anyController: true, prompt: "click four nonenchantment permanents you don't control. An aim counter goes on each of them." },
+      { type: "counters", what: { ref: "created" }, counter: "aim", n: 1 },
+    ];
   }
   // Zimone's Hypothesis: "Put a +1/+1 counter on a creature": any player's, picked as it resolves, not targeted. Gix's
   // Command: "Put two +1/+1 counters on up to one creature": the same, or none (rulings: chosen as it resolves).
@@ -1965,7 +1978,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Hydro-Man, Fluid Felon: "Until your next turn, ~ becomes a land and gains "{T}: Add {U}."": itself.
   // Xenic Poltergeist: "Until your next upkeep, target noncreature artifact becomes ...": over as your next upkeep begins
   // (rulings).
-  if ((m = /^Until (end of turn|your next turn|your next upkeep), ((?:up to one )?target .+?|~) ((?:gets?|gains?|loses?|has|becomes?) .+)$/.exec(s))) {
+  // Ertai's Familiar, Spatial Binding: "Until your next upkeep, ~ (target permanent) can't phase out".
+  if ((m = /^Until (end of turn|your next turn|your next upkeep), ((?:up to one )?target .+?|~) ((?:gets?|gains?|loses?|has|becomes?) .+|can't phase out)$/.exec(s))) {
     const what = parseObject(m[2]!, ctx);
     const mods = what && parseChanges(m[3]!);
     return what && mods ? [{ type: "continuous", what, mods, duration: m[1] === "end of turn" ? "endOfTurn" : m[1] === "your next upkeep" ? "yourNextUpkeep" : "yourNextTurn" }] : null;

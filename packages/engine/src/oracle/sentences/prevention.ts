@@ -182,6 +182,13 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (spec?.kind !== "object") return null;
     return rule({ by: { target: { ref: "target", index: addTarget(ctx, spec) } }, ...(m[1] ? { to: { target: { ref: "self" } } } : {}) });
   }
+  // Encircling Fissure: "Prevent all combat damage that would be dealt this turn by creatures target opponent controls":
+  // a rule for the turn (CR 611.2c), by any creature that player controls as the damage would be dealt, even one that
+  // wasn't on the battlefield or wasn't a creature as it resolved (rulings).
+  if ((m = /^Prevent all (combat )?damage that would be dealt this turn by creatures target (opponent|player) controls$/.exec(s))) {
+    const index = addTarget(ctx, { kind: "player", ...(m[2] === "opponent" ? { opponent: true as const } : {}), text: `target ${m[2]}` });
+    return rule({ ...(m[1] ? { combat: "only" as const } : {}), by: { filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creatures" }, controllerTarget: index } });
+  }
   // Dazzling Reflection: "You gain life equal to target creature's power. The next time that creature would deal damage
   // this turn, prevent that damage.": a shield on that creature as a source, used up by its next damage event (CR 615.8),
   // for as long as it's that object.

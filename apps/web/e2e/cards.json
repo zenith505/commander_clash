@@ -2114,6 +2114,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4993e373-4b76-4582-a789-6a3123e7ca89",
+  "name": "Bane Alley Broker",
+  "manaCost": "{1}{U}{B}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Rogue"
+  ],
+  "oracleText": "{T}: Draw a card, then exile a card from your hand face down.\nYou may look at cards exiled with this creature.\n{U}{B}, {T}: Return a card exiled with this creature to its owner's hand.",
+  "power": "0",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "gtc",
+  "releasedAt": "2013-02-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "38839894-1706-4e11-8310-5ea8dd8866d9",
   "name": "Bane of Bala Ged",
   "manaCost": "{7}",
@@ -4037,6 +4070,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ed0cf504-c365-4486-92bc-c329b83b99d0",
+  "name": "Carrion Wurm",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Creature — Zombie Wurm",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Wurm"
+  ],
+  "oracleText": "Whenever this creature attacks or blocks, any player may exile three cards from their graveyard. If a player does, this creature assigns no combat damage this turn.",
+  "power": "6",
+  "toughness": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tor",
+  "releasedAt": "2002-02-04",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0d8730b5-f7ba-48b0-928d-d8b7685347d3",
   "name": "Case of the Uneaten Feast",
   "manaCost": "{W}",
@@ -5375,6 +5439,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9ffb5615-124e-4848-9e0d-120851bd50e5",
+  "name": "Corpseweft",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}{B}, Exile one or more creature cards from your graveyard: Create a tapped X/X black Zombie Horror creature token, where X is twice the number of cards exiled this way.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dtk",
+  "releasedAt": "2015-03-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "acf4d685-a718-42f7-9a7a-dee069ae8db2",
   "name": "Council's Judgment",
   "manaCost": "{1}{W}{W}",
@@ -6032,6 +6122,34 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8dc067bf-f78f-4ac4-b6e7-b305c42cf0bc",
+  "name": "Darksteel Citadel",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Artifact Land",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "Indestructible\n{T}: Add {C}.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Indestructible"
+  ],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2021-10-15",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -10594,6 +10712,37 @@
   ]
  },
  {
+  "oracleId": "25977c02-e2d4-4afd-b12d-37ce4d58f453",
+  "name": "Golden Egg",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact — Food",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Food"
+  ],
+  "oracleText": "When this artifact enters, draw a card.\n{1}, {T}, Sacrifice this artifact: Add one mana of any color.\n{2}, {T}, Sacrifice this artifact: You gain 3 life.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "eld",
+  "releasedAt": "2019-10-04",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "546f037b-aea8-4c7a-9b66-373f1be0bac6",
   "name": "Goldmeadow Harrier",
   "manaCost": "{W}",
@@ -11371,6 +11520,32 @@
   }
  },
  {
+  "oracleId": "fc1eb1c9-b22b-41a1-8b13-94a0e758db0f",
+  "name": "Haphazard Bombardment",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, choose four nonenchantment permanents you don't control and put an aim counter on each of them.\nAt the beginning of your end step, if two or more permanents you don't control have an aim counter on them, destroy one of those permanents at random.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dom",
+  "releasedAt": "2018-04-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6c943c9d-090b-41c1-9003-24c91601e589",
   "name": "Harmony of Nature",
   "manaCost": "{2}{G}",
@@ -12077,6 +12252,30 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0440f85f-8128-4399-9a3d-51f39e196c96",
+  "name": "Illuminated Folio",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact — Book",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Book"
+  ],
+  "oracleText": "{1}, {T}, Reveal two cards from your hand that share a color: Draw a card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "08daa30f-7ce0-4a72-b539-fbb0c585fd73",
   "name": "Illuna, Apex of Wishes",
   "manaCost": "{2}{G}{U}{R}",
@@ -12658,6 +12857,32 @@
   "commanderLegal": "legal",
   "set": "neo",
   "releasedAt": "2022-02-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "448e0cf2-c97c-4dc0-96ef-91f1eb75d97c",
+  "name": "Ion Storm",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}{R}, Remove a +1/+1 counter or a charge counter from a permanent you control: This enchantment deals 2 damage to any target.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "5dn",
+  "releasedAt": "2004-06-04",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -13269,6 +13494,32 @@
   "commanderLegal": "legal",
   "set": "leg",
   "releasedAt": "1994-06-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7d69be1e-701a-4bcb-a83e-38b4174f7828",
+  "name": "Kaervek's Spite",
+  "manaCost": "{B}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, sacrifice all permanents you control and discard your hand.\nTarget player loses 5 life.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "vis",
+  "releasedAt": "1997-02-03",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -14503,6 +14754,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ea66ffa3-d084-434f-91a6-fdff49806285",
+  "name": "Lavabrink Venturer",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "As this creature enters, choose odd or even. (Zero is even.)\nThis creature has protection from each mana value of the chosen quality.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "iko",
+  "releasedAt": "2020-04-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7df50107-25d8-47dc-9a13-27b257cfbf6f",
   "name": "Lens of Clarity",
   "manaCost": "{1}",
@@ -15697,6 +15979,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7663ac7c-1de3-4250-b96a-fae9dbd66a27",
+  "name": "Memnite",
+  "manaCost": "{0}",
+  "cmc": 0,
+  "typeLine": "Artifact Creature — Construct",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Construct"
+  ],
+  "oracleText": "",
+  "power": "1",
+  "toughness": "1",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "som",
+  "releasedAt": "2010-10-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "deeb942b-cf50-43f7-90a9-bdce4e42123a",
   "name": "Memoricide",
   "manaCost": "{3}{B}",
@@ -16123,6 +16432,32 @@
   "set": "nem",
   "releasedAt": "2000-02-14",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "31f3a9f3-881e-4dc9-b71d-5d1fc86477bf",
+  "name": "Mindblaze",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose a nonland card name and a number greater than 0. Target player reveals their library. If that library contains exactly the chosen number of cards with the chosen name, Mindblaze deals 8 damage to that player. Then that player shuffles.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -17458,6 +17793,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "547da0ef-f1e1-4b04-ba83-4845552b0dc4",
+  "name": "Nimble Hobbit",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Halfling Peasant",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Halfling",
+   "Peasant"
+  ],
+  "oracleText": "Whenever this creature attacks, you may sacrifice a Food or pay {2}{W}. When you do, tap target creature an opponent controls.",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ltr",
+  "releasedAt": "2023-06-23",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e06007cf-dc6e-4b50-93d5-9a7c8ee9c023",
   "name": "Nine-Fingers Keene",
   "manaCost": "{1}{B}{G}{U}",
@@ -17715,6 +18081,68 @@
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "82922f3a-a444-49cf-b136-f30a3c85f791",
+  "name": "Odds // Ends",
+  "manaCost": "{U}{R} // {3}{R}{W}",
+  "cmc": 7,
+  "typeLine": "Instant // Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Flip a coin. If it comes up heads, counter target instant or sorcery spell. If it comes up tails, copy that spell and you may choose new targets for the copy.",
+  "colors": [
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dis",
+  "releasedAt": "2006-05-05",
+  "rarity": "rare",
+  "layout": "split",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Odds",
+    "manaCost": "{U}{R}",
+    "typeLine": "Instant",
+    "supertypes": [],
+    "types": [
+     "Instant"
+    ],
+    "subtypes": [],
+    "oracleText": "Flip a coin. If it comes up heads, counter target instant or sorcery spell. If it comes up tails, copy that spell and you may choose new targets for the copy.",
+    "colors": [
+     "U",
+     "R"
+    ]
+   },
+   {
+    "name": "Ends",
+    "manaCost": "{3}{R}{W}",
+    "typeLine": "Instant",
+    "supertypes": [],
+    "types": [
+     "Instant"
+    ],
+    "subtypes": [],
+    "oracleText": "Target player sacrifices two attacking creatures of their choice.",
+    "colors": [
+     "W",
+     "R"
+    ]
+   }
+  ]
  },
  {
   "oracleId": "ade898df-14a5-460b-94f6-1f3f74d3ff95",
@@ -18975,6 +19403,32 @@
   "commanderLegal": "legal",
   "set": "rav",
   "releasedAt": "2005-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "873e739c-edf4-46a7-9024-5caaf87f507e",
+  "name": "Pick Up the Pace",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever a creature you control that entered this turn attacks, exile the top card of your library.\nYou may play cards exiled with this enchantment as long as you attacked this turn.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -21160,6 +21614,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d0dd0586-d89e-40e9-863d-9c390bee117a",
+  "name": "Rite of Ruin",
+  "manaCost": "{5}{R}{R}",
+  "cmc": 7,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose an order for artifacts, creatures, and lands. Each player sacrifices one permanent of their choice of the first type, sacrifices two of their choice of the second type, then sacrifices three of their choice of the third type.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "avr",
+  "releasedAt": "2012-05-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "77aa591d-efb5-48b5-98aa-5c8912ede11b",
   "name": "Rites of Initiation",
   "manaCost": "{R}",
@@ -21925,6 +22405,38 @@
   "set": "mps",
   "releasedAt": "2016-09-30",
   "rarity": "special",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c8d95ca8-7d12-4072-aeaf-e20f248c7e39",
+  "name": "Scrubland",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Plains Swamp",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Plains",
+   "Swamp"
+  ],
+  "oracleText": "({T}: Add {W} or {B}.)",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -23342,6 +23854,34 @@
   "set": "frc",
   "releasedAt": "2026-10-02",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0f7a7348-3081-4fbb-9386-719a4ae7fa57",
+  "name": "Solar Tide",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose one —\n• Destroy all creatures with power 2 or less.\n• Destroy all creatures with power 3 or greater.\nEntwine—Sacrifice two lands. (Choose both if you pay the entwine cost.)",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Entwine"
+  ],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -25051,6 +25591,70 @@
   "gameChanger": false
  },
  {
+  "oracleId": "22e3cf1d-3559-4ce1-954c-8dc815342979",
+  "name": "Taiga",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Mountain Forest",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Mountain",
+   "Forest"
+  ],
+  "oracleText": "({T}: Add {R} or {G}.)",
+  "colors": [],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G",
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fc638800-6aec-4a48-ad2c-c9a5ce93c236",
+  "name": "Tainted Specter",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Specter",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Specter"
+  ],
+  "oracleText": "Flying\n{1}{B}{B}, {T}: Target player discards a card unless they put a card from their hand on top of their library. If that player discards a card this way, this creature deals 1 damage to each creature and each player. Activate only as a sorcery.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ac2dd694-d2f1-4025-8400-12332bdc882a",
   "name": "Takenuma, Abandoned Mire",
   "manaCost": "",
@@ -26755,6 +27359,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "bc6ee33a-4245-4edb-a6b3-0bdcc2883fbc",
+  "name": "Torrent of Stone",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Instant — Arcane",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [
+   "Arcane"
+  ],
+  "oracleText": "Torrent of Stone deals 4 damage to target creature.\nSplice onto Arcane—Sacrifice two Mountains. (As you cast an Arcane spell, you may reveal this card from your hand and pay its splice cost. If you do, add this card's effects to that spell.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Splice"
+  ],
+  "commanderLegal": "legal",
+  "set": "bok",
+  "releasedAt": "2005-02-04",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a6395447-677d-4c39-8eda-2d57e527c94e",
   "name": "Torrential Gearhulk",
   "manaCost": "{4}{U}{U}",
@@ -26982,6 +27616,36 @@
   "set": "inv",
   "releasedAt": "2000-10-02",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "371e8e29-f569-4b23-bae4-cf89e5b09fd3",
+  "name": "Traveling Plague",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nAt the beginning of each upkeep, put a plague counter on this Aura.\nEnchanted creature gets -1/-1 for each plague counter on this Aura.\nWhen enchanted creature leaves the battlefield, that creature's controller returns this Aura from its owner's graveyard to the battlefield.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "ody",
+  "releasedAt": "2001-10-01",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -28800,6 +29464,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "42989c6d-75d9-4ddd-bb9f-f18c0eb005fe",
+  "name": "Weight of Conscience",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature can't attack.\nTap two untapped creatures you control that share a creature type: Exile enchanted creature.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "mor",
+  "releasedAt": "2008-02-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b0394cf2-12a0-4d4f-87e0-fe8937e6faff",
   "name": "Well of Lost Dreams",
   "manaCost": "{4}",
@@ -29283,6 +29977,102 @@
   "set": "ons",
   "releasedAt": "2002-10-07",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4216f9ce-bdd9-4213-8c3f-e2ef4cd848f9",
+  "name": "Wormfang Crab",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Nightmare Crab",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Nightmare",
+   "Crab"
+  ],
+  "oracleText": "This creature can't be blocked.\nWhen this creature enters, an opponent chooses a permanent you control other than this creature and exiles it.\nWhen this creature leaves the battlefield, return the exiled card to the battlefield under its owner's control.",
+  "power": "3",
+  "toughness": "6",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "jud",
+  "releasedAt": "2002-05-27",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d37c4e77-5023-4d13-9cfe-a43f513364bf",
+  "name": "Wormfang Drake",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Nightmare Drake",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Nightmare",
+   "Drake"
+  ],
+  "oracleText": "Flying\nWhen this creature enters, sacrifice it unless you exile a creature you control other than this creature.\nWhen this creature leaves the battlefield, return the exiled card to the battlefield under its owner's control.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "jud",
+  "releasedAt": "2002-05-27",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "be014a79-5550-4f79-8789-b4d6783d7ec8",
+  "name": "Wormfang Newt",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Nightmare Salamander Beast",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Nightmare",
+   "Salamander",
+   "Beast"
+  ],
+  "oracleText": "When this creature enters, exile a land you control.\nWhen this creature leaves the battlefield, return the exiled card to the battlefield under its owner's control.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "jud",
+  "releasedAt": "2002-05-27",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

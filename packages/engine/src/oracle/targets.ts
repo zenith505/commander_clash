@@ -417,6 +417,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // that share a creature type with the sacrificed creature": compared with the creature as it last existed (CR 608.2h).
   const kin = /^(?:each creature|all creatures) (with the same mana value as|that shares? a creature type with) the sacrificed creature$/i.exec(p.trim());
   if (kin) return { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: p.trim().replace(/^(?:each|all) /i, "") }, sacrificedKin: /mana value/.test(kin[1]!) ? "manaValue" : "creatureType" };
+  // Eye of Singularity (see ObjRef "sharingName").
+  if (/^each permanent with the same name as another permanent, except for basic lands$/i.test(p.trim())) return { ref: "sharingName" };
+  if (/^all other permanents with that name$/i.test(p.trim()) && ctx.subject && !ctx.spell && !ctx.targets.length) return { ref: "sharingName", subject: true };
   // "Each creature that convoked it" (Venerated Loxodon, CR 702.51a): the creatures tapped to cast it.
   if (/^each creature that convoked (?:it|~)$/i.test(p.trim())) return { ref: "convokers" };
   // Kjeldoran Frostbeast: "all creatures blocking or blocked by ~": the ones in combat with it as this resolves.
@@ -1279,6 +1282,13 @@ export function parseTargetPhrase(
     const head = parseTargetPhrase(activeSince[1]!, opts);
     return head?.kind === "object" && !head.controller && !head.controlledSinceTurnBegan ? { ...head, activeController: true, controlledSinceTurnBegan: true, text: `${head.text} the active player has controlled continuously since the beginning of the turn` } : null;
   }
+  // Dwarven Sea Clan, Seasinger: "target (attacking or blocking) creature whose controller controls an Island": a creature
+  // whose controller controls an Island as it's chosen and as the ability resolves (CR 608.2b, rulings).
+  const islander = /^(.+?) whose controller controls an Island$/.exec(phrase.trim());
+  if (islander) {
+    const head = parseTargetPhrase(islander[1]!, opts);
+    return head?.kind === "object" && !head.controller && !head.controllerControlsSubtype ? { ...head, controllerControlsSubtype: "Island", text: `${head.text} whose controller controls an Island` } : null;
+  }
   // Clockspinning, Timecrafting, Fury Charm: "target permanent or suspended card"; Jhoira's Timebug: "target permanent you
   // control or suspended card you own": one target, a permanent or a suspended card, one that has suspend, is in exile
   // and has a time counter on it (CR 702.62b, rulings) (TargetSpec.orSuspended).
@@ -1636,8 +1646,9 @@ export function parseTargetPhrase(
     extra.chosen = "name";
     p = (p.slice(0, withName.index) + p.slice(withName.index + withName[0].length)).trim();
   }
-  // "Target creature it's blocking" (Tinder Wall): one blocked by the source.
-  const blocked = / (?:it's|~ is) blocking$/.exec(p);
+  // "Target creature it's blocking" (Tinder Wall): one blocked by the source; Whip Vine's "target creature with flying
+  // blocked by ~" the same.
+  const blocked = / (?:it's|~ is) blocking$/.exec(p) ?? (opts.target ? /(?<! or) blocked by ~$/.exec(p) : null);
   if (blocked) {
     extra.blockedBySource = true;
     p = p.slice(0, blocked.index);
@@ -1921,6 +1932,8 @@ export function parseTargetPhrase(
     // 201.2), another card's (compile keeps a quoted ability's own card name as written).
     const namedCard = /^card named ([A-Z][\w'-]*(?:,? (?:[A-Z][\w'-]*|of|the|a))*)$/.exec(listed);
     if (namedCard && !linkedExile && !Object.keys(extra).length) return { kind: "card", types: [], notTypes: [], notColors: [], named: namedCard[1]!, ...(owner ? { owner } : {}), text };
+    // Groffskithur: "target card named ~ from your graveyard": the source's own name (TargetSpec.namedAsSource).
+    if (listed === "card named ~" && !linkedExile && !Object.keys(extra).length) return { kind: "card", types: [], notTypes: [], notColors: [], namedAsSource: true, ...(owner ? { owner } : {}), text };
     // "Dragon creature card or Ugin planeswalker card" (Haven of the Spirit Dragon): either.
     if (/^[^,]+ card or [^,]+ card$/.test(p)) p = p.replace(/ card or /, " or ");
     // The word "card" comes before any "with ..." qualifier: "creature card with mana value 3 or less".

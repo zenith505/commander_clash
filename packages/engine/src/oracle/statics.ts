@@ -840,6 +840,10 @@ export function parseActivateCondition(text: string): StaticCondition | null {
     return conds.every((c): c is StaticCondition => !!c) ? { kind: "anyOf", conds } : null;
   }
   if (/^~ entered (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn" };
+  // Ashen Ghoul: "Activate only during your upkeep and only if three or more creature cards are above ~": cards put into
+  // its owner's graveyard after it (rulings, CR 404.1), counted as it's activated (CR 602.5b).
+  const above = /^(two|three|four|five) or more creature cards are above ~$/.exec(text);
+  if (above) return { kind: "selfInGraveyard", creaturesAbove: ["two", "three", "four", "five"].indexOf(above[1]!) + 2 };
   // Rocket Launcher (CR 302.6's test, for its controller's most recent turn).
   if (/^you've controlled ~ continuously since the beginning of your most recent turn$/.test(text)) return { kind: "self", is: "controlledSinceYourTurnBegan" };
   // Idol of Oblivion: "Activate only if you created a token this turn."
@@ -884,6 +888,8 @@ function parseTurnPoint(text: string): StaticCondition | null {
     "before attackers are declared": "beforeAttackers",
     "before blockers are declared": "beforeBlockers",
     "before the combat damage step": "beforeDamage",
+    // Dwarven Sea Clan: the end of combat step of the turn's first combat (CR 506.8d-e, 506.8g).
+    "before the end of combat step": "beforeEndCombat",
     "after combat": "afterCombat",
   };
   const w = points[text];
@@ -1488,6 +1494,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     if (kinds.includes(what) || (subtypeSet(what) && subtypeSet(what) !== "Spell"))
       return { kind: "youEntered", types: what === "nonland permanent" || what === "permanent" || !kinds.includes(what) ? [] : [capital(what)], ...(what === "nonland permanent" ? { notTypes: ["Land"] } : {}), ...(!kinds.includes(what) ? { subtype: what } : {}), n: m[2] ? num(m[2]) : 1, ...(m[1] ? { other: true as const } : {}) };
   }
+  // Flying Drone: "if another creature with flying entered the battlefield under your control this turn": one that had
+  // flying as it entered, not ~ itself (as the object it is now), whatever happened to it since.
+  if (/^another creature with flying entered the battlefield under your control this turn$/.test(text)) return { kind: "youEntered", types: ["Creature"], n: 1, other: true, flying: true };
   // Cleaving Reaper: "if you had an Angel or Berserker enter the battlefield under your control this turn": either one, any
   // time this turn, whether or not you still control it (rulings).
   if ((m = /^you had an? ([A-Z][a-z]+) or ([A-Z][a-z]+) enter the battlefield under your control this turn$/.exec(text)) && subtypeSet(m[1]!) === "Creature" && subtypeSet(m[2]!) === "Creature")
@@ -1735,6 +1744,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Insubordination: "unless that creature attacked this turn" (read as "if enchanted creature didn't attack this turn"):
   // the creature it's attached to as the ability resolves, not declared as an attacker this turn (CR 508.1a).
+  // Thirsting Axe: "if equipped creature didn't deal combat damage to a creature this turn": the creature it's attached to
+  // as it is now, whether or not this was attached to it then (rulings); combat damage to a player only doesn't count.
+  if (text === "equipped creature didn't deal combat damage to a creature this turn") return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], combat: "didntCombatDamageCreatureThisTurn", text: "creature that didn't deal combat damage to a creature this turn" } };
   if (text === "enchanted creature didn't attack this turn") return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], combat: "didntAttackThisTurn", text: "creature that didn't attack this turn" } };
   // Stunning Strike: "As long as enchanted creature isn't legendary": the creature it's attached to, as it is now.
   if ((m = /^enchanted creature (is|isn't) legendary$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], ...(m[1] === "is" ? { supertypes: ["Legendary"] } : { notSupertypes: ["Legendary"] }), text: `${m[1] === "is" ? "" : "non"}legendary creature` } };
@@ -2560,6 +2572,14 @@ export function parseStaticMods(rest: string): Modification[] | null {
 }
 
 export function parseStatic(line: string): StaticAbility | null {
+  // Lymph Sliver: "All Sliver creatures have absorb 1.": absorb N is "If a source would deal damage to this creature,
+  // prevent N of that damage" (CR 702.64a), N from each source (rulings), several instances each applying (CR 702.64b).
+  // (Any creature type: a text-changing effect can change "Sliver", CR 612.2.)
+  const absorb = /^All ([A-Z][a-z]+) creatures have absorb (\d+)\.$/.exec(line);
+  if (absorb) {
+    const st = parseStatic(`All ${absorb[1]} creatures have "If a source would deal damage to this creature, prevent ${absorb[2]} of that damage."`);
+    return st && { ...st, text: line };
+  }
   // Konda's Banner: "Creatures that share a color with equipped creature get +1/+1", "... a creature type ...": anyone's
   // creatures, the equipped creature too (it shares with itself, rulings), compared with its colors and creature types
   // as layers 4 and 5 leave them (CR 613.1d-e) when the P/T change applies (layer 7c). Sharing two colors is still +1/+1.

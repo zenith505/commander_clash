@@ -308,6 +308,10 @@ export interface GameObject {
   copyGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string };
   /** Regeneration shields made this turn (CR 701.19a); each replaces one destruction. */
   regenShields?: number;
+  /** The shields among regenShields with a "When it regenerates this way" rider (Matopi Golem), oldest first; the rest have none. */
+  regenRiders?: RegenRider[];
+  /** How many times it regenerated (a shield or a static regeneration replaced its destruction) during `turn` (Spiny Starfish). */
+  regenerated?: { turn: number; n: number };
   /** Quarum Trench Gnomes: "If target Plains is tapped for mana, it produces colorless mana instead of white mana" (indefinitely, CR 614.1a): each such effect on this permanent. */
   manaReplaced?: { from: ManaType; to: ManaType }[];
   /** "Prevent the next N damage that would be dealt to it this turn": what's left of such shields (CR 615.7). */
@@ -785,6 +789,11 @@ export interface Player {
   shuffles?: number;
   /** "You have no maximum hand size for the rest of the game" from a resolved spell or ability (CR 402.2). */
   noMaxHandSize?: true;
+  /**
+   * "Your maximum hand size is reduced by three for the rest of the game" (Inspired Idea), from resolved spells and
+   * abilities: each change with its timestamp, applied with the static ones in timestamp order (CR 402.2, 613.11; rulings).
+   */
+  handSizeForGame?: { plus: number; timestamp: number }[];
   /** "You have no maximum hand size for as long as you control ~" (The Great Synthesis): while they control that object (CR 611.2b). */
   noMaxHandSizeWhile?: { id: ObjectId; zc: number }[];
   /** "You have no maximum hand size until your next turn" (Enter the Infinite): until that player's next turn begins. */
@@ -1234,6 +1243,20 @@ export interface PendingTrigger {
   targetChooser?: PlayerId;
 }
 
+/** A regeneration shield's "When it regenerates this way, ..." (CR 603.7): the delayed trigger it makes when it's used. */
+export interface RegenRider {
+  /** Its delayed trigger's instructions; none for `control`. */
+  body?: AbilityBody;
+  /** Debt of Loyalty: `controller` gains control of the permanent as the shield is used, for the rest of the game (rulings). */
+  control?: true;
+  controller: PlayerId;
+  sourceId: ObjectId;
+  sourceCardId: string;
+  sourceZc: number;
+  /** "That player": the player the ability that made the shield targeted (Soldevi Sentry), the trigger's event player. */
+  player?: PlayerId;
+}
+
 export interface LastKnown {
   /** The object it was (a card keeps its id in its new zone): "another permanent card" than the one sacrificed this way. */
   id?: ObjectId;
@@ -1666,7 +1689,7 @@ export interface TurnLog {
   /** Each token created this turn (CR 111.2): who created it and its subtypes then ("Treasure tokens you created"). */
   tokensCreated?: { player: PlayerId; subtypes: string[] }[];
   /** Permanents that entered the battlefield, with their controller, card types and colors as they entered. */
-  entered?: { controller: PlayerId; types: string[]; subtypes?: string[]; colors: Color[]; /** The permanent, for "another" (Éowyn). */ id?: ObjectId; zc?: number; /** A token (Gyome's "nontoken creatures"). */ token?: true }[];
+  entered?: { controller: PlayerId; types: string[]; subtypes?: string[]; colors: Color[]; /** The permanent, for "another" (Éowyn). */ id?: ObjectId; zc?: number; /** A token (Gyome's "nontoken creatures"). */ token?: true; /** It had flying as it entered (Flying Drone's "another creature with flying entered"). */ flying?: true }[];
   /** Noncreature permanents destroyed by a spell or ability: their controller and the destroying spell's or ability's (Cobra Trap). */
   destroyed?: { controller: PlayerId; by: PlayerId }[];
   /** For each player, the creatures (`id@zoneChanges`) that dealt them damage (Inferno Trap). */
@@ -1726,6 +1749,8 @@ export interface TurnLog {
   lorePut?: string[];
   /** Cards put into each owner's graveyard from their hand or library this turn (Welcome the Dead). */
   toGraveyardFromHandOrLibrary?: Record<number, number>;
+  /** Cards put into each owner's graveyard from their library this turn (Cruel Calculations). */
+  toGraveyardFromLibrary?: Record<number, number>;
   /** Each event this turn that discarded cards: who discarded them, and the cards (keys into `cards`). */
   discards?: { player: PlayerId; cards: string[] }[];
   /** Each event that put cards into graveyards this turn: the cards (CardDef keys), by their owner (Crawling Sensation's "for the first time each turn"). */
@@ -1749,6 +1774,8 @@ export interface TurnLog {
   diedDamaged?: { id: ObjectId; zc: number; by: ObjectId[] }[];
   /** Wolverine, Best There Is: the sources that dealt damage to a creature other than themselves this turn, as `id@zoneChanges`. */
   damagedCreature?: string[];
+  /** Thirsting Axe: the sources that dealt combat damage to a creature this turn, as `id@zoneChanges`. */
+  combatDamagedCreature?: string[];
   /** The sources that dealt damage, as `id@zoneChanges` (a card's name without one), by the player who controlled each as it did. */
   damageSources?: Record<number, string[]>;
   /** The damage each source (`id@zoneChanges`, a card's name without one) dealt to each player this turn (Vessel of the All-Consuming). */
@@ -2129,7 +2156,7 @@ export interface GameState {
   /** The player who has the initiative (CR 726), once someone has taken it. */
   initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
-  lastKnown?: Record<ObjectId, { zc: number; /** Tapped as it left the battlefield (Sphinx Sovereign's "if ~ is untapped"). */ tapped?: true; /** Saddled as it left the battlefield (Caustic Bronco, CR 702.171b). */ saddled?: true; power: number; toughness: number; /** Its base power as it last existed (see basePowerNow): Jason Bright's "if its power was different from its base power". */ basePower?: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number>; /** Its creature types ("all" for changeling-like), for kinship once it's gone. */ creatureTypes?: string[] | "all"; /** The player chosen as it entered (Saskia's "the chosen player" once it's gone, CR 608.2h). */ chosenPlayer?: PlayerId; /** The color and creature type chosen as it entered (Volrath's Laboratory's token once it's gone, CR 608.2h). */ chosenColor?: Color; chosenType?: string; /** The creatures it was blocking ("target creature it's blocking" once it's sacrificed, Tinder Wall). */ blocking?: ObjectId[]; /** The creatures blocking it ("target creature blocking it" once it's sacrificed, Urborg Panther). */ blockedBy?: ObjectId[]; /** What it was attacking (Myr Battlesphere's "the player or planeswalker it's attacking"). */ attacking?: PlayerId; attackingPermanent?: { id: ObjectId; zc: number; battleController?: PlayerId }; /** What it was as a source of damage, for "it deals damage" once it's gone (CR 608.2h): its lifelink, deathtouch, colors, and a "can't be prevented" that applied to it (Questing Beast). */ source?: { name: string; colors: Color[]; types: string[]; subtypes: string[]; supertypes?: string[]; allCreatureTypes?: true; keywords: string[]; unpreventable?: "all" | "combat" } }>;
+  lastKnown?: Record<ObjectId, { zc: number; /** Tapped as it left the battlefield (Sphinx Sovereign's "if ~ is untapped"). */ tapped?: true; /** Saddled as it left the battlefield (Caustic Bronco, CR 702.171b). */ saddled?: true; power: number; toughness: number; /** Its base power as it last existed (see basePowerNow): Jason Bright's "if its power was different from its base power". */ basePower?: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number>; /** Its creature types ("all" for changeling-like), for kinship once it's gone. */ creatureTypes?: string[] | "all"; /** The player chosen as it entered (Saskia's "the chosen player" once it's gone, CR 608.2h). */ chosenPlayer?: PlayerId; /** The color and creature type chosen as it entered (Volrath's Laboratory's token once it's gone, CR 608.2h). */ chosenColor?: Color; chosenType?: string; /** The creatures it was blocking ("target creature it's blocking" once it's sacrificed, Tinder Wall). */ blocking?: ObjectId[]; /** The creatures blocking it ("target creature blocking it" once it's sacrificed, Urborg Panther). */ blockedBy?: ObjectId[]; /** What it was attacking (Myr Battlesphere's "the player or planeswalker it's attacking"). */ attacking?: PlayerId; /** Attacking or blocking alone as it left (CR 506.5, Thijarian Witness). */ aloneIn?: "attacking" | "blocking"; attackingPermanent?: { id: ObjectId; zc: number; battleController?: PlayerId }; /** What it was as a source of damage, for "it deals damage" once it's gone (CR 608.2h): its lifelink, deathtouch, colors, and a "can't be prevented" that applied to it (Questing Beast). */ source?: { name: string; colors: Color[]; types: string[]; subtypes: string[]; supertypes?: string[]; allCreatureTypes?: true; keywords: string[]; unpreventable?: "all" | "combat" } }>;
   nextTimestamp: number;
   /**
    * Mystic Reflection: the next time one or more creatures or planeswalkers enter this turn, they enter as copies of this
@@ -2241,6 +2268,8 @@ export interface Chosen {
   players?: PlayerId[];
   /** "Choose odd or even" (Extinction Event). */
   parity?: "odd" | "even";
+  /** "Choose an order for artifacts, creatures, and lands" (Rite of Ruin): the card types in the order chosen. */
+  typeOrder?: string[];
   /** "Choose left or right" (Pramikon, Sky Rampart; Teyo, Geometric Tactician): a direction around the table (CR 101.4: turns pass to the left). */
   direction?: "left" | "right";
   /** "Choose land or nonland" (Abundant Harvest). */
@@ -2439,7 +2468,7 @@ export interface Resolving {
   /** The cards it revealed, for "each green mana symbol in those cards' mana costs" (Phosphorescent Feast). */
   revealedFromHandIds?: ObjectId[];
   /** The land and nonland cards its parleyReveal instruction revealed ("for each nonland card revealed this way"). */
-  parley?: { land: number; nonland: number };
+  parley?: { land: number; nonland: number; /** Their total mana value (Naya Soulbeast). */ mv?: number };
   /** The mana value of the card its last revealUntil instruction found, if it found one (Yuna's Whistle's reflexive X). */
   revealedUntilMv?: number;
   /** How many cards the last revealUntil revealed, the one found included ("the number of cards revealed this way", Madcap Experiment). */
@@ -2659,7 +2688,11 @@ export interface Resolving {
       /** The choices each player made this round (one, or `picks`). */
       made: Record<string, string[]>;
       /** The cards each player picked to discard and the permanents to sacrifice. */
-      chosen?: Record<string, { discard?: ObjectId[]; sacrifice?: ObjectId[] }>;
+      chosen?: Record<string, { discard?: ObjectId[]; sacrifice?: ObjectId[]; /** Cards in their graveyard to exile (PunisherOption exileFromGraveyard). */ exile?: ObjectId[]; /** Cards from their hand to put on top of their library (PunisherOption handToTop). */ top?: ObjectId[] }>;
+      /** The player asked which cards of their hand go on top (chooseHandToTop's answer is ResolvingState.scratch.chosen). */
+      topAsked?: PlayerId;
+      /** The player asked which cards of their graveyard to exile (searchLibrary's answer is ResolvingState.scratch.found). */
+      yardAsked?: PlayerId;
       /** The discards and sacrifices are done; `penalty`: how many times the penalty has been run. */
       acted?: boolean;
       penalty?: number;
@@ -2751,6 +2784,8 @@ export interface Resolving {
     playLinkedPick?: true;
     /** Fiery Gambit: the flips won so far in a run one may stop, and whether "flip again?" was asked. */
     flipRun?: { wins: number; asked?: true };
+    /** Krark's Thumb on an uncalled flip (Odds): heads and tails, the choice asked (chooseMay yes keeps heads). */
+    thumbUncalled?: true;
     thumbFlip?: true; // Krark's Thumb: one coin won, one lost, the choice asked // "play one of them" (Evercoat Ursine): which one was asked (in `found`)
     cipherCopy?: ObjectId; // the copy of an encoded card offered to cast (CR 702.99a)
     looked?: ObjectId[]; // the top cards a "look at the top N" effect is choosing from

@@ -149,6 +149,7 @@ import {
   counterOnCandidates,
   untapViaMana,
   counterCostCandidates,
+  counterCostKinds,
   craftCandidates,
   ringBearer,
   power,
@@ -188,6 +189,7 @@ import {
   blockWithoutCompany,
   showGrantSource,
   sameName,
+  costChoiceShares,
   mayPayUse,
 } from "@cc/engine";
 import { HUMAN, YOU, actAs, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
@@ -450,6 +452,8 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; fac
   sameName?: true;
   /** Ormos, Archive Keeper: no two of the cards picked may share a name. */
   differentNames?: true;
+  /** Weight of Conscience, Illuminated Folio: the cost the picks must share a creature type or a color for (costChoiceShares). */
+  share?: AdditionalCost;
   /** "Untap a tapped creature you control": the permanents picked are untapped, not tapped. */
   untap?: true;
   /** Offering when it can't be cast now without it: no skipping. */
@@ -760,7 +764,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         const extra = mvX.kind === "sacrifice" ? `sacrifice ${/^[aeiou]/i.test(mvX.filter.text) ? "an" : "a"} ${mvX.filter.text.replace(/~/g, cardOf(s, objectId).name)}` : "discard a card with mana value X";
         return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: mv !== undefined && mv <= max && fits(mv) ? mv : max, modes, extra });
       }
-      const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));
+      // "Exile one or more ...": X can't be 0 (Corpseweft), so 0 is never what we ask about.
+      const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, Math.max(n, ab.xMin ?? 0)));
       // "Tap X untapped Knights you control" (Aryel): the noun before "you control" in the plural.
       const extra = [...(ab.energyX ? ["pay X energy"] : []), ...(ab.removeCounters?.x ? [`remove X ${ab.removeCounters.counter} counters`] : []), ...(ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [c.kind === "removeCounters" ? `remove X ${c.counter ?? ""} counters from among ${c.filter.text}`.replace(/  +/g, " ") : `${c.kind === "sacrifice" ? "sacrifice" : c.kind === "exileFromGraveyard" ? "exile" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : c.kind === "tap" ? c.filter.text.replace(/(\w)( you control)$/, "$1s$2") : c.kind === "reveal" ? `${plural(c.filter.text)} from your hand` : c.kind === "exileFromGraveyard" ? `${plural(c.filter?.text ?? "card")} from your graveyard` : ""}`.trim()] : []))].join(" and ");
       return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: Math.min(max, Math.max(ab.xMin ?? 0, 1)), modes, extra });
@@ -806,7 +811,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (c.kind === "removeCounters") {
         // "Remove three counters from among other artifacts, creatures, and planeswalkers you control": pick them (CR 602.2b).
         if (d.counters !== undefined) continue;
-        return setCounterPick({ activate: d, label: cardOf(s, d.objectId).name, what: `remove ${c.n} ${c.counter ? `${c.counter} ` : ""}counter${c.n === 1 ? "" : "s"} ${c.self ? "from it" : `from among ${c.filter.text}`}`, n: c.n, candidates: counterCostCandidates(s, HUMAN, s.objects[d.objectId]!, c) });
+        return setCounterPick({ activate: d, label: cardOf(s, d.objectId).name, what: `remove ${c.n} ${counterCostKinds(c)}counter${c.n === 1 ? "" : "s"} ${c.self ? "from it" : `from among ${c.filter.text}`}`, n: c.n, candidates: counterCostCandidates(s, HUMAN, s.objects[d.objectId]!, c) });
       }
       if (c.kind === "putCounter") {
         // "Put a -1/-1 counter on a creature you control" (Hatchet Bully): click the creature (CR 602.2b).
@@ -822,7 +827,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         // "Tap an untapped creature you control": click what to tap (CR 602.2b).
         if (d.tap !== undefined) continue;
         // "Untap a tapped creature you control" (Halo Fountain) likewise, or one to tap for mana first.
-        return setCostPick({ activate: d, kind: "tap", ...(c.untap ? { untap: true as const } : {}), label: cardOf(s, d.objectId).name, what: `${c.untap ? "untap" : "tap"} ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.n === 1 ? c.filter.text : c.filter.text.replace(/([^s])( you control)$/, "$1s$2")}`, n: c.n, candidates: [...tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c), ...(c.untap ? untapViaMana(s, HUMAN, s.objects[d.objectId]!, c) : [])].filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
+        return setCostPick({ activate: d, kind: "tap", ...(c.untap ? { untap: true as const } : {}), ...(c.shareCreatureType ? { share: c } : {}), label: cardOf(s, d.objectId).name, what: `${c.untap ? "untap" : "tap"} ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.n === 1 ? c.filter.text : c.filter.text.replace(/([^s])( you control)$/, "$1s$2")}${c.shareCreatureType ? " that share a creature type" : ""}`, n: c.n, candidates: [...tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c), ...(c.untap ? untapViaMana(s, HUMAN, s.objects[d.objectId]!, c) : [])].filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
       }
       if (c.kind === "exileFromHand" && c.toLibrary) {
         // "Put a card from your hand on top of your library" (Penance): click the cards in your hand.
@@ -858,7 +863,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         // "Reveal X red cards from your hand" (Martyr of Ashes): click the cards in your hand; they stay there.
         if (d.reveal !== undefined) continue;
         const what = c.filter.text;
-        return setCostPick({ activate: d, kind: "reveal", label: cardOf(s, d.objectId).name, what: `reveal ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${c.n > 1 ? plural(what) : what} from your hand`, n: c.n, candidates: s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && printedMatches(c.filter, cardOf(s, id))), chosen: [] });
+        return setCostPick({ activate: d, kind: "reveal", ...(c.shareColor ? { share: c } : {}), label: cardOf(s, d.objectId).name, what: `reveal ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${c.n > 1 ? plural(what) : what} from your hand${c.shareColor ? " that share a color" : ""}`, n: c.n, candidates: s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && printedMatches(c.filter, cardOf(s, id))), chosen: [] });
       }
       if (c.kind !== "sacrifice" && c.kind !== "discard") continue;
       if (c.kind === "discard" && c.random) continue; // the game picks it (CR 701.9b)
@@ -1032,7 +1037,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (d.targets === undefined && specs.length && specs.every((t) => t.skip)) return continueCast({ ...d, targets: specs.map(() => ({ kind: "none" })) });
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: skipped(specs, []), label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
     for (const c of castExtraCosts(card, d, d.x ?? 0, s, HUMAN)) {
-      if (c.kind === "payLife" || c.kind === "payEnergy" || c.kind === "revealHand" || c.kind === "mill" || (c.kind === "discard" && c.random)) continue;
+      if (c.kind === "payLife" || c.kind === "payEnergy" || c.kind === "revealHand" || c.kind === "sacrificeAll" || c.kind === "discardHand" || c.kind === "mill" || (c.kind === "discard" && c.random)) continue;
       // Conspiracy Unraveler: collect evidence 10 rather than pay the mana cost (CR 701.59a, 118.9).
       if (c.kind === "collectEvidence") {
         if (d.collect !== undefined) continue;
@@ -1062,7 +1067,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       // "Removing six counters from among creatures you control" (Quilled Greatwurm): pick them (CR 601.2h).
       if (c.kind === "removeCounters") {
         if (d.counters !== undefined) continue;
-        return setCounterPick({ draft: d, label: card.name, what: `remove ${c.n} ${c.counter ? `${c.counter} ` : ""}counter${c.n === 1 ? "" : "s"} ${c.self ? "from it" : `from among ${c.filter.text}`}`, n: c.n, candidates: counterCostCandidates(s, HUMAN, s.objects[d.objectId]!, c) });
+        return setCounterPick({ draft: d, label: card.name, what: `remove ${c.n} ${counterCostKinds(c)}counter${c.n === 1 ? "" : "s"} ${c.self ? "from it" : `from among ${c.filter.text}`}`, n: c.n, candidates: counterCostCandidates(s, HUMAN, s.objects[d.objectId]!, c) });
       }
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
@@ -1899,6 +1904,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           {costPick && (costPick.kind === "sacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "offering" || costPick.kind === "tap" || costPick.kind === "conspire" || costPick.kind === "counterOn") && (
             <CostPickBar
               pick={costPick}
+              valid={!costPick.share || costChoiceShares(s, costPick.share, costPick.chosen)}
               onDone={() => finishCostPick(costPick)}
               onSkip={costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "conspire" || (costPick.kind === "offering" && !costPick.required) ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
               onCancel={() => setCostPick(null)}
@@ -1976,7 +1982,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               chosen={costPick.chosen}
               n={costPick.n}
               {...(costPick.min !== undefined ? { min: costPick.min } : {})}
-              valid={(!costPick.oneOf || costPick.chosen.some((id) => printedMatches(costPick.oneOf!, cardOf(s, id)))) && (!costPick.differentNames || namesDiffer(s, costPick.chosen)) && (!costPick.sameName || costPick.chosen.every((id) => sameName(cardOf(s, id).name, cardOf(s, costPick.chosen[0]!).name)))}
+              valid={(!costPick.oneOf || costPick.chosen.some((id) => printedMatches(costPick.oneOf!, cardOf(s, id)))) && (!costPick.differentNames || namesDiffer(s, costPick.chosen)) && (!costPick.sameName || costPick.chosen.every((id) => sameName(cardOf(s, id).name, cardOf(s, costPick.chosen[0]!).name))) && (!costPick.share || costChoiceShares(s, costPick.share, costPick.chosen))}
               onHover={setHover}
               onToggle={(id) =>
                 setCostPick({ ...costPick, chosen: costPick.chosen.includes(id) ? costPick.chosen.filter((x) => x !== id) : [...costPick.chosen, id].slice(-costPick.n) })
@@ -2137,6 +2143,8 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "discard") return `discard ${n(c.n, c.filter?.text ?? "card")}${c.random ? " at random" : ""}`;
   if (c.kind === "returnToHand") return `return ${n(c.n, c.filter.text)} to hand`;
   if (c.kind === "revealHand") return "reveal your hand";
+  if (c.kind === "sacrificeAll") return "sacrifice all permanents you control";
+  if (c.kind === "discardHand") return "discard your hand";
   if (c.kind === "giveLife") return c.each ? `have each other player gain ${c.n} life` : `have an opponent gain ${c.n} life`;
   if (c.kind === "tap") return `${c.untap ? "untap" : "tap"} ${n(c.n, c.filter.text)}`;
   if (c.kind === "reveal" && c.orControl) return `behold ${beholdWhat(c)}${c.exile ? " and exile it" : ""}`;
@@ -2455,13 +2463,13 @@ function KickPickBar({
 }
 
 /** Sacrificing as an additional cost (CR 601.2h): click the permanents to sacrifice. */
-function CostPickBar({ pick, onDone, onSkip, onCancel }: { pick: CostPick; onDone: () => void; onSkip?: () => void; onCancel: () => void }) {
+function CostPickBar({ pick, valid = true, onDone, onSkip, onCancel }: { pick: CostPick; valid?: boolean; onDone: () => void; onSkip?: () => void; onCancel: () => void }) {
   return (
     <div className="targeting">
       <span>
         <strong>{pick.label}</strong>: {pick.what} (click {pick.n === 1 ? "it" : "them"})
       </span>
-      <button disabled={pick.chosen.length !== pick.n} onClick={onDone}>
+      <button disabled={pick.chosen.length !== pick.n || !valid} onClick={onDone}>
         {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "counterOn" ? `${pick.what.startsWith("blight") ? "Blight" : "Put the counter"} and ${pick.draft ? "cast" : "activate"}` : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
       </button>
       {onSkip && <button onClick={onSkip}>Cast without</button>}
@@ -4201,6 +4209,7 @@ function modeMenuProps(s: GameState, pick: ModePick) {
     modes: m.modes.map((x, i) => text(x.text, i)),
     legal: legalModes(s, pick.body, HUMAN, undefined, pick.mode === "activate" ? pick.objectId : undefined),
     entwine: m.entwine,
+    ...(m.entwineText ? { entwineText: m.entwineText } : {}),
     ...(m.repeat ? { repeat: true } : {}),
     ...(m.pawprints ? { pawprints: m.pawprints } : {}),
     ...(m.escalate ? { escalate: m.escalate.mana ?? m.escalate.text.toLowerCase() } : {}),
@@ -4215,6 +4224,7 @@ function ModeMenu({
   modes,
   legal,
   entwine,
+  entwineText,
   repeat,
   pawprints,
   escalate,
@@ -4230,6 +4240,8 @@ function ModeMenu({
   legal: boolean[];
   /** Entwine's cost: all the modes, for that much more (CR 702.42a). */
   entwine?: string;
+  /** An entwine cost that isn't mana, in words ("sacrifice three lands", Betrayal of Flesh). */
+  entwineText?: string;
   /** "You may choose the same mode more than once" (CR 700.2d): each click adds the mode once more. */
   repeat?: boolean;
   /** Each mode's {P}: any modes worth up to `max` of them (CR 700.2i). */
@@ -4279,9 +4291,9 @@ function ModeMenu({
           )}
         </span>
       ))}
-      {entwine && (
+      {entwine !== undefined && (
         <button className="entwine" disabled={!legal.every(Boolean)} title={legal.every(Boolean) ? "" : "Every mode needs a legal target"} onClick={() => onDone(modes.map((_, i) => i))}>
-          Entwine <ManaCost cost={entwine} />: all of them
+          Entwine {entwineText ? `(${entwineText})` : <ManaCost cost={entwine} />}: all of them
         </button>
       )}
       {!single && (
@@ -5041,7 +5053,7 @@ function Controls({
       </div>
     );
   if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "bid" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy" || pending.what === "payLifeRound") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "unlessWay" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "addOrRemoveCounter" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser" || pending.what === "direction" || pending.what === "skipChoice" || pending.what === "payLifeOrDestroy" || ((pending.what === "textFrom" || pending.what === "textTo") && pending.options.length <= 10)) && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "unlessWay" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "addOrRemoveCounter" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser" || pending.what === "direction" || pending.what === "skipChoice" || pending.what === "payLifeOrDestroy" || ((pending.what === "textFrom" || pending.what === "textTo" || pending.what === "typeOrder") && pending.options.length <= 10)) && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

@@ -209,6 +209,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     ctx.parley = true;
     return [{ type: "parleyReveal" }];
   }
+  // Naya Soulbeast: "~ enters with X +1/+1 counters on it, where X is the total mana value of all cards revealed this way" in
+  // its own cast trigger: the spell enters with them if it resolves (CR 614.1c; rulings: known once the trigger resolves).
+  // (The "where X is" amount is put in for X afterwards.)
+  if (ctx.parley && ctx.selfCastSpell && ctx.whereX && /^~ enters with X \+1\/\+1 counters on it$/.test(s)) return [{ type: "spellEntersWith", counter: "+1/+1", n: amt("X") }];
   if (ctx.parley && (m = /^For each ((?:non)?land card revealed this way), (?:you )?(.+)$/.exec(s))) return parseSentence(`${m[2]!.charAt(0).toUpperCase()}${m[2]!.slice(1)} for each ${m[1]}`, ctx);
   // "Put your commander into your hand from the command zone" (Command Beacon): one you own, of your choice with two
   // (rulings); nothing if none is there (CR 903.3).
@@ -634,6 +638,18 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     tb.distinctFrom = [a.index];
     return [{ type: "putOntoBattlefield", what: { ref: "target", index: a.index, n: 2 } }];
   }
+  // Relive the Past: "Return up to one target artifact card, up to one target land card, and up to one target non-Aura
+  // enchantment card from your graveyard to the battlefield": all enter at the same time (CR 608.2c). One card could be
+  // chosen for two of them (CR 115.3) but would return once all the same, so each must be another card.
+  if (!ctx.targets.length && (m = /^Return (up to one target [a-z]+ card), (up to one target [a-z]+ card), and (up to one target [A-Za-z-]+ [a-z]+ card) from your graveyard to the battlefield$/.exec(s))) {
+    const refs = [m[1]!, m[2]!, m[3]!].map((p) => parseObject(`${p} from your graveyard`, ctx, true));
+    if (refs.some((r, i) => r?.ref !== "target" || r.n || r.index !== i)) return null;
+    const specs = ctx.targets.slice(0, 3);
+    if (specs.length !== 3 || specs.some((t) => t.kind !== "card" || t.owner !== "you" || !t.optional)) return null;
+    specs[1]!.distinctFrom = [0];
+    specs[2]!.distinctFrom = [0, 1];
+    return [{ type: "putOntoBattlefield", what: { ref: "target", index: 0, n: 3 } }];
+  }
   // Narcomoeba: "When ~ is put into your graveyard from your library, you may put it onto the battlefield": the card,
   // if it's still there (CR 400.7).
   if (ctx.selfCard && !ctx.activated && /^[Pp]ut (?:it|~) onto the battlefield$/.test(s)) return [{ type: "putOntoBattlefield", what: { ref: "selfCard" } }];
@@ -653,6 +669,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const attachToTarget = ctx.targets.length;
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToTarget }] : null;
+  }
+  // Traveling Plague: "When enchanted creature leaves the battlefield, that creature's controller returns ~ from its owner's
+  // graveyard to the battlefield": the Aura's card that state-based actions put there (CR 704.5m), under the control of
+  // the creature's controller as it last existed (CR 608.2h, 110.2a), who chooses what it enchants (CR 303.4f, rulings);
+  // with nothing it could enchant, it stays (303.4g). It's a new object, with no counters (CR 400.7).
+  if (ctx.auraCard && ctx.subject && /^[Tt]hat creature's controller returns ~ from its owner's graveyard to the battlefield$/.test(s)) {
+    const who = parsePlayer("that creature's controller", ctx);
+    return who?.ref === "subjectController" ? [{ type: "putOntoBattlefield", what: { ref: "selfCard", moved: true }, under: who }] : null;
   }
   if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield attached to that creature$/.test(s))
     return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToSubject: true }];
@@ -1585,8 +1609,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (ctx.activated && /^Return the exiled card to its owner's hand$/.test(s)) return [{ type: "bounce", what: { ref: "linkedCard" } }];
   // "When ~ leaves the battlefield, return the exiled card to the battlefield under its owner's control" (Fiend
   // Hunter): the cards its own exile ability took (CR 607.2a); compile() links the two.
-  if ((m = /^Return the exiled (?:card|cards|permanent|permanents|creature|creatures) to (the battlefield under (?:its|their) owners?'s? control|(?:its|their) owners?'s? hands?)$/i.exec(s)) && ctx.selfCard)
-    return [{ type: "returnLinked", dest: /^the battlefield/i.test(m[1]!) ? "battlefield" : "hand" }];
+  // Realm Razer: "return the exiled cards to the battlefield tapped under their owners' control", the same, tapped.
+  if ((m = /^Return the exiled (?:card|cards|permanent|permanents|creature|creatures) to (the battlefield (tapped )?under (?:its|their) owners?'s? control|(?:its|their) owners?'s? hands?)$/i.exec(s)) && ctx.selfCard)
+    return [{ type: "returnLinked", dest: /^the battlefield/i.test(m[1]!) ? "battlefield" : "hand", ...(m[2] ? { tapped: true as const } : {}) }];
   // Savior of Ollenbock: "When ~ leaves the battlefield, put the exiled cards onto the battlefield under their owners'
   // control": the same, the cards its own exile ability took (CR 607.2a).
   if (/^Put the exiled cards onto the battlefield under their owners' control$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "battlefield" }];
@@ -1702,6 +1727,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (/^Exile all cards from your hand face down$/i.test(s)) return [{ type: "exileFaceDown", from: "hand" }];
     if (/^Exile a card from your hand face down$/i.test(s)) return [{ type: "exileFaceDown", from: "handCard" }];
     if (/^Put all cards exiled with ~ into their owners?'s? graveyards?$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard" }];
+    // Knowledge Vault: "When ~ leaves the battlefield, put all cards exiled with it into their owner's graveyard".
+    if (/^Put all cards exiled with it into their owners?'s? graveyards?$/i.test(s) && ctx.selfCard) return [{ type: "moveLinked", dest: "graveyard" }];
     // Underworld Sentinel: "When ~ dies, put all cards exiled with it onto the battlefield": under the control of the
     // ability's controller, who puts them there (its rulings).
     if (/^Put all cards exiled with (?:it|~) onto the battlefield$/i.test(s) && ctx.selfCard) return [{ type: "moveLinked", dest: "battlefield" }];
@@ -1710,6 +1737,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Safe Haven: "return each card exiled with ~ to the battlefield under its owner's control", all at once and whatever
     // they are now (rulings).
     if (/^Return each card exiled with ~ to the battlefield under its owner's control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield", ownersControl: true }];
+    // Bane Alley Broker: "Return a card exiled with ~ to its owner's hand": one of them, chosen as it resolves (CR 607.2a).
+    if (/^Return a card exiled with ~ to its owner's hand$/.test(s)) return [{ type: "moveLinked", dest: "hand", exactly: 1 }];
     // Vault 13: Dweller's Journey: "Return two cards exiled with ~ to the battlefield under their owners' control and put the
     // rest on the bottom of their owners' libraries": two chosen as it resolves, returned at once; the others to the bottom.
     if (/^Return two cards exiled with ~ to the battlefield under their owners' control and put the rest on the bottom of their owners' libraries$/.test(s)) return [{ type: "moveLinked", dest: "battlefield", ownersControl: true, exactly: 2 }, { type: "linkedToBottom" }];
@@ -2249,9 +2278,16 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // The War Games: "You may exile a nontoken creature you control. When you do, ...": one of yours, chosen as it resolves
   // (not targeted).
-  if ((m = /^[Ee]xile a (nontoken creature) you control$/.exec(s))) {
+  // Wormfang Newt: "When ~ enters, exile a land you control": linked to its "return the exiled card" ability (CR 607.2a).
+  if ((m = /^[Ee]xile a (nontoken creature|land) you control$/.exec(s))) {
     const filter = pickFilter(m[1]!);
     return filter?.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "exile" }] : null;
+  }
+  // Wormfang Crab: "an opponent chooses a permanent you control other than ~ and exiles it": an opponent you choose as it
+  // resolves picks one of your permanents (not targeted) and exiles it.
+  if (/^[Aa]n opponent chooses a permanent you control other than ~ and exiles it$/.test(s)) {
+    const filter = pickFilter("permanent");
+    return filter?.kind === "object" ? [{ type: "choose", choice: "opponent" }, { type: "pick", who: { ref: "chosenPlayer" }, among: { ref: "you" }, filter: { ...filter, notSource: true, text: "permanent other than ~" }, n: 1, action: "exile" }] : null;
   }
   // Fugitive of the Judoon: "You may exile a Human you control and an artifact you control. If you do, ...": two different
   // permanents of yours, chosen as it resolves (not targeted); doing it means exiling both (CR 609.3).

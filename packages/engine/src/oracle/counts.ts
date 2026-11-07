@@ -2,7 +2,7 @@ import type { AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "../abilit
 import { ANY_COUNTER } from "../abilities";
 import { NUM, num, COUNTER, counterKind, COLOR_WORDS, capital, singularWord } from "./words";
 import { CREATURE_TYPES, SUPPORTED_KEYWORDS, canonicalKeyword, type SupportedKeyword } from "../keywords";
-import { STARTING_LIFE } from "../types";
+import { STARTING_LIFE, type Color } from "../types";
 import { Ctx, addTarget } from "./body";
 import { parseGroup, parsePlayer, parseTargetPhrase, subtypeClause } from "./targets";
 import { parseSearchFilter } from "./search";
@@ -538,6 +538,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // your hand" (Scent of Cinder), or in its reflexive trigger (Invasion of Tarkir).
   if (ctx?.revealedFromHand && /^(?:the number of )?cards? revealed this way$/i.test(p)) return { count: { kind: "revealedFromHand" } };
   // Parley: "for each nonland card revealed this way", "for each land card revealed this way".
+  // Naya Soulbeast: "the total mana value of all cards revealed this way" after parley's reveal.
+  if (ctx?.parley && /^the total mana value of all cards revealed this way$/.test(p)) return { count: { kind: "parleyRevealed", mv: true } };
   if (ctx?.parley && (m = /^(nonland|land) cards? revealed this way$/i.exec(p))) return { count: { kind: "parleyRevealed", ...(m[1]!.toLowerCase() === "land" ? { land: true as const } : {}) } };
   // "The amount of excess damage dealt to that creature this way" (Hell to Pay), "that excess damage" (Contest of Claws):
   // after a damage instruction (CR 120.10).
@@ -906,6 +908,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each creature it devoured" (CR 702.82b): only the permanent's own abilities know what it devoured.
   if (/^creatures? (?:it|~) devoured$/i.test(p) && (ctx === null || ctx.selfIt)) return count({ kind: "devoured" });
   if (/^times ~ has mutated$/i.test(p)) return count({ kind: "mutations" });
+  // Spiny Starfish: "for each time it regenerated this turn": the permanent's own abilities only.
+  if (each && (m = /^time (it|~) regenerated this turn$/i.exec(p)) && ctx && !ctx.subject && !ctx.subjectIt && (m[1] === "~" || ctx.selfIt || ctx.lastObjectTarget === undefined)) return count({ kind: "regenerations" });
   // Converge: "the number of colors of mana spent to cast this spell", "for each color of mana spent to cast it".
   // "It" is the object itself only where nothing else can be "it" (not "whenever you cast a spell").
   // Wildgrowth Archaic: "whenever you cast a creature spell, ... where X is the number of colors of mana spent to cast
@@ -922,6 +926,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each {S} spent to cast ~", "the amount of {S} spent to cast ~" (CR 107.4h): the spell's, or its permanent's
   // enters trigger's (compile checks it's one of those).
   if ((m = /^(?:the )?(?:amount of )?\{S\} spent to cast (~|it)$/i.exec(p)) && ctx !== null && (ctx.spell || (ctx.selfIt && m[1] === "it") || m[1] === "~")) return count({ kind: "snowSpent" });
+  // Bladecoil Serpent, Clay Champion: "for each {U}{U} spent to cast it (this creature)": whole pairs of that color, the
+  // spell's or its permanent's (compile checks it's one of those, CR 601.2h).
+  if (each && (m = /^\{([WUBRG])\}\{\1\} spent to cast (~|it)$/.exec(p)) && ctx !== null && (ctx.spell || ctx.selfIt || m[2] === "~")) return count({ kind: "spentPairs", color: m[1] as Color });
   // Blood Tyrant: "each player loses 1 life. Put a +1/+1 counter on ~ for each 1 life lost this way": what its loseLife
   // took off life totals, every player's (rulings: yours too).
   if (each && /^1 life lost this way$/i.test(p) && ctx !== null) return count({ kind: "lifeLostThisWay", byLoss: true });
@@ -1048,6 +1055,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^cards? put into (your|their|that player's|enchanted player's) graveyard from anywhere this turn$/i.exec(p))) {
     const whose = whosePlayer(m[1]!, ctx);
     return whose && count({ kind: "cardsToGraveyardThisTurn", whose });
+  }
+  // Cruel Calculations: "the number of cards that were put into target player's graveyard from their library this turn":
+  // milled or otherwise, owned by that player (a card goes to its owner's graveyard, CR 404.2), tokens aren't cards.
+  if ((m = /^cards? (?:that were )?put into (target player's) graveyard from their library this turn$/i.exec(p))) {
+    const whose = whosePlayer(m[1]!, ctx);
+    return whose && count({ kind: "cardsToGraveyardThisTurn", whose, fromLibrary: true });
   }
   // Welcome the Dead: "cards that were put into your graveyard from your hand or library this turn": cards, not tokens.
   if ((m = /^cards? (?:that were )?put into your graveyard from your hand or library this turn$/i.exec(p)))

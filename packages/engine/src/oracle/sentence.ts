@@ -567,6 +567,7 @@ export function parseChanges(text: string): Modification[] | null {
   // lifelink" (Paragon of the Amesha): a list of changes. Dance of the Skywise: "becomes a blue Dragon Illusion with base
   // power and toughness 4/4, loses all abilities, and gains flying": in that order, so it has flying (rulings).
   // Werewolf Pack Leader: "... gains trample, and isn't a Human": that creature type goes (layer 4), its other types stay.
+  if (text === "can't phase out") return [{ kind: "cantPhaseOut" }];
   const notType = /^(.+?),? and isn't an? ([A-Z][a-z]+)$/.exec(text);
   const lostSubtype = notType && CREATURE_TYPES.has(notType[2]!) ? notType[2]! : undefined;
   if (lostSubtype) text = notType![1]!;

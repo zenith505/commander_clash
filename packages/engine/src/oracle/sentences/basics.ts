@@ -947,6 +947,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
         refs.add("subject");
         whats.add(JSON.stringify(y.to));
       }
+      // Dwarven Sea Clan: "Choose target attacking or blocking creature .... ~ deals 2 damage to that creature at end of
+      // combat": about the target as it is now (CR 603.7c, 400.7), not targeted again; ~ deals it even if it has left.
+      if (y.type === "damage" && "ref" in y.to && y.to.ref === "target" && ctx.activated && !ctx.spell && !y.by) {
+        refs.add("target");
+        whats.add(JSON.stringify(y.to));
+      }
       if ("who" in y && (y.who as PlayerRef).ref !== "you") players = false;
       if (y.type === "delayed") players = false;
     }
@@ -1278,6 +1284,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const away: Effect = /^sacrifice/i.test(m[1]!) ? sacrificeSelf : /^tap/i.test(m[1]!) ? { type: "tap", what: { ref: "self" } } : /^destroy/i.test(m[1]!) ? { type: "destroy", what: { ref: "self" } } : { type: "exile", what: { ref: "self" } };
     return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true }, n: many ? num(many[1]!) : 1, action: "sacrifice" }], otherwise: [away], keep: true, text: `Sacrifice ${m[3]} to keep ~${/^tap/i.test(m[1]!) ? " untapped" : ""}` }];
   }
+  // Wormfang Drake: "sacrifice it unless you exile a creature you control other than ~": the choice is made as it resolves,
+  // even after it has left (then the exiled card stays exiled, rulings); with no other creature, it's sacrificed.
+  if ((m = /^[Ss]acrifice (~|it) unless you exile a creature you control other than ~$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const filter = pickFilter("creature");
+    if (filter?.kind !== "object") return null;
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: "creature other than ~" }, n: 1, action: "exile" }], otherwise: [sacrificeSelf], keep: true, text: "Exile a creature you control other than ~ to keep ~" }];
+  }
   // Bandit's Talent: "draw an additional card for each opponent who has one or fewer cards in hand" (in your draw step).
   if ((m = /^(.*?\b[Dd]raws?) an additional card for each (.+)$/.exec(s))) return parseSentence(`${m[1]} a card for each ${m[2]}`, ctx);
   // "That player draws an additional card" (Howling Mine): just another draw.
@@ -1437,6 +1450,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
       { type: "preventNext", n, to: { ref: "each", filter: { kind: "object", types: ["Creature"], text: "each creature" } } },
       { type: "preventNext", n, to: { ref: "eachPlayer" } },
     ];
+  }
+  // Samite Censer-Bearer: "Prevent the next 1 damage that would be dealt to each creature you control this turn": a shield
+  // on each one there as it resolves (rulings).
+  if ((m = new RegExp(`^Prevent the next ${NUMX} damage that would be dealt to (each creature you control) this turn$`, "i").exec(s))) {
+    const to = parseObject(m[2]!, ctx);
+    return to && "ref" in to && to.ref === "each" ? [{ type: "preventNext", n: amt(m[1]!), to }] : null;
   }
   // "... dealt to ~ this turn" (Revered Elder), "to you" (Conservator), "to target player or planeswalker" (Noble Vestige),
   // "dealt this turn to target creature you control" (Samite Alchemist), "to enchanted creature" (Fylgja).
@@ -1984,6 +2003,8 @@ export function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] |
     else if ((m = /^ha(?:ve|s) (?:it|~) deal (\d+) damage to (?:them|that player)$/.exec(part))) out.push({ damage: Number(m[1]) });
     // Temporal Extortion: "any player may pay half their life, rounded up": half their own life (CR 107.1a).
     else if ((m = /^pays? half their life, rounded (up|down)$/.exec(part))) out.push({ halfLife: m[1] as "up" | "down" });
+    // Carrion Rats, Carrion Wurm: "any player may exile a card (three cards) from their graveyard": their own (CR 404).
+    else if ((m = new RegExp(`^exiles? (a|${NUM}) cards? from their graveyard$`).exec(part))) out.push({ exileFromGraveyard: m[1] === "a" ? 1 : num(m[1]!) });
     // Combustion Man: "has ~ deal damage to them equal to ~'s power": its power as that player chooses, or as it last
     // existed (CR 608.2h).
     else if (/^has ~ deal damage to them equal to ~'s power$/.test(part)) out.push({ damage: { count: { kind: "power", of: { ref: "self" } } } });

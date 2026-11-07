@@ -359,6 +359,8 @@ function diesMatches(
   if (d.damagedBySelf && !dying.o.damagedBy?.includes(srcId)) return false;
   if (d.damagedByEquipped && (!attachedTo || !dying.o.damagedBy?.includes(attachedTo))) return false;
   if (d.blockingSelf && !dying.o.blocking?.includes(srcId)) return false;
+  // Thijarian Witness: attacking or blocking alone as it left (CR 506.5), noted then (LastKnown aloneIn).
+  if (d.aloneInCombat && !s.lastKnown?.[dying.o.id]?.aloneIn) return false;
   // Dance of Many: a token this object created, as the object it is now (CR 400.7).
   if (d.createdWithSelf) return dying.o.createdWith?.id === srcId && dying.o.createdWith.zc === (s.objects[srcId]?.zoneChanges ?? 0);
   if (srcId === dying.o.id) {
@@ -454,7 +456,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   // The Traps look back at what entered this turn, as it entered (after "as it enters" choices, CR 614.12).
   if (ev.type === "enters" && s.objects[ev.id]) {
     const c = characteristics(s, s.objects[ev.id]!);
-    ((s.turnLog ??= {}).entered ??= []).push({ controller: c.controller, types: [...c.types], subtypes: [...c.subtypes], colors: [...c.colors], id: ev.id, zc: s.objects[ev.id]!.zoneChanges ?? 0, ...(s.objects[ev.id]!.isToken ? { token: true as const } : {}) });
+    ((s.turnLog ??= {}).entered ??= []).push({ controller: c.controller, types: [...c.types], subtypes: [...c.subtypes], colors: [...c.colors], id: ev.id, zc: s.objects[ev.id]!.zoneChanges ?? 0, ...(s.objects[ev.id]!.isToken ? { token: true as const } : {}), ...(c.keywords.some((k) => k.toLowerCase() === "flying") ? { flying: true as const } : {}) });
   }
   // While set, `add` is looking at an Aura's or Equipment's abilities about this creature it's attached to.
   let hosting: GameObject | null = null;
@@ -605,7 +607,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const you = controllerOf(s, a);
       hosting = host;
       try {
-        add(a, you, (e, t) => pred(e, t, you) && !(t.toOpponent && event?.player === you), undefined, cause, subject, undefined, undefined, undefined, event);
+        add(a, you, (e, t) => pred(e, t, you) && !(t.toOpponent && event?.player === you) && !(t.toYou && event?.player !== you), undefined, cause, subject, undefined, undefined, undefined, event);
       } finally {
         hosting = null;
       }
@@ -1836,7 +1838,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       addHosted(o, (e, t) => (e === "selfDealsDamage" && ev.amount >= (t.minDamage ?? 0)) || (ev.combat && e === "selfDealsCombatDamage"), undefined, o, { amount: ev.amount });
       // "Until your next turn, whenever either of those creatures deals combat damage" (Tamiyo, Field Researcher).
       // Long River Lurker: "whenever that creature deals combat damage this turn, you may exile it": the creature is its subject.
-      if (ev.combat) fromFloating((src, ctrl, triggers) => add(src, ctrl, (e) => e === "selfDealsCombatDamage", triggers, undefined, o, undefined, undefined, undefined, { amount: ev.amount }), o);
+      // Spiritualize, Niko Aris: "whenever that creature deals damage this turn", combat damage or not.
+      fromFloating((src, ctrl, triggers) => add(src, ctrl, (e) => e === "selfDealsDamage" || (ev.combat && e === "selfDealsCombatDamage"), triggers, undefined, o, undefined, undefined, undefined, { amount: ev.amount }), o);
       if (ev.toBlocker) add(o, controllerOf(s, o), (e) => e === "selfDealsCombatDamageToBlockers");
       // Essence Sliver: "Whenever a Sliver deals damage": anyone's, the dealer the subject.
       for (const id of s.battlefield) {
@@ -1858,7 +1861,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const info = { player: ev.player, amount: ev.amount };
     if (o?.zone === "battlefield") {
       const you = controllerOf(s, o);
-      add(o, you, (e, t) => e === "selfDealsDamageToPlayer" && !(t.toOpponent && ev.player === you) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
+      add(o, you, (e, t) => e === "selfDealsDamageToPlayer" && !(t.toOpponent && ev.player === you) && !(t.toYou && ev.player !== you) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
       addHosted(o, (e) => e === "selfDealsDamageToPlayer", undefined, o, info);
       // Syr Carah: "Whenever ~ or an instant or sorcery spell you control deals damage to a player": ~ itself too.
       add(o, you, (e, t) => e === "spellYouControlDealsDamage" && !!t.spellDamage?.orSelf, undefined, undefined, undefined, undefined, undefined, undefined, info);
@@ -2011,6 +2014,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const creature = ev.srcId && ev.creature ? s.objects[ev.srcId] : undefined;
     if (o?.zone === "battlefield" && creature) addHosted(o, (e) => e === "creatureDealsDamageToAttached", undefined, creature, { amount: ev.amount, player: ev.by });
     if (o?.zone === "battlefield" && creature) add(o, controllerOf(s, o), (e) => e === "creatureDealsDamageToSelf", undefined, undefined, creature, undefined, undefined, undefined, { amount: ev.amount, player: ev.by });
+    // Glyph of Life: "Whenever that creature is dealt damage by an attacking creature this turn": a delayed trigger about
+    // the creature dealt damage, the creature dealing it as it is now (still attacking or not).
+    if (o?.zone === "battlefield" && creature) fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "creatureDealsDamageToSelf" && !!t.subjectFilter && objectMatches(s, t.subjectFilter, creature, ctrl, false), triggers, undefined, creature, undefined, undefined, undefined, { amount: ev.amount, player: ev.by }), o);
     if (o?.zone === "battlefield" && ev.spell) add(o, controllerOf(s, o), (e) => e === "spellDealsDamageToSelf", undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount, player: ev.by });
     const dealer = ev.combat && ev.srcId ? s.objects[ev.srcId] : undefined;
     if (o?.zone === "battlefield" && dealer) {
@@ -2200,6 +2206,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           if (!name || !exiledWithNamed(s, o, name)) return false;
         }
         if (t.cast.spentLessThanMv && !(item && !ev.copy && (ev.manaSpent ?? 0) < spellManaValue(s, item))) return false;
+        // Obscura Ascendancy: its mana value on the stack (X included, CR 202.3e) against the counters on ~ now.
+        if (t.cast.mvIsSelfCountersPlus && (item ? spellManaValue(s, item) : defMv(ev.card)) !== (o.counters?.[t.cast.mvIsSelfCountersPlus.counter] ?? 0) + t.cast.mvIsSelfCountersPlus.plus) return false;
         if (t.cast.sharesTypeWithSelf && !(spell && shareCreatureType(creatureTypesOf(s, o), creatureTypesOf(s, spell)))) return false;
         if (t.cast.sharesNoTypeWithYours) {
           if (!spell) return false;

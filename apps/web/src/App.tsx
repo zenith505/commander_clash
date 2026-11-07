@@ -4209,6 +4209,7 @@ function modeMenuProps(s: GameState, pick: ModePick) {
     modes: m.modes.map((x, i) => text(x.text, i)),
     legal: legalModes(s, pick.body, HUMAN, undefined, pick.mode === "activate" ? pick.objectId : undefined),
     entwine: m.entwine,
+    ...(m.entwineText ? { entwineText: m.entwineText } : {}),
     ...(m.repeat ? { repeat: true } : {}),
     ...(m.pawprints ? { pawprints: m.pawprints } : {}),
     ...(m.escalate ? { escalate: m.escalate.mana ?? m.escalate.text.toLowerCase() } : {}),
@@ -4223,6 +4224,7 @@ function ModeMenu({
   modes,
   legal,
   entwine,
+  entwineText,
   repeat,
   pawprints,
   escalate,
@@ -4238,6 +4240,8 @@ function ModeMenu({
   legal: boolean[];
   /** Entwine's cost: all the modes, for that much more (CR 702.42a). */
   entwine?: string;
+  /** An entwine cost that isn't mana, in words ("sacrifice three lands", Betrayal of Flesh). */
+  entwineText?: string;
   /** "You may choose the same mode more than once" (CR 700.2d): each click adds the mode once more. */
   repeat?: boolean;
   /** Each mode's {P}: any modes worth up to `max` of them (CR 700.2i). */
@@ -4287,9 +4291,9 @@ function ModeMenu({
           )}
         </span>
       ))}
-      {entwine && (
+      {entwine !== undefined && (
         <button className="entwine" disabled={!legal.every(Boolean)} title={legal.every(Boolean) ? "" : "Every mode needs a legal target"} onClick={() => onDone(modes.map((_, i) => i))}>
-          Entwine <ManaCost cost={entwine} />: all of them
+          Entwine {entwineText ? `(${entwineText})` : <ManaCost cost={entwine} />}: all of them
         </button>
       )}
       {!single && (

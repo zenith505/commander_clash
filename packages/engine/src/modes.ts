@@ -19,7 +19,7 @@ export function modeCountProblem(body: AbilityBody, modes: number[], both = fals
   if (m.pawprints) return pawprintsOf(m, modes) > m.max ? `choose up to ${m.max} {P} worth of modes` : null;
   const [min, max] = modeRange(body, both);
   if (m.optional && !modes.length) return null;
-  if (modes.length < min || (modes.length > max && !entwined(body, modes))) return `choose ${describeCount(min, max)}${m.entwine ? ", or all of them (entwine)" : ""}`;
+  if (modes.length < min || (modes.length > max && !entwined(body, modes))) return `choose ${describeCount(min, max)}${m.entwine !== undefined ? ", or all of them (entwine)" : ""}`;
   return null;
 }
 
@@ -40,7 +40,7 @@ export function modeRange(body: AbilityBody, both = false): [number, number] {
 /** All the modes of a spell with entwine were chosen, so it costs its entwine cost more (CR 702.42a). */
 export function entwined(body: AbilityBody, modes: number[] | undefined): boolean {
   const m = body.modal;
-  return !!m?.entwine && !!modes && modes.length === m.modes.length && modes.length > m.max;
+  return m?.entwine !== undefined && !!modes && modes.length === m.modes.length && modes.length > m.max;
 }
 
 export function describeCount(min: number, max: number): string {

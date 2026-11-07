@@ -3256,7 +3256,8 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
   const choice = printed?.modal ? chooseModes(s, pid, printed, false, id) : null;
   if (printed?.modal && !choice) return null;
   // Entwine (CR 702.42a): every mode, when we can pay for it and they all have targets.
-  if (printed?.modal?.entwine && legalModes(s, printed, pid).every(Boolean)) {
+  // An entwine cost beyond mana (Solar Tide's "sacrifice two lands"): only when every mode together is worth it.
+  if (printed?.modal?.entwine !== undefined && legalModes(s, printed, pid).every(Boolean) && (!printed.modal.entwineCosts || (landsToSpare(s, pid, printed.modal.entwineCosts) && (groupValue(s, pid, withModes(printed, printed.modal.modes.map((_, i) => i))) ?? 0) > 2))) {
     const plan = castPlanWithModes(s, pid, id, free, x, via, alt, printed.modal.modes.map((_, i) => i));
     if (plan) return plan;
   }
@@ -3424,7 +3425,10 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
       for (const buyback of buybacks)
         for (const kicks of kickOptions(s, pid, id, free, x).filter(kickOk).filter((k) => !(printed?.modal?.both === "kicked" && (modes?.length ?? 0) < 2 && k.length) && !(k.length && bb.kicker?.extraCosts && (!kickCosts || buyback || k.length > 1)))) {
           const all = splice ? [...(targets ?? []), ...splice.targets] : targets;
-          const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length && kickCosts ? kickCosts : {}), ...(kicks.length ? { kicks } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}), ...(offer ? { offering: offer } : {}) });
+          // Splice costs beyond mana (Torrent of Stone's "sacrifice two Mountains"): paid as our other costs would be.
+          const spliceCosts = splice?.costly && !buyback && !kicks.length ? chooseExtraCosts(s, pid, id, all ?? [], via, alt, extra.costOr, x ?? 0, modes, false, undefined, splice.ids) : undefined;
+          if (splice?.costly && !spliceCosts) continue;
+          const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length && kickCosts ? kickCosts : {}), ...(spliceCosts ?? {}), ...(kicks.length ? { kicks } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}), ...(offer ? { offering: offer } : {}) });
           // Leave mana for ward on what it targets, or don't bother (CR 702.21a).
           if (plan && all && !canAlsoPayWard(s, pid, plan, all)) continue;
           if (plan) return plan;
@@ -3436,8 +3440,8 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
  * Cards to splice onto this spell (CR 702.47a): ones whose text does something for us now (not only mana, which would
  * come too late), each with targets of its own we'd pick.
  */
-function chooseSplices(s: GameState, pid: PlayerId, id: ObjectId, x: number): { ids: ObjectId[]; targets: TargetChoice[] } {
-  const out: { ids: ObjectId[]; targets: TargetChoice[] } = { ids: [], targets: [] };
+function chooseSplices(s: GameState, pid: PlayerId, id: ObjectId, x: number): { ids: ObjectId[]; targets: TargetChoice[]; costly?: true } {
+  const out: { ids: ObjectId[]; targets: TargetChoice[]; costly?: true } = { ids: [], targets: [] };
   for (const c of spliceCandidates(s, pid, id)) {
     const body = compileCard(defOf(s, obj(s, c))).spell!;
     if (body.effects.every((e) => e.type === "addMana")) continue;
@@ -3446,6 +3450,13 @@ function chooseSplices(s: GameState, pid: PlayerId, id: ObjectId, x: number): { 
     if (!t || t.some((x) => x.kind === "none")) continue;
     out.ids.push(c);
     out.targets.push(...t);
+    const costs = compileCard(defOf(s, obj(s, c))).splice?.costs;
+    if (costs && !landsToSpare(s, pid, costs)) {
+      out.ids.pop();
+      out.targets.splice(out.targets.length - t.length, t.length);
+      continue;
+    }
+    if (costs) out.costly = true;
   }
   return out;
 }
@@ -3489,11 +3500,11 @@ function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean, x?:
  * and cheap permanents get sacrificed, never the commander or something it targets; the least useful
  * cards get discarded; life is paid only with plenty to spare.
  */
-function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind, alt?: AltCostKind, costOr?: number, x = 0, modes?: number[], buyback?: boolean, kicks?: number[]): CostChoices | null {
+function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind, alt?: AltCostKind, costOr?: number, x = 0, modes?: number[], buyback?: boolean, kicks?: number[], splice?: ObjectId[]): CostChoices | null {
   const out: CostChoices = {};
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
   const d = defOf(s, obj(s, id));
-  for (const c of castExtraCosts(d, { via, alt, costOr, objectId: id, ...(modes ? { modes } : {}), ...(buyback ? { buyback } : {}), ...(kicks ? { kicks } : {}) }, x, s, pid)) {
+  for (const c of castExtraCosts(d, { via, alt, costOr, objectId: id, ...(modes ? { modes } : {}), ...(buyback ? { buyback } : {}), ...(kicks ? { kicks } : {}), ...(splice?.length ? { splice } : {}) }, x, s, pid)) {
     if (c.kind === "revealHand") continue; // nothing to choose
     // Kaervek's Spite: everything we have, only to finish an opponent at 5 life or less.
     if (c.kind === "sacrificeAll" || c.kind === "discardHand") {
@@ -3906,6 +3917,12 @@ function pactCost(effects: Effect[]): number {
 }
 /** The Pacts this player still has to pay for. */
 const owedPacts = (s: GameState, pid: PlayerId) => (s.delayed ?? []).filter((d) => d.controller === pid).reduce((n, d) => n + pactCost([{ type: "delayed", when: "yourNextUpkeep", effects: d.body.effects, text: "" }]), 0);
+/** A cost of sacrificing lands (Torrent of Stone's splice, Solar Tide's entwine): paid only with five lands left after. */
+const LAND_TYPES = ["Plains", "Island", "Swamp", "Mountain", "Forest"];
+function landsToSpare(s: GameState, pid: PlayerId, costs: AdditionalCost[]): boolean {
+  const n = costs.reduce((a, c) => a + (c.kind === "sacrifice" && (c.filter.types?.includes("Land") || c.filter.subtypes?.some((t) => LAND_TYPES.includes(t))) ? c.n : 0), 0);
+  return !n || lands(s, pid) - n >= 5;
+}
 const lands = (s: GameState, pid: PlayerId) => s.battlefield.filter((x) => controllerOf(s, obj(s, x)) === pid && objIsType(s, obj(s, x), "Land")).length;
 
 /** Explore revealed a nonland card: keep it on top if we could cast it soon, otherwise mill it. */

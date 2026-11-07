@@ -22289,6 +22289,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c8d95ca8-7d12-4072-aeaf-e20f248c7e39",
+  "name": "Scrubland",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Plains Swamp",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Plains",
+   "Swamp"
+  ],
+  "oracleText": "({T}: Add {W} or {B}.)",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ca16b32c-3f1e-4f8d-821a-064f922c45d8",
   "name": "Scrying Glass",
   "manaCost": "{2}",
@@ -23702,6 +23734,34 @@
   "set": "frc",
   "releasedAt": "2026-10-02",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0f7a7348-3081-4fbb-9386-719a4ae7fa57",
+  "name": "Solar Tide",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose one —\n• Destroy all creatures with power 2 or less.\n• Destroy all creatures with power 3 or greater.\nEntwine—Sacrifice two lands. (Choose both if you pay the entwine cost.)",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Entwine"
+  ],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -25370,6 +25430,38 @@
   "set": "rtr",
   "releasedAt": "2012-10-05",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "22e3cf1d-3559-4ce1-954c-8dc815342979",
+  "name": "Taiga",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Mountain Forest",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Mountain",
+   "Forest"
+  ],
+  "oracleText": "({T}: Add {R} or {G}.)",
+  "colors": [],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G",
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -27106,6 +27198,36 @@
   "set": "bok",
   "releasedAt": "2005-02-04",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "bc6ee33a-4245-4edb-a6b3-0bdcc2883fbc",
+  "name": "Torrent of Stone",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Instant — Arcane",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [
+   "Arcane"
+  ],
+  "oracleText": "Torrent of Stone deals 4 damage to target creature.\nSplice onto Arcane—Sacrifice two Mountains. (As you cast an Arcane spell, you may reveal this card from your hand and pay its splice cost. If you do, add this card's effects to that spell.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Splice"
+  ],
+  "commanderLegal": "legal",
+  "set": "bok",
+  "releasedAt": "2005-02-04",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

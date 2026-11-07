@@ -1,6 +1,6 @@
 # Roadmap
 
-30,294 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,315 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,641 of
 9,979 (96%).
 
@@ -6294,6 +6294,22 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   this turn attacks"; play the exiled cards as long as you attacked this turn), Bane Alley Broker (face-down exile you may
   look at, CR 406.3, and the return of one of them; a new controller sees them only as that return resolves). Browser
   tests for both share-cost pickers, Haphazard Bombardment's pick and Bane Alley Broker's return. +10 (30,304 of 31,936).
+- Round B134 (least played first, from the list): splice costs that aren't mana (CR 702.47a, 601.2b, 601.2f-h): Torrent
+  of Stone ("Sacrifice two Mountains", any land with the Mountain subtype, rulings), Hundred-Talon Strike ("Tap an untapped
+  white creature you control"), Roar of Jukai ("An opponent gains 5 life", the opponent picked as for Invigorate), Horobi's
+  Whisper ("Exile four cards from your graveyard") and Veil of Secrecy ("Return a blue creature you control to its
+  owner's hand"), paid with the spell's other costs after its targets; entwine costs that aren't mana (CR 702.42a):
+  Betrayal of Flesh ("Sacrifice three lands") and Solar Tide ("Sacrifice two lands"), the entwine button naming the cost;
+  Samite Censer-Bearer (a shield of 1 on each creature you control as it resolves, rulings), Puppet Master (the creature
+  card back to its owner's hand, then {U}{U}{U} to return the Aura, offered only if the card went to the hand, rulings),
+  Rock Hydra (each 1 damage removes a +1/+1 counter and is prevented while it has one, the rest dealt; damage that can't
+  be prevented still removes them, rulings; its own shields are used first, CR 616.1), Whip Vine ("target creature with
+  flying blocked by ~", kept tapped while the Vine stays tapped). Bots splice or entwine with lands as the cost only with
+  five lands left after, and entwine Solar Tide only when both modes together help them. Browser tests for Torrent of
+  Stone's Mountains picked after the targets and Solar Tide's entwine button. +11 (30,315 of 31,936).
+- Known gap from round B134: a splice or entwine cost that picks the same kind of thing as one of the spell's other costs
+  (Torrent of Stone's Mountains onto an Arcane spell that also sacrifices a creature) isn't offered or is refused as it's
+  cast, though the rules allow paying both.
 - Out after round B133 (looked at, not done): Tamanoa (noncreature sources' damage as one event), Graceful Takedown,
   Imperiosaur (mana spent only from basic lands), Flaming Gambit (the target player redirects the damage to a creature),
   Magus of the Arena and Evangelize (a target chosen by an opponent).

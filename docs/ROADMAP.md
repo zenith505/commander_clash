@@ -1,6 +1,6 @@
 # Roadmap
 
-30,367 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,376 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,659 of
 9,979 (96%).
 
@@ -2378,8 +2378,8 @@ line blocks.
    ("reveal a Dragon card from your hand or choose a Dragon you control" is beholding a Dragon, CR 701.4a: the damage is
    that Dragon's power as it resolves or as it last existed, a card's in the hand; a browser test; the bot beholds only
    a Dragon with more than 3 power); "You may cast ~ as though it had flash if you behold a Dragon as an additional cost
-   to cast it" (Molten Exhale, CR 601.3c: a browser test in another player's end step). +14, 30,367 of 31,936 with
-   B135 and B136.
+   to cast it" (Molten Exhale, CR 601.3c: a browser test in another player's end step). +14, 30,376 of 31,936 with
+   B135 to B137.
    Out after round 299 (looked at, not done): Yurlok of Scorch Thrash, Curse of Bounty and Enchanter's Bane (as after
    round 298); Hatchery Sliver, Zinnia, Valley's Voice and Ian Chesterton (replicate or offspring given to other spells:
    one kicker-like cost each, not a second one); Mirrormind Crown, Esix, Moonlit Meditation and Jinnie Fay

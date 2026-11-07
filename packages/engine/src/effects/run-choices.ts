@@ -870,7 +870,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "revealedNameInYard"
             ? ((rv) => !!rv && !!s.objects[rv.id] && (s.objects[rv.id]!.zoneChanges ?? 0) === rv.zc && player(s, ctx.controller).graveyard.some((id) => id !== rv.id && sameName(defOf(s, obj(s, id)).name, defOf(s, s.objects[rv.id]!).name)))(s.resolving!.revealed)
             : e.cond.kind === "yardChosenIs"
-            ? (s.resolving!.yardChosen ?? []).some((id) => !!s.objects[id] && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
+            ? (s.resolving!.yardChosen ?? []).some((id) => !!s.objects[id] && printedMatches(bindBound(s, (e.cond as { filter: TargetSpec }).filter, amountCtx(s, ctx)), defOf(s, s.objects[id]!)))
             : e.cond.kind === "putIntoHandIs"
             ? [...(s.resolving!.putIntoHand ?? []), ...(s.resolving!.dugToHandCards ?? [])].some((id) => s.objects[id]?.zone === "hand" && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!))) || (!!e.cond.orState && staticConditionNow(s, e.cond.orState, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller, ctx.event?.player, undefined, ctx.sourceId ? ctx.sourceZc : undefined))
             : e.cond.kind === "returnedToHandIs"
@@ -1273,6 +1273,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     // A processor's "you may put two cards your opponents own from exile ...": not with fewer there (rulings).
     if (e.type === "processExile" && !e.adventureOf && processCandidates(s, ctx.controller).length < e.n) return false;
     if (e.type === "processExile" && e.adventureOf && !adventureExileCards(s, players(s, e.adventureOf, ctx)[0]).length) return false;
+    if (e.type === "parleyToGraveyards" && !(s.resolving?.parley?.ids ?? []).some((id) => s.objects[id]?.zone === "library")) return false;
     if (e.type === "removeExiledCounter" && !exiledWithCounter(s, players(s, e.owner, ctx), e.counter).length) return false;
     // "Unless you exile the top creature card of your graveyard" (Barrow Ghoul): you can't with no creature card there.
     if ((e.type === "exile" || e.type === "putOntoBattlefield") && e.what.ref === "graveyardEnd" && !objects(s, e.what, ctx).length) return false;

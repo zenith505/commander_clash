@@ -575,6 +575,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         return;
       }
       if (e.flash) log(s, `${src}: ${player(s, ctx.controller).name} may cast ${e.text.replace(/^the next (.+?) you cast this turn can be cast .*$/, (_, w: string) => (w === "spell of the chosen type" ? `their next ${filter.subtypes?.join(" ") ?? ""} spell` : `their next ${w}`))} this turn as though it had flash.`);
+      if (e.alt) log(s, `${src}: ${player(s, ctx.controller).name} may cast their next ${filter.text.replace(/^target /, "")} this turn ${e.alt === "free" ? "without paying its mana cost" : "for life equal to its mana value"}.`);
+      if (e.counter) log(s, `${src}: the next ${filter.text.replace(/^target /, "")} ${player(s, ctx.controller).name} casts this turn enters with an additional ${e.counter} counter.`);
       for (const caster of e.who ? players(s, e.who, ctx) : [ctx.controller])
         (s.nextCast ??= []).push({
           controller: caster,
@@ -589,6 +591,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           ...(e.fromHand ? { fromHand: true as const } : {}),
           ...(e.flash ? { flash: true as const } : {}),
           ...(e.toHand ? { toHand: true as const } : {}),
+          ...(e.counter ? { counter: e.counter } : {}),
+          ...(e.alt ? { alt: e.alt } : {}),
           ...(ctx.x ? { x: ctx.x } : {}),
         });
       return;

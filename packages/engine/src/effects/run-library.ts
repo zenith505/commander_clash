@@ -153,7 +153,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
         moveObject(s, id, "graveyard");
         log(s, `${p.name} puts ${defOf(s, obj(s, id)).name}, the bottom card of their library, into their graveyard.`);
-        if (obj(s, id).zone === "graveyard") s.resolving!.yardChosen.push(id);
+        // Grenzo, Dungeon Warden: "If it's a creature card ..., put it onto the battlefield": that card even if a replacement
+        // exiled it instead (rulings), so wherever it went.
+        if (obj(s, id).zone === "graveyard" || obj(s, id).zone === "exile") {
+          s.resolving!.yardChosen.push(id);
+          s.resolving!.chosenFromYard = { id, zc: obj(s, id).zoneChanges ?? 0 };
+        }
       }
       return;
     }
@@ -463,10 +468,19 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         revealed.push(id);
         log(s, `${p.name} reveals ${d.name} from the top of their library.`);
       }
-      s.resolving!.parley = counts;
+      s.resolving!.parley = { ...counts, ids: revealed };
       // Game Preserve: every card revealed a creature card, they all enter together under their owners' control.
       if (e.allCreaturesEnter && revealed.length && revealed.every((id) => isType(defOf(s, obj(s, id)), "Creature")))
         enterTogether(s, () => revealed.forEach((id) => moveObject(s, id, "battlefield", { controller: obj(s, id).owner })));
+      return;
+    }
+    case "parleyToGraveyards": {
+      // Dakra Mystic: "You may put the revealed cards into their owners' graveyards": each one still in its owner's library
+      // (CR 400.7), all at once. Not a mill (CR 701.13a): they aren't put there by milling.
+      const ids = (s.resolving?.parley?.ids ?? []).filter((id) => s.objects[id]?.zone === "library");
+      if (!ids.length) return;
+      log(s, `${src}: ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} ${ids.length === 1 ? "is" : "are"} put into ${ids.length === 1 ? "its owner's graveyard" : "their owners' graveyards"}.`);
+      for (const id of ids) moveObject(s, id, "graveyard");
       return;
     }
     case "spellToHand": {

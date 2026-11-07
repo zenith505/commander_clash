@@ -6215,7 +6215,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   two of them, as it would return once all the same, CR 115.3), Cruel
   Calculations (cards put into the target player's graveyard from their library this turn), Clay Champion and Bladecoil
   Serpent (for each {G}{G}, {W}{W}, {U}{U}, {B}{B} or {R}{R} spent to cast it, CR 601.2h; Bladecoil's trample and haste
-  once, as gaining them again changes nothing, CR 702.19g, 702.10d). +11 (30,242 of 31,936 with B127).
+  once, as gaining them again changes nothing, CR 702.19g, 702.10d). +11 (30,252 of 31,936 with B127 and round 296).
 - Round B129 (least played first, from the skip lists): Groffskithur ("target card named ~": a target filter bound to
   the source's name as it's chosen and as it resolves, CR 201.2), Mindblaze (a nonland card name and a number greater than
   0 chosen as it resolves, CR 201.4; the number picker stops at the target's library size; the library is revealed and

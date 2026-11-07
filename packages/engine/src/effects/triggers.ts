@@ -1177,7 +1177,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         (t.cast.by === "any" || you === ev.player) &&
         printedMatches(t.cast.orPlaysLand, defOf(s, land)) &&
         (!t.cast.from || castFromMatches(t.cast.from, { castFrom: ev.from } as GameObject, ev.player)) &&
-        (!t.cast.sharesTypeWithLinked || sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, characteristics(s, land).types));
+        (!t.cast.sharesTypeWithLinked || sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, characteristics(s, land).types)) &&
+        (!t.cast.fromLinked || (ev.from === "exile" && playedFromLinked(s, o, land, false)));
       add(o, you, (e, t) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player && (!t.subjectFilter || objectMatches(s, t.subjectFilter, land, you, false))) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player && (!t.subjectFilter || objectMatches(s, t.subjectFilter, land, you, false))) || (e === "castSpell" && asCast(t)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, played: { id: land.id, zc: land.zoneChanges ?? 0 } });
     }
   } else if (ev.type === "finalChapterResolved") {
@@ -2199,6 +2200,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         }
         // "If it shares a card type with the exiled card" (Cemetery Protector, CR 603.4), checked again as it resolves.
         if (t.cast.sharesTypeWithLinked && !sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, spell ? characteristics(s, spell).types : ev.card.types)) return false;
+        // Voltaic Visionary: the spell's card was one its linked ability exiled, cast from there.
+        if (t.cast.fromLinked && !(spell && !ev.copy && spell.castFrom === "exile" && playedFromLinked(s, o, spell, true))) return false;
         // "A spell with {X} in its mana cost": the half cast, for a split card (CR 709.3b); a copy has the same mana cost.
         if (t.cast.xInCost && !(spell && parseManaCost(defOf(s, spell).manaCost).hasX)) return false;
         // Rage Extractor: "a spell with {H} in its mana cost": a Phyrexian mana symbol of any color, hybrid ones too (CR 107.4f).
@@ -3115,6 +3118,14 @@ export function closeZoneBatch(s: GameState) {
 }
 
 /** Was this spell cast from the zone a "whenever you cast a spell from ..." trigger asks for? */
+/**
+ * Voltaic Visionary: `card` was a card in exile that `o`'s linked ability exiled (CR 607.2a): a spell cast from there
+ * (the stack object keeps the card's zone-change count), or a land played from there (one zone change later).
+ */
+function playedFromLinked(s: GameState, o: GameObject, card: GameObject, spell: boolean): boolean {
+  return (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).some((l) => l.id === card.id && l.zc + (spell ? 0 : 1) === (card.zoneChanges ?? 0));
+}
+
 function castFromMatches(from: NonNullable<NonNullable<TriggeredAbility["cast"]>["from"]>, spell: GameObject | undefined, caster: PlayerId): boolean {
   const z = spell?.castFrom;
   if (!z) return false;

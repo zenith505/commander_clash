@@ -3236,6 +3236,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const land = parseTargetPhrase("land");
     return land?.kind === "object" ? { ...t, cast: { ...t.cast, orPlaysLand: { ...land, text: "land" }, sharesTypeWithLinked: true } } : "fail";
   }
+  // Voltaic Visionary: "When you play a card exiled with ~, transform ~": casting a spell or playing a land (CR 305.1,
+  // 601.2) from among the cards its linked ability exiled (CR 607.2a).
+  const playLinked = /^When you play a card exiled with ~, (transform ~\.)$/.exec(line);
+  if (playLinked) {
+    const t = parseTrigger(`Whenever you cast a spell, ${playLinked[1]}`);
+    if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.cast.orCopy || t.ifCond || t.cast.from) return "fail";
+    const land = parseTargetPhrase("land");
+    return land?.kind === "object" ? { ...t, cast: { ...t.cast, orPlaysLand: { ...land, text: "land" }, fromLinked: true } } : "fail";
+  }
   // Faldorn: "Whenever you cast a spell from exile or a land you control enters from exile": the cast trigger, which a
   // land entering from exile under your control also triggers (played or put there, CR 603.6a).
   const landFromExile = /^Whenever you cast a spell from exile or a land you control enters from exile, (.+)$/.exec(line);

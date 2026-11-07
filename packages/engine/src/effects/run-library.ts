@@ -14,7 +14,8 @@ import { attackChoices, chooseAuraHosts, suspendExiled } from "./run-zones";
 import { namesFrom } from "./run-names";
 import { addDelayed } from "./run-spells";
 import type { AuraHost } from "../game";
-import { defMv, sameName } from "../faces";
+import { defMv, restingDef, sameName } from "../faces";
+import { addCopyEffect, copyKey } from "../copies";
 import { characteristics } from "../layers";
 import type { TargetSpec } from "../abilities";
 import { CREATURE_TYPES, LAND_TYPES } from "../keywords";
@@ -337,6 +338,21 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const id = p.library[0];
       s.resolving!.revealed = id ? { id, zc: s.objects[id]!.zoneChanges ?? 0 } : undefined;
       if (id) log(s, e.look ? `${p.name} looks at the top card of their library.` : `${p.name} reveals ${defOf(s, obj(s, id)).name} from the top of their library.`);
+      return;
+    }
+    case "revealedToGraveyardCopySelf": {
+      const r = s.resolving!.revealed;
+      const card = r && s.objects[r.id]?.zone === "library" && (obj(s, r.id).zoneChanges ?? 0) === r.zc ? obj(s, r.id) : undefined;
+      if (!card) return;
+      const base = restingDef(s.cards[card.cardId]!);
+      moveObject(s, card.id, "graveyard");
+      log(s, `${player(s, card.owner).name} puts ${base.name} into their graveyard.`);
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc)) {
+        const was = defOf(s, me).name;
+        addCopyEffect(s, me, copyKey(s, base));
+        log(s, `${was} becomes a copy of ${base.name}.`);
+      }
       return;
     }
     case "revealedUntilToBottom": {

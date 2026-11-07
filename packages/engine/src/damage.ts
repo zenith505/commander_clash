@@ -273,11 +273,12 @@ export function dealDamage(
     o.wasDealtDamage = true;
     // Grisly Sigil: "If it was dealt noncombat damage this turn".
     if (!opts.combat) o.wasDealtNoncombatDamage = true;
-    // Aegar: what dealt damage to it this turn, as the source was then.
-    (((s.turnLog ??= {}).damageDealtTo ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []).push({ controller: src.controller, subtypes: [...src.subtypes], ...(src.spell ? { spell: true as const } : {}), amount: n });
     // Wolverine: "if ~ dealt damage to another creature this turn".
     const srcObj = src.id ? s.objects[src.id] : undefined;
     const srcKey = srcObj && `${srcObj.id}@${srcObj.zoneChanges ?? 0}`;
+    // Aegar: what dealt damage to it this turn, as the source was then; Brine Hag, Giant Albatross: which permanent it
+    // was (`src`); Blazing Effigy: its name.
+    (((s.turnLog ??= {}).damageDealtTo ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []).push({ controller: src.controller, subtypes: [...src.subtypes], ...(src.spell ? { spell: true as const } : {}), amount: n, name: src.name, ...(srcKey && !src.spell ? { src: srcKey } : {}) });
     if (srcKey && src.id !== o.id && c.types.includes("Creature") && !s.turnLog.damagedCreature?.includes(srcKey)) (s.turnLog.damagedCreature ??= []).push(srcKey);
     // "Whenever ~ deals damage to a creature" (combat damage is all dealt before any of it triggers anything), once the
     // excess damage dealt at the same time is known (see dealPlanned).

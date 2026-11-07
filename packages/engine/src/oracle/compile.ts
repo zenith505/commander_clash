@@ -848,6 +848,13 @@ export function compile(d: CardDef): CompiledCard {
       out.borrows = { filter: { kind: "object", subtypes: [topBorrow[1]!], text: `${topBorrow[1]} card` }, top: true };
       continue;
     }
+    // Skill Borrower: "As long as the top card of your library is an artifact or creature card, ~ has all activated
+    // abilities of that card": the printed ones of that card, "~" in them being this creature (rulings), as Conspicuous
+    // Snoop.
+    if (line === "As long as the top card of your library is an artifact or creature card, ~ has all activated abilities of that card." && !out.borrows) {
+      out.borrows = { filter: { kind: "object", types: ["Artifact", "Creature"], notTypes: [], notColors: [], text: "artifact or creature card" }, top: true };
+      continue;
+    }
     // Myr Welder: "~ has all activated abilities of all cards exiled with it"; Dark Impostor, Patchwork Crawler: "all
     // creature cards exiled with it", linked to its one exile ability below (CR 607.2a).
     const borrowLinked = borrow && !borrow[2] && !borrow[3] ? /^all (?:(creature|artifact) )?cards exiled with (?:it|~)$/.exec(borrow[1]!) : null;
@@ -2685,6 +2692,16 @@ export function compile(d: CardDef): CompiledCard {
     if (line === "During your turn, you may cast cards exiled with ~ and you may cast them as though they had flash. Mana of any type can be spent to cast those spells.") {
       if (out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
       else (out.playLinkedWhile = { kind: "allOf", conds: [{ kind: "yourTurn" }] }), (out.playLinkedCastOnly = true), (out.playLinkedFlash = true), (out.playLinkedAnyType = true);
+      continue;
+    }
+    // Null Summoner: "Threshold — As long as there are seven or more cards in your graveyard, you may cast the exiled card,
+    // and mana of any type can be spent to cast that spell.": the card its enters ability exiled from a hand (CR 607.2a),
+    // while the condition holds, as a spell with its usual timing, any type of mana (CR 609.4b).
+    const castExiledWhile = /^As long as (there are seven or more cards in your graveyard), you may cast the exiled card, and mana of any type can be spent to cast that spell\.$/.exec(line);
+    if (castExiledWhile) {
+      const cond = parseStaticCondition(castExiledWhile[1]!, { affects: { kind: "self" }, mods: [], text: line });
+      if (!cond || out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
+      else (out.playLinkedWhile = { kind: "allOf", conds: [cond] }), (out.playLinkedCastOnly = true), (out.playLinkedAnyType = true), castsTheExiled.add(out);
       continue;
     }
     if (line === "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells.") {
@@ -6282,6 +6299,9 @@ function bindThisAbility<T extends object>(ability: T, line: string): T {
   return ability;
 }
 
+/** Null Summoner: cards whose "you may cast the exiled card" is linked to their one exile of a card from a hand (see linkExile). */
+const castsTheExiled = new WeakSet<CompiledCard>();
+
 /**
  * "When ~ enters, exile target creature an opponent controls. When ~ leaves the battlefield, return the
  * exiled card to the battlefield under its owner's control": the two abilities are linked (CR 607.2a), so
@@ -6443,7 +6463,14 @@ function linkExile(out: CompiledCard) {
   }
   // Evendo Brushrazer: "play cards exiled with ~" is about the cards its one "exile the top card of your library" exiled
   // (CR 607.2a); Nightveil Specter's "that player exiles the top card of their library" likewise.
-  if (out.playLinkedWhile && out.playLinkedCastOnly) {
+  if (castsTheExiled.has(out)) {
+    // Null Summoner: "the exiled card" is the one its one "exile that card" from a hand exiled (CR 607.2a).
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const takes = all.filter((e): e is Extract<Effect, { type: "takeFromHand" }> => e.type === "takeFromHand" && e.action === "exile" && e.n === undefined && !e.until && !e.orGraveyard);
+    const others = all.some((e) => e.type === "exile" || e.type === "exileTop" || e.type === "exileGraveyard" || e.type === "impulse" || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile) || (e.type === "search" && e.dest.zone === "exile") || e.type === "castFromAmong" || e.type === "pick" || e.type === "chooseFromGraveyard" || (e.type === "takeFromHand" && !takes.includes(e)));
+    if (others || out.spell || takes.length !== 1) out.unsupported.push("(casts the exiled card, which it can't link to one exile ability)");
+    else takes[0]!.linked = true;
+  } else if (out.playLinkedWhile && out.playLinkedCastOnly) {
     // Rona, Disciple of Gix: its "exile target historic card from your graveyard" as it enters and its "exile the top card
     // of your library" both (CR 607.2a: each ability printed on it that exiles cards; rulings).
     const all = bodies.flatMap((b) => allEffects(b.effects));
@@ -6466,7 +6493,7 @@ function linkExile(out: CompiledCard) {
   // Court of Locthwain: "cast a spell from among cards exiled with ~" too.
   const usesLinked = (b: AbilityBody) => allEffects(b.effects).some((e) => e.type === "moveLinked" || e.type === "castLinkedFree") || JSON.stringify(b).includes('"linkedExiled"');
   const impulses = bodies.flatMap((b) => allEffects(b.effects)).filter((e): e is Extract<Effect, { type: "impulse" }> => e.type === "impulse");
-  if (impulses.length && (bodies.some(usesLinked) || out.triggers.some((t) => JSON.stringify(t.ifCond ?? null).includes('"linkedExiled"')))) {
+  if (impulses.length && (bodies.some(usesLinked) || out.triggers.some((t) => JSON.stringify(t.ifCond ?? null).includes('"linkedExiled"') || !!t.cast?.fromLinked))) {
     const others = bodies.flatMap((b) => allEffects(b.effects)).some((e) => e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
     if (others || impulses.length !== 1) out.unsupported.push("(refers to cards exiled with it that it can't link to one exile ability)");
     else impulses[0]!.linked = true;

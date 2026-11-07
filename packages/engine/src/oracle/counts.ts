@@ -970,6 +970,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Tangled Colony: "When ~ dies, create X ... tokens ..., where X is the amount of damage dealt to it this turn": the
   // permanent it was (CR 400.7), all the damage dealt to it this turn (TurnLog.damageDealtTo).
+  // Blazing Effigy: "3 plus the amount of damage dealt to ~ this turn by other sources named ~".
+  if (/^the amount of damage dealt to ~ this turn by other sources named ~$/.test(p)) return count({ kind: "damageDealtToThisTurn", of: { ref: "self" }, byOtherNamed: true });
   if (/^the amount of damage dealt to it this turn$/.test(p)) {
     const of = whoseObject("its", ctx);
     return of?.ref === "self" || of?.ref === "target" ? count({ kind: "damageDealtToThisTurn", of }) : null;

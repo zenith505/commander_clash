@@ -2367,6 +2367,68 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, shown.length ? `${p.name} ${e.orControl ? "beholds" : "reveals"} ${shown.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand.` : `${p.name} ${e.orControl ? "beholds nothing" : "reveals no cards"}.`);
       return;
     }
+    case "struggleForHand": {
+      // Struggle for Sanity: the hand was revealed; its owner exiles one card, then you do, until none is left (exiled face
+      // up, CR 406.3); then the owner's go back to their hand and yours to their graveyard (CR 608.2c).
+      const pid = players(s, e.who, ctx).find((x) => !player(s, x).lost);
+      if (pid === undefined) return;
+      const them = player(s, pid);
+      const sc = (s.resolving!.scratch ??= {});
+      const st = (sc.struggle ??= { theirs: [], yours: [], next: "them" });
+      while (them.hand.length) {
+        const picker = st.next === "them" ? pid : ctx.controller;
+        const pick = them.hand.length === 1 ? them.hand[0]! : st.pick !== undefined && them.hand.includes(st.pick) ? st.pick : undefined;
+        st.pick = undefined;
+        if (pick === undefined) {
+          s.pending = { kind: "chooseOption", player: picker, source: src, what: "struggleExile", options: [...them.hand], labels: them.hand.map((id) => defOf(s, obj(s, id)).name), prompt: st.next === "them" ? `exile a card from your hand (it returns to your hand afterwards)` : `exile a card from ${them.name}'s hand (it goes to their graveyard afterwards)` };
+          return "paused";
+        }
+        moveObject(s, pick, "exile");
+        log(s, `${player(s, picker).name} exiles ${defOf(s, obj(s, pick)).name} from ${them.name}'s hand.`);
+        (st.next === "them" ? st.theirs : st.yours).push(pick);
+        st.next = st.next === "them" ? "you" : "them";
+      }
+      const back = st.theirs.filter((id) => s.objects[id]?.zone === "exile");
+      const rest = st.yours.filter((id) => s.objects[id]?.zone === "exile");
+      for (const id of back) moveObject(s, id, "hand");
+      for (const id of rest) moveObject(s, id, "graveyard");
+      if (back.length || rest.length) log(s, `${them.name} returns ${back.length} card${back.length === 1 ? "" : "s"} to their hand and puts ${rest.length} into their graveyard.`);
+      return;
+    }
+    case "destroyEachUnlessLife": {
+      // Giant Albatross: the creatures as it begins (CR 608.2c), their controllers deciding in APNAP order, one creature at
+      // a time; paying needs that much life (CR 119.4). Then the rest are destroyed at once.
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.unlessLife) {
+        const all = objects(s, e.what, ctx);
+        const order = apnap(s, s.turnOrder);
+        all.sort((a, b) => order.indexOf(controllerOf(s, a)) - order.indexOf(controllerOf(s, b)));
+        sc.unlessLife = { ids: all.map((o) => ({ id: o.id, zc: o.zoneChanges ?? 0 })), i: 0, doomed: [] };
+      }
+      const st = sc.unlessLife;
+      for (; st.i < st.ids.length; st.i++) {
+        const at = st.ids[st.i]!;
+        const o = s.objects[at.id];
+        if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== at.zc) continue;
+        const who = controllerOf(s, o);
+        const name = defOf(s, o).name;
+        let answer = st.answer;
+        st.answer = undefined;
+        if (answer === undefined && payableLife(s, who) < e.life) answer = "none";
+        if (answer === undefined) {
+          s.pending = { kind: "chooseOption", player: who, source: src, what: "payLifeOrDestroy", about: o.id, options: ["pay", "none"], labels: [`Pay ${e.life} life`, `Let ${name} be destroyed`], prompt: `pay ${e.life} life, or ${name} is destroyed${e.noRegen ? " (it can't be regenerated)" : ""}?` };
+          return "paused";
+        }
+        if (answer === "pay") {
+          payLife(s, who, e.life);
+          log(s, `${player(s, who).name} pays ${e.life} life for ${name}.`);
+        } else st.doomed.push(o.id);
+      }
+      const doomed = st.doomed.filter((id) => s.objects[id]?.zone === "battlefield");
+      if (!doomed.length) return;
+      s.resolving!.created = doomed;
+      return runEffect(s, { type: "destroy", what: { ref: "created" }, ...(e.noRegen ? { noRegen: true as const } : {}) }, ctx);
+    }
     case "alternatePicks": {
       // Memories Returning: revealed (CR 701.20a) and kept on top until picked; each step from those still there.
       const sc = (s.resolving!.scratch ??= {});

@@ -264,7 +264,7 @@ describe("Aquamorph Entity: 5/1 or 1/5 as it enters or is turned face up", () =>
     s = settle(run(s, planCast(s, ap, ids[2]!)), { me: [ap] });
     for (let i = 0; i < 5 && s.pending && !(s.pending.kind === "chooseOption" && s.pending.what === "form"); i++) {
       const p = s.pending;
-      if (p.kind === "chooseMay") s = settle(act(s, { type: "chooseMay", player: ap, choice: true }), { me: [ap] });
+      if (p.kind === "chooseMay") s = settle(act(s, { type: "chooseMay", player: ap, yes: true }), { me: [ap] });
       else if (p.kind === "chooseOption") s = settle(act(s, { type: "chooseOption", player: ap, choice: p.options.includes(ids[0]!) ? ids[0]! : p.options[0]! }), { me: [ap] });
       else break;
     }

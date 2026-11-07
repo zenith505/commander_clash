@@ -8829,6 +8829,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0d787c6b-ab82-42c5-b840-8f3a09af30ac",
+  "name": "Fasting",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, put a hunger counter on this enchantment. Then destroy this enchantment if it has five or more hunger counters on it.\nIf you would begin your draw step, you may skip that step instead. If you do, you gain 2 life.\nWhen you draw a card, destroy this enchantment.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "drk",
+  "releasedAt": "1994-08-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "676935c8-22e0-427f-9566-16778cea0873",
   "name": "Fatespinner",
   "manaCost": "{1}{U}{U}",
@@ -11046,6 +11072,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fe8b7835-a9b2-4a8d-964a-471430f1d143",
+  "name": "Grifter's Blade",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Flash\nAs this Equipment enters, choose a creature you control it could be attached to. If you do, it enters attached to that creature.\nEquipped creature gets +1/+1.\nEquip {1}",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip",
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "rav",
+  "releasedAt": "2005-10-07",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4afd88fa-f8bb-46d4-9ba7-09419e6f858c",
   "name": "Grimdancer",
   "manaCost": "{1}{B}{B}",
@@ -11824,6 +11877,34 @@
   "set": "blc",
   "releasedAt": "2024-08-02",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d8f08699-6210-41c3-bfa0-c4b3bcbbaf1c",
+  "name": "Heat Wave",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Cumulative upkeep {R} (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nBlue creatures can't block creatures you control.\nNonblue creatures can't block creatures you control unless their controller pays 1 life for each blocking creature they control.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Cumulative upkeep"
+  ],
+  "commanderLegal": "legal",
+  "set": "vis",
+  "releasedAt": "1997-02-03",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -15370,6 +15451,32 @@
   "set": "slc",
   "releasedAt": "2022-11-01",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "867d603d-3aa4-4160-9112-a18f795f3d53",
+  "name": "Liquid Fire",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, choose a number between 0 and 5.\nLiquid Fire deals X damage to target creature and 5 minus X damage to that creature's controller, where X is the chosen number.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ody",
+  "releasedAt": "2001-10-01",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -25287,6 +25394,37 @@
   "commanderLegal": "legal",
   "set": "tsr",
   "releasedAt": "2021-03-19",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b7aa0625-c691-4219-b099-3798b349d09c",
+  "name": "Stromgald Spy",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Human Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Rogue"
+  ],
+  "oracleText": "Whenever this creature attacks and isn't blocked, you may have defending player play with their hand revealed for as long as this creature remains on the battlefield. If you do, this creature assigns no combat damage this turn.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

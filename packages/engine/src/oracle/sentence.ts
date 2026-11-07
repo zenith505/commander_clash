@@ -5,7 +5,7 @@ import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind, X
 import { Ctx, parseBody, parseUnlessPays } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseCount } from "./counts";
-import { parseKeywordList, parseObject, parsePlayer } from "./targets";
+import { parseKeywordList, parseObject, parsePlayer, parseTargetPhrase } from "./targets";
 import { parseGrants } from "./grants";
 import { parseBasicsSentence } from "./sentences/basics";
 import { parseEveryPlayerZonesSentence, parseZonesSentence } from "./sentences/zones";
@@ -236,6 +236,13 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   // Summary Dismissal: "Exile all other spells and counter all abilities" (see Effect "dismissStack").
   if (ctx.spell && /^Exile all other spells and counter all abilities$/.test(s)) return [{ type: "dismissStack" }];
   if (ctx.spell && /^Counter all spells your opponents control and all abilities your opponents control$/.test(s)) return [{ type: "counterOpponentsStack" }];
+  // Cut the Tethers (see Effect "bounceEachUnless"): every permanent of that subtype (CR 205.3), whoever controls it.
+  const tethers = ctx.spell ? /^For each ([A-Z][a-z]+), return it to its owner's hand unless that player pays ((?:\{[^}]+\})+)$/.exec(s) : null;
+  if (tethers) {
+    const filter = parseTargetPhrase(tethers[1]!);
+    const unless = parseUnlessPays(tethers[2]!, ctx);
+    return filter?.kind === "object" && !filter.controller && unless && !unless.generic && !unless.life && !unless.lifeAmount ? [{ type: "bounceEachUnless", filter: { ...filter, text: tethers[1]! }, unless }] : null;
+  }
   // Whirlwind Denial (see Effect "counterOpponentsStackUnless").
   const denial = ctx.spell ? /^For each spell and ability your opponents control, counter it unless its controller pays (\{\d+\})$/.exec(s) : null;
   if (denial) {

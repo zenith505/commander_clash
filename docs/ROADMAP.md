@@ -1,6 +1,6 @@
 # Roadmap
 
-30,324 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,334 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,649 of
 9,979 (96%).
 
@@ -415,7 +415,7 @@ line blocks.
    "with lesser toughness" in dies triggers (Colfenor, the Last Yew; "other target creature card" is other than the one
    that died, which also fixes Jackdaw Savior, rulings), Exponential Growth (doubling X times), granted extort (Pontiff
    of Blight), Analyze the Pollen (either search, by evidence).
-   Out after round 187 (looked at, not done): Force Bubble (damage to you replaced by that many counters on it),
+   Out after round 187 (looked at, not done): Force Bubble (done in round B135) (damage to you replaced by that many counters on it),
    Killer Service ("you may pay {2} and sacrifice a token": a paid "may" with a sacrifice in it), Abundant
    Harvest ("choose land or nonland": a new choice).
    Round 188 went on from the top: "choose odd or even" (Extinction Event, Mutinous Massacre, Twins of Discord,
@@ -2398,7 +2398,7 @@ line blocks.
    checked for each defender, so not the Saddlebrute's controller or their planeswalkers, nor battles; CR 302.6, 508.1a); "Whenever an opponent gains control of a permanent
    from you" (Zidane, Tantalus Thief); "Whenever a permanent card is put into your graveyard from your library, exile
    it with a croak counter on it" and "You may play lands and cast spells from among cards you own in exile with croak
-   counters on them" (Grolnok, the Omnivore). +9, 30,324 of 31,936 with B128 to B134.
+   counters on them" (Grolnok, the Omnivore). +9, 30,334 of 31,936 with B128 to B135.
    Out after round 297 (looked at, not done): Intellect Devourer (done in round 298) ("each opponent exiles a card from their hand until ~
    leaves the battlefield", then casting those cards with mana of any color: next round); The Red Terror ("Whenever a red source you control deals damage to
    one or more permanents and/or players": one trigger per source per damage event, CR 120.3); Archfiend of Spite ("loses
@@ -3266,7 +3266,7 @@ line blocks.
    - Bots vote by a rough count of what each choice does for them (bot-votes.ts), and always take an optional extra
      vote.
    - Storage lands still out: Crucible of the Spirit Dragon (X mana in any combination of all five colors: too many
-     buttons), City of Shadows ("Exile a creature you control" cost); Decree of Silence and Force Bubble (depletion
+     buttons), City of Shadows ("Exile a creature you control" cost); Decree of Silence and Force Bubble (done in round B135) (depletion
      counters as a trigger's or replacement's count).
    - Autopay and bots take one storage counter at a time from a storage land (never more than a payment needs, so
      a bigger amount is only from the land's menu); a bot keeps Bottomless Vault-style lands tapped until they have
@@ -3554,7 +3554,7 @@ line blocks.
      Urabrask's Forge (X/X tokens); "any number of target ... return each of them" (Semester's End, Brago); Flickerform
      ("and all Auras attached to it"); Memory Jar (exile hands face down); Teferi's Time Twist, Phelia, Koya, Norin,
      Conciliator's Duelist, Mistmeadow Vanisher, Vizier of Deferment, Charming Prince; Avacyn and Resurrection Orb,
-     From the Catacombs, Moira and Teshar, Kheru Lich Lord; copy tokens with "except" or "for each" (Hate Mirage,
+     From the Catacombs, Moira and Teshar, Kheru Lich Lord (done in round B135); copy tokens with "except" or "for each" (Hate Mirage,
      Twinflame, Kindred Charge, Jaxis); Spinal Embrace, Lae'zel's Acrobatics, Golden Argosy, Identity Thief, Wake to
      Slaughter; "If you controlled it, ... Otherwise, its controller" (Unyielding Gatekeeper) and Azog's amass.
    - Simplifications: "sacrifice those creatures / them at the next end step" makes one delayed trigger per object
@@ -3759,7 +3759,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   from Deserts); Balduvian Fallen (mana spent on a cumulative upkeep payment); Viashino Bey (an attack requirement
   that depends on the declaration itself); Heroism (per-attacker pay-or-prevent); Ogre Enforcer (lethal damage from a
   single source); Groffskithur (done in round B129) ("target card named ~" in a graveyard: a target filter by the source's name); Urborg
-  Panther (a cost that sacrifices creatures by name); Sworn Defender and Lesser Werewolf (power-dependent combat
+  Panther (a cost that sacrifices creatures by name); Sworn Defender (done in round B135) and Lesser Werewolf (power-dependent combat
   tricks).
 - Round B2 (ranks 32,230 up to about 31,000, plus some more played cards the same templates cover): prevention of
   damage a creature deals to, or is dealt by, creatures of a color, snow creatures, Walls, enchanted creatures or
@@ -3875,7 +3875,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "Cowards (creatures with defender) can't block this turn"; "attacking Warriors get +1/+1". +74 (25,572 with round 177).
 - Skipped there, with reasons: Silence the Believers (done in round B109) ("any number of target creatures and all Auras attached to
   them"); Mark of Eviction (done in round B108) and Deathless Knight (done in round B108) (triggers from the battlefield back to the hand or the graveyard);
-  Prairie Dog (a counter replacement until end of turn); Kazandu Stomper ("up to two lands you control": a pick with
+  Prairie Dog (done in round B135) (a counter replacement until end of turn); Kazandu Stomper ("up to two lands you control": a pick with
   "up to"); Vicious Offering (a kicker cost that isn't mana); Nissa's Defeat (its target phrase); Chandra's Defeat
   ("if that permanent is a Chandra planeswalker, you may discard a card. If you do, ..."); Prohibit (done in round B108), Expel the
   Unworthy and Agonizing Demise (done in round B109) (kicked riders not parsed yet); Morgue Burst (done in round B109) ("the power of the card returned this
@@ -4475,7 +4475,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   life"), Carrion Wurm ("any player may exile three", done in round B132), Matopi Golem (a regeneration shield's rider, done in
   round B132), Taunt (a rule
   bound to a target player), Goblin Sappers ("destroy it and ~ at end of combat"), Curtain of Light (done in round B110), Dazzling Beauty (done in round B110) and
-  Trap Runner (done in round B110) ("becomes blocked" by an effect), Kill-Suit Cultist (a destroy-instead damage shield), Rock Jockey,
+  Trap Runner (done in round B110) ("becomes blocked" by an effect), Kill-Suit Cultist (done in round B135) (a destroy-instead damage shield), Rock Jockey,
   Explosion of Riches, Power Pack, Cinderheart Giant (done in round B116) (chosen at random as it resolves, not targeted), Juju Bubble ("play
   a card"), Curse Artifact, Erithizon (done in round B110) (a target chosen by the defending player), Selfless Exorcist (done in round B126), Cut the Tethers.
 - Round B32 (harder skipped cards, least played first): "you may pay ... If you do ... Otherwise, ..." (Spitting
@@ -4925,7 +4925,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Hedron Blade), "As long as you've surveilled this turn" (Darkblade Agent: surveil now tracked apart from scry),
   "When a source an opponent controls deals damage to you, sacrifice ~" (Awaken the Sky Tyrant). +32 (28,296 of 31,936 with rounds 217 to 221).
 - Out after round B51 (looked at, not done): Backfire (done in round B130) ("that much damage" from damage the enchanted creature dealt to
-  you), Equal Treatment and Well-Laid Plans (damage replacement and prevention between sources), Spin into Myth
+  you), Equal Treatment (done in round B135) and Well-Laid Plans (damage replacement and prevention between sources), Spin into Myth
   (fateseal), Elderwood Scion (spells that target it cost less), Tidal Control and Quicksilver Dragon (any player may
   activate; changing a spell's only target), Necromancer's Magemark (a replacement for enchanted creatures you control),
   Selective Snare (X targets of a chosen type), Roving Keep (done in round B113), Slab Hammer (done in round B113), Leonin Bola, Apathy (done in round B112), Death Match (done in round B110), Display of
@@ -6132,7 +6132,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   answer threats with Turn the Tables (at their biggest attacker), Aegis of Honor and Reverberation. No new prompts. +10
   (30,073 of 31,936 with B119 and rounds 286 and 287).
 - Out after round B120 (looked at, not done): Nova Pentacle (a target creature an opponent of your choice chooses, rulings),
-  Lichenthrope, Force Bubble and Crumbling Sanctuary (damage replaced by counters or exiled cards: a replacement that isn't
+  Lichenthrope, Force Bubble (done in round B135) and Crumbling Sanctuary (damage replaced by counters or exiled cards: a replacement that isn't
   a prevention, so it applies to damage that can't be prevented and is ordered with the shields, CR 616.1; the damage rules
   only prevent or redirect), Eye for an Eye (the damage is dealt and the same amount dealt to the source's controller),
   Channel Harm ("you may have ~ deal that much damage" each time damage is prevented, a choice inside the prevention).
@@ -6351,6 +6351,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   flying blocked by ~", kept tapped while the Vine stays tapped). Bots splice or entwine with lands as the cost only with
   five lands left after, and entwine Solar Tide only when both modes together help them. Browser tests for Torrent of
   Stone's Mountains picked after the targets and Solar Tide's entwine button. +11 (30,315 of 31,936).
+- Round B135 (least played first, from the list): Prairie Dog ("until end of turn, if you would put one or more +1/+1
+  counters on a creature you control, put that many plus one": only counters you put, each resolution one more, a creature
+  entering with counters too, rulings), Force Bubble (damage to you replaced by that many depletion counters on it, not
+  prevented, rulings), Kill-Suit Cultist (the next damage to target creature this turn replaced by its destruction: none
+  of it is dealt, and an indestructible one keeps it used up, rulings), Equal Treatment (any damage of 1 or more is 2 this
+  turn), Void (the number chosen as it resolves, 0 to 20: no Commander card has a mana value over 16; the target as it's
+  cast, rulings), Bronze Horse (damage from a spell that has it as a target prevented while you control another
+  creature), Sentinel and Sworn Defender (power and toughness set from a creature in combat with it, locked in as the
+  ability resolves, CR 608.2h, in layer 7b so counters still apply, rulings), Kheru Lich Lord (a creature card at random
+  from your graveyard with flying, trample and haste, exiled at your next end step or if it would leave, rulings), Grave
+  Consequences (each player exiles any number of cards from their graveyard in APNAP order, all at once, then loses 1
+  life for each card left; bots keep only what they can use there while life allows). Bots don't activate Kill-Suit
+  Cultist, Prairie Dog's ability or Sworn Defender's (Sentinel's {0} neither, like other free abilities). Browser tests for
+  Grave Consequences' graveyard pick and Void's number. +10 (30,325 of 31,936).
+- Known gap from round B135: with two Force Bubbles (a copy), the first one takes all the damage; its controller should
+  choose which one does each time (rulings).
+- Out after round B135 (looked at, not done): Tariff (a punisher whose cost is the chosen creature's own mana cost),
+  Words of War (a target chosen as a draw is replaced), Gloom (a tax on activated abilities, mana abilities too),
+  Delaying Shield (its first line compiles now; still out: "you lose 1 life unless you pay {1}{W}" for each counter removed).
 - Known gap from round B134: a splice or entwine cost that picks the same kind of thing as one of the spell's other costs
   (Torrent of Stone's Mountains onto an Arcane spell that also sacrifices a creature) isn't offered or is refused as it's
   cast, though the rules allow paying both.
@@ -6417,7 +6436,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   blocking alone" as it died, CR 506.5, with other creatures dying at the same time).
 - Out after round B115 (looked at, not done): Cut the Tethers (a punisher for each Spirit that returns only the ones
   their owners didn't pay for), Song of Blood (done in round B127) (a delayed attack trigger whose bonus counts the creature cards milled as
-  it resolved), Expel the Unworthy (a kicker that changes what the spell can target), Kill-Suit Cultist and Goblin
+  it resolved), Expel the Unworthy (a kicker that changes what the spell can target), Kill-Suit Cultist (done in round B135) and Goblin
   Psychopath (damage replaced by a destroy or redirected, ordered with other shields, CR 616.1, as Lichenthrope).
 - Out after round B114 (looked at, not done): Titania's Song (its effect continuing until end of turn after it leaves the
   battlefield), Fortunate Few (each player in turn choosing a nonland permanent not already chosen), Magnetic Mountain
@@ -6573,7 +6592,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Bonerattle (a destination chosen by mana value against domain), Nick Fury (put onto the battlefield tapped and
   attacking from the hand), Oath of Mages (a target chosen by another player), Glyph of Life (done in round B130), Mob Mentality,
   Breaking // Entering, Darigaaz, Grime Gorger, Naya Soulbeast.
-- Out after round B85 (looked at, not done): Grave Consequences (each player exiles any number from their own
+- Out after round B85 (looked at, not done): Grave Consequences (done in round B135) (each player exiles any number from their own
   graveyard, then a count per player), Magus of the Arena (a target chosen by an opponent), Paragon of Modernity
   (exactly three colors of mana spent on an activation), Scarwood Bandits (an "Unless an opponent pays" lead clause on
   an activated ability).
@@ -6600,7 +6619,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B79 (looked at, not done): Aquamorph Entity (a choice as it's turned face up: the special action
   can't pause yet), Volrath's Laboratory and Riptide Replicator (tokens of the chosen color and creature type), Barbed
   Foliage ("loses flanking" has to remove the trigger), Sunglasses of Urza, Knight of Valor, Grifter's Blade, Halfdane,
-  Bronze Horse, Mister Immortal (activated from exile), Wall of Deceit (done in round 271) and Backslide (turn a creature face down),
+  Bronze Horse (done in round B135), Mister Immortal (activated from exile), Wall of Deceit (done in round 271) and Backslide (turn a creature face down),
   Sarkhan's Whelp (done in round B105), Dredging Claw, Defiant Vanguard (done in round B108). Known gaps: Dormant Gomazoa doesn't trigger when a spell's target is
   changed to you; a non-mana echo cost (Echo—discard) doesn't count as "echo cost is paid".
 - Out after round B78 (looked at, not done): Master of Barbs ("one or more opponents are dealt noncombat damage": no

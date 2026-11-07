@@ -228,6 +228,22 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const amount = { ...n, plus: Number(m[2]) };
     return [{ type: "continuous", what: { ref: "self" }, mods: [m[1] === "power" ? { kind: "setPower", power: amount } : { kind: "setToughness", toughness: amount }], duration: "game" }];
   }
+  // Sentinel: "~'s base toughness becomes equal to 1 plus the power of target creature blocking or blocked by ~" (lasting
+  // indefinitely): that creature's power as it resolves, locked in then (CR 608.2h), set in layer 7b (rulings).
+  if ((m = /^~'s base (power|toughness) becomes equal to (\d+) plus the power of (target creature blocking or blocked by ~)$/.exec(s))) {
+    const of = parseObject(m[3]!, ctx);
+    if (of?.ref !== "target") return null;
+    const amount = { count: { kind: "power" as const, of }, plus: Number(m[2]) };
+    return [{ type: "continuous", what: { ref: "self" }, mods: [m[1] === "power" ? { kind: "setPower", power: amount } : { kind: "setToughness", toughness: amount }], duration: "game" }];
+  }
+  // Sworn Defender: "~'s power becomes the toughness of target creature blocking or being blocked by ~ minus 1 until end of
+  // turn, and its toughness becomes 1 plus the power of that creature until end of turn": both from that creature as it
+  // resolves, locked in then (CR 608.2h), set in layer 7b (rulings).
+  if ((m = /^~'s power becomes the toughness of (target creature blocking or (?:being )?blocked by ~) minus (\d+) until end of turn, and its toughness becomes (\d+) plus the power of that creature until end of turn$/.exec(s))) {
+    const of = parseObject(m[1]!.replace("being blocked", "blocked"), ctx);
+    if (of?.ref !== "target") return null;
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPower", power: { count: { kind: "toughness", of }, plus: -Number(m[2]) } }, { kind: "setToughness", toughness: { count: { kind: "power", of }, plus: Number(m[3]) } }], duration: "endOfTurn" }];
+  }
   if ((m = /^~'s base power becomes equal to (the number of .+) until end of turn$/.exec(s))) {
     const n = parseCount(m[1]!, ctx);
     if (!n) return null;

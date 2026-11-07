@@ -15,7 +15,7 @@ import { batchCountersRemoved, batchPlayerCounters, countersRemoved, putPlayerCo
 import { createExtraTokens, createToken } from "./effects/run-tokens";
 import { fireEvent } from "./effects";
 import { bindChosen, inRange, objectMatches, playerProtectedFrom } from "./effects/targeting";
-import { canPreventDamage, enterTogether, gainLife, log, loseLife, simultaneousLifeLoss, millCount, moveObject, obj, player, syncControl, turnOrderFrom, useShieldCounter } from "./game";
+import { canPreventDamage, destroyPermanent, enterTogether, gainLife, log, loseLife, simultaneousLifeLoss, millCount, moveObject, obj, player, syncControl, turnOrderFrom, useShieldCounter } from "./game";
 import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import type { CardDef, Color, DamageRule, GameObject, GameState, ObjectId, PlayerId, RedirectShield } from "./types";
@@ -438,7 +438,7 @@ type ShieldOp =
   | { kind: "prevent"; to: Rec; n: number; srcName: string; toName: string; rule?: string; src?: DamageSource; card?: string }
   | { kind: "redirect"; to: Rec; shield: string; n: number; srcName: string; fromName: string; toName: string; card: string; rule?: boolean }
   /** A damage amount replacement or a prevention effect that changes the amount (see DamageMod): `from` became `n`. */
-  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** Damage to a player: who. */ player?: PlayerId; /** A "next time" one, used up now. */ once?: string; /** Lichenthrope: the counters put on `id` instead, by `by`. */ counters?: { id: ObjectId; counter: string; by: PlayerId }; /** Undead Alchemist, Szadek: `player` mills `from - n` cards instead. */ mill?: true }
+  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** Damage to a player: who. */ player?: PlayerId; /** A "next time" one, used up now. */ once?: string; /** Lichenthrope: the counters put on `id` instead, by `by`. */ counters?: { id: ObjectId; counter: string; by: PlayerId }; /** Kill-Suit Cultist: the creature destroyed instead. */ destroy?: ObjectId ; /** Undead Alchemist, Szadek: `player` mills `from - n` cards instead. */ mill?: true }
   /** The Mindskinner's additional effect (CR 615.5): each opponent of `by` mills `n` cards, even if the damage couldn't be prevented (615.12). */
   | { kind: "mill"; by: PlayerId; n: number; card: string; /** `by` mills it themselves (Angel of Suffering). */ self?: true; /** Gloom Surgeon: `by` exiles that many from the top of their library instead (not a mill, CR 701.17a). */ exile?: true }
   /** Khârn the Betrayer's additional effect (CR 615.5): `to` gains control of it, after any prevention. */
@@ -456,6 +456,8 @@ interface ShieldPlan {
   used?: number;
   /** The rules it planned with, static ones included (Purity's are made for this event only). */
   rules?: DamageRule[];
+  /** Kill-Suit Cultist: the creatures destroyed instead of being dealt the damage, filled in as the plan is committed. */
+  destroyed?: ObjectId[];
 }
 
 /** One of the shields around a permanent or player, as the planner sees it. */
@@ -711,6 +713,7 @@ function modApplies(s: GameState, m: LiveMod, e: DamageEvent, preventing: boolea
         ok =
           (!!t.self && o.id === h?.id) ||
           (!!t.objects && objectMatches(s, t.objects, o, d.you, false)) ||
+          (!!t.chosen && o.id === t.chosen.id && (o.zoneChanges ?? 0) === t.chosen.zc) ||
           (!!t.chosenPermanents && h?.chosen?.player !== undefined && controllerOf(s, o) === h.chosen.player) ||
           (t.permanentsOf !== undefined && controllerOf(s, o) === t.permanentsOf);
     }
@@ -731,7 +734,8 @@ function modAmount(s: GameState, m: LiveMod, n: number): number {
   if (d.op === "allBut") return Math.min(n, d.n ?? 0);
   if (d.op === "raiseTo") return Math.max(n, modExtra(s, m));
   if (d.op === "setTo") return modExtra(s, m);
-  // Lichenthrope: none of it is dealt; the counters are put instead (see the "modify" op).
+  // Lichenthrope: none of it is dealt; the counters are put instead (see the "modify" op). Kill-Suit Cultist: none of it
+  // is dealt; the creature is destroyed instead.
   return 0;
 }
 
@@ -745,8 +749,9 @@ function modLabel(s: GameState, m: LiveMod): string {
     : d.op === "allBut" ? `Prevent all but ${d.n} of it`
     : d.op === "raiseTo" || d.op === "setTo" ? `Make it ${modExtra(s, m)}`
     : d.op === "counters" && d.mill ? `Put that many ${d.counter} counters on ${m.card} and mill that many cards instead`
-    : d.op === "counters" ? `Put that many ${d.counter} counters on it instead`
+    : d.op === "counters" ? `Put that many ${d.counter} counters on ${d.to?.self ? "it" : m.card} instead`
     : d.op === "mill" ? "Mill that many cards instead"
+    : d.op === "destroy" ? "Destroy it instead"
     : "Prevent it";
   return `${what} (${m.card})`;
 }
@@ -1024,7 +1029,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         const before = at[i]!;
         at[i] = modAmount(s, m, before);
         seen[i]!.add(m.key);
-        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}), ...toPlayer(to), ...(m.mod.op === "counters" && m.holder ? { counters: { id: m.holder.id, counter: m.mod.counter!, by: m.mod.you } } : {}), ...(m.mod.mill && "player" in to ? { mill: true as const } : {}) });
+        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}), ...toPlayer(to), ...(m.mod.op === "counters" && m.holder ? { counters: { id: m.holder.id, counter: m.mod.counter!, by: m.mod.you } } : {}), ...(m.mod.op === "destroy" && "object" in to ? { destroy: to.object } : {}), ...(m.mod.mill && "player" in to ? { mill: true as const } : {}) });
       }
     };
     // How much of the damage a shield takes from each source's: `pick` chooses one at a time, among the options in the
@@ -1136,7 +1141,10 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
             applyMod(o.mod, at, seen);
             // Undead Alchemist's and Szadek's milling (and Szadek's counters) instead count as much as the damage would.
             if (o.mod.mod.mill) swapped += before - at.reduce((a, n) => a + n, 0);
-            else if (o.mod.mod.op === "counters") swapped += (before - at.reduce((a, n) => a + n, 0)) * (o.mod.mod.counter === "-1/-1" ? 1.5 : -0.5);
+            // Force Bubble's depletion counters bring its sacrifice nearer: better than the damage, worse than preventing it.
+            else if (o.mod.mod.op === "counters") swapped += (before - at.reduce((a, n) => a + n, 0)) * (o.mod.mod.counter === "-1/-1" ? 1.5 : o.mod.mod.counter === "+1/+1" ? -0.5 : 0.5);
+            // Kill-Suit Cultist: the creature destroyed is worse for its controller than any damage to it.
+            if (o.mod.mod.op === "destroy" && before > at.reduce((a, n) => a + n, 0) && "object" in to) swapped += controllerOf(s, obj(s, to.object)) === who ? 100 : -100;
           } else taken.push(allocate(o.shield, at, () => 0)!);
         }
         const used = taken.reduce((a, t) => a + t.reduce((x, y) => x + y, 0), 0);
@@ -1230,7 +1238,13 @@ function preventedAll(s: GameState, e: DamageEvent): boolean {
   if (from?.zone === "battlefield" && characteristics(s, from).preventDamage?.some((p) => p.by && kind(p))) return true;
   if (!("object" in e.to)) return false;
   const to = obj(s, e.to.object);
-  return !!characteristics(s, to).preventDamage?.some((p) => p.to && kind(p) && (!p.fromTypes || p.fromTypes.every((t) => e.src.types.includes(t))) && (!p.fromColors || p.fromColors.some((c) => (e.src.colors as string[]).includes(c))));
+  return !!characteristics(s, to).preventDamage?.some((p) => p.to && kind(p) && (!p.fromTypes || p.fromTypes.every((t) => e.src.types.includes(t))) && (!p.fromColors || p.fromColors.some((c) => (e.src.colors as string[]).includes(c))) && (!p.targetingSpells || spellTargets(s, e.src, to)));
+}
+
+/** Bronze Horse: is the damage from a spell (the one resolving) with `o` among its targets? */
+function spellTargets(s: GameState, src: DamageSource, o: GameObject): boolean {
+  const item = s.resolving?.item;
+  return !!src.spell && item?.kind === "spell" && !!src.ref && item.objectId === src.ref.object && (item.targets ?? []).some((t) => t.kind === "object" && t.id === o.id);
 }
 
 /** Which of the permanents and players a rule protects its controller would rather it took damage away from: a creature the damage would destroy first, then the player. */
@@ -1343,7 +1357,10 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     } else if (op.kind === "shieldCounter") useShieldCounter(s, obj(s, op.id), `${op.srcName} dealing damage to it`);
     else if (op.kind === "modify") {
       if (op.once) usedMods.add(op.once);
-      if (op.counters) {
+      if (op.destroy !== undefined) {
+        (plan.destroyed ??= []).push(op.destroy);
+        log(s, `${op.card}: ${op.from} damage from ${op.srcName} to ${op.toName} isn't dealt; it's destroyed instead.`);
+      } else if (op.counters) {
         swapLater.push({ ...op.counters, n: op.from - op.n });
         log(s, `${op.card}: ${op.from} damage from ${op.srcName}${op.mill ? ` to ${op.toName}` : ""} is replaced by ${op.from - op.n} ${op.counters.counter} counter${op.from - op.n === 1 ? "" : "s"}${op.mill ? " and a mill" : ""}.`);
       } else if (op.mill) log(s, `${op.card}: ${op.from} damage from ${op.srcName} to ${op.toName} is replaced by a mill.`);
@@ -1562,6 +1579,12 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
       return { ...e, dealt };
     })),
   ));
+  // Kill-Suit Cultist: destroyed instead of being dealt the damage, as the rest of it is dealt (CR 614.1a).
+  for (const id of new Set(plan.destroyed ?? [])) {
+    const o = s.objects[id];
+    if (o?.zone === "battlefield") destroyPermanent(s, o, `${characteristics(s, o).name} is destroyed.`);
+  }
+  if (plan.destroyed?.length) invalidateCharacteristics(s);
   for (const [key, n] of witherCounters) {
     const [id, by] = key.split("|") as [ObjectId, PlayerId];
     const o = obj(s, id);

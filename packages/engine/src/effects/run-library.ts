@@ -434,7 +434,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     }
     case "parleyReveal": {
       // Parley: each player reveals the top card of their library, in turn order (CR 101.4); an empty library reveals nothing.
-      const counts = { land: 0, nonland: 0 };
+      const counts = { land: 0, nonland: 0, mv: 0 };
       const revealed: ObjectId[] = [];
       for (const pid of apnap(s, s.turnOrder.filter((p) => !player(s, p).lost))) {
         const p = player(s, pid);
@@ -442,6 +442,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (!id) continue;
         const d = defOf(s, obj(s, id));
         counts[isType(d, "Land") ? "land" : "nonland"]++;
+        counts.mv += defMv(d); // a split card's halves together, a double-faced card's front (CR 709.4, 712.8a)
         revealed.push(id);
         log(s, `${p.name} reveals ${d.name} from the top of their library.`);
       }

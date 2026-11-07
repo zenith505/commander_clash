@@ -508,7 +508,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "manifestedThisWay":
       return s.resolving?.manifestedThisWay ?? 0;
     case "parleyRevealed":
-      return (c.land ? s.resolving?.parley?.land : s.resolving?.parley?.nonland) ?? 0;
+      return (c.mv ? s.resolving?.parley?.mv : c.land ? s.resolving?.parley?.land : s.resolving?.parley?.nonland) ?? 0;
     case "damageThisWay":
       return s.resolving?.damageThisWay ?? 0;
     case "excessThisWay":
@@ -1364,7 +1364,7 @@ function describeCount(c: Count): string {
     case "manifestedThisWay":
       return "#cards manifested";
     case "parleyRevealed":
-      return c.land ? "#land cards revealed" : "#nonland cards revealed";
+      return c.mv ? "the total mana value of the cards revealed" : c.land ? "#land cards revealed" : "#nonland cards revealed";
     case "damageThisWay":
       return "the damage dealt";
     case "excessThisWay":

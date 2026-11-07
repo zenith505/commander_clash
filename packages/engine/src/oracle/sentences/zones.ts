@@ -209,6 +209,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     ctx.parley = true;
     return [{ type: "parleyReveal" }];
   }
+  // Naya Soulbeast: "~ enters with X +1/+1 counters on it, where X is the total mana value of all cards revealed this way" in
+  // its own cast trigger: the spell enters with them if it resolves (CR 614.1c; rulings: known once the trigger resolves).
+  // (The "where X is" amount is put in for X afterwards.)
+  if (ctx.parley && ctx.selfCastSpell && ctx.whereX && /^~ enters with X \+1\/\+1 counters on it$/.test(s)) return [{ type: "spellEntersWith", counter: "+1/+1", n: amt("X") }];
   if (ctx.parley && (m = /^For each ((?:non)?land card revealed this way), (?:you )?(.+)$/.exec(s))) return parseSentence(`${m[2]!.charAt(0).toUpperCase()}${m[2]!.slice(1)} for each ${m[1]}`, ctx);
   // "Put your commander into your hand from the command zone" (Command Beacon): one you own, of your choice with two
   // (rulings); nothing if none is there (CR 903.3).
@@ -1733,6 +1737,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Safe Haven: "return each card exiled with ~ to the battlefield under its owner's control", all at once and whatever
     // they are now (rulings).
     if (/^Return each card exiled with ~ to the battlefield under its owner's control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield", ownersControl: true }];
+    // Bane Alley Broker: "Return a card exiled with ~ to its owner's hand": one of them, chosen as it resolves (CR 607.2a).
+    if (/^Return a card exiled with ~ to its owner's hand$/.test(s)) return [{ type: "moveLinked", dest: "hand", exactly: 1 }];
     // Vault 13: Dweller's Journey: "Return two cards exiled with ~ to the battlefield under their owners' control and put the
     // rest on the bottom of their owners' libraries": two chosen as it resolves, returned at once; the others to the bottom.
     if (/^Return two cards exiled with ~ to the battlefield under their owners' control and put the rest on the bottom of their owners' libraries$/.test(s)) return [{ type: "moveLinked", dest: "battlefield", ownersControl: true, exactly: 2 }, { type: "linkedToBottom" }];

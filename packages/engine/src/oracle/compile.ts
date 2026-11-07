@@ -522,6 +522,8 @@ export function compile(d: CardDef): CompiledCard {
   const isSpell = d.types.includes("Instant") || d.types.includes("Sorcery");
   const spellLines: string[] = [];
   let ascendSpell = false;
+  /** Bane Alley Broker: "You may look at cards exiled with ~." (its face-down exile ability's cards). */
+  let lookLinked: string | undefined;
   /** Banefire: "If X is 5 or more, ... the damage can't be prevented": applied to the spell's damage once it's compiled. */
   let unpreventableX: number | undefined;
   /** Demonfire: "If you have no cards in hand, ... the damage can't be prevented", applied the same way. */
@@ -2693,6 +2695,21 @@ export function compile(d: CardDef): CompiledCard {
       const cond = parseStaticCondition(playWhile[1]!, { affects: { kind: "self" }, mods: [], text: line });
       if (!cond || out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
       else out.playLinkedWhile = { kind: "allOf", conds: [{ kind: "yourTurn" }, cond] };
+      continue;
+    }
+    // Bane Alley Broker: "You may look at cards exiled with ~.": the cards its face-down exile ability exiled (CR 406.3, 607.2a).
+    if (line === "You may look at cards exiled with ~.") {
+      if (lookLinked) out.unsupported.push(raw);
+      else lookLinked = raw;
+      continue;
+    }
+    // Pick Up the Pace: "You may play cards exiled with ~ as long as you attacked this turn": whenever that holds, with the
+    // usual costs and timing (playing a card is playing a land or casting a spell, CR 305.1, 601.2).
+    const playAsLong = /^You may play cards exiled with ~ as long as (.+)\.$/.exec(line);
+    if (playAsLong) {
+      const cond = parseStaticCondition(playAsLong[1]!, { affects: { kind: "self" }, mods: [], text: line });
+      if (!cond || out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
+      else out.playLinkedWhile = { kind: "allOf", conds: [cond] };
       continue;
     }
     // Nightveil Specter: "You may play lands and cast spells from among cards exiled with ~": always, with the usual
@@ -6277,6 +6294,15 @@ export function compile(d: CardDef): CompiledCard {
   if (cleave && !d.oracleId.endsWith("|cleaved")) {
     const v = compileCard({ ...d, oracleId: `${d.oracleId}|cleaved`, oracleText: cleavedTexts.get(d.oracleId) ?? cleavedText(d.oracleText) });
     if (!out.spell || v.unsupported.length || !v.spell) out.unsupported.push(`Cleave ${cleave.mana}`);
+  }
+  // Bane Alley Broker: its controller may look at the cards its one exile ability exiled face down, as they're exiled (and
+  // as they choose one to return, effects/run-zones.ts).
+  if (lookLinked) {
+    const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects));
+    const faceDown = all.filter((e): e is Extract<Effect, { type: "exileFaceDown" }> => e.type === "exileFaceDown");
+    const others = all.some((e) => e.type === "exile" || e.type === "exileTop" || e.type === "exileGraveyard" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "impulse" || e.type === "exileHand" || (e.type === "discard" && !!e.exile));
+    if (others || out.spell || faceDown.length !== 1 || faceDown[0]!.actor || faceDown[0]!.who) out.unsupported.push(lookLinked);
+    else faceDown[0]!.look = true;
   }
   linkExile(out);
   // "Target ... card not named ~" (Staff of Eden): this card's name (CR 201.5).

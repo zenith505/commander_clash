@@ -6280,6 +6280,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   and take 2 damage if it was discarded; the payer picks the card), Ion Storm ("Remove a +1/+1 counter or a charge
   counter from a permanent you control", the counter picker offering only those kinds). Browser tests for Carrion Wurm's
   graveyard pick, Tainted Specter's library-top choice and Ion Storm's counter picker. +11 (30,294 of 31,936).
+- Round B133 (least played first, from the skip lists): Flying Drone ("another creature with flying entered the
+  battlefield under your control this turn", the entered log noting flying), Thirsting Axe ("if equipped creature didn't
+  deal combat damage to a creature this turn, sacrifice it": an intervening if, CR 603.4, and the equipped creature is
+  sacrificed, CR 701.21a), Paragon of Modernity ("if exactly three colors of mana were spent to activate this ability",
+  from the mana paid for the activation; bots don't aim at three colors), Weight of Conscience ("Tap two untapped
+  creatures you control that share a creature type", changelings share every type, CR 702.73a) and Illuminated Folio
+  ("Reveal two cards from your hand that share a color", colorless isn't a color, CR 105.2c; a split card has both
+  colors, CR 709.4a): the cost picker's button waits for a valid pair, Genju of the Fields ("~'s controller gains that
+  much life"), Naya Soulbeast (parley's total mana value, the cast spell enters with that many +1/+1 counters), Haphazard
+  Bombardment (aim counters on four chosen nonenchantment permanents you don't control, not targeted; at your end step one
+  of them destroyed at random among those that can be, rulings), Pick Up the Pace ("a creature you control that entered
+  this turn attacks"; play the exiled cards as long as you attacked this turn), Bane Alley Broker (face-down exile you may
+  look at, CR 406.3, and the return of one of them; a new controller sees them only as that return resolves). Browser
+  tests for both share-cost pickers, Haphazard Bombardment's pick and Bane Alley Broker's return. +10 (30,304 of 31,936).
+- Out after round B133 (looked at, not done): Tamanoa (noncreature sources' damage as one event), Graceful Takedown,
+  Imperiosaur (mana spent only from basic lands), Flaming Gambit (the target player redirects the damage to a creature),
+  Magus of the Arena and Evangelize (a target chosen by an opponent).
 - Out after round B132 (looked at, not done): Bullseye and Death Dealer (still an activation cost with "or" between two
   costs), Misfortune, Fatal Lore and Library of Lat-Nam (still a mode chosen by an opponent as it's cast, CR 700.2e).
 - Out after round B131 (looked at, not done): Mister Immortal (an ability activated from exile, which neither the UI nor

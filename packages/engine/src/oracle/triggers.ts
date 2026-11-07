@@ -3904,6 +3904,31 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(line.replace(/, that creature gains /, ", enchanted creature gains "));
     return t && t !== "fail" && t.ifCond?.kind === "attachedIs" ? t : "fail";
   }
+  // Pick Up the Pace: "Whenever a creature you control that entered this turn attacks": that object came onto the
+  // battlefield this turn (CR 400.7; phasing in isn't entering, CR 702.26d).
+  const enteredAttacks = /^Whenever a creature you control that entered this turn attacks, (.+)$/.exec(line);
+  if (enteredAttacks) {
+    const t = parseTrigger(`Whenever a creature you control attacks, ${enteredAttacks[1]!}`);
+    if (!t || t === "fail" || t.event !== "creatureYouControlAttacks" || !t.attacker || t.attacker.anyone || t.attacker.other) return "fail";
+    return { ...t, attacker: { ...t.attacker, filter: { ...t.attacker.filter, enteredThisTurn: true, text: "creature you control that entered this turn" } } };
+  }
+  // Haphazard Bombardment: "At the beginning of your end step, if two or more permanents you don't control have an aim
+  // counter on them, destroy one of those permanents at random.": an intervening "if" (CR 603.4), any aim counters, whoever
+  // put them there (rulings); the one destroyed chosen among those without indestructible (rulings).
+  if (/^At the beginning of your end step, if two or more permanents you don't control have an aim counter on them, destroy one of those permanents at random\.$/.test(line)) {
+    const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], controller: "opponent", counter: "aim", text: "permanent you don't control with an aim counter on it" };
+    return { event: "yourEndStep", ifCond: { kind: "amount", amount: { count: { kind: "permanents", filter } }, min: 2 }, body: { targets: [], effects: [{ type: "destroyRandom", filter, destroyable: true }], text: "destroy one of those permanents at random." } };
+  }
+  // Genju of the Fields' animated Plains: "Whenever this creature deals damage, its controller gains that much life.": "its"
+  // is ~'s, as it resolves or as ~ last existed (CR 608.2h); once for each damage event (rulings: each instance triggers).
+  if (/^Whenever ~ deals damage, its controller gains that much life\.$/.test(line)) return parseTrigger(line.replace("its controller", "~'s controller"));
+  // Thirsting Axe: "At the beginning of your end step, if equipped creature didn't deal combat damage to a creature this
+  // turn, sacrifice it.": "it" is that creature, checked again as it resolves (CR 603.4); you sacrifice it only if you
+  // control it (CR 701.21a).
+  if (/^At the beginning of your end step, if equipped creature didn't deal combat damage to a creature this turn, sacrifice it\.$/.test(line)) {
+    const t = parseTrigger(line.replace(/sacrifice it\.$/, "sacrifice equipped creature."));
+    return t && t !== "fail" && t.ifCond?.kind === "attachedIs" ? t : "fail";
+  }
   // Volition Reins: "When this Aura enters, if enchanted permanent is tapped, untap it.": "it" is that permanent.
   if (/^When ~ enters, if enchanted permanent is tapped, untap it\.?$/.test(line)) {
     const t = parseTrigger(line.replace(/untap it(\.?)$/, "untap enchanted permanent$1"));

@@ -3068,6 +3068,11 @@ function parseStaticLine(line: string): StaticAbility | null {
   // Archangel of Tithes (as long as it's attacking): each blocking creature costs its controller {1} (CR 509.1d).
   const blockTax = /^Creatures can't block unless their controller pays \{(\d+)\} for each of those creatures$/.exec(text);
   if (blockTax) return { affects: { kind: "self" }, mods: [{ kind: "blockTax", n: Number(blockTax[1]) }], text: line };
+  // Heat Wave: "Nonblue creatures can't block creatures you control unless their controller pays 1 life for each blocking
+  // creature they control": life for each nonblue creature blocking one or more of yours, paid as blockers are declared
+  // (CR 509.1d-f).
+  const lifeBlockTax = /^Non(white|blue|black|red|green) creatures can't block creatures you control unless their controller pays (\d+) life for each blocking creature they control$/.exec(text);
+  if (lifeBlockTax) return { affects: { kind: "self" }, mods: [{ kind: "blockLifeTax", n: Number(lifeBlockTax[2]), notColor: COLOR_WORDS[lifeBlockTax[1]!]! }], text: line };
   // Norn's Annex: a Phyrexian symbol per creature, its color or 2 life (CR 107.4f).
   const phyTax = /^Creatures can't attack you( or planeswalkers you control)? unless their controller pays (\{[WUBRG]\/P\}) for each of those creatures$/.exec(text);
   if (phyTax) return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: 0, mana: phyTax[2]!, ...(phyTax[1] ? { planeswalkers: true as const } : {}) }], text: line };

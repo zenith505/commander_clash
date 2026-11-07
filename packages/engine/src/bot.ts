@@ -15,6 +15,8 @@ import {
   waitingOn,
   untapChoiceProblem,
   blockCost,
+  blockLifeCost,
+  blocksMayCostLife,
   blocksMayCost,
   livingPlayers,
   abilityProblem,
@@ -241,6 +243,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Lim-Dûl's Vault: keep five cards with at least two we'd like to draw; otherwise dig on while life allows, a few times.
     // Blocks an opponent chose for us with Odric: we don't pay for their plan; they choose again.
     if (pend.kind === "chooseMay" && pend.blockTax) return [{ type: "chooseMay", player: pid, yes: false }];
+    // Fasting: skip the draw step for the life while the hand still holds three or more cards (drawing destroys it).
+    if (pend.kind === "chooseMay" && pend.skipDraw) return [{ type: "chooseMay", player: pid, yes: player(s, pid).hand.length >= 3 }];
     // Dance with Calamity: another card while there's room for one of about average mana value under the limit.
     const luck = pend.kind === "chooseMay" ? /^exile the top card of your library \(total mana value so far: (\d+); (\d+) or less/.exec(pend.prompt) : null;
     if (luck) return [{ type: "chooseMay", player: pid, yes: Number(luck[2]) - Number(luck[1]) >= 4 }];
@@ -325,6 +329,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const lands = hand.filter((d) => isType(d, "Land")).length;
       return [{ type: "chooseMay", player: pid, yes: lands >= 1 && hand.length - lands <= 1 }];
     }
+    // Stromgald Spy: a revealed hand tells a bot nothing it uses; the combat damage is worth more.
+    if (pend.kind === "chooseMay" && mayFx.some((x) => x.type === "revealHandWhile")) return [{ type: "chooseMay", player: pid, yes: false }];
     if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? (revealedMay(s, pend.card) ?? millExplored(s, pid, pend.card)) : wantsMay(s, pid) }];
     // Perplex: discard the whole hand to keep the spell only when that hand is one card or none.
     // Grip of Amnesia: keep the spell unless the graveyard holds more than a few cards (they may be worth more).
@@ -837,6 +843,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const max = pend.numberRange?.max ?? 0;
       const n = Math.max(Math.min(max, life > 5 ? 1 : 0), Math.min(max, life - 12, 7));
       return [{ type: "chooseOption", player: pid, choice: String(n) }];
+    }
+    // Grifter's Blade: on our strongest creature.
+    if (pend.kind === "chooseOption" && pend.what === "attachHost") {
+      const best = [...pend.options].sort((a, b) => power(s, obj(s, b)) - power(s, obj(s, a)))[0]!;
+      return [{ type: "chooseOption", player: pid, choice: best }];
     }
     // Tribute (CR 702.104a): ask the opponent with the most life, who can best afford to let its ability happen.
     if (pend.kind === "chooseOption" && pend.what === "tribute") {
@@ -3315,6 +3326,19 @@ function castPlanWithModes(s: GameState, pid: PlayerId, id: string, free: boolea
 }
 
 /**
+ * Liquid Fire: the number chosen as it's cast (CR 601.2b), X damage to the target creature and the rest to its
+ * controller: just enough to destroy the creature, the rest at the player.
+ */
+function castNumberFor(s: GameState, id: ObjectId, targets: TargetChoice[] | undefined): number | undefined {
+  const r = compileCard(defOf(s, obj(s, id))).castNumber;
+  if (!r) return undefined;
+  const t = targets?.find((x) => x.kind === "object");
+  const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+  const need = o?.zone === "battlefield" ? Math.max(0, toughness(s, o) - (o.damage ?? 0)) : r.max;
+  return Math.min(r.max, Math.max(r.min, need));
+}
+
+/**
  * Casting it with these modes. `gate`: the optional costs some of its targets depend on, all of them paid or none (an
  * undefined gate leaves them to the usual choices below).
  */
@@ -3336,6 +3360,12 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
     for (let i = targets.length - 1; i > 0 && !planCast(s, pid, id, targets, modes, "auto", x, way); i--) if (targets[i]!.kind !== "none") targets[i] = { kind: "none" };
   }
   if (!free && body && isCounterOnly(body)) return null; // hold counterspells
+  // Cut the Tethers: only when the opponents own more of them than we do.
+  const tethers = body ? allEffects(body.effects).find((e) => e.type === "bounceEachUnless") : undefined;
+  if (tethers?.type === "bounceEachUnless") {
+    const hit = s.battlefield.filter((b) => objectMatches(s, tethers.filter, obj(s, b), pid, false)).map((b) => obj(s, b).owner);
+    if (hit.filter((p) => p !== pid).length <= hit.filter((p) => p === pid).length) return null;
+  }
   // Epic: no more spells for the rest of the game (CR 702.50a), so only as our last spell in hand.
   if (compileCard(defOf(s, obj(s, id))).epic && player(s, pid).hand.some((h) => h !== id && !isType(defOf(s, obj(s, h)), "Land"))) return null;
   // "Destroy all creatures" and the like: only when it hurts the opponents more than us.
@@ -3347,6 +3377,8 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
     const e = chooseExtraCosts(s, pid, id, targets ?? [], via, alt, costOr, x ?? 0, modes);
     if (!e) continue;
     if (costOr !== undefined) e.costOr = costOr;
+    const num = castNumberFor(s, id, targets ?? undefined);
+    if (num !== undefined) e.number = num;
     if (costOr === undefined || planCast(s, pid, id, targets ?? undefined, modes, "auto", x, { ...e, ...(via ? { via } : {}), ...(alt ? { alt } : {}) })) {
       extra = e;
       break;
@@ -4958,6 +4990,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
       if (halfLifeCost(s, pid, ab) > 3) continue;
       if (lifeSwapHurts(s, pid, ab.body.effects)) continue;
+      // Goblin Test Pilot: a target chosen at random might be us or ours.
+      if (ab.body.targets.some((x) => x.random)) continue;
       // The Deck of Many Things: "roll a d20 and subtract the number of cards in your hand. If the result is 0 or less,
       // discard your hand": with more than three cards in hand, the risk outweighs what the roll brings.
       if (ab.body.effects.some((e) => e.type === "if" && e.cond.kind === "rollIn" && e.cond.max !== undefined && e.cond.max <= 0 && e.effects.some((x) => x.type === "discard" && x.hand)) && player(s, pid).hand.length > 3) continue;
@@ -6725,15 +6759,17 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
  * left out, the last chosen first (the chump blocks and extras), with any attacker then left with too few blockers.
  */
 function payForBlocks(s: GameState, pid: PlayerId, a: Action): Action[] {
-  if (a.type !== "declareBlockers" || !blocksMayCost(s, pid)) return [a];
+  if (a.type !== "declareBlockers" || !(blocksMayCost(s, pid) || blocksMayCostLife(s))) return [a];
   let blocks = a.blocks;
   for (;;) {
     const blockers = [...new Set(blocks.map((b) => b.blocker))];
     const cost = blockCost(s, blockers.length, blockers, blocks);
+    // Heat Wave: life for blocks, only while 10 or more is left after paying.
+    const life = blockLifeCost(s, blocks);
     const taps = cost ? planMana(s, pid, parseManaCost(cost)) : [];
-    if (taps) return [...taps, { ...a, blocks }];
+    if (taps && (!life || player(s, pid).life - life >= 10)) return [...taps, { ...a, blocks }];
     // Qal Sisma Behemoth: the last one chosen that costs something to block.
-    const drop = [...blockers].reverse().find((b) => !!blockCost(s, 1, [b], blocks.filter((x) => x.blocker === b)))!;
+    const drop = [...blockers].reverse().find((b) => !!blockCost(s, 1, [b], blocks.filter((x) => x.blocker === b)) || blockLifeCost(s, blocks.filter((x) => x.blocker === b)) > 0)!;
     blocks = blocks.filter((b) => b.blocker !== drop);
     blocks = blocks.filter((b) => blocks.filter((x) => x.attacker === b.attacker).length >= blockersNeeded(s, obj(s, b.attacker)));
     const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);

@@ -18,6 +18,18 @@ import { emblemAbilityOk } from "../grants";
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
+  // Liquid Fire: "~ deals X damage to target creature and 5 minus X damage to that creature's controller, where X is the
+  // chosen number": the number chosen as it was cast (CompiledCard.castNumber; compile() refuses it without one).
+  // (body.ts rewrites it without "X", which would be the spell's own X, CR 107.3).
+  if ((m = /^~ deals the chosen number of damage to target creature and (\d+) minus the chosen number of damage to that creature's controller$/.exec(s))) {
+    const fx = parseSentence("~ deals 1 damage to target creature and 1 damage to that creature's controller", ctx);
+    if (!fx || fx.length !== 2 || fx.some((e) => e.type !== "damage")) return null;
+    const [a, b] = fx as Extract<Effect, { type: "damage" }>[];
+    return [
+      { ...a!, amount: { count: { kind: "chosenNumber" } } },
+      { ...b!, amount: { count: { kind: "chosenNumber" }, times: -1, plus: Number(m[1]) } },
+    ];
+  }
 
   // Plagiarize: "Until end of turn, if target player would draw a card, instead that player skips that draw and you draw a
   // card." (CR 614.1a; the body reads it as "If ..., ... until end of turn"): every draw of theirs this turn, the first in
@@ -1591,6 +1603,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const filter = m[2] ? parseTargetPhrase("noncreature spell") : undefined;
     if (filter === null || (filter && filter.kind !== "spell")) return null;
     return [{ type: "cantCast", who, ...(filter ? { filter: { ...filter, text: "noncreature spell" } } : {}), untilYourNextTurn: true }];
+  }
+  // Stromgald Spy: "defending player plays with their hand revealed for as long as ~ remains on the battlefield" (CR 402.3).
+  if ((m = /^(Defending player|That player|Target player|Target opponent|Each opponent) plays? with (?:their|his or her) hands? revealed for as long as ~ remains on the battlefield$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    if (!who) return null;
+    return [{ type: "revealHandWhile", who }];
   }
   // War Cadence: "This turn, creatures can't block unless their controller pays {X} for each blocking creature they
   // control": a cost to block for the rest of the turn (CR 509.1d), the X of the ability; blocks already declared don't

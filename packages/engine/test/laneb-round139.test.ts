@@ -16,6 +16,7 @@ const breakOpen = card("Break Open", "Instant", "{1}{R}", { oracleText: "Turn ta
 const citadel = card("Darksteel Citadel", "Artifact Land", "", { keywords: ["Indestructible"], oracleText: "Indestructible\n{T}: Add {C}." });
 const ogre = card("Gray Ogre", "Creature — Ogre", "{2}{R}", { power: "2", toughness: "2" });
 const legend = card("Isamaru, Hound of Konda", "Legendary Creature — Dog", "{W}", { power: "2", toughness: "2" });
+const clone = card("Clone", "Creature — Shapeshifter", "{3}{U}", { power: "0", toughness: "0", oracleText: "You may have Clone enter as a copy of any creature on the battlefield." });
 const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -247,6 +248,31 @@ describe("Aquamorph Entity: 5/1 or 1/5 as it enters or is turned face up", () =>
     s = settle(act(s, { type: "chooseOption", player: opp, choice: "1" }));
     expect(s.objects[aq]!.faceDown).toBeFalsy();
     expect(pt(s, aq)).toBe("1/5");
+  });
+
+  it("rulings: a creature becoming a copy of a face-up 1/5 Entity is 1/5; a Clone entering as a copy chooses for itself", () => {
+    const { s: s0, ap, ids, opp } = setup([aquamorph, cytoshape, clone]);
+    putOnBattlefield(s0, ap, card("Island", "Basic Land — Island"));
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)), { me: [ap] });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "1" }));
+    expect(pt(s, ids[0]!)).toBe("1/5");
+    const theirBear = putOnBattlefield(s, opp, bear());
+    s = settle(run(s, planCast(s, ap, ids[1]!, [tgt(theirBear)])), { me: [ap] });
+    s = settle(act(s, { type: "pickPermanents", player: ap, ids: [ids[0]!] }));
+    expect(nameOf(s, theirBear)).toBe("Aquamorph Entity");
+    expect(pt(s, theirBear)).toBe("1/5");
+    s = settle(run(s, planCast(s, ap, ids[2]!)), { me: [ap] });
+    for (let i = 0; i < 5 && s.pending && !(s.pending.kind === "chooseOption" && s.pending.what === "form"); i++) {
+      const p = s.pending;
+      if (p.kind === "chooseMay") s = settle(act(s, { type: "chooseMay", player: ap, choice: true }), { me: [ap] });
+      else if (p.kind === "chooseOption") s = settle(act(s, { type: "chooseOption", player: ap, choice: p.options.includes(ids[0]!) ? ids[0]! : p.options[0]! }), { me: [ap] });
+      else break;
+    }
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap, what: "form" });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "0" }));
+    expect(nameOf(s, ids[2]!)).toBe("Aquamorph Entity");
+    expect(pt(s, ids[2]!)).toBe("5/1");
+    expect(pt(s, ids[0]!)).toBe("1/5");
   });
 
   it("a bot turning its own face up picks a form", () => {

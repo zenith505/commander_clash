@@ -123,7 +123,7 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // The name is as short as it can be (Mordor Trebuchet: "named Ballistic Boulder that's tapped and attacking"), since the
   // "i" flag lets [A-Z] match "that's" too.
-  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?(\\d+|X)/(\\d+|X) (.+?) creature tokens?(?: with (.+?))?(?: named ([A-Z][\\w'-]*(?: (?:of |the )?[A-Z][\\w'-]*)*?))?(?: that(?:'s| are) (tapped(?: and attacking(?: that player)?)?|attacking|blocking that creature))?$`, "i").exec(s))) {
+  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?(\\d+|X)/(\\d+|X) (.+?) creature tokens?(?: with (.+?))?(?: named ([A-Z][\\w'-]*(?: (?:of |the )?(?!for each\\b)[A-Z][\\w'-]*)*?))?(?: that(?:'s| are) (tapped(?: and attacking(?: that player)?)?|attacking|blocking that creature))?$`, "i").exec(s))) {
     const xx = m[4] === "X" || m[5] === "X";
     // "An X/1 red Phyrexian Horror creature token" (Urabrask's Forge): only its power is X.
     const xPower = m[4] === "X" && m[5] !== "X";

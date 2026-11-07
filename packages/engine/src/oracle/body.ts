@@ -1086,6 +1086,58 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Agility Bobblehead: "Up to X target creatures you control each gain haste until end of turn and can't be blocked this
   // turn except by creatures with haste, where X is ...": both to each target, X counted as the targets are chosen
   // (rulings: what happens to the Bobbleheads later doesn't matter).
+  // Dragon's Approach: "~ deals 3 damage to each opponent. You may exile ~ and four cards named ~ from your graveyard. If you
+  // do, search your library for a Dragon creature card, put it onto the battlefield, then shuffle.": offered only with four
+  // such cards there (canDoNow), since exiling them all is what "if you do" needs (CR 609.3); the spell on the stack is exiled with
+  // them, a copy too (it ceases to exist, CR 707.10a, rulings), and the four are chosen if there are more.
+  if (opts.spell && text.trim() === "~ deals 3 damage to each opponent. You may exile ~ and four cards named ~ from your graveyard. If you do, search your library for a Dragon creature card, put it onto the battlefield, then shuffle.") {
+    const dmg = parseBody("~ deals 3 damage to each opponent.", opts);
+    const four = parseBody("Exile four cards named ~ from your graveyard.", opts);
+    const search = parseBody("Search your library for a Dragon creature card, put it onto the battlefield, then shuffle.", opts);
+    if (!dmg || !four || !search || dmg.targets.length || four.targets.length || search.targets.length) return null;
+    // The four first: the may runs its instructions again from the start after the choice.
+    return {
+      targets: [],
+      effects: [
+        ...dmg.effects,
+        { type: "may", effects: [...four.effects, { type: "exileSpell" }], text: "exile ~ and four cards named ~ from your graveyard" },
+        { type: "if", cond: { kind: "youDid" }, effects: search.effects },
+      ],
+      text,
+    };
+  }
+  // Aven Courier: "choose a counter on a permanent you control. Put a counter of that kind on target permanent you control
+  // if it doesn't have a counter of that kind on it.": the target chosen as it's put on the stack, the kind as it resolves
+  // (rulings).
+  if (/^[Cc]hoose a counter on a permanent you control\. Put a counter of that kind on target permanent you control if it doesn't have a counter of that kind on it\.$/.test(text.trim())) {
+    const b = parseBody("Tap target permanent you control.", opts);
+    if (!b || b.targets.length !== 1) return null;
+    return { targets: b.targets, effects: [{ type: "counterOfKindOnIt", what: { ref: "target", index: 0 }, kindFromYours: true }], text };
+  }
+  // Spry and Mighty: "Choose exactly two creatures you control. You draw X cards and the chosen creatures get +X/+X and gain
+  // trample until end of turn, where X is the difference between the chosen creatures' powers.": two chosen as it
+  // resolves (not targeted), X the larger power minus the smaller, counted once (CR 608.2h); with fewer than two creatures
+  // it does nothing (rulings).
+  if (text.trim() === "Choose exactly two creatures you control. You draw X cards and the chosen creatures get +X/+X and gain trample until end of turn, where X is the difference between the chosen creatures' powers.") {
+    const x: Amount = { count: { kind: "powerDifference", of: { ref: "created" } } };
+    return {
+      targets: [],
+      effects: [{ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "permanents", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creature you control" } } }, min: 2 }, effects: [
+        { type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, n: 2, action: "choose", prompt: "choose exactly two creatures you control: X is the difference between their powers" },
+        { type: "draw", who: { ref: "you" }, n: x },
+        { type: "continuous", what: { ref: "created" }, mods: [{ kind: "modifyPT", power: x, toughness: x }, { kind: "addKeywords", keywords: ["Trample"] }], duration: "endOfTurn" },
+      ] }],
+      text,
+    };
+  }
+  // Jared Carthalion: "Choose up to two target creatures. For each of them, put a number of +1/+1 counters on it equal to
+  // the number of colors it is.": each one's own colors as it resolves (CR 105.2, 608.2h).
+  if (/^Choose up to two target creatures\. For each of them, put a number of \+1\/\+1 counters on it equal to the number of colors it is\.$/.test(text.trim())) {
+    const b = parseBody("Tap up to two target creatures.", opts);
+    if (!b || b.targets.length !== 2) return null;
+    const on = (index: number): Effect => ({ type: "counters", what: { ref: "target", index }, counter: "+1/+1", n: { count: { kind: "colorsOf", of: { ref: "target", index } }, times: 1 } });
+    return { targets: b.targets, effects: [on(0), on(1)], text };
+  }
   const hasteUnblock = /^(Up to X target creatures you control each gain haste until end of turn) and can't be blocked this turn except by creatures with haste(, where X is [^.]+)\.$/.exec(text.trim());
   if (hasteUnblock) {
     const b = parseBody(`${hasteUnblock[1]}${hasteUnblock[2]}.`, opts);
@@ -7826,6 +7878,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "exile", what: { ref: "tokensCreatedWithSelf" } });
       continue;
     }
+    // Tombstone Stairwell: "destroy all tokens created with ~. They can't be regenerated.": the same tokens, whoever controls
+    // them (rulings: renamed ones too).
+    if (/^[Dd]estroy all tokens created with ~$/.test(s)) {
+      const noRegen = /^They can't be regenerated\.?$/.test(sentences[si + 1] ?? "");
+      effects.push({ type: "destroy", what: { ref: "tokensCreatedWithSelf" }, ...(noRegen ? { noRegen: true } : {}) });
+      if (noRegen) si++;
+      continue;
+    }
     // Wondrous Crucible: "exile a nonland card at random from your graveyard. Copy it. You may cast the copy without paying
     // its mana cost." Cast as this resolves, or never (CR 608.2g); the card stays exiled and an uncast copy ceases to exist
     // (rulings); X is 0 (CR 107.3b).
@@ -12507,6 +12567,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const inner = parseOne(capital(isCard[2]!), ctx);
       if (!inner || ctx.targets.length !== i + 1 || inner.some((e) => pauses(e))) return null;
       effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter: { kind: "card", subtypes: [isCard[1]!], text: `${isCard[1]} card` } }, effects: inner });
+      continue;
+    }
+    // Jared Carthalion: "Return target multicolored card from your graveyard to your hand. If that card was all colors, draw
+    // a card and create two Treasure tokens.": the card returned, by its printed colors (all five, CR 105.2).
+    const allColorsCard = /^If that card was all colors, (.+)$/.exec(s);
+    if (allColorsCard) {
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      const prev = effects[effects.length - 1];
+      if (!t || t.kind !== "card" || t.many || t.optional || prev?.type !== "bounce" || prev.what.ref !== "target" || prev.what.index !== i) return null;
+      const inner = parseOne(capital(allColorsCard[1]!), ctx);
+      if (!inner || ctx.targets.length !== i + 1 || inner.some((e) => pauses(e))) return null;
+      effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter: { kind: "card", colorCount: "all", text: "card that's all colors" } }, effects: inner });
       continue;
     }
     // Glorious Gale: "Counter target creature spell. If it was a legendary spell, the Ring tempts you": that spell's card,
@@ -18357,6 +18430,14 @@ function parseForEach(s: string, ctx: Ctx): Effect[] | null {
   // Other players ("defending player", "target player") are read below, as "their" is for them.
   const theirYard = /^(.+?) in (?:that player's|their) graveyard$/.exec(phrase);
   const e0 = fx[0]!;
+  // Tombstone Stairwell: "each player creates a 2/2 black Zombie creature token ... for each creature card in their
+  // graveyard": each player their own number, all at once.
+  if (theirYard && e0.type === "createToken" && e0.who?.ref === "eachPlayer" && e0.n === 1) {
+    const count = parseCount(`${theirYard[1]} in your graveyard`, ctx, true);
+    if (!count || count.count.kind !== "cardsInGraveyard" || count.times || count.plus) return null;
+    const scaled = scaleEffect(e0, { count: { ...count.count, who: { ref: "eachOne" } } });
+    return scaled ? [scaled] : null;
+  }
   if (theirYard && (e0.type === "loseLife" || e0.type === "gainLife" || e0.type === "draw") && (e0.who.ref === "eachPlayer" || e0.who.ref === "eachOpponent")) {
     const e = e0;
     const who: PlayerRef = { ref: "eachOne" };

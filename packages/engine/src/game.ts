@@ -1267,7 +1267,7 @@ export function moveObject(
     else if (printed.entersExchangeText && textExchangeCandidates(s, o).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "exchangeText", enterOpts: how });
     else if (printed.entersUnderOpponent && opponents(s, o.controller).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "controlOpponent", enterOpts: how });
     // Neverwinter Hydra: that many dice, rolled as it enters; the counters their total (none rolled with X 0).
-    else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: withCounters.rollD ? rollDice(s, o.controller, withCounters.rollD, counterN, realDefOf(s, o).name).result : counterN, ...(withCounters.also ? { also: withCounters.also } : {}) } : undefined);
+    else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: withCounters.rollD ? rollDice(s, o.controller, withCounters.rollD, counterN, realDefOf(s, o).name).result : counterN, ...(withCounters.also ? { also: withCounters.also } : {}), ...(withCounters.more ? { more: withCounters.more } : {}) } : undefined);
     // Entering with others (enterTogether): off the list until they all have, so the next ones don't see it.
     if (together && o.zone === "battlefield") {
       s.battlefield = s.battlefield.filter((x) => x !== id);
@@ -1331,6 +1331,7 @@ export function moveObject(
   // From the battlefield it's a leaves-the-battlefield ability: it looks back to the permanent, which may have had no
   // abilities (face down, Humility) (CR 603.10a).
   if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id, from: fromZone });
+  if (to === "command" && fromZone !== "command" && o.isCommander) fireEvent(s, { type: "toCommand", id, owner: o.owner });
   // Darksteel Colossus: its own replacement ability shuffled it in, controlled by whoever controlled it (by its owner
   // from another zone, CR 113.8).
   if (shuffleIn && to === "library") shuffleLibrary(s, player(s, o.owner), fromZone === "battlefield" ? lastController : o.owner);
@@ -1380,6 +1381,7 @@ function scatterMerged(s: GameState, ids: ObjectId[], to: ZoneName, top: boolean
     if (dest === "graveyard") (s.zoneBatch ??= []).push({ id, zc: p.zoneChanges, from: "merged", to: dest, owner: p.owner, ...(p.isToken ? { notCard: true as const } : {}), card: p.cardId });
     // A commander that went to the command zone instead isn't where the effect looks for the new objects.
     if (dest === to) moved.push({ id, zc: p.zoneChanges });
+    else fireEvent(s, { type: "toCommand", id, owner: p.owner });
   }
   invalidateCharacteristics(s);
   return moved;
@@ -1392,7 +1394,7 @@ type EnterOpts = { /** Sunburst the spell gained (Lux Artillery), each instance 
  * The rest of entering the battlefield (CR 614.1c, 614.12): tapped or not, counters, "as it enters" choices,
  * then its enters event. `withCounters`: its "enters with N counters", counted before it was on the battlefield.
  */
-function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opts: EnterOpts, withCounters?: { counter: string; n: number; also?: { counter: string; n: number } }) {
+function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opts: EnterOpts, withCounters?: { counter: string; n: number; also?: { counter: string; n: number }; more?: { counter: string; n: number }[] }) {
   const id = o.id;
   // Its own replacement effects apply only if it has them as it would exist on the battlefield (CR 614.12): a nonbasic
   // land entering under Blood Moon has lost them (CR 305.7, rulings), so it doesn't enter tapped.
@@ -1422,6 +1424,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (withCounters && opts.escaped && printed.entersWithCounters?.escaped !== undefined) withCounters = { ...withCounters, n: printed.entersWithCounters.escaped };
   if (withCounters) add(withCounters.counter, withCounters.n);
   if (withCounters?.also) add(withCounters.also.counter, withCounters.also.n);
+  for (const m of withCounters?.more ?? []) add(m.counter, m.n);
   for (const [k, n] of Object.entries(opts.counters ?? {})) add(k, n);
   if (characteristics(s, o).types.includes("Creature")) for (const [k, n] of Object.entries(opts.countersIfCreature ?? {})) add(k, n);
   if (characteristics(s, o).types.includes("Planeswalker")) for (const [k, n] of Object.entries(opts.countersIfPlaneswalker ?? {})) add(k, n);
@@ -1598,7 +1601,7 @@ function finishEnteringAs(s: GameState, o: GameObject, opts: EnterOpts) {
   const n0 = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) && !(ewc.ifWebSlung && !o.webSlung) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue })) * (ewc.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= ewc.doubleIfXAtLeast ? 2 : 1) : 0;
   // Neverwinter Hydra: that many dice, rolled as it enters; the counters their total (none rolled with X 0).
   const n = ewc?.rollD && n0 > 0 ? rollDice(s, o.controller, ewc.rollD, n0, realDefOf(s, o).name).result : n0;
-  finishEntering(s, o, printed, opts, ewc && n ? { counter: ewc.counter, n, ...(ewc.also ? { also: ewc.also } : {}) } : undefined);
+  finishEntering(s, o, printed, opts, ewc && n ? { counter: ewc.counter, n, ...(ewc.also ? { also: ewc.also } : {}), ...(ewc.more ? { more: ewc.more } : {}) } : undefined);
 }
 
 /**
@@ -2460,6 +2463,17 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
   // `made`: draws a replacement effect already made of an earlier one, which that effect doesn't replace again (CR
   // 614.5); each number is how many Alhammarret's Archives can still replace that draw.
   made = [...made];
+  // Quantum Riddler: an instruction to draw one or more cards, while its controller has one or fewer cards in hand, is one
+  // to draw that many plus one, before anything replaces the single draws (rulings); once for each Riddler, each a
+  // replacement of its own that the bigger instruction doesn't undo (CR 614.5, 616.1). With Alms Collector too, the
+  // drawing player could choose the order (CR 616.1); Riddler's is applied first.
+  if (!resumed && !made.length && n >= 1 && player(s, pid).hand.length <= 1) {
+    const riddlers = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawPlusOneLowHand);
+    if (riddlers.length) {
+      n += riddlers.length;
+      log(s, `${player(s, pid).name} draws ${n} cards instead (${riddlers.map((id) => nameOf(s, id)).join(", ")}).`);
+    }
+  }
   // `resumed`: the rest of an instruction that already began, which Alms Collector looked at then.
   const alms = !resumed && n >= 2 && !made.length ? almsCollector(s, pid) : undefined;
   if (alms) {
@@ -5777,6 +5791,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       // "From your graveyard": a card cast from another player's graveyard isn't (a card is in its owner's, CR 404.2).
       if (m.fromGraveyard && o.zone === "graveyard" && o.owner !== pid) continue;
       if (m.notOwned && o.owner === pid) continue;
+      if (m.perOwnCommanderCast && !(o.isCommander && o.owner === c.controller)) continue;
       // Semblance Anvil: a card type (CR 205.2a) the spell shares with a card exiled with it (CR 607.2a).
       if (m.sharesTypeWithLinked && !linkedExileCards(s, src).some((x) => defOf(s, obj(s, x)).types.some((t) => d.types.includes(t)))) continue;
       // Mistform Warchief: a creature type the spell (the face cast) shares with the source as it is now (CR 205.3m).
@@ -5824,7 +5839,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       // itself if it's cast from there (it's on the stack as its cost is determined, rulings).
       const names = d.name.split(" // ");
       const same = m.perSameNameInGraveyard ? s.players[pid]!.graveyard.filter((id) => id !== o.id && defOf(s, obj(s, id)).name.split(" // ").some((x) => names.includes(x))).length : undefined;
-      const n = same !== undefined ? m.n * same : shared ? m.n * d.types.filter((t) => shared.has(t)).length : m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: m.timesForCaster ? pid : c.controller, sourceId: src.id })) : m.n;
+      const n = m.perOwnCommanderCast ? m.n * (player(s, o.owner).commanderCasts[o.id] ?? 0) : same !== undefined ? m.n * same : shared ? m.n * d.types.filter((t) => shared.has(t)).length : m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: m.timesForCaster ? pid : c.controller, sourceId: src.id })) : m.n;
       if (n > 0) more += n;
       else less -= n;
     }
@@ -9324,6 +9339,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       else if (pend.what === "riot")
         s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: pend.source, sourceId: o.id, duration: "game", affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
       log(s, `${pend.source} enters ${choice === ENTERS_COUNTER ? "with a +1/+1 counter" : pend.what === "riot" ? "with haste" : "without a counter"} (${pend.what}).`);
+    } else if (pend.what === "color" && entry?.many) {
+      // Tablet of the Guilds: "choose two colors": two different ones (rulings), Chosen.colors in the order chosen.
+      if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(", ")}`);
+      const color = (Object.keys(COLOR_NAMES) as Color[]).find((c) => COLOR_NAMES[c] === choice)!;
+      o.chosen = { ...o.chosen, colors: [...(o.chosen?.colors ?? []), color] };
+      log(s, `${p.name} chooses ${choice.toLowerCase()} for ${pend.source}.`);
     } else if (pend.what === "keyword" && entry?.many) {
       // Greymond: "choose two abilities from among ...": each one different (Chosen.keywords).
       if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(", ")}`);
@@ -10122,8 +10143,8 @@ function askEntersChoice(s: GameState): boolean {
       return true;
     }
     // Greymond: "choose two abilities from among ...": one not chosen already.
-    const many = c.many ? (c.options ?? []).filter((k) => !o.chosen?.keywords?.includes(k)) : undefined;
-    s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: many ?? c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(c.what === "cardType" ? { prompt: "choose a card type" } : c.what === "direction" ? { labels: ["Left", "Right"], prompt: "choose left or right: each player may attack only the nearest opponent that way" } : many ? { prompt: `choose ${o.chosen?.keywords?.length ? "another ability" : "an ability"} for ${defOf(s, o).name} to give` } : {}) };
+    const many = c.many && c.what === "color" ? choiceOptions("color").filter((n) => !o.chosen?.colors?.some((col) => COLOR_NAMES[col] === n)) : c.many ? (c.options ?? []).filter((k) => !o.chosen?.keywords?.includes(k)) : undefined;
+    s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: many ?? c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(c.what === "cardType" ? { prompt: "choose a card type" } : c.what === "direction" ? { labels: ["Left", "Right"], prompt: "choose left or right: each player may attack only the nearest opponent that way" } : many && c.what === "color" ? { prompt: o.chosen?.colors?.length ? "choose a second color" : "choose two colors: the first" } : many ? { prompt: `choose ${o.chosen?.keywords?.length ? "another ability" : "an ability"} for ${defOf(s, o).name} to give` } : {}) };
     return true;
   }
   return false;

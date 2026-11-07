@@ -130,7 +130,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
     if (!host || (view && !hostChars) || !objectMatches(s, spec.attachedTo, host, controller, false, undefined, hostChars, view)) return false;
   }
   // A choice that was never made: "of the chosen type" matches nothing, "not of the chosen type" everything.
-  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.chosen === "parity" || spec.chosen === "landOrNonland" || spec.chosen === "landType") return false;
+  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.chosen === "parity" || spec.chosen === "landOrNonland" || spec.chosen === "landType" || spec.chosen === "colorsChosen") return false;
   if (spec.parity?.is && !isParity(spec.parity.of === "power" ? (c.types.includes("Creature") ? c.power : undefined) : defMv(defOf(s, o)), spec.parity)) return false;
   if (spec.noCounters && Object.values(o.counters).some((n) => (n ?? 0) > 0)) return false;
   // Keldon Twilight: "that they controlled since the beginning of the turn": under its controller since before this turn.
@@ -379,6 +379,7 @@ export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): Target
   if (kind === "powerAtLeast" && chosen?.number !== undefined) return { ...rest, power: { ...rest.power, min: Math.max(rest.power?.min ?? -Infinity, chosen.number) } };
   if ((kind === "color" || kind === "notColor") && chosen?.color)
     return kind === "color" ? { ...rest, colors: [chosen.color] } : { ...rest, notColors: [...(rest.notColors ?? []), chosen.color] };
+  if (kind === "colorsChosen" && chosen?.colors?.length) return { ...rest, colors: [...chosen.colors] };
   if (kind === "landType" && chosen?.landType) return { ...rest, subtypes: [...(rest.subtypes ?? []), chosen.landType] };
   if (kind === "attackingPlayer") return { ...rest, attackingWhom: chosen?.player ?? "eventPlayer" };
   return kind === "notType" || kind === "notColor" || kind === "notTypesChosen" ? rest : spec;
@@ -494,7 +495,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.anyOf && !spec.anyOf.some((a) => printedMatches(a, d))) return false;
   if (spec.subtypes?.length && !(spec.allSubtypes ? spec.subtypes.every(hasSubtype) : spec.subtypes.some(hasSubtype))) return false;
   if (spec.notSubtypes?.some(hasSubtype)) return false;
-  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.chosen === "parity" || spec.chosen === "landOrNonland" || spec.chosen === "landType" || spec.counter) return false;
+  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.chosen === "parity" || spec.chosen === "landOrNonland" || spec.chosen === "landType" || spec.chosen === "colorsChosen" || spec.counter) return false;
   if (spec.parity?.is && !isParity(spec.parity.of === "power" ? (d.types.includes("Creature") && /^-?\d+$/.test(d.power ?? "") ? Number(d.power) : undefined) : defMv(d), spec.parity)) return false;
   const hasKw = (k: string) => d.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.keywords?.some((k) => !hasKw(k))) return false;

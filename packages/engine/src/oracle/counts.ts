@@ -929,6 +929,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^times? (?:~|it) was kicked$/i.test(p)) return count({ kind: "kicked" });
   // "For each of that spell's colors" in a cast trigger (Ramos, Dragon Engine).
   if (/^of that spell's colors$/i.test(p) && ctx?.castSpell) return count({ kind: "castSpellColors" });
+  // Tablet of the Guilds: "for each of the chosen colors that spell is".
+  if (/^of the chosen colors that spell is$/i.test(p) && ctx?.castSpell) return count({ kind: "castSpellChosenColors" });
   // Rumbling Aftershocks: "the number of times that spell was kicked", in a cast trigger.
   if (/^times that spell was kicked$/i.test(p) && ctx?.castSpell) return count({ kind: "castSpellKicked" });
   // Civic Saber: "Equipped creature gets +1/+0 for each of its colors" (a static ability: the permanent it applies to,

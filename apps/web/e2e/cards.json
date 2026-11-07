@@ -437,6 +437,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a87abe7a-fee9-45fd-b3d8-896e43ed6b3c",
+  "name": "Agent's Toolkit",
+  "manaCost": "{1}{G}{U}",
+  "cmc": 3,
+  "typeLine": "Artifact — Clue",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Clue"
+  ],
+  "oracleText": "This artifact enters with a +1/+1 counter, a flying counter, a deathtouch counter, and a shield counter on it. (If it would be dealt damage or destroyed, remove a shield counter from it instead.)\nWhenever a creature you control enters, you may move a counter from this artifact onto that creature.\n{2}, Sacrifice this artifact: Draw a card.",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "abe377f8-35f0-4dea-a681-91d31a36815c",
   "name": "Agitator Ant",
   "manaCost": "{2}{R}",
@@ -1837,6 +1867,39 @@
   "set": "isd",
   "releasedAt": "2011-09-30",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a01746f3-8e6f-47ce-a95b-e44556d1f73e",
+  "name": "Aven Courier",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Bird Advisor",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Bird",
+   "Advisor"
+  ],
+  "oracleText": "Flying\nWhenever this creature attacks, choose a counter on a permanent you control. Put a counter of that kind on target permanent you control if it doesn't have a counter of that kind on it.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -6834,6 +6897,32 @@
   "set": "dtk",
   "releasedAt": "2015-03-27",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "47e191f7-6314-4875-b5ee-57e5daf089c4",
+  "name": "Dragon's Approach",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Dragon's Approach deals 3 damage to each opponent. You may exile this spell and four cards named Dragon's Approach from your graveyard. If you do, search your library for a Dragon creature card, put it onto the battlefield, then shuffle.\nA deck can have any number of cards named Dragon's Approach.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "stx",
+  "releasedAt": "2021-04-23",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -23642,6 +23731,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "04cc9177-1ffc-4ac8-a64d-7995b4f33d23",
+  "name": "Spry and Mighty",
+  "manaCost": "{4}{G}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose exactly two creatures you control. You draw X cards and the chosen creatures get +X/+X and gain trample until end of turn, where X is the difference between the chosen creatures' powers.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "620d0572-6d22-43e2-83a9-000e605c8a2b",
   "name": "Squandered Resources",
   "manaCost": "{B}{G}",
@@ -24474,6 +24589,28 @@
   "set": "bbd",
   "releasedAt": "2018-06-08",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "71ce7034-1400-4e7c-9ef3-37baed669faf",
+  "name": "Tablet of the Guilds",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "As this artifact enters, choose two colors.\nWhenever you cast a spell, if it's at least one of the chosen colors, you gain 1 life for each of the chosen colors it is.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rtr",
+  "releasedAt": "2012-10-05",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

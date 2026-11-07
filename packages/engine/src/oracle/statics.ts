@@ -423,6 +423,18 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
   // Rusted Relic: "~ is a 5/5 Golem artifact creature as long as ...", Warden of the Wall: "During turns other than yours,
   // ~ is a 2/3 Gargoyle artifact creature with flying": it keeps its other card types and subtypes, its creature types
   // replaced (CR 205.1b), with that base power and toughness (layers 4 and 7b).
+  // Gideon Blackblade: "During your turn, ~ is a 4/4 Human Soldier creature with indestructible that's still a
+  // planeswalker": a planeswalker creature with those creature types added (CR 205.1b), that base power and toughness
+  // (layer 7b) and the keyword (layer 6), only during your turn. Once it applies in layer 4 it keeps applying if it loses
+  // its abilities (CR 613.6, rulings).
+  const pwCreature = /^~ is (an? \d+\/\d+ (?:[A-Z][a-z]+ )+creature with [a-z]+ that's still a planeswalker)$/.exec(statement);
+  if (pwCreature && cond === "it's your turn") {
+    const mods = parseBecomes(pwCreature[1]!);
+    if (!mods || mods.some((x) => x.kind === "setColors")) return null;
+    const self: StaticAbility = { affects: { kind: "self" }, mods, text: line };
+    const condition = parseStaticCondition(cond, self);
+    return condition ? { ...self, condition } : null;
+  }
   const artifactCreature = /^~ is (an? (?:\d+\/\d+ )?(?:[A-Z][a-z]+ )*artifact creature(?: with [a-z ,]+)?)$/.exec(statement);
   if (artifactCreature) {
     const mods = parseBecomes(artifactCreature[1]!);
@@ -585,6 +597,12 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     const c = parseCount(m[2]!, null, true);
     return c ? { less: { ...c, times: (c.times ?? 1) * Number(m[1]) } } : "fail";
   }
+  // Myth Unbound: "Your commander costs {1} less to cast for each time it's been cast from the command zone this game": the
+  // spell that's a commander of this permanent's controller (CR 903.3), cast from anywhere and by anyone (rulings), {1}
+  // less for each previous cast from the command zone (the count commander tax uses, CR 903.8). Reductions apply after
+  // the tax is added (CR 601.2f), so in effect the tax is {1} a time (rulings).
+  if ((m = /^Your commander costs \{(\d+)\} less to cast for each time it's been cast from the command zone this game$/.exec(text)))
+    return { costMod: { who: "all", filter: { kind: "spell", text: "your commander" }, n: -Number(m[1]), perOwnCommanderCast: true, text: line } };
   // Cemetery Prowler: "Spells you cast cost {1} less to cast for each card type they share with cards exiled with ~"
   // (linked in compile.ts).
   if ((m = /^Spells you cast cost \{(\d+)\} less to cast for each card type they share with cards exiled with ~$/.exec(text)))

@@ -308,6 +308,8 @@ export type TriggerSourceEvent =
   | { type: "discarded"; player: PlayerId; id: ObjectId; card: CardDef; cycled?: boolean; /** The X of the cycling cost. */ x?: number; /** The controller of the spell or ability whose effect made them discard, if one did (not a cost). */ cause?: PlayerId }
   /** A card (or token) was put into a graveyard, from any zone. */
   | { type: "toGraveyard"; id: ObjectId; from?: ZoneName }
+  /** A commander was put into the command zone from another zone (CR 903.9). */
+  | { type: "toCommand"; id: ObjectId; owner: PlayerId }
   /** A resolved instant or sorcery card was put into its owner's graveyard (CR 608.2n): haunt on a spell (702.55a). */
   | { type: "resolvedToGraveyard"; id: ObjectId }
   /** A player drew a card, their `nth` this turn (CR 121.2). */
@@ -2358,6 +2360,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "When ~ is put into a graveyard from anywhere": the card's ability, in the graveyard (CR 603.6c).
     const card = s.objects[ev.id];
     if (card?.zone === "graveyard") add(card, card.owner, (e) => e === "selfToGraveyardAnywhere" || (e === "selfToGraveyardFromLibrary" && ev.from === "library"), compileCard(defOf(s, card)).triggers);
+  } else if (ev.type === "toCommand") {
+    // Myth Unbound: "Whenever your commander is put into the command zone": its owner is this permanent's controller.
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      if (you === ev.owner) add(o, you, (e) => e === "yourCommanderToCommand");
+    }
   } else if (ev.type === "resolvedToGraveyard") {
     // Haunt on an instant or sorcery: "When this spell is put into a graveyard during its resolution" (CR 702.55a). It
     // triggers in the graveyard, where the card has no controller, so its owner controls it (CR 108.4a, 113.8).

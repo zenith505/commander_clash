@@ -1,7 +1,7 @@
 import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
-import type { Amount, Modification, FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
+import type { Amount, CounterKind, Modification, FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
 import { canonicalKeyword, LAND_TYPES, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, SACRIFICED_LANDWALK, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
@@ -1594,6 +1594,13 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Tablet of the Guilds: "As ~ enters, choose two colors." (CR 614.12): two different colors (rulings), one after the
+    // other, kept as Chosen.colors.
+    if (line === "As ~ enters, choose two colors.") {
+      if (out.entersChoose?.some((c) => c.what === "color")) out.unsupported.push(raw);
+      else for (let i = 0; i < 2; i++) (out.entersChoose ??= []).push({ what: "color", many: true });
+      continue;
+    }
     // Greymond, Avacyn's Stalwart: "As ~ enters, choose two abilities from among first strike, vigilance, and lifelink."
     // (CR 614.12): two different keywords, one after the other, kept as Chosen.keywords.
     const asAbilities = /^As ~ enters, choose (two|three) abilities from among ((?:[a-z ]+, )+and [a-z ]+)\.$/.exec(line);
@@ -3136,6 +3143,10 @@ export function compile(d: CardDef): CompiledCard {
       out.drawEmptyReturn = true;
       continue;
     }
+    if (line === "As long as you have one or fewer cards in hand, if you would draw one or more cards, you draw that many cards plus one instead.") {
+      out.drawPlusOneLowHand = true;
+      continue;
+    }
     if (line === "If you would draw a card, you may instead choose land or nonland and reveal cards from the top of your library until you reveal a card of the chosen kind. Put that card into your hand and put all other cards revealed this way on the bottom of your library in any order.") {
       out.drawAbundance = true;
       continue;
@@ -4191,13 +4202,26 @@ export function compile(d: CardDef): CompiledCard {
       (out.altCosts ??= []).push({ kind: "prototype", mana: proto[1]! });
       continue;
     }
+    // Tombstone Stairwell: "At the beginning of each end step and when ~ leaves the battlefield, destroy all tokens created
+    // with ~. They can't be regenerated.": two triggered abilities with the same effect (CR 603.2), the second looking back
+    // to the permanent that left (CR 603.10a) for the tokens its abilities created (CR 607.2).
+    const endOrLeaves = /^At the beginning of each end step and when ~ leaves the battlefield, (destroy all tokens created with ~\. They can't be regenerated\.)$/.exec(line);
+    if (endOrLeaves) {
+      const a = parseTrigger(`At the beginning of each end step, ${endOrLeaves[1]}`);
+      const b = parseTrigger(`When ~ leaves the battlefield, ${endOrLeaves[1]}`);
+      if (a && a !== "fail" && b && b !== "fail") {
+        out.triggers.push(a, b);
+        continue;
+      }
+    }
     // Myr Servitor: "At the beginning of your upkeep, if ~ is on the battlefield, ...": an intervening "if" (CR 603.4) that's
     // true as it triggers, so what counts is that ~ is still on the battlefield as it resolves (rulings).
-    const stillHere = /^(At the beginning of your upkeep), if ~ is on the battlefield, (.+)$/.exec(line);
+    // Tombstone Stairwell: "At the beginning of each upkeep, if ~ is on the battlefield, ..." the same, at each player's.
+    const stillHere = /^(At the beginning of (?:your|each) upkeep), if ~ is on the battlefield, (.+)$/.exec(line);
     if (stillHere) {
       const t = parseTrigger(`${stillHere[1]}, ${stillHere[2]}`);
-      if (t && t !== "fail" && t.event === "yourUpkeep" && !t.body.targets.length && Object.keys(t).every((k) => k === "event" || k === "body")) {
-        out.triggers.push({ ...t, body: { ...t.body, effects: [{ type: "if", cond: { kind: "selfHere" }, effects: t.body.effects }], text: line.replace(/^At the beginning of your upkeep, /, "") } });
+      if (t && t !== "fail" && (t.event === "yourUpkeep" || t.event === "eachUpkeep") && !t.body.targets.length && Object.keys(t).every((k) => k === "event" || k === "body")) {
+        out.triggers.push({ ...t, body: { ...t.body, effects: [{ type: "if", cond: { kind: "selfHere" }, effects: t.body.effects }], text: line.replace(/^At the beginning of (?:your|each) upkeep, /, "") } });
         continue;
       }
     }
@@ -5022,6 +5046,19 @@ export function compile(d: CardDef): CompiledCard {
       const plain = (x: typeof a) => !!x && typeof x === "object" && !x.times && !x.plus && !x.half && !x.negate;
       if (!a || !b || !plain(a) || !plain(b) || out.entersWithCounters) out.unsupported.push(raw);
       else out.entersWithCounters = { counter: counterKind(ewcEach[1]!), n: { count: { kind: "sum", of: [a.count, b.count] } } };
+      continue;
+    }
+    // Agent's Toolkit: "~ enters with a +1/+1 counter, a flying counter, a deathtouch counter, and a shield counter on it.":
+    // one of each kind, all as it enters (CR 614.1c, 122.6).
+    const ewcList = new RegExp(`^~ enters with ((?:${NUM} ${COUNTER} counters?, )+and ${NUM} ${COUNTER} counters?) on it\\.$`).exec(line);
+    if (ewcList) {
+      const parts = ewcList[1]!.split(/, (?:and )?/).map((x) => new RegExp(`^${NUM} ${COUNTER} counters?$`).exec(x));
+      const kinds = parts.map((x) => (x ? { counter: counterKind(x[2]!), n: num(x[1]!) } : null));
+      if (out.entersWithCounters || kinds.some((k) => !k || !k.n) || new Set(kinds.map((k) => k?.counter)).size !== kinds.length) out.unsupported.push(raw);
+      else {
+        const [first, second, ...rest] = kinds as { counter: CounterKind; n: number }[];
+        out.entersWithCounters = { counter: first!.counter, n: first!.n, also: second!, ...(rest.length ? { more: rest } : {}) };
+      }
       continue;
     }
     // Dust Animus: "If you control five or more untapped lands, ~ enters with two +1/+1 counters and a lifelink counter on

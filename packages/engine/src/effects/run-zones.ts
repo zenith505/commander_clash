@@ -817,6 +817,8 @@ function runMeld(s: GameState, e: Extract<Effect, { type: "meld" }>, ctx: Resolv
 const commanderMv = (s: GameState, o: GameObject) => (o.zone === "battlefield" ? characteristics(s, o).manaValue : defMv(defOf(s, o)));
 
 export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
+  // "Four cards named ~ from your graveyard" (Dragon's Approach): the source's name (CR 201.5).
+  if (e.type === "chooseFromGraveyard" && e.filter?.named === "~") e = { ...e, filter: { ...e.filter, named: ctx.sourceDef.name, text: e.filter.text.replace(/~/g, ctx.sourceDef.name) } };
   switch (e.type) {
     case "sunburstChoose": {
       // Sculpted Sunburst: you choose first, then each opponent in turn order, one with power no greater than the power of

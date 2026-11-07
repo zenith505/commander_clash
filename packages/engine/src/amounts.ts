@@ -681,6 +681,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       }
       return ctx.colorsSpent ?? 0;
     }
+    case "powerDifference": {
+      const [a, b] = refObjects(s, c.of, ctx).filter((o) => o.zone === "battlefield");
+      return a && b ? Math.abs(characteristics(s, a).power - characteristics(s, b).power) : 0;
+    }
     case "colorsOf": {
       const o = refObjects(s, c.of, ctx)[0];
       if (!o) return 0;
@@ -701,6 +705,12 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
       const o = item?.objectId ? s.objects[item.objectId] : undefined;
       return o?.zone === "stack" ? characteristics(s, o).colors.length : (item?.castColors?.length ?? 0);
+    }
+    case "castSpellChosenColors": {
+      const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+      const o = item?.objectId ? s.objects[item.objectId] : undefined;
+      const colors = o?.zone === "stack" ? characteristics(s, o).colors : (item?.castColors ?? []); // as it was cast, once it has left the stack
+      return (ctx.chosen?.colors ?? []).filter((c) => colors.includes(c)).length;
     }
     case "castSpellManaSymbols": {
       // Its mana cost as a spell (the half cast, for a split card); it doesn't change if the spell has left the stack.
@@ -1527,10 +1537,14 @@ function describeCount(c: Count): string {
       return "times that spell was kicked";
     case "castSpellColors":
       return "that spell's colors";
+    case "castSpellChosenColors":
+      return "the chosen colors that spell is";
     case "castSpellManaSymbols":
       return `that spell's ${c.color} mana symbols`;
     case "castSpellTargets":
       return "that spell's targets";
+    case "powerDifference":
+      return "the difference between the chosen creatures' powers";
     case "colorsOf":
       return "its colors";
     case "castSpellCommanderCasts":

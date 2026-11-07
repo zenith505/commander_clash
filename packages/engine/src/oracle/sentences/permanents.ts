@@ -1196,6 +1196,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const n = /^all$/i.test(m[1]!) ? "all" : m[1] === "twice X" ? { count: { kind: "x" as const }, times: 2 } : amt(m[1]!);
     return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n }] : null;
   }
+  // Agent's Toolkit: "move a counter from ~ onto that creature": a kind ~ has, chosen as it resolves if it has more than
+  // one (rulings: any counters on it, not only those it entered with); if either can't happen, neither does (CR 122.5).
+  if ((m = /^Move a counter from ~ onto (that creature)$/i.exec(s))) {
+    const to = parseObject(m[1]!, ctx);
+    return to?.ref === "subject" ? [{ type: "moveCounter", counter: "any", from: { ref: "self" }, to }] : null;
+  }
   // "Remove up to three counters from target permanent" (Glissa Sunslayer), "Remove X counters from target permanent,
   // where X is ..." (Thornmantle Striker), "Remove a counter from target nonland permanent" (Thrull Parasite).
   if ((m = new RegExp(`^Remove (up to )?(a|${NUMX.slice(1, -1)}) counters? from (~|it|(?:another )?target .+)$`, "i").exec(s))) {

@@ -666,6 +666,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
       return [{ type: "pickPermanents", player: pid, ids: pick ? [pick.id] : [] }];
     }
+    // Spry and Mighty: "X is the difference between the chosen creatures' powers": the strongest and the weakest.
+    if (pend.kind === "pickPermanents" && pend.action === "choose" && pend.count === 2 && s.resolving && JSON.stringify(s.resolving.body.effects).includes('"powerDifference"')) {
+      const byPower = [...pend.options].sort((a, b) => power(s, obj(s, b)) - power(s, obj(s, a)) || worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+      return [{ type: "pickPermanents", player: pid, ids: byPower.length > 1 ? [byPower[0]!, byPower[byPower.length - 1]!] : byPower }];
+    }
     // Battle for Bretagard: "For each of them, create a token that's a copy of it": one of each name, the best first.
     if (pend.kind === "pickPermanents" && pend.differentNames && pend.action === "choose") return [{ type: "pickPermanents", player: pid, ids: differentlyNamed(s, [...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))) }];
     // "Remove a lore counter from each of any number of Sagas you control. Put a +1/+1 counter on ~ for each lore counter
@@ -1069,6 +1074,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       if (onto && mine && controllerOf(s, onto) === pid && pend.options.includes("done")) return [{ type: "chooseOption", player: pid, choice: "done" }];
       const good = kinds.filter((k) => harmfulCounter(k) === mine).sort((a, b) => Number(b === "loyalty") - Number(a === "loyalty") || Number(b === "+1/+1") - Number(a === "+1/+1"));
       return [{ type: "chooseOption", player: pid, choice: good[0] ?? (pend.options.includes("done") ? "done" : kinds[0]!) }];
+    }
+    // Aven Courier: a helpful kind our target doesn't have yet (+1/+1 first), never a harmful one.
+    if (pend.kind === "chooseOption" && pend.what === "counterKind" && pend.about && s.objects[pend.about] && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "counterOfKindOnIt" && e.kindFromYours)) {
+      const on = obj(s, pend.about);
+      const fresh = pend.options.filter((k) => !harmfulCounter(k) && !["age", "time", "fade", "doom", "loyalty"].includes(k) && !((on.counters[k] ?? 0) > 0));
+      return [{ type: "chooseOption", player: pid, choice: fresh.includes("+1/+1") ? "+1/+1" : fresh[0] ?? pend.options.find((k) => !harmfulCounter(k)) ?? pend.options[0]! }];
     }
     // Elspeth Conquers Death: a loyalty counter on a planeswalker that isn't a creature.
     if (pend.kind === "chooseOption" && pend.what === "counterKind" && pend.about && pend.options.includes("loyalty") && s.objects[pend.about] && objIsType(s, obj(s, pend.about), "Planeswalker") && !objIsType(s, obj(s, pend.about), "Creature"))

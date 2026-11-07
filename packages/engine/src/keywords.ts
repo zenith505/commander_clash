@@ -191,6 +191,12 @@ export const CHOSEN_KEYWORD = "(the chosen keyword)";
 export const CHOSEN_LANDWALK = "(landwalk of the chosen type)";
 /** "Gains snow landwalk of the chosen type" (Barbarian Guides): a snow land of the land type chosen as it resolved (CR 702.14c). */
 export const CHOSEN_SNOW_LANDWALK = "(snow landwalk of the chosen type)";
+/**
+ * "Gains landwalk of each of the land types of the sacrificed land" (Excavator): filled in as it resolves with the
+ * landwalk of each land type the land its cost sacrificed had as it last existed (CR 608.2h, 702.14a; rulings: all of
+ * them if it had several, none for Wastes).
+ */
+export const SACRIFICED_LANDWALK = "(landwalk of each of the sacrificed land's types)";
 /** The landwalk keyword of a chosen land type ("Swampwalk", "Gatewalk"), or its snow form ("Snow swampwalk", CR 702.14c). */
 export const chosenLandwalk = (k: string, landType: string | undefined): string[] =>
   !landType ? [] : k === CHOSEN_SNOW_LANDWALK ? [`Snow ${landType.toLowerCase()}walk`] : [`${landType}walk`];

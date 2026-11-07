@@ -32,7 +32,10 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
   const mark = (i: number, n = 1) => {
     for (let j = i; j < i + n; j++) harm[j] = true;
   };
-  for (const e of allEffects(body.effects)) {
+  // A punisher's effects (Scarwood Bandits: "Unless an opponent pays {2}, gain control of target artifact") are what
+  // happens to the target if no one pays.
+  const all = allEffects(body.effects).flatMap((e) => (e.type === "punisher" ? [e, ...allEffects(e.effects)] : [e]));
+  for (const e of all) {
     if (e.type === "damage" && "index" in e.to) mark(e.to.index, "n" in e.to ? e.to.n : 1);
     // Returning a card from a graveyard to its owner's hand helps its owner.
     if (e.type === "bounce" && e.what.ref === "target" && body.targets[e.what.index]?.kind === "card") continue;

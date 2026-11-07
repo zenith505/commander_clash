@@ -593,6 +593,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!fx || !options || ctx.targets.length !== before) return null;
     return [{ type: "punisher", who: { ref: "eachPlayer" }, options, effects: fx, mode: "ifNone", thenText: m[1]!.replace(/^They\b/, "they").replace(/^That creature\b/, "that creature") }];
   }
+  // Scarwood Bandits: "Unless an opponent pays {2}, gain control of target artifact for as long as ~ remains on the
+  // battlefield.": each opponent in turn order may pay (CR 101.4); control only if none does.
+  if ((m = /^Unless an opponent (pays (?:\{[^}]+\})+), (gain control of target artifact for as long as ~ remains on the battlefield)$/.exec(s)) && ctx.activated && !ctx.spell) {
+    const before = ctx.targets.length;
+    const fx = parseSentence(`G${m[2]!.slice(1)}`, ctx);
+    const options = parsePunisherOptions(m[1]!, ctx);
+    if (!fx?.length || !options || ctx.targets.length !== before + 1) return null;
+    return [{ type: "punisher", who: { ref: "eachOpponent" }, options, effects: fx, mode: "ifNone", thenText: "~'s controller gains control of the target artifact" }];
+  }
   // Icy Prison: "sacrifice ~ unless any player pays {3}": each player in turn order may pay, the caster too; sacrificed
   // only if no one does (CR 101.4).
   if ((m = /^[Ss]acrifice ~ unless any player (pays (?:\{[^}]+\})+)$/.exec(s))) {

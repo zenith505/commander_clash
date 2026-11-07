@@ -1201,7 +1201,9 @@ function selfCardExiled(s: GameState, effects: Effect[], ctx: ResolveCtx): Objec
 }
 
 function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
-  for (const e of effects) {
+  for (const e0 of effects) {
+    // "Cards named ~" (Dragon's Approach): the source's name (CR 201.5).
+    const e = e0.type === "chooseFromGraveyard" && e0.filter?.named === "~" ? { ...e0, filter: { ...e0.filter, named: ctx.sourceDef.name } } : e0;
     // What a pick picks ("it", Akiri's "that creature") isn't known until it's made.
     if ("what" in e && typeof e.what === "object" && e.what && "ref" in e.what && e.what.ref === "created" && effects.some((x) => x.type === "pick" && effects.indexOf(x) < effects.indexOf(e))) continue;
     // Discarding your hand can be done with an empty hand (rulings on Moonveil Regent).

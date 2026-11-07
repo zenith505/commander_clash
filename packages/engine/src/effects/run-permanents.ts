@@ -1219,6 +1219,26 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       const o = objects(s, e.what, ctx)[0];
       if (!o) return;
+      if (e.kindFromYours) {
+        const yours = s.battlefield.map((id) => s.objects[id]!).filter((p) => controllerOf(s, p) === ctx.controller);
+        const options = [...new Set(yours.flatMap((p) => Object.keys(p.counters).filter((k) => (p.counters[k] ?? 0) > 0)))];
+        const sc = (s.resolving!.scratch ??= {});
+        if (options.length > 1 && sc.counterKind === undefined) {
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "counterKind", options, labels: options.map((k) => `A ${k} counter`), about: o.id, prompt: `choose a counter on a permanent you control: ${characteristics(s, o).name} gets one of that kind if it has none` };
+          return "paused";
+        }
+        const counter = sc.counterKind ?? options[0];
+        sc.counterKind = undefined;
+        if (!counter || !options.includes(counter)) return;
+        if ((o.counters[counter] ?? 0) > 0) {
+          log(s, `${characteristics(s, o).name} already has a ${counter} counter (${src}).`);
+          return;
+        }
+        const put = putCounters(s, o, counter, 1);
+        invalidateCharacteristics(s);
+        log(s, `${src} puts ${put === 1 ? "a" : put} ${counter} counter${put === 1 ? "" : "s"} on ${characteristics(s, o).name}.`);
+        return;
+      }
       const kinds = Object.keys(o.counters).filter((k) => (o.counters[k] ?? 0) > 0);
       if (e.eachKind) {
         for (const k of kinds) {

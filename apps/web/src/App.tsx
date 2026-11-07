@@ -5337,7 +5337,7 @@ function Controls({
     return (
       <div className="controls color-pick">
         <span>
-          <strong>{pending.source}:</strong> choose a color
+          <strong>{pending.source}:</strong> {pending.prompt ?? "choose a color"}
         </span>
         {(Object.keys(COLOR_NAMES) as (keyof typeof COLOR_NAMES)[])
           .filter((c) => pending.options.includes(COLOR_NAMES[c]))

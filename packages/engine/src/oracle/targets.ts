@@ -1609,6 +1609,12 @@ export function parseTargetPhrase(
     extra.notNamed = "~";
     p = p.replace(/ not named ~$/, "");
   }
+  // Tablet of the Guilds: "a spell of one of the chosen colors": any of the colors chosen (Chosen.colors).
+  if (/ of one of the chosen colors$/.test(p)) {
+    if (!opts.chosen) return null;
+    extra.chosen = "colorsChosen";
+    p = p.replace(/ of one of the chosen colors$/, "");
+  }
   // "of the chosen type", "that aren't of the chosen type", "of that color": only where the caller fills in the choice.
   const chosen = /,? (that (?:aren't|are not|isn't|is not) |not )?of (?:(?:the chosen|that) (creature type|type|color)|(a type chosen this way))/.exec(p);
   if (chosen) {

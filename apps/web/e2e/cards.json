@@ -24409,6 +24409,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "18d4c57b-e2bf-47a0-8823-c4a79498a7ff",
+  "name": "Soulblast",
+  "manaCost": "{3}{R}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, sacrifice all creatures you control.\nSoulblast deals damage to any target equal to the total power of the sacrificed creatures.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "10e",
+  "releasedAt": "2007-07-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c6aadaf0-eb47-4228-95e2-48e3ff7b6e2f",
   "name": "Sower of Discord",
   "manaCost": "{4}{B}{B}",
@@ -29302,6 +29328,32 @@
   "commanderLegal": "legal",
   "set": "mom",
   "releasedAt": "2023-04-21",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1779af8e-38fc-4043-b5fa-ee16a7ea840c",
+  "name": "Voltage Surge",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, you may sacrifice an artifact.\nVoltage Surge deals 2 damage to target creature or planeswalker. If this spell's additional cost was paid, Voltage Surge deals 4 damage instead.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

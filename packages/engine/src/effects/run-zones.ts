@@ -3892,8 +3892,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "exileUncastThisTurn":
-      s.exileUncastTurn = s.turn;
-      log(s, "Until end of turn, nontoken creatures that weren't cast are exiled instead of entering the battlefield.");
+      if (e.tokens) s.exileUncastAnyTurn = s.turn;
+      else s.exileUncastTurn = s.turn;
+      log(s, `Until end of turn, ${e.tokens ? "creatures" : "nontoken creatures"} that weren't cast are exiled instead of entering the battlefield.`);
       return;
     case "exileDyingThisTurn":
       if (e.opponentsOfYou) s.exileDyingOpponents = [...(s.exileDyingOpponents ?? []).filter((x) => x.turn === s.turn && x.player !== ctx.controller), { turn: s.turn, player: ctx.controller }];

@@ -265,7 +265,7 @@ export type Count =
   | { kind: "countersRemovedThisWay" }
   /** "Cards exiled with ~": those this object's linked exile took that are still there (CR 607.2a, 400.7). `ever`:
    * "cards have been exiled with ~" (Colfenor's Urn): every card it exiled over the game, wherever it is now (rulings). */
-  | { kind: "linkedExiled"; ever?: true }
+  | { kind: "linkedExiled"; ever?: true; /** "Creature cards exiled with ~" (Negative Zone Portal): only those matching this, as cards in exile. */ filter?: TargetSpec }
   /** "The exiled creature card's power" (Phyrexian Ingester): the power (or toughness) of each creature card its linked
    * exile took that's still there, as it is in exile (rulings: no bonus for a card that isn't a creature card). */
   | { kind: "linkedExiledPT"; stat: "power" | "toughness" }
@@ -3111,7 +3111,7 @@ export type Effect =
   | { type: "exileIfDies"; what: ObjRef; ifCreature?: true }
   /** "If a creature would die this turn, exile it instead" (Malicious Malfunction): every creature this turn, ones that enter or become creatures later too (rulings, CR 614.1a). */
   /** Mistcaller: "Until end of turn, if a nontoken creature would enter and it wasn't cast, exile it instead" (GameState.exileUncastTurn). */
-  | { type: "exileUncastThisTurn" }
+  | { type: "exileUncastThisTurn"; /** Hallowed Moonlight: "if a creature would enter": tokens too (GameState.exileUncastAnyTurn). */ tokens?: true }
   | { type: "exileDyingThisTurn"; /** Malicious Eclipse: only creatures the controller's opponents control. */ opponentsOfYou?: true }
   /** "Players can't search libraries this turn" (Shadow of Doubt): GameState.noSearchTurn. */
   | { type: "noSearchThisTurn" }
@@ -3753,6 +3753,8 @@ export type Effect =
   | { type: "noEffect"; text: string }
   /** Count `n` now and keep it for the rest of this resolution (Count notedAmount): one X for several instructions. */
   | { type: "noteAmount"; n: Amount }
+  /** Cellar Door: "Target player puts the bottom card of their library into their graveyard": not a mill (CR 701.17a); the card is ResolvingInfo.yardChosen for "if it's a creature card". */
+  | { type: "bottomToGraveyard"; who: PlayerRef }
   | { type: "mill"; who: PlayerRef; n: Amount; /** Grindstone: "If two cards that share a color were milled this way, repeat this process" (each player's own repeats). */ repeatSharedColor?: true; /** The Tale of Tamiyo: "If two cards that share a card type were milled this way, draw a card and repeat this process". */ repeatSharedTypeDraw?: true }
   /** "That player exiles the top card of their library" (ingest, CR 702.115a): face up (CR 406.3), with no permission to play it. */
   /**
@@ -6655,7 +6657,7 @@ export type AdditionalCost =
    * Kaervek's Spite: "sacrifice all permanents you control": every one, nothing to choose; not payable while one of them
    * can't be sacrificed, as the cost couldn't be paid in full (CR 118.3, 601.2h). With none, there's nothing to sacrifice.
    */
-  | { kind: "sacrificeAll" }
+  | { kind: "sacrificeAll"; /** Soulblast: "sacrifice all creatures you control": only creatures (none pays it too). */ creatures?: true }
   /** Kaervek's Spite: "discard your hand": every card in it, the spell itself already on the stack (CR 601.2a); an empty hand pays it. */
   | { kind: "discardHand" }
   /**

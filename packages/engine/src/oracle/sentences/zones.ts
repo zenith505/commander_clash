@@ -1788,6 +1788,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Skyship Weatherlight: a card exiled with it chosen at random as it resolves, into its owner's hand (rulings: the
     // errata's owner).
     if (/^Put a card exiled with ~ chosen at random into its owner's hand$/.test(s)) return [{ type: "moveLinked", dest: "hand", one: true, random: true }];
+    // Negative Zone Portal: "sacrifice ~ and return a card exiled with it at random to its owner's hand": one, chosen at
+    // random as it resolves, from the cards linked to it as it was (CR 607.2a), even once it's gone.
+    if (/^[Ss]acrifice ~ and return a card exiled with it at random to its owner's hand$/.test(s)) return [{ type: "sacrifice", what: { ref: "self" } }, { type: "moveLinked", dest: "hand", one: true, random: true }];
     // Omenpath Journey: "choose a card at random exiled with ~ and put it onto the battlefield tapped": under this ability's
     // controller's control (CR 110.2a).
     if (/^[Cc]hoose a card at random exiled with ~ and put it onto the battlefield tapped$/.test(s)) return [{ type: "moveLinked", dest: "battlefield", one: true, random: true, tapped: true }];

@@ -1140,6 +1140,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^(?:there are cards|a card is) exiled with (?:~|it)$/.test(text)) return { kind: "amount", amount: { count: { kind: "linkedExiled" } }, min: 1 };
   // Veteran Survivor: "As long as there are three or more cards exiled with ~": the same, at least that many.
   if ((m = new RegExp(`^there are ${NUM} or more cards exiled with ~$`).exec(text))) return { kind: "amount", amount: { count: { kind: "linkedExiled" } }, min: num(m[1]!) };
+  // Negative Zone Portal: "if there are four or more creature cards exiled with ~": only those cards.
+  if ((m = new RegExp(`^there are ${NUM} or more (creature|artifact|land) cards exiled with ~$`).exec(text))) {
+    const filter = parseSearchFilter(`${m[2]} card`);
+    return filter ? { kind: "amount", amount: { count: { kind: "linkedExiled", filter } }, min: num(m[1]!) } : null;
+  }
   // "Whenever a player casts a spell, if it's not their turn" (Scytheclaw Raptor): the caster's. "Whenever a player taps
   // a land for mana, if it's not that player's turn" (Price of Glory): the player who tapped it.
   if (/^it(?: isn't that player's|'s not their| isn't their|'s not that player's) turn$/.test(text)) return { kind: "eventPlayersTurn", not: true };

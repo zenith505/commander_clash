@@ -3558,6 +3558,12 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
   for (const c of castExtraCosts(d, { via, alt, costOr, objectId: id, ...(modes ? { modes } : {}), ...(buyback ? { buyback } : {}), ...(kicks ? { kicks } : {}), ...(splice?.length ? { splice } : {}) }, x, s, pid)) {
     if (c.kind === "revealHand") continue; // nothing to choose
     // Kaervek's Spite: everything we have, only to finish an opponent at 5 life or less.
+    // Soulblast: all our creatures, only to finish an opponent with their total power.
+    if (c.kind === "sacrificeAll" && c.creatures) {
+      const total = s.battlefield.map((x) => obj(s, x)).filter((o) => controllerOf(s, o) === pid && objIsType(s, o, "Creature")).reduce((n, o) => n + Math.max(0, power(s, o)), 0);
+      if (!targets.some((t) => t.kind === "player" && t.id !== pid && player(s, t.id).life <= total)) return null;
+      continue;
+    }
     if (c.kind === "sacrificeAll" || c.kind === "discardHand") {
       if (!targets.some((t) => t.kind === "player" && t.id !== pid && player(s, t.id).life <= 5)) return null;
       continue;

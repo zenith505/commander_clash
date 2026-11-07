@@ -7,7 +7,7 @@ import { attackingPermanentOf, castProblem, creatureTypesOf, freeCastable, draw,
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, cardPT, objectMatches, pickOptions, printedMatches, sayBound } from "./targeting";
-import { ResolveCtx, apnap, gifteeOf, attachedHostTypes, players, amountNow, amountCtx, amountFor, objects, runEffect } from "./resolve";
+import { ResolveCtx, apnap, gifteeOf, attachedHostTypes, subjectCreatureTypes, players, amountNow, amountCtx, amountFor, objects, runEffect } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
 import { attackChoices, chooseAuraHosts, suspendExiled } from "./run-zones";
@@ -1924,11 +1924,15 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         const filter = chosenFilter?.xRange ? (({ xRange: _, ...r }) => ({ ...r, manaValue: { max: ctx.x ?? 0 } }))(chosenFilter) : chosenFilter && bindBound(s, chosenFilter, amountCtx(s, ctx));
         const mvMax = filter?.manaValue?.max ?? ctx.x ?? 0;
         // Call to the Kindred: sharing a creature type with the enchanted creature, as it is now or last was.
-        const kin = filter?.sharesTypeWithAttached ? (attachedHostTypes(s, ctx) ?? new Set<string>()) : undefined;
-        const printed = kin && filter ? (({ sharesTypeWithAttached: _, ...r }) => r)(filter) : filter;
+        // Conjurer's Mantle: with the trigger's subject (the equipped creature that attacked), as it is now or last was.
+        const kin = filter?.sharesTypeWithAttached ? (attachedHostTypes(s, ctx) ?? new Set<string>()) : filter?.sharesTypeWithSubjectCreature ? (subjectCreatureTypes(s, ctx) ?? new Set<string>()) : undefined;
+        // Radagast the Brown: the creature types of the creatures you control now; a card sharing none of them.
+        const yours = filter?.notKinOfYourCreatures ? s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid && objIsType(s, o, "Creature")).map((o) => creatureTypesOf(s, o)) : undefined;
+        const yourKin: Set<string> | "all" | undefined = yours && (yours.includes("all") ? "all" : new Set(yours.flatMap((t) => [...(t as Set<string>)])));
+        const printed = (kin || yourKin) && filter ? (({ sharesTypeWithAttached: _, sharesTypeWithSubjectCreature: __, notKinOfYourCreatures: ___, ...r }) => r)(filter) : filter;
         // Smelting Vat: a total counted as it resolves (the sacrificed artifact's mana value).
         const totalMv = e.totalMv === undefined ? undefined : amountNow(s, e.totalMv, ctx);
-        const options = sc.looked.filter((id) => (!printed || printedMatches(printed, defOf(s, obj(s, id)))) && (!kin || shareCreatureType(kin, creatureTypesOf(s, obj(s, id)))) && (totalMv === undefined || defMv(defOf(s, obj(s, id))) <= totalMv));
+        const options = sc.looked.filter((id) => (!printed || printedMatches(printed, defOf(s, obj(s, id)))) && (!kin || shareCreatureType(kin, creatureTypesOf(s, obj(s, id)))) && (!yourKin || !shareCreatureType(yourKin, creatureTypesOf(s, obj(s, id)))) && (totalMv === undefined || defMv(defOf(s, obj(s, id))) <= totalMv));
         // "If ~ was kicked, put two of those cards into your hand instead" (Consult the Star Charts, CR 702.33e).
         const yardHas = (f: TargetSpec) => player(s, ctx.controller).graveyard.some((id) => printedMatches(f, defOf(s, obj(s, id))));
         const count = e.countAll ? sc.looked.length : e.countX ? Math.max(0, ctx.x ?? 0) : e.kickedCount !== undefined && ctx.kicked?.length ? e.kickedCount : (e.countIfYard?.min ? player(s, ctx.controller).graveyard.filter((id) => printedMatches(e.countIfYard!.has[0]!, defOf(s, obj(s, id)))).length >= e.countIfYard.min : e.countIfYard?.has.every(yardHas)) ? e.countIfYard!.count : e.countIfCond && staticConditionNow(s, e.countIfCond.cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller) ? e.countIfCond.count : e.count;
@@ -2074,10 +2078,12 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           } else player(s, from).library = [id, ...player(s, from).library.filter((x) => x !== id)];
         }
       });
-      if (e.rest === "shuffle") {
+      // Nine-Fingers Keene: where the rest go, decided now, the card taken already where it went (rulings).
+      const restTo = e.restToHandIf && !sc.moved && staticConditionNow(s, e.restToHandIf, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller) ? "hand" : e.rest;
+      if (restTo === "shuffle") {
         shuffleLibrary(s, p); // "Then shuffle" (CR 701.20)
         log(s, `${p.name} shuffles their library.`);
-      } else if (e.rest === "graveyard") {
+      } else if (restTo === "graveyard") {
         if (rest.length) log(s, `${p.name} puts ${names(rest)} into ${from === pid ? "their" : `${player(s, from).name}'s`} graveyard.`);
         for (const id of rest) moveObject(s, id, "graveyard");
         // "For each card put into your graveyard this way" (Dihada): those that got there.
@@ -2085,13 +2091,13 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           s.resolving.movedLinked = rest.filter((id) => s.objects[id]?.zone === "graveyard").length;
           s.resolving.movedLinkedIds = rest.filter((id) => s.objects[id]?.zone === "graveyard");
         }
-      } else if (e.rest === "keep") {
+      } else if (restTo === "keep") {
         // They stay on top, in the order they were in (an orderTop's digRest).
         r.digRest = rest.length;
-      } else if (e.rest === "hand") {
+      } else if (restTo === "hand") {
         if (rest.length) log(s, `${p.name} puts ${rest.length === 1 ? "the other card" : `the other ${rest.length} cards`} into their hand.`);
         for (const id of rest) moveObject(s, id, "hand");
-      } else if (e.rest === "exile") {
+      } else if (restTo === "exile") {
         // Face up (CR 406.3).
         if (rest.length) log(s, `${p.name} exiles ${names(rest)}.`);
         for (const id of rest) moveObject(s, id, "exile");

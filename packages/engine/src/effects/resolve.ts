@@ -359,6 +359,18 @@ export function attachedHostTypes(s: GameState, ctx: ResolveCtx): Set<string> | 
   return lk?.zc === host.zc && lk.creatureTypes ? (lk.creatureTypes === "all" ? "all" : new Set(lk.creatureTypes)) : undefined;
 }
 
+/** The trigger subject's creature types: as it is on the battlefield, or as it last existed there (CR 608.2h). */
+export function subjectCreatureTypes(s: GameState, ctx: ResolveCtx): Set<string> | "all" | undefined {
+  const sub = ctx.subject;
+  const o = sub ? s.objects[sub.id] : undefined;
+  if (!sub || !o) return undefined;
+  if (o.zone === "battlefield" && (o.zoneChanges ?? 0) === sub.zc) return creatureTypesOf(s, o);
+  // A dies trigger's subject is the card in its new zone, one zone change after it left the battlefield.
+  const lk = s.lastKnown?.[o.id];
+  if (!lk?.creatureTypes || (lk.zc !== sub.zc && lk.zc !== sub.zc - 1)) return undefined;
+  return lk.creatureTypes === "all" ? "all" : new Set(lk.creatureTypes);
+}
+
 export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
   if (ref.ref === "castSpell") return []; // only counted (amounts.ts)
   if (ref.ref === "ringBearer") {
@@ -1261,6 +1273,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "keepRest":
     case "keepDestroyRest":
     case "empowerJace":
+    case "returnOneElsewhere":
     case "bounce":
     case "weld":
     case "putOntoBattlefield":

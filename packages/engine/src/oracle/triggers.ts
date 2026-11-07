@@ -1464,6 +1464,11 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // (Death's Oasis's "with lesser mana value than the creature that died" isn't a target: body.ts.)
   const lesserKey = attached ? undefined : / with lesser (mana value|toughness)\b(?! than)/.exec(bodyText)?.[1];
   const lesser = lesserKey !== undefined;
+  // Puca's Covenant: "return another target permanent card with mana value less than or equal to the number of counters on
+  // that creature from your graveyard to your hand": the counters of every kind the creature had as it last existed
+  // (CR 608.2h), fixed as the target is chosen (TargetSpec.bound); "another" than the card that died.
+  const perCounters = !attached && !lesser && / with mana value less than or equal to the number of counters on that creature\b/.test(bodyText);
+  if (perCounters) bodyText = bodyText.replace(/ with mana value less than or equal to the number of counters on that creature\b/, "");
   if (lesser) bodyText = bodyText.replace(/ with lesser (?:mana value|toughness)\b/, "").replace(/^return to your hand (target [a-z ]+ card) in your graveyard\.$/, "return $1 from your graveyard to your hand.");
   // Mimic Vat: "you may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (CR
   // 607.2a). The card is exiled linked to ~; if it has left the graveyard, nothing happens and the other card stays (rulings).
@@ -1488,6 +1493,12 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
     const { notSource, ...rest } = t;
     if (notSource && m?.[1] !== "~ or another") return "fail";
     body = { ...body, targets: [{ ...rest, ...(notSource ? { notSubject: true as const } : {}), bound: { key, at: "most", amount: { count: { kind: key, of: { ref: "subject" } }, plus: -1 } }, text: `${t.text} with lesser ${lesserKey}` }] };
+  }
+  if (perCounters) {
+    const [t, ...more] = body.targets;
+    if (!t || more.length || t.kind !== "card" || t.bound || t.manaValue || !t.notSource || m?.[1]?.toLowerCase() !== "a") return "fail";
+    const { notSource: _n, ...rest } = t;
+    body = { ...body, targets: [{ ...rest, notSubject: true as const, bound: { key: "manaValue", at: "most", amount: { count: { kind: "counters", counter: ANY_COUNTER, of: { ref: "subject" } } } }, text: `${t.text} with mana value less than or equal to the number of counters on that creature` }] };
   }
   // Illicit Masquerade: "Whenever a creature you control with an impostor counter on it dies, exile it. Return up to one
   // other target creature card from your graveyard to the battlefield": "other" than the card that died, the trigger's

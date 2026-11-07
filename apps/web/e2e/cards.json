@@ -4011,6 +4011,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ed0cf504-c365-4486-92bc-c329b83b99d0",
+  "name": "Carrion Wurm",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Creature — Zombie Wurm",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Wurm"
+  ],
+  "oracleText": "Whenever this creature attacks or blocks, any player may exile three cards from their graveyard. If a player does, this creature assigns no combat damage this turn.",
+  "power": "6",
+  "toughness": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tor",
+  "releasedAt": "2002-02-04",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0d8730b5-f7ba-48b0-928d-d8b7685347d3",
   "name": "Case of the Uneaten Feast",
   "manaCost": "{W}",
@@ -12658,6 +12689,32 @@
   "commanderLegal": "legal",
   "set": "neo",
   "releasedAt": "2022-02-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "448e0cf2-c97c-4dc0-96ef-91f1eb75d97c",
+  "name": "Ion Storm",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}{R}, Remove a +1/+1 counter or a charge counter from a permanent you control: This enchantment deals 2 damage to any target.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "5dn",
+  "releasedAt": "2004-06-04",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -25177,6 +25234,38 @@
   "set": "rtr",
   "releasedAt": "2012-10-05",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fc638800-6aec-4a48-ad2c-c9a5ce93c236",
+  "name": "Tainted Specter",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Specter",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Specter"
+  ],
+  "oracleText": "Flying\n{1}{B}{B}, {T}: Target player discards a card unless they put a card from their hand on top of their library. If that player discards a card this way, this creature deals 1 damage to each creature and each player. Activate only as a sorcery.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

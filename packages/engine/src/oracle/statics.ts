@@ -2559,6 +2559,14 @@ export function parseStaticMods(rest: string): Modification[] | null {
 }
 
 export function parseStatic(line: string): StaticAbility | null {
+  // Lymph Sliver: "All Sliver creatures have absorb 1.": absorb N is "If a source would deal damage to this creature,
+  // prevent N of that damage" (CR 702.64a), N from each source (rulings), several instances each applying (CR 702.64b).
+  // (Any creature type: a text-changing effect can change "Sliver", CR 612.2.)
+  const absorb = /^All ([A-Z][a-z]+) creatures have absorb (\d+)\.$/.exec(line);
+  if (absorb) {
+    const st = parseStatic(`All ${absorb[1]} creatures have "If a source would deal damage to this creature, prevent ${absorb[2]} of that damage."`);
+    return st && { ...st, text: line };
+  }
   // Konda's Banner: "Creatures that share a color with equipped creature get +1/+1", "... a creature type ...": anyone's
   // creatures, the equipped creature too (it shares with itself, rulings), compared with its colors and creature types
   // as layers 4 and 5 leave them (CR 613.1d-e) when the P/T change applies (layer 7c). Sharing two colors is still +1/+1.

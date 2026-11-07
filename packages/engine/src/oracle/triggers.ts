@@ -195,7 +195,7 @@ function withOtherOpponents(body: AbilityBody): AbilityBody {
 }
 
 /** What an attached permanent's creature does (see TriggeredAbility.host): the event, and what its text can say. */
-const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: true; defending?: true; toOpponent?: true; creature?: true; spell?: true; aura?: true }][] = [
+const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: true; defending?: true; toOpponent?: true; toYou?: true; creature?: true; spell?: true; aura?: true }][] = [
   [/^attacks or blocks, (.+)$/, "selfAttacksOrBlocks", {}],
   [/^attacks, (.+)$/, "selfAttacks", { defending: true }],
   [/^blocks or becomes blocked, (.+)$/, "selfBlocksOrBecomesBlocked", {}],
@@ -211,6 +211,8 @@ const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: tru
   [/^deals combat damage to an opponent, (.+)$/, "selfDealsCombatDamageToPlayer", { thatMuch: true, eventPlayer: true, toOpponent: true }],
   [/^deals damage to a player, (.+)$/, "selfDealsDamageToPlayer", { thatMuch: true, eventPlayer: true }],
   [/^deals damage to an opponent, (.+)$/, "selfDealsDamageToPlayer", { thatMuch: true, eventPlayer: true, toOpponent: true }],
+  // Backfire: "Whenever enchanted creature deals damage to you": the Aura's controller (CR 109.5).
+  [/^deals damage to you, (.+)$/, "selfDealsDamageToPlayer", { thatMuch: true, eventPlayer: true, toYou: true }],
   [/^deals combat damage to a creature, (.+)$/, "selfDealsCombatDamageToCreature", { thatMuch: true, creature: true }],
   [/^deals damage to a creature, (.+)$/, "selfDealsDamageToCreature", { thatMuch: true, creature: true }],
   [/^deals combat damage, (.+)$/, "selfDealsCombatDamage", { thatMuch: true }],
@@ -358,7 +360,7 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
       body = moved;
     }
     if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, h[1]!) };
-    return { event, body: withOtherOpponents(body), host: m[1] ? "orSelf" : "attached", ...(o.spell ? { targeted: { spell: true as const, ...(o.aura ? { spellSubtypes: ["Aura"] } : {}) } } : {}), ...(o.toOpponent ? { toOpponent: true } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(yours ? { activeIf: { kind: "yourTurn" as const } } : {}) };
+    return { event, body: withOtherOpponents(body), host: m[1] ? "orSelf" : "attached", ...(o.spell ? { targeted: { spell: true as const, ...(o.aura ? { spellSubtypes: ["Aura"] } : {}) } } : {}), ...(o.toOpponent ? { toOpponent: true } : {}), ...(o.toYou ? { toYou: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(yours ? { activeIf: { kind: "yourTurn" as const } } : {}) };
   }
   return null; // "whenever equipped creature dies" is parseDiesTrigger's
 }
@@ -1100,10 +1102,15 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // once it's cast, so checking it as it triggers is checking it as it resolves too (CR 603.4).
   const short = /^if the amount of mana spent to cast it was less than its mana value, (.+)$/.exec(m[4]!);
   if (short && m[2]) return "fail";
+  // Obscura Ascendancy: "if its mana value is equal to 1 plus the number of soul counters on ~, ...": an intervening if
+  // (CR 603.4), checked as it triggers and again as it resolves (rulings), against the counters then.
+  const mvCounters = !treasure && !spentIf && !short ? /^if its mana value is equal to (\d+) plus the number of ([a-z]+) counters on ~, (.+)$/.exec(m[4]!) : null;
+  const mvKind = mvCounters ? counterKind(mvCounters[2]!) : undefined;
+  if (mvCounters && (m[2] || !mvKind)) return "fail";
   // "That player" is the one who cast it.
   // "If eight or more mana was spent to cast that spell, ... it deals that much damage to each opponent" (Tellah): the
   // mana spent to cast it (CR 601.2h), which the cast event carries.
-  let text = treasure ? treasure[1]! : spentIf ? spentIf[2]! : short ? short[1]!.replace(/\bloses life equal to the difference(\.?)$/, "loses X life$1") : m[4]!;
+  let text = mvCounters ? mvCounters[3]! : treasure ? treasure[1]! : spentIf ? spentIf[2]! : short ? short[1]!.replace(/\bloses life equal to the difference(\.?)$/, "loses X life$1") : m[4]!;
   // Tokka & Rahzar: "Whenever a player casts a spell, if ..., ~ deals 3 damage to that player": the same, with nothing
   // about the difference.
   if (short && /\bthe difference\b/.test(text)) return "fail";
@@ -1129,7 +1136,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (symMany) body = { ...replaceX(body, { count: { kind: "castSpellManaSymbols", color: symColor! } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (tgtsMany) body = { ...replaceX(body, { count: { kind: "castSpellTargets" } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(orSpell ? { orSpell } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(nameExiled ? { nameExiledWithSelf: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(phyM ? { phyrexianInCost: true as const } : {}), ...(tgtsM ? { hasTargets: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMain ? { ownTurn: true as const, mainPhase: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(teamworkM ? { teamwork: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(mvCounters ? { mvIsSelfCountersPlus: { counter: mvKind!, plus: Number(mvCounters[1]) } } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(orSpell ? { orSpell } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(nameExiled ? { nameExiledWithSelf: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(phyM ? { phyrexianInCost: true as const } : {}), ...(tgtsM ? { hasTargets: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMain ? { ownTurn: true as const, mainPhase: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(teamworkM ? { teamwork: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**

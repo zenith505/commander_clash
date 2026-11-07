@@ -6108,7 +6108,9 @@ export function compile(d: CardDef): CompiledCard {
     // card." then "Draw a card.": the same, the delayed trigger after another instruction in its paragraph.
     const floatingFirst = tail === undefined && !costSacrificedX && spellLines.length > 1 && /(?:^|\. )(?:Whenever [^,]+ this turn, |Until end of turn, whenever )/.test(spellLines[0]!) && !spellLines.some((l) => l.includes("•"));
     const parts = floatingFirst ? [parseBody(spellLines[0]!, { spell: true }), parseBody(spellLines.slice(1).join(" "), { spell: true })] : [];
-    const joined: AbilityBody | null = parts.length && parts.every((b) => b && !b.targets.length && !b.modal && Object.keys(b).every((k) => k === "targets" || k === "effects" || k === "text")) ? { targets: [], effects: parts.flatMap((b) => b!.effects), text: spellLines.join(" ") } : null;
+    // Spiritualize: "Until end of turn, whenever target creature deals damage, ..." then "Draw a card.": the first
+    // paragraph's targets are the spell's, as long as the rest has none of its own (its indexes stay the same).
+    const joined: AbilityBody | null = parts.length && parts.every((b, i) => b && (i === 0 || !b.targets.length) && !b.modal && Object.keys(b).every((k) => k === "targets" || k === "effects" || k === "text")) ? { targets: parts[0]!.targets, effects: parts.flatMap((b) => b!.effects), text: spellLines.join(" ") } : null;
     const body = floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}) }) : null;
     if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;

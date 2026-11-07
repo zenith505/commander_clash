@@ -783,6 +783,11 @@ export interface Player {
   shuffles?: number;
   /** "You have no maximum hand size for the rest of the game" from a resolved spell or ability (CR 402.2). */
   noMaxHandSize?: true;
+  /**
+   * "Your maximum hand size is reduced by three for the rest of the game" (Inspired Idea), from resolved spells and
+   * abilities: each change with its timestamp, applied with the static ones in timestamp order (CR 402.2, 613.11; rulings).
+   */
+  handSizeForGame?: { plus: number; timestamp: number }[];
   /** "You have no maximum hand size for as long as you control ~" (The Great Synthesis): while they control that object (CR 611.2b). */
   noMaxHandSizeWhile?: { id: ObjectId; zc: number }[];
   /** "You have no maximum hand size until your next turn" (Enter the Infinite): until that player's next turn begins. */

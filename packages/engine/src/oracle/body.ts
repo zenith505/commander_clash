@@ -5157,36 +5157,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // card they exiled, by its printed characteristics; nothing if their graveyard was empty.
     // Deathbonnet Hulk: "you may exile a card from a graveyard. If a creature card was exiled this way, put a +1/+1 counter
     // on ~": the same, about the card exiled (none if you didn't).
-    const lastYard0 = effects[effects.length - 1];
-    const lastYard = lastYard0?.type === "may" && lastYard0.effects.length === 1 && lastYard0.effects[0]!.type === "chooseFromGraveyard" && lastYard0.effects[0]!.anyGraveyard ? lastYard0.effects[0]! : lastYard0;
-    // Grenzo, Dungeon Warden: "Put the bottom card of your library into your graveyard. If it's a creature card with power
-    // less than or equal to ~'s power, put it onto the battlefield": that card, from wherever it went (into exile instead
-    // under Leyline of the Void, rulings), compared with ~'s power as this resolves or as it last existed (rulings).
-    const grenzo = lastYard?.type === "bottomToGraveyard" && lastYard.who.ref === "you" ? /^If it's a creature card with power less than or equal to ~'s power, put it onto the battlefield$/.exec(s) : null;
-    if (grenzo) {
-      effects.push({ type: "if", cond: { kind: "yardChosenIs", filter: { kind: "card", types: ["Creature"], bound: { key: "power", at: "most", amount: { count: { kind: "power", of: { ref: "self" } } } }, text: "creature card with power less than or equal to ~'s power" } }, effects: [{ type: "putOntoBattlefield", what: { ref: "chosenFromYard" } }] });
-      continue;
-    }
-    // Cellar Door: "Target player puts the bottom card of their library into their graveyard. If it's a creature card, ...":
-    // the card put there, as it is there (CR 701.17a: not a mill).
-    const yardIs = lastYard?.type === "chooseFromGraveyard" && lastYard.n === 1 && lastYard.dest === "exile" && !lastYard.anyNumber ? (lastYard.upTo ? null : /^If it's an? (.+? card), (.+)$/.exec(s)) ?? (lastYard.anyGraveyard ? /^If an? (.+? card) was exiled this way, (.+)$/.exec(s) : null) : lastYard?.type === "bottomToGraveyard" ? /^If it's an? (.+? card), (.+)$/.exec(s) : null;
-    if (yardIs) {
-      const filter = parseSearchFilter(yardIs[1]!);
-      // Lazav, Familiar Stranger: "you may have ~ become a copy of that card until end of turn": the card exiled.
-      const copyIt = lastYard?.type === "chooseFromGraveyard" && lastYard.anyGraveyard && /^you may have ~ become a copy of that card until end of turn$/.test(yardIs[2]!);
-      const then: Effect[] | null | undefined = copyIt ? [{ type: "may", effects: [{ type: "becomeCopy", what: { ref: "self" }, of: { ref: "chosenFromYard" }, duration: "endOfTurn" }], text: "have ~ become a copy of that card until end of turn" }] : filter && parseOne(capital(yardIs[2]!), ctx);
-      if (!filter || !then) return null;
-      effects.push({ type: "if", cond: { kind: "yardChosenIs", filter }, effects: then });
-      continue;
-    }
-    // Currency Converter: "Put a card exiled with ~ into its owner's graveyard. If it's a land card, create a Treasure token.
-    // If it's a nonland card, ...": the card that moved, by its printed characteristics; nothing if none did.
-    const movedIs = effects.some((e) => e.type === "moveLinked" && e.one && e.dest === "graveyard") ? /^If it's an? (.+? card), (.+)$/.exec(s) : null;
-    if (movedIs) {
-      const filter = parseSearchFilter(movedIs[1]!);
-      const then = filter && parseOne(capital(movedIs[2]!), ctx);
-      if (!filter || !then) return null;
-      effects.push({ type: "if", cond: { kind: "movedLinkedIs", filter }, effects: then });
+    // Graveyard Shovel, Deathbonnet Hulk, Grenzo, Cellar Door, Currency Converter: "If it's a ... card" about the card the
+    // instruction before moved (see yardCardIs).
+    const yardFx = yardCardIs(effects, s, ctx);
+    if (yardFx !== undefined) {
+      if (!yardFx) return null;
+      effects.push(yardFx);
       continue;
     }
     // "At the beginning of the next end step, sacrifice that creature" (Meek Attack) is "Sacrifice that creature at the
@@ -10624,12 +10600,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // layer 7b (CR 613.4b); modifiers and counters still apply on top, later setting effects win (rulings).
     // Eldrazi Mimic: "you may have this creature's base power and toughness become equal to that creature's power and
     // toughness until end of turn": both, the same way (rulings: as it last existed if it's gone, negative values too).
-    const basePowerMay = !ctx.spell ? /^[Yy]ou may have ~'s base power( and toughness)? become equal to that creature's power( and toughness)? until end of turn$/.exec(s) : null;
-    if (basePowerMay && !!basePowerMay[1] === !!basePowerMay[2]) {
-      const of = parseObject("that creature", ctx);
-      if (of?.ref !== "subject") return null;
-      const both = !!basePowerMay[1];
-      effects.push({ type: "may", effects: [{ type: "continuous", what: { ref: "self" }, mods: [both ? { kind: "setPT", power: { count: { kind: "power", of } }, toughness: { count: { kind: "toughness", of } } } : { kind: "setPower", power: { count: { kind: "power", of } } }], duration: "endOfTurn" }], text: both ? "have ~'s base power and toughness become equal to that creature's power and toughness until end of turn" : "have ~'s base power become equal to that creature's power until end of turn" });
+    const basePowerMay = !ctx.spell ? basePowerOfSubject(s, ctx) : undefined;
+    if (basePowerMay === null) return null;
+    if (basePowerMay) {
+      effects.push(basePowerMay);
       continue;
     }
     // Lagonna-Band Storyteller: "you may put target enchantment card from your graveyard on top of your library. If you do,
@@ -19223,4 +19197,57 @@ function parseOfferRest(text: string, ctx: Ctx): Effect[] | null {
     return null;
   }
   return fx;
+}
+
+/**
+ * Grenzo, Dungeon Warden: "If it's a creature card with power less than or equal to ~'s power, put it onto the battlefield"
+ * after "Put the bottom card of your library into your graveyard" (see the call).
+ */
+function grenzoReturn(last: Effect | undefined, s: string): Effect | null {
+  if (last?.type !== "bottomToGraveyard" || last.who.ref !== "you" || !/^If it's a creature card with power less than or equal to ~'s power, put it onto the battlefield$/.test(s)) return null;
+  return { type: "if", cond: { kind: "yardChosenIs", filter: { kind: "card", types: ["Creature"], bound: { key: "power", at: "most", amount: { count: { kind: "power", of: { ref: "self" } } } }, text: "creature card with power less than or equal to ~'s power" } }, effects: [{ type: "putOntoBattlefield", what: { ref: "chosenFromYard" } }] };
+}
+
+/**
+ * Belligerent Yearling's "you may have ~'s base power become equal to that creature's power until end of turn" and Eldrazi
+ * Mimic's "... base power and toughness become equal to that creature's power and toughness ..." (see the call): undefined
+ * if the sentence isn't one, null if it can't be compiled.
+ */
+function basePowerOfSubject(s: string, ctx: Ctx): Effect | null | undefined {
+  const m = /^[Yy]ou may have ~'s base power( and toughness)? become equal to that creature's power( and toughness)? until end of turn$/.exec(s);
+  if (!m || !!m[1] !== !!m[2]) return undefined;
+  const of = parseObject("that creature", ctx);
+  if (of?.ref !== "subject") return null;
+  const both = !!m[1];
+  return { type: "may", effects: [{ type: "continuous", what: { ref: "self" }, mods: [both ? { kind: "setPT", power: { count: { kind: "power", of } }, toughness: { count: { kind: "toughness", of } } } : { kind: "setPower", power: { count: { kind: "power", of } } }], duration: "endOfTurn" }], text: both ? "have ~'s base power and toughness become equal to that creature's power and toughness until end of turn" : "have ~'s base power become equal to that creature's power until end of turn" };
+}
+
+/** "If it's a ... card, ..." about the card the instruction before put into a graveyard or exile (see the call): undefined if the sentence isn't one. */
+function yardCardIs(effects: Effect[], s: string, ctx: Ctx): Effect | null | undefined {
+  const lastYard0 = effects[effects.length - 1];
+  const lastYard = lastYard0?.type === "may" && lastYard0.effects.length === 1 && lastYard0.effects[0]!.type === "chooseFromGraveyard" && lastYard0.effects[0]!.anyGraveyard ? lastYard0.effects[0]! : lastYard0;
+  // Grenzo, Dungeon Warden: "Put the bottom card of your library into your graveyard. If it's a creature card with power
+  // less than or equal to ~'s power, put it onto the battlefield": that card, from wherever it went (into exile instead
+  // under Leyline of the Void, rulings), compared with ~'s power as this resolves or as it last existed (rulings).
+  const grenzo = grenzoReturn(lastYard, s);
+  if (grenzo) return grenzo;
+  // Cellar Door: "Target player puts the bottom card of their library into their graveyard. If it's a creature card, ...":
+  // the card put there, as it is there (CR 701.17a: not a mill).
+  const yardIs = lastYard?.type === "chooseFromGraveyard" && lastYard.n === 1 && lastYard.dest === "exile" && !lastYard.anyNumber ? (lastYard.upTo ? null : /^If it's an? (.+? card), (.+)$/.exec(s)) ?? (lastYard.anyGraveyard ? /^If an? (.+? card) was exiled this way, (.+)$/.exec(s) : null) : lastYard?.type === "bottomToGraveyard" ? /^If it's an? (.+? card), (.+)$/.exec(s) : null;
+  if (yardIs) {
+    const filter = parseSearchFilter(yardIs[1]!);
+    // Lazav, Familiar Stranger: "you may have ~ become a copy of that card until end of turn": the card exiled.
+    const copyIt = lastYard?.type === "chooseFromGraveyard" && lastYard.anyGraveyard && /^you may have ~ become a copy of that card until end of turn$/.test(yardIs[2]!);
+    const then: Effect[] | null | undefined = copyIt ? [{ type: "may", effects: [{ type: "becomeCopy", what: { ref: "self" }, of: { ref: "chosenFromYard" }, duration: "endOfTurn" }], text: "have ~ become a copy of that card until end of turn" }] : filter && parseOne(capital(yardIs[2]!), ctx);
+    return !filter || !then ? null : { type: "if", cond: { kind: "yardChosenIs", filter }, effects: then };
+  }
+  // Currency Converter: "Put a card exiled with ~ into its owner's graveyard. If it's a land card, create a Treasure token.
+  // If it's a nonland card, ...": the card that moved, by its printed characteristics; nothing if none did.
+  const movedIs = effects.some((e) => e.type === "moveLinked" && e.one && e.dest === "graveyard") ? /^If it's an? (.+? card), (.+)$/.exec(s) : null;
+  if (movedIs) {
+    const filter = parseSearchFilter(movedIs[1]!);
+    const then = filter && parseOne(capital(movedIs[2]!), ctx);
+    return !filter || !then ? null : { type: "if", cond: { kind: "movedLinkedIs", filter }, effects: then };
+  }
+  return undefined;
 }

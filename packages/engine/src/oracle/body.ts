@@ -3763,6 +3763,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 3;
       continue;
     }
+    // Kamiz, Obscura Oculus: "target attacking creature can't be blocked this turn. It connives. Then choose another attacking
+    // creature with lesser power. That creature gains double strike until end of turn." Chosen as this resolves, not
+    // targeted, with less power than the target has then (after conniving); none if there's no such creature.
+    if (/^Choose another attacking creature with lesser power$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && ctx.targets[ctx.lastObjectTarget]!.combat === "attacking") {
+      const then = parseOne(sentences[si + 1]?.replace(/\.$/, "") ?? "", ctx);
+      const idx = ctx.lastObjectTarget;
+      // "That creature" is the one chosen, not the target ("it" before).
+      const gains = then?.length === 1 && then[0]!.type === "continuous" && /^That creature gains [a-z ]+ until end of turn\.?$/.test(sentences[si + 1] ?? "") ? then[0] : undefined;
+      if (gains?.type !== "continuous") return null;
+      effects.push({ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], combat: "attacking", text: "attacking creature with lesser power" }, n: 1, action: "choose", otherThanTarget: idx, lesserPowerThanTarget: idx }, { ...gains, what: { ref: "created" } });
+      si++;
+      continue;
+    }
     // An Aura token and what it has, said in the next sentence ("... attached to another target creature. That token has
     // enchant creature and "..."", The Rani): one instruction creating it (see parseTokensSentence). Without its enchant
     // ability the line isn't understood.

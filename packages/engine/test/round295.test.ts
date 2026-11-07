@@ -1,7 +1,7 @@
 // Round 295: harder cards from the "Out after round N" lists, most played first.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
+import { act, bear, card, forest as forestCard, passUntil, putOnBattlefield, setup } from "./helpers";
 import { applyAction, characteristics, controllerOf, planActivate, invalidateCharacteristics, isFullySupported, objHasKeyword, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 import { cardSource, dealDamage, objectSource } from "../src/damage";
 
@@ -37,6 +37,8 @@ const plaguereav = (): CardDef => ({"oracleId":"eef50ef8-958b-4f5c-b261-16926d9f
 const conjurers = (): CardDef => ({"oracleId":"21b520c6-c94a-475a-a824-dd96394ea55b","name":"Conjurer's Mantle","manaCost":"{1}{W}","cmc":2,"typeLine":"Artifact — Equipment","supertypes":[],"types":["Artifact"],"subtypes":["Equipment"],"oracleText":"Equipped creature gets +1/+1 and has vigilance.\nWhenever equipped creature attacks, look at the top six cards of your library. You may reveal a card that shares a creature type with that creature from among them and put it into your hand. Put the rest on the bottom of your library in a random order.\nEquip {1}","colors":["W"],"colorIdentity":["W"],"keywords":["Equip"],"imageUrl":"https://cards.scryfall.io/normal/front/5/1/51ddebe2-aad6-4097-ac02-fa6c99f30de7.jpg?1783917292","artUrl":"https://cards.scryfall.io/art_crop/front/5/1/51ddebe2-aad6-4097-ac02-fa6c99f30de7.jpg?1783917292","commanderLegal":"legal","set":"moc","releasedAt":"2023-04-21","rarity":"rare","layout":"normal","gameChanger":false} as CardDef);
 const radagast = (): CardDef => ({"oracleId":"dfa47d0d-17f0-4a12-89d3-0d3c7f3db8c6","name":"Radagast the Brown","manaCost":"{2}{G}{G}","cmc":4,"typeLine":"Legendary Creature — Avatar Wizard","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Avatar","Wizard"],"oracleText":"Whenever Radagast or another nontoken creature you control enters, look at the top X cards of your library, where X is that creature's mana value. You may reveal a creature card that doesn't share a creature type with a creature you control from among those cards and put it into your hand. Put the rest on the bottom of your library in a random order.","power":"2","toughness":"5","colors":["G"],"colorIdentity":["G"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/b/3/b3988120-ebbe-4d24-9bb4-8c5331a14034.jpg?1783916261","artUrl":"https://cards.scryfall.io/art_crop/front/b/3/b3988120-ebbe-4d24-9bb4-8c5331a14034.jpg?1783916261","commanderLegal":"legal","set":"ltr","releasedAt":"2023-06-23","rarity":"mythic","layout":"normal","gameChanger":false} as CardDef);
 const ninefinger = (): CardDef => ({"oracleId":"e06007cf-dc6e-4b50-93d5-9a7c8ee9c023","name":"Nine-Fingers Keene","manaCost":"{1}{B}{G}{U}","cmc":4,"typeLine":"Legendary Creature — Human Rogue","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Rogue"],"oracleText":"Menace\nWard—Pay 9 life.\nWhenever Nine-Fingers Keene deals combat damage to a player, look at the top nine cards of your library. You may put a Gate card from among them onto the battlefield. Then if you control nine or more Gates, put the rest into your hand. Otherwise, put the rest on the bottom of your library in a random order.","power":"4","toughness":"4","colors":["B","G","U"],"colorIdentity":["B","G","U"],"keywords":["Menace","Ward"],"imageUrl":"https://cards.scryfall.io/normal/front/3/3/33ac9e11-0fa8-4a58-8268-b46ad18c75c2.jpg?1783922622","artUrl":"https://cards.scryfall.io/art_crop/front/3/3/33ac9e11-0fa8-4a58-8268-b46ad18c75c2.jpg?1783922622","commanderLegal":"legal","set":"clb","releasedAt":"2022-06-10","rarity":"rare","layout":"normal","gameChanger":false} as CardDef);
+const pucas = (): CardDef => ({"oracleId":"9b832f87-0bd5-47bd-ab9c-718bd9a6c441","name":"Puca's Covenant","manaCost":"{2}{G}","cmc":3,"typeLine":"Enchantment","supertypes":[],"types":["Enchantment"],"subtypes":[],"oracleText":"Whenever a creature you control with a counter on it dies, you may return another target permanent card with mana value less than or equal to the number of counters on that creature from your graveyard to your hand. Do this only once each turn.","colors":["G"],"colorIdentity":["G"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/1/9/1966dbd2-963a-4d37-ab26-c0a0715f523f.jpg?1783904602","artUrl":"https://cards.scryfall.io/art_crop/front/1/9/1966dbd2-963a-4d37-ab26-c0a0715f523f.jpg?1783904602","commanderLegal":"legal","set":"ecc","releasedAt":"2026-01-23","rarity":"rare","layout":"normal","gameChanger":false} as CardDef);
+const kamiz = (): CardDef => ({"oracleId":"49da6a78-f3b2-4691-975c-efbb644311f3","name":"Kamiz, Obscura Oculus","manaCost":"{1}{W}{U}{B}","cmc":4,"typeLine":"Legendary Creature — Octopus Rogue","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Octopus","Rogue"],"oracleText":"Whenever you attack, target attacking creature can't be blocked this turn. It connives. Then choose another attacking creature with lesser power. That creature gains double strike until end of turn. (To have a creature connive, draw a card, then discard a card. If you discarded a nonland card, put a +1/+1 counter on that creature.)","power":"2","toughness":"4","colors":["B","U","W"],"colorIdentity":["B","U","W"],"keywords":["Connive"],"imageUrl":"https://cards.scryfall.io/normal/front/7/4/74b8ae28-e169-46be-8180-ebdaf80efd81.jpg?1783923381","artUrl":"https://cards.scryfall.io/art_crop/front/7/4/74b8ae28-e169-46be-8180-ebdaf80efd81.jpg?1783923381","commanderLegal":"legal","set":"ncc","releasedAt":"2022-04-29","rarity":"mythic","layout":"normal","gameChanger":false} as CardDef);
 
 describe("Grothama, All-Devouring: each player draws for the damage their sources dealt it this turn", () => {
   it("when it leaves the battlefield, each player draws that many: what each player's sources dealt it, as they controlled them", () => {
@@ -253,5 +255,80 @@ describe("Nine-Fingers Keene: a Gate from the top nine, then the rest into your 
     expect(zone(s, g)).toBe("battlefield");
     expect(s.players[ap]!.hand).toHaveLength(0);
     expect(s.players[ap]!.library.slice(-8).sort()).toEqual(top.slice(1).sort());
+  });
+});
+
+describe("Puca's Covenant: a card with mana value up to the dead creature's counters, once each turn", () => {
+  it("counts every kind of counter it had; not the card that died; only once each turn", () => {
+    supported(pucas());
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, pucas());
+    const a = putOnBattlefield(s0, ap, bear({ name: "Test Elder" }));
+    s0.objects[a]!.counters = { charge: 1, "+1/+1": 1 };
+    const b = putOnBattlefield(s0, ap, bear({ name: "Test Squire" }));
+    s0.objects[b]!.counters = { charge: 3 };
+    invalidateCharacteristics(s0);
+    const two = put(s0, ap, bear({ name: "Test Two" }), "graveyard");
+    const three = put(s0, ap, bear({ name: "Test Three", manaCost: "{2}{G}", cmc: 3 } as Partial<CardDef>), "graveyard");
+    const killer = putOnBattlefield(s0, s0.turnOrder.find((p) => p !== ap)!, bear());
+    let s = s0;
+    dealDamage(s, objectSource(s, s.objects[killer]!), { object: s.objects[a]! }, 5);
+    s = settle(act(s, { type: "passPriority", player: waitingOn(s)! }));
+    expect(s.pending?.kind).toBe("chooseTargets");
+    // Two counters: not the 3-drop, nor Test Elder itself (now a card in the graveyard).
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [tgt(three)] })).toThrow();
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [tgt(a)] })).toThrow();
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [tgt(two)] }));
+    expect(s.pending?.kind).toBe("chooseMay");
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(zone(s, two)).toBe("hand");
+    // The second death this turn: done already.
+    dealDamage(s, objectSource(s, s.objects[killer]!), { object: s.objects[b]! }, 5);
+    s = settle(act(s, { type: "passPriority", player: waitingOn(s)! }));
+    expect(s.pending?.kind).not.toBe("chooseTargets");
+    expect(zone(s, three)).toBe("graveyard");
+  });
+});
+
+describe("Kamiz, Obscura Oculus: the target connives, then another attacker with lesser power gains double strike", () => {
+  it("lesser than the target's power after it connived; the target itself and bigger attackers aren't offered", () => {
+    supported(kamiz());
+    const { s: s0, ap, opp } = setup([]);
+    s0.players[ap]!.hand = [];
+    putOnBattlefield(s0, ap, kamiz());
+    const a = putOnBattlefield(s0, ap, bear({ name: "Test Two" }));
+    const b = putOnBattlefield(s0, ap, bear({ name: "Test Small", power: "1" }));
+    const c = putOnBattlefield(s0, ap, bear({ name: "Test Even", power: "3" }));
+    // Conniving draws this nonland card, discarded: a +1/+1 counter makes the target 3/3.
+    put(s0, ap, bear({ name: "Test Drawn" }), "library");
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [a, b, c].map((attacker) => ({ attacker, defender: opp })) } as Action);
+    s = settle(s);
+    expect(s.pending?.kind).toBe("chooseTargets");
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [tgt(a)] }));
+    // The only card in hand, drawn and discarded: a nonland card, so a +1/+1 counter.
+    expect(s.objects[a]!.counters["+1/+1"]).toBe(1);
+    // Test Even (3) isn't less than the target's 3 now; only Test Small, chosen as the only one.
+    expect(objHasKeyword(s, s.objects[b]!, "Double strike")).toBe(true);
+    expect(objHasKeyword(s, s.objects[c]!, "Double strike")).toBe(false);
+    expect(objHasKeyword(s, s.objects[a]!, "Double strike")).toBe(false);
+  });
+  it("two smaller attackers: you choose one of them", () => {
+    const { s: s0, ap, opp } = setup([]);
+    s0.players[ap]!.hand = [];
+    putOnBattlefield(s0, ap, kamiz());
+    const a = putOnBattlefield(s0, ap, bear({ name: "Test Big", power: "4" }));
+    const b = putOnBattlefield(s0, ap, bear({ name: "Test Small", power: "1" }));
+    const c = putOnBattlefield(s0, ap, bear({ name: "Test Mid" }));
+    put(s0, ap, forestCard, "library");
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [a, b, c].map((attacker) => ({ attacker, defender: opp })) } as Action);
+    s = settle(act(settle(s), { type: "chooseTargets", player: ap, targets: [tgt(a)] }));
+    expect(s.pending?.kind).toBe("pickPermanents");
+    const q = s.pending as Extract<GameState["pending"], { kind: "pickPermanents" }>;
+    expect([...q.options].sort()).toEqual([b, c].sort());
+    s = settle(act(s, { type: "pickPermanents", player: ap, ids: [c] }));
+    expect(objHasKeyword(s, s.objects[c]!, "Double strike")).toBe(true);
+    expect(objHasKeyword(s, s.objects[b]!, "Double strike")).toBe(false);
   });
 });

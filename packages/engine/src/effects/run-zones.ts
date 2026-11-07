@@ -175,7 +175,10 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const options2 = e.leaving ? pickLeaving(s, e, options1, pid, ctx) : options1;
     // Feast of Worms: "another land": not the target, if it survived (an indestructible one).
     const other = e.otherThanTarget !== undefined ? objects(s, { ref: "target", index: e.otherThanTarget }, ctx).map((o) => o.id) : [];
-    const options = other.length ? options2.filter((id) => !other.includes(id)) : options2;
+    const options3 = other.length ? options2.filter((id) => !other.includes(id)) : options2;
+    // Kamiz, Obscura Oculus: "with lesser power" than the target, as it is now (after it connived).
+    const than = e.lesserPowerThanTarget !== undefined ? objects(s, { ref: "target", index: e.lesserPowerThanTarget }, ctx).find((o) => o.zone === "battlefield") : undefined;
+    const options = e.lesserPowerThanTarget === undefined ? options3 : than ? options3.filter((id) => power(s, obj(s, id)) < power(s, than)) : [];
     // "Sacrifice any number of other creatures": as many as they like, asked even with only one.
     if (e.anyNumber) {
       if (!options.length) {

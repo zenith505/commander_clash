@@ -9800,6 +9800,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a1fc4269-f3e4-4a59-849d-aa1727eef23a",
+  "name": "From Under the Floorboards",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Madness {X}{B}{B} (If you discard this card, discard it into exile. When you do, cast it for its madness cost or put it into your graveyard.)\nCreate three tapped 2/2 black Zombie creature tokens and you gain 3 life. If this spell's madness cost was paid, instead create X of those tokens and you gain X life.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Madness"
+  ],
+  "commanderLegal": "legal",
+  "set": "soi",
+  "releasedAt": "2016-04-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cacda1c2-2fe8-40a3-89f3-38a835f10af3",
   "name": "Fugitive of the Judoon",
   "manaCost": "{4}{G}",
@@ -25621,6 +25649,34 @@
   "set": "dsc",
   "releasedAt": "2024-09-27",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "495ebe60-f0e5-4f0f-9d99-b2c64c95dbf4",
+  "name": "Starnheim Unleashed",
+  "manaCost": "{2}{W}{W}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Create a 4/4 white Angel Warrior creature token with flying and vigilance. If this spell was foretold, create X of those tokens instead.\nForetell {X}{X}{W} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Foretell"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

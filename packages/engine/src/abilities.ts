@@ -4321,7 +4321,7 @@ export type Effect =
   /** "Each opponent loses all counters" (CR 122.1): poison and energy, the player counters there are here. */
   /** Suncleanser: "It can't have counters put on it for as long as ~ remains on the battlefield", "That player can't get counters for as long as ~ remains on the battlefield" (CR 611.2b): the object (as that object, CR 400.7) or player, while the source stays (counters.ts countersBanned, playerCountersToPut). */
   | { type: "banCounters"; what?: ObjRef; who?: PlayerRef }
-  | { type: "loseAllCounters"; who: PlayerRef; /** "Loses all poison counters" (Leeches): only those; how many is kept for "that much" (Count poisonLostThisWay). */ poison?: true }
+  | { type: "loseAllCounters"; who: PlayerRef; /** "Loses all poison counters" (Leeches): only those; how many is kept for "that much" (Count poisonLostThisWay). */ poison?: true; /** Mutated Cultist: the counters removed count for "for each counter removed this way" (ResolvingState.countersRemoved). */ counted?: true }
   /** "Double the number of each kind of counter you have" (CR 701.10e): that many more of each. */
   | { type: "doublePlayerCounters"; who: PlayerRef }
   /**
@@ -6987,6 +6987,10 @@ export interface CompiledCard {
   scryBeforeExplore?: true;
   entersWithAdditional?: { counter: CounterKind; /** Counted as it enters: "for each instant and sorcery spell you've cast this turn" (Ral, Leyline Prodigy). */ n: Amount }[];
   entersTappedUnless?: EntersCondition;
+  /** Thief of Blood: "As ~ enters, remove all counters from all permanents. ~ enters with a +1/+1 counter on it for each counter removed this way" (CR 614.1c, 614.12): every kind from every other permanent, players' counters staying (rulings). */
+  entersStealsCounters?: true;
+  /** Slumbering Trudge: "If X is 2 or less, it enters tapped": the X chosen for the spell it was (CR 107.3m); entering any other way, X is 0. */
+  entersTappedIfXAtMost?: number;
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */
   entersChoose?: { what: ChoiceKind; except?: string; /** "Choose two abilities from among first strike, vigilance, and lifelink" (Greymond): one of several keywords chosen, each added to Chosen.keywords and not offered again. */ many?: true; names?: TargetSpec; purpose?: NamePurpose; /** "Choose artifact, creature, enchantment, instant, or sorcery" (Cloud Key): the card types offered. */ options?: string[]; /** "Choose a number between 1 and 10" (Talion): any whole number in it. */ range?: { min: number; max: number } }[];

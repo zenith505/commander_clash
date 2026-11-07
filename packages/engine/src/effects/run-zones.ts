@@ -3325,6 +3325,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     }
     case "exiledToGraveyard": {
       const cards = (e.cards ?? []).filter((c) => s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc).map((c) => c.id);
+      // Psychic Theft: "return it to its owner's hand".
+      if (e.toHand) {
+        if (cards.length) log(s, `${src} returns ${cards.map((id) => defOf(s, obj(s, id)).name).join(", ")} to ${cards.length === 1 ? "its owner's hand" : "their owners' hands"}.`);
+        for (const id of cards) moveObject(s, id, "hand");
+        return;
+      }
       if (cards.length) log(s, `${src} puts ${cards.map((id) => defOf(s, obj(s, id)).name).join(", ")} into ${cards.length === 1 ? "its owner's graveyard" : "their owners' graveyards"}.`);
       for (const id of cards) moveObject(s, id, "graveyard");
       // Only what got there (not what a replacement effect sent elsewhere) was put there this way.

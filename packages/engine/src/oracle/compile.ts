@@ -1,8 +1,8 @@
 import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
-import type { Modification, FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, SACRIFICED_LANDWALK, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
+import type { Amount, Modification, FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
+import { canonicalKeyword, LAND_TYPES, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, SACRIFICED_LANDWALK, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -238,7 +238,7 @@ export function isFullySupported(d: CardDef): boolean {
   const defined = c.statics.flatMap((st) => st.mods).find((x) => x.kind === "definePT");
   // A printed negative number is a number (Char-Rumbler's -1, Spinal Parasite's -1/-1).
   // Primal Clay's "*/*": 0/0 off the battlefield, the chosen values on it (CR 208.2b).
-  const ptOk = (v: string | undefined, key: "power" | "toughness") => /^-?\d+$/.test(v ?? "") || (/\*/.test(v ?? "") && defined?.kind === "definePT" && defined[key] !== undefined) || (v === "*" && !!c.entersForms);
+  const ptOk = (v: string | undefined, key: "power" | "toughness") => /^-?\d+$/.test(v ?? "") || (/\*/.test(v ?? "") && defined?.kind === "definePT" && defined[key] !== undefined) || (v === "*" && (!!c.entersForms || !!c.starsSetOnBattlefield));
   if ((d.types.includes("Creature") || d.subtypes.includes("Vehicle")) && (!ptOk(d.power, "power") || !ptOk(d.toughness, "toughness"))) return false;
   if (c.unsupported.length) return false;
   if ((d.types.includes("Instant") || d.types.includes("Sorcery")) && !c.spell) return false;
@@ -5438,6 +5438,19 @@ export function compile(d: CardDef): CompiledCard {
     const grantedRipple = /^Spells you cast have ripple (\d+)\.$/.exec(line);
     if (grantedRipple) {
       out.triggers.push({ event: "castSpell", cast: { by: "you", spell: { kind: "spell", text: "spell" } }, body: rippleBody(Number(grantedRipple[1]), "cause") });
+      continue;
+    }
+    // Gaea's Liege: "As long as ~ isn't attacking, its power and toughness are each equal to the number of Forests you control.
+    // As long as ~ is attacking, its power and toughness are each equal to the number of Forests defending player controls.":
+    // set only while a condition holds, so not a characteristic-defining ability (CR 604.3a(5)) but a layer 7b effect (CR
+    // 613.4b), 0/0 off the battlefield (CR 208.2); "defending player" is the player it attacks, or whose planeswalker or
+    // battle it attacks (CR 506.2). While it's being declared as an attacker it isn't attacking yet (rulings).
+    const liege = /^As long as ~ isn't attacking, its power and toughness are each equal to the number of ([A-Z][a-z]+s) you control\. As long as ~ is attacking, its power and toughness are each equal to the number of \1 defending player controls\.$/.exec(line);
+    const liegeType = liege ? liege[1]!.slice(0, -1) : undefined;
+    if (liege && liegeType && LAND_TYPES.has(liegeType)) {
+      const of = (whose?: true): Amount => ({ count: { kind: "permanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [liegeType], ...(whose ? {} : { controller: "you" as const }), text: `${liege[1]} ${whose ? "defending player controls" : "you control"}` }, ...(whose ? { whose: { ref: "selfDefending" as const } } : {}) } });
+      out.starsSetOnBattlefield = true;
+      out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "setPT", power: of(), toughness: of() }], condition: { kind: "self", is: "attacking", not: true }, text: line }, { affects: { kind: "self" }, mods: [{ kind: "setPT", power: of(true), toughness: of(true) }], condition: { kind: "self", is: "attacking" }, text: line });
       continue;
     }
     // Evolved Spinoderm: "~ has trample as long as it has two or fewer oil counters on it. Otherwise, it has hexproof.": one

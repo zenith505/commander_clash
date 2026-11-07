@@ -942,6 +942,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "452d98ae-0fa2-4cff-9e18-eecd76ddb20b",
+  "name": "Anthropede",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Insect",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Insect"
+  ],
+  "oracleText": "Reach\nWhen this creature enters, you may discard a card or pay {2}. When you do, destroy target Room.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Reach"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8d4d70c4-0490-4239-ac8f-dd1d1a008f08",
   "name": "Anurid Scavenger",
   "manaCost": "{2}{G}",
@@ -14179,6 +14211,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3196e1f4-7f94-4eb6-ae2b-ed11ba392552",
+  "name": "Last Rites",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Discard any number of cards. Target player reveals their hand, then you choose a nonland card from it for each card discarded this way. That player discards those cards.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ody",
+  "releasedAt": "2001-10-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "649d983a-e861-4893-8ae8-fb0a22cfad0a",
   "name": "Last Thoughts",
   "manaCost": "{3}{U}",
@@ -19550,6 +19608,32 @@
   "commanderLegal": "legal",
   "set": "nph",
   "releasedAt": "2011-05-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "66953dfd-d908-41d3-abb4-309c6a165dc3",
+  "name": "Psychic Theft",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target player reveals their hand. You choose an instant or sorcery card from it and exile that card. You may cast that card for as long as it remains exiled. At the beginning of the next end step, if you haven't cast the card, return it to its owner's hand.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "pcy",
+  "releasedAt": "2000-06-05",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

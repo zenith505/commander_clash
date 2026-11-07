@@ -1507,6 +1507,39 @@ function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell
   const puppet = ctx.auraCard && si === 0 && sentences.length === 3 && /^[Rr]eturn that card to its owner's hand$/.test(s) && /^If that card is returned to its owner's hand this way, you may pay ((?:\{[0-9WUBRGC]\})+)$/.exec(sentences[1]!);
   if (puppet && sentences[2] === "If you do, return ~ to its owner's hand")
     return { effects: [{ type: "bounce", what: { ref: "subjectCard" }, setsDid: true }, { type: "if", cond: { kind: "youDid" }, effects: [{ type: "may", effects: [{ type: "bounce", what: { ref: "selfCard", moved: true } }], pay: { mana: puppet[1]! }, text: `pay ${puppet[1]}. If you do, return ~ to its owner's hand` }] }], skip: 2 };
+  // Valleymaker: "Choose a player. That player adds {G}{G}{G}.": as Stadium Vendors' (below) with fixed mana; still a mana
+  // ability (rulings, CR 605.1a), the player chosen as it resolves, you too.
+  const fixedTo = /^[Cc]hoose a player$/.test(s) ? /^That player adds ((?:\{[WUBRGC]\})+)\.?$/.exec(sentences[si + 1] ?? "") : null;
+  if (fixedTo && ctx.activated && sentences.length === si + 2 && !ctx.chosenOpponent && !ctx.eventPlayer && ctx.lastPlayerTarget === undefined)
+    return { effects: [{ type: "choosePlayer", prompt: `to add ${fixedTo[1]}` }, { type: "addMana", mana: fixedTo[1]!, who: { ref: "chosenPlayer", nth: 0 } }], skip: 1 };
+  // Cytoshape: "Choose a nonlegendary creature on the battlefield. Target creature becomes a copy of that creature until end
+  // of turn." Polymorphous Rush: "Any number of target creatures you control each become a copy of that creature until end of
+  // turn." Only the creatures becoming copies are targeted; the one copied is chosen as it resolves, anyone's, a target too
+  // (rulings, CR 608.2d), copied with its copiable values (CR 707.2).
+  const chooseToCopy = spell ? /^Choose an? ((?:nonlegendary )?creature) on the battlefield$/.exec(s) : null;
+  const copiers = chooseToCopy ? /^(Target creature|Any number of target creatures you control) (?:becomes a copy|each become a copy) of that creature until end of turn$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+  if (chooseToCopy && copiers && sentences.length === si + 2 && (copiers[1] === "Target creature") === /becomes a copy/.test(sentences[si + 1]!)) {
+    const filter = pickFilter(chooseToCopy[1]!);
+    const what = parseObject(copiers[1]!.charAt(0).toLowerCase() + copiers[1]!.slice(1), ctx);
+    if (filter?.kind !== "object" || what?.ref !== "target") return null;
+    return { effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, text: `${chooseToCopy[1]} on the battlefield` }, n: 1, action: "choose", anyController: true, prompt: `click a ${chooseToCopy[1]} on the battlefield (anyone's) for the target to become a copy of until end of turn, then choose it.` }, { type: "becomeCopy", what, of: { ref: "created" }, duration: "endOfTurn" }], skip: 1 };
+  }
+  // Burning of Xinye: "You destroy four lands you control, then target opponent destroys four lands they control. Then ~
+  // deals 4 damage to each creature.": each chooses their own lands as it resolves, all of theirs at once, none with
+  // indestructible (rulings, CR 701.8a); yours first, then theirs, then the damage (CR 608.2c).
+  if (spell && s === "You destroy four lands you control" && sentences.slice(si + 1).join("|") === "Target opponent destroys four lands they control|Then ~ deals 4 damage to each creature") {
+    const index = addTarget(ctx, { kind: "player", opponent: true, text: "target opponent" });
+    const dmg = parseOne("~ deals 4 damage to each creature", ctx);
+    const land = (text: string): TargetSpec => ({ kind: "object", types: ["Land"], notTypes: [], notColors: [], controller: "you", text });
+    if (!dmg) return null;
+    return { effects: [
+      { type: "pick", who: { ref: "you" }, filter: land("land you control"), n: 4, action: "choose", destroyable: true, prompt: "click four lands you control (all of them with fewer) for ~ to destroy, then choose them." },
+      { type: "destroy", what: { ref: "created" } },
+      { type: "pick", who: { ref: "target", index }, filter: land("land they control"), n: 4, action: "choose", destroyable: true, prompt: "click four lands you control (all of them with fewer) for ~ to destroy, then choose them." },
+      { type: "destroy", what: { ref: "created" } },
+      ...dmg,
+    ], skip: 2 };
+  }
   if (ctx.auraCard && /^[Cc]hoose a creature at random ~ can enchant$/.test(s) && sentences[si + 1] === "Return ~ to the battlefield attached to that creature" && sentences.length === si + 2)
     return { effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard", moved: true }, attachRandom: true }], skip: 1 };
   return null;

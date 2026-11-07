@@ -1073,6 +1073,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ed47dd31-f7cd-4ecb-960f-470cb8f4ed3c",
+  "name": "Aquamorph Entity",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Shapeshifter",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Shapeshifter"
+  ],
+  "oracleText": "As this creature enters or is turned face up, it becomes your choice of 5/1 or 1/5.\nMorph {2}{U} (You may cast this card face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.)",
+  "power": "*",
+  "toughness": "*",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Morph"
+  ],
+  "commanderLegal": "legal",
+  "set": "plc",
+  "releasedAt": "2007-02-02",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "28d500ea-720f-4332-891e-404fb03acb5c",
   "name": "Arachne, Psionic Weaver",
   "manaCost": "{2}{W}",
@@ -3036,6 +3068,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "64e29bfc-9313-4e8c-808c-bc27f6b018a6",
+  "name": "Bloodfell Caves",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "This land enters tapped.\nWhen this land enters, you gain 1 life.\n{T}: Add {B} or {R}.",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "dft",
+  "releasedAt": "2025-02-14",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "01ab7724-1967-4da6-aebd-3729983d6a0e",
   "name": "Bloodthorn Flail",
   "manaCost": "{B}",
@@ -3622,6 +3683,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1fcec3b2-47ba-4c56-9ce1-a4807e8ad262",
+  "name": "Break Open",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Turn target face-down creature an opponent controls face up.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6d194882-ca37-49bb-ac9f-a751c53850a8",
   "name": "Bribery",
   "manaCost": "{3}{U}{U}",
@@ -3768,6 +3855,32 @@
   "set": "shm",
   "releasedAt": "2008-05-02",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3a3cec13-4766-40d2-88e0-41bcdd5249e9",
+  "name": "Burning of Xinye",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "You destroy four lands you control, then target opponent destroys four lands they control. Then Burning of Xinye deals 4 damage to each creature.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ptk",
+  "releasedAt": "1999-05-01",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -5973,6 +6086,34 @@
   "gameChanger": true
  },
  {
+  "oracleId": "14221c18-7801-49c9-a2c8-53b8c5181d63",
+  "name": "Cytoshape",
+  "manaCost": "{1}{G}{U}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose a nonlegendary creature on the battlefield. Target creature becomes a copy of that creature until end of turn.",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dis",
+  "releasedAt": "2006-05-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cdc4048a-73ec-4ec1-a179-2b36c397bf1a",
   "name": "Dakmor Salvage",
   "manaCost": "",
@@ -6901,6 +7042,35 @@
   "commanderLegal": "legal",
   "set": "bro",
   "releasedAt": "2022-11-18",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "865a2194-fca0-446e-aae3-ca475cd66e00",
+  "name": "Dismal Backwater",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "This land enters tapped.\nWhen this land enters, you gain 1 life.\n{T}: Add {U} or {B}.",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "dft",
+  "releasedAt": "2025-02-14",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -16861,6 +17031,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f016ad56-4f73-4091-a1c2-937782642ecb",
+  "name": "Mister Immortal",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Mutant Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Mutant",
+   "Hero"
+  ],
+  "oracleText": "{2}{G}: Return this card from your graveyard or from exile to the battlefield tapped.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "40362fe0-a1a9-4d76-8c35-eac474b91af5",
   "name": "Mizzix's Mastery",
   "manaCost": "{3}{R}",
@@ -18307,6 +18510,36 @@
   "set": "bfz",
   "releasedAt": "2015-10-02",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fbfa8b3f-58a7-44ca-8c22-6747b56fdcb9",
+  "name": "Obstinate Familiar",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Creature — Lizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Lizard"
+  ],
+  "oracleText": "If you would draw a card, you may skip that draw instead.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ody",
+  "releasedAt": "2001-10-01",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -20556,6 +20789,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7f5124a4-9ffd-475a-8b77-3ff59a9871a1",
+  "name": "Pursuit of Knowledge",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If you would draw a card, you may put a study counter on this enchantment instead.\nRemove three study counters from this enchantment, Sacrifice this enchantment: Draw seven cards.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sth",
+  "releasedAt": "1998-03-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ecc435e2-deb1-420a-a79f-01dd08747314",
   "name": "Pyroblast",
   "manaCost": "{R}",
@@ -22077,6 +22336,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6c922206-6e68-4dcd-9559-88da1074f2c4",
+  "name": "Rugged Highlands",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "This land enters tapped.\nWhen this land enters, you gain 1 life.\n{T}: Add {R} or {G}.",
+  "colors": [],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G",
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "dft",
+  "releasedAt": "2025-02-14",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1cf82e44-99dd-48d3-a272-8df9835ebc0d",
   "name": "Ruin Processor",
   "manaCost": "{7}",
@@ -22256,6 +22544,39 @@
   "set": "spg",
   "releasedAt": "2024-09-27",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d6c008c7-6c87-4677-ba0e-6d95f10d10bc",
+  "name": "Sages of the Anima",
+  "manaCost": "{3}{G}{U}",
+  "cmc": 5,
+  "typeLine": "Creature — Elf Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Wizard"
+  ],
+  "oracleText": "If you would draw a card, instead reveal the top three cards of your library. Put all creature cards revealed this way into your hand and the rest on the bottom of your library in any order.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arb",
+  "releasedAt": "2009-04-30",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -27768,6 +28089,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5d641bf6-0f93-4189-8dc1-ec7ea446dade",
+  "name": "Tranquil Cove",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "This land enters tapped.\nWhen this land enters, you gain 1 life.\n{T}: Add {W} or {U}.",
+  "colors": [],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "dft",
+  "releasedAt": "2025-02-14",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e87a4461-f3d1-443f-ad4c-dba91a993809",
   "name": "Tranquil Frillback",
   "manaCost": "{2}{G}",
@@ -28497,6 +28847,42 @@
   "set": "dsk",
   "releasedAt": "2024-09-27",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "57098671-016e-4adb-ba7d-ab2dd2bc34e3",
+  "name": "Valleymaker",
+  "manaCost": "{5}{R/G}",
+  "cmc": 6,
+  "typeLine": "Creature — Giant Shaman",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Giant",
+   "Shaman"
+  ],
+  "oracleText": "{T}, Sacrifice a Mountain: This creature deals 3 damage to target creature.\n{T}, Sacrifice a Forest: Choose a player. That player adds {G}{G}{G}.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

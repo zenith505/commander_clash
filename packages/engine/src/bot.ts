@@ -23,6 +23,7 @@ import {
   loyaltyChange,
   definedX,
   faceUpWays,
+  faceUpFormsOf,
   faceUpManaCost,
   dredgeAmount,
   assistedRemaining,
@@ -223,7 +224,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const has = (k: string) => pend.options.find((o) => o === k || o.startsWith(`${k}:`));
       const dredges = pend.options.filter((k) => k.startsWith("dredge:")).map((k) => k.slice("dredge:".length));
       const dredge = dredges.length ? chooseDredge(s, pid, dredges) : undefined;
-      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("archive") ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? pend.options.find((k) => k !== "thief" && !k.startsWith("dredge:")) ?? pend.options[0]!;
+      // Pursuit of Knowledge: a counter until it has three (then seven cards); Obstinate Familiar: skip only with a short library.
+      const counter = pend.options.find((k) => k.startsWith("counter:") && (s.objects[k.slice("counter:".length)]!.counters[abilitiesOf(s, s.objects[k.slice("counter:".length)]!).drawMayCounter ?? ""] ?? 0) < 3);
+      const skip = player(s, pid).library.length <= 5 ? has("mayskip") : undefined;
+      const declinable = (k: string) => k === "thief" || /^(?:dredge|mayskip|counter):/.test(k);
+      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("archive") ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? pend.options.find((k) => !declinable(k)) ?? pend.options[0]!;
       return [{ type: "drawInstead", player: pid, choice: pick }];
     }
     if (pend.kind === "dredge") {
@@ -838,6 +843,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // "As ~ enters, it becomes your choice of a 3/3 creature with flying, ... or a 0/12 creature with defender": the one
     // that attacks best, flying first, never defender, then the most power.
+    // Aquamorph Entity turned face up by an effect: as for the special action (botFaceUpForm).
+    if (pend.kind === "chooseOption" && pend.what === "faceUpForm") return [{ type: "chooseOption", player: pid, choice: pend.options[botFormIndex(pend.labels ?? [])] ?? pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "form") {
       const score = (label: string) => (/defender/.test(label) ? -100 : 0) + (/flying/.test(label) ? 10 : 0) + Number(/(\d+)\//.exec(label)?.[1] ?? 0);
       const best = pend.options.map((o, i) => ({ o, sc: score(pend.labels?.[i] ?? "") })).sort((a, b) => b.sc - a.sc)[0]!;
@@ -1503,7 +1510,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const extra = faceUpWays(s, o)[w.i]!.costs;
         const costs = extra ? faceUpCosts(s, pid, o, extra) : undefined;
         if (costs === null) continue;
-        const plan = planTurnFaceUp(s, pid, id, w.i, faceUpX(s, pid, o, w.i), costs);
+        const plan = planTurnFaceUp(s, pid, id, w.i, faceUpX(s, pid, o, w.i), costs, botFaceUpForm(s, o));
         if (plan) return plan;
       }
     }
@@ -1769,6 +1776,18 @@ function faceUpCosts(s: GameState, pid: PlayerId, o: GameObject, costs: Addition
  * can pay, except that "up to X targets" (Aurelia's Vindicator) takes only as many as we'd choose, and "all creatures
  * get -X/-X" (Bane of the Living) the X that kills the most worth of our opponents' creatures for the least of ours.
  */
+/** The form scored best, as "As ~ enters, it becomes your choice of ..." picks: flying first, never defender, then the most power. */
+function botFormIndex(labels: string[]): number {
+  const score = (label: string) => (/defender/.test(label) ? -100 : 0) + (/flying/.test(label) ? 10 : 0) + Number(/(\d+)\//.exec(label)?.[1] ?? 0);
+  return labels.map((l, i) => ({ i, sc: score(l) })).sort((a, b) => b.sc - a.sc)[0]?.i ?? 0;
+}
+
+/** Aquamorph Entity: the form it's turned face up as (CompiledCard.faceUpForms), undefined for the rest. */
+function botFaceUpForm(s: GameState, o: GameObject): number | undefined {
+  const forms = faceUpFormsOf(s, o);
+  return forms ? botFormIndex(forms.map((f) => f.text)) : undefined;
+}
+
 function faceUpX(s: GameState, pid: PlayerId, o: GameObject, way: number): number {
   const cost = faceUpWays(s, o)[way]!.cost;
   const per = xCount(parseManaCost(cost));
@@ -1785,7 +1804,7 @@ function faceUpX(s: GameState, pid: PlayerId, o: GameObject, way: number): numbe
   // counts. What leaves the battlefield is scored by its worth now (Bane's face up): an opponent's for us, ours 1.5 times against.
   const before = s.battlefield.filter((id) => objIsType(s, obj(s, id), "Creature") || id === o.id).map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0, v: (controllerOf(s, obj(s, id)) === pid ? -1.5 : 1) * (id === o.id ? Math.max(1, Number(card.power ?? 0) + Number(card.toughness ?? 0)) + 1 : worth(s, pid, obj(s, id))) }));
   const score = (x: number): number | null => {
-    const plan = planTurnFaceUp(s, pid, o.id, way, x);
+    const plan = planTurnFaceUp(s, pid, o.id, way, x, undefined, botFaceUpForm(s, o));
     if (!plan) return null;
     const u = cloneState(s);
     try {
@@ -5712,11 +5731,12 @@ function chooseSneak(s: GameState, pid: PlayerId): Action[] | null {
 }
 
 function chooseUnearth(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbility) => boolean): Action[] | null {
-  for (const id of player(s, pid).graveyard) {
+  // Mister Immortal: from exile too (ActivatedAbility.orExile).
+  for (const id of [...player(s, pid).graveyard, ...player(s, pid).exile]) {
     const abilities = abilitiesOf(s, obj(s, id)).activated;
     for (let i = 0; i < abilities.length; i++) {
       const ab = abilities[i]!;
-      if (ab.zone !== "graveyard" || (only && !only(ab))) continue;
+      if (ab.zone !== "graveyard" || (only && !only(ab)) || (obj(s, id).zone === "exile" && !ab.orExile)) continue;
       // Scavenge needs a creature to grow (CR 702.97a).
       const targets = ab.body.targets.length ? chooseTargets(s, pid, ab.body, false, id) : undefined;
       if (ab.body.targets.length && !targets) continue;

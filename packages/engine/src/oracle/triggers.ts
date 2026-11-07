@@ -4809,7 +4809,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Olivia, Crimson Bride's grant: "When you don't control a legendary Vampire, exile this creature": the same as "When you
   // control no legendary Vampires" (CR 603.8), the creature itself counting if it's one.
   const stLine = line.replace(/^(When ~ has [a-z ]+ counters) on ~, (transform ~\.)$/, "$1 on it, $2").replace(/^When you don't control an? ((?:legendary )?[A-Z][a-z]+), /, "When you control no $1s, ");
-  const st = new RegExp(`^When (you control no .+?|there are no creatures on the battlefield|no creatures are on the battlefield|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or (?:more|less) life|an opponent has ${NUM} or less life|a player has no cards in hand|(?:you|an opponent) controls? an? (?:[A-Z][a-z]+|creature with (?:power|toughness) ${NUM} or (?:greater|less))|~ has [a-z ]+), (.+)$`).exec(stLine);
+  // Mana Vortex: "When there are no lands on the battlefield, sacrifice ~", the same as for creatures (CR 603.8).
+  const st = new RegExp(`^When (you control no .+?|there are no creatures on the battlefield|there are no lands on the battlefield|no creatures are on the battlefield|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or (?:more|less) life|an opponent has ${NUM} or less life|a player has no cards in hand|(?:you|an opponent) controls? an? (?:[A-Z][a-z]+|creature with (?:power|toughness) ${NUM} or (?:greater|less))|~ has [a-z ]+), (.+)$`).exec(stLine);
   if (st) {
     const state = parseStaticCondition(st[1]!.replace(/^no creatures are on the battlefield$/, "there are no creatures on the battlefield"), { affects: { kind: "self" }, mods: [], text: "" });
     const body = state && parseBody(st[st.length - 1]!, { selfIt: true });

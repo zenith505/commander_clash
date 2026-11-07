@@ -2114,6 +2114,8 @@ export interface GameState {
   exileDyingTurn?: number;
   /** Mistcaller: the turn in which nontoken creatures that weren't cast are exiled instead of entering (CR 614.1a). */
   exileUncastTurn?: number;
+  /** Hallowed Moonlight: the same for every creature that wasn't cast, tokens and copies of spells too (CR 614.1a). */
+  exileUncastAnyTurn?: number;
   /** "If a creature an opponent controls would die this turn, exile it instead" (Malicious Eclipse): whose opponents' creatures, and the turn. */
   exileDyingOpponents?: { turn: number; player: PlayerId }[];
   /** "Players can't search libraries this turn" (Shadow of Doubt): the turn it applies in. */

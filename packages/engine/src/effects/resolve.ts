@@ -1536,6 +1536,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "controlSpell":
       return runSpellsEffect(s, e, ctx, src);
     case "mill":
+    case "bottomToGraveyard":
     case "revealUntilLandToGraveyard":
     case "revealTopLandsToGraveyard":
     case "exileUntilTotalMv":

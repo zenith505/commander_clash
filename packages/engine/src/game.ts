@@ -821,6 +821,18 @@ export function moveObject(
       to = "exile";
     }
   }
+  // Hallowed Moonlight: "Until end of turn, if a creature would enter and it wasn't cast, exile it instead" (CR 614.1a): a
+  // token too (it's put into exile instead and ceases to exist, rulings: tokens are never cast), and a copy of a creature
+  // spell (a copy isn't cast, CR 707.10), which ceases to exist anywhere but the stack (CR 707.10a). A spell that was cast
+  // isn't affected, whatever zone it was cast from (rulings).
+  if (to === "battlefield" && s.exileUncastAnyTurn === s.turn && fromZone !== "battlefield" && fromZone !== "phasedOut" && fromZone !== "merged" && (fromZone !== "stack" || o.spellCopy) && entersAsCreature(s, o, opts.controller ?? o.controller, opts.faceDown, opts.entersAs)) {
+    log(s, `${opts.faceDown ? "The face-down card" : defOf(s, o).name}${o.isToken || o.spellCopy ? " (a token)" : ""} is exiled instead of entering: it wasn't cast (this turn).`);
+    if (o.spellCopy) {
+      delete s.objects[id];
+      return;
+    }
+    to = "exile";
+  }
   // Cosmic Intervention: "If a permanent you control would be put into a graveyard from the battlefield this turn, exile it
   // instead" (CR 614.1a), with a delayed trigger to return it (below). With other replacements that would exile it, its
   // controller applies this one first (CR 616.1), the one that brings it back.
@@ -7776,8 +7788,8 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     }
     // Kaervek's Spite: every permanent you control, so not with one that can't be sacrificed (CR 118.3).
     if (c.kind === "sacrificeAll") {
-      const stuck = s.battlefield.map((id) => obj(s, id)).find((x) => controllerOf(s, x) === pid && !canSacrificeForCost(s, x));
-      if (stuck) return `${defOf(s, stuck).name} can't be sacrificed, so you can't sacrifice all your permanents to ${doing}`;
+      const stuck = s.battlefield.map((id) => obj(s, id)).find((x) => controllerOf(s, x) === pid && (!c.creatures || objIsType(s, x, "Creature")) && !canSacrificeForCost(s, x));
+      if (stuck) return `${defOf(s, stuck).name} can't be sacrificed, so you can't sacrifice all your ${c.creatures ? "creatures" : "permanents"} to ${doing}`;
       continue;
     }
     if (c.kind === "discardHand") continue; // an empty hand pays it too
@@ -8281,9 +8293,17 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       log(s, `${p.name} mills ${n === 1 ? "a card" : `${n} cards`}.`);
       for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard", { milled: true });
     } else if (c.kind === "sacrificeAll") {
-      // Kaervek's Spite: all of them at once (CR 701.21a), as they are now.
-      const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p.id);
-      log(s, ids.length ? `${p.name} sacrifices all their permanents: ${ids.map((id) => nameOf(s, id)).join(", ")}.` : `${p.name} has no permanents to sacrifice.`);
+      // Kaervek's Spite: all of them at once (CR 701.21a), as they are now. Soulblast: all creatures, each as it last
+      // existed for "the total power of the sacrificed creatures" (CR 608.2h).
+      const what = c.creatures ? "creatures" : "permanents";
+      const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p.id && (!c.creatures || objIsType(s, obj(s, id), "Creature")));
+      log(s, ids.length ? `${p.name} sacrifices all their ${what}: ${ids.map((id) => nameOf(s, id)).join(", ")}.` : `${p.name} has no ${what} to sacrifice.`);
+      if (c.creatures)
+        for (const id of ids) {
+          const o = obj(s, id);
+          const ch = characteristics(s, o);
+          sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), types: [...ch.types], subtypes: [...ch.subtypes], colors: [...ch.colors] });
+        }
       for (const id of ids) moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
       closeZoneBatch(s);
     } else if (c.kind === "discardHand") {

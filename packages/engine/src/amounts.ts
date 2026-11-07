@@ -335,7 +335,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "linkedExiled": {
       const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const linked = src ? (s.linkedExile?.[`${src.id}@${src.zoneChanges ?? 0}`] ?? []) : [];
-      return c.ever ? linked.length : linked.filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).length;
+      if (c.ever) return linked.length;
+      return linked.filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc && (!c.filter || (!s.objects[l.id]!.faceDown && printedMatches(c.filter, defOf(s, s.objects[l.id]!))))).length;
     }
     case "linkedExiledMv": {
       const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;

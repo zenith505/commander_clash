@@ -2016,6 +2016,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "92ac7531-10bb-47a2-9dd0-378d547b4ed6",
+  "name": "Battlefield Scrounger",
+  "manaCost": "{3}{G}{G}",
+  "cmc": 5,
+  "typeLine": "Creature — Centaur",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Centaur"
+  ],
+  "oracleText": "Threshold — Put three cards from your graveyard on the bottom of your library: This creature gets +3/+3 until end of turn. Activate only once each turn and only if there are seven or more cards in your graveyard.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Threshold"
+  ],
+  "commanderLegal": "legal",
+  "set": "jud",
+  "releasedAt": "2002-05-27",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b76d1ae6-ad1d-4bac-b4c3-2e03e0e84d9b",
   "name": "Bayou",
   "manaCost": "",
@@ -10619,6 +10651,36 @@
   "commanderLegal": "legal",
   "set": "rtr",
   "releasedAt": "2012-10-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "835733a2-3738-4fc0-97d5-33156b711ba4",
+  "name": "Gurzigost",
+  "manaCost": "{3}{G}{G}",
+  "cmc": 5,
+  "typeLine": "Creature — Beast",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Beast"
+  ],
+  "oracleText": "At the beginning of your upkeep, sacrifice this creature unless you put two cards from your graveyard on the bottom of your library.\n{G}{G}, Discard a card: You may have this creature assign its combat damage this turn as though it weren't blocked.",
+  "power": "6",
+  "toughness": "8",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tor",
+  "releasedAt": "2002-02-04",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

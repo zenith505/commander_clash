@@ -1157,7 +1157,7 @@ function targetSource(s: GameState, ctx: ResolveCtx, index: number, lastKnown?: 
   // (CR 108.4a).
   if (exiled) {
     const t = ctx.targets[index];
-    if (!o || t?.kind !== "object" || o.zone !== "exile" || (o.zoneChanges ?? 0) !== t.zc + 1) return undefined;
+    if (!o || t?.kind !== "object" || o.zone !== "exile" || t.zc === undefined || (o.zoneChanges ?? 0) !== t.zc + 1) return undefined;
     return { ...objectSource(s, o), controller: o.owner, ref: { object: o.id, zc: o.zoneChanges ?? 0 } };
   }
   if (o?.zone === "battlefield") return objectSource(s, o);

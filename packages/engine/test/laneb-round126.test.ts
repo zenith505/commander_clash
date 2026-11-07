@@ -1,9 +1,9 @@
 // Lane B round B126: Veiled Sentry and Opal Titan (the triggering spell's mana value and colors, as cast or as it last
 // existed on the stack), Selfless Exorcist (the exiled card as the source of the damage), Moratorium Stone (every card and
-// permanent with the target card's name), Ersatz Gnomes (a spell made colorless, the permanent it becomes too),
+// permanent with the target card's name), Ersatz Gnomes and Moonlace (a spell made colorless, the permanent it becomes too),
 // Battlefield Scrounger (graveyard cards put on the bottom of the library as a cost), Gurzigost (two cards to keep it; damage
 // assigned as though unblocked, chosen as the ability resolves), Crown of Convergence (creatures sharing a color with the
-// top card of the library), Mindreaver (counter a spell named like a card its heroic ability exiled).
+// top card of the library), Mindreaver (counter a spell named like a card its heroic ability exiled), Horn of Plenty (pay to draw at the next end step).
 
 import { describe, expect, it } from "vitest";
 import { act, forest, putOnBattlefield, setup } from "./helpers";
@@ -57,6 +57,7 @@ const veiledSentry = (): CardDef => ({"oracleId":"0b9b8e60-51eb-4d4a-95c1-48ca5b
 const opalTitan = (): CardDef => ({"oracleId":"ce06fe83-a8c5-46b7-b30c-b8189d217741","name":"Opal Titan","manaCost":"{2}{W}{W}","cmc":4,"typeLine":"Enchantment","supertypes":[],"types":["Enchantment"],"subtypes":[],"oracleText":"When an opponent casts a creature spell, if this permanent is an enchantment, it becomes a 4/4 Giant creature with protection from each of that spell's colors.","colors":["W"],"colorIdentity":["W"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/3/7/379f1f01-88c6-4cc2-9049-078aa6980582.jpg?1783946373","commanderLegal":"legal","set":"usg","releasedAt":"1998-10-12","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 const selflessExorcist = (): CardDef => ({"oracleId":"78e875b1-e621-4bf0-ad81-24ed9e2b43f8","name":"Selfless Exorcist","manaCost":"{3}{W}{W}","cmc":5,"typeLine":"Creature — Human Cleric","supertypes":[],"types":["Creature"],"subtypes":["Human","Cleric"],"oracleText":"{T}: Exile target creature card from a graveyard. That card deals damage equal to its power to this creature.","power":"3","toughness":"4","colors":["W"],"colorIdentity":["W"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/c/9/c9b1c300-aec3-4512-9902-309615e86c73.jpg?1783945133","commanderLegal":"legal","set":"jud","releasedAt":"2002-05-27","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 const moratoriumStone = (): CardDef => ({"oracleId":"bb0d89e7-4ae6-4ac2-a0e6-51ab08226069","name":"Moratorium Stone","manaCost":"{1}","cmc":1,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"{2}, {T}: Exile target card from a graveyard.\n{2}{W}{B}, {T}, Sacrifice this artifact: Exile target nonland card from a graveyard, all other cards from graveyards with the same name as that card, and all permanents with that name.","colors":[],"colorIdentity":["B","W"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/5/5/5529edfc-22bd-43dc-878b-6ec9fba74795.jpg?1783943456","commanderLegal":"legal","set":"gpt","releasedAt":"2006-02-03","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const moonlace = (): CardDef => ({"oracleId":"52d4dc8a-2799-4b4e-9c20-f14bb75c2279","name":"Moonlace","manaCost":"{U}","cmc":1,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Target spell or permanent becomes colorless.","colors":["U"],"colorIdentity":["U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/c/7/c781cc80-5f57-4677-a9da-3523191cc7c6.jpg?1783943242","artUrl":"https://cards.scryfall.io/art_crop/front/c/7/c781cc80-5f57-4677-a9da-3523191cc7c6.jpg?1783943242","commanderLegal":"legal","set":"tsp","releasedAt":"2006-10-06","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 const ersatzGnomes = (): CardDef => ({"oracleId":"ea016b84-7f77-42e7-bd14-2e62a1e35f3b","name":"Ersatz Gnomes","manaCost":"{3}","cmc":3,"typeLine":"Artifact Creature — Gnome","supertypes":[],"types":["Artifact","Creature"],"subtypes":["Gnome"],"oracleText":"{T}: Target spell becomes colorless.\n{T}: Target permanent becomes colorless until end of turn.","power":"1","toughness":"1","colors":[],"colorIdentity":[],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/5/a/5a2747ab-00c8-4f59-b9a6-54ff4e99f6c8.jpg?1783947043","commanderLegal":"legal","set":"mir","releasedAt":"1996-10-08","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
 const battlefieldScrounger = (): CardDef => ({"oracleId":"92ac7531-10bb-47a2-9dd0-378d547b4ed6","name":"Battlefield Scrounger","manaCost":"{3}{G}{G}","cmc":5,"typeLine":"Creature — Centaur","supertypes":[],"types":["Creature"],"subtypes":["Centaur"],"oracleText":"Threshold — Put three cards from your graveyard on the bottom of your library: This creature gets +3/+3 until end of turn. Activate only once each turn and only if there are seven or more cards in your graveyard.","power":"3","toughness":"3","colors":["G"],"colorIdentity":["G"],"keywords":["Threshold"],"imageUrl":"https://cards.scryfall.io/normal/front/f/5/f5ac74bc-1198-4a9a-bcde-668cca08b274.jpg?1783945114","commanderLegal":"legal","set":"jud","releasedAt":"2002-05-27","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
 const gurzigost = (): CardDef => ({"oracleId":"835733a2-3738-4fc0-97d5-33156b711ba4","name":"Gurzigost","manaCost":"{3}{G}{G}","cmc":5,"typeLine":"Creature — Beast","supertypes":[],"types":["Creature"],"subtypes":["Beast"],"oracleText":"At the beginning of your upkeep, sacrifice this creature unless you put two cards from your graveyard on the bottom of your library.\n{G}{G}, Discard a card: You may have this creature assign its combat damage this turn as though it weren't blocked.","power":"6","toughness":"8","colors":["G"],"colorIdentity":["G"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/f/4/f4e672c6-6ddc-4dd2-b4c7-5083d7566e87.jpg?1783945142","commanderLegal":"legal","set":"tor","releasedAt":"2002-02-04","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
@@ -226,6 +227,32 @@ describe("Ersatz Gnomes: a spell made colorless", () => {
     expect(characteristics(s, s.objects[bears]!).colors).toEqual([]);
     s = goTo(s, "upkeep", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!);
     expect(characteristics(s, s.objects[bears]!).colors).toEqual(["G"]);
+  });
+});
+
+describe("Moonlace: a spell or permanent made colorless for good", () => {
+  it("compile", () => supported(moonlace()));
+
+  it("a permanent stays colorless after the turn ends (rulings: the effect doesn't wear off)", () => {
+    const { s: s0, ap, ids, opp } = setup([moonlace()]);
+    const bears = putOnBattlefield(s0, opp, grizzlyBears());
+    pool(s0, ap, { U: 1 });
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(bears)])));
+    expect(characteristics(s, s.objects[bears]!).colors).toEqual([]);
+    s = goTo(s, "upkeep", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!);
+    expect(characteristics(s, s.objects[bears]!).colors).toEqual([]);
+  });
+
+  it("a creature spell made colorless enters colorless and stays so (rulings)", () => {
+    const { s: s0, ap, ids } = setup([grizzlyBears(), moonlace()]);
+    pool(s0, ap, { G: 1, U: 1, C: 1 });
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    const item = s.stack.find((x) => x.kind === "spell")!;
+    s = settle(run(s, planCast(s, ap, ids[1]!, [{ kind: "stack", id: item.id }])));
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    expect(characteristics(s, s.objects[ids[0]!]!).colors).toEqual([]);
+    s = goTo(s, "upkeep", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!);
+    expect(characteristics(s, s.objects[ids[0]!]!).colors).toEqual([]);
   });
 });
 

@@ -78,7 +78,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // turn, generic mana only (CR 601.2f, 118.7a; rulings), counted as it resolves.
   // Invasion of the Giants: "The next Giant spell you cast this turn costs {2} less to cast": a spell with that creature type
   // (a kindred one too, CR 205.3m).
-  if ((m = /^[Tt]he next ((?:instant or sorcery |noncreature |creature |artifact |[A-Z][a-z]+ )?spell) you cast this turn costs \{(\d+|X)\} less to cast(?:, where X is (.+?)| for each (.+))?$/.exec(s)) && (m[2] === "X") === !!(m[3] || ctx.whereX) && (!/^[A-Z]/.test(m[1]!) || CREATURE_TYPES.has(m[1]!.split(" ")[0]!))) {
+  // Elminster: "Whenever you scry, the next instant or sorcery spell you cast this turn costs {X} less to cast, where X is
+  // the number of cards looked at while scrying this way": the trigger's own X (TriggeredAbility.eventX, ctx.ownX).
+  if ((m = /^[Tt]he next ((?:instant or sorcery |noncreature |creature |artifact |[A-Z][a-z]+ )?spell) you cast this turn costs \{(\d+|X)\} less to cast(?:, where X is (.+?)| for each (.+))?$/.exec(s)) && (m[2] === "X" ? !!(m[3] || ctx.whereX || ctx.ownX) : !(m[3] || ctx.whereX)) && (!/^[A-Z]/.test(m[1]!) || CREATURE_TYPES.has(m[1]!.split(" ")[0]!))) {
     const what = m[1] === "spell" ? "Spells" : `${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1).replace(/ or /, " and ")}s`;
     const change = parseCostChange(`${what} you cast cost {${m[2] === "X" ? 1 : m[2]}} less to cast`);
     if (!change || change === "fail" || !("costMod" in change) || change.costMod.who !== "you" || change.costMod.turn || change.costMod.fromGraveyard || change.costMod.times || change.costMod.nth) return null;
@@ -176,6 +178,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "bottomToGraveyard", who }] : null;
   }
+  // Grenzo, Dungeon Warden: "Put the bottom card of your library into your graveyard": the same, yours.
+  if (/^Put the bottom card of your library into your graveyard$/.test(s)) return [{ type: "bottomToGraveyard", who: { ref: "you" } }];
   if ((m = new RegExp(`^(.+?) mills? ${NUMX} cards?$`, "i").exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "mill", who, n: amt(m[2]!) }] : null;
@@ -534,6 +538,16 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const b = a && parseObject(m[2]!, ctx);
     return a?.ref === "target" && a.n && b?.ref === "target" && !isGroup(b) && !isSeveral(b) ? [{ type: "bite", a, b }] : null;
   }
+  // Friendly Rivalry: "Target creature you control and up to one other target legendary creature you control each deal
+  // damage equal to their power to target creature you don't control": the same, each of the first two still legal (one
+  // illegal, the other still deals its damage), none if the last is illegal (rulings).
+  if ((m = /^(Target creature you control) and (up to one other target legendary creature you control) each deal damage equal to their power to (target creature you don't control)$/.exec(s))) {
+    const first = parseObject(m[1]!.toLowerCase(), ctx);
+    const second = first && parseObject(m[2]!, ctx);
+    const b = second && parseObject(m[3]!, ctx);
+    if (first?.ref !== "target" || first.n || second?.ref !== "target" || second.n || second.index !== first.index + 1 || b?.ref !== "target" || isSeveral(b)) return null;
+    return [{ type: "bite", a: { ref: "target", index: first.index, n: 2 }, b }];
+  }
   // "Target creature you control deals damage equal to its power to each other creature and each opponent" (Chandra's
   // Ignition): that creature is the source (rulings), its power as this resolves; "other" is other than it.
   if ((m = /^(Target creature(?: you control)?) deals damage equal to its power to (each other creature)(?: and (each opponent|each player))?$/.exec(s))) {
@@ -742,6 +756,29 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Tt]he next (spell of the chosen type|(?:[a-z]+ )?spell) you cast this turn can be cast as though it had flash$/.exec(s))) {
     const filter: TargetSpec | null = m[1] === "spell of the chosen type" ? { kind: "spell", chosen: "type", text: "spell of the chosen type" } : parseTargetPhrase(m[1]!);
     return filter?.kind === "spell" ? [{ type: "nextCast", filter, effects: [], text: `the next ${m[1]} you cast this turn can be cast as though it had flash`, flash: true }] : null;
+  }
+  // Savage Summoning: "The next creature spell you cast this turn can be cast as though it had flash. That spell can't be
+  // countered. That creature enters with an additional +1/+1 counter on it" (joined by the body): all three for the same
+  // spell, whether or not it uses the flash, and from any zone (rulings); each such effect adds its own counter (CR
+  // 614.1c, rulings).
+  if ((m = /^[Tt]he next ((?:[a-z]+ )?creature spell) you cast this turn can be cast as though it had flash, can't be countered, and enters with an additional (\+1\/\+1) counter on it$/.exec(s))) {
+    const filter = parseTargetPhrase(m[1]!);
+    if (filter?.kind !== "spell") return null;
+    return [
+      { type: "nextCast", filter, effects: [], text: `the next ${m[1]} you cast this turn can be cast as though it had flash`, flash: true },
+      { type: "nextCast", filter, effects: [], text: `the next ${m[1]} you cast this turn can't be countered`, uncounterable: true },
+      { type: "nextCast", filter, effects: [], text: `the next ${m[1]} you cast this turn enters with an additional ${m[2]} counter`, counter: m[2]! },
+    ];
+  }
+  // World War Hulk: "The next red or green creature spell you cast this turn can be cast without paying its mana cost";
+  // Marshland Bloodcaster: "Rather than pay the mana cost of the next spell you cast this turn, you may pay life equal to
+  // that spell's mana value". An alternative cost (CR 118.9) offered to the next such spell, which uses it up whether or
+  // not it's paid (rulings on Marshland Bloodcaster); an X is 0 then (CR 107.3b).
+  if ((m = /^[Tt]he next ((?:[a-z]+ or [a-z]+ |[a-z]+ )?(?:[a-z]+ )?spell) you cast this turn can be cast without paying its mana cost$/.exec(s)) || (m = /^[Rr]ather than pay the mana cost of the next ((?:[a-z]+ )?spell) you cast this turn, you may pay life equal to that spell's mana value$/.exec(s))) {
+    const filter = parseTargetPhrase(m[1]!);
+    if (filter?.kind !== "spell") return null;
+    const life = /^[Rr]ather/.test(s);
+    return [{ type: "nextCast", filter, effects: [], text: life ? `the next ${m[1]} you cast this turn may be cast for life equal to its mana value` : `the next ${m[1]} you cast this turn can be cast without paying its mana cost`, alt: life ? "life" : "free" }];
   }
   // Copying spells (CR 707.10): "Copy target instant or sorcery spell", and in "when you cast" abilities "copy it".
   // Double Major: "Copy target creature spell you control, except it isn't legendary if the spell is legendary" (CR 707.9b):

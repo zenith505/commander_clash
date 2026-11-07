@@ -597,6 +597,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && (m = /^(?:your )?opponents? (?:with|who ha(?:s|ve)) (one|two|three|four|five|six|seven) or more cards in (?:their )?hand$/i.exec(p))) return count({ kind: "players", opponents: true, handAtLeast: num(m[1]!) });
   // Glissa's Retriever: "the number of opponents who have three or more poison counters", counted as it's needed.
   if (each && (m = /^opponents? who ha(?:s|ve) (one|two|three|four|five|six|seven|eight|nine) or more poison counters$/i.exec(p))) return count({ kind: "players", opponents: true, poisonAtLeast: num(m[1]!) });
+  // Excess: "for each creature you controlled that dealt combat damage to a player this turn": as it dealt it (rulings).
+  if (each && /^creature you controlled that dealt combat damage to a player this turn$/i.test(p)) return count({ kind: "yourCombatDamagers" });
   // Tymna the Weaver: "the number of opponents that were dealt combat damage this turn", those who've lost since too (rulings).
   if (each && /^opponents? (?:that|who) (?:were|was) dealt combat damage this turn$/i.test(p)) return count({ kind: "players", opponents: true, combatDamaged: true });
   if (each && /^opponents? (?:that|who) (?:were|was) dealt damage this turn$/i.test(p)) return count({ kind: "players", opponents: true, damaged: true });

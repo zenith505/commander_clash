@@ -668,6 +668,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return Object.entries(s.damageThisTurn ?? {}).reduce((n, [p, v]) => (Number(p) !== ctx.controller ? n + v : n), 0);
     case "playerDamageThisTurn":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + ((c.byArtifacts ? s.turnLog?.artifactDamage : s.damageThisTurn)?.[pid] ?? 0), 0);
+    case "yourCombatDamagers":
+      return (s.turnLog?.combatDamagersBy?.[ctx.controller] ?? []).length;
     case "opponentsNoncombatDamage":
       return Object.entries(s.turnLog?.noncombatDamage ?? {}).reduce((n, [p, v]) => (Number(p) !== ctx.controller ? n + v : n), 0);
     case "kicked":
@@ -1512,6 +1514,8 @@ function describeCount(c: Count): string {
       return "damage dealt to your opponents this turn";
     case "playerDamageThisTurn":
       return "damage dealt to that opponent this turn";
+    case "yourCombatDamagers":
+      return "creatures you controlled that dealt combat damage to a player this turn";
     case "opponentsNoncombatDamage":
       return "noncombat damage dealt to your opponents this turn";
     case "lifeLostThisTurn":

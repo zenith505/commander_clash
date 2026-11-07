@@ -2878,9 +2878,9 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     if (plan) return plan;
   }
   // Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" too (CR 118.9).
-  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv" || x.kind === "genericMv" || x.kind === "energyForSpell" || x.kind === "grantedEmerge")]) {
+  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv" || x.kind === "nextLife" || x.kind === "genericMv" || x.kind === "energyForSpell" || x.kind === "grantedEmerge")]) {
     // Bolas's Citadel, Demon of Fate's Design: life rather than mana, while we'd still have 15 or more afterwards.
-    if ((a.kind === "citadel" || a.kind === "lifeForMv") && player(s, pid).life - mv(s, id) < 15) continue;
+    if ((a.kind === "citadel" || a.kind === "lifeForMv" || a.kind === "nextLife") && player(s, pid).life - mv(s, id) < 15) continue;
     if (a.kind === "evoke" && !c.triggers.some((t) => t.event === "selfEnters" && !t.ifEvoked)) continue;
     if (a.kind === "bestow" || a.kind === "overload") continue; // tried first, see bestowPlan and overloadPlan
     const plan = castPlan(s, pid, id, false, undefined, a.kind);
@@ -2901,6 +2901,11 @@ function freeAltPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   // Omniscience: every spell from our hand for nothing.
   if (o.zone === "hand" && altCost(defOf(s, o), "omniscience", s, pid)) {
     const plan = castPlan(s, pid, id, false, undefined, "omniscience");
+    if (plan) return plan;
+  }
+  // World War Hulk: the next red or green creature spell, for nothing.
+  if (altCost(defOf(s, o), "nextFree", s, pid)) {
+    const plan = castPlan(s, pid, id, false, undefined, "nextFree");
     if (plan) return plan;
   }
   // Court of Locthwain: a card exiled with it, for nothing.

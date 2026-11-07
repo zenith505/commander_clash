@@ -381,6 +381,12 @@ export function dealDamage(
           if (!e) typed.push({ key: `${from.id}@${zc}`, types: [...types] });
           else for (const t of types) if (!e.types.includes(t)) e.types.push(t);
         }
+        // Excess: the creature, for the player who controlled it as it dealt the damage.
+        if (from) {
+          const zc = from.zone === "battlefield" ? (from.zoneChanges ?? 0) : (s.lastKnown?.[from.id]?.zc ?? from.zoneChanges ?? 0);
+          const mine = ((s.turnLog.combatDamagersBy ??= {})[src.controller] ??= []);
+          if (!mine.includes(`${from.id}@${zc}`)) mine.push(`${from.id}@${zc}`);
+        }
         // Prowl (CR 702.76a): the source's creature types as it dealt the damage, for the player who controlled it.
         const mine = ((s.turnLog.combatDamageTypesBy ??= {})[src.controller] ??= []);
         for (const t of from && from.zone === "battlefield" && characteristics(s, from).allCreatureTypes ? ["*"] : src.subtypes) if (!mine.includes(t)) mine.push(t);

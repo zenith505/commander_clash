@@ -8495,6 +8495,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4af2e62f-150e-4fd0-98b0-c6e72f5f9a51",
+  "name": "Expel the Unworthy",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Kicker {2}{W} (You may pay an additional {2}{W} as you cast this spell.)\nChoose target creature with mana value 3 or less. If this spell was kicked, instead choose target creature. Exile the chosen creature, then its controller gains life equal to its mana value.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Kicker"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8a83ecee-092b-456c-803f-a9aaa17c4da9",
   "name": "Exploration Broodship",
   "manaCost": "{G}",
@@ -13118,6 +13146,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "868b3c65-d753-4f32-b6ca-31e58782ea92",
+  "name": "Invoke the Ancients",
+  "manaCost": "{1}{G}{G}{G}{G}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Create two 4/5 green Spirit creature tokens. For each of them, put your choice of a reach counter, a vigilance counter, or a trample counter on it.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "448e0cf2-c97c-4dc0-96ef-91f1eb75d97c",
   "name": "Ion Storm",
   "manaCost": "{2}{R}",
@@ -14283,6 +14337,32 @@
   "commanderLegal": "legal",
   "set": "inr",
   "releasedAt": "2025-01-24",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6562f141-7f57-4218-b873-f2fc0211e124",
+  "name": "Kindle the Carnage",
+  "manaCost": "{1}{R}{R}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Discard a card at random. If you do, Kindle the Carnage deals damage equal to that card's mana value to each creature. You may repeat this process any number of times.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dis",
+  "releasedAt": "2006-05-05",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

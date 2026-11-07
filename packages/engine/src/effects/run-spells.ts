@@ -728,6 +728,16 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           for (const id of seen) moveObject(s, id, "hand");
           return;
         }
+        // Calibrated Blast: all of them to the bottom in a random order, the nonland card's mana value noted for the
+        // reflexive trigger (none if there was no nonland card); it's there with the others (rulings).
+        if (e.then === "bottomRandom") {
+          if (hit) s.resolving!.revealedUntilMv = defMv(defOf(s, obj(s, hit)));
+          else delete s.resolving!.revealedUntilMv;
+          const all = [...seen];
+          shuffle(s, all);
+          for (const id of all) moveObject(s, id, "library");
+          return;
+        }
         // Erratic Explosion: they stay in the library for now; "that card" is the nonland card (none if every card was a
         // land: its mana value counts as 0, rulings).
         if (e.then === "keep") {

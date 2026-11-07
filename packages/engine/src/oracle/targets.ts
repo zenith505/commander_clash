@@ -110,8 +110,10 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
   }
   // "Each of X targets" (Firestorm, Meteor Blast): exactly the spell's X targets, all different (CR 115.3, 601.2c); "each
   // of up to X targets" (Crackle with Power): up to X of them.
+  // Batroc the Leaper: "each of up to X targets, where X is the number of times ~ was kicked" in its enters trigger, X the
+  // trigger's own (TriggeredAbility.xKicked), known as its targets are chosen.
   if (/^each of (?:up to )?X targets$/i.test(p)) {
-    if (!ctx.spell || ctx.targets.some((t) => t.many)) return null;
+    if (!(ctx.spell || (ctx.ownX && /up to/i.test(p))) || ctx.whereX || ctx.targets.some((t) => t.many)) return null;
     const index = addTarget(ctx, { kind: "any", text: "any target", many: /up to/i.test(p) ? "x" : "exactX" });
     ctx.lastObjectTarget = undefined;
     ctx.lastTargets = { index, n: 2 };

@@ -947,6 +947,9 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
     return { effect: { type: "exileUntilNonland", then: "hitToHand", repeatMvAtLeast: num(repeatMv[1]!) }, next: at + 3 };
   }
   if (reveal && !shuffleFirst && sentences[at + 1] === "Put all cards revealed this way into your hand") return { effect: { type: "exileUntilNonland", reveal: true, then: "hand" }, next: at + 2 };
+  // Calibrated Blast: "... Put the revealed cards on the bottom of your library in a random order. When you reveal a nonland
+  // card this way, ...": the reflexive trigger (CR 603.12) is the next sentence's (as Yuna's Whistle's).
+  if (reveal && !shuffleFirst && sentences[at + 1]?.replace(/\.$/, "") === "Put the revealed cards on the bottom of your library in a random order" && /^When you reveal a nonland card this way, /.test(sentences[at + 2] ?? "")) return { effect: { type: "exileUntilNonland", reveal: true, then: "bottomRandom" }, next: at + 2 };
   // Erratic Explosion, Goblin Machinist: "... until you reveal a nonland card. ~ deals damage equal to that card's mana
   // value to any target. Put the revealed cards on the bottom of your library in any order." The cards stay in the library
   // while the next instruction reads "that card", then go to the bottom (see revealedUntilToBottom).
@@ -1437,7 +1440,7 @@ function wandPunisher(who: PlayerRef, landLife: number): Effect {
   };
 }
 
-function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell: boolean): { effects: Effect[]; skip: number } | null {
+function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell: boolean, before: Effect[]): { effects: Effect[]; skip: number } | null {
   // Lightstall Inquisitor: "each opponent exiles a card from their hand and may play that card for as long as it remains
   // exiled. Each spell cast this way costs {1} more to cast. Each land played this way enters tapped.": each chooses their
   // own card (CR 701.9b); its owner may play it with its usual timing (rulings), paying {1} more for a spell (CR 601.2f),
@@ -1509,6 +1512,46 @@ function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell
   const puppet = ctx.auraCard && si === 0 && sentences.length === 3 && /^[Rr]eturn that card to its owner's hand$/.test(s) && /^If that card is returned to its owner's hand this way, you may pay ((?:\{[0-9WUBRGC]\})+)$/.exec(sentences[1]!);
   if (puppet && sentences[2] === "If you do, return ~ to its owner's hand")
     return { effects: [{ type: "bounce", what: { ref: "subjectCard" }, setsDid: true }, { type: "if", cond: { kind: "youDid" }, effects: [{ type: "may", effects: [{ type: "bounce", what: { ref: "selfCard", moved: true } }], pay: { mana: puppet[1]! }, text: `pay ${puppet[1]}. If you do, return ~ to its owner's hand` }] }], skip: 2 };
+  // Invoke the Ancients: "Create two 4/5 green Spirit creature tokens. For each of them, put your choice of a reach counter,
+  // a vigilance counter, or a trample counter on it.": a separate choice for each token created, however many a
+  // replacement makes (rulings).
+  const forEachChoice = /^For each of them, (put your choice of .+ on it)$/.exec(s.replace(/\.$/, ""));
+  const made = forEachChoice ? before.at(-1) : undefined;
+  if (made?.type === "createToken" && made.who?.ref === "you") {
+    const choice = attempt(ctx, () => parsePutChoice(capital(forEachChoice![1]!).replace(/ on it$/, " on each of them"), ctx));
+    const either = choice?.length === 1 && choice[0]!.type === "either" ? choice[0]! : null;
+    const onCreated = either?.options.every((o) => o.every((x) => x.type === "counters" && x.what.ref === "created"));
+    return either && onCreated ? { effects: [{ ...either, eachCreated: true }], skip: 0 } : null;
+  }
+  const tail = sentences.slice(si + 1).map((x) => x.replace(/\.$/, ""));
+  // Expel the Unworthy: "Choose target creature with mana value 3 or less. If this spell was kicked, instead choose target
+  // creature. Exile the chosen creature, then its controller gains life equal to its mana value.": one target or the other,
+  // whichever the kicker allows, chosen as it's cast (CR 702.33g: cast as if it didn't have the other one); the life as
+  // the creature last existed (rulings).
+  const chooseKicked = spell && si === 0 && (sentences.length === 3 || sentences.length === 4) ? /^If ~ was kicked, instead choose (target [a-z ]+)$/.exec(tail[0] ?? "") : null;
+  // "..., then its controller gains life ..." comes split off as a sentence of its own.
+  const chosenDo = chooseKicked ? /^(Exile|Destroy) the chosen creature(, then .+)?$/.exec(`${tail[1] ?? ""}${tail[2] ? `, then ${tail[2].charAt(0).toLowerCase()}${tail[2].slice(1)}` : ""}`) : null;
+  const plain = chosenDo ? /^Choose (target [a-z0-9 ]+)$/.exec(s) : null;
+  if (plain && chooseKicked && chosenDo) {
+    const at = ctx.targets.length;
+    const unkicked = attempt(ctx, () => parseOne(`${chosenDo[1]} ${plain[1]}${chosenDo[2] ?? ""}`, ctx));
+    const kicked = ctx.targets.length === at + 1 ? attempt(ctx, () => parseOne(`${chosenDo[1]} ${chooseKicked[1]}${chosenDo[2] ?? ""}`, ctx)) : null;
+    if (!unkicked || !kicked || ctx.targets.length !== at + 2 || ctx.targets.slice(at).some((t) => t.kind !== "object" || !t.types?.includes("Creature"))) return null;
+    ctx.targets[at] = { ...ctx.targets[at]!, onlyIf: { cond: { kind: "kicked" }, not: true } };
+    ctx.targets[at + 1] = { ...ctx.targets[at + 1]!, onlyIf: { cond: { kind: "kicked" } } };
+    return { effects: [{ type: "if", cond: { kind: "kicked" }, effects: kicked, otherwise: unkicked }], skip: sentences.length - 1 };
+  }
+  // Kindle the Carnage: "Discard a card at random. If you do, ~ deals damage equal to that card's mana value to each
+  // creature. You may repeat this process any number of times.": each pass a new random discard and its own damage event
+  // (rulings: one source, a separate instance each time); after each, its controller decides whether to go on; the
+  // creatures dealt lethal damage die together once it's done (CR 704.3).
+  if (spell && si === 0 && s === "Discard a card at random" && tail.join("|") === "If you do, ~ deals damage equal to that card's mana value to each creature|You may repeat this process any number of times") {
+    const each: Effect[] = [
+      { type: "discard", who: { ref: "you" }, n: 1, random: true },
+      { type: "if", cond: { kind: "discardedThisWayIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "card" } }, effects: [{ type: "damage", amount: { count: { kind: "discardedManaValue" } }, to: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "each creature" } } }] },
+    ];
+    return { effects: [{ type: "repeatMay", effects: each, text: "discard a card at random and deal damage equal to its mana value to each creature", needsHand: true }], skip: 2 };
+  }
   if (ctx.auraCard && /^[Cc]hoose a creature at random ~ can enchant$/.test(s) && sentences[si + 1] === "Return ~ to the battlefield attached to that creature" && sentences.length === si + 2)
     return { effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard", moved: true }, attachRandom: true }], skip: 1 };
   return null;
@@ -2359,7 +2402,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^(~ and up to one other target creature you control) both gain your choice of /, "$1 gain your choice of ");
   // Transcendent Archaic: "the number of colors of mana spent to cast this spell" in a permanent's enters trigger is the
   // permanent's spell, as it was cast (CR 702.69a).
-  if (opts.selfEntered && !opts.spell) text = text.replace(/\bthe number of colors of mana spent to cast this spell\b/, "the number of colors of mana spent to cast ~");
+  // Tajuru Paragon: "You may put a card that shares a creature type with it from among them into your hand": "it" is ~,
+  // the permanent that entered (the trigger's subject), its types as it last existed if it's gone (rulings).
+  if (opts.selfEntered && !opts.spell) text = text.replace(/\bthe number of colors of mana spent to cast this spell\b/, "the number of colors of mana spent to cast ~").replace(/(\bYou may put a card that shares a creature type with) it( from among them into your hand\.)/, "$1 ~$2");
   // Disciple of Phenax: "target player reveals a number of cards from their hand equal to ... You choose one of them.
   // That player discards that card." Cabal Interrogator: "... reveals X cards from their hand and you choose one of them.
   // That player discards that card.": one instruction (spells.ts).
@@ -4682,11 +4727,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Loamcrafter Faun: "you may discard one or more land cards. When you do, return up to that many target nonland
     // permanent cards from your graveyard to your hand." Any number, none too; the reflexive trigger (CR 603.12) has up to
     // as many targets as were discarded, chosen as it's put on the stack.
-    const discardMany = /^[Yy]ou may discard one or more ([a-z]+) cards$/.exec(s);
-    const discardWhen = discardMany && /^When you do, (return up to (?:that many|X) (target .+))$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
-    if (discardMany && discardWhen) {
-      const filter = parseSearchFilter(`${discardMany[1]} card`);
-      const reflexive = filter ? reflexiveBody(capital(discardWhen[1]!.replace(/^return up to (?:that many|X) /, "return up to X ")), ctx, false, false, true) : null;
+    // Miasma Demon: "you may discard any number of cards. When you do, up to that many target creatures each get -2/-2
+    // until end of turn.": the same with any cards (rulings: its targets chosen as the reflexive trigger is put on the stack).
+    const discardMany = /^[Yy]ou may discard (?:one or more ([a-z]+)|any number of) cards$/.exec(s);
+    const discardWhen = discardMany && /^When you do, (return up to (?:that many|X) (target .+)|up to that many target creatures each get [-+]\d+\/[-+]\d+ until end of turn)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (discardMany && discardWhen && !discardMany[1] === discardWhen[1]!.startsWith("up to")) {
+      const filter = discardMany[1] ? parseSearchFilter(`${discardMany[1]} card`) : ({ kind: "card", types: [], notTypes: [], notColors: [], text: "card" } as TargetSpec);
+      const reflexive = filter ? reflexiveBody(capital(discardWhen[1]!.replace(/^return up to (?:that many|X) /, "return up to X ").replace(/^up to that many /, "up to X ")), ctx, false, false, true) : null;
       if (!reflexive || !filter) return null;
       effects.push({ type: "discard", who: { ref: "you" }, n: 99, upTo: true, filter });
       effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "discardedThisWay" } }, min: 1 }, effects: [{ type: "reflexive", body: reflexive, xDiscarded: true }] });
@@ -5741,8 +5788,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // than you, you may put that card onto the battlefield tapped. If you don't put the card onto the battlefield, put it
     // into your hand. Then shuffle." One search; the card found goes onto the battlefield instead only if the condition
     // holds then, and the player wants it to (rulings).
-    const mayInstead = searchReveal && /^If (.+), you may put that card onto the battlefield( tapped)?$/.exec(sentences[si + 1] ?? "");
-    if (searchReveal && mayInstead && sentences[si + 2] === "If you don't put the card onto the battlefield, put it into your hand" && /^Then,? shuffle$/.test(sentences[si + 3] ?? "")) {
+    // Ruin in Their Wake: "... You may put that card onto the battlefield tapped if you control a land named Wastes.
+    // Otherwise, put that card into your hand. Then shuffle.": the same, the condition after the "may".
+    const mayInstead = searchReveal && (/^If (.+), you may put that card onto the battlefield( tapped)?$/.exec(sentences[si + 1] ?? "") ?? /^You may put that card onto the battlefield( tapped)? if (.+)$/.exec(sentences[si + 1] ?? "")?.map((x, i, a) => (i === 1 ? a[2] : i === 2 ? a[1] : x)!));
+    if (searchReveal && mayInstead && /^(?:If you don't put the card onto the battlefield, put it|Otherwise, put that card) into your hand$/.test(sentences[si + 2] ?? "") && /^Then,? shuffle$/.test(sentences[si + 3] ?? "")) {
       const fx = parseOne(`Search your library for ${searchReveal[1]}, reveal it, put it into your hand, then shuffle`, ctx);
       const cond = parseStaticCondition(mayInstead[1]!, { affects: { kind: "self" }, mods: [], text: "" });
       if (fx?.length !== 1 || fx[0]!.type !== "search" || !cond) return null;
@@ -11564,7 +11613,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
-    const multi = sentenceRun(s, sentences, si, ctx, !!opts.spell);
+    const multi = sentenceRun(s, sentences, si, ctx, !!opts.spell, effects);
     if (multi) {
       effects.push(...multi.effects);
       si += multi.skip;
@@ -13070,10 +13119,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Yuna's Whistle: "Reveal cards ... until you reveal a creature card. Put that card into your hand ... When you reveal a
     // creature card this way, put X +1/+1 counters on target creature you control, where X is the mana value of that
     // card": a reflexive trigger (CR 603.12) only if one was found, its X that card's mana value.
-    const whenRevealed = /^When you reveal an? ([a-z]+ card) this way, (.+), where X is the mana value of that card$/.exec(s);
+    // Calibrated Blast: "When you reveal a nonland card this way, ~ deals damage equal to that card's mana value to any
+    // target", after its exileUntilNonland "bottomRandom": the same, X that card's mana value.
+    const whenRevealed = /^When you reveal an? ([a-z]+ card) this way, (.+), where X is the mana value of that card$/.exec(s.replace(/^(When you reveal a nonland card this way, ~ deals) damage equal to that card's mana value to (any target)\.?$/, "$1 X damage to $2, where X is the mana value of that card"));
     if (whenRevealed) {
       const prev = effects[effects.length - 1];
-      if (prev?.type !== "revealUntil" || prev.n || prev.who || prev.filter.text !== whenRevealed[1] || si + 1 !== sentences.length || /\b(?:that|those|it)\b/.test(whenRevealed[2]!)) return null;
+      if (!(prev?.type === "exileUntilNonland" && prev.then === "bottomRandom" && whenRevealed[1] === "nonland card") && (prev?.type !== "revealUntil" || prev.n || prev.who || prev.filter.text !== whenRevealed[1]) || si + 1 !== sentences.length || /\b(?:that|those|it)\b/.test(whenRevealed[2]!)) return null;
       const reflexive = reflexiveBody(whenRevealed[2]!, ctx, false, false, true);
       if (!reflexive) return null;
       effects.push({ type: "reflexive", body: reflexive, xRevealedMv: true });

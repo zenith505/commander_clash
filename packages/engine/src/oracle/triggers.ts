@@ -3089,7 +3089,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // is the number of times ~ was kicked": X is known as the ability is put on the stack, when its targets are chosen
   // (CR 601.2c, 603.3d), from the permanent's multikicker (CR 702.33d; TriggeredAbility.xKicked).
   const kickedX = /^(When ~ enters), (.+), where X is the number of times ~ was kicked\.$/.exec(line);
-  if (kickedX && /\bup to X target\b/.test(kickedX[2]!)) {
+  if (kickedX && /\bup to X targets?\b/.test(kickedX[2]!)) {
     const t = parseTrigger(`${kickedX[1]}, ${kickedX[2]}.`);
     return t && t !== "fail" && t.event === "selfEnters" ? { ...t, xKicked: true } : "fail";
   }

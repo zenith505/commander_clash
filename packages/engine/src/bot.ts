@@ -296,6 +296,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.clash) return [{ type: "chooseMay", player: pid, yes: !wantOnTop(s, pid, pend.card!) }];
     // "Each player may discard their hand and draw five cards": when that's more cards than we'd throw away.
     // Ad Nauseam: another card while there's life to spare (a loss is a state-based action once it stops, CR 704.5a).
+    // Kindle the Carnage: again only while an opponent still has a creature and we have none to lose.
+    const discardPass = s.resolving?.body.effects.some((e) => e.type === "repeatMay" && e.needsHand);
+    if (pend.kind === "chooseMay" && pend.repeat && discardPass) return [{ type: "chooseMay", player: pid, yes: !s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature")) && s.battlefield.some((id) => controllerOf(s, obj(s, id)) !== pid && objIsType(s, obj(s, id), "Creature")) }];
     if (pend.kind === "chooseMay" && pend.repeat) return [{ type: "chooseMay", player: pid, yes: player(s, pid).life > 15 && player(s, pid).hand.length < 12 }];
     if (pend.kind === "chooseMay" && pend.wheel !== undefined) return [{ type: "chooseMay", player: pid, yes: player(s, pid).hand.length < pend.wheel }];
     // A land played as an effect resolves (Gix): untapped as we'd play it ourselves (see chooseLand).

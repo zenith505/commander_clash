@@ -2962,7 +2962,8 @@ function parseStaticLine(line: string): StaticAbility | null {
   const noAbilities = /^Enchanted (creature|permanent|artifact|land)'s activated abilities can't be activated( unless they're mana abilities)?$/.exec(text);
   if (noAbilities) return { affects: { kind: "attached" }, mods: [{ kind: "cantActivate", ...(noAbilities[2] ? { exceptMana: true as const } : {}) }], text: line };
   // "You control enchanted creature." (Mind Control), "... enchanted artifact creature." (Domineer)
-  if (/^You control enchanted (creature|permanent|artifact|land|enchantment|artifact creature)$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "control" }], text: line };
+  // "You control enchanted Equipment." (Carry Away): an Equipment's controller is apart from the equipped creature's (CR 301.5d).
+  if (/^You control enchanted (creature|permanent|artifact|land|enchantment|artifact creature|Equipment)$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "control" }], text: line };
   // Fealty to the Realm: "The monarch controls enchanted creature" (CR 725, layer 2).
   if (text === "The monarch controls enchanted creature") return { affects: { kind: "attached" }, mods: [{ kind: "control", monarch: true }], text: line };
   // Onakke Oathkeeper: "Creatures can't attack planeswalkers you control unless their controller pays {1} for each creature

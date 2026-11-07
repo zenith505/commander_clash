@@ -1,6 +1,6 @@
 # Roadmap
 
-30,180 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,190 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,962 of 4,988 (99%), top 10,000: 9,621 of
 9,979 (96%).
 
@@ -2376,7 +2376,7 @@ line blocks.
    card from it, then you exile a card from it. Repeat this process ..." (Struggle for Sanity, with a browser test); "As long
    as there are seven or more cards in your graveyard, you may cast the exiled card, and mana of any type can be spent"
    (Null Summoner, linked to its exile from a hand); "When you play a card exiled with ~, transform ~" (Voltaic Visionary).
-   +10, 30,180 of 31,936 with B123. After it, every unsupported name has been looked at by some round.
+   +10, 30,190 of 31,936 with B123 and B124. After it, every unsupported name has been looked at by some round.
    Out after round 294 (looked at, not done): Adventurers' Guildhouse, Mountain Stronghold, Unholy Citadel, Seafarer's
    Quay, Shelkin Brownie ("bands with other"); Oracle en-Vec (chosen creatures attack next turn, the others can't); False
    Orders, Balduvian Warlord, General Jarkeld (a blocker removed, then blocking another attacker); Takklemaggot; Jötun Grunt
@@ -6094,6 +6094,21 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   strike, trample or rampage 3 until your next upkeep, with a browser test of the Rampage 3 button), Wellspring (you gain
   control of the enchanted land until end of turn on entering and at your upkeep; bots enchant an opponent's land).
   +10 (30,160 of 31,936 with B122 and rounds 290-292).
+- Round B124 (least played first, from the skip lists): Phantasmal Mount (+1/+1 and flying for a creature you control with
+  toughness 2 or less; when the Mount leaves the battlefield this turn its controller sacrifices that creature, and when the
+  creature leaves the Mount is sacrificed, each tied to the object as it was, CR 400.7), Carry Away (you control the enchanted
+  Equipment, CR 301.5d, unattached as the Aura enters; bots take an opponent's), Excavator (landwalk of each land type the
+  sacrificed basic land had as it last existed, CR 608.2h: none for Wastes), Feint (the creatures blocking the target tapped,
+  then its combat damage and theirs prevented this turn, tapped blockers still dealing combat damage, CR 510.1), Sewers of
+  Estark (attacking or blocking checked as it resolves, neither doing nothing, rulings: unblockable this turn, or its combat
+  damage and that of the creatures it blocks prevented until end of combat), Game Preserve (each player reveals their top
+  card; only if every card revealed is a creature card do they all enter together under their owners' control, CR 608.2f),
+  Specter's Shriek (you may choose a nonland card from the revealed hand for its owner to exile; if it was nonblack you exile
+  a card from your hand, none if it's empty, rulings), Clash of Elements (its owner's choice of the top of their library and
+  2 damage, or the bottom), Scarwood Bandits (each opponent in turn order may pay {2}, CR 101.4; if none does you gain control
+  of the artifact for as long as the Bandits remain; bots now aim a punisher's harmful effects at an opponent's permanent),
+  Mimeofacture (you search the target's controller's library for a card with its name, which enters under your control;
+  replicate copies choose new targets). No new prompts. +10 (30,180 of 31,936 with B123 and rounds 290-293).
 - Out after round B123 (looked at, not done): Misfortune, Library of Lat-Nam and Fatal Lore (an opponent chooses the mode
   as the spell is cast, CR 700.2e), Kheru Lich Lord (a returned card's abilities and its exile replacement), Fasting (an
   optional draw-step skip with a counter rider), Matopi Golem and Skeleton Scavengers (a rider on one regeneration

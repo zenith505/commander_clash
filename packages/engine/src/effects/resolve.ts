@@ -4,7 +4,7 @@ import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness }
 import { addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, draw, endTheCombatPhase, endTheTurn, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
 import { compileCard } from "../oracle";
-import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, chosenLandwalk, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, TARGET_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION } from "../keywords";
+import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LANDWALK, SACRIFICED_LANDWALK, landwalkLand, CHOSEN_SNOW_LANDWALK, chosenLandwalk, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, TARGET_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, shieldChoicesPossible, ShieldQuestionPause, withShieldAnswers, type DamageSource } from "../damage";
 import { RulesError, type CardDef, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ManaType, type ObjectId, type PlayerId, type StackItem, type TriggerEventInfo } from "../types";
@@ -1085,6 +1085,9 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
           // Sponge): the keyword chosen as it resolved.
           (m.kind === "addKeywords" || m.kind === "removeKeywords") && m.keywords.includes(CHOSEN_KEYWORD)
         ? { ...m, keywords: m.keywords.flatMap((k) => (k !== CHOSEN_KEYWORD ? [k] : s.resolving?.chosen?.keyword ? [s.resolving.chosen.keyword] : [])) }
+        : // Excavator: "landwalk of each of the land types of the sacrificed land", as it last existed (CR 608.2h).
+          m.kind === "addKeywords" && m.keywords.includes(SACRIFICED_LANDWALK)
+        ? { ...m, keywords: m.keywords.flatMap((k) => (k !== SACRIFICED_LANDWALK ? [k] : [...new Set(ctx.sacrificed?.[0]?.subtypes ?? [])].map((t) => `${t}walk`).filter((w) => !!landwalkLand(w)))) }
         : // Giant Slug: "gains landwalk of the chosen type": that land type's landwalk (CR 702.14a); Barbarian Guides: "snow
           // landwalk of the chosen type", a snow land of that type (CR 702.14c).
           m.kind === "addKeywords" && (m.keywords.includes(CHOSEN_LANDWALK) || m.keywords.includes(CHOSEN_SNOW_LANDWALK))

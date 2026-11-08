@@ -1,6 +1,6 @@
 # Roadmap
 
-30,469 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,476 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,699 of
 9,979 (97%).
 
@@ -2379,7 +2379,7 @@ line blocks.
    browser test); "You may cast ~ as though it had flash by tapping three untapped creatures you control with flying in
    addition to paying its other costs" (Tegwyll's Scouring: an optional additional cost, CR 601.2b, 601.3c, a browser
    test); "Whenever a red source you control deals damage to one or more permanents and/or players" (The Red Terror:
-   once for each source in each batch of damage, CR 603.2c). +8, 30,469 of 31,936.
+   once for each source in each batch of damage, CR 603.2c). +8, 30,476 of 31,936 with B142.
    Out after round 305 (looked at, not done): Spell Queller (casting the exiled card when it leaves: needs the exiled
    card linked to its leaves trigger); Karplusan Minotaur ("any target of an opponent's choice" in a triggered ability
    with a coin flip cumulative upkeep); Toggo, Goblin Weaponsmith (a named Equipment token granting an ability with a
@@ -2400,7 +2400,7 @@ line blocks.
    any number of creatures and/or Vehicles target player controls" (Invoke Justice: chosen as it resolves, the returned
    permanent included, rulings; a browser test); replicate costs that aren't mana, "Tap an untapped Dalek you control"
    (Exterminate!, a different one each time, summoning sick ones too, CR 302.6; a browser test), "Tap an untapped Horror
-   you control" (Psionic Ritual) and "Pay {E}{E}{E}" (Reiterating Bolt). +10, 30,461 of 31,936.
+   you control" (Psionic Ritual) and "Pay {E}{E}{E}" (Reiterating Bolt). +10, 30,461 of 31,936 (30,468 with B142).
    Out after round 304 (looked at, not done): Night Soil ("Exile two creature cards from a single graveyard" as a cost:
    the cost picker only offers your own graveyard); Karn, Living Legacy ("Pay any amount of mana" as an effect, and an
    emblem whose ability's cost taps an artifact); Moxite Refinery, Abstruse Appropriation, Oskar, Araumi, Ride the
@@ -4805,7 +4805,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Rahzar), "Players can't search libraries" (Mindlock Orb). +24 (27,620 of 31,936 with B35 to B37 and rounds 202 to
   207).
 - Out after round B38: Wall of Shadows (whether a spell or ability "can target only Walls" needs its whole target
-  specs), Library of Lat-Nam (an opponent chooses the mode), Serene Master (exchanging power with values locked in, as
+  specs), Library of Lat-Nam (done in round B142) (an opponent chooses the mode), Serene Master (exchanging power with values locked in, as
   for "exchange life totals"), Kav Landseeker ("at the beginning of the end step on your next turn": there is only
   "your next end step", which can be this turn's).
 - Round B39 (harder skipped cards, least played first): the Eldrazi processors, "put a card an opponent owns from exile
@@ -6630,7 +6630,24 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   They don't activate Magus of the Arena, Arena, Cuombajj Witches, Diaochan or Nova Pentacle, whose opponent-chosen target
   can hurt them, and their ability heuristics don't pick Echo Chamber or Preacher yet. Browser tests for choosing the opponent, a single chooser, your own
   targets first and a bot's spell asking you. +9 (30,443 of 31,936 with B140 and round 302).
-- Out after round B141 (looked at, not done): Misfortune and Fatal Lore ("an opponent chooses one": the mode chosen by an
+- Round B142 (least played first, from the skip lists): "An opponent chooses one —" (Misfortune, Fatal Lore, Library of
+  Lat-Nam). As it's cast, its caster chooses which opponent chooses the mode (CR 700.2e; the only one left, without a
+  question); the cast waits, unchanged, while that opponent chooses among the modes the spell could be cast with, then
+  its caster chooses the targets of that mode (CR 601.2b-c; ruling on Fatal Lore: up to two, none is fine). "That
+  player" is the opponent who chose (`modeChooser`), for good. Bots choosing for others pick a mode that spares them
+  (no creature of theirs dies to Misfortune's counters, no destroy while they have creatures, life kept above 10), else
+  the other; bots cast them too. Nature's Blessing's "a +1/+1 counter or banding, first strike or trample" (an
+  "either" choice); Soul Ransom's "This Aura's controller sacrifices it, then draws two cards", activated only by its
+  controller's opponents; Shrouded Lore and Forgotten Lore (the target opponent chooses a card in your graveyard, again
+  among cards not chosen yet each time you pay, none left: no more paying, rulings; the last chosen goes to your hand;
+  bots choose the card worth least to you and pay while they can). Browser tests for choosing who chooses, your targets
+  after their mode, a bot's spell asking you for the mode and "draw up to three", Soul Ransom's ability on Ana's Aura
+  and Shrouded Lore's Pay. +7 (30,458 of 31,936 with B141 and round 303).
+- Out after round B142 (looked at, not done): Decaying Soil (a dies trigger granted by threshold needs a look-back,
+  CR 603.10a), Nivmagus Elemental (a cost that exiles a spell from the stack), Benthic Explorers (untapping an
+  opponent's land as a mana ability's cost), Charmed Pendant (mana by the milled card's mana symbols, instant-speed
+  only), Grime Gorger (exiling cards that share a type is ambiguous for multi-type cards).
+- Out after round B141 (looked at, not done): Misfortune (done in round B142) and Fatal Lore (done in round B142) ("an opponent chooses one": the mode chosen by an
   opponent as it's cast, then Fatal Lore's targets; the same wait could carry it).
 - Out after round B140 (looked at, not done): nothing new; the cards still on the B139 and earlier lists are out for the
   reasons given there.
@@ -6641,7 +6658,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   reasons in the earlier lists.
 - Out after round B138 (looked at, not done): Kodama of the Center Tree (soulshift X counted from the Spirits on the
   battlefield just before it died, Spirits dying with it included, CR 603.10a), Lantern Flare (X in its cleave cost).
-- Out after round B136 (looked at, not done): Forgotten Lore (an opponent chooses again each time you pay {G}),
+- Out after round B136 (looked at, not done): Forgotten Lore (done in round B142) (an opponent chooses again each time you pay {G}),
   Infinite Authority (a delayed trigger that checks "if that creature was destroyed this way").
 - Out after round B135 (looked at, not done): Tariff (a punisher whose cost is the chosen creature's own mana cost),
   Words of War (a target chosen as a draw is replaced), Gloom (a tax on activated abilities, mana abilities too),
@@ -6653,7 +6670,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Imperiosaur (mana spent only from basic lands), Flaming Gambit (the target player redirects the damage to a creature),
   Magus of the Arena (done in round B141) and Evangelize (done in round B141) (a target chosen by an opponent).
 - Out after round B132 (looked at, not done): Bullseye and Death Dealer (still an activation cost with "or" between two
-  costs), Misfortune, Fatal Lore and Library of Lat-Nam (still a mode chosen by an opponent as it's cast, CR 700.2e).
+  costs), Misfortune (done in round B142), Fatal Lore (done in round B142) and Library of Lat-Nam (done in round B142) (still a mode chosen by an opponent as it's cast, CR 700.2e).
 - Out after round B131 (looked at, not done): Mister Immortal (done in round B139) (an ability activated from exile, which neither the UI nor
   the bots offer).
 - Out after round B130 (looked at, not done): Molten Sentry and Aquamorph Entity (done in round B139) (a coin flip or a choice as it enters,
@@ -6680,7 +6697,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cast-time number choice yet), Preferred Selection (the two cards looked at are held across a "you may sacrifice ~ and
   pay" choice), Thelon's Chant and Tourach's Chant (the player who put it onto the battlefield isn't tracked), Wand of Ith
   and Tainted Specter (a payment or a library-top choice for the revealed or discarded card; both done in round B132).
-- Out after round B123 (looked at, not done): Misfortune, Library of Lat-Nam and Fatal Lore (an opponent chooses the mode
+- Out after round B123 (looked at, not done): Misfortune (done in round B142), Library of Lat-Nam (done in round B142) and Fatal Lore (done in round B142) (an opponent chooses the mode
   as the spell is cast, CR 700.2e), Kheru Lich Lord (a returned card's abilities and its exile replacement), Fasting (done in round B136) (an
   optional draw-step skip with a counter rider), Matopi Golem and Skeleton Scavengers (a rider on one regeneration
   shield, a choice among shields; done in round B132), Thirsting Axe (combat damage dealt to creatures this turn isn't tracked), Heat Wave (done in round B136) (a
@@ -6792,11 +6809,11 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   in"), Time Reaper (targeting a face-up card in exile), Strax, Sontaran Nurse (a player chosen at random, then a reflexive
   fight), Sevinne, the Chronoclasm (copy the first instant or sorcery cast from a graveyard each turn), Soulcipher Board
   (omen counters off for each creature card put into your graveyard), Biolume Egg ("When you sacrifice ~, return it ...
-  transformed"), Wumpus Aberration, Roving Actuator, Kianne, Dean of Substance, Chong and Lily, Nomads, Soul Ransom ("Only
+  transformed"), Wumpus Aberration, Roving Actuator, Kianne, Dean of Substance, Chong and Lily, Nomads, Soul Ransom (done in round B142) ("Only
   your opponents may activate this ability"), Grinning Totem, Failure // Comply (Comply's chosen name), Musician, Soul
   Sculptor ("until a player casts a creature spell"), Heat Wave (done in round B136) (a block cost per creature), Bane Alley Broker, Essence of
   the Wild, Dreams of the Dead (done in round B136), Ludevic, Necrogenius. Bot gap: bots don't use Carrionette from the graveyard.
-- Out after round B97 (looked at, not done): Wall of Caltrops, Nature's Blessing, Master of the Hunt and the "bands with
+- Out after round B97 (looked at, not done): Wall of Caltrops, Nature's Blessing (done in round B142), Master of the Hunt and the "bands with
   other legendary creatures" lands (banding), Shield Dancer (a combat damage redirection to its source), Mirror-Shield
   Hoplite (copy a backup ability), Speedball (new targets for that spell), Bill Ferny (done in round 272), Elemental Expressionist (a granted replacement and exile trigger), Wormfang Drake and Wormfang Crab (returns
   for a card exiled by a different ability), Split the Spoils (piles), Swindler's Scheme (counter and cast the revealed
@@ -6818,7 +6835,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   type with a card put into your graveyard, then a granted leave-the-battlefield replacement), Back from the Brink (a
   token copy of the card exiled to pay the cost), Dream Halls (an alternative cost for every player's spells: discard a
   card sharing a color), Hall of Gemstone (lands tapped for mana make the chosen color instead, a mana replacement).
-- Out after round B94 (looked at, not done): Forgotten Lore and Shrouded Lore (an opponent chooses a card in your
+- Out after round B94 (looked at, not done): Forgotten Lore (done in round B142) and Shrouded Lore (done in round B142) (an opponent chooses a card in your
   graveyard, repeated while you pay, none chosen twice), Graceful Takedown ("any number of target enchanted creatures you
   control and up to one other target creature" each dealing damage), Nahiri's Sacrifice (an additional sacrifice with
   mana value X, then X divided), Clay Champion (done in round B128) (counters for each {G}{G} and each {W}{W} spent), Sutured Ghoul (power and
@@ -6841,7 +6858,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   your choice instead: a choice as the land is tapped), Escaped Shapeshifter (keywords and protection read from opponents'
   creatures, a layer 6 dependency), Spoils of War (X set by an opponent's graveyard as you cast it), Drain Life, Soul Burn
   and Consume Spirit ("Spend only black mana on X" on a spell, with cost reductions), Emblazoned Golem (one mana of each
-  color on X), Fatal Lore (an opponent chooses the mode), Echo Chamber (done in round B141) (an opponent chooses the target), Butcher Orgg and
+  color on X), Fatal Lore (done in round B142) (an opponent chooses the mode), Echo Chamber (done in round B141) (an opponent chooses the target), Butcher Orgg and
   Cunning Giant (combat damage assigned to other creatures).
 - Out after round B91 (looked at, not done): Goblin Test Pilot (done in round B136) (a target chosen at random as an activated ability is
   activated: the activation, the bots and the UI would all need to leave the target to chance), Flying Drone (a colored

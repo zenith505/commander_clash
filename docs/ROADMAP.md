@@ -1,7 +1,7 @@
 # Roadmap
 
-30,508 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,705 of
+30,523 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,713 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1001,7 +1001,7 @@ line blocks.
    Roaring Prophet; Aurification; Creeping Dread; Gavi, Nest Warden; Tezzeret, Agent of Bolas (−1 base 5/5); Jared
    Carthalion; Frodo, Determined Hero; Syr Carah; Shadow Urchin; Head Games; Seeker of Slaanesh; Drizzt Do'Urden;
    Soul-Shackled Zombie ("from a single graveyard ... if at least one creature card was exiled this way"); Ambitious
-   Augmenter; Isareth the Awakener; Maeve, Insidious Singer. Next fresh candidates, looked at briefly or not at all: Renegade Bull ("up to one target" exile-and-copy),
+   Augmenter; Isareth the Awakener (done in round B146); Maeve, Insidious Singer. Next fresh candidates, looked at briefly or not at all: Renegade Bull ("up to one target" exile-and-copy),
    Duel for Dominance, Startled Awake, Borrowed Knowledge, Thought-Stalker Warlock, Embermouth Sentinel,
    Contagious Vorrac, Zaffai, The Eighth Doctor, Arcade Gannon, Mortarion, Wail of the Forgotten, Multiple Choice, Gor
    Muldrak.
@@ -3311,7 +3311,7 @@ line blocks.
    count once; K'rrik gives no explicit choice to pay life with lands untapped (autopay prefers mana); Notion Thief's
    order against the player's own draw replacements, and several Thieves at once; Trostani Discordant, Not of This
    World; Webstrike Elite and Rampaging War Mammoth (done in round 277) (an X from the cycling cost in their targets); the other "you may
-   pay {X}. When you do" cards (Isareth, Rose Room Treasurer, Tester of the Tangential); "can't attack
+   pay {X}. When you do" cards (Isareth (done in round B146), Rose Room Treasurer, Tester of the Tangential (done in round B146)); "can't attack
    unless you control more creatures than defending player" (Goblin Goon, Mogg Toady, Monstrous Hound); Kaboom!,
    Soulfire Eruption ("choose any number of targets. For each of them, ..."). Smaller gaps from round 99: Depala, Azor's other line,
    Bane's and Biomancer's Familiar's other lines, Cadric, The Master, Sliver Gravemother (done in round 274), Spider-Verse and Mirror
@@ -3753,7 +3753,7 @@ line blocks.
      doublers, halvers and prevention.
    - Coin flips (CR 705) work for "If you win / lose the flip", "until you lose a flip" and "whenever you win a coin
      flip" (25 cards); still out: Krark's Thumb, Edgar's "come up heads" (705.3), heads or tails (Odds // Ends (done in round B129), Mana
-     Clash, Two-Headed Giant, Rakdos the Showstopper, Molten Sentry), a flip for each (Mutalith Vortex Beast (done in round 278), Fighting
+     Clash, Two-Headed Giant, Rakdos the Showstopper, Molten Sentry (done in round B146)), a flip for each (Mutalith Vortex Beast (done in round 278), Fighting
      Chance), Fiery Gambit, Game of Chaos (done in round 298), Squee's Revenge (done in round 298), Crooked Scales, Krark the Thumbless, and lines
      that are out for other reasons (Goblin Bangchuckers' "itself", Chance Encounter, Okaun). Bots weigh a flip whose loss costs
      them something as the average of its two outcomes (Bottle of Suleiman), and use "phase out or bounce, else
@@ -3783,7 +3783,7 @@ line blocks.
      (CR 603.7 has one for all; no supported card can tell); a flicker's return is one trigger for all the cards.
    Left from the reflexive triggers round ("When you do" after a payment, a sacrifice, a may, a mill, a roll, a count
    or a token, CR 603.12; named tokens; "that artifact gains haste" after putting it onto the battlefield):
-   - Reflexive triggers still out: "pay {X}. When you do" (Isareth, Numa, Rose Room Treasurer); "remove a counter from" any kind (Slumbering
+   - Reflexive triggers still out: "pay {X}. When you do" (Isareth (done in round B146), Numa, Rose Room Treasurer); "remove a counter from" any kind (Slumbering
      Walker); "exile N cards from your graveyard. When you do" (Kroxa, Young Necromancer, Kishla Trawlers); Wick's
      Patrol ("the greatest mana value among cards in your graveyard");
      Red Hulk, Ziatora, Tiger-Tribe Hunter, Surtland Flinger, Bolg, Edgar's Awakening, Leyline Tyrant ("any
@@ -4070,7 +4070,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Skipped there, with reasons: Mystic Decree ("lose flying and islandwalk" isn't parsed); Hei Bai (reveal until a
   Shrine); Avatar of Discord (done in round B105) ("unless you discard two cards" with one card in hand: a partial payment question);
   Polar Kraken and Phyrexian Soulgorger (cumulative upkeep paid by sacrificing); Stand United (an "if" effect that
-  pauses for a scry); Nissa's Defeat (its target phrase); Wargling (an ability word before "until end of turn,");
+  pauses for a scry); Nissa's Defeat (its target phrase); Wargling (done in round B146) (an ability word before "until end of turn,");
   Phoenix Fleet Airship ("permanents named ~"); Galactus (a name with ~ in it); Festering Newt, Ruin in
   Their Wake, Rix Maadi Guildmage, Dragon Hunter, Will of the All-Hunter, Foe-liage, Inflame and Executioner's Swing
   (each needs a check not modeled: which creatures were dealt damage this turn, "if it's blocking", Dragons as
@@ -5117,7 +5117,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   nontoken creature is put into your graveyard from the battlefield" must look back in time, CR 603.10a, so the
   creature that makes seven doesn't trigger it, but granted abilities are read after the event), Pinnacle Starcage
   ("Put each card exiled with ~ into its owner's graveyard, then create ... Robot"), Not Forgotten (done in round B113) and Swat Away (top or
-  bottom of the library, owner's choice), Case the Joint and Medomai's Prophecy (the top card of each player's
+  bottom of the library, owner's choice), Case the Joint (done in round B146) and Medomai's Prophecy (the top card of each player's
   library), Kayla's Reconstruction, Treacherous Urge, Rogues' Gallery, Liberated Livestock, Borderland Explorer,
   Cathedral Membrane (done in round B108), Dimensional Infiltrator (done in round B108), Sharp-Eyed Rookie; harder: Grand Master of Flowers, Mana Maze, Eureka,
   Portcullis.
@@ -5148,7 +5148,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "When a source an opponent controls deals damage to you, sacrifice ~" (Awaken the Sky Tyrant). +32 (28,296 of 31,936 with rounds 217 to 221).
 - Out after round B51 (looked at, not done): Backfire (done in round B130) ("that much damage" from damage the enchanted creature dealt to
   you), Equal Treatment (done in round B135) and Well-Laid Plans (damage replacement and prevention between sources), Spin into Myth
-  (fateseal), Elderwood Scion (spells that target it cost less), Tidal Control and Quicksilver Dragon (any player may
+  (fateseal), Elderwood Scion (spells that target it cost less), Tidal Control (done in round B146) and Quicksilver Dragon (any player may
   activate; changing a spell's only target), Necromancer's Magemark (a replacement for enchanted creatures you control),
   Selective Snare (X targets of a chosen type), Roving Keep (done in round B113), Slab Hammer (done in round B113), Leonin Bola, Apathy (done in round B112), Death Match (done in round B110), Display of
   Dominance, Addle, Soul Search, Thought Prison, Spara's Adjudicators and Masked Bandits (until cast from exile), plus
@@ -6744,6 +6744,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   untap their best creatures (on their own upkeep with half their lands at most), cast Yare and Blaze only on their own
   creature while attacked, block every attacker with a Blazed creature, and keep Johan back when two other creatures can
   attack. Browser tests for the pay-to-untap picker. +9 (30,508 of 31,936 with rounds 305 and 306).
+- Round B146 (least played first, from the skip lists): Bullseye, Death Dealer ("{3}, {T}, Sacrifice an artifact or
+  discard a nonland card: ...") and Tidal Control ("Pay 2 life or {2}: Counter target red or green spell. Any player may
+  activate this ability."): an ability whose last cost is a choice of two, made as it's activated (CR 602.2b, 601.2b),
+  compiled as one ability per cost like The Shards, so each is its own menu entry. Tester of the Tangential ("you may pay
+  {X}. When you do, move X +1/+1 counters from ~ onto another target creature"): X of them, all if it has fewer (rulings
+  on Blaster, Morale Booster), none onto ~ itself (CR 122.5). Isareth the Awakener: the reflexive ability's "target
+  creature card with mana value X from your graveyard" is exactly the X paid (as Halo Forager), the corpse counter and
+  the exile replacement as before. Molten Sentry: "As ~ enters, flip a coin. If the coin comes up heads, ~ enters as a 5/2
+  creature with haste. If it comes up tails, ... a 2/5 creature with defender": the two forms of Primal Clay's kind, the
+  coin picking one (CR 705.2: no one wins or loses it), Edgar's first flips heads, Krark's Thumb's heads and tails asked
+  as the form question; a creature entering as a copy flips for itself on top of the copied form (its power and toughness
+  from its own flip, the keywords of both, as the rulings on Primal Plasma and Corrupted Shapeshifter say). Wargling:
+  "until end of turn, ~ gets +1/+0 and creatures you control gain trample". Case the Joint: "look at the top card of each
+  player's library", each shown only to you in the log. Bots pay Tester's X for as many counters as it has when they have
+  another creature, and Isareth's X for the best creature card in their graveyard. A browser test for Bullseye's two cost
+  entries. +7 (30,523 of 31,936 with B145 and rounds 305-307).
+- Out after round B146 (looked at, not done): Tamanoa and Blaze Commando ("whenever a noncreature source / an instant or
+  sorcery spell you control deals damage": once per source and damage event, which Lane A's round 305, PR #452, adds for
+  The Red Terror; merged now, so they're next), Bargaining Table (still: the opponent chosen as it's activated sets X), Foraging
+  Wickermaw (a mana ability that also makes ~ the color of the mana it made), Isu the Abominable ("you may pay {G}, {W},
+  or {U}": one of three payments), Cheering Fanatic ("spells with the chosen name cost {1} less to cast this turn").
 - Out after round B144 (looked at, not done): Merseine ("pay enchanted creature's mana cost" as a cost, activated only
   by that creature's controller), Yare (done in round B145) and Blaze of Glory (done in round B145) ("target creature defending player controls" on a spell, with
   several defending players, CR 508.5a), North Star (mana spent as though any type for one spell), Lumbering Laundry
@@ -6777,17 +6798,17 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B133 (looked at, not done): Tamanoa (noncreature sources' damage as one event), Graceful Takedown,
   Imperiosaur (mana spent only from basic lands), Flaming Gambit (done in round B143) (the target player redirects the damage to a creature),
   Magus of the Arena (done in round B141) and Evangelize (done in round B141) (a target chosen by an opponent).
-- Out after round B132 (looked at, not done): Bullseye and Death Dealer (still an activation cost with "or" between two
+- Out after round B132 (looked at, not done): Bullseye and Death Dealer (done in round B146) (still an activation cost with "or" between two
   costs), Misfortune (done in round B142), Fatal Lore (done in round B142) and Library of Lat-Nam (done in round B142) (still a mode chosen by an opponent as it's cast, CR 700.2e).
 - Out after round B131 (looked at, not done): Mister Immortal (done in round B139) (an ability activated from exile, which neither the UI nor
   the bots offer).
-- Out after round B130 (looked at, not done): Molten Sentry and Aquamorph Entity (done in round B139) (a coin flip or a choice as it enters,
+- Out after round B130 (looked at, not done): Molten Sentry (done in round B146) and Aquamorph Entity (done in round B139) (a coin flip or a choice as it enters,
   or is turned face up, that a creature becoming a copy of it later takes too, rulings: the engine's "enters as" effect
   isn't copied), Glass Asp, Nafs Asp and Sabertooth Cobra ("unless they pay {2} before that step": a payment any time
   before a step begins).
 - Out after round B129 (looked at, not done): Spoils of War, Grenzo's Rebuttal, Peace Talks and Martyr of Bones, still
   out for the reasons in the earlier lists.
-- Out after round B128 (looked at, not done): Bullseye, Death Dealer and Ion Storm (an activation cost with "or" between
+- Out after round B128 (looked at, not done): Bullseye, Death Dealer (done in round B146) and Ion Storm (an activation cost with "or" between
   two costs; Ion Storm done in round B132), Price of Betrayal (counters removed from an opponent, a player, as well as permanents), Bargaining Table
   (X set by the opponent chosen as it's activated), Selective Snare (a creature type chosen as it's cast).
 - Out after round B127 (looked at, not done): Sutured Ghoul (an enters replacement exiling any number of creature cards
@@ -7036,7 +7057,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B76 (looked at, not done): Mind Roots (done in round B112) (a land card discarded this way onto the battlefield: no
   effect for cards a discard just moved yet), Mark for Death (done in round B113) ("Other creatures that player controls can't block this
   turn": a can't-block rule for one player's creatures except the target), Ashnod's Cylix (done in round B117) (the target player looks at
-  the top three and chooses which one goes back), Bullseye, Death Dealer and Ion Storm (Ion Storm done in round B132; costs with "or": "sacrifice an
+  the top three and chooses which one goes back), Bullseye, Death Dealer (done in round B146) and Ion Storm (Ion Storm done in round B132; costs with "or": "sacrifice an
   artifact or discard a nonland card", "remove a +1/+1 counter or a charge counter").
 - Out after round B75 (looked at, not done): Mishra, Artificer Prodigy (a search for a card with the cast spell's name),
   Titania, Voice of Gaea's ward ("discard a card or pay {2}"), Fog Patch (done in round B110) and Choking Vines (done in round B110) ("become blocked"), Mistform

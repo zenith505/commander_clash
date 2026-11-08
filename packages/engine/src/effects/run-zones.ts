@@ -4059,6 +4059,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (id) log(s, `${p.name}'s card: ${defOf(s, obj(s, id)).name}.`, ctx.controller);
           continue;
         }
+        // Case the Joint: the top card of their library, seen only by the player looking; it stays there.
+        if (e.topCard) {
+          const top = p.library[0];
+          log(s, `${player(s, ctx.controller).name} looks at the top card of ${pid === ctx.controller ? "their" : `${p.name}'s`} library.`);
+          log(s, `The top card of ${p.name}'s library: ${top ? defOf(s, obj(s, top)).name : "none (it's empty)"}.`, ctx.controller);
+          continue;
+        }
         // Mindblaze: "reveals their library", every card in it, the order unchanged.
         if (e.library) {
           log(s, `${p.name} reveals their library: ${p.library.map((id) => defOf(s, obj(s, id)).name).join(", ") || "no cards"}.`);

@@ -3925,6 +3925,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "10db57b4-f895-4514-b610-2252ba676353",
+  "name": "Bullseye, Death Dealer",
+  "manaCost": "{2}{B/R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Assassin Villain",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Assassin",
+   "Villain"
+  ],
+  "oracleText": "When Bullseye enters, you may sacrifice an artifact or discard a nonland card. When you do, Bullseye deals 2 damage to any target.\n{3}, {T}, Sacrifice an artifact or discard a nonland card: Bullseye deals 2 damage to any target.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "566b4dcc-b7d7-4443-b2d0-954f1fc33a11",
   "name": "Burn Trail",
   "manaCost": "{3}{R}",

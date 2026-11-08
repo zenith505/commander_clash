@@ -19,7 +19,7 @@ import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, prot
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { canAttachTo, turnFaceDown } from "./effects/run-permanents";
-import { rollDice } from "./effects/run-dice";
+import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
 import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, enchantableBy, everyCreatureType, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
@@ -11019,7 +11019,32 @@ function askEntersChoice(s: GameState): boolean {
     }
     if (c.what === "form") {
       // "As ~ enters, it becomes your choice of ..." (CR 614.12): its controller picks one of them.
-      const forms = compileCard(defOf(s, o)).entersForms ?? [];
+      const compiled = compileCard(defOf(s, o));
+      const forms = compiled.entersForms ?? [];
+      // Molten Sentry: a coin flip picks it, heads the first, tails the second (CR 705.2). Edgar: the first coins flipped
+      // this turn come up heads, won flips too (CR 705.3, as with Ral Zarek's rulings). Krark's Thumb: two coins, one
+      // ignored (CR 614.1a): with heads and tails, its controller keeps either, so chooses the form.
+      if (compiled.entersFormsFlip && forms.length === 2) {
+        const who = controllerOf(s, o);
+        const rigged = flipsRigged(s, who);
+        noteFlipped(s, who);
+        const thumb = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === who && !!abilitiesOf(s, obj(s, id)).flipTwo);
+        const coins = rigged ? [true] : thumb ? [nextRandom(s) < 0.5, nextRandom(s) < 0.5] : [nextRandom(s) < 0.5];
+        if (rigged) fireEvent(s, { type: "coinFlipped", player: who, won: true });
+        if (coins.length === 2 && coins[0] !== coins[1]) {
+          log(s, `${player(s, who).name} flips two coins for ${defOf(s, o).name} (Krark's Thumb): heads and tails.`);
+          s.pending = { kind: "chooseOption", player: who, source: defOf(s, o).name, what: "form", options: ["0", "1"], labels: forms.map((f, i) => `${i ? "Keep tails" : "Keep heads"}: ${f.text}`), objectId: o.id, prompt: `Krark's Thumb: keep heads or tails for ${defOf(s, o).name}` };
+          return true;
+        }
+        const heads = coins[0]!;
+        const form = forms[heads ? 0 : 1]!;
+        log(s, `${player(s, who).name} flips a coin for ${defOf(s, o).name}: it comes up ${heads ? "heads" : "tails"}${rigged ? " (the first coins flipped this turn come up heads)" : ""}.`);
+        addCopyEffect(s, o, copyKey(s, copiableDef(s, o), form.except));
+        log(s, `${defOf(s, o).name} enters as ${form.text}.`);
+        q.shift();
+        if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
+        continue;
+      }
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "form", options: forms.map((_, i) => String(i)), labels: forms.map((f) => f.text.charAt(0).toUpperCase() + f.text.slice(1)), objectId: o.id, prompt: `choose what ${defOf(s, o).name} becomes as it enters` };
       return true;
     }

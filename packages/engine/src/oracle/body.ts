@@ -1673,6 +1673,8 @@ function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell
     ];
     return { effects: [{ type: "repeatMay", effects: each, text: "discard a card at random and deal damage equal to its mana value to each creature", needsHand: true }], skip: 2 };
   }
+  // Case the Joint: "look at the top card of each player's library": each one, seen only by you (Effect lookAtHand topCard).
+  if (/^[Ll]ook at the top card of each player's library$/.test(s)) return { effects: [{ type: "lookAtHand", who: { ref: "eachPlayer" }, topCard: true }], skip: 0 };
   if (ctx.auraCard && /^[Cc]hoose a creature at random ~ can enchant$/.test(s) && sentences[si + 1] === "Return ~ to the battlefield attached to that creature" && sentences.length === si + 2)
     return { effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard", moved: true }, attachRandom: true }], skip: 1 };
   return null;
@@ -12308,8 +12310,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         // Numa, Joraga Chieftain: "distribute X +1/+1 counters among any number of target Elves": the X paid, divided as
         // the reflexive ability is put on the stack (CR 603.12, 601.2d). Fire Lord Sozin: "put any number of target creature
         // cards with total mana value X or less ...": the X paid bounds the targets chosen then. Halo Forager: "you may cast
-        // target instant or sorcery card with mana value X from a graveyard": exactly the X paid (rulings: X can be 0).
-        const reflexive = reflexiveBody([paidText, ...sentences.slice(si + 1)].join(". "), ctx, false, false, !!payFirst.payX && !payFirst.payX.color && (/^distribute X /.test(paidText) || / target .+? with total mana value X or less /.test(paidText) || / target .+? card with mana value X from a graveyard /.test(paidText)));
+        // target instant or sorcery card with mana value X from a graveyard": exactly the X paid (rulings: X can be 0). Isareth
+        // the Awakener: "return target creature card with mana value X from your graveyard": the same.
+        const reflexive = reflexiveBody([paidText, ...sentences.slice(si + 1)].join(". "), ctx, false, false, !!payFirst.payX && !payFirst.payX.color && (/^distribute X /.test(paidText) || / target .+? with total mana value X or less /.test(paidText) || / target .+? card with mana value X from (?:a|your) graveyard /.test(paidText)));
         if (!reflexive) return null;
         effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: payFirst.pay, ...(payFirst.payX ? { payX: payFirst.payX } : {}), text: `${payFirst.text}. When you do, ${[whenPaid[1]!, ...sentences.slice(si + 1)].join(". ")}` });
         payFirst = null;
@@ -19569,6 +19572,9 @@ function wholeTextForms(text: string, selfEntered: boolean): AbilityBody | strin
   // Arlinn, the Pack's Hope: "Until your next turn, you may cast creature spells as though they had flash, and each
   // creature you control enters with an additional +1/+1 counter on it.": two effects of the same duration.
   text = text.replace(/^Until your next turn, (you may cast creature spells as though they had flash), and (each creature you control enters with an additional \+1\/\+1 counter on it)\.$/, "Until your next turn, $1. Until your next turn, $2.");
+  // Wargling: "until end of turn, ~ gets +1/+0 and creatures you control gain trample": two effects of the same duration,
+  // the group fixed as it resolves either way (CR 611.2c).
+  text = text.replace(/^[Uu]ntil end of turn, (~ gets [+-]\d+\/[+-]\d+) and (creatures you control gain [a-z]+)\.$/, (_, a: string, b: string) => `${a.charAt(0).toUpperCase()}${a.slice(1)} until end of turn. ${b.charAt(0).toUpperCase()}${b.slice(1)} until end of turn.`);
   const twoDigs = landThenCardDig(text);
   if (twoDigs) return twoDigs;
   // Scion of the Ur-Dragon: "Search your library for a Dragon permanent card and put it into your graveyard. If you do, ~

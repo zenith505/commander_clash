@@ -436,6 +436,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (/^Return enchanted creature and ~ to their owners' hands$/.test(s) && !ctx.spell) return [{ type: "bounce", what: { ref: "attached" } }, { type: "bounce", what: { ref: "self" } }];
   // Black Sun's Zenith: "Shuffle ~ into its owner's library" as it resolves (CR 608.2n, 701.24c).
   if (/^Shuffle ~ into its owner's library$/i.test(s) && ctx.spell) return [{ type: "shuffleSpell" }];
+  // Fblthp, the Lost: "When ~ becomes the target of a spell, shuffle ~ into its owner's library": the permanent, while it's
+  // still the same object on the battlefield (CR 400.7); its owner's library is shuffled (CR 701.24c).
+  if (/^[Ss]huffle ~ into its owner's library$/.test(s) && !ctx.spell && !ctx.selfCard && ctx.selfIt) return [{ type: "shuffleIntoLibrary", what: { ref: "self" } }];
   // Seasons Past: "Put ~ on the bottom of its owner's library", likewise the resolving spell itself (CR 608.2n).
   if (/^Put ~ on the bottom of its owner's library$/i.test(s) && ctx.spell) return [{ type: "shuffleSpell", bottom: true }];
   // "When ~ dies, shuffle it into its owner's library", "When ~ is put into a graveyard from anywhere, ...": the card where
@@ -577,6 +580,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // A land card can't be cast (CR 305.9).
     if (what?.ref !== "target" || spec?.kind !== "card" || ctx.targets.length !== i + 1 || spec.types?.includes("Land") || !(spec.types?.length || spec.anyOf?.length)) return null;
     return [{ type: "grantFlashback", what, escape: { exile: num(m[2]!) } }];
+  }
+  // Cursecloth Wrappings: "Target creature card in your graveyard gains embalm until end of turn. The embalm cost is equal
+  // to its mana cost" (joined by parseBody): an activated ability of that card (CR 702.128a), with its mana cost.
+  if ((m = /^(target creature card in your graveyard) gains (embalm|encore) with its mana cost until end of turn$/i.exec(s))) {
+    const what = parseCardTarget(m[1]!, ctx, "you");
+    return what ? [{ type: "grantYardKeyword", what, keyword: m[2]!.toLowerCase() === "embalm" ? "Embalm" : "Encore" }] : null;
   }
   // Snapcaster Mage, Past in Flames: "... gains flashback until end of turn. The flashback cost is equal to its mana cost"
   // (parseBody joins the two sentences).

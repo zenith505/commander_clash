@@ -4060,6 +4060,8 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
  * +N/+N for each, so tokens up to that size go; exploit's payoff is worth a small token or a small creature.
  */
 function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<PendingDecision, { kind: "pickPermanents" }>): ObjectId[] {
+  // Phyrexian Dreadnought: the least worth creatures that reach the total power (wantsMay checked they're worth less than it).
+  if (pend.minTotalPower !== undefined) return powerFloorSet(s, pid, pend.options, pend.minTotalPower) ?? [];
   const ok = pend.options.map((id) => obj(s, id)).filter((o) => !o.isCommander && !objIsType(s, o, "Land"));
   if (pend.objectId) {
     const devour = compileCard(defOf(s, obj(s, pend.objectId))).devour;
@@ -4311,6 +4313,14 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     return !!t && t.kind === "object" && !!s.objects[t.id] && isMine(s, pid, t) !== harmsChosenTarget(r.body);
   }
   if (!r || e?.type !== "may") return true;
+  // Phyrexian Dreadnought: keep it only by sacrificing other creatures worth less than it, together.
+  const floor = e.keep && e.effects.length === 1 && e.effects[0]!.type === "pick" ? e.effects[0]!.minTotalPower : undefined;
+  if (floor !== undefined) {
+    const me = r.item.sourceId ? s.objects[r.item.sourceId] : undefined;
+    const others = s.battlefield.filter((id) => id !== r.item.sourceId && controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
+    const set = powerFloorSet(s, pid, others, floor);
+    return !!set && !!me && me.zone === "battlefield" && set.reduce((t, id) => t + worth(s, pid, obj(s, id)), 0) < worth(s, pid, me);
+  }
   // "Sacrifice it unless you discard a creature card", "discard two cards unless you discard an artifact card": the
   // smaller loss (only asked when it can be done).
   if (e.keep && e.otherwise?.some((x) => (x.type === "sacrifice" || x.type === "exile") && x.what.ref === "self") && e.effects.every((x) => x.type === "discard" || x.type === "pick")) return true;
@@ -7201,4 +7211,17 @@ function textWordPick(s: GameState, pid: PlayerId, pend: Extract<PendingDecision
   // A basic land type: as for "becomes the basic land type of your choice" (Reef Shaman).
   if (pend.options.every((w) => LAND_COLOR[w])) return chooseLandType(s, pid, pend.options);
   return pend.options[0]!;
+}
+
+/** The least worth of these creatures (no commander) whose total power reaches `min`, taken best power for worth first; null if they can't. */
+function powerFloorSet(s: GameState, pid: PlayerId, options: ObjectId[], min: number): ObjectId[] | null {
+  const ok = options.map((id) => obj(s, id)).filter((o) => !o.isCommander && power(s, o) > 0);
+  const ids: ObjectId[] = [];
+  let total = 0;
+  for (const o of [...ok].sort((a, b) => worth(s, pid, a) / power(s, a) - worth(s, pid, b) / power(s, b))) {
+    if (total >= min) break;
+    ids.push(o.id);
+    total += power(s, o);
+  }
+  return total >= min ? ids : null;
 }

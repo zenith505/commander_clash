@@ -2,7 +2,7 @@ import { exiledWithNamed } from "../names";
 import { defMv, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import { isRealKicker, type AbilityBody, type BatchTrigger, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
-import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
+import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, pairedWith, power, toughness } from "../cards";
 import { checkAscend, isEmerge, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, spellHasFlash, conspireGranted, casualtyGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, modeRange, withModes } from "../modes";
@@ -259,6 +259,8 @@ export type TriggerSourceEvent =
   | { type: "countersRemoved"; id: ObjectId; counter: string; n: number }
   | { type: "echoPaid"; id: ObjectId }
   | { type: "trained"; id: ObjectId }
+  /** Champion (CR 702.72c): `id` exiled `card` as the direct result of its champion ability; `subtypes` the card's as it last was on the battlefield. */
+  | { type: "championed"; id: ObjectId; card: ObjectId; subtypes: string[]; allTypes: boolean }
   /** A face-down permanent was turned face up (CR 702.37e, 708.8). */
   | { type: "turnedFaceUp"; id: ObjectId; /** The X chosen for its morph or disguise cost (CR 702.37f, 702.168e). */ x?: number; /** Who turned it face up: the player taking the special action (CR 116.2b), or the controller of the effect that did. */ by?: PlayerId }
   /** It's the only creature declared as an attacker this combat (CR 506.5, exalted 702.83b). */
@@ -1768,6 +1770,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "echoPaid") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfEchoPaid");
+  } else if (ev.type === "championed") {
+    // Mistbind Clique: "When a Faerie is championed with ~": the champion still on the battlefield, the card a Faerie as
+    // it was exiled (CR 702.72c), that card the subject.
+    const o = s.objects[ev.id];
+    if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e, t) => e === "selfChampions" && (!t.championedSubtype || ev.allTypes || ev.subtypes.includes(t.championedSubtype)), undefined, undefined, s.objects[ev.card]);
   } else if (ev.type === "trained") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfTrains");
@@ -2039,6 +2046,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const first = (s.turnLog?.timesDealtDamage?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? 0) <= 1;
       add(o, controllerOf(s, o), (e, t) => (e === "selfIsDealtDamage" && ev.amount >= (t.minDamage ?? 0) && (!t.firstDealtEachTurn || first)) || (e === "selfIsDealtNoncombatDamage" && !ev.combat) || (e === "selfIsDealtCombatDamage" && !!ev.combat), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfIsDealtDamage", undefined, o, { amount: ev.amount });
+      // Donna Noble: "Whenever ~ or a creature it's paired with is dealt damage": its partner's too, even lethal damage
+      // (rulings); both dealt damage at once is two events, so it triggers twice (rulings).
+      const partner = pairedWith(s, o);
+      if (partner) add(partner, controllerOf(s, partner), (e, t) => e === "selfIsDealtDamage" && !!t.orPaired, undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
       // Arcbond: "Whenever that creature is dealt damage this turn, ...": a delayed trigger about it (CR 603.7c), it the subject.
       fromFloating((src, ctrl, triggers) => add(src, ctrl, (e) => e === "selfIsDealtDamage", triggers, undefined, o, undefined, undefined, undefined, { amount: ev.amount }), o);
       // "Whenever a Dragon you control is dealt damage" (Wrathful Red Dragon): that permanent is the subject.

@@ -291,6 +291,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Wall of Shards: a wall worth a few life for the opponents, while the total stays small.
     if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.giveLife) return [{ type: "chooseMay", player: pid, yes: (s.resolving?.scratch?.n ?? 0) * upkeepFx.giveLife <= 4 }];
+    // Sheltering Ancient: a cheap trampler worth a couple of counters on the opponents' creatures, not more.
+    if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.oppCreatureCounter) return [{ type: "chooseMay", player: pid, yes: (s.resolving?.scratch?.n ?? 0) <= 2 }];
     // Braid of Fire: adding the mana costs nothing, so keep it.
     if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.addMana) return [{ type: "chooseMay", player: pid, yes: true }];
     // Psychic Vortex: keep drawing while the library has plenty left and the hand isn't overfull.
@@ -4153,6 +4155,8 @@ function chooseCounterRemoval(s: GameState, pid: PlayerId, options: ObjectId[], 
 }
 
 function chooseDistribution(s: GameState, pid: PlayerId, options: ObjectId[], total: number, counter: CounterKind): Record<ObjectId, number> {
+  // Counters that help, onto opponents' creatures only (Sheltering Ancient): all on the weakest one.
+  if (!harmfulCounter(counter) && options.length && options.every((id) => controllerOf(s, obj(s, id)) !== pid)) return { [[...options].sort((a, b) => power(s, obj(s, a)) - power(s, obj(s, b)))[0]!]: total };
   const byWorth = [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
   if (harmfulCounter(counter)) return { [byWorth[byWorth.length - 1]!]: total };
   const parts: Record<ObjectId, number> = {};

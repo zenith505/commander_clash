@@ -615,6 +615,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^creature you controlled that dealt combat damage to a player this turn$/i.test(p)) return count({ kind: "yourCombatDamagers" });
   // Tymna the Weaver: "the number of opponents that were dealt combat damage this turn", those who've lost since too (rulings).
   if (each && /^opponents? (?:that|who) (?:were|was) dealt combat damage this turn$/i.test(p)) return count({ kind: "players", opponents: true, combatDamaged: true });
+  // Estinien Varlineau: "the number of your opponents who were dealt combat damage by ~ or a Dragon this turn".
+  const bySelfOr = each ? /^(?:your )?opponents (?:that|who) were dealt combat damage by ~ or an? ([A-Z][a-z]+) this turn$/.exec(p) : null;
+  if (bySelfOr && CREATURE_TYPES.has(bySelfOr[1]!)) return count({ kind: "players", opponents: true, combatDamagedBySelfOr: bySelfOr[1]! });
   if (each && /^opponents? (?:that|who) (?:were|was) dealt damage this turn$/i.test(p)) return count({ kind: "players", opponents: true, damaged: true });
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
   if (ctx && each && /^card returned to your hand this way$/.test(p)) return { count: { kind: "returnedToYourHand" } };

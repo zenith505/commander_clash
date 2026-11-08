@@ -25389,6 +25389,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4554ce06-4992-4689-8a40-558a1545b968",
+  "name": "Sheltering Ancient",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Creature — Treefolk",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Treefolk"
+  ],
+  "oracleText": "Trample\nCumulative upkeep—Put a +1/+1 counter on a creature an opponent controls. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Trample",
+   "Cumulative upkeep"
+  ],
+  "commanderLegal": "legal",
+  "set": "csp",
+  "releasedAt": "2006-07-21",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "711eea87-0fa3-46e0-a42b-fa5a86455f04",
   "name": "Shivan Dragon",
   "manaCost": "{4}{R}{R}",

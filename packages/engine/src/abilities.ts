@@ -903,6 +903,15 @@ export interface TargetSpec {
    * (rulings: it resolves even if that's no longer true).
    */
   comparedToYou?: { stat: "life" | "creatures" | "hand" | "creatureCardsInGraveyard"; by: number; fewer?: true };
+  /**
+   * For players: "target player who controls more creatures than they do and is their opponent" (Oath of Druids), "more
+   * lands" (Oath of Lieges), "has more life" (Oath of Mages), "more cards in hand" (Oath of Scholars), "whose graveyard has
+   * fewer creature cards in it than their graveyard does" (Oath of Ghouls): an opponent of `than` (the trigger's player,
+   * "eventPlayer" until the trigger knows that player) whose `stat` is greater than theirs (with `fewer`, smaller). Part of
+   * the targeting requirement, so checked again as it resolves (CR 608.2b; rulings: it doesn't resolve if that's no longer
+   * true).
+   */
+  outnumbers?: { stat: "life" | "creatures" | "lands" | "hand" | "creatureCardsInGraveyard"; fewer?: true; than: "eventPlayer" | PlayerId };
   /** For players: not the one a trigger is about ("choose another target player", The Lord of Pain); `notPlayer` once it's known. */
   notEventPlayer?: true;
   /**
@@ -4266,7 +4275,7 @@ export type Effect =
    * chooses X as it resolves (CR 107.1c, 608.2d), at most `max` ("where X is less than or equal to the amount of life you
    * gained", Well of Lost Dreams), then pays `pay` with that X; `effects` use it as X.
    */
-  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; /** The payment is ~'s cumulative upkeep (CR 702.24a), for mana spent "only to pay cumulative upkeep costs". */ cumulativeUpkeep?: true; /** The payment is ~'s echo cost (CR 702.30a): Thick-Skinned Goblin lets {0} be paid instead. */ echo?: true; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G"; /** "You may pay any amount of life" (Necrodominance): X life, up to the life the player could pay (CR 119.4). */ life?: true; /** "You may pay any amount of {E}" (Galvanic Discharge): X energy, up to the energy the player has (CR 107.14). */ energy?: true; /** "You may pay one or more {E}. If you do" (Localized Destruction): paying none is not paying. */ atLeastOne?: true; /** "You may pay {1}{W} any number of times" (Intrepid Adversary): `pay` X times, X chosen first (none is not paying), at most as many times as the player could pay. */ times?: true }; /** "Pay {E}{E}. If you can't, ..." (Greenbelt Rampager): energy paid whenever it can be, with no choice (rulings). */ must?: true; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /** "Unless you pay {1} for each card in your hand" (Megatherium): `pay` that many times, counted as it resolves. */ payTimes?: Amount; /** "Unless you pay its mana cost" (Pendrell Flux): the source's mana cost as it resolves, X as 0 (unpayable with none, CR 118.6). */ payManaCost?: true; /**
+  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; /** Learn's "you may discard a card" (CR 701.48a): a Retriever Phoenix in the player's graveyard may replace the whole learn first (CompiledCard.returnInsteadOfLearn). */ learn?: true; /** The payment is ~'s cumulative upkeep (CR 702.24a), for mana spent "only to pay cumulative upkeep costs". */ cumulativeUpkeep?: true; /** The payment is ~'s echo cost (CR 702.30a): Thick-Skinned Goblin lets {0} be paid instead. */ echo?: true; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G"; /** "You may pay any amount of life" (Necrodominance): X life, up to the life the player could pay (CR 119.4). */ life?: true; /** "You may pay any amount of {E}" (Galvanic Discharge): X energy, up to the energy the player has (CR 107.14). */ energy?: true; /** "You may pay one or more {E}. If you do" (Localized Destruction): paying none is not paying. */ atLeastOne?: true; /** "You may pay {1}{W} any number of times" (Intrepid Adversary): `pay` X times, X chosen first (none is not paying), at most as many times as the player could pay. */ times?: true }; /** "Pay {E}{E}. If you can't, ..." (Greenbelt Rampager): energy paid whenever it can be, with no choice (rulings). */ must?: true; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /** "Unless you pay {1} for each card in your hand" (Megatherium): `pay` that many times, counted as it resolves. */ payTimes?: Amount; /** "Unless you pay its mana cost" (Pendrell Flux): the source's mana cost as it resolves, X as 0 (unpayable with none, CR 118.6). */ payManaCost?: true; /**
    * "For each opponent, you may put up to one target creature card from that player's graveyard onto the battlefield"
    * (Sepulchral Primordial): asked about each target in turn, then done at once to the ones chosen (rulings: they enter
    * simultaneously). The targets turned down aren't affected.
@@ -6938,6 +6947,11 @@ export interface CompiledCard {
   ventureOncePerTurn?: true;
   /** Mossbridge Troll: "If ~ would be destroyed, regenerate it" (CR 614.1a, 701.19a), every time. */
   regeneratesInsteadOfDestroyed?: true;
+  /**
+   * Retriever Phoenix: "As long as ~ is in your graveyard, if you would learn, you may instead return ~ to the battlefield"
+   * (CR 614.1a): asked as its owner learns (Effect "may" `learn`), only with it in their graveyard then (rulings).
+   */
+  returnInsteadOfLearn?: true;
   /** Possessed Portal: "If a player would draw a card, that player skips that draw instead" (CR 614.1b). */
   skipsAllDraws?: true;
   /** Crackling Emergence: "If enchanted land would be destroyed, instead sacrifice ~ and that land gains indestructible until end of turn" (CR 614.1a). */

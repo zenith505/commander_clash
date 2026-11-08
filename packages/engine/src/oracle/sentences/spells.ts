@@ -451,7 +451,7 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // one is optional) and nothing else outside the game, so only the first part can happen.
   if (/^Learn$/i.test(s))
     return [
-      { type: "may", effects: [{ type: "discard", who: { ref: "you" }, n: 1, random: false }], text: "discard a card" },
+      { type: "may", effects: [{ type: "discard", who: { ref: "you" }, n: 1, random: false }], text: "discard a card", learn: true },
       { type: "if", cond: { kind: "youDid" }, effects: [{ type: "draw", who: { ref: "you" }, n: 1 }] },
     ];
   // Empower Jace (CR 701.71a)

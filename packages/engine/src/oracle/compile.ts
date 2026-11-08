@@ -3124,6 +3124,12 @@ export function compile(d: CardDef): CompiledCard {
       out.stealsDraws = true;
       continue;
     }
+    // Retriever Phoenix: "As long as ~ is in your graveyard, if you would learn, you may instead return ~ to the
+    // battlefield": a replacement effect of the card in its owner's graveyard (CR 614.1a, 113.6), asked as they learn.
+    if (line === "As long as ~ is in your graveyard, if you would learn, you may instead return ~ to the battlefield.") {
+      out.returnInsteadOfLearn = true;
+      continue;
+    }
     // Possessed Portal: "If a player would draw a card, that player skips that draw instead": a replacement effect (CR
     // 614.1b) on every draw, the first in a draw step too, which the drawing player orders with any other (CR 616.1).
     if (line === "If a player would draw a card, that player skips that draw instead.") {

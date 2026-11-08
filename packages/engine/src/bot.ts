@@ -368,7 +368,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Stromgald Spy: a revealed hand tells a bot nothing it uses; the combat damage is worth more.
     if (pend.kind === "chooseMay" && mayFx.some((x) => x.type === "revealHandWhile")) return [{ type: "chooseMay", player: pid, yes: false }];
-    if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? (revealedMay(s, pend.card) ?? millExplored(s, pid, pend.card)) : wantsMay(s, pid) }];
+    // Retriever Phoenix back on the battlefield rather than learning (discarding a card to draw one): always.
+    if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.insteadOfLearn ? true : pend.card ? (revealedMay(s, pend.card) ?? millExplored(s, pid, pend.card)) : wantsMay(s, pid) }];
     // Perplex: discard the whole hand to keep the spell only when that hand is one card or none.
     // Grip of Amnesia: keep the spell unless the graveyard holds more than a few cards (they may be worth more).
     if (pend.kind === "payUnless" && pend.exileGraveyard) return [{ type: "payUnless", player: pid, pay: player(s, pid).graveyard.length <= 3 }];
@@ -764,6 +765,19 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         return (harmful ? 100 : 0) + total - (lastLoyalty ? 1000 : 0);
       };
       return [{ type: "pickPermanents", player: pid, ids: [...pend.options].sort((a, b) => score(b) - score(a)).slice(0, pend.count) }];
+    }
+    // Flaming Gambit: its damage to one of our creatures instead of us or our planeswalker: one that survives it, or the
+    // least valuable when the damage would kill us (or the planeswalker); otherwise none.
+    const redirect = pend.kind === "pickPermanents" && pend.action === "choose" && pend.min === 0 && pend.count === 1 ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
+    if (pend.kind === "pickPermanents" && redirect?.type === "if" && redirect.cond.kind === "createdNone" && redirect.effects[0]?.type === "damage" && redirect.otherwise?.[0]?.type === "damage") {
+      const r = s.resolving!;
+      const n = evalAmount(s, redirect.effects[0].amount, { controller: r.item.controller, ...(r.item.sourceId ? { sourceId: r.item.sourceId } : {}), x: r.item.x ?? 0 });
+      const ours = pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid).sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)));
+      const lasting = ours.filter((id) => toughness(s, obj(s, id)) - (obj(s, id).damage ?? 0) > n);
+      const t = r.item.targets?.[0];
+      const pw = t?.kind === "object" ? s.objects[t.id] : undefined;
+      const kills = pw ? (pw.counters.loyalty ?? 0) <= n : player(s, pid).life <= n;
+      return [{ type: "pickPermanents", player: pid, ids: n <= 0 ? [] : lasting.length ? [lasting[0]!] : kills && ours.length ? [ours[0]!] : [] }];
     }
     // Krenko's Buzzcrusher: for each player, up to one of their permanents to destroy: an opponent's best one, none of ours.
     const destroying = pend.kind === "pickPermanents" && pend.action === "choose" && pend.min === 0 && pend.count === 1 ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
@@ -4362,6 +4376,13 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   }
   // Obeka, Brute Chronologist: "the player whose turn it is may end the turn": bots don't end their own turn early.
   if (r && e?.type === "eachMay" && e.effects.some((x) => x.type === "endTurn")) return false;
+  // The Oaths: what the first player may do is theirs (TargetSpec.outnumbers): Oath of Scholars' new hand only for a small
+  // one, Oath of Druids' reveal only with a creature card left to find (else it mills the whole library); the rest always.
+  if (r && e?.type === "eachMay" && e.each && r.body.targets[0]?.outnumbers) {
+    if (e.effects.some((x) => x.type === "discard" && x.hand)) return player(s, pid).hand.length < 3;
+    if (e.effects.some((x) => x.type === "revealUntil")) return player(s, pid).library.some((id) => isType(defOf(s, obj(s, id)), "Creature"));
+    return true;
+  }
   // Ley Line, Death Match: "that player may ..." to the target they chose for it (TargetSpec.chosenBy): only when it's
   // good for us, a counter on ours or -3/-3 on an opponent's.
   if (r && e?.type === "eachMay" && r.body.targets.length === 1 && r.body.targets[0]!.chosenBy) {

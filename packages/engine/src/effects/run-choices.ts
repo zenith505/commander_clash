@@ -41,6 +41,29 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         return;
       }
       if (sc.may === undefined && source?.triggeredThisTurn?.includes(key)) sc.may = false; // done already this turn (CR 603.2h)
+      // Learn with a Retriever Phoenix in the learner's graveyard as they're told to learn (rulings): "you may instead return
+      // ~ to the battlefield" replaces the whole learn (CR 614.1a, 616.1), asked first; each one there is a choice.
+      if (e.learn && sc.may === undefined) {
+        const li = (sc.learnInstead ??= { asked: [] });
+        const last = li.asked.at(-1);
+        if (li.yes && last !== undefined) {
+          li.yes = undefined;
+          const o = s.objects[last];
+          if (o?.zone === "graveyard" && o.owner === ctx.controller) {
+            moveObject(s, last, "battlefield", { controller: ctx.controller });
+            log(s, `${player(s, ctx.controller).name} returns ${defOf(s, o).name} to the battlefield instead of learning.`);
+          }
+          r.did = false;
+          return;
+        }
+        const phoenix = player(s, ctx.controller).graveyard.find((id) => !li.asked.includes(id) && !!abilitiesOf(s, obj(s, id)).returnInsteadOfLearn);
+        if (phoenix !== undefined) {
+          li.asked.push(phoenix);
+          const name = defOf(s, obj(s, phoenix)).name;
+          s.pending = { kind: "chooseMay", player: ctx.controller, prompt: `return ${name} to the battlefield instead of learning`, source: name, card: phoenix, insteadOfLearn: phoenix };
+          return "paused";
+        }
+      }
       // "You may pay any amount of life" (Necrodominance): the amount first, at most their life total (0 when it's 0 or
       // less, or when they can't lose life, CR 119.4, 119.8); paying 0 is paying (CR 107.1b). Paid at once.
       if (e.payX?.life && sc.may === undefined) {

@@ -250,6 +250,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(under[2]!, ctx);
     return who ? [{ ...sr, dest: { ...sr.dest, under: who } }] : null;
   }
+  // Sovereigns of Lost Alara: "search your library for an Aura card that could enchant that creature, put it onto the
+  // battlefield attached to that creature, then shuffle": the trigger's creature as it is now, still on the battlefield as
+  // that object; only Auras that could enchant it (its enchant ability, protection and the like), not targeted; with it
+  // gone, nothing can be found but the library is still shuffled (rulings, CR 303.4f-g).
+  if (ctx.subject && /^[Ss]earch your library for an Aura card that could enchant that creature, put it onto the battlefield attached to that creature, then shuffle$/.test(s))
+    return [{ type: "search", filter: { kind: "card", types: [], notTypes: [], notColors: [], subtypes: ["Aura"], text: "Aura card that could enchant that creature" }, n: 1, upTo: false, reveal: false, dest: { zone: "battlefield", attachTo: { ref: "subject" } }, couldEnchantDest: true }];
   // Bitterheart Witch: "search your library for a Curse card, put it onto the battlefield attached to target player, then
   // shuffle": an Aura put onto the battlefield enchanting that player, if it could legally enchant them (rulings, CR
   // 303.4f-g), else it stays in the library.

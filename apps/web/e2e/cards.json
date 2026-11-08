@@ -2062,6 +2062,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "35b3ae1c-4116-49b0-89a9-7332fe9bbff0",
+  "name": "Axebane Ferox",
+  "manaCost": "{2}{G}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Beast",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Beast"
+  ],
+  "oracleText": "Deathtouch, haste\nWard—Collect evidence 4. (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player exiles cards with total mana value 4 or greater from their graveyard.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Collect evidence",
+   "Haste",
+   "Ward",
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ad1712d8-809f-410c-8b91-ffe6fb8a69a1",
   "name": "Azorius Guildgate",
   "manaCost": "",
@@ -7687,6 +7722,32 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "01bc8bfa-2e46-4324-a848-cc68bc9330d0",
+  "name": "Doomsday Confluence",
+  "manaCost": "{X}{X}{B}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose X. You may choose the same mode more than once.\n• Each player sacrifices a nonartifact creature of their choice.\n• Create a 3/3 black Dalek artifact creature token with menace.\n• Each opponent discards a card.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

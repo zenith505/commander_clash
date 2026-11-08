@@ -1,7 +1,7 @@
 # Roadmap
 
-30,532 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,713 of
+30,540 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,716 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2363,6 +2363,28 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 308 took cards back off the "Out after round N" lists, most played first: "For each opponent, choose up to one
+   target creature that player controls. ~ deals X damage to each of those creatures. You create a Mutagen token for
+   each creature dealt damage this way" (Shellshock: Count damagedThisWayCount, none with X 0); "Ward—Collect evidence 4"
+   (Axebane Ferox: the payer picks the cards after saying yes, and can't say yes without total mana value 4 in their
+   graveyard, rulings, CR 702.21a, 701.59a; a browser test); "For each opponent, create two 3/3 ... tokens with flying
+   that attack that opponent this turn if able" (Furygale Flocking: the player, not a planeswalker, rulings; the tokens a
+   doubler adds too); "For each player, choose a creature card in that player's graveyard. Put those cards onto the
+   battlefield under your control. They're black Zombies in addition to their other colors and types and they gain
+   decayed" (Ghouls' Night Out, CR 614.12); "Choose X. You may choose the same mode more than once" (Doomsday Confluence:
+   X is how many modes are chosen as it's cast, CR 601.2b, 700.2d; the mode menu sets X; a browser test); "Choose target
+   player. They may discard up to X cards. Then they draw a card for each card discarded this way" (Mishra's Command);
+   "Whenever one or more of your opponents are attacked" (Party Dude's level 3: whoever attacks them, the same event as
+   Jolene's); "Discard your hand, then draw a card for each creature you control" and "~ deals 4 damage to each creature
+   except for tokens you control" (Ajani Unrelenting). +8, 30,531 of 31,936 with B145 and B146.
+   Out after round 308 (looked at, not done): Pulmonic Sliver (a granted "If ~ would be put into a graveyard, you may put
+   it on top of its owner's library instead": no optional self-replacement of that kind yet); Grave Sifter (each player's
+   own creature type, then any number of cards of it); Eumidian Wastewaker ("you and defending player each discard a card
+   or sacrifice a permanent", mandatory, then the land cards put into graveyards this way); Detective's Phoenix (bestow
+   with collect evidence, cast from the graveyard with bestow); Hand of Vecna ("equipped creature or a creature you
+   control named Vecna", chosen as it resolves, and a life-per-card equip cost); Saruman of Many Colors (its ward needs a
+   discard of a kind, but its second-spell trigger is the harder part); Infernal Offering (both modes choose an
+   opponent first).
    Round 307 took cards back off the "Out after round N" lists, most played first: "−6: Choose left or right. Each player
    gains control of all nonland permanents other than ~ controlled by the next player in the chosen direction"
    (Aminatou, the Fateshifter: who controls what is seen once, then all the control changes at once and for good, layer
@@ -6776,8 +6798,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   damage to target creature that player controls"). Briarbridge Patrol ("Whenever ~ deals damage to one or more
   creatures, investigate"): once for each event (rulings). Greatbow Doyen and Ohabi Caleria ("Whenever an Archer you
   control deals damage to a creature"): once for each creature each Archer permanent dealt damage, combat or not
-  (rulings); Doyen's damage dealt by that Archer to the creature's controller as the ability resolves. +9 (30,532 of
-  31,936 with B145-B146 and rounds 305-307).
+  (rulings); Doyen's damage dealt by that Archer to the creature's controller as the ability resolves. +9 (30,540 of
+  31,936 with B145-B146 and rounds 305-308).
 - Out after round B147 (looked at, not done): Ogre Enforcer ("can't be destroyed by lethal damage unless lethal damage
   dealt by a single source is marked on it": damage marked per source, which removing damage has to clear too), Sea Troll
   ("if ~ blocked or was blocked by a blue creature this turn": the colors of its blocks this turn, as they were),

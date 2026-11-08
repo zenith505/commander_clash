@@ -1316,6 +1316,14 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         event: "becomesTargetOfOpponent",
         body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", blight: n }, ward: true }], text: `Ward—Blight ${n}: counter that spell or ability unless its controller blights ${n}.` },
       });
+    } else if ((m = /^ward—collect evidence (\d+)\.?$/i.exec(p))) {
+      // "Ward—Collect evidence 4" (Axebane Ferox): counter it unless that player exiles cards with total mana value 4 or
+      // more from their graveyard (CR 702.21a, 701.59a), which they can't choose to do without enough (rulings).
+      const n = Number(m[1]);
+      out.triggers.push({
+        event: "becomesTargetOfOpponent",
+        body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", collectEvidence: n }, ward: true }], text: `Ward—Collect evidence ${n}: counter that spell or ability unless its controller collects evidence ${n}.` },
+      });
     } else if ((m = /^ward—waterbend \{(\d+)\}\.?$/i.exec(p))) {
       // "Ward—Waterbend {4}" (The Unagi of Kyoshi Island): counter it unless that player pays {4}, tapping their
       // artifacts and creatures for {1} each of it if they like (CR 702.21a, 701.67a).

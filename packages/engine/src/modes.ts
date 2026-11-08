@@ -8,6 +8,9 @@
 import type { AbilityBody, AltCostKind, SpellCondition, TargetChoice, TargetSpec } from "./abilities";
 import type { PlayerId } from "./types";
 
+/** "Choose X" (Doomsday Confluence, AbilityBody.modal.xCount): no more modes than this, whatever X is. */
+export const X_MODES_MAX = 20;
+
 /** Why `modes` isn't a valid choice for this modal body (ignoring targets), or null. `both`: see modeRange. */
 export function modeCountProblem(body: AbilityBody, modes: number[], both = false): string | null {
   const m = body.modal;

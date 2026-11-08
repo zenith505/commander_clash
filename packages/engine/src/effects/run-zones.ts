@@ -461,7 +461,8 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
   }
   const under = (pid: PlayerId) => (e.youChoose || e.underYours ? ctx.controller : pid);
   for (const { id, pid } of moves) log(s, e.youChoose || e.underYours ? `${player(s, ctx.controller).name} puts ${defOf(s, obj(s, id)).name} from ${pid === ctx.controller || e.fromYours ? "their" : `${player(s, pid).name}'s`} graveyard onto the battlefield.` : `${player(s, pid).name} returns ${defOf(s, obj(s, id)).name} from their graveyard to the battlefield.`);
-  enterTogether(s, () => moves.forEach(({ id, pid }) => moveObject(s, id, "battlefield", { controller: under(pid), ...(e.tapped ? { tapped: true } : {}) })));
+  // Ghouls' Night Out: "They're black Zombies ... and they gain decayed", each as it enters (CR 614.12) and for good.
+  enterTogether(s, () => moves.forEach(({ id, pid }) => moveObject(s, id, "battlefield", { controller: under(pid), ...(e.tapped ? { tapped: true } : {}), ...(e.alsoMods ? { entersAs: e.alsoMods, entersAsBy: { controller: ctx.controller, source: src } } : {}) })));
 }
 
 /**
@@ -3237,7 +3238,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // Realmbreaker: under your control; "it" afterwards is the permanent it became (CR 400.7).
           const me = player(s, ctx.controller);
           if (ids.length) log(s, `${me.name} puts ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from ${p.name}'s graveyard onto the battlefield under their control${e.tapped ? ", tapped" : ""}.`);
-          enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: me.id, ...(e.tapped ? { tapped: true } : {}), ...hosts.get(id) })));
+          enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: me.id, ...(e.tapped ? { tapped: true } : {}), ...(e.alsoMods ? { entersAs: e.alsoMods, entersAsBy: { controller: ctx.controller, source: src } } : {}), ...hosts.get(id) })));
           if (s.resolving) s.resolving.created = ids.filter((id) => obj(s, id).zone === "battlefield");
           return;
         }

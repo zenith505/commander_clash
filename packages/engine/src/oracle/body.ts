@@ -14,6 +14,7 @@ import { parseManaSpend, parseManaTrigger } from "./mana-abilities";
 import { parseTrigger } from "./triggers";
 import { parseToken } from "./tokens";
 import { parsePunisherOptions } from "./sentences/basics";
+import { X_MODES_MAX } from "../modes";
 
 export interface Ctx {
   targets: TargetSpec[];
@@ -1494,6 +1495,13 @@ function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell
     if (to?.ref !== "target" || to.n || !draw) return null;
     return { effects: [{ type: "removeAnyCounters", what: { ref: "self" }, n: 0, upTo: true, moveTo: to, atLeastOne: true }, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "countersRemovedThisWay" } }, min: 1 }, effects: draw }], skip: 1 };
   }
+  // Mishra's Command: "Choose target player. They may discard up to X cards. Then they draw a card for each card discarded
+  // this way.": that player chooses none to X as it resolves (CR 107.1c), then draws as many as they discarded.
+  if (s === "Choose target player" && /^They may discard up to X cards$/.test(sentences[si + 1] ?? "") && /^Then they draw a card for each card discarded this way\.?$/.test(sentences[si + 2] ?? "") && (spell || ctx.activated)) {
+    const who = parsePlayer("target player", ctx);
+    if (who?.ref !== "target") return null;
+    return { effects: [{ type: "discard", who, n: { count: { kind: "x" } }, upTo: true }, { type: "draw", who, n: { count: { kind: "discardedThisWay", who } } }], skip: 2 };
+  }
   // Aminatou, the Fateshifter (Effect rotateControl).
   if (s === "Choose left or right" && /^Each player gains control of all nonland permanents other than ~ controlled by the next player in the chosen direction\.?$/.test(sentences[si + 1] ?? "")) return { effects: [{ type: "rotateControl" }], skip: 1 };
   // Power Sink: "Counter target spell unless its controller pays {X}. If that player doesn't, they tap all lands with mana
@@ -1678,6 +1686,15 @@ function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell
   if (ctx.auraCard && /^[Cc]hoose a creature at random ~ can enchant$/.test(s) && sentences[si + 1] === "Return ~ to the battlefield attached to that creature" && sentences.length === si + 2)
     return { effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard", moved: true }, attachRandom: true }], skip: 1 };
   return null;
+}
+
+/** Ghouls' Night Out: "They're black Zombies in addition to their other colors and types and they gain decayed". Undefined
+ * when the sentence isn't that form; null when it is but can't be read. */
+function decayedZombieMods(sentence: string | undefined): Modification[] | null | undefined {
+  const m = /^They're (white|blue|black|red|green) ([A-Z][a-z]+)s in addition to their other colors and types and they gain decayed$/.exec(sentence?.replace(/\.$/, "") ?? "");
+  if (!m) return undefined;
+  const mods = CREATURE_TYPES.has(m[2]!) ? parseBecomes(`a ${m[1]} ${m[2]} in addition to its other colors and types`) : null;
+  return mods ? [...mods, { kind: "addKeywords", keywords: ["Decayed"] }] : null;
 }
 
 function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfAttacking?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
@@ -5542,9 +5559,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // tapped, then shuffle." (Scapeshift): the same count.
     // Flame Sweep: "~ deals 2 damage to each creature except for creatures you control with flying": each creature an
     // opponent controls or without flying.
-    const sweep = /^~ deals (\d+) damage to each creature except for creatures you control with flying$/.exec(s);
+    // Ajani Unrelenting: "~ deals 4 damage to each creature except for tokens you control": each creature an opponent
+    // controls or that isn't a token.
+    const sweep = /^~ deals (\d+) damage to each creature except for (creatures you control with flying|tokens you control)$/.exec(s);
     if (sweep) {
-      const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], anyOf: [{ kind: "object", controller: "opponent", text: "an opponent controls" }, { kind: "object", notKeywords: ["Flying"], text: "without flying" }], text: "creature except for creatures you control with flying" };
+      const other: TargetSpec = sweep[2] === "tokens you control" ? { kind: "object", token: false, text: "nontoken" } : { kind: "object", notKeywords: ["Flying"], text: "without flying" };
+      const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], anyOf: [{ kind: "object", controller: "opponent", text: "an opponent controls" }, other], text: `creature except for ${sweep[2]}` };
       effects.push({ type: "damage", amount: Number(sweep[1]), to: { ref: "each", filter } });
       continue;
     }
@@ -9455,8 +9475,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (eachYard && /^Put those cards onto the battlefield under your control$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
       const filter = parseSearchFilter(eachYard[1]!);
       if (!filter?.types?.length || filter.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
-      effects.push({ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachPlayer" }, youChoose: true });
-      si++;
+      // Ghouls' Night Out: "They're black Zombies in addition to their other colors and types and they gain decayed": each
+      // as it enters (CR 614.12), from then on; decayed even if it isn't a creature then (rulings).
+      const ghoulMods = decayedZombieMods(sentences[si + 2]);
+      if (ghoulMods === null) return null;
+      effects.push({ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachPlayer" }, youChoose: true, ...(ghoulMods ? { alsoMods: ghoulMods } : {}) });
+      si += ghoulMods ? 2 : 1;
       continue;
     }
     // Diabolic Vision: "Look at the top five cards of your library. Put one of them into your hand and the rest on top of
@@ -19311,7 +19335,7 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
 
 // "Choose one —" and its bulleted modes; "choose one that hasn't been chosen [this turn] —" (GameObject.modesChosen) and
 // "choose one at random —". Spree's "+ {cost} —" modes, escalate, pawprints and repeated modes are read in compile.ts.
-const MODAL = /^[Cc]hoose (one|two|three|four|five|one or both|one or more|up to one|up to two|up to four|any number)( that hasn't been chosen(?: this turn)?| at random)? —\s*((?:•[^•]+)+)$/;
+const MODAL = /^[Cc]hoose (one|two|three|four|five|one or both|one or more|up to one|up to two|up to four|any number|X)( that hasn't been chosen(?: this turn)?| at random)? —\s*((?:•[^•]+)+)$/;
 
 /** How many modes each "Choose ..." allows (CR 700.2), given how many there are. */
 const MODE_COUNTS: Record<string, (n: number) => [number, number]> = {
@@ -19330,6 +19354,9 @@ const MODE_COUNTS: Record<string, (n: number) => [number, number]> = {
   "up to four": () => [0, 4],
   // "Choose any number —" (Rankle and Torbran): none, some or all, in the order printed (rulings).
   "any number": (n) => [0, n],
+  // Doomsday Confluence: "Choose X. You may choose the same mode more than once." (compile.ts): as many as X, checked as
+  // it's cast (AbilityBody.modal.xCount).
+  X: () => [0, X_MODES_MAX],
 };
 
 function parseModal(count: string, bullets: string, text: string, opts: Parameters<typeof parseBody>[1] = {}): AbilityBody | null {
@@ -19345,7 +19372,7 @@ function parseModal(count: string, bullets: string, text: string, opts: Paramete
   // Only a triggered ability's, whose modes may all be left out (CR 700.2b, 603.3c).
   if (count === "any number" && (opts.spell || opts.activated)) return null;
   const [min, max] = MODE_COUNTS[count]!(modes.length);
-  if (modes.length < 2 || (max > modes.length && count !== "up to four")) return null;
+  if (modes.length < 2 || (max > modes.length && count !== "up to four" && count !== "X")) return null;
   return { targets: [], effects: [], text, modal: { min, max, modes } };
 }
 

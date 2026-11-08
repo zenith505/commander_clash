@@ -1,7 +1,7 @@
 # Roadmap
 
-30,565 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,724 of
+30,577 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,728 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2363,6 +2363,28 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 310 took cards back off the "Out after round N" lists, most played first: "create a 0/0 green Ooze creature token
+   with trample. The token enters with X +1/+1 counters on it, where X is the number of other creatures you control"
+   (Printlifter Ooze: it enters with them, CR 614.1c, X counted as it's created, so every creature you control then);
+   "target creature an opponent controls attacks during its controller's next combat phase if able" (Trench Behemoth,
+   Sizzling Soloist: an attack requirement only in combats of the turns of the player controlling it as it resolves, not
+   one going on then, over as that combat phase ends, CR 508.1d, 500.5a; duration "controllersNextCombat"); "Put target
+   creature card from a graveyard onto the battlefield under your control with a corpse counter on it. You take the
+   initiative. If that creature would leave the battlefield, exile it instead ..." (From the Catacombs: the replacement is
+   about the creature, not the counter, rulings); "sacrifice ~ unless you pay {10}. This cost is reduced by {2} for each
+   basic land type among lands you control" (Draco: {1} that many times, counted as it resolves); "support X" on an
+   enters trigger (Blitzball Stadium: X of its spell, CR 107.3m) and "draw a card for each kind of counter on it" (Count
+   counters `kinds`); "put a +1/+1 counter on target creature you control and a plan counter on ~" (Claim the Kingdom);
+   "When ~ dies, return it to the battlefield face down under your control" (Ashcloud Phoenix: its own morph turns it
+   face up, rulings); "search target opponent's library for up to three creature cards and put them into their
+   graveyard" (Life's Finale, Quiet Speculation's cards with flashback: their owner's graveyard, CR 400.3); "counter that
+   spell and put a depletion counter on ~. If there are three or more depletion counters on ~, sacrifice it" (Decree of
+   Silence); "tap two untapped creatures and/or Treasures you control" (Rent Is Due: anyOf a creature or a Treasure).
+   +12, 30,577 of 31,936 with round 309, B148 and B149.
+   Out after round 310 (looked at, not done): Gift of Doom ("As ~ is turned face up, you may attach it to a creature": a
+   choice inside the special action, CR 702.37e, with no pause there yet, and a morph cost that sacrifices another
+   creature); Hofri Ghostforge and Timothar, Baron of Bats (a token's granted "return the exiled card" linked to the card
+   the resolution exiled, not to an exile ability of the token's own, CR 607.2a).
    Round 309 took cards back off the "Out after round N" lists, most played first: "You may have ~ enter as a copy of any
    creature on the battlefield, except it's a Wall in addition to its other types and has defender. When you do, tap the
    copied creature and it doesn't untap during its controller's untap step for as long as you control ~" (Wall of Stolen

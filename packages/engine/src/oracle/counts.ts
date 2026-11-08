@@ -1045,6 +1045,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const of = whoseObject(m[1] === "~" ? "~'s" : m[1] === "it" ? "its" : `${m[1]}'s`, ctx);
     return of && count({ kind: "counters", counter: ANY_COUNTER, of });
   }
+  // Blitzball Stadium's granted "draw a card for each kind of counter on it": the kinds it has, each once (CR 122.1).
+  if (each && (m = /^kind of counter on (~|it)$/.exec(p))) {
+    const of = whoseObject(m[1] === "~" ? "~'s" : "its", ctx);
+    return of && count({ kind: "counters", counter: ANY_COUNTER, of, kinds: true });
+  }
   // Flesh // Blood: "where X is the power of the card you exiled": the one card targeted, as it last existed in the
   // graveyard (rulings), as Lobelia's "the exiled card's power".
   if ((m = /^the (power|toughness) of the card you exiled$/.exec(p)) && ctx) {

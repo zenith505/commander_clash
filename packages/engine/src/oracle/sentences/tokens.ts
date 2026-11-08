@@ -31,6 +31,14 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return (mod?.what === "tokens" && mod.who === "you" && (mod.op === "double" || mod.op === "triple")) || counters ? [{ type: "countModThisTurn", mod: mod! }] : null;
   }
 
+  // Printlifter Ooze (body.ts joins its two sentences): "create a 0/0 green Ooze creature token with trample that enters
+  // with X +1/+1 counters on it": it enters with them (CR 614.1c, 122.6), X counted as it's created.
+  if ((m = /^([Cc]reate an? 0\/0 [a-z]+ [A-Z][a-z]+ creature token(?: with [a-z]+)?) that enters with X \+1\/\+1 counters on it$/.exec(s))) {
+    const fx = parseSentence(m[1]!, ctx);
+    const tok = fx?.length === 1 ? fx[0] : undefined;
+    if (tok?.type !== "createToken" || tok.counters || tok.pt || tok.n !== 1) return null;
+    return [{ ...tok, counters: { counter: "+1/+1", n: X } }];
+  }
   // Volrath's Laboratory, Riptide Replicator, Sarpadian Empires, Vol. VII: "Create a 2/2 creature token of the chosen color
   // and type": the color and the creature type chosen as the source entered (CR 607.2a), as the token is created.
   if ((m = /^Create an? (\d+|X)\/(\d+|X) creature token of the chosen color and type$/.exec(s)) && (m[1] === "X") === (m[2] === "X")) {

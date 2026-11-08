@@ -2020,6 +2020,17 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // resolves (CR 611.2c), in each combat this turn (CR 508.1d).
   if (/^Creatures the active player controls attack this turn if able$/.test(s))
     return [{ type: "continuous", what: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creatures the active player controls" }, of: { ref: "activePlayer" } }, mods: [{ kind: "attacksIfAble" }], duration: "endOfTurn" }];
+  // Ashcloud Phoenix: "When ~ dies, return it to the battlefield face down under your control": the card, if it's still
+  // in the graveyard it went to (CR 400.7, rulings), a 2/2 face-down creature (CR 708.2) that its own morph can turn face
+  // up (CR 702.37e, rulings).
+  if (/^[Rr]eturn it to the battlefield face down under your control$/.test(s) && ctx.selfCard && !ctx.spell) return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, faceDown: "plain" }];
+  // "Target creature an opponent controls attacks during its controller's next combat phase if able" (Trench Behemoth,
+  // Sizzling Soloist): an attack requirement (CR 508.1d) in the next combat phase of the player controlling it as this
+  // resolves, until that combat phase ends (CR 500.5a); it can attack whom its controller chooses (rulings).
+  if ((m = /^(target creature an opponent controls|that creature) attacks during its controller's next combat phase if able$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what ? [{ type: "continuous", what, mods: [{ kind: "attacksIfAble", turnOf: "controller" }], duration: "controllersNextCombat" }] : null;
+  }
   // "Target creature attacks this turn if able": in each combat this turn (CR 508.1d).
   if ((m = /^(.+?) attacks? (?:each combat )?this turn if able$/i.exec(s)) && !/ and$/.test(m[1]!)) {
     const what = parseObject(m[1]!, ctx);

@@ -2209,6 +2209,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Archangel Elspeth: "It becomes an Angel in addition to its other types and gains flying." Two changes, both with no
   // duration (rulings).
   text = text.replace(/\bIt becomes (an? [A-Z][a-z]+) in addition to its other types and gains ([a-z]+)\./g, "It becomes $1 in addition to its other types. It gains $2.");
+  // Round 310's rewrites (Printlifter Ooze, From the Catacombs, Draco, Blitzball Stadium, Claim the Kingdom, Quiet
+  // Speculation, Decree of Silence), in a helper: this function is at TypeScript's control-flow limit.
+  text = round310Rewrites(text);
   // Tend the Pests: '... with "When this token dies, you gain 1 life," where X is ...': the comma belongs before "where".
   text = text.replace(/,"( where X is )/g, '",$1');
   // Samwise the Stouthearted: "choose up to one target permanent card in your graveyard that was put there from the
@@ -18904,9 +18907,11 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   // "Untap ~ and put a +1/+1 counter on it" (Grimgrin, Corpse-Born): "it" is ~.
   s = s.replace(/^((?:Untap|Tap) ~ and put .+ counters? on) it$/, "$1 ~");
   // Support N (CR 701.41a): "other" target creatures on a permanent, any on an instant or sorcery.
-  // Support X would need a variable number of targets: not supported.
-  const support = /^[Ss]upport (\d+)$/.exec(s);
-  if (support) s = `Put a +1/+1 counter on each of up to ${num(support[1]!) === 1 ? "one" : support[1]} ${ctx.spell ? "" : "other "}target creature${support[1] === "1" ? "" : "s"}`;
+  // "When ~ enters, support X" (Blitzball Stadium): up to X targets, X being the one its spell was cast with (CR 107.3m),
+  // known as the trigger's targets are chosen.
+  const support = /^[Ss]upport (\d+|X)$/.exec(s);
+  if (support?.[1] === "X" && !ctx.ownX) return null;
+  if (support) s = `Put a +1/+1 counter on each of up to ${support[1] === "X" ? "X" : num(support[1]!) === 1 ? "one" : support[1]} ${ctx.spell ? "" : "other "}target creature${support[1] === "1" ? "" : "s"}`;
   // "Target player reveals their hand, you choose a nonland card from it, then that player discards that card" (River's
   // Grasp): the three-sentence hand disruption in one (see parseBody), another player picking the card (CR 701.9b).
   const disrupt = /^(.+? reveals (?:their|his or her) hand), you choose an? (.+?) from it, then that player discards that card$/.exec(s);
@@ -19732,5 +19737,33 @@ function wholeTextForms(text: string, selfEntered: boolean): AbilityBody | strin
   text = text.replace(/(^|\. )Then each player creates X ([^.]+?) tokens and ~ deals X damage to each player, where X is ([^.]+)\./, "$1Then each player creates X $2 tokens, where X is $3. ~ deals X damage to each player, where X is $3.");
   // The Kenriths' Royal Funeral: "You draw X cards and you lose X life, where X is ...": the same X for both.
   text = text.replace(/(^|\. )You draw X cards and you lose X life, where X is (the greatest mana value among cards exiled this way)\./, "$1You draw X cards, where X is $2. You lose X life, where X is $2.");
+  return text;
+}
+
+/** Round 310's whole-text rewrites, run by parseBodyText (which is at TypeScript's control-flow limit, TS2563). */
+function round310Rewrites(text: string): string {
+  // Printlifter Ooze: "create a 0/0 green Ooze creature token with trample. The token enters with X +1/+1 counters on it,
+  // where X is the number of other creatures you control": it enters with them (CR 614.1c, 122.6), X counted as it's
+  // created, before it's on the battlefield, so "other" (than the token) is every creature you control then.
+  text = text.replace(/(^|\. )([Cc]reate an? 0\/0 [a-z]+ [A-Z][a-z]+ creature token(?: with [a-z]+)?)\. The token enters with X \+1\/\+1 counters on it, where X is the number of other (creatures|artifacts|permanents) you control\./, "$1$2 that enters with X +1/+1 counters on it, where X is the number of $3 you control.");
+  // From the Catacombs: "Put target creature card ... with a corpse counter on it. You take the initiative. If that creature
+  // would leave the battlefield, exile it instead ...": the replacement is about the creature put onto the battlefield
+  // (the counter only reminds, rulings), so it's read right after it; taking the initiative only triggers (CR 726.2), so
+  // the order changes nothing.
+  text = text.replace(/^(Put target creature card from a graveyard onto the battlefield under your control with a corpse counter on it\.) (You take the initiative\.) (If that creature would leave the battlefield, exile it instead of putting it anywhere else\.)$/, "$1 $3 $2");
+  // Draco: "sacrifice ~ unless you pay {10}. This cost is reduced by {2} for each basic land type among lands you
+  // control": one payment, its generic mana counted as the trigger resolves (sentences/basics.ts).
+  text = text.replace(/(unless you pay \{\d+\})\. This cost is reduced by (\{\d+\} for each [^.]+)\./, "$1 reduced by $2.");
+  // Blitzball Stadium: 'Until end of turn, target creature gains "..." and it can't be blocked this turn.': two changes to
+  // that target, both for this turn.
+  text = text.replace(/^(Until end of turn, target creature gains "[^"]+") and it can't be blocked this turn\.$/, "$1. It can't be blocked this turn.");
+  // Claim the Kingdom: "put a +1/+1 counter on target creature you control and a plan counter on ~": two instructions in
+  // order; with its one target illegal the whole ability doesn't resolve (CR 608.2b) either way.
+  text = text.replace(/^([Pp]ut an? \+1\/\+1 counter on target creature you control) and (an? [a-z]+ counter on ~)\.$/, "$1. Put $2.");
+  // Quiet Speculation: "Search target player's library for ... Then the player shuffles.": that player, the one searched.
+  text = text.replace(/^(Search target player's library for [^.]+\.) Then the player shuffles\.$/, "$1 Then that player shuffles.");
+  // Decree of Silence: "... put a depletion counter on ~. If there are three or more depletion counters on ~, sacrifice it.":
+  // "it" is ~, checked as the ability resolves, after the counter.
+  text = text.replace(/(put an? [a-z]+ counter on ~\. If there are [a-z]+ or more [a-z]+ counters on ~, sacrifice) it\./, "$1 ~.");
   return text;
 }

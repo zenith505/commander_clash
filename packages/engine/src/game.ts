@@ -11092,6 +11092,14 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     continueResolution(s);
     return;
   }
+  if (pend.insteadOfLearn) {
+    const li = ((r.scratch ??= {}).learnInstead ??= { asked: [] });
+    li.yes = yes;
+    if (!yes) log(s, `${p.name} chooses not to ${pend.prompt.replace(/\byour\b/g, "their")}.`);
+    s.pending = null;
+    continueResolution(s);
+    return;
+  }
   if (pend.eachTarget) {
     (r.scratch ??= {}).mayAnswer = yes;
     if (!yes) log(s, `${p.name} chooses not to ${pend.prompt.replace(/\.$/, "")}.`);

@@ -2926,11 +2926,40 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 /** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
 const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", /** Old One Eye: "At the beginning of your first main phase" (CR 505.1a). */ "yourFirstMain", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut", "youSacrifice", "opponentGainsLife", /** Deathless Knight. */ "youGainLife"];
 
+/** The Oaths (see parseTrigger): `what` the target has more (or fewer) of, `may` what the first player may do. */
+function oathTrigger(what: string, may: string, whole: string): TriggeredAbility | "fail" {
+  const stat: NonNullable<TargetSpec["outnumbers"]>["stat"] = /creatures$/.test(what) ? "creatures" : /lands$/.test(what) ? "lands" : /life$/.test(what) ? "life" : /hand$/.test(what) ? "hand" : "creatureCardsInGraveyard";
+  // As the first player: "their" is theirs; "the second player" is the target.
+  const asYou = may
+    .replace(/^have ~ deal (\d+) damage to the second player$/, "~ deals $1 damage to target player")
+    .replace(/^reveal cards from the top of their library until they reveal a creature card\. If the first player does, that player puts that card onto the battlefield and all other cards revealed this way into their graveyard$/, "reveal cards from the top of your library until you reveal a creature card. Put that card onto the battlefield and all other cards revealed this way into your graveyard")
+    .replace(/^(search|return a creature card from) their (library|graveyard)/, "$1 your $2")
+    .replace(/ to their hand$/, " to your hand");
+  // Oath of Scholars: "discard their hand and draw three cards" (CR 701.9b: the whole hand, then the draw).
+  const wheel = /^discard their hand and draw (\w+) cards$/.exec(may);
+  const inner: AbilityBody | null = wheel
+    ? num(wheel[1]!) > 0 ? { targets: [], effects: [{ type: "discard", who: { ref: "you" }, n: 0, hand: true }, { type: "draw", who: { ref: "you" }, n: num(wheel[1]!) }], text: may } : null
+    : /\btheir\b|\bthey\b|first player|second player/.test(asYou) ? null : parseBody(asYou.charAt(0).toUpperCase() + asYou.slice(1) + ".");
+  if (!inner || inner.targets.length > 1 || (inner.targets.length === 1 && (inner.targets[0]!.kind !== "player" || !/~ deals \d+ damage to target player/.test(asYou)))) return "fail";
+  const target: TargetSpec = { kind: "player", outnumbers: { stat, ...(stat === "creatureCardsInGraveyard" ? { fewer: true as const } : {}), than: "eventPlayer" }, chosenBy: "eventPlayer", text: `player who ${what.replace(/^fewer creature cards$/, "has fewer creature cards in their graveyard")} than that player and is their opponent` };
+  // Oath of Ghouls: nobody is asked to return a creature card they don't have (CR 101.3).
+  const need = /^return a creature card from your graveyard/.test(asYou) ? { need: { zone: "graveyard" as const, filter: { kind: "card" as const, types: ["Creature"], text: "creature card" } } } : {};
+  const text = asYou.replace(/~ deals (\d+) damage to target player/, "have ~ deal $1 damage to the target player").replace(/^discard their hand/, "discard your hand");
+  return { event: "eachUpkeep", body: { targets: [target], effects: [{ type: "eachMay", who: { ref: "eventPlayer" }, effects: inner.effects, text, each: true, ...need }], text: whole } };
+}
+
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Fasting: "When you draw a card, destroy ~.": "when" triggers each time like "whenever" (CR 603.2).
   if (/^When you draw a card, /.test(raw)) return parseTrigger(raw.replace(/^When you draw a card, /, "Whenever you draw a card, "));
   // Eye of Singularity: "a permanent other than a basic land" is a nonbasic permanent: only lands are basic (CR 205.4c).
   if (/^Whenever a permanent other than a basic land enters, /.test(raw)) return parseTrigger(raw.replace(/^Whenever a permanent other than a basic land enters, /, "Whenever a nonbasic permanent enters, "));
+  // The Oaths: "At the beginning of each player's upkeep, that player chooses target player who controls more creatures
+  // than they do and is their opponent. The first player may ...": the upkeep's player chooses the target for the
+  // ability's controller (TargetSpec.chosenBy "eventPlayer"), an opponent of theirs that outnumbers them, checked again as
+  // it resolves (TargetSpec.outnumbers; rulings); then that player decides whether to do it as it resolves (CR 101.4), as
+  // the one doing it (eachMay's each: "their library" is theirs, "the second player" is the target).
+  const oath = /^At the beginning of each player's upkeep, that player chooses target player (?:who (controls more creatures|controls more lands|has more life|has more cards in hand) than they do|whose graveyard has (fewer creature cards) in it than their graveyard does) and is their opponent\. The first player may (.+)\.$/.exec(raw);
+  if (oath) return oathTrigger(oath[1] ?? oath[2]!, oath[3]!, raw.replace(/^At the beginning of each player's upkeep, /, ""));
   // Bladegriff Prototype: "destroy target nonland permanent of that player's choice that one of your opponents controls":
   // the damaged player chooses it among the permanents the controller's opponents control (rulings), read as "of
   // their choice" on "target nonland permanent an opponent controls".

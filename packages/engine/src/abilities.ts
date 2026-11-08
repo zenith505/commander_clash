@@ -278,6 +278,8 @@ export type Count =
   | { kind: "eventGroupPower" }
   /** "For each card type among those cards" (Polluted Cistern): the cards of a "one or more cards are put into your graveyard" event (CR 205.2a). */
   | { kind: "eventGroupCardTypes" }
+  /** Amzu, Swarm's Hunger: "the greatest mana value among those cards", the cards that left the graveyard in the trigger's event, as cards (CR 202.3), 0 with none. */
+  | { kind: "eventGroupGreatestMv" }
   /** "The total power of creatures goaded this way" (Havoc Eater): the targets `of` names still on the battlefield as it resolves (illegal ones weren't goaded, CR 608.2b), a negative power taking some off. */
   | { kind: "totalPowerOf"; of: ObjRef }
   /** Sword of the Ages: "the total power of the creatures sacrificed this way": its sacrifice cost's, as they last existed (CR 608.2h). */
@@ -341,6 +343,8 @@ export type Count =
   | { kind: "lifeBelowStart" }
   /** "The number of experience counters you have" (CR 122.1). */
   | { kind: "experience"; who: PlayerRef }
+  /** Energy counters (CR 107.14, 122.1): "the amount of {E} you have" (Razorfield Ripper). */
+  | { kind: "energy"; who: PlayerRef }
   /** "For each poison counter your opponents have" (Phyrexian Swarmlord): all of theirs together (CR 122.1f). */
   | { kind: "poison"; who: PlayerRef }
   /** "For each card type among cards discarded this way" (Kefka, Court Mage): every card discarded while this resolves. */
@@ -355,6 +359,8 @@ export type Count =
   | { kind: "drawnRevealedMv" }
   /** "For each creature card put into a graveyard this way" after a mill (Dread Summons): the milled cards that went there and match. */
   | { kind: "milledThisWay"; filter?: TargetSpec }
+  /** Intrude on the Mind: "for each card put into your graveyard this way", after a "piles" instruction: the pile put there. */
+  | { kind: "pilesToGraveyard" }
   /** "The number of rad counters you have", "the total number of rad counters among players" (`who` unset; CR 728). */
   | { kind: "rad"; who?: PlayerRef }
   /** Lumbering Megasloth: "for each counter among players and permanents": every counter of every kind on each player still in the game and each permanent (CR 122.1). */
@@ -979,6 +985,8 @@ export interface TargetSpec {
   notSourceHost?: true;
   /** Curse Artifact: "unless they sacrifice that artifact": only the permanent the source is attached to (a pick, not a target). */
   sourceHost?: true;
+  /** Enchanter's Bane: "unless that player sacrifices it": only the ability's target at this index (bound to its `objectId` as the punisher starts). */
+  targetObject?: number;
   /**
    * Targets this one can't be the same as: the others of the same "two target creatures" (CR 115.3),
    * or the earlier ones for "another target".
@@ -3120,7 +3128,7 @@ export type Effect =
    * creature." (CR 708.2, FaceDownKind "cyberman"); Wall of Deceit's "Turn ~ face down": a 2/2 with no text (708.2a, `as` "morph": turned face up again only by a morph
    * ability it has, 702.37e). Not one that's face down already (708.2b), nor a double-faced one (712.16).
    */
-  | { type: "turnFaceDown"; what: ObjRef; as: "cyberman" | "morph" }
+  | { type: "turnFaceDown"; what: ObjRef; as: "cyberman" | "morph" | "horror" }
   /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
   | { type: "suspect"; what: ObjRef; no?: true }
   /** Amy Pond: "choose a suspended card you own and remove that many time counters from it", chosen as it resolves. */
@@ -3152,7 +3160,20 @@ export type Effect =
    */
   | { type: "returnHeld"; under: "owner" | "you"; at?: "nextEndStep"; thenExile?: true; /** "With a vigilance counter and a lifelink counter on it" (Gilraen): each enters with one of each (CR 122.6). */ counters?: CounterKind[] }
   /** "Separate all permanents target player controls into two piles. That player sacrifices all permanents in the pile of their choice." (Liliana of the Veil, CR 700.3). */
-  | { type: "permanentPiles"; who: PlayerRef }
+  | {
+      type: "permanentPiles";
+      who: PlayerRef;
+      /** "Separate all creatures target player controls" (Do or Die): only permanents of these types. */
+      types?: string[];
+      /** Do or Die: "Destroy all creatures in the pile of that player's choice. They can't be regenerated." */
+      destroy?: true;
+      /**
+       * Make an Example: "Each opponent separates the creatures they control into two piles. For each opponent, you choose
+       * one of their piles. Each opponent sacrifices the creatures in their chosen pile": each of `who` separates their own,
+       * you choose, and then all of the chosen piles are sacrificed at once.
+       */
+      theySeparate?: true;
+    }
   /** A delayed flicker's return: the exiled card, while it's still in exile as that object. */
   /** A delayed flicker's return: its subject, or with `cards` each of those cards, if still the same objects in exile. */
   /** "Each opponent can't block with more than one creature this combat" (Mirri, Weatherlight Duelist; CR 509.1b): for each of those players, until the combat ends. */
@@ -4608,7 +4629,7 @@ export type Effect =
    * (CR 701.23). `filter` unset = any card. Found cards go to `dest`; with `others`, only the first
    * does and the rest go there (Cultivate). The library is then shuffled (CR 701.20).
    */
-  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; /** Signal the Clans: "If you reveal three cards with different names, choose one of them at random and put that card into your hand. Shuffle the rest into your library.": `dest` gets one of them at random only if `n` were found and no two share a name; the others stay in the library for the shuffle (rulings). */ randomOfDistinct?: true; /** With `others`: "Put two of them onto the battlefield tapped and the other into your hand" (Viewpoint Synchronization): the first this many found go to `dest`. One if left out. */ firstN?: number; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster), "cards with different names" (Three Dreams): at most one card of each name. */ oneEach?: true; /** "Exactly two cards" (Burning-Rune Demon): that many or none (CR 701.23b lets the searcher find none), never fewer. */ exactly?: true; /** "Creature cards with different powers" (Threats Undetected): no two found with the same power. */ differentPowers?: true; /** "Up to two basic land cards that share a land type" (Myriad Landscape): the cards found all have a land type in common. */ shareLandType?: true; /** With a `who` of several players: `n` is worked out for each of them as their search begins (PlayerRef eachOne is that player), and one with none to find doesn't search, or shuffle (Scholarship Sponsor, rulings). */ perPlayerN?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true; /** "Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand" (Gifts Ungiven): `n` of the cards found, chosen by that opponent (by an opponent you choose as it resolves if left out), go `to`; the rest go to `dest`. */ split?: { chooser?: PlayerRef; n: number; to: SearchDest }; /** "Put that card into your hand if you control an Assassin. Otherwise, put that card on top of your library." (Loyal Inventor): where the cards found go instead of `dest` while `cond` holds, as they're put there. */ condDest?: { cond: StaticCondition; dest: SearchDest }; /** "Put it onto the battlefield tapped if it's a land card. Otherwise, put it into your hand." (Archdruid's Charm): where a land card found goes instead of `dest`. */ landTo?: SearchDest; /** "Put it onto the battlefield if its mana value is 2 or less. Otherwise, put it into your hand." (Guidelight Pathmaker): where a card found that's `card` goes instead of `dest`. */ cardTo?: { card: TargetSpec; dest: SearchDest }; /** "A Forest card and a Plains card" (Krosan Verge): up to one card for each of these, each card found matching a different one. */ oneOfEach?: TargetSpec[]; /** The cards a "hold" flicker exiled enter with the found cards, at the same time, under your control (Sword of Hearth and Home). */ withHeld?: true; /** Not shuffled now: a later "shuffle" with `ifSearched` does it once (Claim Jumper). */ noShuffle?: true; /** "Search your library and graveyard for five cards" (Doomsday): both zones together, no choice. */ andGraveyard?: true; /** With `andGraveyard`: "Search your graveyard, hand, and library for a card named ..." (Kassandra, Eagle Bearer): the hand too. */ andHand?: true; /** "And exile the rest" (Doomsday): every other card in the zones searched is exiled before the found cards are put where they go. */ exileRest?: true; /** "Any number of creature cards with total mana value 6 or less" (Protean Hulk): of all the cards found. */ totalMv?: number; /** Scholar of New Horizons: "If an opponent controls more lands than you, you may put that card onto the battlefield tapped. If you don't put the card onto the battlefield, put it into your hand": the one card found may go here instead of `dest` while `cond` holds, the searcher's choice. */ mayInstead?: { dest: SearchDest; /** Left out (Dina's Guidance: "put it into your hand or graveyard"): always the searcher's choice. */ cond?: StaticCondition; /** "If it's an artifact card, you may put it onto the battlefield" (Treasure Chest): only a card found that's this. */ card?: TargetSpec }; /** Transmute Artifact: the one card found goes to `dest` if its mana value is at most this; if greater, only if the searcher pays the difference as it resolves, and into its owner's graveyard if they don't. */ payDiff?: Amount; /** "Search your library for three cards, exile them" (Foresight): cards the searcher wants gone (for the bot). */ away?: true; /** "A card with the same name as target nontoken creature" (Bifurcate), "... as that creature" (Remembrance): only cards with that name or one of those names, found as it resolves (CR 201.2). */ sameName?: SameNameRef; /** "Search ... for any number of basic land cards, put them onto the battlefield ... Those lands become ..." (Nissa, Worldwaker): every card found and put onto the battlefield is remembered (ObjRef "created"). */ rememberAll?: true; /** "Search your library for a card, exile it, then shuffle. ... put that card into your hand" (Distant Memories): the one card found and exiled is remembered (ObjRef "exiledTop"). */ rememberExiled?: true; /** "For each land destroyed this way, its controller may search their library for a basic land card" (From the Ashes): each player who controlled a permanent like this that this resolution destroyed searches (with `may`, in APNAP order) for up to one card for each of them; `n` is unused. */ perDestroyed?: TargetSpec; /** With `perDestroyed`: "for each land sacrificed this way" (Wave of Vitriol): those this resolution sacrificed instead, of the card types in `perDestroyed`, as they last existed. */ perSacrificed?: true }
+  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; /** Signal the Clans: "If you reveal three cards with different names, choose one of them at random and put that card into your hand. Shuffle the rest into your library.": `dest` gets one of them at random only if `n` were found and no two share a name; the others stay in the library for the shuffle (rulings). */ randomOfDistinct?: true; /** With `others`: "Put two of them onto the battlefield tapped and the other into your hand" (Viewpoint Synchronization): the first this many found go to `dest`. One if left out. */ firstN?: number; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster), "cards with different names" (Three Dreams): at most one card of each name. */ oneEach?: true; /** "Exactly two cards" (Burning-Rune Demon): that many or none (CR 701.23b lets the searcher find none), never fewer. */ exactly?: true; /** "Creature cards with different powers" (Threats Undetected): no two found with the same power. */ differentPowers?: true; /** "Up to two basic land cards that share a land type" (Myriad Landscape): the cards found all have a land type in common. */ shareLandType?: true; /** With `sameName`: "basic land cards which have the same name as the chosen land" (Canoptek Wraith): the cards found all have one name. */ oneName?: true; /** With a `who` of several players: `n` is worked out for each of them as their search begins (PlayerRef eachOne is that player), and one with none to find doesn't search, or shuffle (Scholarship Sponsor, rulings). */ perPlayerN?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true; /** "Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand" (Gifts Ungiven): `n` of the cards found, chosen by that opponent (by an opponent you choose as it resolves if left out), go `to`; the rest go to `dest`. */ split?: { chooser?: PlayerRef; n: number; to: SearchDest }; /** "Put that card into your hand if you control an Assassin. Otherwise, put that card on top of your library." (Loyal Inventor): where the cards found go instead of `dest` while `cond` holds, as they're put there. */ condDest?: { cond: StaticCondition; dest: SearchDest }; /** "Put it onto the battlefield tapped if it's a land card. Otherwise, put it into your hand." (Archdruid's Charm): where a land card found goes instead of `dest`. */ landTo?: SearchDest; /** "Put it onto the battlefield if its mana value is 2 or less. Otherwise, put it into your hand." (Guidelight Pathmaker): where a card found that's `card` goes instead of `dest`. */ cardTo?: { card: TargetSpec; dest: SearchDest }; /** "A Forest card and a Plains card" (Krosan Verge): up to one card for each of these, each card found matching a different one. */ oneOfEach?: TargetSpec[]; /** The cards a "hold" flicker exiled enter with the found cards, at the same time, under your control (Sword of Hearth and Home). */ withHeld?: true; /** Not shuffled now: a later "shuffle" with `ifSearched` does it once (Claim Jumper). */ noShuffle?: true; /** "Search your library and graveyard for five cards" (Doomsday): both zones together, no choice. */ andGraveyard?: true; /** With `andGraveyard`: "Search your graveyard, hand, and library for a card named ..." (Kassandra, Eagle Bearer): the hand too. */ andHand?: true; /** "And exile the rest" (Doomsday): every other card in the zones searched is exiled before the found cards are put where they go. */ exileRest?: true; /** "Any number of creature cards with total mana value 6 or less" (Protean Hulk): of all the cards found. */ totalMv?: number; /** Scholar of New Horizons: "If an opponent controls more lands than you, you may put that card onto the battlefield tapped. If you don't put the card onto the battlefield, put it into your hand": the one card found may go here instead of `dest` while `cond` holds, the searcher's choice. */ mayInstead?: { dest: SearchDest; /** Left out (Dina's Guidance: "put it into your hand or graveyard"): always the searcher's choice. */ cond?: StaticCondition; /** "If it's an artifact card, you may put it onto the battlefield" (Treasure Chest): only a card found that's this. */ card?: TargetSpec }; /** Transmute Artifact: the one card found goes to `dest` if its mana value is at most this; if greater, only if the searcher pays the difference as it resolves, and into its owner's graveyard if they don't. */ payDiff?: Amount; /** "Search your library for three cards, exile them" (Foresight): cards the searcher wants gone (for the bot). */ away?: true; /** "A card with the same name as target nontoken creature" (Bifurcate), "... as that creature" (Remembrance): only cards with that name or one of those names, found as it resolves (CR 201.2). */ sameName?: SameNameRef; /** "Search ... for any number of basic land cards, put them onto the battlefield ... Those lands become ..." (Nissa, Worldwaker): every card found and put onto the battlefield is remembered (ObjRef "created"). */ rememberAll?: true; /** "Search your library for a card, exile it, then shuffle. ... put that card into your hand" (Distant Memories): the one card found and exiled is remembered (ObjRef "exiledTop"). */ rememberExiled?: true; /** "For each land destroyed this way, its controller may search their library for a basic land card" (From the Ashes): each player who controlled a permanent like this that this resolution destroyed searches (with `may`, in APNAP order) for up to one card for each of them; `n` is unused. */ perDestroyed?: TargetSpec; /** With `perDestroyed`: "for each land sacrificed this way" (Wave of Vitriol): those this resolution sacrificed instead, of the card types in `perDestroyed`, as they last existed. */ perSacrificed?: true }
   /** "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and the rest into your hand" (Murmurs from Beyond): the chooser (an opponent you choose as it resolves if left out) picks one revealed card (one that fits `filter`), which goes `to`; the rest go `rest`, or stay on top. */
   /**
    * Guild Feud: "target opponent reveals the top three cards of their library, may put a creature card from among them onto
@@ -5379,6 +5400,8 @@ export type TriggerEvent =
   | "sourceYouControlDamagesOpponent"
   /** "Whenever another source you control deals exactly 1 damage to a permanent or player" (Ghyrson Starn): once for each source and recipient, the permanent dealt it the subject, the player the event player. */
   | "sourceYouControlDealsDamage"
+  /** The Red Terror: "Whenever a red source you control deals damage to one or more permanents and/or players" (`sourceColor`). */
+  | "yourSourceDealsDamage"
   /** "Whenever ~ deals damage": once per event, however many things it damaged at once; "that much" is the total. */
   | "selfDealsDamage"
   | "selfDealsCombatDamage"
@@ -5904,6 +5927,8 @@ export interface TriggeredAbility {
   otherSource?: true;
   /** For "sourceYouControlDealsDamage": exactly this much at once; `other`: a source other than this permanent. */
   sourceDamage?: { exactly: number; other?: true };
+  /** For "yourSourceDealsDamage": only a source of this color, as it deals the damage. */
+  sourceColor?: Color;
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
   minAttackers?: number;
   /** With `minAttackers`: "When you attack with exactly two creatures" (Alluring Suitor): that many, no more. */
@@ -7035,6 +7060,11 @@ export interface CompiledCard {
    * discarded card has, one of each kind however many cards have it (rulings).
    */
   entersDiscardKeywords?: string[];
+  /**
+   * Ixidron: "As ~ enters, turn all other nontoken creatures face down. (They're 2/2 creatures.)": the ones already on the
+   * battlefield, before it's there (not those entering with it, rulings; CR 614.1c), each a plain 2/2 (CR 708.2a).
+   */
+  entersTurnOthersFaceDown?: true;
   /** Urborg Lhurgoyf: "As ~ enters, mill three cards for each time it was kicked" (rulings: no trigger, CR 614.1c). */
   entersMillPerKick?: number;
   /**

@@ -4245,6 +4245,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "61849685-b407-4ed0-aafc-ec3a003200b9",
+  "name": "Canoptek Wraith",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact Creature — Wraith",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Wraith"
+  ],
+  "oracleText": "Wraith Form — This creature can't be blocked.\nTransdimensional Scout — When this creature deals combat damage to a player, you may pay {3} and sacrifice it. If you do, choose a land you control. Then search your library for up to two basic land cards which have the same name as the chosen land, put them onto the battlefield tapped, then shuffle.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Transdimensional Scout",
+   "Wraith Form"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8c411f4e-a091-447c-9450-d895b10b4985",
   "name": "Carnage Tyrant",
   "manaCost": "{4}{G}{G}",
@@ -7514,6 +7544,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f25af42d-f1bf-4bd3-aded-ecadafdbf6e6",
+  "name": "Do or Die",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Separate all creatures target player controls into two piles. Destroy all creatures in the pile of that player's choice. They can't be regenerated.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "inv",
+  "releasedAt": "2000-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2c438ecb-b127-4450-9395-2d1eea294f30",
   "name": "Domineering Will",
   "manaCost": "{3}{U}",
@@ -8568,6 +8624,32 @@
   "commanderLegal": "legal",
   "set": "mul",
   "releasedAt": "2023-04-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1f0548f8-5dec-44b5-b5a9-e55fa4366e08",
+  "name": "Enchanter's Bane",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your end step, target enchantment deals damage equal to its mana value to its controller unless that player sacrifices it.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c18",
+  "releasedAt": "2018-08-10",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -16774,6 +16856,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "591edddc-3736-44cf-9719-117c24ff3980",
+  "name": "Make an Example",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each opponent separates the creatures they control into two piles. For each opponent, you choose one of their piles. Each opponent sacrifices the creatures in their chosen pile. (Piles can be empty.)",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "416608a1-89a4-44ce-8fd0-fab6b023d3d4",
   "name": "Malik, Grim Manipulator",
   "manaCost": "{2}{R}{W}{B}",
@@ -22275,6 +22383,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ef842299-8a31-4793-9142-2bcd7a8b2fab",
+  "name": "Razorfield Ripper",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Artifact Creature — Equipment Rhino",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Equipment",
+   "Rhino"
+  ],
+  "oracleText": "Whenever this creature or equipped creature attacks, you get {E} (an energy counter), then it gets +X/+X until end of turn, where X is the amount of {E} you have.\nReconfigure—Pay {2} or {E}{E}{E}. (Pay {2} or {E}{E}{E}: Attach to target creature you control; or unattach from a creature. Reconfigure only as a sorcery. While attached, this isn't a creature.)",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Reconfigure"
+  ],
+  "commanderLegal": "legal",
+  "set": "m3c",
+  "releasedAt": "2024-06-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1818324c-2738-42e2-a78b-63abf325d8e9",
   "name": "Razorgrass Screen",
   "manaCost": "{1}",
@@ -23593,6 +23735,32 @@
   "commanderLegal": "legal",
   "set": "arb",
   "releasedAt": "2009-04-30",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2c3c3bec-00f0-4de2-b929-73f1c9276ec4",
+  "name": "Sakashima's Will",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose one. If you control a commander as you cast this spell, you may choose both instead.\n• Target opponent chooses a creature they control. You gain control of it.\n• Choose a creature you control. Each other creature you control becomes a copy of that creature until end of turn.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -26888,6 +27056,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "000d5588-5a4c-434e-988d-396632ade42c",
+  "name": "Storm Crow",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Bird",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Bird"
+  ],
+  "oracleText": "Flying (This creature can't be blocked except by creatures with flying or reach.)",
+  "power": "1",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2020-09-30",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e5b29094-0bb4-4c18-ad47-dce4d4379a4f",
   "name": "Stream of Thought",
   "manaCost": "{U}",
@@ -27207,6 +27407,38 @@
   "commanderLegal": "legal",
   "set": "mom",
   "releasedAt": "2023-04-21",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a8d31e2f-7b2e-4135-8074-9e6ef778bd80",
+  "name": "Suntail Hawk",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Creature — Bird",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Bird"
+  ],
+  "oracleText": "Flying",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "m14",
+  "releasedAt": "2013-07-19",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -27817,6 +28049,32 @@
   "set": "c14",
   "releasedAt": "2014-11-07",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "58ebaaba-7e35-4588-9679-23b22e39789b",
+  "name": "Tegwyll's Scouring",
+  "manaCost": "{4}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "You may cast this spell as though it had flash by tapping three untapped creatures you control with flying in addition to paying its other costs.\nDestroy all creatures. Create three 1/1 black Faerie Rogue creature tokens with flying.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "woc",
+  "releasedAt": "2023-09-08",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -28704,6 +28962,32 @@
   "set": "mkm",
   "releasedAt": "2024-02-09",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "53467cf4-5db2-4b9c-af2b-03b044c558cd",
+  "name": "This Is How It Ends",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Target creature's owner shuffles it into their library, then faces a villainous choice — They lose 5 life, or they shuffle another creature they own into their library.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

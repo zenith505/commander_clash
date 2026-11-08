@@ -2210,6 +2210,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref === "target" ? [{ type: "permanentPiles", who }] : null;
   }
+  // Do or Die, Make an Example (joined into one sentence in body.ts): creatures only.
+  if ((m = /^Separate all creatures (.+?) controls into two piles for that player to choose the pile to destroy without regeneration$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && who.ref === "target" ? [{ type: "permanentPiles", who, types: ["Creature"], destroy: true }] : null;
+  }
+  if (/^Each opponent separates the creatures they control into two piles for you to choose the pile they sacrifice$/.test(s))
+    return [{ type: "permanentPiles", who: { ref: "eachOpponent" }, types: ["Creature"], theySeparate: true }];
   // "Each opponent sacrifices a creature with the greatest power among creatures they control", "... a creature they
   // control with the greatest power" (Szat's Will), "a creature or planeswalker with the greatest mana value among
   // creatures and planeswalkers they control" (Soul Shatter).

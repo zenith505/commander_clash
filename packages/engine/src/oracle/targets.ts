@@ -725,6 +725,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (thatPlayers) return { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "other creature that player controls" }, of: { ref: "targetController", index: ctx.lastObjectTarget! }, otherThan: ctx.lastObjectTarget! };
   // "All creatures with toughness less than or equal to the number of Islands you control": counted as it resolves.
   const group = parseGroup(x, false, (t) => parseBoundCount(t, ctx));
+  // Sakashima's Will: "Choose a creature you control. Each other creature you control becomes a copy of that creature":
+  // other than the one chosen as it resolves (a spell has no source to be other than).
+  if (group && group.other && ctx.spell && ctx.lastChosen && ctx.lastObjectTarget === undefined) return { ref: "each", filter: group.filter, notCreated: true };
   if (group && group.other && ctx.spell) {
     // A spell's "other creatures you control": other than the creature it targeted ("Put two +1/+1
     // counters on target creature you control. Other creatures you control get +1/+1"). Other than

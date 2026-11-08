@@ -229,6 +229,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^the total number of rad counters among players$/i.test(p)) return { count: { kind: "rad" } };
   // Mariposa Military Base: "for each rad counter you have" (CR 122.1), yours only.
   if ((each && /^rad counter you have$/i.test(p)) || /^the number of rad counters you have$/i.test(p)) return { count: { kind: "rad", who: { ref: "you" } } };
+  // Razorfield Ripper: "the amount of {E} you have", your energy counters (CR 107.14, 122.1) as it resolves (rulings).
+  if (!each && /^the amount of \{E\} you have$/i.test(p)) return { count: { kind: "energy", who: { ref: "you" } } };
   // "The number of experience counters you have", "for each experience counter you have" (CR 122.1).
   if ((each && /^experience counter you have$/i.test(p)) || /^the number of experience counters you have$/i.test(p)) return { count: { kind: "experience", who: { ref: "you" } } };
   // "Each creature your opponents control gets -1/-1 until end of turn for each poison counter its controller has" (Phyresis
@@ -652,6 +654,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const filter = parseSearchFilter(m[1]!);
     return filter ? count({ kind: "milledThisWay", filter }) : null;
   }
+  // Intrude on the Mind: "for each card put into your graveyard this way", after the piles: the pile put there (one put
+  // somewhere else instead by a replacement doesn't count).
+  if (each && ctx?.afterPilesGraveyard && /^card put into your graveyard this way$/i.test(p)) return count({ kind: "pilesToGraveyard" });
   // Struggle for Project Purity: "Each opponent draws a card. You draw a card for each card drawn this way."
   if (each && /^card drawn this way$/i.test(p)) return count({ kind: "drawnThisWay" });
   // Smuggler's Share: "for each opponent who drew two or more cards this turn", "... who had two or more lands enter the

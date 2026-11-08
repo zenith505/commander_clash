@@ -504,7 +504,9 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
  */
 function parseVillainous(subject: string, rest: string, ctx: Ctx): Effect[] | null {
   const facing = subject.replace(/^Then /, "").toLowerCase();
-  const who = facing === "each opponent" ? ({ ref: "eachOpponent" } as const) : facing === "target opponent" || facing === "that player" || facing === "defending player" || /^each opponent who lost /.test(facing) ? parsePlayer(facing, ctx) : null;
+  // This Is How It Ends: "Then its owner faces ...": the owner of the creature the spell targeted (rewritten in body.ts).
+  const ownerOf = facing === "its owner" && ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets.length === 1 ? ctx.lastObjectTarget : undefined;
+  const who = ownerOf !== undefined ? ({ ref: "targetOwner", index: ownerOf } as const) : facing === "each opponent" ? ({ ref: "eachOpponent" } as const) : facing === "target opponent" || facing === "that player" || facing === "defending player" || /^each opponent who lost /.test(facing) ? parsePlayer(facing, ctx) : null;
   if (!who || /\bvillainous\b/.test(rest)) return null;
   const option = (text: string): Effect[] | null => {
     const before = ctx.targets.length;

@@ -63,7 +63,7 @@ export function canTransform(s: GameState, o: GameObject, byDayNight = false): b
  * (a melded one, a double-faced token, CR 707.8a) can't be turned face down (712.16), nor a merged permanent with one
  * among its components, since each of them would be (730.2f).
  */
-function turnFaceDown(s: GameState, o: GameObject, as: "cyberman" | "morph", src: string) {
+export function turnFaceDown(s: GameState, o: GameObject, as: "cyberman" | "morph" | "horror", src: string) {
   if (o.zone !== "battlefield" || o.faceDown) return;
   const doubleFaced = (x: GameObject) => !!x.melded || !!x.tokenBackUp || (!!s.cards[x.cardId] && (isDoubleFacedDef(s.cards[x.cardId]!) || !!s.cards[x.cardId]!.tokenBack));
   const name = defOf(s, o).name;
@@ -74,7 +74,7 @@ function turnFaceDown(s: GameState, o: GameObject, as: "cyberman" | "morph", src
   o.faceDown = as;
   o.timestamp = s.nextTimestamp++;
   invalidateCharacteristics(s);
-  log(s, `${src} turns ${name} face down: it's a 2/2 ${as === "cyberman" ? "Cyberman artifact " : ""}creature.`);
+  log(s, `${src} turns ${name} face down: it's a 2/2 ${as === "cyberman" ? "Cyberman artifact " : as === "horror" ? "Horror " : ""}creature.`);
 }
 
 /**

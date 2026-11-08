@@ -34,12 +34,17 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   // "A permanent card with the same name as target nontoken creature" (Bifurcate), "a card with the same name as that
   // creature" (Remembrance): the search as without it, finding only cards with that name (CR 201.2), worked out as it
   // resolves (`same` says from what, registering a target if there is one).
-  const sm = / with the same name as (.+)$/.exec(m[3]!);
+  // Canoptek Wraith: "up to two basic land cards which have the same name as the chosen land" (read as "... as a land you
+  // control", the land chosen as it resolves): all of them with one name, that of a land you control (rulings: the two
+  // must have the same name as each other).
+  const sm = / (with|which have) the same name as (.+)$/.exec(m[3]!);
   if (sm) {
-    const ref = same?.(sm[1]!);
+    const ref = same?.(sm[2]!);
     const fx = ref && parseSearch(s.replace(sm[0], ""), count);
     if (!ref || fx?.length !== 1 || fx[0]!.type !== "search" || fx[0]!.oneEach || fx[0]!.oneOfEach || fx[0]!.filter?.anyOf) return null;
-    return [{ ...fx[0]!, filter: { ...(fx[0]!.filter ?? { kind: "card" }), text: m[3]! }, sameName: ref }];
+    const oneName = sm[1] === "which have" && "permanents" in ref && !ref.each;
+    if (sm[1] === "which have" && !oneName) return null;
+    return [{ ...fx[0]!, filter: { ...(fx[0]!.filter ?? { kind: "card" }), text: m[3]! }, sameName: ref, ...(oneName ? { oneName: true as const } : {}) }];
   }
   const upTo = !!m[1] || m[2] === "any number of";
   // "Up to X basic land cards" (New Frontiers): the X it was cast with. "X cards" (Insidious Dreams) too: as many as

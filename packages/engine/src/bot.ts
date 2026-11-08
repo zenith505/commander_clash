@@ -618,6 +618,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = groups.reduce<string[]>((a, g) => (g.length > a.length ? g : a), []);
       return [{ type: "searchLibrary", player: pid, found: best }];
     }
+    // Canoptek Wraith: "basic land cards which have the same name": as many as we can of one name, the best-ranked first.
+    if (pend.kind === "searchLibrary" && pend.oneName) {
+      const ranked = chooseSearch(s, pid, pend.cards, pend.cards.length);
+      const groups = ranked.map((first) => ranked.filter((id) => sameName(defOf(s, obj(s, id)).name, defOf(s, obj(s, first)).name)).slice(0, pend.max));
+      const best = groups.reduce<string[]>((a, g) => (g.length > a.length ? g : a), []);
+      return [{ type: "searchLibrary", player: pid, found: best }];
+    }
     // "A Forest card and a Plains card" (Krosan Verge): the best-ranked cards that still fit one each.
     if (pend.kind === "searchLibrary" && pend.oneOfEach) {
       const found: string[] = [];
@@ -1256,7 +1263,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const worth = pend.sacrificePile ? (id: string) => permanentWorth(s, pid, id) : pend.pileMode === "battlefield" ? (id: string) => 1 + mv(s, id) : (id: string) => handWorth(s, id);
       // Atris: a face-down pile is guessed at by its size alone; Truth or Tale: a pile is worth its best card.
       const [a, b] = pend.piles.map((pile, i) => (pend.pileMode === "faceDown" && i === 0 ? pile.length * 2 : pend.pileMode === "pickOne" ? Math.max(0, ...pile.map(worth)) : pile.reduce((n, id) => n + worth(id), 0)));
-      const mine = pend.of === pid && !pend.sacrificePile;
+      // Make an Example: another player's pile for them to sacrifice, so the one worth more.
+      const mine = pend.sacrificePile ? pend.of !== pid : pend.of === pid;
       return [{ type: "chooseOption", player: pid, choice: (mine ? a! >= b! : a! <= b!) ? "0" : "1" }];
     }
     // Liliana of the Dark Realms: +X/+X for our own creature, -X/-X for anyone else's.
@@ -1772,7 +1780,10 @@ function villainCost(s: GameState, pid: PlayerId, fx: Effect[]): number {
   return fx.reduce((sum, e) => {
     switch (e.type) {
       case "loseLife":
-        return sum + (us(e.who) ? n(e.n, 3) : 0);
+        // Not the option that would lose us the game (CR 104.3b).
+        return sum + (us(e.who) ? (typeof e.n === "number" && e.n >= me.life ? 100 : n(e.n, 3)) : 0);
+      case "shuffleIntoLibrary":
+        return sum;
       case "damage": {
         const to = e.to as { ref: string };
         if (!us(to)) return sum + 1;
@@ -1780,6 +1791,8 @@ function villainCost(s: GameState, pid: PlayerId, fx: Effect[]): number {
         return sum + (c?.kind === "cardsInHand" ? me.hand.length : c?.kind === "exiledTopManaValue" ? 8 : n(e.amount, 4));
       }
       case "pick":
+        // This Is How It Ends: one of our own creatures shuffled away, if we own any.
+        if (us(e.who) && e.action === "choose" && e.anyController && e.filter.kind === "object" && e.filter.owner === "you") return sum + (s.battlefield.some((id) => obj(s, id).owner === pid && objectMatches(s, e.filter, obj(s, id), pid, false)) ? 5 : 0);
         return sum + (us(e.who) && e.action === "sacrifice" ? (s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, e.filter, obj(s, id), pid, false)) ? 5 : 0) : 2);
       case "discard":
         return sum + (us(e.who) ? Math.min(me.hand.length, e.hand ? me.hand.length : n(e.n, 1)) * 1.5 : 0);
@@ -3825,6 +3838,8 @@ function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean, x?:
   if (!k) return [[]];
   // "As an additional cost to cast this spell, waterbend {5}": always paid, nothing to choose.
   if (k.required) return [[]];
+  // Molten Exhale, Tegwyll's Scouring: the price of casting it as though it had flash, not paid when it needn't be.
+  if (compileCard(defOf(s, obj(s, id))).flashIfKicked) return canActAtSorcerySpeed(s, pid) ? [[]] : [[0]];
   // "Kicker {X}": kicked only with an X chosen for it, else not.
   if (parseManaCost(k.costs[0]!).hasX && !parseManaCost(defOf(s, obj(s, id)).manaCost).hasX) return x ? [[0]] : [[]];
   if (k.multi) {

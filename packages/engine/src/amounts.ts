@@ -441,6 +441,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "sacrificedThisWayCount":
       return s.resolving?.sacrificedThisWay?.length ?? 0;
+    case "damagedThisWayCount":
+      return [...new Set(s.resolving?.damagedThisWay ?? [])].filter((id) => {
+        const o = s.objects[id];
+        return !c.filter || (!!o && (o.zone !== "battlefield" || objectMatches(s, c.filter, o, ctx.controller, false)));
+      }).length;
     case "spellsCounteredThisWay":
       return s.resolving?.spellsCountered ?? 0;
     case "stackCounteredThisWay":
@@ -1334,6 +1339,8 @@ function describeCount(c: Count): string {
       return `#${c.filter ? `${c.filter.text}s` : "cards"} exiled`;
     case "sacrificedThisWayCount":
       return "#sacrificed";
+    case "damagedThisWayCount":
+      return `#${c.filter?.text ?? "permanent"}s dealt damage`;
     case "spellsCounteredThisWay":
       return "#spells countered";
     case "stackCounteredThisWay":

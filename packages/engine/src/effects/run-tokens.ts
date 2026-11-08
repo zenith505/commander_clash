@@ -424,6 +424,22 @@ function createTokensFor(s: GameState, e00: Extract<Effect, { type: "createToken
   const xx = e0.pt !== undefined ? amountNow(s, e0.pt, ctx) : undefined;
   const t = e0.ptToughness !== undefined ? amountNow(s, e0.ptToughness, ctx) : undefined;
   const e = xx !== undefined ? { ...e0, token: { ...e0.token, power: xx, toughness: t ?? (e0.ptPowerOnly ? e0.token.toughness : xx) } } : e0;
+  // Furygale Flocking: one group for each opponent, each token required to attack that opponent this turn (CR 508.1d), the
+  // ones a doubler adds too (rulings on Chatterfang: what the effect says about its tokens applies to them).
+  if (e.mustAttackEach) {
+    const pid = ctx.controller;
+    for (const opp of apnap(s, opponents(s, pid))) {
+      const before = s.resolving?.created?.length ?? 0;
+      const { same: k, extra } = tokenBatch(s, pid, e.token, n);
+      for (let i = 0; i < k; i++) createToken(s, pid, e.token);
+      createExtraTokens(s, pid, extra);
+      const ids = (s.resolving?.created ?? []).slice(before).filter((id) => s.objects[id]?.zone === "battlefield");
+      if (k) log(s, `${src} creates ${k === 1 ? "a" : k} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""} that must attack ${player(s, opp).name} this turn.`);
+      if (ids.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: pid, sourceName: src, duration: "endOfTurn", affected: ids, mods: [{ kind: "mustAttackPlayer", player: opp }] });
+    }
+    invalidateCharacteristics(s);
+    return;
+  }
   // One group for each opponent, attacking that opponent if it's this player's combat (CR 508.4), tapped either way.
   if (e.attackingEach) {
     const pid = ctx.controller;

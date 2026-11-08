@@ -4710,8 +4710,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     return { ...t, attackerOpponent: true, body: { ...t.body, text: oppAttacksOther[1]! } };
   }
   // Jolene, the Plunder Queen: "Whenever a player attacks one or more of your opponents": once for each declaration of
-  // attackers that attacks any of them (CR 508.3e).
-  const attacksOpp = /^Whenever a player attacks (one|one or more) of your opponents, (?:if that opponent has more life than another of your opponents, )?(.+)$/.exec(line);
+  // attackers that attacks any of them (CR 508.3e). Party Dude: "Whenever one or more of your opponents are attacked" is
+  // the same event, the players themselves (not their planeswalkers), whoever attacks them.
+  const attacksOpp = /^Whenever a player attacks (one|one or more) of your opponents, (?:if that opponent has more life than another of your opponents, )?(.+)$/.exec(line.replace(/^Whenever one or more of your opponents are attacked, (?!.*\bthat (?:opponent|player)\b)/, "Whenever a player attacks one or more of your opponents, "));
   if (attacksOpp) {
     const text = attacksOpp[2]!;
     const oneOrMore = attacksOpp[1] === "one or more";

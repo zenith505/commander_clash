@@ -5,7 +5,7 @@ import type { Amount, CounterKind, Modification, FromTop, AbilityBody, Count, Ch
 import { canonicalKeyword, LAND_TYPES, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, SACRIFICED_LANDWALK, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CHOSEN_PARITY_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
-import { withModes, gateTargets, type CastHow } from "../modes";
+import { withModes, gateTargets, X_MODES_MAX, type CastHow } from "../modes";
 import type { CardDef, Color, ManaType, PlayerId } from "../types";
 import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS, capital, singularWord } from "./words";
@@ -538,6 +538,9 @@ export function compile(d: CardDef): CompiledCard {
   let bothAny = false;
   // "Choose three. You may choose the same mode more than once." (the Confluences, CR 700.2d).
   let repeat = false;
+  // Doomsday Confluence: "Choose X. You may choose the same mode more than once.": as many modes as the X announced as it's
+  // cast (CR 601.2b, 700.2d), any of them again (see AbilityBody.modal.xCount).
+  let xModes = false;
   let cipher = false;
   let uncopyableSpell = false;
   // Dance of Many: "the token" in its other abilities is the one token its enters ability creates (linked abilities, CR
@@ -709,6 +712,11 @@ export function compile(d: CardDef): CompiledCard {
         if (same && isSpell) {
           repeat = true;
           return `Choose ${same[1]} —`;
+        }
+        if (isSpell && /^Choose X\. You may choose the same mode more than once\.$/.test(l.trim()) && /\{X\}/.test(d.manaCost)) {
+          repeat = true;
+          xModes = true;
+          return "Choose X —";
         }
         if (/^Choose one\. If ~ was kicked, choose any number instead\.$/.test(l.trim())) {
           both = "kicked";
@@ -6452,6 +6460,7 @@ export function compile(d: CardDef): CompiledCard {
       delete out.cantBeCounteredIf;
     }
   }
+  if (xModes && out.spell?.modal && !out.spell.modal.costs && !out.spell.modal.pawprints && out.spell.modal.min === 0 && out.spell.modal.max === X_MODES_MAX) out.spell.modal.xCount = true;
   if (repeat) {
     const modal = out.spell?.modal;
     if (modal && !modal.costs && !modal.pawprints && ((modal.min === modal.max && modal.min > 1) || (modal.min === 0 && modal.max > 1))) modal.repeat = true;

@@ -2658,6 +2658,8 @@ export interface Resolving {
   /** "Each player rolls a d20" (Chaos Dragon): each player's result. */
   rolledEach?: Partial<Record<PlayerId, number>>;
   scratch?: {
+    /** Effect "loreChoices" (Shrouded Lore): the cards the opponent has chosen, the last of them, and whether paying for another choice is asked next. */
+    lore?: { chosen: ObjectId[]; last?: ObjectId; pay: boolean };
     /** Effect "counterOfKindEach" (The Caves of Androzani): the permanents picked, as the objects they were, and the kind chosen for each. */
     counterEach?: { picked: { id: ObjectId; zc: number }[]; kinds: Record<ObjectId, string> };
     /** Effect "eachExilesPermanentsOrHand" (Descent into Madness): how many each exiles, who still chooses, and what the others chose. */

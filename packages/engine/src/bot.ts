@@ -300,6 +300,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const ok = !!taps && (!mana || manaValue(parseManaCost(mana)) <= Math.max(4, lands(s, pid) - 2)) && player(s, pid).life > life + 5 && (player(s, pid).energy ?? 0) >= energy;
       return ok ? [...taps!, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
     }
+    // Shrouded Lore: the opponent chooses the card that helps us least, so each payment can only get us a better one.
+    if (pend.kind === "chooseMay" && pend.pay?.mana && s.resolving?.body.effects[s.resolving.next]?.type === "loreChoices") {
+      const taps = planMana(s, pid, parseManaCost(pend.pay.mana));
+      return taps ? [...taps, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
+    }
     if (pend.kind === "chooseMay" && pend.pay) {
       // "You may pay {1}. If you do, ...": worth it when the rest is, and it leaves us some life.
       const { mana, life = 0 } = pend.pay;

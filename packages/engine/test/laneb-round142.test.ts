@@ -4,12 +4,18 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { applyAction, botActions, controllerOf, invalidateCharacteristics, isFullySupported, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { applyAction, botActions, controllerOf, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 // Real oracle text (Scryfall).
 const misfortune = card("Misfortune", "Sorcery", "{1}{B}{R}{G}", { oracleText: "An opponent chooses one —\n• You put a +1/+1 counter on each creature you control and gain 4 life.\n• You put a -1/-1 counter on each creature that player controls and Misfortune deals 4 damage to that player." });
 const fatalLore = card("Fatal Lore", "Sorcery", "{2}{B}{B}", { oracleText: "An opponent chooses one —\n• You draw three cards.\n• You destroy up to two target creatures that player controls. They can't be regenerated. That player draws up to three cards." });
 const library = card("Library of Lat-Nam", "Sorcery", "{4}{U}", { oracleText: "An opponent chooses one —\n• You draw three cards at the beginning of the next turn's upkeep.\n• You search your library for a card, put that card into your hand, then shuffle." });
+
+const blessing = card("Nature's Blessing", "Enchantment", "{2}{G}{W}", { keywords: ["Banding"], oracleText: "{G}{W}, Discard a card: Put a +1/+1 counter on target creature or that creature gains banding, first strike, or trample. (This effect lasts indefinitely. Any creatures with banding, and up to one without, can attack in a band. Bands are blocked as a group. If any creatures with banding a player controls are blocking or being blocked by a creature, that player divides that creature's combat damage, not its controller, among any of the creatures it's being blocked by or is blocking.)" });
+const ransom = card("Soul Ransom", "Enchantment — Aura", "{2}{U}{B}", { oracleText: "Enchant creature\nYou control enchanted creature.\nDiscard two cards: This Aura's controller sacrifices it, then draws two cards. Only your opponents may activate this ability." });
+const shrouded = card("Shrouded Lore", "Sorcery", "{B}", { oracleText: "Target opponent chooses a card in your graveyard. You may pay {B}. If you do, repeat this process except that opponent can't choose a card already chosen for Shrouded Lore. Then put the last chosen card into your hand." });
+const forgotten = card("Forgotten Lore", "Sorcery", "{G}", { oracleText: "Target opponent chooses a card in your graveyard. You may pay {G}. If you do, repeat this process except that opponent can't choose a card already chosen for Forgotten Lore. Then put the last chosen card into your hand." });
+const wurm = card("Craw Wurm", "Creature — Wurm", "{4}{G}{G}", { power: "6", toughness: "4" });
 
 const giant = card("Hill Giant", "Creature — Giant", "{3}{R}", { power: "3", toughness: "3" });
 const ogre = card("Gray Ogre", "Creature — Ogre", "{2}{R}", { power: "2", toughness: "2" });
@@ -23,6 +29,25 @@ const run = (s: GameState, plan: Action[] | null) => {
 };
 const tgt = (id: string): TargetChoice => ({ kind: "object", id });
 const NONE: TargetChoice = { kind: "none" };
+const pool = (s: GameState, pid: PlayerId, mana: Partial<Record<"W" | "U" | "B" | "R" | "G" | "C", number>>) => {
+  for (const [k, n] of Object.entries(mana)) s.players[pid]!.manaPool[k as "W"] += n!;
+};
+/** A card put into `pid`'s graveyard. */
+const toYard = (s: GameState, pid: PlayerId, def: CardDef) => {
+  const id = putOnBattlefield(s, pid, def);
+  s.battlefield.splice(s.battlefield.indexOf(id), 1);
+  s.objects[id]!.zone = "graveyard";
+  s.players[pid]!.graveyard.push(id);
+  return id;
+};
+/** A card put into `pid`'s hand. */
+const toHand = (s: GameState, pid: PlayerId, def: CardDef) => {
+  const id = toYard(s, pid, def);
+  s.players[pid]!.graveyard.splice(s.players[pid]!.graveyard.indexOf(id), 1);
+  s.objects[id]!.zone = "hand";
+  s.players[pid]!.hand.push(id);
+  return id;
+};
 const pt = (s: GameState, id: string) => `${power(s, s.objects[id]!)}/${toughness(s, s.objects[id]!)}`;
 const zone = (s: GameState, id: ObjectId) => s.objects[id]!.zone;
 const opps = (s: GameState, ap: PlayerId) => s.turnOrder.filter((p) => p !== ap);
@@ -40,6 +65,9 @@ const settle = (s: GameState, opts: { me?: PlayerId[] } = {}) => {
 describe("parsing", () => {
   it("the three cards are supported, their modes chosen by an opponent", () => {
     supported(misfortune, fatalLore, library);
+  });
+  it("Nature's Blessing, Soul Ransom, Shrouded Lore and Forgotten Lore are supported", () => {
+    supported(blessing, ransom, shrouded, forgotten);
   });
 });
 
@@ -256,5 +284,120 @@ describe("Library of Lat-Nam: an opponent chooses one", () => {
     expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap });
     s = settle(s);
     expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+});
+
+describe("Nature's Blessing: a +1/+1 counter or banding, first strike or trample, chosen as it resolves", () => {
+  const start = () => {
+    const { s: s0, ap } = setup([]);
+    const nb = putOnBattlefield(s0, ap, blessing);
+    const bear = putOnBattlefield(s0, ap, ogre);
+    const fodder = toHand(s0, ap, giant);
+    invalidateCharacteristics(s0);
+    return { s0, ap, nb, bear, fodder };
+  };
+  it("first strike, for good; the card is discarded as the cost", () => {
+    const { s0, ap, nb, bear, fodder } = start();
+    let s = run(s0, planActivate(s0, ap, nb, 0, [tgt(bear)], undefined, undefined, undefined, { discard: [fodder] }));
+    expect(zone(s, fodder)).toBe("graveyard");
+    s = settle(s, { me: [ap] });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap, what: "either", labels: ["Put a +1/+1 counter on it", "It gains banding", "It gains first strike", "It gains trample"] });
+    s = act(s, { type: "chooseOption", player: ap, choice: "2" });
+    s = settle(s);
+    expect(objHasKeyword(s, s.objects[bear]!, "First strike")).toBe(true);
+    expect(pt(s, bear)).toBe("2/2");
+    // Still there next turn: no duration (rulings).
+    s = passUntil(s, "upkeep", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]);
+    expect(objHasKeyword(s, s.objects[bear]!, "First strike")).toBe(true);
+  });
+  it("or the +1/+1 counter", () => {
+    const { s0, ap, nb, bear, fodder } = start();
+    let s = run(s0, planActivate(s0, ap, nb, 0, [tgt(bear)], undefined, undefined, undefined, { discard: [fodder] }));
+    s = settle(s, { me: [ap] });
+    s = act(s, { type: "chooseOption", player: ap, choice: "0" });
+    s = settle(s);
+    expect(pt(s, bear)).toBe("3/3");
+    expect(objHasKeyword(s, s.objects[bear]!, "Banding")).toBe(false);
+  });
+});
+
+describe("Soul Ransom: only its opponents may activate it; its controller sacrifices it and draws two", () => {
+  const start = () => {
+    const { s: s0, ap } = setup([]);
+    const [b] = opps(s0, ap);
+    const wurmId = putOnBattlefield(s0, b!, wurm);
+    const aura = putOnBattlefield(s0, ap, ransom);
+    s0.objects[aura]!.attachedTo = wurmId;
+    const discards = [toHand(s0, b!, giant), toHand(s0, b!, ogre)];
+    invalidateCharacteristics(s0);
+    return { s0, ap, b: b!, wurmId, aura, discards };
+  };
+  it("you control the enchanted creature, and can't activate the ability yourself", () => {
+    const { s0, ap, wurmId, aura } = start();
+    expect(controllerOf(s0, s0.objects[wurmId]!)).toBe(ap);
+    expect(planActivate(s0, ap, aura, 0, undefined, undefined, undefined, undefined, { discard: s0.players[ap]!.hand.slice(0, 2) })).toBeNull();
+  });
+  it("an opponent discards two: the Aura's controller sacrifices it and draws two, and the creature goes back", () => {
+    const { s0, ap, b, wurmId, aura, discards } = start();
+    let s = s0;
+    while (waitingOn(s) !== b) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = run(s, planActivate(s, b, aura, 0, undefined, undefined, undefined, undefined, { discard: discards }));
+    expect(discards.map((id) => zone(s, id))).toEqual(["graveyard", "graveyard"]);
+    const hand = s.players[ap]!.hand.length;
+    const theirs = s.players[b]!.hand.length;
+    s = settle(s);
+    expect(zone(s, aura)).toBe("graveyard");
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect(s.players[b]!.hand.length).toBe(theirs);
+    expect(controllerOf(s, s.objects[wurmId]!)).toBe(b);
+  });
+});
+
+describe("Shrouded Lore and Forgotten Lore: the opponent chooses again each time you pay", () => {
+  const start = (lore: CardDef) => {
+    const { s: s0, ap, ids } = setup([lore]);
+    const [b] = opps(s0, ap);
+    const cards = [toYard(s0, ap, ogre), toYard(s0, ap, giant), toYard(s0, ap, wurm)];
+    return { s0, ap, b: b!, id: ids[0]!, cards };
+  };
+  it("pay once: the second card chosen goes into your hand, and the opponent can't choose the first again", () => {
+    const { s0, ap, b, id, cards } = start(shrouded);
+    let s = run(s0, planCast(s0, ap, id, [{ kind: "player", id: b }]));
+    s = settle(s, { me: [ap, b] });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: b, cards, min: 1, max: 1 });
+    s = act(s, { type: "searchLibrary", player: b, found: [cards[0]!] });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap, pay: { mana: "{B}" } });
+    pool(s, ap, { B: 1 });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: b, cards: [cards[1], cards[2]] });
+    expect(() => act(s, { type: "searchLibrary", player: b, found: [cards[0]!] })).toThrow();
+    s = act(s, { type: "searchLibrary", player: b, found: [cards[1]!] });
+    s = act(s, { type: "chooseMay", player: ap, yes: false });
+    s = settle(s);
+    expect(cards.map((c) => zone(s, c))).toEqual(["graveyard", "hand", "graveyard"]);
+    expect(zone(s, id)).toBe("graveyard");
+  });
+  it("with no card left to choose there's nothing to pay for: the last one goes into your hand", () => {
+    const { s0, ap, b, id } = start(forgotten);
+    const s1 = structuredClone(s0);
+    s1.players[ap]!.graveyard = s1.players[ap]!.graveyard.slice(0, 1);
+    const only = s1.players[ap]!.graveyard[0]!;
+    let s = run(s1, planCast(s1, ap, id, [{ kind: "player", id: b }]));
+    s = settle(s, { me: [ap, b] });
+    s = act(s, { type: "searchLibrary", player: b, found: [only] });
+    expect(s.pending).toBeNull();
+    s = settle(s);
+    expect(zone(s, only)).toBe("hand");
+  });
+  it("a bot opponent chooses the card worth least to you; a bot caster pays while it can", () => {
+    const { s0, ap, b, id, cards } = start(shrouded);
+    let s = run(s0, planCast(s0, ap, id, [{ kind: "player", id: b }]));
+    s = settle(s, { me: [ap, b] });
+    const [pick] = botActions(s, b);
+    expect(pick).toMatchObject({ type: "searchLibrary", found: [cards[0]] });
+    s = act(s, pick!);
+    // We have Swamps untapped: we pay.
+    const answer = botActions(s, ap);
+    expect(answer.at(-1)).toEqual({ type: "chooseMay", player: ap, yes: true });
   });
 });

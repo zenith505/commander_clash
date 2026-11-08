@@ -3263,6 +3263,51 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.milled && (e.dest ?? "hand") === "hand") s.resolving!.putIntoHand = found;
       return;
     }
+    case "loreChoices": {
+      // Shrouded Lore: the opponent chooses a card in your graveyard; each time you pay, they choose again among the cards
+      // not chosen yet (none left: no more choosing, rulings); the last card chosen goes into your hand (CR 608.2c).
+      const me = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      const st = (sc.lore ??= { chosen: [], pay: false });
+      const chooser = players(s, e.who, ctx).find((q) => !player(s, q).lost);
+      const left = () => me.graveyard.filter((id) => !st.chosen.includes(id));
+      for (;;) {
+        if (!st.pay) {
+          // The opponent's choice.
+          const pick = sc.found?.[0];
+          sc.found = undefined;
+          if (pick !== undefined) {
+            st.chosen.push(pick);
+            st.last = pick;
+            st.pay = true;
+            log(s, `${player(s, chooser ?? me.id).name} chooses ${defOf(s, obj(s, pick)).name} in ${me.name}'s graveyard for ${src}.`);
+            continue;
+          }
+          const cards = left();
+          if (chooser === undefined || !cards.length) break;
+          s.pending = { kind: "searchLibrary", player: chooser, source: src, what: `a card in ${me.name}'s graveyard`, cards, min: 1, max: 1, fromGraveyard: "hand", ...(chooser !== me.id ? { forPlayer: me.id, helps: true as const } : {}) };
+          return "paused";
+        }
+        // Paying for another choice, only with a card left to choose (rulings).
+        if (sc.may !== undefined) {
+          const again = sc.may;
+          sc.may = undefined;
+          if (!again) break;
+          st.pay = false;
+          continue;
+        }
+        if (chooser === undefined || !left().length) break;
+        s.pending = { kind: "chooseMay", player: me.id, source: src, prompt: `pay ${e.pay} to have ${player(s, chooser).name} choose another card`, pay: { mana: e.pay } };
+        return "paused";
+      }
+      const last = st.last;
+      sc.lore = undefined;
+      if (last !== undefined && me.graveyard.includes(last)) {
+        log(s, `${me.name} puts ${defOf(s, obj(s, last)).name} from their graveyard into their hand.`);
+        moveObject(s, last, "hand");
+      }
+      return;
+    }
     case "reorderGraveyard": {
       const p = player(s, ctx.controller);
       if (e.random) {

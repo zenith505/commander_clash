@@ -1,9 +1,10 @@
 // Lane B round B142 in the browser: "An opponent chooses one —". You choose which opponent chooses the mode of your
 // Misfortune or Fatal Lore (CR 700.2e), then the targets of Fatal Lore's mode (601.2c); a bot's Fatal Lore asks you for
-// the mode, and "that player draws up to three cards" asks you how many.
+// the mode, and "that player draws up to three cards" asks you how many. Also Soul Ransom's "Only your opponents may
+// activate this ability" on Ana's Aura, and Shrouded Lore's "You may pay {B}" to have Ana choose again.
 import { expect, test } from "@playwright/test";
 import { one, open, pageErrors, playWithBots, scene } from "./scene";
-import { card, controls, resolveUntil } from "./ui";
+import { card, clickPlayer, controls, menu, modal, resolveUntil } from "./ui";
 
 const MANA = ["Swamp", "Swamp", "Mountain", "Forest", "Plains"];
 
@@ -67,5 +68,54 @@ test("Ana's Fatal Lore: you, her only opponent left, choose the destroy mode; sh
   await bar.getByRole("button", { name: "Draw 3 cards" }).click();
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.players[0]!.hand.length === hand + 3);
   expect(after.players[0]!.hand.length).toBe(hand + 3);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Soul Ransom: Ana's Aura controls your Gray Ogre; you discard two to make her sacrifice it, she draws two, the Ogre comes back", async ({ page }) => {
+  const s = scene({ hand: ["Hill Giant", "Grizzly Bears"], board: ["Gray Ogre"] }, [{ board: ["Soul Ransom"] }]);
+  const [aura, ogre, giant, bears] = [one(s, "Soul Ransom"), one(s, "Gray Ogre"), one(s, "Hill Giant"), one(s, "Grizzly Bears")];
+  s.objects[aura]!.attachedTo = ogre;
+  const anaHand = s.players[1]!.hand.length;
+  await open(page, s);
+  // Attached under the Ogre: its visible corner.
+  await page.locator(`[data-obj="${aura}"]`).first().click({ position: { x: 6, y: 6 } });
+  const ability = menu(page).getByRole("button", { name: /sacrifices it, then draws two cards/ });
+  await expect(ability).toBeEnabled();
+  await ability.click();
+  const pick = modal(page);
+  await pick.locator(`[data-pick="${giant}"]`).click();
+  await pick.locator(`[data-pick="${bears}"]`).click();
+  await pick.getByRole("button", { name: "Done" }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[aura]!.zone === "graveyard");
+  expect(after.objects[giant]!.zone).toBe("graveyard");
+  expect(after.objects[bears]!.zone).toBe("graveyard");
+  expect(after.players[1]!.hand.length).toBe(anaHand + 2);
+  expect(after.players[0]!.hand.length).toBe(0);
+  expect(after.objects[ogre]!.zone).toBe("battlefield");
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Shrouded Lore: Ana chooses a card in your graveyard, you pay {B} once for another choice, and that one comes to your hand", async ({ page }) => {
+  const s = scene({ hand: ["Shrouded Lore"], board: ["Swamp", "Swamp"], yard: ["Gray Ogre", "Hill Giant", "Grizzly Bears"] });
+  const lore = one(s, "Shrouded Lore");
+  const yard = [...s.players[0]!.graveyard];
+  await open(page, s);
+  await card(page, "Shrouded Lore", s).click();
+  await clickPlayer(page, 1);
+  await resolveUntil(page, (st) => st.pending?.kind === "chooseMay" && st.pending.player === 0);
+  const bar = controls(page);
+  await expect(bar).toContainText("to have Ana choose another card");
+  await bar.getByRole("button", { name: "Pay", exact: true }).click();
+  const again = await resolveUntil(page, (st) => st.pending?.kind === "chooseMay" && st.pending.player === 0 && st.log.filter((l) => l.text.includes("for Shrouded Lore.") && l.text.includes(" chooses ")).length === 2);
+  // Two cards chosen so far; the Swamps are both tapped (one for the spell, one for the second choice).
+  expect(again.battlefield.filter((id) => again.objects[id]!.controller === 0 && again.objects[id]!.tapped).length).toBe(2);
+  await bar.getByRole("button", { name: "Don't pay" }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[lore]!.zone === "graveyard");
+  const back = yard.filter((id) => after.objects[id]!.zone === "hand");
+  expect(back.length).toBe(1);
+  // The card that came back is the second one Ana chose.
+  const chosen = after.log.filter((l) => / chooses .+ in You's graveyard for Shrouded Lore\./.test(l.text));
+  expect(chosen.length).toBe(2);
+  expect(chosen[1]!.text).toContain(after.cards[after.objects[back[0]!]!.cardId]!.name);
   expect(pageErrors(page)).toEqual([]);
 });

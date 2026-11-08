@@ -3818,6 +3818,13 @@ export type Effect =
    */
   | { type: "duelReveal"; between: PlayerRef[] }
   /** "You may repeat this process any number of times" (Ad Nauseam): `effects` (none of which waits on a choice), then the controller decides whether to go again, each time after seeing the result (rulings). */
+  /**
+   * Shrouded Lore, Forgotten Lore: "Target opponent chooses a card in your graveyard. You may pay {B}. If you do, repeat this
+   * process except that opponent can't choose a card already chosen for ~. Then put the last chosen card into your hand."
+   * `who` chooses, then its controller may pay `pay` for another choice among the cards not chosen yet, as long as there is
+   * one (rulings); the last card chosen goes into its controller's hand.
+   */
+  | { type: "loreChoices"; who: PlayerRef; pay: string }
   | { type: "repeatMay"; effects: Effect[]; text: string; /** Kindle the Carnage: offered again only while its controller has a card in hand (not a library, as Ad Nauseam's); each pass discards anew. */ needsHand?: true }
   /** Sunforger: the card a search with dest "cast" found, cast from the library without paying its mana cost (CR 608.2g). */
   | { type: "castSearched" }

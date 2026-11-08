@@ -24326,6 +24326,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f21bd7b6-a03f-402e-a2b1-899ccbd9f0cf",
+  "name": "Shrouded Lore",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target opponent chooses a card in your graveyard. You may pay {B}. If you do, repeat this process except that opponent can't choose a card already chosen for Shrouded Lore. Then put the last chosen card into your hand.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "plc",
+  "releasedAt": "2007-02-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "728d2e30-2f36-4054-81db-29b01e376a82",
   "name": "Sickening Dreams",
   "manaCost": "{1}{B}",
@@ -25287,6 +25313,38 @@
   "set": "ecl",
   "releasedAt": "2026-01-23",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f4ae18b5-2cf1-4720-8237-40a0c7b040ae",
+  "name": "Soul Ransom",
+  "manaCost": "{2}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nYou control enchanted creature.\nDiscard two cards: This Aura's controller sacrifices it, then draws two cards. Only your opponents may activate this ability.",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "gtc",
+  "releasedAt": "2013-02-01",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

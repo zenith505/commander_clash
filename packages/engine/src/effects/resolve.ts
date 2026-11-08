@@ -1331,6 +1331,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "randomTargetsToBottom":
     case "destroyRandomTarget":
     case "chooseFromGraveyard":
+    case "loreChoices":
     case "reorderGraveyard":
     case "returnAllFromGraveyard":
     case "commandersOntoBattlefield":

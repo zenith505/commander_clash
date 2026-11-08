@@ -1137,6 +1137,23 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // "An opponent chooses one —" (Misfortune, Fatal Lore, Library of Lat-Nam): a spell's mode chosen by an opponent its caster
   // chooses (CR 700.2e), "that player" in its modes being that opponent (modal.chooser, opponentChosenModes).
   if (opts.spell && /^An opponent chooses one —/.test(text.trim())) return opponentChosenModes(text.trim(), opts);
+  // Nature's Blessing: "Put a +1/+1 counter on target creature or that creature gains banding, first strike, or trample.":
+  // one of the four, chosen as it resolves (CR 608.2d); the keyword with no duration lasts indefinitely (rulings).
+  const counterOrGains = /^Put a \+1\/\+1 counter on (target [^.]+?) or that creature gains ((?:[a-z]+(?: [a-z]+)?, )+)or ([a-z]+(?: [a-z]+)?)\.$/.exec(text.trim());
+  if (counterOrGains) return counterOrKeyword(counterOrGains, text.trim(), opts);
+  // Shrouded Lore, Forgotten Lore: an opponent chooses again each time you pay (Effect loreChoices).
+  const lore = opts.spell ? /^Target opponent chooses a card in your graveyard\. You may pay (\{[WUBRG]\})\. If you do, repeat this process except that opponent can't choose a card already chosen for ~\. Then put the last chosen card into your hand\.$/.exec(text.trim()) : null;
+  if (lore) {
+    const who = parseBody("Target opponent draws a card.", opts);
+    return who?.targets.length === 1 ? { targets: who.targets, effects: [{ type: "loreChoices", who: { ref: "target", index: 0 }, pay: lore[1]! }], text: text.trim() } : null;
+  }
+  // Soul Ransom (an ability only its opponents may activate): "~'s controller sacrifices it, then draws two cards": the
+  // permanent's controller, not the ability's, sacrifices it (CR 701.21a) and draws, even if it's gone by then (rulings).
+  const ransom = opts.activated ? /^~'s controller sacrifices it, then draws (a card|two cards|three cards)\.$/.exec(text.trim()) : null;
+  if (ransom) {
+    const draw = parseBody(`~'s controller draws ${ransom[1]!}.`, opts);
+    return draw && !draw.targets.length ? { targets: [], effects: [{ type: "sacrifice", what: { ref: "self" }, byController: true }, ...draw.effects], text: text.trim() } : null;
+  }
   if (opts.subjectIt && !opts.selfIt && /^you may transform it\.$/.test(text)) return { targets: [], effects: [{ type: "may", effects: [{ type: "transform", what: { ref: "subject" } }], text: "transform it" }], text };
   // Dazzling Denial: "Counter target spell unless its controller pays {2}. If you control a Bird, counter that spell unless
   // its controller pays {4} instead." One counter, with the cost the condition sets as it resolves (CR 608.2c).
@@ -18110,6 +18127,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
 }
 
 /** "{2}{U}", "3 life", "{E}{E}", "{1} and 2 life": a cost paid as an ability resolves. */
+/** parseBody's "Put a +1/+1 counter on target creature or that creature gains banding, first strike, or trample" (Nature's Blessing). */
+function counterOrKeyword(m: RegExpExecArray, text: string, opts: Parameters<typeof parseBody>[1]): AbilityBody | null {
+  const put = parseBody(`Put a +1/+1 counter on ${m[1]!}.`, opts);
+  const words = [...m[2]!.split(", ").filter(Boolean), m[3]!];
+  const gains = words.map((w) => parseBody(`${capital(m[1]!)} gains ${w}.`, opts));
+  if (!put || put.targets.length !== 1 || gains.some((g) => !g || g.targets.length !== 1 || JSON.stringify(g.targets) !== JSON.stringify(put.targets))) return null;
+  return {
+    targets: put.targets,
+    effects: [{ type: "either", options: [put.effects, ...gains.map((g) => g!.effects)], labels: ["Put a +1/+1 counter on it", ...words.map((w) => `It gains ${w}`)] }],
+    text,
+  };
+}
+
 /**
  * parseBody's "An opponent chooses one —" for a spell (modal.chooser "opponent", CR 700.2e): each mode read as its caster's
  * instructions ("You put ...", "You draw ..."), "that player" in it read as a trigger's player and then made the opponent

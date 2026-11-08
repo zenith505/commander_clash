@@ -1298,6 +1298,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const away: Effect = /^sacrifice/i.test(m[1]!) ? sacrificeSelf : /^tap/i.test(m[1]!) ? { type: "tap", what: { ref: "self" } } : /^destroy/i.test(m[1]!) ? { type: "destroy", what: { ref: "self" } } : { type: "exile", what: { ref: "self" } };
     return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true }, n: many ? num(many[1]!) : 1, action: "sacrifice" }], otherwise: [away], keep: true, text: `Sacrifice ${m[3]} to keep ~${/^tap/i.test(m[1]!) ? " untapped" : ""}` }];
   }
+  // Phyrexian Dreadnought: "sacrifice it unless you sacrifice any number of creatures with total power 12 or greater": you
+  // choose as it resolves, even with ~ gone; the creatures are sacrificed at once, and that option can't be chosen without
+  // that much power to sacrifice (rulings). ~ itself is one of "any number of creatures" (the text doesn't say "other").
+  if ((m = /^[Ss]acrifice (~|it) unless you sacrifice any number of creatures with total power (\d+) or greater$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const filter = pickFilter("creature");
+    if (filter?.kind !== "object") return null;
+    const min = Number(m[2]);
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 0, anyNumber: true, minTotalPower: min, action: "sacrifice", prompt: `sacrifice any number of your creatures with total power ${min} or greater (~ is one of them, if you like): click them, then sacrifice them.` }], otherwise: [sacrificeSelf], keep: true, text: `Sacrifice creatures with total power ${min} or greater (or ~ is sacrificed)` }];
+  }
   // Wormfang Drake: "sacrifice it unless you exile a creature you control other than ~": the choice is made as it resolves,
   // even after it has left (then the exiled card stays exiled, rulings); with no other creature, it's sacrificed.
   if ((m = /^[Ss]acrifice (~|it) unless you exile a creature you control other than ~$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {

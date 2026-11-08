@@ -848,6 +848,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.foretold
             : e.cond.kind === "castInMain"
             ? !!s.resolving!.item.castInMain
+            : e.cond.kind === "selfFromYourLibrary"
+            ? ((o) => !!o && o.owner === ctx.controller && (ctx.sourceZc === undefined || (o.zoneChanges ?? 0) === ctx.sourceZc ? !!o.fromOwnLibrary : s.lastKnown?.[o.id]?.zc === ctx.sourceZc && !!s.lastKnown[o.id]!.fromOwnLibrary))(ctx.sourceId ? s.objects[ctx.sourceId] : undefined)
             : e.cond.kind === "castFromHandAndAnotherNamed"
             ? ((o) => !s.resolving!.item.copy && o?.castFrom === "hand" && (player(s, ctx.controller).castNames?.[defOf(s, o).name] ?? 0) >= 2)(s.objects[s.resolving!.item.objectId ?? ""])
             : e.cond.kind === "castFromGraveyard"
@@ -1313,6 +1315,9 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "collectEvidence" && evidenceProblem(s, ctx.controller, e.n, undefined, selfCardExiled(s, effects, ctx))) return false;
     // "Unless you return a non-Lair land you control": you can't if you have none.
     if (e.type === "pick" && e.who.ref === "you" && pickOptions(s, e, ctx.controller, ctx.sourceId).length < amountNow(s, e.n, ctx)) return false;
+    // Phyrexian Dreadnought: "unless you sacrifice any number of creatures with total power 12 or greater": only with that
+    // much power to sacrifice (rulings: otherwise that option can't be chosen).
+    if (e.type === "pick" && e.who.ref === "you" && e.minTotalPower !== undefined && pickOptions(s, e, ctx.controller, ctx.sourceId).reduce((t, id) => t + Math.max(0, power(s, obj(s, id))), 0) < e.minTotalPower) return false;
     // Fugitive of the Judoon: "exile a Human you control and an artifact you control": two different permanents.
     if (e.type === "pick" && e.who.ref === "you" && e.leaving) {
       const next = pickOptions(s, { filter: e.leaving }, ctx.controller, ctx.sourceId);

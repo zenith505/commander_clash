@@ -941,8 +941,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       log(s, `${player(s, ctx.controller).name} has no maximum hand size for the rest of the game.`);
       return;
     case "entersWithCountersThisTurn":
-      (s.entersWithCountersThisTurn ??= []).push({ controller: ctx.controller, filter: e.filter, counter: e.counter, n: e.n, source: src });
-      log(s, `This turn, each creature ${player(s, ctx.controller).name} controls enters with an additional ${e.counter} counter (${src}).`);
+      (s.entersWithCountersThisTurn ??= []).push({ controller: ctx.controller, filter: e.filter, counter: e.counter, n: e.n, source: src, ...(e.untilYourNextTurn ? { untilYourNextTurn: true as const } : {}) });
+      log(s, `${e.untilYourNextTurn ? "Until their next turn" : "This turn"}, each creature ${player(s, ctx.controller).name} controls enters with an additional ${e.counter} counter (${src}).`);
       return;
     case "enterTappedUntil":
       (s.entersTappedUntil ??= []).push({ controller: ctx.controller, filter: e.filter, source: src, ...(e.thisTurn ? { thisTurn: true as const } : {}) });
@@ -1898,6 +1898,52 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         const put = putCounters(s, o, k, 1);
         if (put) log(s, `${player(s, you).name} puts another ${k} counter on ${defOf(s, o).name} (${src}).`);
       }
+      return;
+    }
+    case "counterKindToOthers": {
+      // Contractual Safeguard: a creature you control with a counter on it and one kind of counter on it, chosen as this
+      // resolves (the shield counter its addendum just put on one, too, rulings); then a counter of that kind on each
+      // other creature you control. With no counters on your creatures, nothing happens.
+      const you = ctx.controller;
+      const sc = (s.resolving!.scratch ??= {});
+      const kindsOn = (o: GameObject) => Object.keys(o.counters).filter((k) => (o.counters[k] ?? 0) > 0);
+      const mine = () => s.battlefield.filter((id) => !s.phasedOut?.includes(id) && controllerOf(s, obj(s, id)) === you && objIsType(s, obj(s, id), "Creature"));
+      if (!sc.kindFrom) {
+        const options = mine().filter((id) => kindsOn(obj(s, id)).length > 0);
+        if (!options.length) {
+          log(s, `${src}: no creature you control has a counter on it.`);
+          return;
+        }
+        if (options.length > 1 && !sc.queue) {
+          sc.queue = [you];
+          sc.chosen = {};
+          s.pending = { kind: "pickPermanents", player: you, source: src, action: "choose", what: "creature with a counter", options, count: 1, prompt: "choose a creature of yours with a counter on it: you choose a kind of counter on it, and each other creature you control gets a counter of that kind." };
+          return "paused";
+        }
+        const id = options.length === 1 ? options[0]! : (sc.chosen?.[you] ?? [])[0];
+        sc.queue = undefined;
+        sc.chosen = undefined;
+        if (!id) return;
+        sc.kindFrom = { id, zc: obj(s, id).zoneChanges ?? 0 };
+      }
+      const from = obj(s, sc.kindFrom.id);
+      const kinds = kindsOn(from);
+      if (kinds.length > 1 && sc.counterKind === undefined) {
+        s.pending = { kind: "chooseOption", player: you, source: src, what: "counterKind", options: kinds, labels: kinds.map((k) => `A ${k} counter`), about: from.id, prompt: `choose a kind of counter on ${characteristics(s, from).name}: each other creature you control gets a counter of that kind` };
+        return "paused";
+      }
+      const kind = sc.counterKind ?? kinds[0];
+      sc.counterKind = undefined;
+      const fromId = sc.kindFrom.id;
+      sc.kindFrom = undefined;
+      if (!kind) return;
+      for (const id of mine()) {
+        if (id === fromId) continue;
+        const o = obj(s, id);
+        const put = putCounters(s, o, kind, 1);
+        if (put) log(s, `${src} puts ${put === 1 ? "a" : put} ${kind} counter${put === 1 ? "" : "s"} on ${characteristics(s, o).name}.`);
+      }
+      invalidateCharacteristics(s);
       return;
     }
     case "successionControl": {

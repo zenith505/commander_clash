@@ -206,7 +206,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         sc.queue.shift();
         continue;
       }
-      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: options.length, min: 0, anyNumber: true, ...(e.prompt ? { prompt: e.prompt.replace(/~/g, src) } : {}), ...(e.differentNames ? { differentNames: true as const } : {}), ...(e.differentPowers ? { differentPowers: true as const } : {}) };
+      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: options.length, min: 0, anyNumber: true, ...(e.prompt ? { prompt: e.prompt.replace(/~/g, src) } : {}), ...(e.differentNames ? { differentNames: true as const } : {}), ...(e.differentPowers ? { differentPowers: true as const } : {}), ...(e.minTotalPower !== undefined ? { minTotalPower: e.minTotalPower } : {}) };
       return "paused";
     }
     if (!n || (e.upTo && !options.length)) {
@@ -1893,6 +1893,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // Dire Fleet Daredevil: this turn only, with its usual timing (rulings).
           if (e.youMay && !card.isToken) card.mayPlay = { player: ctx.controller, zc: card.zoneChanges ?? 0, until: e.youMay.thisTurn ? "thisTurn" : e.youMay.nextTurn ? "nextTurn" : e.youMay.whileControlled ? "whileControlled" : "exiled", turn: s.turn, ...(e.youMay.whileControlled && ctx.sourceId ? { source: { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 } } : {}), ...(e.youMay.play ? {} : { castOnly: true as const }), ...(e.youMay.anyType ? { anyType: true as const } : {}), ...(e.youMay.exileAfter ? { exileAfter: true as const } : {}) };
         }
+      }
+      return;
+    }
+    case "grantYardKeyword": {
+      // Cursecloth Wrappings: the target card, still in its owner's graveyard (CR 608.2b), has embalm with its own mana cost
+      // until end of turn; a card with no mana cost gets an ability it can't pay for (CR 118.6, see cards.ts).
+      for (const o of objects(s, e.what, ctx)) {
+        if (o.zone !== "graveyard") continue;
+        (s.yardKeywordGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, keyword: e.keyword });
+        log(s, `${defOf(s, o).name} gains ${e.keyword.toLowerCase()} until end of turn (${src}).`);
       }
       return;
     }

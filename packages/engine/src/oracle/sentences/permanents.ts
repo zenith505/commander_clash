@@ -13,6 +13,9 @@ import { parseGrants } from "../grants";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
+  // Contractual Safeguard (one sentence, see body.ts): "Choose a kind of counter on a creature you control. Put a counter of
+  // that kind on each other creature you control."
+  if (s === "Choose a kind of counter on a creature you control and put a counter of that kind on each other creature you control") return [{ type: "counterKindToOthers" }];
   // Autumn Willow: "Until end of turn, ~ can be the target of spells and abilities controlled by target player as though it
   // didn't have shroud" (CR 702.18a): that player's, until the cleanup step (CR 514.2).
   // (The sentence comes here with "until end of turn" moved to its end.)
@@ -163,6 +166,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (turnCounters) {
     const g = parseGroup(`each ${turnCounters[1]}`);
     return g && !g.other && g.filter.kind === "object" && g.filter.controller === "you" ? [{ type: "entersWithCountersThisTurn", filter: g.filter, counter: counterKind(turnCounters[2]!), n: 1 }] : null;
+  }
+  // Arlinn, the Pack's Hope: "Until your next turn, each creature you control enters with an additional +1/+1 counter on
+  // it": the same replacement, ending as your next turn begins.
+  const nextTurnCounters = new RegExp(`^Until your next turn, each (creature you control) enters with an additional ${COUNTER} counter on it$`).exec(s);
+  if (nextTurnCounters) {
+    const g = parseGroup(`each ${nextTurnCounters[1]}`);
+    return g && !g.other && g.filter.kind === "object" && g.filter.controller === "you" ? [{ type: "entersWithCountersThisTurn", filter: g.filter, counter: counterKind(nextTurnCounters[2]!), n: 1, untilYourNextTurn: true }] : null;
   }
 
   // Maddening Hex: "Then attach ~ to another one of your opponents chosen at random."

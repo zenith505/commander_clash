@@ -1,6 +1,7 @@
 import type { AbilityBody, CompiledCard, ManaAbility, TargetSpec, TriggeredAbility } from "./abilities";
 import { characteristics, controllerOf, offFieldColored, offFieldDefinedPT, offFieldTyped, printedKeywords, type PTPart } from "./layers";
 import { cleavedText, compileCard, compileGranted, normalizeSelf, overloadedText } from "./oracle";
+import { parseCostKeyword } from "./oracle/keyword-abilities";
 import { COLORS, type CardDef, type Chosen, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
 import { faceKey, isRoom, registerFace, registerRoom, restingDef, roomKey, sameName } from "./faces";
@@ -413,6 +414,14 @@ function yardGranted(s: GameState, o: GameObject): CompiledCard["activated"] {
       const mv = g.manaValueCost ? `{${manaValue(parseManaCost(d.manaCost ?? ""))}}` : g.manaCostCost ? d.manaCost! : undefined;
       out.push(mv ? { ...g.activated, manaCost: mv, text: g.activated.text.replace(/\{[^}]+\}$/, mv) } : g.activated);
     }
+  }
+  // Cursecloth Wrappings: embalm (or encore) until end of turn for this card, "equal to its mana cost": its printed mana
+  // cost, an {X} in it counted as 0 (CR 202.3e, 107.3); with no mana cost, nothing to pay it with (CR 118.6).
+  for (const g of s.yardKeywordGrants ?? []) {
+    if (g.id !== o.id || g.zc !== (o.zoneChanges ?? 0) || !d.manaCost) continue;
+    const cost = d.manaCost.replace(/\{X\}/g, "") || "{0}";
+    const kw = parseCostKeyword(`${g.keyword} ${cost}`, d);
+    if (kw && kw !== "fail" && kw.activated) out.push(kw.activated);
   }
   return out;
 }

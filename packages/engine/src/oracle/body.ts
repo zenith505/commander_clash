@@ -1471,6 +1471,66 @@ function wandPunisher(who: PlayerRef, landLife: number): Effect {
   };
 }
 
+/**
+ * Sentences of round B148's cards, outside parseBodyText (which is at TypeScript's size limit, TS2563), read where it
+ * reads parseFaceDownPlay's: the last effect and the next sentence's index in parseFaceDownPlay's shape (the effects
+ * before the last one already pushed), "fail" for one that can't be read, or null when it isn't one of them.
+ */
+function roundB148Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  const out = (fx: Effect[], skip: number) => {
+    effects.push(...fx.slice(0, -1));
+    return { effect: fx[fx.length - 1]!, next: si + 1 + skip };
+  };
+  // Courier of Comestibles: "you may search your library for a Food card, reveal it, put it into your hand, then shuffle.
+  // If you don't put a card into your hand this way, create a Food token.": whether the search found one (none if it was
+  // declined or found nothing), so the token comes otherwise.
+  const searchedMay = effects[effects.length - 1];
+  const searchedFx = searchedMay?.type === "may" && searchedMay.effects.length === 1 ? searchedMay.effects[0] : undefined;
+  const didntSearch = /^If you don't put a card into your hand this way, (.+)$/.exec(s);
+  if (didntSearch && searchedFx?.type === "search" && searchedFx.dest.zone === "hand" && searchedFx.n === 1 && searchedMay?.type === "may" && !searchedMay.otherwise) {
+    const before = ctx.targets.length;
+    const inner = parseOne(capital(didntSearch[1]!), ctx);
+    if (!inner?.length || ctx.targets.length !== before || inner.some((e) => pauses(e))) return "fail";
+    return out([{ type: "if", cond: { kind: "searchFound", filter: { kind: "card", types: [], notTypes: [], notColors: [], text: "card" } }, effects: [], otherwise: inner }], 0);
+  }
+  // Xathrid Demon: "sacrifice a creature other than ~, then each opponent loses life equal to the sacrificed creature's
+  // power. If you can't sacrifice a creature, tap ~ and you lose 7 life.": the loss only after a sacrifice, the rest
+  // only when there was none to sacrifice (you must if you can).
+  const sacLater = /^If you can't sacrifice a creature, (.+)$/.exec(s);
+  const sacBefore = effects[effects.length - 2];
+  const afterSac = effects[effects.length - 1];
+  if (sacLater && sacBefore?.type === "pick" && sacBefore.action === "sacrifice" && sacBefore.who.ref === "you" && sacBefore.n === 1 && !sacBefore.unless && !sacBefore.anyNumber && !sacBefore.upTo && sacBefore.filter.types?.length === 1 && sacBefore.filter.types[0] === "Creature" && afterSac?.type === "loseLife" && JSON.stringify(afterSac).includes('"ref":"sacrificed"')) {
+    const before = ctx.targets.length;
+    const inner = parseOne(capital(sacLater[1]!), ctx);
+    if (!inner?.length || ctx.targets.length !== before || inner.some((e) => pauses(e))) return "fail";
+    effects.pop();
+    return out([{ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [afterSac], otherwise: inner }], 0);
+  }
+  // Council Guardian: "~ gains protection from each color with the most votes or tied for most votes": each such color,
+  // for as long as it's on the battlefield (CR 611.2a, 702.16a); none of them if it has left (rulings).
+  if (s === "~ gains protection from each color with the most votes or tied for most votes" && ctx.vote?.options?.length && ctx.vote.options.every((c) => /^(white|blue|black|red|green)$/.test(c))) {
+    return out(ctx.vote.options.map((c): Effect => ({ type: "if", cond: { kind: "voteWins", option: c, amongMost: true }, effects: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "addKeywords", keywords: [`Protection from ${c}`] }], duration: "game" }] })), 0);
+  }
+  // Celestial Judgment: "For each different power among creatures on the battlefield, choose a creature with that power.
+  // Destroy each creature not chosen this way.": one creature of each power there is, anyone's, none targeted, chosen as
+  // it resolves (rulings: even one that couldn't be destroyed), then all the rest at once.
+  if (s === "For each different power among creatures on the battlefield, choose a creature with that power" && /^Destroy each creature not chosen this way\.?$/.test(sentences[si + 1] ?? "")) {
+    const creature: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+    return out([{ type: "pick", who: { ref: "you" }, filter: creature, n: { count: { kind: "permanents", filter: creature, differentPowers: true } }, action: "choose", anyController: true, differentPowers: true, prompt: "click one creature of each power (anyone's), then choose them: ~ destroys each creature not chosen." }, { type: "destroy", what: { ref: "each", filter: creature, notCreated: true } }], 1);
+  }
+  // Borderland Explorer: "Each player may discard a card. Each player who discarded a card this way may search their
+  // library for a basic land card, reveal it, put it into their hand, then shuffle.": the discards decided in turn order,
+  // then made (rulings), then each of those players may search, in turn order.
+  const searchAfter = /^[Ee]ach player may discard a card$/.test(s) ? /^Each player who discarded a card this way may (search their library for .+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+  if (searchAfter) {
+    const before = ctx.targets.length;
+    const fx = parseOne(`Each player may ${searchAfter[1]}`, ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "search" || fx[0]!.who?.ref !== "eachPlayer" || !fx[0]!.may || ctx.targets.length !== before) return "fail";
+    return out([{ type: "eachMay", who: { ref: "eachPlayer" }, effects: [{ type: "discard", who: { ref: "you" }, n: 1, random: false }], text: "discard a card", each: true, need: { zone: "hand", filter: { kind: "card", text: "card" } } }, { ...fx[0]!, who: { ref: "choseThisWay" } }], 1);
+  }
+  return null;
+}
+
 function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell: boolean, before: Effect[]): { effects: Effect[]; skip: number } | null {
   // Vraska, the Silencer: "you may pay {1}. If you do, return that card to the battlefield tapped under your control. It's
   // a Treasure artifact with "...," and it loses all other card types": the permanent it becomes, from then on (CR
@@ -6428,8 +6488,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       spendAdded = added;
       continue;
     }
-    // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3).
-    const faceDown = parseFaceDownPlay(sentences, si, ctx);
+    // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
+    // round B148's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
+    const faceDown = roundB148Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);

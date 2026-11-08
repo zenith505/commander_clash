@@ -2078,6 +2078,13 @@ export function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] |
       if (!mana || !life) return null;
       out.push({ pay: mana }, { pay: life });
     }
+    // Torment of Venom: "unless they sacrifice another nonland permanent of their choice": any but the creature targeted
+    // (an Aura on it can be, rulings).
+    else if ((m = /^sacrifices? another (nonland permanent|permanent|creature) of their choice$/.exec(part))) {
+      const filter = pickFilter(m[1]!);
+      if (filter?.kind !== "object" || ctx.lastObjectTarget === undefined || ctx.targets.length !== 1) return null;
+      out.push({ sacrifice: { ...filter, notTargetObject: ctx.lastObjectTarget, text: `${m[1]} other than the targeted creature` } });
+    }
     else if ((m = /^sacrifices? (?:an?|one) (.+?)(?: of (?:their|his or her) choice)?$/.exec(part))) {
       // "An artifact, a creature, or a land": one permanent that's any of them.
       const filter = pickFilter(m[1]!.replace(/, (?:or )?an? /g, (x) => x.replace(/an? $/, "")).replace(/ or an? /, " or "));

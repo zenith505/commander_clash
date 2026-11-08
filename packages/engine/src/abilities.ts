@@ -987,6 +987,8 @@ export interface TargetSpec {
   sourceHost?: true;
   /** Enchanter's Bane: "unless that player sacrifices it": only the ability's target at this index (bound to its `objectId` as the punisher starts). */
   targetObject?: number;
+  /** Torment of Venom: "unless they sacrifice another nonland permanent": not the ability's target at this index (bound to `notId` as the punisher starts). */
+  notTargetObject?: number;
   /**
    * Targets this one can't be the same as: the others of the same "two target creatures" (CR 115.3),
    * or the earlier ones for "another target".
@@ -1136,7 +1138,11 @@ export interface TargetSpec {
    * or color chosen for the source (see GameObject.chosen) or while the spell resolves. Before
    * `bindChosen` fills it in, a filter that needs a choice that wasn't made matches nothing.
    */
-  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "Of a type chosen this way" (Chosen.types: any of them), "that aren't ...". */ "typesChosen" | "notTypesChosen" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name" | /** "Equal to the chosen number" (Chosen.number; see equalsChosen). */ "number" | /** "With power greater than or equal to the chosen number" (Expel the Interlopers): `power.min`, once it's known. */ "powerAtLeast" | /** "With mana value of the chosen quality" (Chosen.parity): `parity.is`, once it's known. */ "parity" | /** "A card of the chosen kind" after "choose land or nonland" (Chosen.landOrNonland). */ "landOrNonland" | /** "Creatures attacking the last chosen player" (Triarch Stalker): `attackingWhom` that player (Chosen.player), none while there's none. */ "attackingPlayer" | /** "A land of the chosen type" (Roots of Life): Chosen.landType, the land type chosen as its source entered. */ "landType" | /** Rite of Ruin: "the first type", the card type at `orderIndex` of Chosen.typeOrder. */ "typeOrder" | /** "Of one of the chosen colors" (Tablet of the Guilds): any of Chosen.colors. */ "colorsChosen";
+  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "Of a type chosen this way" (Chosen.types: any of them), "that aren't ...". */ "typesChosen" | "notTypesChosen" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name" | /** "Equal to the chosen number" (Chosen.number; see equalsChosen). */ "number" | /** "With power greater than or equal to the chosen number" (Expel the Interlopers): `power.min`, once it's known. */ "powerAtLeast" | /** "With mana value of the chosen quality" (Chosen.parity): `parity.is`, once it's known. */ "parity" | /** "A card of the chosen kind" after "choose land or nonland" (Chosen.landOrNonland). */ "landOrNonland" | /** "Creatures attacking the last chosen player" (Triarch Stalker): `attackingWhom` that player (Chosen.player), none while there's none. */ "attackingPlayer" | /** "A land of the chosen type" (Roots of Life): Chosen.landType, the land type chosen as its source entered. */ "landType" | /** Rite of Ruin: "the first type", the card type at `orderIndex` of Chosen.typeOrder. */ "typeOrder" | /** "Of one of the chosen colors" (Tablet of the Guilds): any of Chosen.colors. */ "colorsChosen" | /** "Creatures controlled by players who chose war" (Archangel of Strife): controlled by a player whose Chosen.byPlayer word is `chosenWord`. */ "byPlayer";
+  /** The word of `chosen` "byPlayer". */
+  chosenWord?: string;
+  /** Controlled by one of these players (`chosen` "byPlayer" once bound; none: nothing). */
+  controlledByAny?: PlayerId[];
   /** With `chosen` "typeOrder": which of the types chosen in order, from 0. */
   orderIndex?: number;
   /** "With mana value of the chosen quality" (Extinction Event), "with power of that quality" (Zimone's Hypothesis): odd or even, zero being even. */
@@ -4943,7 +4949,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature" | /** Mindblaze: a card in that player's library. */ "inLibrary";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther";
+export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -5228,7 +5234,7 @@ export type SpellCondition =
    * `orTie`: "If taxes gets more votes or the vote is tied": also when two or more choices tie for the most (rulings on
    * Coercive Portal).
    */
-  | { kind: "voteWins"; option: string; orTie?: true }
+  | { kind: "voteWins"; option: string; orTie?: true; /** "Each color with the most votes or tied for most votes" (Council Guardian): this option has the most, alone or tied (CR 701.38). */ amongMost?: true }
   /** "If each opponent chose silence" (Prisoner's Dilemma): every one of them still in the game chose that word (Effect eachChooses). */
   | { kind: "allChose"; option: string };
 
@@ -7130,7 +7136,7 @@ export interface CompiledCard {
   entersTappedIfXAtMost?: number;
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */
-  entersChoose?: { what: ChoiceKind; except?: string; /** "Choose two abilities from among first strike, vigilance, and lifelink" (Greymond): one of several keywords chosen, each added to Chosen.keywords and not offered again. */ many?: true; names?: TargetSpec; purpose?: NamePurpose; /** "Choose artifact, creature, enchantment, instant, or sorcery" (Cloud Key): the card types offered. */ options?: string[]; /** "Choose a number between 1 and 10" (Talion): any whole number in it. */ range?: { min: number; max: number } }[];
+  entersChoose?: { what: ChoiceKind; except?: string; /** "Choose two abilities from among first strike, vigilance, and lifelink" (Greymond): one of several keywords chosen, each added to Chosen.keywords and not offered again. */ many?: true; names?: TargetSpec; purpose?: NamePurpose; /** "Choose artifact, creature, enchantment, instant, or sorcery" (Cloud Key): the card types offered. */ options?: string[]; /** "Choose a number between 1 and 10" (Talion): any whole number in it. */ range?: { min: number; max: number }; /** "Choose 2, 3, or 4 at random" (Haktos): one of these, at random, with no one choosing. */ random?: number[] }[];
   /** "Noncreature spells with mana value equal to the chosen number can't be cast." (Sanctum Prelate): anyone's. */
   noncreatureChosenMvCantBeCast?: true;
   /** "You may cast ~ as though it had flash if it targets a commander." (Timely Ward) */
@@ -7151,6 +7157,12 @@ export interface CompiledCard {
   entersLookHand?: true;
   /** "As ~ enters, choose Khans or Dragons" (CR 614.12b): the anchor words, one chosen as it enters (Chosen.anchor). */
   entersAnchor?: string[];
+  /**
+   * Archangel of Strife: "As ~ enters, each player chooses war or peace." (CR 614.12): each player picks one of these
+   * words, the active player first, then the others in turn order, each knowing the earlier choices (rulings), kept as
+   * Chosen.byPlayer.
+   */
+  entersEachPlayerChooses?: string[];
   /**
    * Primeval Spawn: "If ~ would enter and it wasn't cast or no mana was spent to cast it, exile it instead" (CR 614.1a),
    * judged by the abilities it would have on the battlefield (614.12): under Humility it enters (rulings).
@@ -7419,6 +7431,8 @@ export interface CompiledCard {
   opponentsCantCastMvAtMost?: number;
   /** "Your opponents can't cast spells with even mana values." (Void Winnower). */
   opponentsCantCastEven?: true;
+  /** Mana Maze: "Players can't cast spells that share a color with the spell most recently cast this turn." (its colors as it was cast, rulings). */
+  cantCastSharingLastColor?: true;
   /** Lavinia, Azorius Renegade: "Each opponent can't cast noncreature spells with mana value greater than the number of lands that player controls." */
   opponentsNoncreatureMvAboveLands?: true;
   /** "Your opponents can't block with creatures with even mana values." (Void Winnower). */

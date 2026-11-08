@@ -240,7 +240,7 @@ line blocks.
    and others), taking the easy ones.
    Out after round 177: Muraganda Petroglyphs (done in round 278) ("creatures with no abilities"), Ertai's Scorn and Even the Score
    (colored cost reductions), Skyscribing (forecast), Clever Conjurer ("not named ~" in target legality), Zaffai,
-   Thunder Conductor (an opponent chosen at random), Super-Soldier Serum, Xathrid Demon, Minion of Leshrac and Oath
+   Thunder Conductor (an opponent chosen at random), Super-Soldier Serum, Xathrid Demon (done in round B148), Minion of Leshrac and Oath
    of Lim-Dûl (their other lines), Geralf, the Fleshwright ("each other Zombie that entered this turn": the count
    leaving out the one that entered), Oketra's Last Mercy and Long Rest ("lands you control don't untap during your
    next untap step", lands that enter later too), Trench Behemoth and Sizzling Soloist ("attacks during its
@@ -3478,7 +3478,7 @@ line blocks.
    Left from the voting and storage lands round (CR 701.38: Council's Judgment, Coercive Portal, Tyrant's Choice,
    Brago's Representative, Illusion of Choice; storage lands like Bottomless Vault and Calciform Pools, depletion lands
    like Hickory Woodlot and Land Cap):
-   - Votes still out: Tivit ("enters or deals combat damage"), Council Guardian (protection from the colors with the
+   - Votes still out: Tivit ("enters or deals combat damage"), Council Guardian (done in round B148) (protection from the colors with the
      most votes), Split Decision ("Choose target spell", then "the spell"), Messenger Jays ("for each card drawn this
      way"), Sail into the West, Galadriel, Expropriate, Fateful Tempest, Selvala's Stampede, Travel Through Caradhras;
      votes for a player (Mob Verdict, Círdan), Trap the Trespassers, Truth or Consequences ("an opponent at random");
@@ -3530,7 +3530,7 @@ line blocks.
      Dungeon Crawler, Ellywick's "differently named dungeon" count.
    - "If you've completed a dungeon" inside an effect still out: Caves of Chaos Adventurer (a free play of the exiled
      card), White Plume Adventurer ("untap a creature you control").
-   - Punishers still out: Possessed Portal (done in round B111) (its punisher parses since round 212; its draw replacement doesn't), "another nonland permanent" (Torment of Venom),
+   - Punishers still out: Possessed Portal (done in round B111) (its punisher parses since round 212; its draw replacement doesn't), "another nonland permanent" (Torment of Venom (done in round B148)),
      "that many permanents" (Archfiend of Spite (done in round 302)), "any number of times" (Forbidden Ritual). Rottenmouth Viper's
      trigger works; its "sacrifice any number of nonland permanents, costs {1} less for each" additional cost doesn't
      (it needs a picker when casting). The same "sacrifice any number of X, then that many" shape blocks Pitiless
@@ -4947,8 +4947,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the Pack), the Empires trio (Throne, Scepter, Crown), Destroy the Evidence, Oathsworn Knight, Relic Amulet, Seeds of
   Innocence, Urgoros, Foul Renewal, Hog-Monkey Rampage, Roiling Terrain, Lictor, Moment of Glory. +30 (27,843 of
   31,936 with rounds 209 to 211 and B40-B42).
-- Out after round B43: Cinderheart Giant (done in round B116) (damage to a creature chosen at random, not targeted), Torment of Venom and
-  Xathrid Demon (new punisher forms), Courier of Comestibles and Inscribed Tablet ("if you didn't put a card into your
+- Out after round B43: Cinderheart Giant (done in round B116) (damage to a creature chosen at random, not targeted), Torment of Venom (done in round B148) and
+  Xathrid Demon (done in round B148) (new punisher forms), Courier of Comestibles (done in round B148) and Inscribed Tablet ("if you didn't put a card into your
   hand this way" after a search or a fixed-count reveal, not parsed yet).
 - Round B44 (harder skipped cards, least played first): mana that can only be spent some ways ("only to cast kicked
   spells": Throne of Makindi, Elfhame Druid; "only to pay a disturb cost or cast an instant or sorcery spell":
@@ -5118,8 +5118,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature that makes seven doesn't trigger it, but granted abilities are read after the event), Pinnacle Starcage
   ("Put each card exiled with ~ into its owner's graveyard, then create ... Robot"), Not Forgotten (done in round B113) and Swat Away (top or
   bottom of the library, owner's choice), Case the Joint (done in round B146) and Medomai's Prophecy (the top card of each player's
-  library), Kayla's Reconstruction, Treacherous Urge, Rogues' Gallery, Liberated Livestock, Borderland Explorer,
-  Cathedral Membrane (done in round B108), Dimensional Infiltrator (done in round B108), Sharp-Eyed Rookie; harder: Grand Master of Flowers, Mana Maze, Eureka,
+  library), Kayla's Reconstruction, Treacherous Urge, Rogues' Gallery, Liberated Livestock, Borderland Explorer (done in round B148),
+  Cathedral Membrane (done in round B108), Dimensional Infiltrator (done in round B108), Sharp-Eyed Rookie; harder: Grand Master of Flowers, Mana Maze (done in round B148), Eureka,
   Portcullis.
 - Round B51 (cards no earlier round wrote down, least played first, EDHREC rank about 24,700 to 23,200):
   "if you have a card in hand" (Imaginary Pet), "if you control no other colorless creatures" (Dust Stalker), "When a
@@ -5262,7 +5262,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   graveyard on an event that isn't one yet), Old Fat Spider Can't See Me (a damage rule for as long as ~ remains on the
   battlefield), Isu the Abominable (a choice of payment), Etched Slith ("target permanent or opponent"), Reiterating
   Bolt (an energy additional cost), Dodgy Jalopy (scavenge with a variable power), Chancellor of the Dross (opening-hand
-  reveals), Words of Worship, Garruk, Curse Breaker (its −4), Kaima, Infernal Kirin, Celestial Judgment and Ancestral
+  reveals), Words of Worship, Garruk, Curse Breaker (its −4), Kaima, Infernal Kirin, Celestial Judgment (done in round B148) and Ancestral
   Knowledge (new mechanics), Fatal Fissure (a delayed trigger with a target of its own), Mudslide (done in round B145) and Dream Tides (done in round B145) (pay
   {2} for each of any number of creatures to untap: a new picker), Incriminate (two targets controlled by the same
   player, like Cannibalize).
@@ -5341,7 +5341,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   it" (Malamet Battle Glyph). +19 (28,472 of 31,936).
 - Out after round B58 (looked at, not done): Divine Intervention (a trigger on removing counters), Soulgorger Orgg (the
   life it took, returned as it leaves), Blood Sun ("except mana abilities", and lands entering under it), Archangel of
-  Strife (a new choice for each player as it enters), Haktos the Unscarred (protection from each mana value but one), plus
+  Strife (done in round B148) (a new choice for each player as it enters), Haktos the Unscarred (done in round B148) (protection from each mana value but one), plus
   Summoning Trap, Moonlight Bargain, Wild Research, Random Encounter, Mordor on the March, Boneyard Mycodrax, Hibernation's
   End, Jeskai Infiltrator and Flash Foliage (done in round B137).
 - Round B59 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 15,000): "Until end of
@@ -5446,7 +5446,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B62 (looked at, not done): Arcus Acolyte (outlast granted to creatures without a +1/+1 counter),
   Skyclave Shade (a landfall trigger from the graveyard that lets it be cast this turn), Jocasta, Automaton Avenger
   (returns tapped and attacking when you attack with your commander, from the graveyard), Undiscovered Paradise
-  (returned to hand during your next untap step), Archangel of Strife (each player chooses war or peace), Lumbering
+  (returned to hand during your next untap step), Archangel of Strife (done in round B148) (each player chooses war or peace), Lumbering
   Battlement (exile any number until it leaves, +2/+2 for each), Forbidden Crypt (draws replaced, losing if you
   can't), Induced Amnesia (exiled face down, returned when it leaves), Heart of Kiran (a loyalty counter instead of
   crewing).
@@ -6778,6 +6778,30 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   control deals damage to a creature"): once for each creature each Archer permanent dealt damage, combat or not
   (rulings); Doyen's damage dealt by that Archer to the creature's controller as the ability resolves. +9 (30,532 of
   31,936 with B145-B146 and rounds 305-307).
+- Round B148 (least played first, from the skip lists): choices as a permanent enters (CR 614.12) that weren't read yet:
+  Haktos the Unscarred ("As ~ enters, choose 2, 3, or 4 at random. ~ has protection from each mana value other than the
+  chosen number": chosen with the game's seeded random, protection from every other mana value, CR 702.16a, tokens and
+  mana value 0 included) and Archangel of Strife ("As ~ enters, each player chooses war or peace": you first, then the
+  others in turn order, CR 101.4 and rulings, each seeing the earlier words; "creatures controlled by players who chose
+  war get +3/+0", with a browser test). Council Guardian (will of the council: "~ gains protection from each color with
+  the most votes or tied for most votes", CR 701.38, every tied color, for as long as it's on the battlefield, CR
+  611.2a; bots vote for a color by the permanents it would protect against). Xathrid Demon ("If you can't sacrifice a
+  creature, tap ~ and you lose 7 life": only when there was none to sacrifice, the opponents' loss only after one). Torment
+  of Venom (a punisher "sacrifices another nonland permanent of their choice": any but the targeted creature). Courier of
+  Comestibles ("If you don't put a card into your hand this way, create a Food token": declined or nothing found).
+  Celestial Judgment ("For each different power among creatures on the battlefield, choose a creature with that power.
+  Destroy each creature not chosen this way.": one of each power, anyone's, chosen as it resolves, with a browser test;
+  bots keep their own best creature of each power, else the one least valuable to its controller). Borderland Explorer
+  ("Each player may discard a card. Each player who discarded a card this way may search their library for a basic
+  land card ...": decided in turn order, then those players search). Mana Maze ("Players can't cast spells that share a
+  color with the spell most recently cast this turn", CR 601.3; a colorless spell or none cast yet this turn allows any).
+  +9 (30,541 of 31,936 with B145-B147 and rounds 305-307).
+- Out after round B148 (looked at, not done): Liberated Livestock (for each token created, an Aura from your hand and/or
+  graveyard put onto the battlefield attached to it), Rogues' Gallery (a target slot per color, a multicolored card
+  filling only one), Sungold Sentinel (a color chosen as the ability resolves for hexproof from it and "can't be blocked
+  by creatures of that color"), Blood Spatter Analysis (a reflexive "when you do" after "sacrifice it if it has five or
+  more bloodstain counters"), Triton Tactics (tapping each creature that was blocked by those creatures this turn: block
+  history).
 - Out after round B147 (looked at, not done): Ogre Enforcer ("can't be destroyed by lethal damage unless lethal damage
   dealt by a single source is marked on it": damage marked per source, which removing damage has to clear too), Sea Troll
   ("if ~ blocked or was blocked by a blue creature this turn": the colors of its blocks this turn, as they were),

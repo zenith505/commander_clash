@@ -2,7 +2,7 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { Amount, CounterKind, Modification, FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { canonicalKeyword, LAND_TYPES, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, SACRIFICED_LANDWALK, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CHOSEN_PARITY_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
+import { canonicalKeyword, LAND_TYPES, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, SACRIFICED_LANDWALK, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CHOSEN_PARITY_PROTECTION, CHOSEN_NUMBER_EXCEPT_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -1734,6 +1734,21 @@ export function compile(d: CardDef): CompiledCard {
     if (line === "As ~ enters, choose odd or even.") {
       if (out.entersChoose?.some((c) => c.what === "parity")) out.unsupported.push(raw);
       else (out.entersChoose ??= []).push({ what: "parity" });
+      continue;
+    }
+    // Haktos the Unscarred: "As ~ enters, choose 2, 3, or 4 at random." (CR 614.12): one of those numbers, picked at random
+    // before it enters (rulings), kept as Chosen.number.
+    const asRandom = /^As ~ enters, choose ((?:\d+, )+or \d+) at random\.$/.exec(line);
+    if (asRandom) {
+      if (out.entersChoose?.some((c) => c.what === "number")) out.unsupported.push(raw);
+      else (out.entersChoose ??= []).push({ what: "number", random: asRandom[1]!.split(/, (?:or )?/).map(Number) });
+      continue;
+    }
+    // Archangel of Strife: "As ~ enters, each player chooses war or peace." (CR 614.12, rulings: the active player first).
+    const eachWord = /^As ~ enters, each player chooses ([a-z]+) or ([a-z]+)\.$/.exec(line);
+    if (eachWord) {
+      if (out.entersEachPlayerChooses) out.unsupported.push(raw);
+      else out.entersEachPlayerChooses = [eachWord[1]!, eachWord[2]!];
       continue;
     }
     const asNumber = /^As (?:~|it) enters, choose a number(?: between (\d+) and (\d+))?\.$/.exec(line);
@@ -4971,6 +4986,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Void Winnower: "Your opponents can't cast spells with even mana values" (zero is even; X as chosen, a face-down
     // spell's 0, rulings) and "can't block with creatures with even mana values" (X is 0 on the battlefield, CR 202.3b).
+    // Mana Maze: anyone's spell sharing a color with the last spell cast this turn, by anyone, with its colors as it was cast
+    // (rulings): the first spell of a turn is never stopped, nor is a colorless one.
+    if (line === "Players can't cast spells that share a color with the spell most recently cast this turn.") {
+      out.cantCastSharingLastColor = true;
+      continue;
+    }
     if (/^Your opponents can't cast spells with even mana values\.(?: \(Zero is even\.\))?$/.test(line)) {
       out.opponentsCantCastEven = true;
       continue;
@@ -6597,6 +6618,7 @@ export function compile(d: CardDef): CompiledCard {
   if (out.entersCounterChoice?.escaped && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   checkCastingLinks(out);
   // Lavabrink Venturer: protection "of the chosen quality" needs odd or even chosen as it enters (CR 614.12).
+  if (JSON.stringify([out.statics, out.triggers, out.activated, out.spell]).includes(CHOSEN_NUMBER_EXCEPT_PROTECTION) && !out.entersChoose?.some((c) => c.what === "number")) out.unsupported.push("(protection from mana values but a chosen number with no number chosen as it enters)");
   if (JSON.stringify([out.statics, out.triggers, out.activated, out.spell]).includes(CHOSEN_PARITY_PROTECTION) && !out.entersChoose?.some((c) => c.what === "parity")) out.unsupported.push("(protection of a chosen quality with no odd or even chosen as it enters)");
   // Grandeur's "Discard another card named ~": the card's own name (a copy has it too, CR 707.2).
   for (const ab of out.activated)
@@ -7189,7 +7211,9 @@ function checkCastingLinks(out: CompiledCard) {
     // "Cards exiled with ~" by its cost (Mechtitan Core): an activated ability that exiles other permanents as its cost.
     if (o.type === "returnExiled" && o.fromCost && !exileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
-    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : o.chosen === "landOrNonland" ? needs.add("landOrNonland") : o.chosen === "landType" ? needs.add("landType") : o.chosen === "typeOrder" ? needs.add("typeOrder") : needs.add("creatureType"));
+    // "Players who chose war": one of the words each player chose as it entered.
+    if (o.chosen === "byPlayer" && !out.entersEachPlayerChooses?.includes(o.chosenWord as string)) bad = true;
+    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer" && o.chosen !== "byPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : o.chosen === "landOrNonland" ? needs.add("landOrNonland") : o.chosen === "landType" ? needs.add("landType") : o.chosen === "typeOrder" ? needs.add("typeOrder") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen === true)) needs.add("color");
     if (o.kind === "setColors" && o.chosen === "colors") needs.add("colors");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");

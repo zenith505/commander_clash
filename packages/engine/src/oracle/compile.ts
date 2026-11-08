@@ -6793,7 +6793,8 @@ function linkExile(out: CompiledCard) {
   // same, in an ability's own condition.
   // Phyrexian Ingester: "the exiled creature card's power" is about what its one exile ability (imprint) exiled.
   // Colfenor's Urn: "if three or more cards have been exiled with ~", in its trigger's intervening "if".
-  if ((out.statics.some((st) => /"linkedExiled(?:PT)?"/.test(JSON.stringify(st.mods)) || JSON.stringify(st.condition ?? null).includes('"linkedExiled"')) || bodies.some((b) => JSON.stringify(b).includes('"linkedExiled"')) || out.triggers.some((t) => JSON.stringify(t.ifCond ?? null).includes('{"kind":"linkedExiled","ever":true}'))) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
+  // The Kenriths' Royal Funeral: a cost reduction "for each card exiled with ~", the same.
+  if ((out.statics.some((st) => /"linkedExiled(?:PT)?"/.test(JSON.stringify(st.mods)) || JSON.stringify(st.condition ?? null).includes('"linkedExiled"')) || (out.costMods ?? []).some((cm) => JSON.stringify(cm.times ?? null).includes('"linkedExiled"')) || bodies.some((b) => JSON.stringify(b).includes('"linkedExiled"')) || out.triggers.some((t) => JSON.stringify(t.ifCond ?? null).includes('{"kind":"linkedExiled","ever":true}'))) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const others = all.some((e) => e.type === "exileGraveyard" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));

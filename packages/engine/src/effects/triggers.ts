@@ -2104,7 +2104,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     let nextCastCascade = false;
     for (const d of ev.copy ? [] : [...(s.nextCast ?? [])]) {
       if (d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(d.filter, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
-      s.nextCast = s.nextCast!.filter((x) => x !== d);
+      // Yidris, Maelstrom Wielder: each spell cast from your hand this turn gains cascade; the effect isn't used up.
+      if (!d.allTurn) s.nextCast = s.nextCast!.filter((x) => x !== d);
       // "Has cascade": the spell's own cascade ability triggers (CR 702.85a). "Can be cast as though it had flash": used
       // up now, whenever it was cast.
       // An alternative cost for it (World War Hulk, Marshland Bloodcaster): used up likewise, whichever cost was paid

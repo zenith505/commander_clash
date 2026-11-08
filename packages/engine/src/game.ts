@@ -992,6 +992,7 @@ export function moveObject(
   // zone wasn't, rulings).
   const castFromHand = fromZone === "stack" && o.castFrom === "hand" && !o.spellCopy;
   const castFromGraveyard = fromZone === "stack" && o.castFrom === "graveyard" && !o.spellCopy;
+  const castFromLibrary = fromZone === "stack" && o.castFrom === "library" && !o.spellCopy;
   // Cycle of Life: "target creature you cast this turn": the player who cast the spell it was (CR 601.2), kept as it
   // resolves into this permanent.
   const castBy = fromZone === "stack" && to === "battlefield" && !o.spellCopy ? o.castBy : undefined;
@@ -1027,7 +1028,7 @@ export function moveObject(
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.chosen?.object ? { chosenObject: { ...o.chosen.object } } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.fromOwnLibrary ? { fromOwnLibrary: true as const } : {}), ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.chosen?.object ? { chosenObject: { ...o.chosen.object } } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
@@ -1209,6 +1210,9 @@ export function moveObject(
   o.castBy = castBy;
   o.enteredFromGraveyard = to === "battlefield" && fromZone === "graveyard" ? true : undefined;
   o.enteredFromHand = to === "battlefield" && fromZone === "hand" ? true : undefined;
+  // Fblthp, the Lost: "if it entered from your library or was cast from your library" (a card cast from exile after it was
+  // exiled from the library was cast from exile, rulings). A library is its owner's (CR 400.3).
+  o.fromOwnLibrary = to === "battlefield" && (fromZone === "library" || castFromLibrary) ? true : undefined;
   o.enteredFromExile = to === "battlefield" && fromZone === "exile" ? true : undefined;
   // Sigarda's Splendor: "As ~ enters, note your life total" (a new object notes anew, CR 400.7); one that left keeps it.
   if (to === "battlefield") o.notedLife = compileCard(defOf(s, o)).notesLifeOnEnter ? player(s, o.controller).life : undefined;
@@ -3849,6 +3853,9 @@ function startNextTurn(s: GameState, skipping = false) {
   // "Noncreature spells your opponents cast cost {2} more to cast until your next turn" (Elspeth Conquers Death).
   s.costModsThisTurn = s.costModsThisTurn?.filter((c) => c.untilYourNextTurn && !began.has(c.player));
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.filter((r) => !began.has(r.controller));
+  // Arlinn, the Pack's Hope: "Until your next turn, each creature you control enters with an additional +1/+1 counter".
+  s.entersWithCountersThisTurn = s.entersWithCountersThisTurn?.filter((r) => !(r.untilYourNextTurn && began.has(r.controller)));
+  if (!s.entersWithCountersThisTurn?.length) s.entersWithCountersThisTurn = undefined;
   // Teyo's direction: until that player's next turn (CR 611.2b), or the turn it would have been (CR 800.4m).
   if (s.attackDirections) s.attackDirections = s.attackDirections.some((d) => !began.has(d.by)) ? s.attackDirections.filter((d) => !began.has(d.by)) : undefined;
   for (const p of s.players)
@@ -4384,8 +4391,11 @@ function finishCleanup(s: GameState) {
   s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "endOfTurn" || (f.until === "endOfYourNextTurn" && s.activePlayer === f.controller && s.turn > f.turn)));
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
   s.flashbackGrants = undefined;
+  s.yardKeywordGrants = undefined; // Cursecloth Wrappings' "until end of turn" (CR 514.2)
   // "Lands you control enter tapped this turn" (Nahiri's Lithoforming, CR 514.2).
-  s.entersWithCountersThisTurn = undefined; // Zameck Guildmage's "this turn" (CR 514.2)
+  // Zameck Guildmage's "this turn" (CR 514.2); Arlinn, the Pack's Hope's "until your next turn" goes on.
+  s.entersWithCountersThisTurn = s.entersWithCountersThisTurn?.filter((r) => r.untilYourNextTurn);
+  if (!s.entersWithCountersThisTurn?.length) s.entersWithCountersThisTurn = undefined;
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.some((r) => !r.thisTurn) ? s.entersTappedUntil.filter((r) => !r.thisTurn) : undefined;
   s.topTurn = undefined; // Gwenom's "until end of turn" (CR 514.2)
   s.drawSteals = undefined; // Plagiarize's "until end of turn" (CR 514.2)
@@ -9639,6 +9649,8 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   // Sigarda's Vanguard: every power different, as they are now (rulings).
   if (pend.differentPowers && new Set(ids.map((id) => power(s, obj(s, id)))).size !== ids.length) throw new RulesError("choose creatures with different powers");
   if (pend.maxTotalPower !== undefined && ids.reduce((t, id) => t + power(s, obj(s, id)), 0) > pend.maxTotalPower) throw new RulesError(`choose creatures with total power ${pend.maxTotalPower} or less`);
+  // Phyrexian Dreadnought: at least that much total power, a negative power taking some off.
+  if (pend.minTotalPower !== undefined && ids.reduce((t, id) => t + power(s, obj(s, id)), 0) < pend.minTotalPower) throw new RulesError(`choose creatures with total power ${pend.minTotalPower} or greater`);
   if (pend.attackCost) {
     attackCostPaid(s, p, ids);
     return;

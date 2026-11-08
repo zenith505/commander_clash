@@ -110,6 +110,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Unlicensed Hearse: "the number of cards exiled with it" ("with ~"), the cards its one exile ability exiled (CR 607.2a,
   // linked by compile.ts).
   if (/^the number of cards exiled with (?:it|~)$/.test(p)) return { count: { kind: "linkedExiled" } };
+  // The Kenriths' Royal Funeral: "for each card exiled with ~", the same (still in exile, rulings).
+  if (each && /^card exiled with (?:it|~)$/.test(p)) return { count: { kind: "linkedExiled" } };
   // Strata Scythe: "for each land on the battlefield with the same name as the exiled card", anyone's (rulings), the card
   // its imprint ability exiled (CR 607.2a, linked by compile.ts).
   if (each && /^land on the battlefield with the same name as the exiled card$/.test(p))
@@ -411,6 +413,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (!each && /^the greatest power among creature cards exiled this way$/i.test(p)) return { count: { kind: "greatestPowerExiled" } };
   // "You gain 1 life for each card exiled this way" (Titania's Command), "for each artifact or land card exiled this way"
   // (Canoptek Scarab Swarm), "the number of creature cards exiled this way": after exiling cards from graveyards.
+  // The Kenriths' Royal Funeral: "the greatest mana value among cards exiled this way", as they are in exile.
+  if (!each && ctx?.exiledCards && /^the greatest mana value among cards exiled this way$/i.test(p)) return { count: { kind: "cardsExiledThisWay", greatestMv: true } };
   if (ctx?.exiledCards && (m = /^(?:the number of )?(?!the greatest )(?:(.+?) )?cards? exiled this way$/i.exec(p))) {
     const filter = m[1] ? parseSearchFilter(`${m[1]} card`) : undefined;
     if (filter === null || (filter && filter.kind !== "card")) return null;

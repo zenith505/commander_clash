@@ -1310,6 +1310,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "cipher":
     case "haunt":
     case "grantFlashback":
+    case "grantYardKeyword":
     case "pick":
     case "meld":
     case "sacrificeEach":
@@ -1485,6 +1486,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "scrambleControl":
     case "successionControl":
     case "counterOfKindEach":
+    case "counterKindToOthers":
     case "swapCreatures":
     case "juxtapose":
     case "exchangeControl":

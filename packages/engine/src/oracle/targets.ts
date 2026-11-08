@@ -146,6 +146,13 @@ export function pickFilter(phrase0: string): TargetSpec | null {
     const anyOf = [pickFilter(orToken[1]!), pickFilter(orToken[2]!)];
     return anyOf.every((a): a is TargetSpec => a?.kind === "object") ? { kind: "object", types: [], notTypes: [], notColors: [], anyOf, text: phrase.trim() } : null;
   }
+  // Rent Is Due: "untapped creatures and/or Treasures" ("untapped creature or Treasure" here): each permanent that's either
+  // a creature or a Treasure, untapped.
+  const typeOrSub = /^(untapped )?(creature|artifact) or (Treasure|Clue|Food)$/.exec(phrase.trim());
+  if (typeOrSub) {
+    const anyOf = [pickFilter(`${typeOrSub[1] ?? ""}${typeOrSub[2]}`), pickFilter(`${typeOrSub[1] ?? ""}${typeOrSub[3]}`)];
+    return anyOf.every((a): a is TargetSpec => a?.kind === "object") ? { kind: "object", types: [], notTypes: [], notColors: [], anyOf, text: phrase.trim() } : null;
+  }
   // Omen of Fire: "a Plains or a white permanent": one permanent that's either.
   const either = /^((?:Plains|Island|Swamp|Mountain|Forest)) or an? ((?:white|blue|black|red|green) permanent)$/.exec(phrase.trim());
   if (either) {

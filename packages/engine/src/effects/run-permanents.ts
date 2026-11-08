@@ -1,6 +1,6 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
 import { abilitiesOf, realDefOf, enchantOf, basePowerNow, cardIdOf, defOf, roomOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { turnFaceUpByEffect, faceUpFormsOf, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
+import { turnFaceUpByEffect, faceUpFormsOf, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, inCombatPhase, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
 import { nextRandom } from "../rng";
 import { characteristics, controllerOf, enchantableBy, invalidateCharacteristics } from "../layers";
 import { countersRemoved, countersStay, putPlayerCounters, putCounters, removableCounters, tokenBatch, withModular, withPutter } from "../counters";
@@ -82,6 +82,11 @@ export function turnFaceDown(s: GameState, o: GameObject, as: "cyberman" | "morp
  * 707.8a covers token copies). A Phyrexian has no other face to go back to, so transforming it again does nothing
  * (CR 701.27f).
  */
+/** "During its controller's next combat phase" (Trench Behemoth): that player's, and not one of theirs going on now. */
+function nextCombatOf(s: GameState, pid: PlayerId) {
+  return { turnOf: pid, sinceTurn: s.turn, ...(inCombatPhase(s) && s.activePlayer === pid ? { notCombat: { turn: s.turn, combat: s.combatsThisTurn ?? 0 } } : {}) };
+}
+
 function transformToken(s: GameState, me: GameObject): boolean {
   if (me.zone !== "battlefield" || !me.isToken || me.copyOf || me.copyEffects?.length || characteristics(s, me).cantTransform) return false;
   const front = defOf(s, me);
@@ -1752,7 +1757,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         }
       // "For each poison counter its controller has" (Phyresis Outbreak): each controller's creatures get their own amount,
       // counted once now (rulings), as effects with one timestamp.
-      const perController = JSON.stringify(e.mods).includes('"affectedControllerPoison"');
+      const perController = JSON.stringify(e.mods).includes('"affectedControllerPoison"') || e.duration === "controllersNextCombat";
       // Akroma, Vision of Ixidor: each creature's own bonus, by the keywords it has now (rulings).
       const perAffected = JSON.stringify(e.mods).includes('"affectedKeywordCount"');
       const groups = perAffected ? affected.map((id) => [id]) : perController ? [...new Set(affected.map((id) => controllerOf(s, obj(s, id))))].map((pid) => affected.filter((id) => controllerOf(s, obj(s, id)) === pid)) : [affected];
@@ -1767,7 +1772,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           sourceName: src,
           sourceId: ctx.sourceId,
           duration: e.duration,
-          ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : e.duration === "endOfYourNextTurn" || e.duration === "yourNextUpkeep" ? { turnOf: ctx.controller, sinceTurn: s.turn } : e.duration === "endOfYourNextUpkeep" ? { turnOf: ctx.controller, sinceTurn: s.turn, sinceUpkeeps: s.activePlayer === ctx.controller ? (s.turnLog?.upkeeps ?? 0) : 0 } : e.duration === "controllersNextUntap" ? { turnOf: controllerOf(s, obj(s, group[0]!)), sinceTurn: s.turn } : {}),
+          ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : e.duration === "endOfYourNextTurn" || e.duration === "yourNextUpkeep" ? { turnOf: ctx.controller, sinceTurn: s.turn } : e.duration === "endOfYourNextUpkeep" ? { turnOf: ctx.controller, sinceTurn: s.turn, sinceUpkeeps: s.activePlayer === ctx.controller ? (s.turnLog?.upkeeps ?? 0) : 0 } : e.duration === "controllersNextUntap" ? { turnOf: controllerOf(s, obj(s, group[0]!)), sinceTurn: s.turn } : e.duration === "controllersNextCombat" ? nextCombatOf(s, controllerOf(s, obj(s, group[0]!))) : {}),
           ...(whileTapped ? { whileTapped } : {}),
           ...(whileControlled ? { whileControlled } : {}),
           ...(e.whileCounter ? { whileCounter: e.whileCounter } : {}),

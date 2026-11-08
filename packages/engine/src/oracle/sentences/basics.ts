@@ -162,6 +162,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // moves the "where" to the end); Neverending Torment: "for X cards, where X is ...": as many as there are, up to X (CR
   // 701.23d), counted as it resolves.
   // Earwig Squad: "search target opponent's library for three cards and exile them", a triggered ability's (lowercase).
+  // Life's Finale: "search target opponent's library for up to three creature cards and put them into their graveyard",
+  // Quiet Speculation: "... for up to three cards with flashback and put them into that player's graveyard": their owner's
+  // graveyard (CR 400.3), cards like that only (CR 701.23b).
+  const theirYard = new RegExp(`^[Ss]earch (target opponent's|target player's) library for up to ${NUM} ((?:[a-z]+ )?cards(?: with [a-z]+)?) and put them into (?:their|that player's) graveyard$`).exec(s);
+  if (theirYard) {
+    const filter = parseSearchFilter(theirYard[3]!.replace(/cards/, "card"));
+    const library = parsePlayer(theirYard[1]!.replace(/'s$/, ""), ctx);
+    return library && filter !== null ? [{ type: "search", ...(filter ? { filter } : {}), n: amt(theirYard[2]!), upTo: true, reveal: false, dest: { zone: "graveyard" }, library }] : null;
+  }
   const theirMany = new RegExp(`^[Ss]earch (target opponent's|target player's) library for (up to )?(${NUM}|X) cards and exile them$`).exec(s);
   if (theirMany && (theirMany[3] !== "X" || ctx.whereX)) {
     const library = parsePlayer(theirMany[1]!.replace(/'s$/, ""), ctx);
@@ -1042,6 +1051,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const n = parseCount(m[3]!.replace(/ on it$/, " on ~"), ctx, true);
     if (!n) return null;
     return [{ type: "may", effects: [], pay: { mana: m[2]! }, payTimes: n, otherwise: [sacrificeSelf], keep: true, text: `Pay ${m[2]} for each ${m[3]} to keep ~` }];
+  }
+  // Draco: "sacrifice ~ unless you pay {10} reduced by {2} for each basic land type among lands you control" (body.ts
+  // joins "This cost is reduced by ..." to it): {1} that many times, counted as it resolves (CR 608.2h), none at the least
+  // (CR 107.1b).
+  if ((m = /^[Ss]acrifice ~ unless you pay \{(\d+)\} reduced by \{(\d+)\} for each (.+)$/.exec(s))) {
+    const per = parseCount(m[3]!, ctx, true);
+    if (!per || typeof per !== "object" || per.negate || per.plus || per.half || per.per || per.signed || per.max !== undefined) return null;
+    return [{ type: "may", effects: [], pay: { mana: "{1}" }, payTimes: { ...per, times: -Number(m[2]) * (per.times ?? 1), plus: Number(m[1]) }, otherwise: [sacrificeSelf], keep: true, text: `Pay {${m[1]}} less {${m[2]}} for each ${m[3]} to keep ~` }];
   }
   // Pendrell Flux, Disruption Aura, Essence Leak's granted "sacrifice ~ unless you pay its mana cost": ~'s, as it resolves.
   if ((m = /^[Ss]acrifice (~|it) unless you pay its mana cost$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined)))

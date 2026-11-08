@@ -3660,6 +3660,12 @@ function advanceStep(s: GameState): void {
       s.effects = s.effects.filter((e) => e.duration !== "endOfCombat");
       invalidateCharacteristics(s);
     }
+    // "During its controller's next combat phase" (Trench Behemoth): over as that player's next combat phase ends.
+    const nextCombatOver = (e: (typeof s.effects)[number]) => e.duration === "controllersNextCombat" && e.turnOf === s.activePlayer && !(e.notCombat?.turn === s.turn && e.notCombat.combat === (s.combatsThisTurn ?? 0));
+    if (s.effects.some(nextCombatOver)) {
+      s.effects = s.effects.filter((e) => !nextCombatOver(e));
+      invalidateCharacteristics(s);
+    }
     for (const o of attackersAndBlockers(s)) clearCombat(o);
     for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
     for (const id of s.battlefield) obj(s, id).provokedAlso = undefined;
@@ -4199,7 +4205,7 @@ function beginStep(s: GameState, step: Step): void {
       }
       // "Until its controller's next untap step" (Orcish Farmer): it ends as that player's next untap step begins, before
       // anything untaps; for a player who left the game, at the next untap step (CR 800.4m).
-      const untilUntap = s.effects.filter((e) => e.duration === "controllersNextUntap" && ((e.turnOf === ap && s.turn > (e.sinceTurn ?? 0)) || (e.turnOf !== undefined && player(s, e.turnOf).lost)));
+      const untilUntap = s.effects.filter((e) => (e.duration === "controllersNextUntap" && ((e.turnOf === ap && s.turn > (e.sinceTurn ?? 0)) || (e.turnOf !== undefined && player(s, e.turnOf).lost))) || (e.duration === "controllersNextCombat" && e.turnOf !== undefined && player(s, e.turnOf).lost));
       if (untilUntap.length) {
         s.effects = s.effects.filter((e) => !untilUntap.includes(e));
         invalidateCharacteristics(s);

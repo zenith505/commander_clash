@@ -417,6 +417,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const filter: TargetSpec | null | undefined = m[1] === "card of the chosen color" ? { kind: "card", types: [], notTypes: [], notColors: [], chosen: "color", text: m[1] } : parseSearchFilter(m[1]!);
     return filter ? { count: { kind: "exiledTopMatching", filter } } : null;
   }
+  // Shellshock: "You create a Mutagen token for each creature dealt damage this way": what this spell's damage hit.
+  if (each && /^creature dealt damage this way$/.test(p)) return { count: { kind: "damagedThisWayCount", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" } } };
   // "The greatest power among creature cards exiled this way" (Szat's Will, after exiling graveyards).
   if (!each && /^the greatest power among creature cards exiled this way$/i.test(p)) return { count: { kind: "greatestPowerExiled" } };
   // "You gain 1 life for each card exiled this way" (Titania's Command), "for each artifact or land card exiled this way"

@@ -68,6 +68,8 @@ export interface UnlessPays {
   lifeAmount?: Amount;
   /** "Ward—Sacrifice a creature" (Vein Ripper): `n` permanents of their choice they control that match `filter`. */
   sacrifice?: { n: number; filter: TargetSpec };
+  /** "Ward—Collect evidence 4" (Axebane Ferox): cards of their choice from their graveyard with total mana value this or more, exiled as the payment (CR 701.59a); not with less (rulings). */
+  collectEvidence?: number;
   /** "Ward—Waterbend {4}" (CR 701.67a): up to this much of the cost's generic mana may be paid by tapping untapped artifacts and creatures they control, {1} each. */
   waterbend?: number;
   /** "Unless its controller discards their hand" (Perplex): all of it, even with no cards in hand (rulings). */
@@ -198,6 +200,8 @@ export type Count =
   | { kind: "returnedToughness" }
   /** "Draw that many cards" after "sacrifice any number of other creatures": how many its instructions sacrificed. */
   | { kind: "sacrificedThisWayCount" }
+  /** "You create a Mutagen token for each creature dealt damage this way" (Shellshock): the permanents this spell's or ability's damage hit so far while it resolves, each once (ResolvingState.damagedThisWay), like this as they are now or as they last existed. */
+  | { kind: "damagedThisWayCount"; filter?: TargetSpec }
   /** "Draw a card for each spell countered this way" (Swift Silence). */
   | { kind: "spellsCounteredThisWay" }
   /** "For each spell and ability countered this way" (Glen Elendra's Answer). */
@@ -3807,6 +3811,8 @@ export type Effect =
       blocking?: ObjRef;
       /** "For each opponent, create ... that's tapped and attacking that player": `n` for each opponent, attacking them. */
       attackingEach?: boolean;
+      /** "For each opponent, create two ... tokens ... that attack that opponent this turn if able" (Furygale Flocking): `n` for each opponent, each required to attack that player this turn (CR 508.1d), as encore's. */
+      mustAttackEach?: true;
       /** "... attacking that player or a planeswalker they control" (Adeline): its controller chooses which as they enter. */
       orPlaneswalker?: true;
       /** "With N +1/+1 counters on it": it enters with them (incubate, CR 701.53a). */
@@ -5294,6 +5300,8 @@ export interface AbilityBody {
     distinctTargets?: true;
     /** "Choose up to X, where X is the number of Lesson cards in your graveyard" (Bumi, King of Three Trials): `max` is the most there are modes; this caps it, counted as a triggered ability is put on the stack (CR 603.3c; PendingTrigger.maxModes). */
     maxCount?: AmountExpr;
+    /** "Choose X. You may choose the same mode more than once." (Doomsday Confluence): exactly as many modes as the X announced as it's cast (CR 601.2b, 700.2d); `max` is only a cap. */
+    xCount?: true;
   };
 }
 

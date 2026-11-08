@@ -43,13 +43,14 @@ const arbiter = (): CardDef => ({"oracleId":"a33f6070-590c-4be8-9180-b1ac2608cbc
 const lost = (): CardDef => ({"oracleId":"820ba630-c543-491c-8c77-ada69b01c79d","name":"Lost in Thought","manaCost":"{1}{U}","cmc":2,"typeLine":"Enchantment — Aura","supertypes":[],"types":["Enchantment"],"subtypes":["Aura"],"oracleText":"Enchant creature\nEnchanted creature can't attack or block, and its activated abilities can't be activated. Its controller may exile three cards from their graveyard for that player to ignore this effect until end of turn.","colors":["U"],"colorIdentity":["U"],"keywords":["Enchant"],"layout":"normal"});
 const curse = (): CardDef => ({"oracleId":"f4ff3efb-c9ed-4451-a7f2-5ff52ffb6cab","name":"Volrath's Curse","manaCost":"{1}{U}","cmc":2,"typeLine":"Enchantment — Aura","supertypes":[],"types":["Enchantment"],"subtypes":["Aura"],"oracleText":"Enchant creature\nEnchanted creature can't attack or block, and its activated abilities can't be activated. That creature's controller may sacrifice a permanent of their choice for that player to ignore this effect until end of turn.\n{1}{U}: Return this Aura to its owner's hand.","colors":["U"],"colorIdentity":["U"],"keywords":["Enchant"],"layout":"normal"});
 const damping = (): CardDef => ({"oracleId":"3584a055-5220-4721-89f8-de33f779122f","name":"Damping Engine","manaCost":"{4}","cmc":4,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"A player who controls more permanents than each other player can't play lands or cast artifact, creature, or enchantment spells. That player may sacrifice a permanent of their choice for that player to ignore this effect until end of turn.","colors":[],"colorIdentity":[],"keywords":[],"layout":"normal"});
+const ray = (): CardDef => ({"oracleId":"b592568b-11b0-4081-90a7-30cfb9c1ba80","name":"Suppression Ray // Orderly Plaza","manaCost":"{3}{W/U}{W/U}","cmc":5,"typeLine":"Sorcery // Land","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Tap all creatures target player controls. You may pay any amount of {E}. If you do, choose up to that many creatures tapped this way. Put a stun counter on each of them. (If a permanent with a stun counter would become untapped, remove one from it instead.)","colors":["U","W"],"colorIdentity":["U","W"],"keywords":[],"layout":"modal_dfc","faces":[{"name":"Suppression Ray","manaCost":"{3}{W/U}{W/U}","typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Tap all creatures target player controls. You may pay any amount of {E}. If you do, choose up to that many creatures tapped this way. Put a stun counter on each of them. (If a permanent with a stun counter would become untapped, remove one from it instead.)","colors":["U","W"]},{"name":"Orderly Plaza","manaCost":"","typeLine":"Land","supertypes":[],"types":["Land"],"subtypes":[],"oracleText":"This land enters tapped.\n{T}: Add {W} or {U}.","colors":[]}]} as CardDef);
 const growth = (): CardDef => ({"oracleId":"8539f295-5d58-4436-a73a-b9277c4c7795","name":"Rampant Growth","manaCost":"{1}{G}","cmc":2,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.","colors":["G"],"colorIdentity":["G"],"keywords":[],"layout":"normal"});
 
 const pinger = () => bear({ name: "Test Pinger", oracleText: "{T}: Test Pinger deals 1 damage to any target.", power: "3", toughness: "3" });
 const forestsOnField = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]!.name === "Forest").length;
 
 describe("round 313", () => {
-  it("are fully supported", () => supported(arbiter(), lost(), curse(), damping()));
+  it("are fully supported", () => supported(arbiter(), lost(), curse(), damping(), ray()));
 });
 
 describe("round 313: Leonin Arbiter", () => {
@@ -218,5 +219,42 @@ describe("round 313: Damping Engine", () => {
     invalidateCharacteristics(s);
     expect(controlsMostPermanents(s, ap)).toBe(false);
     expect(castProblem(s, ap, ids[0]!) ?? "").not.toMatch(/Damping Engine/);
+  });
+});
+
+describe("round 313: Suppression Ray", () => {
+  it("taps all of the target player's creatures, then a stun counter on each of up to X of those that became tapped, X the energy paid", () => {
+    const { s: s0, ap, opp, ids } = setup([ray()]);
+    s0.players[ap]!.energy = 3;
+    const [a, b, c] = ["Test A", "Test B", "Test C"].map((name) => putOnBattlefield(s0, opp, bear({ name })));
+    s0.objects[c!]!.tapped = true;
+    const mine = putOnBattlefield(s0, ap, bear({ name: "Test Mine" }));
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }])), ap);
+    expect([a, b, c].map((id) => s.objects[id!]!.tapped)).toEqual([true, true, true]);
+    expect(s.objects[mine]!.tapped).toBe(false);
+    if (s.pending?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "payEnergy", numberRange: { min: 0, max: 3 } });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "2" }), ap);
+    expect(s.players[ap]!.energy).toBe(1);
+    // Only those that became tapped: not Test C, which already was (rulings), nor anything of yours.
+    expect(s.pending?.kind).toBe("pickPermanents");
+    const options = s.pending?.kind === "pickPermanents" ? s.pending.options : [];
+    expect([...options].sort()).toEqual([a, b].sort());
+    expect(() => act(s, { type: "pickPermanents", player: ap, ids: [c!] })).toThrow();
+    s = settle(act(s, { type: "pickPermanents", player: ap, ids: [a!] }), ap);
+    expect(s.objects[a!]!.counters.stun).toBe(1);
+    expect(s.objects[b!]!.counters.stun ?? 0).toBe(0);
+    expect(zone(s, ids[0]!)).toBe("graveyard");
+  });
+
+  it("the bot pays its energy and stuns the opponent's biggest creatures", () => {
+    const { s: s0, ap, opp, ids } = setup([ray()]);
+    s0.players[ap]!.energy = 1;
+    const [small, big] = [putOnBattlefield(s0, opp, bear({ name: "Test Small" })), putOnBattlefield(s0, opp, bear({ name: "Test Big", power: "6", toughness: "6" }))];
+    let s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }]));
+    s = settle(s);
+    expect(s.objects[big]!.counters.stun).toBe(1);
+    expect(s.objects[small]!.counters.stun ?? 0).toBe(0);
+    expect(s.players[ap]!.energy).toBe(0);
   });
 });

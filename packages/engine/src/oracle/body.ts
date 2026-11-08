@@ -6525,7 +6525,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
     // round B148's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    const faceDown = roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);
@@ -19811,6 +19811,24 @@ function round312Sentence(s: string, sentences: string[], si: number, ctx: Ctx, 
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => ty !== "Creature")) return "fail";
     effects.pop();
     return { effect: { ...prev, becomes: { types: ["Artifact"], subtypes: [] } }, next: si + 1 };
+  }
+  return null;
+}
+
+function round313Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  // Suppression Ray: "Tap all creatures target player controls. You may pay any amount of {E}. If you do, choose up to that
+  // many creatures tapped this way. Put a stun counter on each of them.": X energy chosen as it resolves, at most what you
+  // have (CR 107.14), then up to X of the creatures that became tapped (rulings: not those already tapped), each getting a
+  // stun counter (CR 122.1d).
+  if (ctx.spell && /^Tap all creatures target player controls$/.test(s) && /^You may pay any amount of \{E\}\.?$/.test(sentences[si + 1] ?? "") && /^If you do, choose up to that many creatures tapped this way\.?$/.test(sentences[si + 2] ?? "") && /^Put a stun counter on each of them\.?$/.test(sentences[si + 3] ?? "")) {
+    const before = ctx.targets.length;
+    const tap = parseOne(s, ctx);
+    if (tap?.length !== 1 || tap[0]!.type !== "tap" || ctx.targets.length !== before + 1) return "fail";
+    const creature = parseTargetPhrase("creature");
+    if (!creature) return "fail";
+    effects.push({ ...tap[0]!, noteTapped: true });
+    const pick: Effect = { type: "pick", who: { ref: "you" }, filter: { ...creature, kind: "object", text: "creature tapped this way" }, n: { count: { kind: "x" } }, action: "counters", counter: { kind: "stun", n: 1 }, upTo: true, anyController: true, fromTapped: true };
+    return { effect: { type: "may", effects: [pick], pay: {}, payX: { energy: true }, text: "pay any amount of {E}. If you do, put a stun counter on each of up to that many creatures tapped this way" }, next: si + 4 };
   }
   return null;
 }

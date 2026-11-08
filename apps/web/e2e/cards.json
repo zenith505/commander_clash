@@ -27907,6 +27907,71 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b592568b-11b0-4081-90a7-30cfb9c1ba80",
+  "name": "Suppression Ray // Orderly Plaza",
+  "manaCost": "{3}{W/U}{W/U}",
+  "cmc": 5,
+  "typeLine": "Sorcery // Land",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Tap all creatures target player controls. You may pay any amount of {E}. If you do, choose up to that many creatures tapped this way. Put a stun counter on each of them. (If a permanent with a stun counter would become untapped, remove one from it instead.)",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "uncommon",
+  "layout": "modal_dfc",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Suppression Ray",
+    "manaCost": "{3}{W/U}{W/U}",
+    "typeLine": "Sorcery",
+    "supertypes": [],
+    "types": [
+     "Sorcery"
+    ],
+    "subtypes": [],
+    "oracleText": "Tap all creatures target player controls. You may pay any amount of {E}. If you do, choose up to that many creatures tapped this way. Put a stun counter on each of them. (If a permanent with a stun counter would become untapped, remove one from it instead.)",
+    "colors": [
+     "U",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/0/c/0cccd328-457a-48ab-97fb-4bc319db2e60.jpg?1783911225",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/0/c/0cccd328-457a-48ab-97fb-4bc319db2e60.jpg?1783911225"
+   },
+   {
+    "name": "Orderly Plaza",
+    "manaCost": "",
+    "typeLine": "Land",
+    "supertypes": [],
+    "types": [
+     "Land"
+    ],
+    "subtypes": [],
+    "oracleText": "This land enters tapped.\n{T}: Add {W} or {U}.",
+    "colors": [],
+    "imageUrl": "https://cards.scryfall.io/normal/back/0/c/0cccd328-457a-48ab-97fb-4bc319db2e60.jpg?1783911225",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/0/c/0cccd328-457a-48ab-97fb-4bc319db2e60.jpg?1783911225"
+   }
+  ]
+ },
+ {
   "oracleId": "56719f6a-1a6c-4c0a-8d21-18f7d7350b68",
   "name": "Swamp",
   "manaCost": "",

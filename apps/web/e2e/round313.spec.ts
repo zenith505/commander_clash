@@ -4,7 +4,7 @@
 import { expect, test } from "@playwright/test";
 import { invalidateCharacteristics } from "@cc/engine";
 import { LANDS, idsOf, one, open, pageErrors, scene } from "./scene";
-import { card, menu, modal, resolveUntil } from "./ui";
+import { card, clickPlayer, controls, menu, modal, resolveUntil } from "./ui";
 
 test("Leonin Arbiter: pay {2} from Ana's Arbiter's menu, then Rampant Growth can search", async ({ page }) => {
   const s = scene({ hand: ["Rampant Growth"], board: LANDS, library: ["Forest"] }, [{ board: ["Leonin Arbiter"] }]);
@@ -84,5 +84,32 @@ test("Damping Engine: with the most permanents, sacrifice a Plains from Ana's En
   await card(page, "Grizzly Bears", s).click();
   const after = await resolveUntil(page, (st) => st.objects[bears]!.zone === "battlefield" && st.stack.length === 0);
   expect(after.objects[engine]!.ignoredBy?.players).toEqual([0]);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Suppression Ray: tap Ana's creatures, pay 1 energy, then stun Hill Giant (not the already tapped Bears)", async ({ page }) => {
+  const s = scene({ hand: ["Suppression Ray // Orderly Plaza"], board: LANDS }, [{ board: ["Hill Giant", "Grizzly Bears", "Llanowar Elves"] }]);
+  const [giant, bears, elves] = [one(s, "Hill Giant"), one(s, "Grizzly Bears"), one(s, "Llanowar Elves")];
+  s.objects[bears]!.tapped = true;
+  s.players[0]!.energy = 2;
+  await open(page, s);
+  // A modal double-faced card with a land back: its menu, to cast the front.
+  await card(page, "Suppression Ray", s).click();
+  await menu(page).getByRole("button", { name: /^Cast it/ }).click();
+  await clickPlayer(page, 1);
+  await resolveUntil(page, (st) => st.pending?.kind === "chooseOption" && st.pending.what === "payEnergy");
+  const bar = controls(page);
+  await expect(bar).toContainText("how much energy?");
+  await bar.getByRole("button", { name: "Number plus one" }).click();
+  await bar.getByRole("button", { name: "Pay 1 energy" }).click();
+  const picking = await resolveUntil(page, (st) => st.pending?.kind === "pickPermanents" && st.pending.player === 0);
+  expect(picking.pending?.kind === "pickPermanents" && [...picking.pending.options].sort()).toEqual([giant, elves].sort());
+  await page.locator(`[data-obj="${giant}"]`).first().click();
+  await bar.getByRole("button", { name: /^(Choose|Put|Done)/ }).first().click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending);
+  expect(after.objects[giant]!.counters.stun).toBe(1);
+  expect(after.objects[elves]!.counters.stun ?? 0).toBe(0);
+  expect([giant, bears, elves].map((id) => after.objects[id]!.tapped)).toEqual([true, true, true]);
+  expect(after.players[0]!.energy).toBe(1);
   expect(pageErrors(page)).toEqual([]);
 });

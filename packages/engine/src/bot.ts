@@ -1519,6 +1519,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         }
         return [{ type: "chooseOption", player: pid, choice: String(best) }];
       }
+      // Suppression Ray: a stun counter on each of up to that many of the creatures it tapped: one for each of those an
+      // opponent controls.
+      const stun = may?.effects.length === 1 && may.effects[0]!.type === "pick" && may.effects[0]!.fromTapped;
+      if (stun) {
+        const theirs = (s.resolving?.tappedIds ?? []).filter((c) => s.objects[c.id]?.zone === "battlefield" && controllerOf(s, obj(s, c.id)) !== pid).length;
+        return [{ type: "chooseOption", player: pid, choice: String(Math.min(most, theirs)) }];
+      }
       // Wheel of Potential: the {E} paid is how many each player who wheels draws; all we have, short of decking ourselves.
       const wheelPaid = s.resolving?.body.effects.some((x) => x.type === "eachMay" && typeof x.wheel === "object" && "count" in x.wheel && x.wheel.count.kind === "notedAmount");
       if (wheelPaid) return [{ type: "chooseOption", player: pid, choice: String(Math.max(0, Math.min(most, player(s, pid).library.length - 1))) }];

@@ -357,14 +357,22 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         log(s, `${wasTapped.length} tapped creature${wasTapped.length === 1 ? "" : "s"} untap and ${wasUntapped.length} untapped creature${wasUntapped.length === 1 ? "" : "s"} tap.`);
         return;
       }
+      const tappedIds: { id: ObjectId; zc: number }[] = [];
       for (const o of objects(s, e.what, ctx)) {
         if (e.type === "untap") untapPermanent(s, o);
         else if (!o.tapped) {
           tapPermanent(s, o, undefined, ctx.controller);
-          if (o.tapped) tapped++;
+          if (o.tapped) {
+            tapped++;
+            tappedIds.push({ id: o.id, zc: o.zoneChanges ?? 0 });
+          }
         }
       }
-      if (e.type === "tap" && e.noteTapped) s.resolving!.tappedThisWay = tapped;
+      // Those that became tapped (Monsoon counts them; Suppression Ray chooses among them).
+      if (e.type === "tap" && e.noteTapped) {
+        s.resolving!.tappedThisWay = tapped;
+        s.resolving!.tappedIds = tappedIds;
+      }
       return;
     }
     case "harness": {

@@ -1107,6 +1107,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Reverse the Polarity: "Counter all other spells": every spell on the stack but this one, anyone's (CR 701.6a).
   if (/^Counter all other spells$/.test(s) && ctx.spell) return [{ type: "counterEach", filter: { kind: "spell", types: [], notTypes: [], notColors: [], text: "all other spells" } }];
+  // Meddle: "If target spell has only one target and that target is a creature, change that spell's target to another
+  // creature"; Quicksilver Dragon: "... that target is ~ ...": any spell can be targeted, the condition checked as this
+  // resolves (rulings: not a spell with a creature and a player as targets); the new target one the spell could have
+  // (CR 115.7a), a creature; with none, its target stays.
+  if ((m = /^If target spell has only one target and that target is (a creature|~), change that spell's target to another creature$/.exec(s)) && (m[1] !== "~" || ctx.activated)) {
+    return [{ type: "changeTarget", index: addTarget(ctx, { kind: "spell", text: "target spell" }), mustBe: "creature", ifOnly: m[1] === "~" ? "self" : "creature" }];
+  }
   // Deflection: "Change the target of target spell with a single target" (CR 115.7a); Bolt Bend's "spell or ability".
   // Hydroelectric Specimen: "... target instant or sorcery spell with a single target to ~".
   if ((m = /^Change the target of target instant or sorcery spell with a single target to ~$/i.exec(s)))

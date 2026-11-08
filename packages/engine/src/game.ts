@@ -1073,6 +1073,7 @@ export function moveObject(
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
     o.webSlung = undefined;
     o.emergeSacrificed = undefined;
+    o.costDiscarded = undefined;
     o.bargained = undefined; // and whether it was bargained (CR 702.166b)
     o.costOrPaid = undefined; // and which of its either-or costs was paid
     o.evidence = undefined; // and whether evidence was collected for it (CR 701.59c)
@@ -1237,7 +1238,7 @@ export function moveObject(
   // Raid: "~ enters with a +1/+1 counter on it if you attacked this turn".
   // Counted after its "as ~ enters, choose" is answered when it counts what's chosen (afterChoice, see chooseOption).
   const withCounters = (printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller)) || (printedCounters?.castFromHand && !castFromHand) || (printedCounters?.notCastFromHand && castFromHand) || (printedCounters?.ifCast && !(fromZone === "stack" && !o.spellCopy)) || (printedCounters?.ifWebSlung && !(fromZone === "stack" && o.webSlung)) || printedCounters?.afterChoice || printedCounters?.afterPlayer ? undefined : printedCounters;
-  const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue })) * (withCounters.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= withCounters.doubleIfXAtLeast ? 2 : 1) : 0;
+  const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue, ...(o.costDiscarded ? { costDiscarded: o.costDiscarded } : {}) })) * (withCounters.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= withCounters.doubleIfXAtLeast ? 2 : 1) : 0;
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
   if (to === "graveyard") noteToGraveyard(s, o); // its owner may arrange cards put there at the same time (CR 404.3)
@@ -5699,6 +5700,18 @@ export function castProblem(
   }
   // A split card is cast as one of its halves (CR 709.3).
   if (layoutOf(s, o) === "split" && o.face === undefined && o.zone !== "stack") return `choose which half of ${defOf(s, o).name} to cast`;
+  // Nahiri's Sacrifice: "sacrifice an artifact or creature with mana value X": before X is announced, it can be cast if
+  // some X works (CR 107.3a, 601.2b), as Sidisi's ability.
+  if (x === undefined && !choices?.faceDown && o.zone !== "stack" && castExtraCosts(defOf(s, o), choices).some((c) => c.kind === "sacrifice" && mvXCost(c))) {
+    // An X the costs fit but the mana doesn't is "not enough mana" (autopay decides), as Osgir's ability.
+    let short: string | null = null;
+    for (let n = 0; n <= 20; n++) {
+      const p = castProblem(s, pid, id, targets, modes, convoke, improvise, n, choices);
+      if (!p) return null;
+      if (/not enough mana/.test(p)) short ??= p;
+    }
+    return short ?? castProblem(s, pid, id, targets, modes, convoke, improvise, 0, choices);
+  }
   if (choices?.faceDown && !o.faceDown) {
     // Cast face down (CR 702.37c, 708.4): it's turned face down first, so the checks see a 2/2 creature spell.
     const fd = compileCard(defOf(s, o)).faceDownCast;
@@ -7220,6 +7233,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Emerge (CR 702.119a): the creature sacrificed for it, for its permanent's "the sacrificed creature's toughness".
   if (isEmerge(choices.alt) && sacrificed.length) o.emergeSacrificed = sacrificed[0];
   if (discarded.length) item.costDiscarded = discarded;
+  // Dralnu's Pet: "the discarded card" its kicker discarded, for the permanent it becomes (CR 614.1c).
+  if (discarded.length) o.costDiscarded = discarded;
   if (choices.alt === "sneak") o.sneak = returned;
   // Cast using web-slinging (CR 702.188a): the creature it returned, for "the returned creature".
   // A web-slinging cost a permanent gave it (Amazing Spider-Man) is casting it using web-slinging too.
@@ -8023,7 +8038,7 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   // Phyrexian Purge: so much life for each target chosen (CR 601.2c before 601.2f).
   const targetCount = (choices?.targets ?? []).filter((t) => t.kind !== "none").length;
   return costs.map((c) =>
-    xCost(c) ? { ...c, n: x } : c.kind === "payLife" && c.perTarget ? { kind: "payLife", n: c.n * targetCount } : c.kind === "sacrifice" && c.half && s && pid !== undefined ? { ...c, n: Math.ceil(s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.filter, obj(s, id), pid, false)).length / 2) } : c.kind === "exileFromHand" && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x, max: x }, text: c.filter.text.replace(/\bX\b/, String(x)) } } : c,
+    xCost(c) ? { ...c, n: x } : c.kind === "payLife" && c.perTarget ? { kind: "payLife", n: c.n * targetCount } : c.kind === "sacrifice" && c.half && s && pid !== undefined ? { ...c, n: Math.ceil(s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.filter, obj(s, id), pid, false)).length / 2) } : (c.kind === "exileFromHand" || c.kind === "sacrifice") && c.mvX && c.filter && x !== undefined ? { ...c, filter: { ...c.filter, manaValue: { min: x, max: x }, text: c.filter.text.replace(/\bX\b/, String(x)) } } : c,
   );
 }
 
@@ -8077,7 +8092,8 @@ export function counterOnCandidates(s: GameState, pid: PlayerId, c: Extract<Addi
 
 /** Does casting it this way have an X to announce in a cost beyond mana, as Toxic Deluge's "pay X life" (CR 107.3a)? */
 export function costsHaveX(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">): boolean {
-  return castExtraCosts(d, choices).some(xCost);
+  // Nahiri's Sacrifice: "sacrifice an artifact or creature with mana value X", X announced for it (CR 107.3a).
+  return castExtraCosts(d, choices).some((c) => xCost(c) || (c.kind === "sacrifice" && mvXCost(c)));
 }
 
 /** "Sacrifice a creature or pay {3}{B}": the extra mana of the way chosen to pay it, if that's mana (CR 601.2f). */

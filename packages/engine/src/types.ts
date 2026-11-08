@@ -2272,7 +2272,7 @@ export interface GameState {
   untilReturns?: { auras: { id: ObjectId; zc: number; under: PlayerId; source: string; asking?: true }[]; returned: ObjectId[] };
   /** Legends chosen to keep under the legend rule (CR 704.5j), until the state-based actions are next performed. */
   legendKeep?: ObjectId[];
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; many?: true; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; /** One of "two players" (Sower of Discord): added to Chosen.players, not one chosen before. */ pair?: true; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean } }[];
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; many?: true; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; random?: number[]; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; /** One of "two players" (Sower of Discord): added to Chosen.players, not one chosen before. */ pair?: true; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean } }[];
   nextId: number;
   /**
    * Resolutions in a row in this step with every player only passing priority, and the states they left (as hashes,
@@ -2332,6 +2332,8 @@ export interface Chosen {
   colors?: Color[];
   /** "Each player chooses a color" (Selective Obliteration): each player's color. */
   colorsBy?: Record<number, Color>;
+  /** "As ~ enters, each player chooses war or peace" (Archangel of Strife): each player's word. */
+  byPlayer?: Record<number, string>;
   /** Gluntch: the players chosen by Effect "choosePlayer", in the order chosen. */
   players?: PlayerId[];
   /** "Choose odd or even" (Extinction Event). */

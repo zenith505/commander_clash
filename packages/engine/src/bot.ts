@@ -784,6 +784,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "pickPermanents" && pend.differentNames && pend.action === "choose") return [{ type: "pickPermanents", player: pid, ids: differentlyNamed(s, [...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))) }];
     // Sigarda's Vanguard: double strike for its own creatures, one of each power, the best of each first (others' creatures
     // would only gain it too).
+    // Celestial Judgment: one of each power, the rest destroyed: our own best of each power, else the other player's least
+    // valuable, so the better ones go.
+    if (pend.kind === "pickPermanents" && pend.differentPowers && pend.action === "choose" && !pend.anyNumber) {
+      const byPower = new Map<number, ObjectId[]>();
+      for (const id of pend.options) byPower.set(power(s, obj(s, id)), [...(byPower.get(power(s, obj(s, id))) ?? []), id]);
+      const ids = [...byPower.values()].map((group) => {
+        const mine = group.filter((id) => controllerOf(s, obj(s, id)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+        return mine[0] ?? [...group].sort((a, b) => worth(s, controllerOf(s, obj(s, a)), obj(s, a)) - worth(s, controllerOf(s, obj(s, b)), obj(s, b)))[0]!;
+      });
+      return [{ type: "pickPermanents", player: pid, ids: ids.slice(0, pend.count) }];
+    }
     if (pend.kind === "pickPermanents" && pend.differentPowers && pend.action === "choose") {
       const seen = new Set<number>();
       const ids = pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).filter((id) => {
@@ -1140,6 +1151,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const host = m && s.objects[m.host];
       return [{ type: "chooseOption", player: pid, choice: m && host && size(defOf(s, obj(s, m.id))) < size(defOf(s, host)) ? "bottom" : "top" }];
     }
+    // Archangel of Strife: war (+3/+0) to press an attack while healthy, peace (+0/+3) to hold the ground when not.
+    if (pend.kind === "chooseOption" && pend.what === "playerWord") return [{ type: "chooseOption", player: pid, choice: pend.options.join() === "war,peace" ? (player(s, pid).life >= 20 ? "war" : "peace") : pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "anchor") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Its owner keeps it on top (Subtlety); Hinder's controller sends another player's card to the bottom.
     // Temporal Cleansing's owner keeps it second from the top.

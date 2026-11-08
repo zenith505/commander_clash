@@ -277,12 +277,18 @@ export type TriggerSourceEvent =
   | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean; /** The source's colors as it dealt the damage (Circle of Affliction). */ colors?: Color[] }
   /** A source (`source`: its object, "" if none) controlled by `by` dealt damage to a permanent (`id`) or a player. */
   | { type: "sourceDealtDamage"; source: ObjectId; by: PlayerId; id?: ObjectId; player?: PlayerId; amount: number; combat?: true }
-  /** One source's damage in one damage event, to any number of permanents and players (The Red Terror). */
-  | { type: "sourceDealtDamageEvent"; by: PlayerId; colors: Color[] }
+  /**
+   * One source's damage in one damage event, to any number of permanents and players (The Red Terror, Tamanoa, Justice):
+   * `amount` all it dealt then; `creature` it was a creature permanent, `stackSpell` a spell on the stack; `ref` the
+   * object it was.
+   */
+  | { type: "sourceDealtDamageEvent"; by: PlayerId; colors: Color[]; amount: number; types: string[]; creature?: true; stackSpell?: true; ref?: { id: ObjectId; zc: number } }
+  /** A permanent dealt damage to one or more creatures at the same time (Briarbridge Patrol). */
+  | { type: "dealtDamageToCreatures"; source: ObjectId }
   /** A permanent dealt damage to a creature (`id`). */
   | { type: "damagedCreature"; source: ObjectId; id: ObjectId; amount: number; combat: boolean; /** The excess damage that creature has been dealt this turn (CR 120.10). */ excess?: number }
   /** A spell (`card`, controlled by `by`) dealt damage to a player or a battle. */
-  | { type: "spellDealtDamage"; by: PlayerId; card: CardDef; player?: PlayerId; battle?: ObjectId }
+  | { type: "spellDealtDamage"; by: PlayerId; card: CardDef; player?: PlayerId; battle?: ObjectId; amount: number }
   /**
    * Damage dealt to players at the same time (CR 603.2c): each source's to each player, with the source's controller and
    * its card types and subtypes as it dealt it, and the permanent it was (not for a spell).
@@ -1937,8 +1943,21 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // controller's permanents, once for each source and damage event; the source's colors as it dealt the damage.
     for (const id of s.battlefield) {
       const w = obj(s, id);
-      if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "yourSourceDealsDamage" && (!t.sourceColor || ev.colors.includes(t.sourceColor)));
+      const wc = controllerOf(s, w);
+      // Tamanoa: "a noncreature source you control" (rulings: one without the creature type, a creature card dealing
+      // damage from a graveyard included); Blaze Commando: "an instant or sorcery spell you control"; Flame Channeler: "a
+      // spell you control", one on the stack (rulings). "That much" is all that source dealt in that event.
+      const dealtByFits = (d: NonNullable<TriggeredAbility["dealtBy"]>) => (!d.noncreature || !ev.types.includes("Creature")) && (!d.spell || !!ev.stackSpell) && (!d.spellTypes || d.spellTypes.some((x) => ev.types.includes(x))) && (!d.creatureOrSpell || !!ev.creature || !!ev.stackSpell);
+      const fits = (t: TriggeredAbility) => (!t.sourceColor || ev.colors.includes(t.sourceColor)) && (!t.dealtBy || dealtByFits(t.dealtBy));
+      if (wc === ev.by) add(w, ev.by, (e, t) => e === "yourSourceDealsDamage" && fits(t), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount });
+      // Justice: "Whenever a red creature or spell deals damage, ~ deals that much damage to that creature's or spell's
+      // controller": anyone's; that controller as it resolves while the source is still that object (CR 608.2h).
+      add(w, wc, (e, t) => e === "sourceDealsDamage" && fits(t), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount, player: ev.by, ...(ev.ref ? { sourceOf: ev.ref } : {}) });
     }
+  } else if (ev.type === "dealtDamageToCreatures") {
+    // Briarbridge Patrol: "Whenever ~ deals damage to one or more creatures": once for all it dealt at the same time (rulings).
+    const o = s.objects[ev.source];
+    if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfDealsDamageToCreatures");
   } else if (ev.type === "damagedCreature") {
     const o = s.objects[ev.source];
     const hit = s.objects[ev.id];
@@ -1947,6 +1966,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // Vampire Slayer: "deals damage to a Vampire", only a creature that fits (as it's dealt the damage).
       add(o, controllerOf(s, o), (e, t) => (e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature")) && (!t.subjectFilter || objectMatches(s, t.subjectFilter, hit, controllerOf(s, o), false)), undefined, undefined, hit, undefined, undefined, undefined, info);
       addHosted(o, (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, hit, info);
+      // Greatbow Doyen, Ohabi Caleria: "Whenever an Archer you control deals damage to a creature": combat or not (rulings),
+      // the Archer the subject ("that Archer deals ...") and "that creature's controller" the damaged creature's as the
+      // ability resolves while it's still that permanent, otherwise as it last existed (CR 608.2h).
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        const wc = controllerOf(s, w);
+        add(w, wc, (e, t) => e === "creatureDealsDamageToCreature" && !!t.dealer && objectMatches(s, t.dealer.filter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, { ...info, player: controllerOf(s, hit), sourceOf: { id: hit.id, zc: hit.zoneChanges ?? 0 } });
+      }
       // Toxin Sliver: "Whenever a Sliver deals combat damage to a creature": anyone's, as it deals the damage.
       if (ev.combat)
         for (const id of s.battlefield) {
@@ -1959,7 +1986,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix, in
     // a graveyard too): once for each player or battle dealt damage (CR 603.2c).
     const fits = (t: TriggeredAbility) => !!t.spellDamage && printedMatches(t.spellDamage.filter, ev.card) && (ev.battle !== undefined ? !!t.spellDamage.orBattle : ev.player !== undefined && (!!t.spellDamage.anyPlayer || ev.player !== ev.by));
-    const watch = (w: GameObject) => add(w, ev.by, (e, t) => e === "spellYouControlDealsDamage" && fits(t));
+    // Satyr Firedancer: "that much" is the damage dealt to that player, "that player" the one dealt it.
+    const watch = (w: GameObject) => add(w, ev.by, (e, t) => e === "spellYouControlDealsDamage" && fits(t), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount, ...(ev.player !== undefined ? { player: ev.player } : {}) });
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.by) watch(obj(s, id));
     fromGraveyards((o, owner) => owner === ev.by && watch(o));
   } else if (ev.type === "playersDealtDamage") {
@@ -1972,7 +2000,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const g = t.event === "groupDealsDamageToPlayers" ? t.damageGroup : undefined;
         if (!g || (g.yourTurn && s.activePlayer !== wc)) continue;
         const fits = (h: (typeof ev.hits)[number]) => {
-          if ((h.by !== wc && !g.anyController) || h.source === undefined || (g.opponents && !opponents(s, wc).includes(h.player)) || (g.combat && !h.combat)) return false;
+          if ((h.by !== wc && !g.anyController) || (g.opponents && !opponents(s, wc).includes(h.player)) || (g.combat && !h.combat) || (g.noncombat && h.combat)) return false;
+          // Master of Barbs: "Whenever one or more opponents are dealt noncombat damage": from any source, spells too.
+          if (g.anySource) return true;
+          if (h.source === undefined) return false;
           const o = s.objects[h.source];
           if (o?.zone === "battlefield") return objectMatches(s, g.filter, o, wc, false);
           const { kind: _k, text: _t, types = [], subtypes = [], ...rest } = g.filter;

@@ -64,9 +64,9 @@ export function objectSource(s: GameState, o: GameObject): DamageSource {
 }
 
 /** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix). */
-function spellDealt(s: GameState, src: DamageSource, to: { player?: PlayerId; battle?: ObjectId }) {
+function spellDealt(s: GameState, src: DamageSource, to: { player?: PlayerId; battle?: ObjectId }, amount: number) {
   const o = src.spell && src.ref ? s.objects[src.ref.object] : undefined;
-  if (o) fireEvent(s, { type: "spellDealtDamage", by: src.controller, card: defOf(s, o), ...to });
+  if (o) fireEvent(s, { type: "spellDealtDamage", by: src.controller, card: defOf(s, o), ...to, amount });
 }
 
 /** A spell, or an ability whose source is gone: the card's printed characteristics. */
@@ -108,12 +108,28 @@ export const excessOver = (lethal: number[], n: number) => Math.max(0, ...lethal
  * source in each damage event (CR 120.3, 603.2c), damage dealt at the same time being one (see dealPlanned); its colors
  * and controller as it dealt it.
  */
-let sourceBatch: Map<string, DamageSource> | null = null;
-function sourceDealtOnce(s: GameState, src: DamageSource) {
+let sourceBatch: Map<string, { src: DamageSource; amount: number; stackSpell: boolean }> | null = null;
+function sourceDealtOnce(s: GameState, src: DamageSource, n: number) {
   const key = src.ref ? `${src.ref.object}@${src.ref.zc}` : src.id ? `id:${src.id}` : `name:${src.name}:${src.controller}`;
+  // Flame Channeler, Blaze Commando: "a spell you control deals damage" is a spell on the stack (CR 112.1, rulings), not a
+  // reflexive or delayed ability of one that has left it.
+  const stackSpell = !!src.spell && !!src.ref && s.objects[src.ref.object]?.zone === "stack" && (s.objects[src.ref.object]!.zoneChanges ?? 0) === src.ref.zc;
   if (sourceBatch) {
-    if (!sourceBatch.has(key)) sourceBatch.set(key, src);
-  } else fireEvent(s, { type: "sourceDealtDamageEvent", by: src.controller, colors: [...src.colors] });
+    const had = sourceBatch.get(key);
+    if (had) had.amount += n;
+    else sourceBatch.set(key, { src, amount: n, stackSpell });
+  } else fireSourceDealt(s, src, n, stackSpell);
+}
+
+/**
+ * One source's damage in one damage event (The Red Terror, Tamanoa, Justice): the total it dealt then (Justice's rulings:
+ * one source damaging several things at once is added up), its colors and card types as it dealt it, whether it was a
+ * creature permanent (CR 109.2: "a red creature" is one on the battlefield, or as it last existed there) or a spell on
+ * the stack, and the object it was, for "that creature's or spell's controller" as the trigger resolves.
+ */
+function fireSourceDealt(s: GameState, src: DamageSource, amount: number, stackSpell: boolean) {
+  const creature = !src.spell && !!src.id && src.types.includes("Creature");
+  fireEvent(s, { type: "sourceDealtDamageEvent", by: src.controller, colors: [...src.colors], amount, types: [...src.types], ...(creature ? { creature: true as const } : {}), ...(stackSpell ? { stackSpell: true as const } : {}), ...(src.ref ? { ref: { id: src.ref.object, zc: src.ref.zc } } : {}) });
 }
 
 /**
@@ -128,8 +144,8 @@ function sourceDealtOnce(s: GameState, src: DamageSource) {
  * dealDamageBatch; `shielded` says the caller already did that.
  */
 /** The permanent dealing damage, if it's still the object it was, has now dealt damage (Karakyk Guardian). */
-function noteDealt(s: GameState, src: DamageSource, combat: boolean | undefined, to: { player: PlayerId } | { object: GameObject }) {
-  sourceDealtOnce(s, src);
+function noteDealt(s: GameState, src: DamageSource, combat: boolean | undefined, to: { player: PlayerId } | { object: GameObject }, n: number) {
+  sourceDealtOnce(s, src, n);
   const o = src.id ? s.objects[src.id] : undefined;
   if (!o || o.zone !== "battlefield" || (src.ref?.object === o.id && src.ref.zc !== (o.zoneChanges ?? 0))) return;
   // Diseased Vermin and The Fallen: the players and planeswalkers it has dealt damage to as this object (phasing keeps
@@ -273,7 +289,7 @@ export function dealDamage(
       invalidateCharacteristics(s);
       log(s, `${src.name} deals ${n} damage to ${c.name} (${removed} defense removed).`);
       if (removed && removed === had) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "defense" });
-      spellDealt(s, src, { battle: o.id });
+      spellDealt(s, src, { battle: o.id }, n);
     }
     if ((!walker && !battle) || c.types.includes("Creature")) {
       // Wolverine, Fierce Fighter: the damage already marked on it is healed as this is dealt; combat damage is one event
@@ -320,10 +336,13 @@ export function dealDamage(
     if (src.id && c.types.includes("Creature")) {
       const ev = { type: "damagedCreature" as const, source: src.id, id: o.id, amount: n, combat: !!opts.combat };
       if (creatureBatch) creatureBatch.push(ev);
-      else fireEvent(s, ev);
+      else {
+        fireEvent(s, ev);
+        fireEvent(s, { type: "dealtDamageToCreatures", source: src.id });
+      }
     }
     fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, id: o.id, amount: n, ...(opts.combat ? { combat: true } : {}) });
-    noteDealt(s, src, opts.combat, { object: o });
+    noteDealt(s, src, opts.combat, { object: o }, n);
   } else {
     const p = player(s, to.player);
     // Phyrexian Unlife: dealt as though its source had infect while the player was at 0 or less life as the damage was
@@ -372,8 +391,8 @@ export function dealDamage(
     // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).
     fireEvent(s, { type: "damagedPlayer", source: src.id ?? "", by: src.controller, player: p.id, amount: n, combat: !!opts.combat, colors: [...src.colors] });
     fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, player: p.id, amount: n, ...(opts.combat ? { combat: true } : {}) });
-    noteDealt(s, src, opts.combat, { player: p.id });
-    spellDealt(s, src, { player: p.id });
+    noteDealt(s, src, opts.combat, { player: p.id }, n);
+    spellDealt(s, src, { player: p.id }, n);
     if (opts.combat) {
       p.combatDamagedTurn = s.turn;
       if (from) {
@@ -1633,6 +1652,8 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   const dealers = sourceBatch;
   sourceBatch = outerSources;
   for (const ev of toCreatures) fireEvent(s, { ...ev, excess: excessThisTurn(s, ev.id, s.objects[ev.id]?.zoneChanges ?? 0) });
+  // Briarbridge Patrol: "Whenever ~ deals damage to one or more creatures": once for each source in this event (rulings).
+  for (const source of new Set(toCreatures.map((ev) => ev.source))) fireEvent(s, { type: "dealtDamageToCreatures", source });
   for (const [id, amount] of dealtTo) {
     // Each permanent's damage events this turn: damage dealt at the same time is one event (CR 120.3).
     const key = `${id}@${s.objects[id]?.zoneChanges ?? 0}`;
@@ -1654,7 +1675,7 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   infectAtZero = outerInfect;
   for (const [pid, amount] of toPlayers) fireEvent(s, { type: "playerDealtDamage", player: pid, amount, combat });
   firePlayersDealt(s, out);
-  for (const src of dealers.values()) fireEvent(s, { type: "sourceDealtDamageEvent", by: src.controller, colors: [...src.colors] });
+  for (const d of dealers.values()) fireSourceDealt(s, d.src, d.amount, d.stackSpell);
   // "If damage is prevented this way, ~ deals that much damage to that source's controller" (Deflecting Palm), after it.
   for (const b of back) {
     const d = s.cards[b.cardId];

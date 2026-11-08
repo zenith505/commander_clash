@@ -2606,6 +2606,12 @@ export type Effect =
       excessToController?: true;
       /** "And an additional 1 damage to each green creature" (Kaervek's Hex): a recipient in both `to` and `also` is dealt the two amounts added up, as one. */
       merge?: true;
+      /**
+       * "~ deals 3 damage to target player or planeswalker and 3 damage to target creature" (Punish the Enemy): this second
+       * part is dealt at the same time as the damage effect just before it, one damage event (CR 120.3), as it resolves
+       * (effects/resolve.ts merges the two).
+       */
+      sameEvent?: true;
     }
   /**
    * "Each creature deals 1 damage to its controller" (Rakdos Charm): each of those permanents is the source of its own
@@ -5402,6 +5408,12 @@ export type TriggerEvent =
   | "sourceYouControlDealsDamage"
   /** The Red Terror: "Whenever a red source you control deals damage to one or more permanents and/or players" (`sourceColor`). */
   | "yourSourceDealsDamage"
+  /** Justice: "Whenever a red creature or spell deals damage": anyone's, once for each source and damage event (rulings). */
+  | "sourceDealsDamage"
+  /** Briarbridge Patrol: "Whenever ~ deals damage to one or more creatures": once for each damage event (rulings). */
+  | "selfDealsDamageToCreatures"
+  /** Greatbow Doyen, Ohabi Caleria: "Whenever an Archer you control deals damage to a creature": once for each creature dealt damage by each (CR 603.2c), combat or not. */
+  | "creatureDealsDamageToCreature"
   /** "Whenever ~ deals damage": once per event, however many things it damaged at once; "that much" is the total. */
   | "selfDealsDamage"
   | "selfDealsCombatDamage"
@@ -5916,7 +5928,7 @@ export interface TriggeredAbility {
    * one event (CR 603.2c). `opponents`: to your opponents, "that many" how many of them were dealt damage; `perPlayer`:
    * once for each player dealt damage, "that player" them.
    */
-  damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true; /** "Deal combat damage" (Hordewing Skaab): only combat damage. */ combat?: true; /** "If any of that damage was dealt by a Warrior" (Mindblade Render): anyone's, not only yours (rulings). */ anyController?: true; /** "During your turn" (Fblthp, Impossibly Lost): only while its controller is the active player. */ yourTurn?: true };
+  damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true; /** "Deal combat damage" (Hordewing Skaab): only combat damage. */ combat?: true; /** "If any of that damage was dealt by a Warrior" (Mindblade Render): anyone's, not only yours (rulings). */ anyController?: true; /** "During your turn" (Fblthp, Impossibly Lost): only while its controller is the active player. */ yourTurn?: true; /** Master of Barbs: "are dealt noncombat damage": only noncombat damage, from any source (spells too). */ noncombat?: true; anySource?: true };
   /** For "sourceYouControlDamagesOpponent": only noncombat damage. */
   noncombatOnly?: true;
   /** For "sourceYouControlDamagesOpponent", "opponentDealtDamageBySource", "selfDealsDamage" and "selfDealsDamageToPlayer": "deals 5 or more damage" at once (Dragonborn Champion, Spinneret and Spiderling, Deus of Calamity); for "selfIsDealtDamage", "is dealt 3 or more damage" at once (Innocent Bystander). */
@@ -5927,8 +5939,14 @@ export interface TriggeredAbility {
   otherSource?: true;
   /** For "sourceYouControlDealsDamage": exactly this much at once; `other`: a source other than this permanent. */
   sourceDamage?: { exactly: number; other?: true };
-  /** For "yourSourceDealsDamage": only a source of this color, as it deals the damage. */
+  /** For "yourSourceDealsDamage" and "sourceDealsDamage": only a source of this color, as it deals the damage. */
   sourceColor?: Color;
+  /**
+   * For "yourSourceDealsDamage" and "sourceDealsDamage": what the source was as it dealt the damage. `noncreature`
+   * (Tamanoa): without the creature type; `spell`: a spell on the stack (Flame Channeler), of one of `spellTypes`
+   * (Blaze Commando: instant or sorcery); `creatureOrSpell` (Justice): a creature permanent or a spell on the stack.
+   */
+  dealtBy?: { noncreature?: true; spell?: true; spellTypes?: string[]; creatureOrSpell?: true };
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
   minAttackers?: number;
   /** With `minAttackers`: "When you attack with exactly two creatures" (Alluring Suitor): that many, no more. */

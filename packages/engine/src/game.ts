@@ -7620,7 +7620,9 @@ function kickerExtraCosts(d: CardDef, kicks?: number[]): AdditionalCost[] {
   const times = kicks?.filter((i) => i === 0).length ?? 0;
   if (!k?.extraCosts || !times) return [];
   if (times === 1 || !k.multi) return k.extraCosts;
-  return k.extraCosts.map((c) => (c.kind === "exileFromGraveyard" ? { ...c, n: c.n * times } : c));
+  // Exterminate!: "Replicate—Tap an untapped Dalek you control" paid twice taps two of them; Reiterating Bolt's
+  // "Replicate—Pay {E}{E}{E}" paid twice is six energy.
+  return k.extraCosts.map((c) => (c.kind === "exileFromGraveyard" || c.kind === "tap" || c.kind === "payEnergy" ? { ...c, n: c.n * times } : c));
 }
 
 /** Why these kicker choices aren't allowed (CR 702.33): each kicker cost once, multikicker's any number of times. */

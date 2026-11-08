@@ -6311,6 +6311,75 @@
   "gameChanger": false
  },
  {
+  "oracleId": "95d018f4-7f97-4b2c-abb4-cef69031caa1",
+  "name": "Dalek Drone",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Artifact Creature — Dalek",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Dalek"
+  ],
+  "oracleText": "Flying, menace\nExterminate! — When this creature enters, destroy target creature an opponent controls. That player loses 3 life.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying",
+   "Exterminate!",
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "18ae6be7-cfb6-42e3-a04e-99e9c1471ecd",
+  "name": "Dalek Squadron",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Artifact Creature — Dalek",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Dalek"
+  ],
+  "oracleText": "Menace\nMyriad (Whenever this creature attacks, for each opponent other than defending player, you may create a token copy that's tapped and attacking that player or a planeswalker they control. Exile the tokens at end of combat.)",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Menace",
+   "Myriad"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "615b4189-e800-408b-99e0-71ae7089b937",
   "name": "Dance with Calamity",
   "manaCost": "{7}{R}",
@@ -8998,6 +9067,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "90b540ab-b05a-4d29-b896-7ff5da0b101d",
+  "name": "Exterminate!",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Replicate—Tap an untapped Dalek you control. (When you cast this spell, copy it for each time you paid its replicate cost. You may choose new targets for the copies.)\nDestroy target creature. Its controller loses 3 life.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Replicate"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0a11a3a8-ee5f-4caf-bf84-c8248e07c825",
   "name": "Extinction Event",
   "manaCost": "{3}{B}",
@@ -11562,6 +11659,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0221330a-3e7a-40aa-9c78-85c88a4c1a53",
+  "name": "Green Sun's Twilight",
+  "manaCost": "{X}{G}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal the top X plus one cards of your library. Choose a creature card and/or a land card from among them. Put those cards into your hand and the rest on the bottom of your library in a random order. If X is 5 or more, instead put the chosen cards onto the battlefield or into your hand and the rest on the bottom of your library in a random order.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "one",
+  "releasedAt": "2023-02-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "739a5220-50cd-4148-be58-1bbdeef2954e",
   "name": "Greymond, Avacyn's Stalwart",
   "manaCost": "{2}{W}{W}",
@@ -13605,6 +13728,32 @@
   ],
   "colorIdentity": [
    "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3e5cd60f-8fef-4152-a957-0a803997b3da",
+  "name": "Invoke Justice",
+  "manaCost": "{1}{W}{W}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Return target permanent card from your graveyard to the battlefield, then distribute four +1/+1 counters among any number of creatures and/or Vehicles target player controls.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
   ],
   "keywords": [],
   "commanderLegal": "legal",

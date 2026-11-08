@@ -967,6 +967,9 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   // "Two target creatures controlled by different players" (Run Away Together, Switcheroo's kin): each a different
   // controller from the others', checked both ways (rulings: two creatures of one player are both illegal).
   const diffCtl = n > 1 && !many && / controlled by different players$/.test(mine0);
+  // Chaos Mutation: "any number of target creatures controlled by different players": no two of them controlled by the
+  // same player (rulings), however many are announced (TargetSpec.differentControllers).
+  const manyDiffCtl = !!many && / controlled by different players$/.test(mine0);
   // Shifting Loyalties: "two target permanents that share a card type": each sharing one with the other (CR 205.2a).
   const shareCard = n > 1 && !many && / that share a card type$/.test(mine0);
   // Rivals' Duel: "two target creatures that share no creature types": each sharing none with the other.
@@ -1018,7 +1021,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   if (many) {
     // Rats' Feast: "X target cards from a single graveyard": each in the graveyard of the others (TargetSpec.singleGraveyard).
     if ((single && many !== "exactX") || share || ctx.targets.some((t) => t.many)) return null;
-    addTarget(ctx, { ...spec, ...(single ? { singleGraveyard: true as const, text: spec.text.replace(/ from a graveyard$/, " from a single graveyard") } : {}), ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), ...(manyMax ? { manyMax } : {}), ...(range === "one or more" ? { manyMin: 1 as const } : {}), ...(whereMany ? { manyWhere: true as const } : {}), ...(twice ? { manyTimes: 2 as const } : {}), ...(differMv ? { differentManaValues: true as const, text: spec.text.replace(" with mana value ", " with a different mana value ") } : {}), many });
+    addTarget(ctx, { ...spec, ...(single ? { singleGraveyard: true as const, text: spec.text.replace(/ from a graveyard$/, " from a single graveyard") } : {}), ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), ...(manyMax ? { manyMax } : {}), ...(range === "one or more" ? { manyMin: 1 as const } : {}), ...(whereMany ? { manyWhere: true as const } : {}), ...(twice ? { manyTimes: 2 as const } : {}), ...(manyDiffCtl ? { differentControllers: true as const, text: `${spec.text} controlled by a different player` } : {}), ...(differMv ? { differentManaValues: true as const, text: spec.text.replace(" with mana value ", " with a different mana value ") } : {}), many });
     // "It" can't mean one of them; "they", "those creatures" means all of them, however many.
     ctx.lastObjectTarget = undefined;
     ctx.lastTargets = { index: first, n: 2 };

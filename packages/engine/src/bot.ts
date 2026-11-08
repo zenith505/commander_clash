@@ -4174,6 +4174,15 @@ function chooseWord(s: GameState, pid: PlayerId, options: string[]): string {
   return options[0]!;
 }
 
+/** Azra Oddsmaker: a choose-pick right before an "aboutCreated" combat-damage floating trigger, at any nesting depth. */
+function pickThenCombatDamageTrigger(effects: Effect[]): boolean {
+  return effects.some((e, i) => {
+    const next = effects[i + 1];
+    if (e.type === "pick" && e.action === "choose" && next?.type === "floatingTrigger" && next.aboutCreated && next.trigger.event === "selfDealsCombatDamageToPlayer") return true;
+    return "effects" in e && Array.isArray(e.effects) && pickThenCombatDamageTrigger(e.effects as Effect[]);
+  });
+}
+
 function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: number, action: PickAction, counter?: CounterKind): ObjectId[] {
   const self = s.resolving?.item.sourceId;
   if (action === "attach") return attachPicks(s, pid, options);
@@ -4185,6 +4194,15 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
     return [...options].sort((a, b) => Number(given.has(a)) - Number(given.has(b)) || worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   }
   const after = action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next + 1] : undefined;
+  // Azra Oddsmaker: the creature whose combat damage to a player draws us cards this turn: ours that can attack an
+  // opponent now, the strongest first; else our best one.
+  // The pick is nested in "if you do" there, so look for a choose-pick followed by that trigger anywhere in the body.
+  const azra = action === "choose" && s.resolving !== null && pickThenCombatDamageTrigger(s.resolving.body.effects);
+  if (azra || (after?.type === "floatingTrigger" && after.aboutCreated && after.trigger.event === "selfDealsCombatDamageToPlayer")) {
+    const able = (id: ObjectId) => opponents(s, pid).some((q) => attackProblem(s, obj(s, id), q) === null);
+    const rank = (id: ObjectId) => (controllerOf(s, obj(s, id)) !== pid ? -1e6 : (able(id) ? 1e5 : 0) + power(s, obj(s, id)) * 100 + worth(s, pid, obj(s, id)) / 1e3);
+    return [...options].sort((a, b) => rank(b) - rank(a)).slice(0, count);
+  }
   // Drop of Honey, Purging Scythe: a tied creature of anyone's to destroy or damage: an opponent's, worth the most to them;
   // else our least useful one.
   // Eye of Doom: a doom counter (the Eye destroys them later) likewise.
@@ -4538,6 +4556,8 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   // good for us, a counter on ours or -3/-3 on an opponent's.
   if (r && e?.type === "eachMay" && r.body.targets.length === 1 && r.body.targets[0]!.chosenBy) {
     const t = r.item.targets?.[0];
+    // Pandemonium: damage to a player, only to an opponent of ours.
+    if (t?.kind === "player") return harmsChosenTarget(r.body) ? t.id !== pid && !player(s, t.id).lost : t.id === pid;
     return !!t && t.kind === "object" && !!s.objects[t.id] && isMine(s, pid, t) !== harmsChosenTarget(r.body);
   }
   if (!r || e?.type !== "may") return true;

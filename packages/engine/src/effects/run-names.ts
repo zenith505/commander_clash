@@ -86,7 +86,7 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const pid = st.left[0]!.controller;
           const mine = st.left.filter((x) => x.controller === pid);
           let pick = mine[0]!;
-          if (mine.length > 1 && !player(s, pid).lost) {
+          if (mine.length > 1 && !e.filter && !player(s, pid).lost) {
             if (sc.nextExiled === undefined) {
               s.pending = { kind: "chooseOption", player: pid, source: src, what: "nextExiled", options: mine.map((x) => x.id), labels: mine.map((x) => x.name), prompt: "choose the exiled permanent to reveal for next" };
               return "paused";
@@ -98,7 +98,7 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         const cur = st.left.find((x) => x.id === st.current)!;
         if (!player(s, cur.controller).lost) {
-          const r = runEffect(s, { type: "revealUntil", filter: { kind: "card", types: [], notTypes: [], notColors: [], text: `card that shares a card type with ${cur.name}` }, found: "battlefield", rest: "shuffle", who: { ref: "eachOne" }, sharesTypes: cur.types }, { ...ctx, eachOne: cur.controller });
+          const r = runEffect(s, e.filter ? { type: "revealUntil", filter: e.filter, found: "battlefield", rest: e.rest ?? "shuffle", who: { ref: "eachOne" } } : { type: "revealUntil", filter: { kind: "card", types: [], notTypes: [], notColors: [], text: `card that shares a card type with ${cur.name}` }, found: "battlefield", rest: "shuffle", who: { ref: "eachOne" }, sharesTypes: cur.types }, { ...ctx, eachOne: cur.controller });
           if (r === "paused") return "paused";
         }
         st.left = st.left.filter((x) => x.id !== cur.id);

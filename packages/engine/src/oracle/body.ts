@@ -6569,7 +6569,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
     // round B148's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    const faceDown = roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);
@@ -14582,12 +14582,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const mvOf = /^~ deals damage equal to that card's mana value to (?!.*\b(?:that card|its?)\b)/.exec(whenDiscarded[2]!);
       // The Ancient One: "target player mills cards equal to its mana value": the card discarded (rulings).
       const millMv = !mvOf && /^(target (?:player|opponent)) mills cards equal to its mana value$/.exec(whenDiscarded[2]!);
+      // Argentum Masticore: "destroy target nonland permanent an opponent controls with mana value less than or equal to
+      // the mana value of the discarded card": the same X, the target chosen as the reflexive trigger is put on the stack.
+      const mvTarget = !mvOf && !millMv ? /^(destroy target [a-z ]+?) with mana value less than or equal to the mana value of the discarded card$/.exec(whenDiscarded[2]!) : null;
       if (mvOf) whenDiscarded[2] = `~ deals X damage to ${whenDiscarded[2]!.slice(mvOf[0].length)}`;
       else if (millMv) whenDiscarded[2] = `${millMv[1]} mills X cards`;
+      else if (mvTarget) whenDiscarded[2] = `${mvTarget[1]} with mana value X or less`;
       const millText = millMv ? `${millMv[0]}.` : undefined;
-      const reflexive = filter && yourDiscard(effects) && !/\b(?:that card|its?)\b/.test(whenDiscarded[2]!) && reflexiveBody(whenDiscarded[2]!, ctx, false, false, !!mvOf || !!millMv);
+      const reflexive = filter && yourDiscard(effects) && !/\b(?:that card|its?)\b/.test(whenDiscarded[2]!) && reflexiveBody(whenDiscarded[2]!, ctx, false, false, !!mvOf || !!millMv || !!mvTarget);
       if (!reflexive) return null;
-      effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter }, effects: [{ type: "reflexive", body: millText ? { ...reflexive, text: millText } : reflexive, ...(mvOf || millMv ? { xDiscardedMv: true as const } : {}) }] });
+      effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter }, effects: [{ type: "reflexive", body: millText ? { ...reflexive, text: millText } : mvTarget ? { ...reflexive, text: `${mvTarget[0]}.` } : reflexive, ...(mvOf || millMv || mvTarget ? { xDiscardedMv: true as const } : {}) }] });
       continue;
     }
     // Frenetic Sliver: "If ~ is on the battlefield, flip a coin. If you win the flip, exile ~ and return it ... If you lose
@@ -19789,6 +19793,55 @@ function wholeTextForms(text: string, selfEntered: boolean): AbilityBody | strin
   // The Kenriths' Royal Funeral: "You draw X cards and you lose X life, where X is ...": the same X for both.
   text = text.replace(/(^|\. )You draw X cards and you lose X life, where X is (the greatest mana value among cards exiled this way)\./, "$1You draw X cards, where X is $2. You lose X life, where X is $2.");
   return text;
+}
+
+/**
+ * Round 311's sentences, kept out of parseBodyText (TS2563): Divergent Transformations and Chaos Mutation (a reveal for
+ * each creature exiled this way), Kethek (a reveal for a card with lesser mana value than the creature sacrificed) and
+ * Azra Oddsmaker (a creature chosen, then a delayed trigger about it). Null when none of them matches.
+ */
+function round311Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  // Divergent Transformations, after "Exile two target creatures": "For each of those creatures, its controller reveals
+  // cards from the top of their library until they reveal a creature card, puts that card onto the battlefield, then
+  // shuffles the rest into their library." Chaos Mutation, after "Exile any number of target creatures controlled by
+  // different players": "For each creature exiled this way, ... then puts the rest on the bottom of their library in a
+  // random order." Only for the creatures exiled (an illegal target isn't, rulings), each one's controller as it last
+  // existed, in turn order, a player with two doing it twice; the cards found enter one at a time (rulings).
+  // The splitter breaks Chaos Mutation's at ", then puts": its second half is the next sentence.
+  const perExiledCreature = /^For each (?:of those creatures|creature exiled this way), its controller reveals cards from the top of their library until they reveal a creature card, puts that card onto the battlefield(?:, then (shuffles the rest into their library))?$/.exec(s);
+  const perExiledBottom = !!perExiledCreature && !perExiledCreature[1] && /^Puts the rest on the bottom of their library in a random order\.?$/.test(sentences[si + 1] ?? "");
+  if (perExiledCreature && (perExiledCreature[1] || perExiledBottom)) {
+    const ex = effects[0];
+    if (!ctx.spell || effects.length !== 1 || ex?.type !== "exile" || ex.until || ex.what.ref !== "target" || ex.what.index !== 0 || Object.keys(ex).length !== 2 || !ctx.targets.length || ctx.targets.some((t) => t.kind !== "object" || !t.types?.length || t.types.some((ty) => ty !== "Creature"))) return "fail";
+    if (ctx.targets.length === 1 ? ctx.targets[0]!.many !== "any" || ex.what.n !== 2 : ctx.targets.some((t) => t.many) || ex.what.n !== ctx.targets.length) return "fail";
+    return { effect: { type: "revealUntilPerExiled", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, rest: perExiledBottom ? "bottom" : "shuffle" }, next: si + (perExiledBottom ? 2 : 1) };
+  }
+  const ifDid = /^If you do, (.+)$/.exec(s);
+  const prev = effects[effects.length - 1];
+  if (!ifDid || prev?.type !== "may") return null;
+  // Kethek, Crucible Goliath: "you may sacrifice another creature. If you do, reveal cards from the top of your library
+  // until you reveal a nonlegendary creature card with lesser mana value, put it onto the battlefield, then put the rest
+  // on the bottom of your library in a random order": lesser than the sacrificed creature's as it last existed ({X} as
+  // 0, rulings); with none, the whole library is revealed and put on the bottom (CR 701.20a).
+  const sac = prev.effects.length === 1 && prev.effects[0]!.type === "pick" && prev.effects[0]!.action === "sacrifice" && prev.effects[0]!.n === 1;
+  const kethek = sac ? /^reveal cards from the top of your library until you reveal an? (.+? card) with lesser mana value, put it onto the battlefield(, then put the rest on the bottom of your library in a random order)?$/.exec(ifDid[1]!) : null;
+  const kethekRest = !!kethek && !kethek[2] && /^Put the rest on the bottom of your library in a random order\.?$/.test(sentences[si + 1] ?? "");
+  if (kethek && (kethek[2] || kethekRest)) {
+    const filter = parseSearchFilter(kethek[1]!);
+    if (!filter || filter.kind !== "card" || filter.bound) return "fail";
+    return { effect: { type: "if", cond: { kind: "youDid" }, effects: [{ type: "revealUntil", filter: { ...filter, text: `${filter.text} with lesser mana value`, bound: { key: "manaValue", at: "most", amount: { count: { kind: "sacrificedThisWayManaValue" }, plus: -1, signed: true } } }, found: "battlefield", rest: "bottom" }] }, next: si + (kethekRest ? 2 : 1) };
+  }
+  // Azra Oddsmaker: "you may discard a card. If you do, choose a creature. Whenever that creature deals combat damage to a
+  // player this turn, you draw two cards.": any creature, not targeted, chosen as it resolves; then a delayed trigger
+  // about it (CR 603.7b-c), this turn, yours whoever controls it (CR 603.7d-e).
+  const azra = ifDid[1] === "choose a creature" && !ctx.spell && si + 2 === sentences.length ? /^Whenever that creature deals combat damage to a player this turn, (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+  if (azra) {
+    const trigger = parseTrigger(`Whenever ~ deals combat damage to a player, ${azra[1]!}.`);
+    if (!trigger || trigger === "fail" || trigger.event !== "selfDealsCombatDamageToPlayer" || trigger.body.targets.length || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return "fail";
+    const creature: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+    return { effect: { type: "if", cond: { kind: "youDid" }, effects: [{ type: "pick", who: { ref: "you" }, filter: creature, n: 1, action: "choose", anyController: true, prompt: `click a creature (anyone's), then choose it: whenever it deals combat damage to a player this turn, ${azra[1]!}.` }, { type: "floatingTrigger", trigger, until: "endOfTurn", aboutCreated: true }] }, next: si + 2 };
+  }
+  return null;
 }
 
 /** Round 310's whole-text rewrites, run by parseBodyText (which is at TypeScript's control-flow limit, TS2563). */

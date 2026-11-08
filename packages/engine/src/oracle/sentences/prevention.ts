@@ -300,6 +300,14 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     const redirect: DamageRecipient | null = ctx.lastChosen && target === undefined ? { ref: "created" } : target !== undefined ? { ref: "target", index: target } : null;
     return to && redirect ? rule({ to, redirect }) : null;
   }
+  // Saving Grace: "When this Aura enters, all damage that would be dealt this turn to you and permanents you control is
+  // dealt to enchanted creature instead": a redirection (CR 614.9) to the creature it enchants as the trigger resolves, or
+  // last enchanted if it has left (CR 608.2h), fixed then: it goes on if the Aura leaves later, and stops while that
+  // creature is gone or isn't a creature; with several, the player being dealt the damage picks one (rulings, CR 616.1).
+  if (/^[Aa]ll damage that would be dealt this turn to you and permanents you control is dealt to enchanted creature instead$/.test(s) && !ctx.spell && !ctx.activated) {
+    const to = protectedGroup("you and permanents you control");
+    return to ? rule({ to, redirect: { ref: "attached" } }) : null;
+  }
   // Ascent of the Worthy: "Choose a creature you control. Until your next turn, all damage that would be dealt to
   // creatures you control is dealt to that creature instead": the one chosen as it resolves, not targeted; damage to
   // creatures its controller controls then, even if the chosen one changes controller; none while it's gone (rulings,

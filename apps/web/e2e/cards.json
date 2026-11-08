@@ -2160,6 +2160,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "457470db-e664-4ca3-84ec-6cec2d4ae906",
+  "name": "Azra Oddsmaker",
+  "manaCost": "{1}{B}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Azra Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Azra",
+   "Warrior"
+  ],
+  "oracleText": "At the beginning of combat on your turn, you may discard a card. If you do, choose a creature. Whenever that creature deals combat damage to a player this turn, you draw two cards.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bbd",
+  "releasedAt": "2018-06-08",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ee3d21b9-58b4-480c-bae3-26de50f1a5c6",
   "name": "Back for Seconds",
   "manaCost": "{2}{B}",

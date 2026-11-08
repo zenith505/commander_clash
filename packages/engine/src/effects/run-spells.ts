@@ -606,7 +606,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const id = spell ? item.objectId : ctx.sourceId;
       const o = id ? s.objects[id] : undefined;
       if (!id || !o) return;
-      const abouts = e.about !== undefined ? objects(s, { ref: "target", index: e.about, ...(e.each ? { n: e.each } : {}) }, ctx).filter((x) => x.zone === "battlefield") : [undefined];
+      const abouts = e.aboutCreated ? objects(s, { ref: "created" }, ctx).filter((x) => x.zone === "battlefield") : e.about !== undefined ? objects(s, { ref: "target", index: e.about, ...(e.each ? { n: e.each } : {}) }, ctx).filter((x) => x.zone === "battlefield") : [undefined];
       if (!abouts.length) return;
       const toPlayer = e.aboutPlayer !== undefined ? players(s, { ref: "target", index: e.aboutPlayer }, ctx)[0] : undefined;
       if (e.aboutPlayer !== undefined && toPlayer === undefined) return;

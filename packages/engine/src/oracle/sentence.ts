@@ -462,8 +462,9 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   if (/^(?:Until end of turn, damage that would reduce your life total to less than 1 reduces it to 1 instead|Damage that would reduce your life total to less than 1 reduces it to 1 instead until end of turn)$/.test(s)) return [{ type: "playerGains", keywords: [], lifeFloorThisTurn: true }];
   // Summon: Yojimbo, Forbidding Spirit: "Until your next turn, creatures can't attack you (or planeswalkers you control)
   // unless their controller pays {2} for each of those creatures" (CR 508.1g-h).
-  if ((m = /^[Uu]ntil your next turn, creatures can't attack you( or planeswalkers you control)? unless their controller pays \{(\d+)\} for each of those creatures$/.exec(s)))
-    return [{ type: "playerGains", keywords: [], attackTax: { n: Number(m[2]), ...(m[1] ? { planeswalkers: true as const } : {}) } }];
+  // Sivitri, Dragon Master: "... unless their controller pays 2 life for each of those creatures": life instead (CR 119.4).
+  if ((m = /^[Uu]ntil your next turn, creatures can't attack you( or planeswalkers you control)? unless their controller pays (?:\{(\d+)\}|(\d+) life) for each of those creatures$/.exec(s)))
+    return [{ type: "playerGains", keywords: [], attackTax: { n: m[2] ? Number(m[2]) : 0, ...(m[3] ? { life: Number(m[3]) } : {}), ...(m[1] ? { planeswalkers: true as const } : {}) } }];
   // Chronomantic Escape: "Until your next turn, creatures can't attack you" (CR 508.1c): you, not your planeswalkers.
   if (/^[Uu]ntil your next turn, creatures can't attack you$/.test(s)) return [{ type: "playerGains", keywords: [], unattackable: true }];
   const whole = parseEveryPlayerZonesSentence(s, ctx);

@@ -83,6 +83,8 @@ import {
   attackProblem,
   attackCost,
   attackTaxPer,
+  attackLifeCost,
+  payableLife,
   blockCost,
   blockLifeCost,
   blocksMayCostLife,
@@ -762,6 +764,14 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (x === undefined && fixedX != null) x = fixedX;
     // X is announced after modes and before targets (CR 602.2b, 601.2b-c).
     if (x === undefined && parseManaCost(ab.manaCost).hasX) {
+      // Osgir, the Reconstructor: "Exile an artifact card with mana value X from your graveyard": only some X work, so the
+      // greatest that does.
+      const mvCard = ab.costs?.find((c) => c.kind === "exileFromGraveyard" && c.mvX);
+      if (mvCard) {
+        const fits = (n: number) => !!planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n);
+        const max = Array.from({ length: 21 }, (_, n) => 20 - n).find(fits) ?? 0;
+        return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: max, modes, extra: `exile ${mvCard.kind === "exileFromGraveyard" && mvCard.filter ? `${/^[aeiou]/i.test(mvCard.filter.text) ? "an" : "a"} ${mvCard.filter.text}` : "a card"} from your graveyard` });
+      }
       const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));
       return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: max, modes });
     }
@@ -5055,6 +5065,9 @@ function Controls({
     const declared = Object.entries(attacks).map(([attacker, a]) => ({ attacker, defender: a.defender, ...(a.planeswalker ? { planeswalker: a.planeswalker } : {}) }));
     const tax = attackCost(s, declared);
     const taxTaps = tax ? planMana(s, HUMAN, parseManaCost(tax)) : [];
+    // Sivitri, Dragon Master: life for each creature attacking that player.
+    const lifeTax = attackLifeCost(s, declared);
+    const lifeShort = lifeTax > 0 && payableLife(s, HUMAN) < lifeTax;
     const alone = ids.length === 1 && characteristics(s, s.objects[ids[0]!]!).cantAttackAlone ? `${cardOf(s, ids[0]!).name} can't attack alone.` : null;
     return (
       <div className="controls">
@@ -5072,11 +5085,11 @@ function Controls({
               : "Click a creature, then the player it attacks. Click an attacker again to take it back."}
         </span>
         <button
-          disabled={must.length > 0 || bound.length > 0 || !!alone || !taxTaps}
-          title={tax && !taxTaps ? `Attacking costs ${tax} and you can't pay it` : tax.includes("/P}") ? "Phyrexian mana: paid with mana in your pool, otherwise 2 life each" : undefined}
+          disabled={must.length > 0 || bound.length > 0 || !!alone || !taxTaps || lifeShort}
+          title={lifeShort ? `Attacking costs ${lifeTax} life and you can't pay it` : tax && !taxTaps ? `Attacking costs ${tax} and you can't pay it` : tax.includes("/P}") ? "Phyrexian mana: paid with mana in your pool, otherwise 2 life each" : undefined}
           onClick={() => dispatch([...(taxTaps ?? []), { type: "declareAttackers", player: HUMAN, attacks: declared }])}
         >
-          {Object.keys(attacks).length ? `Attack with ${Object.keys(attacks).length}${tax ? ` (pay ${tax})` : ""}` : "No attacks"}
+          {Object.keys(attacks).length ? `Attack with ${Object.keys(attacks).length}${tax || lifeTax ? ` (pay ${[tax, lifeTax ? `${lifeTax} life` : ""].filter(Boolean).join(" and ")})` : ""}` : "No attacks"}
         </button>
       </div>
     );
@@ -5194,13 +5207,15 @@ function Controls({
     const untapProblem = pending.action === "untapLimited" ? untapChoiceProblem(s, HUMAN, pending.options, discards) : undefined;
     // Battle for Bretagard: "with different names".
     const sameNames = !!pending.differentNames && !namesDiffer(s, discards);
-    const ok = (pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count) && !(pending.action === "band" && n === 1) && (pending.maxTotalPower === undefined || totalPower <= pending.maxTotalPower) && !untapProblem && !sameNames;
+    // Sigarda's Vanguard: "with different powers".
+    const samePowers = !!pending.differentPowers && new Set(discards.map((id) => power(s, s.objects[id]!))).size !== discards.length;
+    const ok = (pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count) && !(pending.action === "band" && n === 1) && (pending.maxTotalPower === undefined || totalPower <= pending.maxTotalPower) && !untapProblem && !sameNames && !samePowers;
     return (
       <div className="controls">
         <span>
           <strong>{pending.source}:</strong>{" "}
           {pending.prompt
-            ? `${pending.prompt}${sameNames ? " (two of them have the same name)" : ""}`
+            ? `${pending.prompt}${sameNames ? " (two of them have the same name)" : ""}${samePowers ? " (two of them have the same power)" : ""}`
             : pending.action === "ringBearer"
             ? `the Ring tempts you: click a creature of yours to be your Ring-bearer. It's legendary and can't be blocked by creatures with greater power, and gains the Ring's other abilities as the Ring tempts you more times.`
             : pending.action === "attach"

@@ -1176,7 +1176,7 @@ export function saddledSource(s: GameState, id: ObjectId, sourceId: ObjectId | u
   return !!o && by.includes(`${id}@${o.zoneChanges ?? 0}`);
 }
 
-export function lesserPowerOk(s: GameState, spec: TargetSpec, t: TargetChoice, sourceId: ObjectId | undefined, sourceZc?: number): boolean {
+export function lesserPowerOk(s: GameState, spec: TargetSpec, t: TargetChoice, sourceId: ObjectId | undefined, sourceZc?: number, hostThen?: { id: ObjectId; zc: number }): boolean {
   // Giant Beaver: "target creature that saddled it this turn".
   if (spec.saddledSource && t.kind === "object" && !saddledSource(s, t.id, sourceId, sourceZc)) return false;
   // Getaway Car: "target creature that crewed it this turn".
@@ -1221,6 +1221,14 @@ export function lesserPowerOk(s: GameState, spec: TargetSpec, t: TargetChoice, s
     const blocks = !!was?.blockedBy?.includes(t.id) && o?.blocking !== undefined;
     const blocked = spec.blockingSource === "either" && !!was?.blocking?.includes(t.id) && o?.attacking !== undefined;
     if (!blocks && !blocked) return false;
+  }
+  if (spec.blockingEquipped && t.kind === "object") {
+    // Plasma Caster: the creature it was attached to as the ability was activated (StackItem.hostThen), else (choosing
+    // targets) the one it's attached to now; the target still blocking it (CR 509.1h, 506.4).
+    const me = sourceId ? s.objects[sourceId] : undefined;
+    const host = hostThen ?? (me?.zone === "battlefield" && me.attachedTo ? { id: me.attachedTo, zc: s.objects[me.attachedTo]?.zoneChanges ?? 0 } : undefined);
+    const h = host ? s.objects[host.id] : undefined;
+    if (!h || h.zone !== "battlefield" || (h.zoneChanges ?? 0) !== host!.zc || !h.blockedBy?.includes(t.id) || s.objects[t.id]?.blocking === undefined) return false;
   }
   if ((!spec.lesserPowerThanSource && !spec.greaterPowerThanSource) || t.kind !== "object" || !sourceId) return true; // without the source, checked later
   const me = s.objects[sourceId];

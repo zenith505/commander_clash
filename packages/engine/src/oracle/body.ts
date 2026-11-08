@@ -1447,6 +1447,19 @@ function wandPunisher(who: PlayerRef, landLife: number): Effect {
 }
 
 function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell: boolean, before: Effect[]): { effects: Effect[]; skip: number } | null {
+  // Sigarda's Vanguard: "choose any number of creatures with different powers. Those creatures gain double strike until end
+  // of turn.": anyone's creatures, chosen as it resolves, not targeted, no two with the same power (rulings); one alone is
+  // a set too.
+  if (/^[Cc]hoose any number of creatures with different powers$/.test(s)) {
+    const then = /^Those creatures gain ([a-z ]+) until end of turn\.?$/.exec(sentences[si + 1] ?? "");
+    const gains = then ? parseOne(`~ gains ${then[1]} until end of turn`, ctx) : null;
+    const g = gains?.length === 1 ? gains[0] : undefined;
+    if (g?.type !== "continuous") return null;
+    return { effects: [
+      { type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, n: 0, action: "choose", anyNumber: true, anyController: true, differentPowers: true, prompt: `click any number of creatures with different powers (anyone's), then choose them: they gain ${then![1]} until end of turn` },
+      { ...g, what: { ref: "created" } },
+    ], skip: 1 };
+  }
   // Lightstall Inquisitor: "each opponent exiles a card from their hand and may play that card for as long as it remains
   // exiled. Each spell cast this way costs {1} more to cast. Each land played this way enters tapped.": each chooses their
   // own card (CR 701.9b); its owner may play it with its usual timing (rulings), paying {1} more for a spell (CR 601.2f),
@@ -1652,6 +1665,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Scavenged Brawler: "Choose target creature. Put four +1/+1 counters, a flying counter, ... on that creature.": the
   // counters on that target.
   text = text.replace(/^Choose (target creature)\. (Put [^.]+?) on that creature\.$/, "$2 on $1.");
+  // Plasma Caster: "Choose target creature that's blocking equipped creature. Flip a coin. If you win the flip, exile the
+  // chosen creature. Otherwise, ~ deals 1 damage to it.": the target chosen as it's activated, then the flip (CR 705.2).
+  text = text.replace(/^Choose (target creature that's blocking equipped creature)\. Flip a coin\. If you win the flip, exile the chosen creature\. Otherwise, (~ deals \d+ damage to) it\.$/, "Flip a coin. If you win the flip, exile $1. If you lose the flip, $2 that creature.");
   // Rumbling Ruin: "count the number of +1/+1 counters on creatures you control. Creatures your opponents control with power
   // less than or equal to that number can't block this turn": that number in place.
   text = text.replace(/\bcount the number of (\+1\/\+1 counters on creatures you control)\. Creatures your opponents control with power less than or equal to that number can't block this turn\./, "creatures your opponents control with power less than or equal to the number of $1 can't block this turn.");

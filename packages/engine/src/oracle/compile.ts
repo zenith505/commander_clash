@@ -3873,6 +3873,11 @@ export function compile(d: CardDef): CompiledCard {
       else [out.cantLose, out.cantWin, out.gameEndIf] = ["you", "opponents", cond];
       continue;
     }
+    // "You can't lose the game." (Lich's Mastery, Transcendence): alone, without the opponents' half.
+    if (line === "You can't lose the game.") {
+      out.cantLose = "you";
+      continue;
+    }
     const lockEnd = /^You can't (lose|win) the game and your opponents can't (win|lose) the game\.$/.exec(line);
     if (lockEnd && lockEnd[1] !== lockEnd[2]) {
       if (lockEnd[1] === "lose") [out.cantLose, out.cantWin] = ["you", "opponents"];
@@ -7156,6 +7161,9 @@ function checkCastingLinks(out: CompiledCard) {
   const costTapIn = (v: unknown) => JSON.stringify(v ?? null).includes('"ref":"costTapped"');
   if (costTapIn([out.triggers, out.statics, out.activated])) bad = true;
   if (costTapIn(out.spell) && (out.additionalCosts ?? []).filter((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x && c.filter.kind === "object" && !!c.filter.types?.includes("Creature")).length !== 1) bad = true;
+  // Cryptic Gateway: "each creature tapped this way" is about the activated ability's own cost of tapping two or more creatures.
+  const kinTapIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kinOfCostTapped":true');
+  if (kinTapIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => kinTapIn(ab) && !ab.costs?.some((c) => c.kind === "tap" && c.n >= 2 && !c.untap && !c.x && c.filter.kind === "object" && !!c.filter.types?.includes("Creature")))) bad = true;
   // "If the discarded card ..." needs a discard cost: the spell's, or the activated ability's own.
   const discIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"discardedIs"');
   if (discIn(out.spell) && !out.additionalCosts?.some((c) => c.kind === "discard")) bad = true;

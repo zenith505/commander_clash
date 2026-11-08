@@ -2007,6 +2007,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "dealtDamageBySource") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfDealtDamageBySource", undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount, player: ev.by });
+    // Archfiend of Spite: only a source an opponent controlled as it dealt the damage; the source noted, for its controller
+    // as the ability resolves (rulings).
+    const by = ev.srcId ? s.objects[ev.srcId] : undefined;
+    if (o?.zone === "battlefield" && opponents(s, controllerOf(s, o)).includes(ev.by)) add(o, controllerOf(s, o), (e) => e === "selfDealtDamageByOpponentSource", undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount, player: ev.by, ...(by ? { sourceOf: { id: by.id, zc: by.zoneChanges ?? 0 } } : {}) });
     // "Until your next turn, whenever a creature deals combat damage to ~, destroy that creature" (Vraska the Unseen): once
     // for each creature dealing it combat damage (only creatures deal combat damage, CR 510.1), that creature the subject.
     // Liliana's Talent: "Whenever a creature deals damage to enchanted planeswalker": a creature as it dealt the damage,

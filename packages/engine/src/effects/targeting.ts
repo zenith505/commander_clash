@@ -121,6 +121,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   // the source (see pickOptions, isLegalTarget).
   if (spec.bound || spec.saddledSource || spec.crewedSource || spec.drafted || spec.targetsSource) return false;
   if (spec.objectId !== undefined && o.id !== spec.objectId) return false;
+  if (spec.notId !== undefined && o.id === spec.notId) return false;
   const c = chars ?? characteristics(s, o);
   const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
   if (spec.noAbilities && !hasNoAbilities(s, o, c)) return false;
@@ -151,7 +152,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
     if (!host || (view && !hostChars) || !objectMatches(s, spec.attachedTo, host, controller, false, undefined, hostChars, view)) return false;
   }
   // A choice that was never made: "of the chosen type" matches nothing, "not of the chosen type" everything.
-  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.chosen === "parity" || spec.chosen === "landOrNonland" || spec.chosen === "landType" || spec.chosen === "typeOrder" || spec.chosen === "colorsChosen") return false;
+  if (spec.chosen === "type" || spec.chosen === "byPlayer" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.chosen === "parity" || spec.chosen === "landOrNonland" || spec.chosen === "landType" || spec.chosen === "typeOrder" || spec.chosen === "colorsChosen") return false;
   if (spec.parity?.is && !isParity(spec.parity.of === "power" ? (c.types.includes("Creature") ? c.power : undefined) : defMv(defOf(s, o)), spec.parity)) return false;
   if (spec.noCounters && Object.values(o.counters).some((n) => (n ?? 0) > 0)) return false;
   // Keldon Twilight: "that they controlled since the beginning of the turn": under its controller since before this turn.
@@ -231,6 +232,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.controller === "opponent" && c.controller === controller) return false;
   if (spec.controller === "eventPlayer" || spec.controller === "enchanted" || spec.controller === "chosenPlayer" || spec.controller === "modeChooser" || (spec.controlledBy !== undefined && c.controller !== spec.controlledBy)) return false;
   if (spec.notControlledBy !== undefined && c.controller === spec.notControlledBy) return false;
+  if (spec.controlledByAny && !spec.controlledByAny.includes(c.controller)) return false;
   // Yare: "creature defending player controls": a defending player's, each opponent of the active player during the combat
   // phase (CR 802.2, 506.2), no one's otherwise.
   if (spec.defendingAny && (!inCombatPhase(s) || c.controller === s.activePlayer)) return false;
@@ -413,6 +415,8 @@ export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): Target
   // Rite of Ruin: "the first type" of the order chosen.
   if (kind === "typeOrder" && chosen?.typeOrder?.[rest.orderIndex ?? 0]) return (({ orderIndex: _, ...r }) => ({ ...r, types: [chosen.typeOrder![rest.orderIndex ?? 0]!] }))(rest);
   if (kind === "attackingPlayer") return { ...rest, attackingWhom: chosen?.player ?? "eventPlayer" };
+  // Archangel of Strife: "creatures controlled by players who chose war": those players now, none if no one did.
+  if (kind === "byPlayer") return (({ chosenWord: w, ...r }) => ({ ...r, controlledByAny: Object.entries(chosen?.byPlayer ?? {}).filter(([, x]) => x === w).map(([p]) => Number(p)) }))(rest);
   return kind === "notType" || kind === "notColor" || kind === "notTypesChosen" ? rest : spec;
 }
 

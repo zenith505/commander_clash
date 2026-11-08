@@ -1957,6 +1957,10 @@ export function parseAffected(subject: string): Affects | null {
   // "Creatures attacking your opponents", the same (rulings).
   // Triarch Stalker, Beckoning Will-o'-Wisp: "Creatures attacking the last chosen player": attacking that player (not
   // their planeswalkers or battles), the one its trigger chose last (kept on the permanent, compile.ts).
+  // Archangel of Strife: "Creatures controlled by players who chose war": whoever controls them now, by the word each
+  // player chose as it entered (Chosen.byPlayer; compile.ts checks it chose one).
+  const byWord = /^Creatures controlled by players who chose ([a-z]+)$/.exec(x);
+  if (byWord) return { kind: "filter", types: ["Creature"], spec: { kind: "object", chosen: "byPlayer", chosenWord: byWord[1]!, text: `creature controlled by a player who chose ${byWord[1]}` } };
   if (x === "Creatures attacking the last chosen player") return { kind: "filter", types: ["Creature"], spec: { kind: "object", chosen: "attackingPlayer", text: "creature attacking the last chosen player" } };
   // Curse of Hospitality: "Creatures attacking enchanted player": attacking that player, not their planeswalkers or
   // battles, whoever controls the creatures.

@@ -1348,6 +1348,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "19e302f8-6ddb-4a43-98bc-ee71a456ac5a",
+  "name": "Archangel of Strife",
+  "manaCost": "{5}{W}{W}",
+  "cmc": 7,
+  "typeLine": "Creature — Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flying\nAs this creature enters, each player chooses war or peace.\nCreatures controlled by players who chose war get +3/+0.\nCreatures controlled by players who chose peace get +0/+3.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmd",
+  "releasedAt": "2011-06-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ff5caed4-0276-476d-8fae-edae2536df7f",
   "name": "Archangel of Tithes",
   "manaCost": "{1}{W}{W}{W}",
@@ -4532,6 +4564,32 @@
   "set": "fic",
   "releasedAt": "2025-06-13",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d18c40cd-0f38-498b-8882-10381a831751",
+  "name": "Celestial Judgment",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "For each different power among creatures on the battlefield, choose a creature with that power. Destroy each creature not chosen this way.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mic",
+  "releasedAt": "2021-09-24",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

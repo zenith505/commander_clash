@@ -3,7 +3,7 @@
 import { allEffects, type Amount, type Effect, type PlayerRef } from "./abilities";
 import { defOf } from "./cards";
 import { livingPlayers, obj, opponents, player } from "./game";
-import { controllerOf } from "./layers";
+import { characteristics, controllerOf } from "./layers";
 import { objectMatches } from "./effects";
 import { groupValue, worth } from "./value";
 import type { GameState, PlayerId } from "./types";
@@ -67,6 +67,15 @@ function wordScore(s: GameState, pid: PlayerId, controller: PlayerId, effects: E
   const walk = (es: Effect[]) => {
     for (const e of es) {
       if (e.type === "if" && e.cond.kind === "voteWins") {
+        // Council Guardian: protection from a color for the controller's permanent: worth the permanents of that color
+        // its controller's opponents have, to its controller; to anyone else, the worse the more of their own it stops.
+        const prot = e.cond.amongMost && e.effects.length === 1 && e.effects[0]!.type === "continuous" && e.effects[0]!.what.ref === "self" ? /^Protection from (white|blue|black|red|green)$/.exec(e.effects[0]!.mods.find((m) => m.kind === "addKeywords")?.keywords[0] ?? "") : null;
+        if (prot && e.cond.option === option) {
+          const color = ({ white: "W", blue: "U", black: "B", red: "R", green: "G" } as const)[prot[1] as "white"];
+          const ofColor = (q: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === q && characteristics(s, obj(s, id)).colors.includes(color)).length;
+          v += pid === controller ? opponents(s, controller).reduce((a, q) => a + ofColor(q), 0) : -ofColor(pid);
+          continue;
+        }
         if (e.cond.option === option) v += effectsValue(s, pid, controller, e.effects);
         continue;
       }

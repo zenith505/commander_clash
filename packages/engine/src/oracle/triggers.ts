@@ -598,6 +598,9 @@ function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | n
   // Fear of Burning Alive: "..., if there are four or more card types among cards in your graveyard, ...": an
   // intervening if, read with the others (parseTrigger).
   if (/^if [^,]+, /.test(text)) return null;
+  // Asgardian Inspiration: "you may pay {2}. If you do, return ~ from your graveyard to your hand": an ability that works
+  // from the graveyard, read with the others (CR 113.6m).
+  if (!m0 && !m1![1] && !m1![3] && /^you may pay (?:\{[^}]+\})+\. If you do, return ~ from your graveyard to your hand\.$/.test(text)) return null;
   if (/\b(it|its|that source|that creature|from your graveyard)\b/.test(text)) return "fail";
   const thatMuch = /\bthat (?:much|many|amount of)\b/.test(text);
   if (thatMuch) {
@@ -2977,7 +2980,7 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 }
 
 /** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
-const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", /** Old One Eye: "At the beginning of your first main phase" (CR 505.1a). */ "yourFirstMain", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut", "youSacrifice", "opponentGainsLife", /** Deathless Knight. */ "youGainLife", /** Deathmist Raptor. */ "permanentTurnedFaceUp"];
+const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", /** Old One Eye: "At the beginning of your first main phase" (CR 505.1a). */ "yourFirstMain", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut", "youSacrifice", "opponentGainsLife", /** Deathless Knight. */ "youGainLife", /** Deathmist Raptor. */ "permanentTurnedFaceUp", /** Asgardian Inspiration. */ "sourceYouControlDamagesOpponent"];
 
 /** The Oaths (see parseTrigger): `what` the target has more (or fewer) of, `may` what the first player may do. */
 function oathTrigger(what: string, may: string, whole: string): TriggeredAbility | "fail" {
@@ -3234,6 +3237,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (notBase) {
     const t = parseTrigger(`${notBase[1]}, ${notBase[2]}`);
     return t && t !== "fail" && t.event === "permanentDies" && !t.ifCond ? { ...t, ifCond: { kind: "subjectPowerNotBase" } } : "fail";
+  }
+  // Sharp-Eyed Rookie: "Whenever a creature you control enters, if its power is greater than ~'s power or its toughness is
+  // greater than ~'s toughness, ...": an intervening if (CR 603.4) on the entering creature, checked as it enters and again
+  // as the ability resolves, that creature as it last existed if it has left, ~ likewise (rulings).
+  const biggerThanMe = /^(Whenever (?:a|another) creature you control enters), if its power is greater than ~'s power or its toughness is greater than ~'s toughness, (.+)$/.exec(line);
+  if (biggerThanMe) {
+    const t = parseTrigger(`${biggerThanMe[1]}, ${biggerThanMe[2]}`);
+    return t && t !== "fail" && t.event === "permanentEnters" && !t.ifCond
+      ? { ...t, ifCond: { kind: "anyOf", conds: [{ kind: "subjectPT", stat: "power", greaterThanSource: true }, { kind: "subjectPT", stat: "toughness", greaterThanSource: true }] } }
+      : "fail";
   }
   // Voldaren Bloodcaster: "Whenever you create a Blood token, ...": once for each token of that kind you create (CR 111.2).
   const createdKind = /^Whenever you create an? ([A-Z][a-z]+) token, (.+)$/.exec(line);

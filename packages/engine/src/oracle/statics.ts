@@ -850,6 +850,10 @@ export function parseActivateCondition(text: string): StaticCondition | null {
     return conds.every((c): c is StaticCondition => !!c) ? { kind: "anyOf", conds } : null;
   }
   if (/^~ entered (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn" };
+  // Nemesis Phoenix: "only if you're attacking two or more opponents": opponents creatures you control are attacking
+  // (CR 802.2, 506.3), as Astral Confrontation counts them: a creature attacking a planeswalker or battle isn't attacking
+  // its controller or protector (rulings on Tahngarth, First Mate).
+  if (/^you're attacking two or more opponents$/.test(text)) return { kind: "amount", amount: { count: { kind: "playersAttacked", byYou: true } }, min: 2 };
   // Ashen Ghoul: "Activate only during your upkeep and only if three or more creature cards are above ~": cards put into
   // its owner's graveyard after it (rulings, CR 404.1), counted as it's activated (CR 602.5b).
   const above = /^(two|three|four|five) or more creature cards are above ~$/.exec(text);

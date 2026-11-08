@@ -1,7 +1,7 @@
 // Sentences about sacrificing, milling, discarding, scry/surveil, fighting, counterspells, and copying spells.
 
 import { parseBoundCount, parseCount, roundOf } from "../counts";
-import type { Effect, PlayerRef, TargetSpec } from "../../abilities";
+import type { Effect, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
 import type { SkipWhat } from "../../types";
 import { COLOR_WORDS, NUM, NUMX, X, amt, isGroup, isSeveral, num } from "../words";
 import { parseUnlessPays, addTarget, parseBody, replaceX } from "../body";
@@ -597,6 +597,17 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Breaking of the Fellowship: "Target creature an opponent controls deals damage equal to its power to another target
   // creature that player controls": a second creature with the same controller as the first (as targets are chosen and
   // as it resolves), the first the source of the damage, its power as this resolves; none if either is illegal.
+  // Alpha Brawl: "Target creature an opponent controls deals damage equal to its power to each other creature that player
+  // controls, then each of those creatures deals damage equal to its power to that creature": first the target deals its
+  // damage to each of them at once, then each of them deals its own at once, with no state-based actions between, so a
+  // creature dealt lethal damage still deals its damage, its power as it is then (wither or infect counters count); none
+  // of it combat damage (rulings). Nothing if the target is illegal (CR 608.2b).
+  if ((m = /^Target creature an opponent controls deals damage equal to its power to each other creature that player controls and then each of those creatures deals damage equal to its power to that creature$/.exec(s)) && !ctx.targets.length) {
+    const a = parseObject("target creature an opponent controls", ctx);
+    if (a?.ref !== "target" || a.n || ctx.targets.length !== 1) return null;
+    const theirs: ObjRef = { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, of: { ref: "targetController", index: a.index }, otherThan: a.index };
+    return [{ type: "bite", a, b: theirs }, { type: "bite", a: theirs, b: a }];
+  }
   if (/^Target creature an opponent controls deals damage equal to its power to another target creature that player controls$/.test(s) && !ctx.targets.length) {
     const a = parseObject("target creature an opponent controls", ctx);
     if (a?.ref !== "target" || a.n || ctx.targets.length !== 1) return null;

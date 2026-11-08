@@ -7219,6 +7219,16 @@ function checkCastingLinks(out: CompiledCard) {
     }
     if (!v || typeof v !== "object") return;
     const o = v as Record<string, unknown>;
+    // Adipose Offspring: "If ~'s emerge cost was paid, ... the sacrificed creature's toughness": the creature sacrificed for
+    // its emerge cost (CR 702.119a), only in that branch of its enters trigger.
+    if (o.type === "if" && emergeEnters && (o.cond as { kind?: string; alt?: string } | undefined)?.kind === "altPaid" && (o.cond as { alt?: string }).alt === "emerge") {
+      const was = canSac;
+      canSac = true;
+      visit(o.effects);
+      canSac = was;
+      visit(o.otherwise);
+      return;
+    }
     if ((o.kind === "kicked" || o.kind === "wasKicked") && !("filter" in o)) {
       if (!out.kicker) bad = true;
       else if (typeof o.cost === "string") {
@@ -7301,7 +7311,14 @@ function checkCastingLinks(out: CompiledCard) {
   let yardCostCard = false;
   const oneReveal = (costs: AdditionalCost[] | undefined) => !!costs?.some((c) => c.kind === "reveal" && c.n === 1) && !costs.some((c) => c.kind === "sacrifice" || c.kind === "forage");
   let revealCost = oneReveal(out.additionalCosts);
-  visit([out.spell, out.triggers, out.statics, out.mana]);
+  const hasEmerge = !!out.altCosts?.some((a) => a.kind === "emerge");
+  let emergeEnters = false;
+  visit([out.spell, out.statics, out.mana]);
+  for (const t of out.triggers) {
+    emergeEnters = hasEmerge && t.event === "selfEnters";
+    visit(t);
+  }
+  emergeEnters = false;
   for (const ab of out.activated) {
     yardExile = yardExileOne(ab.costs);
     canSac = !!ab.costs?.some((c) => c.kind === "sacrifice") || yardExile;
@@ -7377,13 +7394,23 @@ function checkCastingLinks(out: CompiledCard) {
   const evidenceIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"evidence"');
   if ((evidenceIn(out.spell) || out.triggers.some((t) => t.ifEvidence || evidenceIn(t.body))) && out.evidence === undefined) bad = true;
   if (out.triggers.some((t) => t.event !== "selfEnters" && evidenceIn(t.body)) || evidenceIn(out.activated) || evidenceIn(out.statics)) bad = true;
+  // Dodgy Jalopy: a "*" power for scavenge needs the characteristic-defining ability that sets it (CR 604.3).
+  if (out.activated.some((ab) => ab.scavengeVariable) && !out.statics.some((st) => st.affects.kind === "self" && !st.condition && st.mods.some((m) => m.kind === "definePT" && m.power !== undefined))) bad = true;
+  // Wanderwine Farewell: "for each permanent returned to its owner's hand this way" needs the spell's own return of
+  // permanents first; nothing else counts it.
+  const returnedIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"returnedFromCount"');
+  if (returnedIn(out.triggers) || returnedIn(out.activated) || returnedIn(out.statics)) bad = true;
+  if (out.spell && returnedIn(out.spell)) {
+    const at = out.spell.effects.findIndex((e) => returnedIn(e));
+    if (!out.spell.effects.slice(0, at).some((e) => e.type === "bounce" && e.what.ref === "target")) bad = true;
+  }
   // "If this spell's surge cost was paid" needs that alternative cost (CR 702.117a, 702.137a): in the spell, or its
   // permanent's enters trigger.
   // "If the {1}{B} cost was paid": the card's one "rather than pay" cost, that mana (Baleful Mastery).
   const masteryMana = /\bIf the ((?:\{[^}]+\})+) cost was paid\b/.exec(out.spell?.text ?? "")?.[1];
   // "If ~ was cast using web-slinging" needs its web-slinging cost (CR 702.188a).
   if ((out.triggers.some((t) => t.ifAlt === "webSlinging") || out.entersWithCounters?.ifWebSlung) && !out.altCosts?.some((a) => a.webSlinging)) bad = true;
-  for (const alt of ["surge", "spectacle", "alternative", "madness", "prowl", "mayhem"] as const) {
+  for (const alt of ["surge", "spectacle", "alternative", "madness", "prowl", "mayhem", "emerge"] as const) {
     const altIn = (v: unknown) => JSON.stringify(v ?? null).includes(`"kind":"altPaid","alt":"${alt}"`);
     const alts = out.altCosts?.filter((a) => a.kind === alt) ?? [];
     // Madness is a keyword, not an alternative cost of the card's own text (CR 702.35).

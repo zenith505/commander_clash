@@ -819,7 +819,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "eventPlayersTurn":
       return eventPlayer !== undefined && (s.activePlayer === eventPlayer) !== !!cond.not;
     case "anyOf":
-      return cond.conds.some((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount, sourceZc));
+      return cond.conds.some((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount, sourceZc, subjectId, subjectZc));
     case "not":
       return !conditionMet(s, cond.cond, sourceId, you, chars, eventPlayer, eventAmount, sourceZc, subjectId, subjectZc);
     case "beforeAttackers":

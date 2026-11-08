@@ -210,6 +210,10 @@ export type Count =
   | { kind: "poisonLostThisWay" }
   /** Sweep: "for each Plains returned this way" after "return any number of Plains you control to their owner's hand": how many its instructions put into a hand. */
   | { kind: "bouncedThisWayCount" }
+  /** Wanderwine Farewell: "for each permanent returned to its owner's hand this way": the effect "bounce" sent from the battlefield to a hand (Resolving.returnedFrom). */
+  | { kind: "returnedFromCount" }
+  /** Dodgy Jalopy: "a number of +1/+1 counters equal to this card's power" for scavenge, its power as the cost exiled it (StackItem.scavengedPower). */
+  | { kind: "scavengedPower" }
   /** Faerie Slumber Party: "for each opponent who controlled a creature returned this way": the different opponents who controlled a permanent its "return all ..." returned (Resolving.returnedFrom). */
   | { kind: "opponentsReturnedFrom" }
   /** Starving Revenant: "for each card you put on top of your library" after "surveil 2": the cards that surveil kept on top. */
@@ -539,7 +543,7 @@ export type Count =
   /** "For each {S} spent to cast ~", "the amount of {S} spent" (CR 107.4h): mana from snow sources spent on the spell. */
   | { kind: "snowSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
-  | { kind: "devoured" }
+  | { kind: "devoured"; /** "The number of Goblins it devoured" (Voracious Dragon): those of that creature type as they last existed. */ subtype?: string }
   /** "The life paid as it entered" (Minion of the Wastes, Phyrexian Processor): the source's GameObject.lifePaidAsEntered. */
   | { kind: "lifePaidAsEntered" }
   /** "For each Aura you controlled that was attached to it" (Hateful Eidolon): the dead creature's, as it last existed (CR 603.10a). */
@@ -5124,7 +5128,7 @@ export type SpellCondition =
   /** "If the gift was promised" (CR 702.174b, k). */
   | { kind: "gift" }
   /** "If this spell's surge cost was paid" (CR 702.117a), "if ~'s spectacle cost was paid" (702.137a): in the spell, or its permanent's enters trigger. */
-  | { kind: "altPaid"; alt: "surge" | "spectacle" | "awaken" | "alternative" | "madness" | "prowl" | /** The Last Ronin's Technique (CR 702.190a). */ "sneak" | /** Sandman's Quicksand: cast using mayhem from the graveyard (CR 702.187b; GameObject.castVia). */ "mayhem" }
+  | { kind: "altPaid"; alt: "surge" | "spectacle" | "awaken" | "alternative" | "madness" | "prowl" | /** The Last Ronin's Technique (CR 702.190a). */ "sneak" | /** Sandman's Quicksand: cast using mayhem from the graveyard (CR 702.187b; GameObject.castVia). */ "mayhem" | /** Adipose Offspring: its own or a granted emerge cost (CR 702.119a), in its enters trigger. */ "emerge" }
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
   | { kind: "state"; cond: StaticCondition; /** "If you control a white permanent other than that creature or ~" (Sorin, Ravenous Neonate): the condition's subject (`otherThanSubject`) is this object, not the trigger's. */ subject?: ObjRef }
   /** "If X is 10 or more" (Finale of Devastation): the X this spell was cast with (CR 107.3a). */
@@ -6387,6 +6391,8 @@ export interface ActivatedAbility {
   energyX?: true;
   /** "Exile this card from your graveyard" is part of the cost: scavenge (CR 702.97a); on the battlefield, "Exile ~" (Relic of Progenitus). */
   exileSelf?: boolean;
+  /** Scavenge on a card whose power is "*" (Dodgy Jalopy): its power in the graveyard, by its characteristic-defining ability (CR 604.3), is noted as the cost is paid (StackItem.scavengedPower). */
+  scavengeVariable?: true;
   /** "Return ~ to its owner's hand" is part of the cost (Shigeki, Jukai Visionary; CR 602.2b). */
   returnSelf?: true;
   /** With `returnSelf`: "Put ~ on the bottom of its owner's library" instead (Timestream Navigator). */

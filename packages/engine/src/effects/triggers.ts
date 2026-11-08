@@ -3,7 +3,7 @@ import { defMv, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import { isRealKicker, type AbilityBody, type BatchTrigger, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
-import { checkAscend, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, spellHasFlash, conspireGranted, casualtyGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
+import { checkAscend, isEmerge, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, spellHasFlash, conspireGranted, casualtyGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, modeRange, withModes } from "../modes";
 import { compileCard, compileGranted } from "../oracle";
@@ -754,8 +754,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       ev.x,
       entering.kicked,
       // Whom its spell's gift was promised to: "the chosen player" (CR 702.174b).
-      entering.gift !== undefined || entering.evidence || entering.treasureSpent || entering.spent || entering.manaSpent || entering.castAlt === "surge" || entering.castAlt === "spectacle" || entering.castAlt === "prowl"
-        ? { ...(entering.gift !== undefined ? { gift: entering.gift } : {}), ...(entering.evidence ? { evidence: true as const } : {}), ...(entering.treasureSpent ? { treasureSpent: entering.treasureSpent } : {}), ...(entering.spent ? { spent: entering.spent } : {}), ...(entering.manaSpent ? { manaSpent: entering.manaSpent } : {}), ...(entering.castAlt === "surge" || entering.castAlt === "spectacle" || entering.castAlt === "prowl" ? { castAlt: entering.castAlt } : {}) }
+      entering.gift !== undefined || entering.evidence || entering.treasureSpent || entering.spent || entering.manaSpent || entering.castAlt === "surge" || entering.castAlt === "spectacle" || entering.castAlt === "prowl" || isEmerge(entering.castAlt)
+        ? { ...(entering.gift !== undefined ? { gift: entering.gift } : {}), ...(entering.evidence ? { evidence: true as const } : {}), ...(entering.treasureSpent ? { treasureSpent: entering.treasureSpent } : {}), ...(entering.spent ? { spent: entering.spent } : {}), ...(entering.manaSpent ? { manaSpent: entering.manaSpent } : {}), ...(entering.castAlt === "surge" || entering.castAlt === "spectacle" || entering.castAlt === "prowl" ? { castAlt: entering.castAlt } : {}), ...(isEmerge(entering.castAlt) ? { castAlt: "emerge" as const, ...(entering.emergeSacrificed ? { emergeSacrificed: entering.emergeSacrificed } : {}) } : {}) }
         : undefined,
       entering.colorsSpent?.length,
     );
@@ -1881,11 +1881,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever a source you control deals noncombat damage to an opponent" (Niv-Mizzet, Visionary): the source's
     // controller's permanents, once for each source and player.
     // "Whenever a source you control deals 5 or more damage to a player" (Dragonborn Champion): that much at once (rulings).
-    if (ev.by !== undefined)
+    if (ev.by !== undefined) {
       for (const id of s.battlefield) {
         const w = obj(s, id);
         if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "sourceYouControlDamagesOpponent" && (ev.by !== ev.player || !!t.anyPlayer) && !(t.otherSource && ev.source === w.id) && !(t.noncombatOnly && ev.combat) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
       }
+      // Asgardian Inspiration: watched from its owner's graveyard, "you" its owner (CR 113.6m, 109.5).
+      fromGraveyards((w, owner) => owner === ev.by && add(w, owner, (e, t) => e === "sourceYouControlDamagesOpponent" && t.zone === "graveyard" && ev.by !== ev.player && !t.anyPlayer && !t.otherSource && !(t.noncombatOnly && ev.combat) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info));
+    }
     // Pain Magnification: "Whenever an opponent is dealt 3 or more damage by a single source": every permanent whose
     // controller that player is an opponent of, once for each source (rulings).
     for (const id of s.battlefield) {

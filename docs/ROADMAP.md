@@ -6859,6 +6859,30 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Conundrum: its controller's draws from an empty library are skipped (CR 614.1b, the game isn't lost for them, CR
   704.5b), and it's a 10/10 flier with vigilance while the library is empty. Bots treat mine and fuse counters as
   harmful. +8 (30,565 of 31,936 with B145-B148 and rounds 305-309).
+- Round B150 (least played first, from the list and the skip lists): Sharp-Eyed Rookie ("Whenever a creature you control
+  enters, if its power is greater than ~'s power or its toughness is greater than ~'s toughness": an intervening if, CR
+  603.4, checked as it enters and again as it resolves, that creature as it last existed if it has left, rulings).
+  Voracious Dragon ("twice the number of Goblins it devoured": each devoured creature's creature types as it last existed
+  on the battlefield, a changeling counting, rulings). Adipose Offspring ("If ~'s emerge cost was paid, instead create X of
+  those tokens, where X is the sacrificed creature's toughness": the creature sacrificed for its own or a granted emerge
+  cost, CR 702.119a, as it last existed, rulings). Wanderwine Farewell ("for each permanent returned to its owner's hand
+  this way": a token too, CR 111.7, not a commander sent to the command zone). Alpha Brawl (the target creature an opponent
+  controls deals damage equal to its power to each other creature that player controls, then each of them deals damage
+  equal to its power to it, with no state-based actions between, rulings). Nahiri's Wrath ("the total mana value of the
+  discarded cards" its "discard X cards" cost discarded). Nemesis Phoenix (returned from the graveyard tapped and attacking,
+  "Activate only during the declare attackers step and only if you're attacking two or more opponents": opponents your
+  creatures attack, not their planeswalkers or battles, as Astral Confrontation counts them; the defending player it
+  attacks is chosen as it enters, CR 508.4). Asgardian Inspiration ("Whenever a source you control deals noncombat damage
+  to an opponent, you may pay {2}. If you do, return this card from your graveyard to your hand": watched from its owner's
+  graveyard, CR 113.6m). Dodgy Jalopy (scavenge with a "*" power: its power in the graveyard by its characteristic-defining
+  ability, CR 604.3, fixed as the cost exiles it, rulings). Bots use these through the existing paths (graveyard abilities
+  in the declare attackers step, emerge, scavenge). +9 (30,566 of 31,936 with B148 and B149).
+- Out after round B150 (looked at, not done): Boneyard Mycodrax (its scavenge compiles now; its "other creature cards in
+  your graveyard" power doesn't yet), the never-examined names still left (Ring of Ma'rûf and the other wishes, Seafarer's
+  Quay and the other banding grants, Cyclopean Tomb, False Orders, Mirror-Shield Hoplite, Chorus of the Conclave, Temporal
+  Aperture, All Hallow's Eve, Idris, The Master, Alhammarret, Tazri, Sasaya, Nathan Drake, Feather, Rosheen, Ore-Rich
+  Stalactite, Zevlor, Kellan, Leori, Mavinda): each needs a mechanic of its own (outside-the-game cards, banding, copies of
+  abilities, exile-zone upkeeps, mana spent only on {X} costs).
 - Out after round B149 (looked at, not done): Dralnu, Lich Lord (damage replaced by sacrificing that many permanents,
   chosen in the middle of the damage event), Rain of Gore (a life gain replacement that depends on whether a spell or
   ability caused the gain and who controls it; gainLife doesn't know its cause), Lich (life gain replaced by draws, which Lich's

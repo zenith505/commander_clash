@@ -2663,6 +2663,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^([Rr]eturn target nonland permanent to its owner's hand)\. Then that player discards a card if (you control an? [A-Z][a-z]+)\.$/, "$1. If $2, its owner discards a card.");
   // Hold for Questioning: "tap enchanted permanent and investigate": two instructions.
   text = text.replace(/^([Tt]ap enchanted (?:permanent|creature)) and investigate\.$/, "$1. Investigate.");
+  // Alpha Brawl: "..., then each of those creatures deals damage equal to its power to that creature": one instruction
+  // (sentences/spells.ts), the second part about the first's creatures, so it isn't split at ", then".
+  text = text.replace(/^(Target creature an opponent controls deals damage equal to its power to each other creature that player controls), then (each of those creatures deals damage equal to its power to that creature\.)$/, "$1 and then $2");
+  // Sharp-Eyed Rookie: "put a +1/+1 counter on ~ and investigate": two instructions, in order.
+  text = text.replace(/^([Pp]ut a \+1\/\+1 counter on ~) and investigate\.$/, "$1. Investigate.");
   // Toolcraft Exemplar: "~ gets +2/+1 until end of turn. If you control three or more artifacts, it also gains first
   // strike until end of turn": ~ again, checked as it resolves.
   text = text.replace(/^(~ gets [+-]\d+\/[+-]\d+ until end of turn\. If you control [^,.]+, )it also (gains [a-z ]+ until end of turn\.)$/, "$1~ $2");
@@ -18404,6 +18409,8 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   { re: "the sacrificed creature was suspected", cond: { kind: "sacrificedSuspected" }, noTargets: true },
   { re: "the sacrificed (?:creature|artifact) was legendary", cond: { kind: "sacrificedLegendary" }, noTargets: true },
   { re: "~'s surge cost was paid", cond: { kind: "altPaid", alt: "surge" } },
+  // Adipose Offspring: its own emerge cost, or one a permanent gave it (CR 702.119a).
+  { re: "~'s emerge cost was paid", cond: { kind: "altPaid", alt: "emerge" } },
   { re: "~'s sneak cost was paid", cond: { kind: "altPaid", alt: "sneak" }, spellOnly: true },
   // "As an additional cost to cast this spell, you may waterbend {2}" is paid like kicker (CompiledCard.kicker.waterbend).
   { re: "~'s waterbend cost was paid", cond: { kind: "kicked" } },

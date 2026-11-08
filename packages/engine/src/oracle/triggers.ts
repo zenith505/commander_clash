@@ -2969,6 +2969,16 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
     const body = parseBody(truce[1]!);
     return body ? { event: "attackBetweenYouAndEnchanted", body } : "fail";
   }
+  // Curse of Shallow Graves: "Whenever a player attacks enchanted player with one or more creatures, that attacking player
+  // may create a tapped 2/2 black Zombie creature token.": once for the attack, not for one on their planeswalkers
+  // (rulings); the attacking player is the active player (CR 506.2), who decides and creates it (CR 101.4).
+  const shallow = /^Whenever a player attacks enchanted player with one or more creatures, that attacking player may (create [^.]+)\.$/.exec(line);
+  if (shallow) {
+    const make = parseBody(`${shallow[1]!.charAt(0).toUpperCase()}${shallow[1]!.slice(1)}.`);
+    const tok = make?.effects.length === 1 && !make.targets.length ? make.effects[0]! : undefined;
+    if (tok?.type !== "createToken" || tok.who.ref !== "you") return "fail";
+    return { event: "enchantedPlayerAttacked", body: { targets: [], effects: [{ type: "eachMay", who: { ref: "activePlayer" }, effects: [{ ...tok, who: { ref: "choseThisWay" } }], text: shallow[1]! }], text: line.replace(/^Whenever [^,]+, /, "") } };
+  }
   // Curse of Bounty: "untap all nonland permanents you control. Each opponent attacking that player untaps all nonland
   // permanents they control": the same for each of them.
   const attacked = /^Whenever enchanted player is attacked, (.+)$/.exec(line.replace(/^(Whenever enchanted player is attacked, untap all nonland permanents you control\.) Each opponent attacking that player untaps all nonland permanents they control\.$/, "$1 Each opponent attacking that player does the same."));
@@ -3065,6 +3075,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const text = mantle ? "have it deal damage equal to its power plus 2 to another target creature; if they do, it assigns no combat damage this turn" : "have it deal damage equal to its power to target creature; if you do, it assigns no combat damage this turn";
     const target: TargetSpec = { kind: "object", types: ["Creature"], ...(mantle ? { notSourceHost: true as const } : {}), text: mantle ? "another target creature" : "target creature" };
     return { ...base, body: { targets: [target], effects: [{ type: "eachMay", who: { ref: "subjectController" }, effects: deal, text, each: true }], text: raw.replace(/^Whenever [^,]+, /, "") } };
+  }
+  // Pandemonium: "Whenever a creature enters, that creature's controller may have it deal damage equal to its power to any
+  // target of their choice.": the trigger is the enchantment controller's, but the entering creature's controller chooses
+  // the target as it's put on the stack (TargetSpec.chosenBy) and whether to do it as it resolves (rulings); the creature
+  // deals the damage, its power then, or as it last existed if it has left (rulings, CR 608.2h).
+  if (raw === "Whenever a creature enters, that creature's controller may have it deal damage equal to its power to any target of their choice.") {
+    const base = parseTrigger("Whenever a creature enters, it gets +1/+0 until end of turn.");
+    if (!base || base === "fail" || base.event !== "permanentEnters") return "fail";
+    const deal: Effect[] = [{ type: "damage", amount: { count: { kind: "power", of: { ref: "subject" } } }, to: { ref: "anyTarget", index: 0 }, by: "subject" }];
+    return { ...base, body: { targets: [{ kind: "any", chosenBy: "subjectController", text: "any target of their choice" }], effects: [{ type: "eachMay", who: { ref: "subjectController" }, effects: deal, text: "have it deal damage equal to its power to any target" }], text: raw.replace(/^Whenever [^,]+, /, "") } };
   }
   // Bladegriff Prototype: "destroy target nonland permanent of that player's choice that one of your opponents controls":
   // the damaged player chooses it among the permanents the controller's opponents control (rulings), read as "of

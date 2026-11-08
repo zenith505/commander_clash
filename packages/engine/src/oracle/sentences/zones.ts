@@ -1226,7 +1226,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "putFromHand", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card that shares a creature type with each creature tapped" }, may: !!m[1], kinOfCostTapped: true }];
   // Yuna's Decision: "you may put a creature card and/or a land card from your hand onto the battlefield": up to one of
   // each, put onto the battlefield at the same time; a card that's both (Dryad Arbor) counts as either.
-  if ((m = /^[Yy]ou may put an? ([a-z]+) card and\/or an? ([a-z]+) card from your hand onto the battlefield$/.exec(s))) {
+  if ((m = /^(?:[Yy]ou may )?[Pp]ut an? ([a-z]+) card and\/or an? ([a-z]+) card from your hand onto the battlefield$/.exec(s))) {
     const a = parseSearchFilter(`${m[1]} card`);
     const b = parseSearchFilter(`${m[2]} card`);
     if (!a || !b || a.kind !== "card" || b.kind !== "card") return null;

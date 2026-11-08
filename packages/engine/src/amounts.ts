@@ -470,6 +470,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.preventedTally?.[c.rule] ?? 0;
     case "sacrificedThisWayGreatestPower":
       return Math.max(0, ...(s.resolving?.sacrificedThisWay ?? []).map((l) => l.power ?? 0));
+    case "sacrificedThisWayManaValue":
+      return s.resolving?.sacrificedThisWay?.at(-1)?.manaValue ?? 0;
     case "sacrificedThisWayTotalPower":
       return (s.resolving?.sacrificedThisWay ?? []).reduce((n, l) => n + (l.power ?? 0), 0);
     case "sacrificedThisWayColors":
@@ -1371,6 +1373,8 @@ function describeCount(c: Count): string {
       return "#damage prevented";
     case "sacrificedThisWayGreatestPower":
       return "the greatest power sacrificed";
+    case "sacrificedThisWayManaValue":
+      return "the sacrificed creature's mana value";
     case "sacrificedThisWayColors":
       return "#colors of the sacrificed creature";
     case "sacrificedThisWayTotalPower":

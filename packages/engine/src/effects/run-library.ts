@@ -3,7 +3,7 @@ import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType, objIsType } from
 import { controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { attackingPermanentOf, castProblem, creatureTypesOf, freeCastable, draw, shareCreatureType, grantedMadness, gainLife, log, loseLife, payLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
+import { attackingPermanentOf, auraHostOptions, castProblem, creatureTypesOf, freeCastable, draw, shareCreatureType, grantedMadness, gainLife, log, loseLife, payLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, cardPT, objectMatches, pickOptions, printedMatches, sayBound } from "./targeting";
@@ -1394,7 +1394,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const n = e.perDestroyed ? lost(p.id) : e.perPlayerN ? (sc.perN ??= ownN(p.id)) : (sc.n ??= perName ? perName.length : amountNow(s, e.n, ctx));
         // "Search your library and/or graveyard": the library too, or not (then no shuffle), chosen before looking. Only
         // asked when the graveyard has a card that fits; otherwise both are searched.
-        const fits = (id: ObjectId) => !filter || printedMatches(filter, defOf(s, obj(s, id)));
+        // Sovereigns of Lost Alara: only an Aura that could enchant that creature, still on the battlefield as that object.
+        const enchantee = e.couldEnchantDest && e.dest.attachTo ? objects(s, e.dest.attachTo, ctx).find((o) => o.zone === "battlefield") : undefined;
+        const fits = (id: ObjectId) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.couldEnchantDest || (!!enchantee && auraHostOptions(s, obj(s, id), p.id).some((h) => "attachTo" in h && h.attachTo === enchantee.id)));
         if (e.orGraveyard && sc.searchZones === undefined) {
           // Dark Supplicant: the hand is searched with the graveyard ("graveyard, hand, and/or library").
           if (!barred(p.id) && (e.andHand ? [...p.graveyard, ...p.hand] : p.graveyard).some(fits)) {

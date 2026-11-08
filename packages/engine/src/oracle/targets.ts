@@ -1891,8 +1891,9 @@ export function parseTargetPhrase(
   // "Target creature that has a -1/-1 counter on it" (Banewhip Punisher): the same as "with".
   p = p.replace(/ that has (an? (?:[+-]1\/[+-]1|fate) counter on it)$/, " with $1");
   // Tetzimoc, Primal Death: "each creature your opponents control with a prey counter on it".
-  // Temporal Distortion: "each permanent with an hourglass counter on it".
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level|trap|prey|rejection|doom|hourglass|impostor|infection|time) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level|doom|hourglass) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  // Temporal Distortion: "each permanent with an hourglass counter on it". Mine Layer: "a land with a mine counter on it";
+  // Sporogenesis: "a creature with a fungus counter on it"; Bomb Squad: "each creature with a fuse counter on it".
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level|trap|prey|rejection|doom|hourglass|impostor|infection|time|mine|fungus|fuse) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level|doom|hourglass|mine|fungus|fuse) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();

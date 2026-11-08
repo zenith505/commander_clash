@@ -1187,6 +1187,24 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const from = objects(s, e.from, ctx)[0];
       const to = objects(s, e.to, ctx)[0];
       if (!from || !to || from.id === to.id) return;
+      if (e.eachKindNotOnTo) {
+        // Goldberry, River-Daughter: the kinds on the other one that aren't on it as this resolves, one of each, together
+        // (CR 122.5); one that can't be removed stays (rulings on Fear of Sleep Paralysis).
+        const kinds = Object.keys(from.counters).filter((k) => removableCounters(s, from, k) > 0 && !((to.counters[k] ?? 0) > 0));
+        if (!kinds.length) {
+          log(s, `${src}: no counter to move.`);
+          return;
+        }
+        for (const k of kinds) {
+          from.counters[k]! -= 1;
+          countersRemoved(s, from, k, 1);
+          putCounters(s, to, k, 1);
+        }
+        invalidateCharacteristics(s);
+        log(s, `${characteristics(s, from).name} moves ${kinds.map((k) => `a ${k} counter`).join(", ")} onto ${characteristics(s, to).name}.`);
+        for (const k of kinds) if (!from.counters[k]) fireEvent(s, { type: "lastCounterRemoved", id: from.id, counter: k });
+        return;
+      }
       let counter = e.counter;
       if (counter === "any") {
         // "Move a counter": a kind it has, chosen as it resolves (rulings on Nesting Grounds).
@@ -1340,13 +1358,17 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         }
         const name = characteristics(s, o).name;
         const prompt = to ? `choose a counter to move from ${name} onto ${characteristics(s, to).name} (${count()} so far)` : `choose a counter to remove from ${name} (${count() + 1} of ${n})`;
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "removeCounter", about: o.id, ...(to ? { onto: to.id } : {}), options: [...kinds, ...(e.upTo ? ["done"] : [])], labels: [...kinds.map((k) => `A ${k} counter (${left(k)} left)`), ...(e.upTo ? [count() ? "That's all" : "None"] : [])], prompt };
+        // Goldberry, River-Daughter: "one or more", so no stopping before the first.
+        const canStop = e.upTo && !(e.atLeastOne && !count());
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "removeCounter", about: o.id, ...(to ? { onto: to.id } : {}), options: [...kinds, ...(canStop ? ["done"] : [])], labels: [...kinds.map((k) => `A ${k} counter (${left(k)} left)`), ...(canStop ? [count() ? "That's all" : "None"] : [])], prompt };
         return "paused";
       }
       sc.countersPicked = undefined;
       sc.countersDone = undefined;
       if (!o) return;
       if (to) {
+        // "If you do" after moving one or more (Goldberry, River-Daughter): how many moved (Count countersRemovedThisWay).
+        if (s.resolving && e.atLeastOne) s.resolving.countersRemoved = (s.resolving.countersRemoved ?? 0) + Object.values(picked).reduce((a, b) => a + Math.max(0, b), 0);
         for (const [k, m] of Object.entries(picked)) {
           if (m <= 0) continue;
           const had = o.counters[k] ?? 0;
@@ -1999,6 +2021,38 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         log(s, `${player(s, to).name} gains control of ${defOf(s, obj(s, id)).name}.`);
       }
       if (!got.length) log(s, `${src}: nobody chose a creature.`);
+      invalidateCharacteristics(s);
+      return;
+    }
+    case "rotateControl": {
+      const r = s.resolving!;
+      const side = r.chosen?.direction;
+      if (!side) {
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "direction", options: ["left", "right"], labels: ["Left", "Right"], prompt: "choose left or right: each player gains control of all nonland permanents controlled by the next player that way." };
+        return "paused";
+      }
+      // Seats follow turn order, which goes to each player's left (CR 101.4); players who left the game have no seat.
+      // Who controls what is seen once, then every player takes control of their new permanents at the same time
+      // (rulings); a phased-out permanent is treated as though it doesn't exist (CR 702.26b).
+      const seats = s.turnOrder.filter((p) => !player(s, p).lost);
+      const next = (pid: PlayerId) => seats[(seats.indexOf(pid) + (side === "left" ? 1 : seats.length - 1)) % seats.length]!;
+      const byController = new Map<PlayerId, ObjectId[]>();
+      for (const id of s.battlefield) {
+        const o = obj(s, id);
+        if (id === ctx.sourceId || s.phasedOut?.includes(id) || objIsType(s, o, "Land")) continue;
+        const c = controllerOf(s, o);
+        byController.set(c, [...(byController.get(c) ?? []), id]);
+      }
+      let moved = 0;
+      for (const to of seats) {
+        const from = next(to);
+        const affected = from === to ? [] : (byController.get(from) ?? []);
+        if (!affected.length) continue;
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: to, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected, mods: [{ kind: "control" }] });
+        log(s, `${player(s, to).name} gains control of ${affected.map((id) => defOf(s, obj(s, id)).name).join(", ")} from ${player(s, from).name}.`);
+        moved += affected.length;
+      }
+      if (!moved) log(s, `${src}: no nonland permanents change control.`);
       invalidateCharacteristics(s);
       return;
     }

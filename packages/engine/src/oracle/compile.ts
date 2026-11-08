@@ -2409,6 +2409,15 @@ export function compile(d: CardDef): CompiledCard {
       else out.exileInsteadOfDying = { filter, countersPower: true };
       continue;
     }
+    // Ravenloft Adventurer: "If a creature an opponent controls would die, instead exile it and put a hit counter on it":
+    // one replacement (CR 614.1a), the counter on the card in exile (CR 122.1).
+    const insteadCounter = /^If a creature an opponent controls would die, instead exile it and put an? ([a-z]+) counter on it\.$/.exec(line);
+    if (insteadCounter) {
+      const filter = parseTargetPhrase("creature an opponent controls");
+      if (filter?.kind !== "object") out.unsupported.push(raw);
+      else out.exileInsteadOfDying = { filter, counter: insteadCounter[1]! };
+      continue;
+    }
     // Nemata, Primeval Warden: "If a creature an opponent controls would die, exile it instead. When you do, create a 1/1
     // green Saproling creature token.": the replacement (CR 614.1a), and a reflexive trigger when it's applied (CR 603.12).
     const exileWhen = /^If an? (.+?) would die, exile it instead\. When you do, (.+)\.$/.exec(line);
@@ -6979,6 +6988,8 @@ function linkExile(out: CompiledCard) {
     else if (!others && !exiles.length && searches.length === 1 && !all.some((e) => e.type === "search" && e !== searches[0])) searches[0]!.dest = { ...searches[0]!.dest, linked: true };
     // Vault 13: Dweller's Journey: "Return two cards exiled with ~ ..." are the ones its chapter I exiled "until ~ leaves the
     // battlefield" (CR 607.2a), its only exile instruction; the ones chapter III moves are no longer there to return.
+    // Sothera, the Supervoid: "each opponent chooses a creature they control and exiles it" is its one exile instruction.
+    else if (!others && !exiles.length && !searches.length && ((picks) => picks.length === 1 && (picks[0]!.linked = true))(all.filter((e): e is Extract<Effect, { type: "pick" }> => e.type === "pick" && e.action === "exile"))) {}
     else if (!others && !exiles.length && !tops.length && !searches.length && all.some((e) => e.type === "moveLinked" && e.exactly !== undefined)) {
       const until = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && e.until === "sourceLeaves");
       if (until.length === 1 && all.filter((e) => e.type === "exile").length === 1) until[0]!.linked = true;

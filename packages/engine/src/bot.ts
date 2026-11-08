@@ -112,6 +112,7 @@ import {
   payableLife,
   halfLifeCost,
   linkedExileCards,
+  linkedCostCards,
   processCandidates,
   hiddenInExile,
   maxHandSize,
@@ -4862,6 +4863,15 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
     };
     return best("right") > best("left") ? "right" : "left";
   }
+  // Aminatou, the Fateshifter: the direction whose next player has the most worth taking (ours go the other way either
+  // way).
+  if (what === "direction" && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "rotateControl")) {
+    const gain = (side: "left" | "right") => {
+      const p = nearestOpponent(s, pid, side);
+      return s.battlefield.map((id) => obj(s, id)).filter((o) => p !== undefined && o.id !== s.resolving!.item.sourceId && controllerOf(s, o) === p && !objIsType(s, o, "Land")).reduce((n, o) => n + worth(s, pid, o), 0);
+    };
+    return gain("right") > gain("left") ? "right" : "left";
+  }
   // Pramikon, Teyo: the direction whose player who could attack us then has the least creature power.
   if (what === "direction") {
     const threat = (side: "left" | "right") =>
@@ -6063,7 +6073,7 @@ function chooseUnearth(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbility
  * that aren't creatures we'd miss, or lands once we have plenty, and cards when our hand is full.
  * Undefined when it costs none of that; null when we'd rather not pay.
  */
-function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets: TargetChoice[], keep?: ObjectId): CostChoices | null | undefined {
+export function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets: TargetChoice[], keep?: ObjectId): CostChoices | null | undefined {
   if (!ab.costs?.length) return undefined;
   const out: CostChoices = {};
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
@@ -6164,6 +6174,12 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
       const cards = processOrder(s, pid, processCandidates(s, pid));
       if (!cards.length) return null;
       out.exileCards = cards.slice(0, 1);
+    } else if (c.kind === "exileFromGraveyard" && c.linked && c.filter) {
+      // Shelob, Dread Weaver: the cheapest creature card exiled with it (the costlier ones are worth putting onto the
+      // battlefield with its other ability).
+      const card = linkedCostCards(s, o, c.filter).sort((a, b) => defMv(defOf(s, obj(s, a))) - defMv(defOf(s, obj(s, b))))[0];
+      if (!card) return null;
+      out.exileCards = [card];
     } else if (c.kind === "exileFromGraveyard" && c.linked) {
       // Jester's Scepter: the exiled card with the name of the spell we target, or not at all.
       const spell = targets.map((t) => (t.kind === "stack" ? s.stack.find((x) => x.id === t.id) : undefined)).find((x) => x?.objectId);

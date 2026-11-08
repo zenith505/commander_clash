@@ -2363,6 +2363,32 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 307 took cards back off the "Out after round N" lists, most played first: "−6: Choose left or right. Each player
+   gains control of all nonland permanents other than ~ controlled by the next player in the chosen direction"
+   (Aminatou, the Fateshifter: who controls what is seen once, then all the control changes at once and for good, layer
+   2, rulings; players who left the game have no seat; a bot weighs what it would get against all it gives away; a
+   browser test); "{2}{B}, Put a creature card exiled with ~ into its owner's graveyard" as a cost (Shelob, Dread Weaver,
+   CR 607.2a; the picker offers only creature cards; a browser test); "return that card to the battlefield tapped under
+   your control. It's a Treasure artifact with "...," and it loses all other card types" (Vraska, the Silencer: it keeps
+   its supertypes and abilities, rulings); "each opponent chooses a creature they control and exiles it" linked to "if a
+   player controls no creatures, sacrifice ~, then put a creature card exiled with it onto the battlefield under your
+   control with two additional +1/+1 counters on it" (Sothera, the Supervoid: StaticCondition control `who` "player",
+   CR 603.4); "Move a counter of each kind not on ~ from another target permanent you control onto ~" and "Move one or
+   more counters from ~ onto another target permanent you control. If you do, draw a card" (Goldberry, River-Daughter,
+   CR 122.5; no "None" before the first counter; a browser test); "Whenever a permanent you control is turned face up,
+   you may return this card from your graveyard to the battlefield face up or face down" (Deathmist Raptor: watched from
+   the graveyard; face down it's a 2/2 that its own megamorph turns face up, CR 702.37e; a browser test); "If a creature
+   an opponent controls would die, instead exile it and put a hit counter on it" and "defending player loses 1 life for
+   each card they own in exile with a hit counter on it" (Ravenloft Adventurer, CR 614.1a); "Each opponent attacking that
+   player untaps all nonland permanents they control" (Curse of Bounty). +8, 30,516 of 31,936 with B145.
+   Out after round 307 (looked at, not done): Brimaz, Blight of Oreskos ("a Phyrexian creature or artifact creature
+   spell": whether "Phyrexian" also qualifies "artifact creature" isn't settled by its rulings); Zinnia, Valley's Voice
+   and Ashling, the Limitless (a keyword cost a spell gains "as you cast" it, and whether the permanent keeps the
+   ability its trigger needs); Hatchery Sliver (a granted replicate whose cost is each spell's own mana cost, beside its
+   printed one); Geyadrone Dihada (protection from permanents with corruption counters on them); Moxite Refinery ("Remove
+   X counters from an artifact or creature you control" as a cost, any kinds); Ashiok, Nightmare Muse's −7 (casting from
+   among face-up cards opponents own in exile); Zenos yae Galvus (a creature chosen by its enters trigger, then "when the
+   chosen creature leaves the battlefield").
    Round 306 took cards back off the "Out after round N" lists, most played first: "Each opponent separates the creatures
    they control into two piles. For each opponent, you choose one of their piles. Each opponent sacrifices the creatures
    in their chosen pile" (Make an Example: each separates their own in turn order, CR 101.4, then all the chosen piles

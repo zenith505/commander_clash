@@ -4,7 +4,7 @@
 import { allEffects, type AbilityBody, type ChosenTarget, type Effect, type ObjRef, type SpentReq } from "./abilities";
 import { power, toughness, defOf } from "./cards";
 import { bindChosen, estimate, harmfulCounter, harmfulTargets, legalTargets, lethalDamage, modsAreHarmful, objectMatches } from "./effects";
-import { livingPlayers, obj, opponents } from "./game";
+import { livingPlayers, nearestOpponent, obj, opponents } from "./game";
 import { characteristics, controllerOf } from "./layers";
 import { compileCard } from "./oracle";
 import { COLORS, type CardDef, type Chosen, type Color, type GameObject, type GameState, type PlayerId } from "./types";
@@ -79,6 +79,13 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
       if (val !== null && (best === null || val > best)) best = val;
     }
     return best;
+  }
+  // Aminatou, the Fateshifter: the better direction's next player's nonland permanents, less all of ours (they go the
+  // other way either way).
+  if (body.effects.some((e) => e.type === "rotateControl")) {
+    const nonland = (p: PlayerId | undefined) => s.battlefield.map((id) => obj(s, id)).filter((o) => p !== undefined && o.id !== sourceId && !s.phasedOut?.includes(o.id) && controllerOf(s, o) === p && !characteristics(s, o).types.includes("Land"));
+    const sum = (os: GameObject[]) => os.reduce((n, o) => n + worth(s, pid, o), 0);
+    return Math.max(...(["left", "right"] as const).map((side) => sum(nonland(nearestOpponent(s, pid, side))))) - sum(nonland(pid));
   }
   let v: number | null = null;
   const group = (r: ObjRef) => {

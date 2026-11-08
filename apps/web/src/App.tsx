@@ -151,6 +151,7 @@ import {
   beholdCandidates,
   beholdWhat,
   linkedExileCards,
+  linkedCostCards,
   processCandidates,
   hiddenInExile,
   tapCostCandidates,
@@ -877,7 +878,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         // Jester's Scepter: pick one of the cards exiled with it (you may look at them) to put into its owner's graveyard.
         if (d.exileCards !== undefined) continue;
         const label = cardOf(s, d.objectId).name;
-        return setCostPick({ activate: d, kind: "exileCards", label, what: `put a card exiled with ${label} into its owner's graveyard`, n: 1, candidates: linkedExileCards(s, s.objects[d.objectId]!), chosen: [] });
+        // Shelob, Dread Weaver: a creature card among them.
+        const what = c.filter ? `${/^[aeiou]/i.test(c.filter.text) ? "an" : "a"} ${c.filter.text}` : "a card";
+        return setCostPick({ activate: d, kind: "exileCards", label, what: `put ${what} exiled with ${label} into its owner's graveyard`, n: 1, candidates: linkedCostCards(s, s.objects[d.objectId]!, c.filter), chosen: [] });
       }
       if (c.kind === "exileFromGraveyard" && !c.top) {
         // "Exile a card from your graveyard" (Stonerise Spirit): click the cards in your graveyard.

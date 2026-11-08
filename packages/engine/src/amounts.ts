@@ -432,8 +432,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.exiledFromHand ?? 0;
     case "returnedToughness":
       return s.resolving?.returnedToughness ?? 0;
-    case "cardsExiledThisWay":
-      return (s.resolving?.exiledCards ?? []).filter((id) => s.objects[id]?.zone === "exile" && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!)))).length;
+    case "cardsExiledThisWay": {
+      const ids = (s.resolving?.exiledCards ?? []).filter((id) => s.objects[id]?.zone === "exile" && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!))));
+      return c.greatestMv ? Math.max(0, ...ids.map((id) => defMv(defOf(s, s.objects[id]!)))) : ids.length;
+    }
     case "sacrificedThisWayCount":
       return s.resolving?.sacrificedThisWay?.length ?? 0;
     case "spellsCounteredThisWay":

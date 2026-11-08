@@ -662,7 +662,7 @@ line blocks.
    Out after round 200 (looked at, not done): Enchanter's Bane (a
    punisher whose option sacrifices the target), You Cannot Pass! (done in round B110) (no record of which creatures blocked or were blocked by a legendary creature),
    Candlekeep Inspiration (cards in exile and graveyard that "have an Adventure"), Convert to Slime (done in round 275), Canoptek Wraith, Mishra's Command, Furygale Flocking, Sentinel Tower (done in round 298), Fishing
-   Gear, Phyrexian Dreadnought. Soulfire Grand Master, Radiant Scrollwielder and Lo and Li still miss another line;
+   Gear, Phyrexian Dreadnought (done in round 303). Soulfire Grand Master, Radiant Scrollwielder and Lo and Li still miss another line;
    Firesong and Sunspeaker's "red instant and sorcery spells" isn't read yet.
    Round 201 went on from the top: "is put into a graveyard from the battlefield or is put into exile from the
    battlefield" (Psychomancer, Shard of the Void Dragon, Slagstone Refinery), "you may put any number of them into your
@@ -873,7 +873,7 @@ line blocks.
    Hand of Vecna ("equipped creature or a creature you control named Vecna" and a life-per-card equip cost); Grave Sifter
    (each player's own creature type); Overseer of Vault 76 ("remove three quest counters from among permanents you
    control"); Dragon's Approach (done in round 296) (exiling four named cards as an optional cost); Signal the Clans (a random pick if the
-   three names differ); Fblthp, the Lost (entered or cast from the library; "becomes the target of a spell");
+   three names differ); Fblthp, the Lost (done in round 303) (entered or cast from the library; "becomes the target of a spell");
    Dack Fayden ("gain control of those permanents" a spell targets); Ashiok, Nightmare Muse ("then that player exiles a
    card from their hand", cast face-up exiled cards).
    Round 211 went on from the top: "you may pay any amount of {E}" with "destroy each ... with mana value less than or
@@ -898,7 +898,7 @@ line blocks.
    mana cost for as long as it remains exiled" (Spelljack, Kheru Spellsnatcher); "cast target instant or sorcery card
    from a graveyard, and mana of any type can be spent" (Quistis Trepe). +21 (27,813 of 31,936 with round 210 and Lane B rounds B40 to B42).
    Out after round 211 (looked at, not done): Tegwyll's Scouring (flash by tapping three flyers as an additional cost);
-   The Kenriths' Royal Funeral (a cost cut counted from linked exiled cards); Suppression Ray ("choose up to that many
+   The Kenriths' Royal Funeral (done in round 303) (a cost cut counted from linked exiled cards); Suppression Ray ("choose up to that many
    creatures tapped this way"); Baba Lysaga, Night Witch ("sacrifice up to three permanents" as a cost, then card types
    among them); Dargo, the Shipwrecker (optional sacrifices as a cost that cut it); Curse of Misfortunes (a Curse not
    sharing a name with one attached to that player); Archmage Ascension (done in round 297) (a "would draw" replacement by a search);
@@ -1126,7 +1126,7 @@ line blocks.
    instead of its mana cost); Watcher of Hours (a trigger of a card in exile, "whenever you remove a time counter from
    this card while it's exiled"); Tarmogoyf Nest and Disa the Restless (done in round 275);
    Kethek, Crucible Goliath (reveal until a nonlegendary creature card with lesser mana value than the sacrificed
-   creature); Yidris, Maelstrom Wielder (cascade on spells cast from hand for the turn); Animal Friend (a quoted
+   creature); Yidris, Maelstrom Wielder (done in round 303) (cascade on spells cast from hand for the turn); Animal Friend (a quoted
    ability that refers to its source); Hive Mind.
    Round 221: "put a +1/+1 counter on target creature and goad it" (Bhaal, Lord of Murder); "the number of cards you
    own in exile" (Cosmogoyf); "{C} for each artifact you control named ~" (Powerstone Shard); "enters or becomes the
@@ -1153,7 +1153,7 @@ line blocks.
    Out after round 221 (looked at, not done): New Perspectives ({0} instead of every cycling cost, non-mana ones
    included); Clay Golem (a die roll as a cost); Ian the Reckless (damage to you and any target at once);
    Stumpsquall Hydra (distribute counters among it and commanders); Cursecloth
-   Wrappings (granted embalm with the card's own mana cost); Rift Elemental (remove a time counter from a permanent or
+   Wrappings (done in round 303) (granted embalm with the card's own mana cost); Rift Elemental (remove a time counter from a permanent or
    suspended card); Ashcloud Phoenix (return face down); Nightshade Assassin (reveal X black cards); Silverquill
    Lecturer (granted demonstrate); Cosi's Trickster (whenever an opponent shuffles, done in round B71); Ib Halfheart, Goblin Tactician
    ("becomes blocked, sacrifice it. If you do, it deals 4 damage to each creature blocking it"); Vivien's Stampede
@@ -2363,6 +2363,32 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands.
+   Round 303 took cards back off the "Out after round N" lists, most played first: "Reveal the top six cards of your
+   library. You may put up to one land card from among them onto the battlefield tapped and up to one Elf card from
+   among them into your hand" (Bounty of Skemfar: the land first, then an Elf card from the cards still there, the rest
+   to the bottom in a random order, a browser test); "sacrifice it unless you sacrifice any number of creatures with
+   total power 12 or greater" (Phyrexian Dreadnought: all at once as the trigger resolves, itself among them if you
+   like, CR 701.21a; the picker holds its button back below 12 and shows the running total, a browser test; the bot
+   keeps it when what it gives up is worth less); "Exile up to two target legendary creature cards ... You draw X cards
+   and you lose X life, where X is the greatest mana value among cards exiled this way" and "Legendary spells you cast
+   cost {1} less to cast for each card exiled with The Kenriths' Royal Funeral" (one X, cards still exiled with it);
+   "Choose a kind of counter on a creature you control. Put a counter of that kind on each other creature you control"
+   (Contractual Safeguard: the creature and the kind as it resolves, the shield counter from its first sentence
+   included, a browser test); "If it entered from your library or was cast from your library, draw two cards instead"
+   and "When ~ becomes the target of a spell, shuffle ~ into its owner's library" (Fblthp, the Lost, rulings); "Until
+   your next turn, you may cast creature spells as though they had flash, and each creature you control enters with an
+   additional +1/+1 counter on it" (Arlinn, the Pack's Hope's +1, ending as your next turn begins);
+   "Whenever Yidris deals combat damage to a player, as you cast spells from your hand this turn, they gain cascade"
+   (each spell from your hand for the rest of the turn); "Target creature card in your graveyard gains embalm until end
+   of turn. The embalm cost is equal to its mana cost" (Cursecloth Wrappings: on the graveyard's menu, X as 0, nothing
+   for a card with no mana cost, a browser test). +8, 30,451 of 31,936 with B141.
+   Out after round 303 (looked at, not done): Oskar, Rubbish Reclaimer ("costs {1} less for each different mana value
+   among cards in your graveyard", and casting the discarded card from the graveyard as the trigger resolves); Araumi of
+   the Dead Tide (its cost "Exile cards from your graveyard equal to the number of opponents you have"; granting encore
+   now works); Obsidian Charmaw (a cost cut counting "each land your opponents control that could produce {C}", near Lane B's round B140 template, left for it); Lumbering Battlement
+   (the exile until it leaves isn't linked yet); Spectral Searchlight, Greater Gargadon, Ride the Avalanche, Panoptic
+   Projektor, Read the Runes, Draco, Azra Oddsmaker, Leonin Arbiter, Incinerator of the Guilty, Baba Lysaga, Archelos and
+   Hatchery Sliver (still out, for the reasons in their earlier notes).
    Round 302 took cards back off the "Out after round N" lists, most played first: "Whenever players finish voting, each
    opponent who voted for a choice you didn't vote for loses 2 life" (Grudge Keeper: with extra votes, only an opponent
    none of whose votes match one of yours, rulings) and "you and each opponent who voted for a choice you voted for may
@@ -2697,7 +2723,7 @@ line blocks.
    Lotus (mana another player adds); Coram, the Undertaker (casting from every graveyard).
    Out after round 274 (looked at, not done): Hatchery Sliver ("Each Sliver spell you cast has replicate": a granted
    replicate beside a spell's own kicker or replicate, two kicker-like costs on one spell, which the cast choices don't
-   have yet); Broodguard Elite (done in round 300) ("Warp {X}{G}": an {X} in a warp cost); Cursecloth Wrappings (a graveyard card gaining
+   have yet); Broodguard Elite (done in round 300) ("Warp {X}{G}": an {X} in a warp cost); Cursecloth Wrappings (done in round 303) (a graveyard card gaining
    embalm until end of turn); Spectral Searchlight ("That player adds one mana of any color they choose": mana for
    another player from your mana ability); Primordial Mist ("Exile a face-down permanent you control face up" as a
    cost); Toggo, Goblin Weaponsmith (a Rock token whose granted ability sacrifices the Rock by name); Ninja Teen (granted
@@ -2904,7 +2930,7 @@ line blocks.
    spell); Sovereigns of Lost Alara (an Aura that could enchant that creature); Durnan of the Yawning Portal (cast it
    with undaunted).
    Out after round 233 (looked at, not done): Invisible Woman, Sue Storm (counters put on several creatures at once as one
-   trigger); Sorceress's Schemes (done in round 272); Cursecloth Wrappings (embalm granted to a
+   trigger); Sorceress's Schemes (done in round 272); Cursecloth Wrappings (done in round 303) (embalm granted to a
    graveyard card); Oblivious Bookworm (a creature that entered face down or was turned face up this turn); Cait, Cage
    Brawler; Augusta, Order Returned; Vault 101: Birthday Party; The First Tyrannic War; Kitt Kanto;
    Daretti, Ingenious Iconoclast (its −6); Expedited Inheritance; Monstrous Emergence; Nyssa of Traken.
@@ -2912,7 +2938,7 @@ line blocks.
    has suspend": counters on the impulsed cards that already have suspend, without granting it); Knowledge Vault (done in round B129)
    ("{0}: Sacrifice ~. If you do, discard your hand, then ..." and its leaves trigger putting the cards into the
    graveyard); Yurlok of Scorch Thrash (mana burn, "each player adds {B}{R}{G}"); Tomik, Distinguished Advokist; Storm
-   Cauldron; Arlinn, the Pack's Hope; The Temporal Anchor; Chandra, Fire of Kaladesh; Panoptic Mirror; Crafty
+   Cauldron; Arlinn, the Pack's Hope (done in round 303); The Temporal Anchor; Chandra, Fire of Kaladesh; Panoptic Mirror; Crafty
    Cutpurse; Hydro-Man; Rootcoil Creeper (done in round 272); Zuko, Conflicted; Runo Stromkirk; Rootpath Purifier; Enduring Angel (not
    started; next candidates).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
@@ -3226,7 +3252,7 @@ line blocks.
    or chosen among a few colors (Hazel of the Rootbloom); Triumph of Cruelty (done in round B111) (a target in "... if you control the
    creature with the greatest power"); Fastbond and the "you play a land or cast a spell" triggers (Cemetery
    Protector, Infernal Sovereign); bots move Forgotten Ancient's counters only onto an evasive creature of theirs.
-   Smaller gaps from round 91 still out: Tail Swipe, Contractual Safeguard,
+   Smaller gaps from round 91 still out: Tail Swipe, Contractual Safeguard (done in round 303),
    Return to Dust (addendum targets), Tergrid ("sacrifices a
    nontoken permanent or discards a permanent card"), Zenith Chronicler ("each other player" meaning other than the
    player who cast the spell). From round 92: "hexproof from" only works for colors, monocolored and multicolored
@@ -3449,7 +3475,7 @@ line blocks.
      Dyadrine and Gyrus are blocked on other lines.
    - Dies-return still out: Not Dead After All, Vincent's Limit Break.
    - Several cards from among the top ones: "with total mana value N or less" (Ao, Michelangelo's Technique, Smelting
-     Vat), two destinations in one sentence (Bounty of Skemfar, Wakanda Forever!), "tapped and attacking" (Arthur, Jet,
+     Vat), two destinations in one sentence (Bounty of Skemfar (done in round 303), Wakanda Forever!), "tapped and attacking" (Arthur, Jet,
      Owlbear Cub), "where X is" in the look (Ajani Outland Chaperone, Famished Worldsire, Emergent Woodwurm), the X
      of an enters or cast trigger (Knickknack Ouphe, Genesis Hydra), exiled top cards (Xenagos, Tezzeret), "that many
      cards" (Gishath), "If you put fewer than two lands" (Expand the Sphere), "When a creature is put onto the battlefield this way" (Vivien's Invocation, Gilgamesh).
@@ -6573,7 +6599,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   among cards not chosen yet each time you pay, none left: no more paying, rulings; the last chosen goes to your hand;
   bots choose the card worth least to you and pay while they can). Browser tests for choosing who chooses, your targets
   after their mode, a bot's spell asking you for the mode and "draw up to three", Soul Ransom's ability on Ana's Aura
-  and Shrouded Lore's Pay. +7 (30,450 of 31,936 with B141).
+  and Shrouded Lore's Pay. +7 (30,458 of 31,936 with B141 and round 303).
 - Out after round B142 (looked at, not done): Decaying Soil (a dies trigger granted by threshold needs a look-back,
   CR 603.10a), Nivmagus Elemental (a cost that exiles a spell from the stack), Benthic Explorers (untapping an
   opponent's land as a mana ability's cost), Charmed Pendant (mana by the milled card's mana symbols, instant-speed

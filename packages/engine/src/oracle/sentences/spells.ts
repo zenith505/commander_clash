@@ -731,6 +731,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseTargetPhrase(m[1]!);
     return filter?.kind === "spell" ? [{ type: "nextCast", filter, effects: [], text: `the next ${m[1]} you cast this turn has storm`, storm: true }] : null;
   }
+  // Yidris, Maelstrom Wielder: "as you cast spells from your hand this turn, they gain cascade": each of them gains cascade
+  // as it's cast (CR 702.85a); each time this resolves adds another instance, each triggering separately (rulings), and it
+  // lasts the turn even once Yidris has left (rulings).
+  if (/^[Aa]s you cast spells from your hand this turn, they gain cascade$/.test(s)) {
+    const filter = parseTargetPhrase("spell");
+    return filter?.kind === "spell" ? [{ type: "nextCast", filter, effects: [], text: "spells you cast from your hand this turn gain cascade", cascade: true, fromHand: true, allTurn: true }] : null;
+  }
   if ((m = /^[Tt]he next ((?:[a-z]+ )?spell)(?: and the next ([a-z]+ spell))? (you|they) cast this turn (?:has|each have) cascade(?: and you may planeswalk)?$/.exec(s)) && !!m[2] === /each have/.test(s)) {
     const who: PlayerRef | null = m[3] === "you" ? null : ctx.lastPlayerTarget !== undefined && !ctx.targets[ctx.lastPlayerTarget]?.many ? { ref: "target", index: ctx.lastPlayerTarget } : null;
     if (m[3] === "they" && !who) return null;

@@ -5205,19 +5205,19 @@ function Controls({
     const what = pending.objectId ? `any number of ${pending.what} permanents` : pending.anyNumber ? `any number of ${/s$/.test(pending.what) ? pending.what : `${pending.what.replace(/y$/, "ie")}s`}` : pending.min !== undefined && pending.count === 1 ? `${an}, if you want,` : pending.count === 1 ? an : `${pending.count} (${pending.what})`;
     const n = discards.length;
     // Slaughter the Strong: the chosen creatures' total power, a negative power subtracting.
-    const totalPower = pending.maxTotalPower !== undefined ? discards.reduce((t, id) => t + power(s, s.objects[id]!), 0) : 0;
+    const totalPower = pending.maxTotalPower !== undefined || pending.minTotalPower !== undefined ? discards.reduce((t, id) => t + power(s, s.objects[id]!), 0) : 0;
     const untapProblem = pending.action === "untapLimited" ? untapChoiceProblem(s, HUMAN, pending.options, discards) : undefined;
     // Battle for Bretagard: "with different names".
     const sameNames = !!pending.differentNames && !namesDiffer(s, discards);
     // Sigarda's Vanguard: "with different powers".
     const samePowers = !!pending.differentPowers && new Set(discards.map((id) => power(s, s.objects[id]!))).size !== discards.length;
-    const ok = (pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count) && !(pending.action === "band" && n === 1) && (pending.maxTotalPower === undefined || totalPower <= pending.maxTotalPower) && !untapProblem && !sameNames && !samePowers;
+    const ok = (pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count) && !(pending.action === "band" && n === 1) && (pending.maxTotalPower === undefined || totalPower <= pending.maxTotalPower) && (pending.minTotalPower === undefined || totalPower >= pending.minTotalPower) && !untapProblem && !sameNames && !samePowers;
     return (
       <div className="controls">
         <span>
           <strong>{pending.source}:</strong>{" "}
           {pending.prompt
-            ? `${pending.prompt}${sameNames ? " (two of them have the same name)" : ""}${samePowers ? " (two of them have the same power)" : ""}`
+            ? `${pending.prompt}${pending.minTotalPower !== undefined ? ` (total power now ${totalPower})` : ""}${sameNames ? " (two of them have the same name)" : ""}${samePowers ? " (two of them have the same power)" : ""}`
             : pending.action === "ringBearer"
             ? `the Ring tempts you: click a creature of yours to be your Ring-bearer. It's legendary and can't be blocked by creatures with greater power, and gains the Ring's other abilities as the Ring tempts you more times.`
             : pending.action === "attach"

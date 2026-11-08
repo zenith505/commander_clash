@@ -2901,7 +2901,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // adds no mana and still draws one).
   text = text.replace(/(^|\. )Discard all the cards in your hand\. Add (\{[WUBRGC]\}) for each card discarded this way, then draw that many cards plus one\./, "$1Discard your hand. Add $2 for each card discarded this way. Draw cards equal to the number of cards discarded this way plus one.");
   text = text.replace(/If you haven't cast a spell this turn, you may cast that card\. If you do, you can't cast additional spells this turn\./, "If you haven't cast a spell this turn, you may cast that card, and if you do, you can't cast additional spells this turn.");
-  text = text.replace(/ gains flashback until end of turn\. (?:The|Its) flashback cost is equal to (?:its|that card's) mana cost\./g, " gains flashback with its mana cost until end of turn.");
+  // Cursecloth Wrappings likewise: "... gains embalm until end of turn. The embalm cost is equal to its mana cost."
+  text = text.replace(/ gains (flashback|embalm|encore) until end of turn\. (?:The|Its) \1 cost is equal to (?:its|that card's) mana cost\./g, " gains $1 with its mana cost until end of turn.");
   // Confession Dial, Desdemona: "... gains escape until end of turn. The escape cost is equal to its mana cost plus exile
   // three other cards from your graveyard." is one instruction.
   text = text.replace(/ gains escape until end of turn\. The escape cost is equal to its mana cost plus exile (two|three|four|five) other cards from your graveyard\./g, " gains escape with its mana cost and exile $1 other cards until end of turn.");
@@ -3380,36 +3381,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       text,
     };
   }
-  // Planar Genesis: "Look at the top four cards of your library. You may put a land card from among them onto the
-  // battlefield tapped. If you don't, put a card from among them into your hand. Put the rest on the bottom of your library
-  // in a random order." The land, or else any one of the four into your hand; the rest to the bottom.
-  const genesis = /^Look at the top (two|three|four|five) cards of your library\. You may put an? ([a-z]+) card from among them onto the battlefield tapped\. If you don't, put a card from among them into your hand\. Put the rest on the bottom of your library in a random order\.$/.exec(text.trim());
-  const genesisFilter = genesis && parseSearchFilter(`${genesis[2]} card`);
-  if (genesis && genesisFilter) {
-    const n = num(genesis[1]!);
-    return {
-      targets: [],
-      effects: [
-        { type: "dig", n, count: 1, upTo: true, filter: genesisFilter, into: "battlefield", tapped: true, rest: "keep", reveal: false },
-        {
-          type: "if",
-          cond: { kind: "digTook" },
-          effects: [{ type: "dig", n: n - 1, count: 0, upTo: true, into: "hand", rest: "bottom", random: true, reveal: false }],
-          otherwise: [{ type: "dig", n, count: 1, upTo: false, required: true, into: "hand", rest: "bottom", random: true, reveal: false }],
-        },
-      ],
-      text,
-    };
-  }
-  // Commodore Guff: "You draw X cards and ~ deals X damage to each opponent, where X is the number of planeswalkers you
-  // control": one X for both instructions.
-  text = text.replace(/(^|\. )You draw X cards and ~ deals X damage to each opponent, where X is ([^.]+)\./, "$1You draw X cards, where X is $2. ~ deals X damage to each opponent, where X is $2.");
-  // Balin, Loremaster: "Draw X cards, where X is the number of cards discarded this way. If you have an enduring story, ~
-  // deals X damage to each opponent.": the same X.
-  text = text.replace(/(^|\. )(Draw X cards), where X is ([^.]+)\. (If [^,.]+, ~ deals X damage to each opponent)\./, "$1$2, where X is $3. $4, where X is $3.");
-  // Descent into Avernus: "Then each player creates X Treasure tokens and ~ deals X damage to each player, where X is the
-  // number of descent counters on ~": the same X for both, which nothing in between changes.
-  text = text.replace(/(^|\. )Then each player creates X ([^.]+?) tokens and ~ deals X damage to each player, where X is ([^.]+)\./, "$1Then each player creates X $2 tokens, where X is $3. ~ deals X damage to each player, where X is $3.");
+  // Whole-text forms (Fblthp, Bounty of Skemfar, Planar Genesis) and rewrites (Arlinn, the Pack's Hope; Contractual
+  // Safeguard; one X for two instructions), in a helper: this function is at TypeScript's control-flow limit.
+  const r303 = wholeTextForms(text, !!opts.selfEntered);
+  if (typeof r303 !== "string") return r303;
+  text = r303;
   // Demonic Counsel: "search your library for any card, put it into your hand": one card, like "a card".
   text = text.replace(/\b([Ss])earch your library for any card, /g, "$1earch your library for a card, ");
   // Gamble: "Search your library for a card, put that card into your hand, discard a card at random, then shuffle." The
@@ -19445,4 +19421,74 @@ function yardCardIs(effects: Effect[], s: string, ctx: Ctx): Effect | null | und
     return !filter || !then ? null : { type: "if", cond: { kind: "movedLinkedIs", filter }, effects: then };
   }
   return undefined;
+}
+
+/** Bounty of Skemfar: "Reveal the top six cards of your library. You may put up to one land card from among them onto the
+ * battlefield tapped and up to one Elf card from among them into your hand. Put the rest on the bottom of your library in a
+ * random order." Two picks from the same six revealed cards: the land first (onto the battlefield tapped), then an Elf card
+ * from the cards still there (into your hand), then the rest to the bottom in a random order (CR 401.4). */
+function landThenCardDig(text: string): AbilityBody | null {
+  const m = /^Reveal the top (four|five|six|seven) cards of your library\. You may put up to one ([a-z]+) card from among them onto the battlefield tapped and up to one ([A-Z][a-z]+) card from among them into your hand\. Put the rest on the bottom of your library in a random order\.$/.exec(text.trim());
+  const first = m && parseSearchFilter(`${m[2]} card`);
+  const second = m && parseSearchFilter(`${m[3]} card`);
+  if (!m || !first || !second) return null;
+  const n = num(m[1]!);
+  const rest = (k: number): Effect => ({ type: "dig", n: k, count: 1, upTo: true, filter: second, into: "hand", rest: "bottom", random: true, reveal: true });
+  return {
+    targets: [],
+    effects: [
+      { type: "dig", n, count: 1, upTo: true, filter: first, into: "battlefield", tapped: true, rest: "keep", reveal: true },
+      { type: "if", cond: { kind: "digTook" }, effects: [rest(n - 1)], otherwise: [rest(n)] },
+    ],
+    text,
+  };
+}
+
+/** Whole-text forms and rewrites, run by parseBodyText before its sentence loop: a body, or the rewritten text. */
+function wholeTextForms(text: string, selfEntered: boolean): AbilityBody | string {
+  // Fblthp, the Lost: "When ~ enters, draw a card. If it entered from your library or was cast from your library, draw two
+  // cards instead." How it entered (rulings: not cast from exile after an effect exiled it from the library).
+  if (selfEntered && /^draw a card\. If it entered from your library or was cast from your library, draw two cards instead\.$/.test(text.trim()))
+    return { targets: [], effects: [{ type: "if", cond: { kind: "selfFromYourLibrary" }, effects: [{ type: "draw", who: { ref: "you" }, n: 2 }], otherwise: [{ type: "draw", who: { ref: "you" }, n: 1 }] }], text };
+  // Arlinn, the Pack's Hope: "Until your next turn, you may cast creature spells as though they had flash, and each
+  // creature you control enters with an additional +1/+1 counter on it.": two effects of the same duration.
+  text = text.replace(/^Until your next turn, (you may cast creature spells as though they had flash), and (each creature you control enters with an additional \+1\/\+1 counter on it)\.$/, "Until your next turn, $1. Until your next turn, $2.");
+  const twoDigs = landThenCardDig(text);
+  if (twoDigs) return twoDigs;
+  // Contractual Safeguard: "Choose a kind of counter on a creature you control. Put a counter of that kind on each other
+  // creature you control." (see the "counterKindToOthers" effect).
+  text = text.replace(/(^|\. )Choose a kind of counter on a creature you control\. Put a counter of that kind on each other creature you control\./, "$1Choose a kind of counter on a creature you control and put a counter of that kind on each other creature you control.");
+  // Planar Genesis: "Look at the top four cards of your library. You may put a land card from among them onto the
+  // battlefield tapped. If you don't, put a card from among them into your hand. Put the rest on the bottom of your library
+  // in a random order." The land, or else any one of the four into your hand; the rest to the bottom.
+  const genesis = /^Look at the top (two|three|four|five) cards of your library\. You may put an? ([a-z]+) card from among them onto the battlefield tapped\. If you don't, put a card from among them into your hand\. Put the rest on the bottom of your library in a random order\.$/.exec(text.trim());
+  const genesisFilter = genesis && parseSearchFilter(`${genesis[2]} card`);
+  if (genesis && genesisFilter) {
+    const n = num(genesis[1]!);
+    return {
+      targets: [],
+      effects: [
+        { type: "dig", n, count: 1, upTo: true, filter: genesisFilter, into: "battlefield", tapped: true, rest: "keep", reveal: false },
+        {
+          type: "if",
+          cond: { kind: "digTook" },
+          effects: [{ type: "dig", n: n - 1, count: 0, upTo: true, into: "hand", rest: "bottom", random: true, reveal: false }],
+          otherwise: [{ type: "dig", n, count: 1, upTo: false, required: true, into: "hand", rest: "bottom", random: true, reveal: false }],
+        },
+      ],
+      text,
+    };
+  }
+  // Commodore Guff: "You draw X cards and ~ deals X damage to each opponent, where X is the number of planeswalkers you
+  // control": one X for both instructions.
+  text = text.replace(/(^|\. )You draw X cards and ~ deals X damage to each opponent, where X is ([^.]+)\./, "$1You draw X cards, where X is $2. ~ deals X damage to each opponent, where X is $2.");
+  // Balin, Loremaster: "Draw X cards, where X is the number of cards discarded this way. If you have an enduring story, ~
+  // deals X damage to each opponent.": the same X.
+  text = text.replace(/(^|\. )(Draw X cards), where X is ([^.]+)\. (If [^,.]+, ~ deals X damage to each opponent)\./, "$1$2, where X is $3. $4, where X is $3.");
+  // Descent into Avernus: "Then each player creates X Treasure tokens and ~ deals X damage to each player, where X is the
+  // number of descent counters on ~": the same X for both, which nothing in between changes.
+  text = text.replace(/(^|\. )Then each player creates X ([^.]+?) tokens and ~ deals X damage to each player, where X is ([^.]+)\./, "$1Then each player creates X $2 tokens, where X is $3. ~ deals X damage to each player, where X is $3.");
+  // The Kenriths' Royal Funeral: "You draw X cards and you lose X life, where X is ...": the same X for both.
+  text = text.replace(/(^|\. )You draw X cards and you lose X life, where X is (the greatest mana value among cards exiled this way)\./, "$1You draw X cards, where X is $2. You lose X life, where X is $2.");
+  return text;
 }

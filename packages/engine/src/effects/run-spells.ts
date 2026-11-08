@@ -586,6 +586,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." },
           turn: s.turn,
           ...(e.cascade ? { cascade: true as const } : {}),
+          ...(e.allTurn ? { allTurn: true as const } : {}),
           ...(e.storm ? { storm: true as const } : {}),
           ...(e.uncounterable ? { uncounterable: true as const } : {}),
           ...(e.fromHand ? { fromHand: true as const } : {}),

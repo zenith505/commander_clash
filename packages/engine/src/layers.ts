@@ -1891,6 +1891,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "attacksIfAble":
       if (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0)) return;
       if (m.combatKey !== undefined && m.combatKey !== s.thatCombat) return;
+      // Trench Behemoth: only in that player's combats, not the one going on as it resolved.
+      if (m.turnOf !== undefined && (m.turnOf !== s.activePlayer || (m.notCombat && m.notCombat.turn === s.turn && m.notCombat.combat === (s.combatsThisTurn ?? 0)))) return;
       c.attacksIfAble = true;
       return;
     case "mustAttackMostLife":

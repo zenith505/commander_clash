@@ -1,7 +1,7 @@
 import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type Effect, type ManaAbility, type Modification, type ObjRef, type PlayerRef, type TargetChoice } from "../abilities";
 import { withPutter } from "../counters";
 import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
-import { addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, draw, endTheCombatPhase, endTheTurn, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
+import { addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, draw, endTheCombatPhase, endTheTurn, enterTogether, inCombatPhase, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
 import { compileCard } from "../oracle";
 import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LANDWALK, SACRIFICED_LANDWALK, landwalkLand, CHOSEN_SNOW_LANDWALK, chosenLandwalk, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, TARGET_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION, CAST_SPELL_COLORS_PROTECTION } from "../keywords";
@@ -1131,6 +1131,10 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
     // "Attacks this combat if able": the combat going on as it resolves.
     m.kind === "attacksIfAble" && m.combat === "this"
       ? { kind: "attacksIfAble", combat: s.combatsThisTurn ?? 0 }
+      : // "Attacks during its controller's next combat phase if able" (Trench Behemoth): that player as it resolves, and not
+        // a combat of theirs going on then (it isn't their next one).
+        m.kind === "attacksIfAble" && m.turnOf === "controller" && affected !== undefined && s.objects[affected]
+        ? { ...m, turnOf: controllerOf(s, s.objects[affected]!), ...(inCombatPhase(s) && s.activePlayer === controllerOf(s, s.objects[affected]!) ? { notCombat: { turn: s.turn, combat: s.combatsThisTurn ?? 0 } } : {}) }
       : // "~ attacks that player this combat if able" (Raving Dead): the player chosen as it resolved, in the combat going on.
         m.kind === "mustAttackPlayer"
         ? { ...m, ...(m.player === "chosen" && s.resolving?.chosen?.player !== undefined ? { player: s.resolving.chosen.player } : {}), ...(m.player === "you" ? { player: ctx.controller } : {}), ...(typeof m.player === "object" && ctx.targets[m.player.target]?.kind === "player" ? { player: (ctx.targets[m.player.target] as { id: PlayerId }).id } : {}), ...(m.combat === "this" ? { combat: s.combatsThisTurn ?? 0 } : {}) }

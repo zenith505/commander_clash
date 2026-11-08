@@ -1018,7 +1018,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "counters": {
       // "For each counter on ~" (Twitching Doll): of every kind.
-      const of = (counters: Record<string, number> | undefined) => (c.counter === ANY_COUNTER ? Object.values(counters ?? {}).reduce((a, b) => a + Math.max(0, b ?? 0), 0) : (counters?.[c.counter] ?? 0));
+      const of = (counters: Record<string, number> | undefined) => (c.kinds ? Object.values(counters ?? {}).filter((v) => (v ?? 0) > 0).length : c.counter === ANY_COUNTER ? Object.values(counters ?? {}).reduce((a, b) => a + Math.max(0, b ?? 0), 0) : (counters?.[c.counter] ?? 0));
       const o = refObjects(s, c.of, ctx)[0];
       if (o?.zone === "battlefield") return of(o.counters);
       // Parting Thoughts: "the number of counters on that creature" after an earlier part of this effect moved the target

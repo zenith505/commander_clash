@@ -1424,7 +1424,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // Lurebound Scarecrow: "permanents of the chosen color", the color chosen for the source; none chosen: never true.
       const filter = cond.filter.chosen ? bindChosen(cond.filter, src.chosen) : cond.filter;
       if (filter.chosen) return false;
-      const whose = cond.who === "defending" ? (src.attacking !== undefined ? [src.attacking] : []) : cond.who === "anyDefending" ? (src.attacking !== undefined ? [src.attacking] : s.turnOrder.filter((p) => p !== s.activePlayer && !s.players[p]!.lost)) : cond.who === "eventPlayer" ? (eventPlayer !== undefined ? [eventPlayer] : []) : cond.who === "attached" ? (src.attachedTo && chars.get(src.attachedTo) ? [chars.get(src.attachedTo)!.controller] : []) : cond.who === "opponent" ? s.turnOrder.filter((p) => p !== you && !s.players[p]!.lost) : [you];
+      const whose = cond.who === "defending" ? (src.attacking !== undefined ? [src.attacking] : []) : cond.who === "anyDefending" ? (src.attacking !== undefined ? [src.attacking] : s.turnOrder.filter((p) => p !== s.activePlayer && !s.players[p]!.lost)) : cond.who === "eventPlayer" ? (eventPlayer !== undefined ? [eventPlayer] : []) : cond.who === "attached" ? (src.attachedTo && chars.get(src.attachedTo) ? [chars.get(src.attachedTo)!.controller] : []) : cond.who === "opponent" ? s.turnOrder.filter((p) => p !== you && !s.players[p]!.lost) : cond.who === "player" ? s.turnOrder.filter((p) => !s.players[p]!.lost) : [you];
       return whose[cond.every ? "every" : "some"]((who) => {
         let n = 0;
         // A face-down permanent has no name (CR 708.2), so it adds none.

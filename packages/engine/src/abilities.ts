@@ -2526,7 +2526,7 @@ export type StaticCondition =
    * "As long as you control three or more artifacts / another Wizard / no untapped lands", "as long as
    * an opponent controls an Island", "as long as defending player controls an artifact".
    */
-  | { kind: "control"; /** "eventPlayer": the trigger's player ("unless they control two or more basic lands", Furnace Punisher). */ who: "you" | "opponent" | "defending" | "eventPlayer" | /** "Activate only during combat and only if defending player controls no snow lands" (Kjeldoran Guard): the player ~ is attacking, or else any one defending player, whom the ability's controller chooses (CR 508.5, 508.5a, 802.2). */ "anyDefending" | /** "Its controller controls no other creatures" (Predator's Gambit): the controller of the permanent the source is attached to; `other` means other than that permanent. */ "attached"; filter: TargetSpec; min?: number; max?: number; other?: boolean; /** "As long as no opponent controls a creature" (Vexing Beetle): every opponent, not any one. */ every?: true; /** "Five other Mountains" after "Whenever a Mountain you control enters" (Valakut): other than the one that entered (rulings). */ otherThanSubject?: true; /** "Lands with different names" (Field of the Dead): each name counted once. */ differentNames?: true; /** "Three or more lands with the same name" (Sceptre of Eternal Glory): the most that share one name. */ sameName?: true; /** "Three or more creatures that share a creature type" (Graxiplon): the most that share one creature type, changelings sharing every one (CR 702.73a). */ sameCreatureType?: true; /** "You control a prime number of lands" (Zimone, All-Questioning): the count is a prime. */ prime?: true }
+  | { kind: "control"; /** "eventPlayer": the trigger's player ("unless they control two or more basic lands", Furnace Punisher). */ who: "you" | "opponent" | "defending" | "eventPlayer" | /** "Activate only during combat and only if defending player controls no snow lands" (Kjeldoran Guard): the player ~ is attacking, or else any one defending player, whom the ability's controller chooses (CR 508.5, 508.5a, 802.2). */ "anyDefending" | /** "If a player controls no creatures" (Sothera, the Supervoid): any player still in the game, you too. */ "player" | /** "Its controller controls no other creatures" (Predator's Gambit): the controller of the permanent the source is attached to; `other` means other than that permanent. */ "attached"; filter: TargetSpec; min?: number; max?: number; other?: boolean; /** "As long as no opponent controls a creature" (Vexing Beetle): every opponent, not any one. */ every?: true; /** "Five other Mountains" after "Whenever a Mountain you control enters" (Valakut): other than the one that entered (rulings). */ otherThanSubject?: true; /** "Lands with different names" (Field of the Dead): each name counted once. */ differentNames?: true; /** "Three or more lands with the same name" (Sceptre of Eternal Glory): the most that share one name. */ sameName?: true; /** "Three or more creatures that share a creature type" (Graxiplon): the most that share one creature type, changelings sharing every one (CR 702.73a). */ sameCreatureType?: true; /** "You control a prime number of lands" (Zimone, All-Questioning): the count is a prime. */ prime?: true }
   /** "If an opponent controls an Island and you control a Mountain" (Mogg Salvage): all of them at once. */
   | { kind: "allOf"; conds: StaticCondition[] }
   /**
@@ -3433,7 +3433,7 @@ export type Effect =
    * `moveTo`: "Move any number of counters from target permanent you control onto a second target permanent you control"
    * (Resourceful Defense): `n` is ignored, up to all of them, each removed and put on that one (CR 122.5).
    */
-  | { type: "removeAnyCounters"; what: ObjRef; n: Amount; upTo?: true; moveTo?: ObjRef; /** "Any number of +1/+1 counters" (Scrounging Bandar): only these kinds. */ kinds?: CounterKind[] }
+  | { type: "removeAnyCounters"; what: ObjRef; n: Amount; upTo?: true; moveTo?: ObjRef; /** "Any number of +1/+1 counters" (Scrounging Bandar): only these kinds. */ kinds?: CounterKind[]; /** With `upTo` and `moveTo`: "Move one or more counters" (Goldberry, River-Daughter): at least one while there's one to move. */ atLeastOne?: true }
   /**
    * Slippery Bogbonder: "Then move any number of counters from among creatures you control onto that creature." Chosen
    * one at a time as it resolves, any kinds, from any of them but `onto` itself (rulings), then moved together (CR 122.5).
@@ -3454,7 +3454,7 @@ export type Effect =
   | { type: "lastKnownCounters"; what: ObjRef; only?: CounterKind }
   /** "Move a +1/+1 counter from ~ onto that creature" (CR 122.5): nothing happens unless both parts can. */
   /** `counter` "any": "move a counter" (Nesting Grounds), of a kind chosen as it resolves (rulings). */
-  | { type: "moveCounter"; counter: CounterKind | "any"; from: ObjRef; to: ObjRef }
+  | { type: "moveCounter"; counter: CounterKind | "any"; from: ObjRef; to: ObjRef; /** Goldberry, River-Daughter: "Move a counter of each kind not on ~ from ... onto ~": with `counter` "any", one of each kind `from` has that `to` has none of as it resolves, all moved together. */ eachKindNotOnTo?: true }
   /** Ichormoon Gauntlet: "choose a counter on target permanent. Put an additional counter of that kind on that permanent." */
   | { type: "counterOfKindOnIt"; what: ObjRef; /** "Choose a counter on target permanent or player. Give that permanent or player another counter of that kind." (Animation Module): this target, which may be a player. */ host?: number; /** "For each kind of counter on target permanent or player, give that permanent or player another counter of that kind" (Maulfist Revolutionary): one of each kind, no choice (rulings). */ eachKind?: true; /** Aven Courier: "choose a counter on a permanent you control. Put a counter of that kind on target permanent you control if it doesn't have a counter of that kind on it": the kind chosen from among those on the permanents its controller controls, as it resolves (rulings), and put on `what` only if it has none of that kind then. */ kindFromYours?: true }
   /** "End the turn." (CR 724.1, Sundial of the Infinite): its last instruction; the rest happens as it finishes resolving. */
@@ -3662,6 +3662,12 @@ export type Effect =
    * layer 2, CR 613.1b).
    */
   | { type: "successionControl" }
+  /**
+   * Aminatou, the Fateshifter: "Choose left or right. Each player gains control of all nonland permanents other than ~
+   * controlled by the next player in the chosen direction.": the direction chosen as it resolves, then each player
+   * takes control of their new permanents at the same time, for as long as each stays (layer 2, CR 613.1b, rulings).
+   */
+  | { type: "rotateControl" }
   /**
    * The Caves of Androzani: "For each non-Saga permanent, choose a counter on it. You may put an additional counter of that
    * kind on that permanent.": the permanents to get one picked first (any number), then for each with more than one
@@ -7007,6 +7013,8 @@ export interface CompiledCard {
     token?: TokenSpec;
     /** "Instead exile it and put a number of +1/+1 counters equal to that creature's power on ~" (Ravenous Slime). */
     countersPower?: true;
+    /** "Instead exile it and put a hit counter on it" (Ravenloft Adventurer): the card in exile gets one (CR 122.1). */
+    counter?: CounterKind;
     linked?: true;
     /** "Exile it instead. When you do, create a 1/1 green Saproling creature token." (Nemata, Primeval Warden): a reflexive trigger each time this replacement is applied (CR 603.12). */
     reflexive?: AbilityBody;

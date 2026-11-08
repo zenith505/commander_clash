@@ -1784,6 +1784,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const amount = parseCount(`the number of ${m[2]} your opponents control`, null);
     return amount && typeof amount === "object" ? { kind: "amount", amount, min: num(m[1]!) } : null;
   }
+  // Sothera, the Supervoid: "if a player controls no creatures": any one player still in the game, you included.
+  if ((m = /^a player controls no ([a-z]+)s$/.exec(text))) {
+    const c = parseStaticCondition(`you control a ${m[1]}`, st);
+    return c?.kind === "control" && c.who === "you" && !c.other && c.min === 1 && c.max === undefined ? { ...c, who: "player", min: undefined, max: 0 } : null;
+  }
   // Kezzerdrix: "if your opponents control no creatures": none of them controls one, as "no opponent controls a creature".
   if ((m = /^your opponents control no ([a-z]+)s$/.exec(text))) return parseStaticCondition(`no opponent controls a ${m[1]}`, st);
   // Chevill, Bane of Monsters: "if your opponents control no permanents with bounty counters on them": any bounty counter,

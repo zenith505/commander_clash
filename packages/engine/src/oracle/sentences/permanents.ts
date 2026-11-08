@@ -1202,6 +1202,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const to = from && !isGroup(from) ? parseObject((g.to ?? g.to2!).replace(/^a second /i, "another "), ctx) : null;
     return from && to && !isGroup(to) ? [{ type: "moveCounter", counter: g.kind ? counterKind(g.kind) : "any", from, to }] : null;
   }
+  // Goldberry, River-Daughter: "Move a counter of each kind not on ~ from another target permanent you control onto ~".
+  if ((m = /^Move a counter of each kind not on ~ from (another target [^,]+?) onto ~$/.exec(s))) {
+    const from = parseObject(m[1]!, ctx);
+    return from?.ref === "target" && !from.n ? [{ type: "moveCounter", counter: "any", from, to: { ref: "self" }, eachKindNotOnTo: true }] : null;
+  }
   // Cytoplast Root-Kin: "Move a +1/+1 counter from target creature you control onto ~" (with none on it, none moves; ~
   // itself as the target moves nothing, CR 122.5).
   if ((m = new RegExp(`^Move (?:a|one) ${COUNTER} counter from (target [^,]+?) onto ~$`, "i").exec(s))) {

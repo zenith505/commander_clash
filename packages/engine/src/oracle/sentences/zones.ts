@@ -1800,7 +1800,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (/^Put a card exiled with ~ into its owner's graveyard$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard", one: true }];
     // Nautiloid Ship: "put a creature card exiled with ~ onto the battlefield under your control".
     // Chaos Shrine's Black Crystal: "... with a finality counter on it": it enters with it (CR 122.6).
-    if ((m = /^Put a creature card exiled with ~ onto the battlefield under your control( with a finality counter on it)?$/i.exec(s))) return [{ type: "moveLinked", dest: "battlefield", one: true, filter: { kind: "card", types: ["Creature"], text: "creature card" }, ...(m[1] ? { counters: { finality: 1 } } : {}) }];
+    // Sothera, the Supervoid: "with two additional +1/+1 counters on it", as it enters (CR 614.1c), on top of any it would
+    // enter with anyway.
+    if ((m = /^Put a creature card exiled with ~ onto the battlefield under your control( with a finality counter on it| with two additional \+1\/\+1 counters on it)?$/i.exec(s))) return [{ type: "moveLinked", dest: "battlefield", one: true, filter: { kind: "card", types: ["Creature"], text: "creature card" }, ...(m[1] ? { counters: /finality/.test(m[1]) ? { finality: 1 } : { "+1/+1": 2 } } : {}) }];
     // Clone Shell: the controller looks at the top four, exiles one of them face down (one must be exiled, rulings) and puts
     // the rest on the bottom in the order they choose.
     if (/^Exile one of the top four cards of your library face down and put the rest on the bottom of your library in any order$/.test(s)) return [{ type: "exileFaceDown", from: "top", n: 4, pickOne: true, bottomAnyOrder: true }];

@@ -2457,10 +2457,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Nemata, Primeval Warden: "If a creature an opponent controls would die, exile it instead. When you do, create a 1/1
     // green Saproling creature token.": the replacement (CR 614.1a), and a reflexive trigger when it's applied (CR 603.12).
-    const exileWhen = /^If an? (.+?) would die, exile it instead\. When you do, (.+)\.$/.exec(line);
+    // Valentin, Dean of the Vein: "... When you do, you may pay {2}. If you do, create a 1/1 black and green Pest creature
+    // token with "When this token dies, you gain 1 life."": the same, its text ending in a quoted ability.
+    const exileWhen = /^If an? (.+?) would die, exile it instead\. When you do, (.+?)(\.|\.")$/.exec(line);
     if (exileWhen) {
       const filter = parseTargetPhrase(exileWhen[1]!);
-      const body = parseBody(`${capital(exileWhen[2]!)}.`, {});
+      const body = parseBody(`${capital(exileWhen[2]!)}${exileWhen[3]}`, {});
       if (filter?.kind !== "object" || filter.combat || !body || body.targets.length || /\b(?:it|that creature|that card)\b/.test(exileWhen[2]!)) out.unsupported.push(raw);
       else out.exileInsteadOfDying = { filter, reflexive: body };
       continue;
@@ -3029,21 +3031,28 @@ export function compile(d: CardDef): CompiledCard {
     // Superior Spider-Man: "... a copy of any creature card in a graveyard, except ... When you do, exile that card.": a
     // reflexive trigger as it enters as that copy (CR 603.12), exiling the card copied.
     const exileCopied = / When you do, exile that card\.$/.test(line);
+    // Wall of Stolen Identity: "When you do, tap the copied creature and it doesn't untap during its controller's untap
+    // step for as long as you control ~": a reflexive trigger as it enters as that copy (CR 603.12); the lock lasts while
+    // its controller keeps controlling it, never again once it's lost (CR 611.2b, rulings).
+    const tapCopiedRe = / When you do, tap the copied creature and it doesn't untap during its controller's untap step for as long as you control ~\.$/;
+    const tapCopied = tapCopiedRe.test(line);
     // Protean Raider: "Raid — If you attacked this turn, you may have ~ enter as a copy of any creature on the battlefield":
     // the option only exists if you attacked with a creature this turn, as it enters (rulings).
     const raidClone = /^If you attacked this turn, you may have ~ enter as a copy of any creature on the battlefield\.$/.test(line);
     const cloneLine = raidClone ? line.replace(/^If you attacked this turn, you/, "You") : line;
-    const clone = /^(?:You may have ~ enter( tapped)? as|As ~ enters, you may have it become) a copy of (?:any |an? )?(.+?)( until end of turn)?(?:, except (.+?))?\.?$/.exec(cloneLine.replace(/ When you do, exile that card\.$/, ""));
+    const clone = /^(?:You may have ~ enter( tapped)? as|As ~ enters, you may have it become) a copy of (?:any |an? )?(.+?)( until end of turn)?(?:, except (.+?))?\.?$/.exec(cloneLine.replace(/ When you do, exile that card\.$/, "").replace(tapCopiedRe, ""));
     if (clone) clone.splice(1, 1);
     const cloneTapped = /^You may have ~ enter tapped as/.test(line) ? { tapped: true as const } : {};
     // "You may have this creature enter as a copy of any creature card in a graveyard, except ..." (Lazotep Convert), "You
     // may have ~ enter tapped as a copy of any land card in a graveyard, except it's a Cave ..." (Echoing Deeps): a card in
     // any graveyard, by its printed characteristics.
-    const fromYard = clone && !clone[2] ? /^(creature|land) card in a graveyard$/.exec(clone[1]!) : null;
-    if (clone && fromYard) {
+    // Activated Sleeper: "any creature card in a graveyard that was put there from the battlefield this turn": a card that
+    // died or was otherwise put there from the battlefield this turn, whoever's it is.
+    const fromYard = clone && !clone[2] ? /^(creature|land) card in a graveyard( that was put there from the battlefield this turn)?$/.exec(clone[1]!) : null;
+    if (clone && fromYard && !tapCopied) {
       const except = clone[3] ? parseCopyExcept(clone[3]) : undefined;
       if (except !== null && !except?.thisAbility) {
-        out.entersAsCopy = { filter: { kind: "card", types: [fromYard[1] === "land" ? "Land" : "Creature"], text: clone[1]! }, ...(except ? { except } : {}), ...cloneTapped, ...(exileCopied ? { exileCopied: true as const } : {}) };
+        out.entersAsCopy = { filter: { kind: "card", types: [fromYard[1] === "land" ? "Land" : "Creature"], ...(fromYard[2] ? { fromBattlefieldThisTurn: true as const } : {}), text: clone[1]! }, ...(except ? { except } : {}), ...cloneTapped, ...(exileCopied ? { exileCopied: true as const } : {}) };
         continue;
       }
     }
@@ -3063,7 +3072,7 @@ export function compile(d: CardDef): CompiledCard {
       const ifEmbalmed = clone[3] === "if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" ? { noManaCost: true, colors: ["W" as const], addSubtypes: ["Zombie"] } : undefined;
       const except = others ? { text: others } : ifEmbalmed ? undefined : clone[3] ? parseCopyExcept(clone[3]) : undefined;
       if (filter?.kind === "object" && except !== null && !except?.thisAbility) {
-        out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}), ...(ifEmbalmed ? { ifEmbalmed } : {}), ...(clone[2] ? { untilEndOfTurn: true } : {}), ...cloneTapped, ...(raidClone ? { ifAttacked: true as const } : {}) };
+        out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}), ...(ifEmbalmed ? { ifEmbalmed } : {}), ...(clone[2] ? { untilEndOfTurn: true } : {}), ...cloneTapped, ...(raidClone ? { ifAttacked: true as const } : {}), ...(tapCopied ? { tapCopied: true as const } : {}) };
         continue;
       }
     }

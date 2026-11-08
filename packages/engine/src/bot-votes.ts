@@ -139,6 +139,17 @@ function effectsValue(s: GameState, pid: PlayerId, controller: PlayerId, es: Eff
         for (const p of e.owners ? livingPlayers(s) : [controller]) to([p], player(s, p).graveyard.filter((id) => defOf(s, obj(s, id)).typeLine.includes("Creature")).length * 3);
         break;
       }
+      // Split Decision: countering the target spell costs its controller the spell; a copy is a spell for the vote's
+      // controller (and the original still resolves).
+      case "counterSpell":
+      case "copySpell": {
+        const t = s.resolving?.item.targets?.[e.type === "counterSpell" ? e.index : typeof e.spell === "object" && "target" in e.spell ? e.spell.target : -1];
+        const item = t?.kind === "stack" ? s.stack.find((x) => x.id === t.id) : undefined;
+        if (!item) break;
+        const worthIt = 3 + (item.objectId ? defMv(defOf(s, obj(s, item.objectId))) : 0);
+        to([e.type === "counterSpell" ? item.controller : controller], e.type === "counterSpell" ? -worthIt : worthIt);
+        break;
+      }
       case "counters":
         if ("what" in e && e.what.ref === "self") to([controller], n(e.n));
         else v += groupValue(s, pid, { targets: [], effects: [e], text: "" }) ?? 0;

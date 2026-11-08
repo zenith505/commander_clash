@@ -1586,7 +1586,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
 /** What a permanent entering "as a copy of" something could copy: other permanents on the battlefield (not targeted). */
 export function copyCandidates(s: GameState, o: GameObject, filter: TargetSpec): ObjectId[] {
   // A card in a graveyard (Lazotep Convert): by its printed characteristics there.
-  if (filter.kind === "card") return livingPlayers(s).flatMap((pid) => player(s, pid).graveyard.filter((id) => id !== o.id && printedMatches(filter, defOf(s, obj(s, id)))));
+  // Activated Sleeper: only one put there from the battlefield this turn.
+  if (filter.kind === "card") return livingPlayers(s).flatMap((pid) => player(s, pid).graveyard.filter((id) => id !== o.id && printedMatches(filter, defOf(s, obj(s, id))) && (!filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn)));
   // Mockingbird's "with mana value less than or equal to the amount of mana spent to cast ~": the spell it was.
   const bound = filter.bound ? bindBound(s, filter, { controller: controllerOf(s, o), sourceId: o.id, manaSpent: o.manaSpent ?? 0 }) : filter;
   return s.battlefield.filter((id) => id !== o.id && objectMatches(s, bound, obj(s, id), controllerOf(s, o), false));
@@ -1648,6 +1649,12 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     // Superior Spider-Man: "When you do, exile that card" (CR 603.12): that card, if it's still the same object then.
     if (own.exileCopied && target.zone === "graveyard")
       s.triggerQueue.push({ sourceId: o.id, sourceCardId: cardIdOf(o), controller: o.controller, index: -1, subject: { id: target.id, zc: target.zoneChanges ?? 0 }, body: { targets: [], effects: [{ type: "exile", what: { ref: "subjectCard", zone: "graveyard" } }], text: "When you do, exile that card." } });
+    // Wall of Stolen Identity: "When you do, tap the copied creature and it doesn't untap during its controller's untap step
+    // for as long as you control ~" (CR 603.12): the copied permanent while it's that object; the lock lasts while this
+    // trigger's controller controls this permanent (CR 611.2b), so none if it left or changed control before it resolves
+    // (rulings: it's still tapped then).
+    if (own.tapCopied && target.zone === "battlefield")
+      s.triggerQueue.push({ sourceId: o.id, sourceCardId: cardIdOf(o), controller: o.controller, index: -1, subject: { id: target.id, zc: target.zoneChanges ?? 0 }, body: { targets: [], effects: [{ type: "tap", what: { ref: "subject" } }, { type: "continuous", what: { ref: "subject" }, mods: [{ kind: "doesntUntap" }], duration: "whileControlled" }], text: "When you do, tap the copied creature and it doesn't untap during its controller's untap step for as long as you control ~." } });
     // Spark Double: "an additional +1/+1 counter on it if it's a creature", judged as the copy (rulings).
     const more = copyEnterCounters(own.except, (type) => objIsType(s, o, type), opts.x ?? 0, controllerOf(s, target) === o.controller);
     if (Object.keys(more).length) {

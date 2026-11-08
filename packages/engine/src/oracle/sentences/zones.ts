@@ -51,6 +51,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // any face-up one (rulings), not only one cast as an Adventure; chosen after seeing their hand, none too.
   if (/^[Pp]ut a card that has an Adventure that player owns from exile into that player's graveyard$/.test(s0) && ctx.lastPlayerTarget !== undefined) return [{ type: "processExile", n: 1, adventureOf: { ref: "target", index: ctx.lastPlayerTarget } }];
   let m: RegExpExecArray | null;
+  // Cybership: "put the top two cards of that player's library onto the battlefield face down under your control. They're
+  // 2/2 Cyberman artifact creatures." (one instruction, see wholeTextForms): face down as nameless, colorless 2/2 Cyberman
+  // artifact creatures (FaceDownKind "cyberman", CR 708.2a, rulings), lands too; their owner is still that player.
+  if ((m = new RegExp(`^Put the top ${NUM} cards of (that player's) library onto the battlefield under your control as face-down 2/2 Cyberman artifact creatures$`, "i").exec(s0))) {
+    const library = parsePlayer(m[2]!.replace(/'s$/, ""), ctx);
+    const n = num(m[1]!);
+    return library && library.ref !== "you" && n > 0 ? [{ type: "dig", n, count: n, upTo: false, required: true, into: "cyberman", rest: "graveyard", reveal: false, library }] : null;
+  }
   // Not Forgotten: "Put target card from a graveyard on your choice of the top or bottom of its owner's library": chosen as
   // it resolves by its controller (rulings).
   if ((m = /^[Pp]ut (target card from a graveyard) on your choice of the top or bottom of its owner's library$/.exec(s0))) {
@@ -366,7 +374,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (/^Put all commanders from the command zone onto the battlefield under your control$/.test(s)) return [{ type: "commandersOntoBattlefield" }];
   // "Manifest the top card of that player's library" (Orochi Soul-Reaver): their card, onto the battlefield face down under
   // your control (CR 701.40a); its owner is still that player.
-  if ((m = /^Manifest the top card of (that player's) library$/i.exec(s))) {
+  // Thieving Amalgam: "At the beginning of each opponent's upkeep, you manifest the top card of that player's library": the
+  // same, that player the one whose upkeep it is.
+  if ((m = /^(?:you )?Manifest the top card of (that player's) library$/i.exec(s))) {
     const library = parsePlayer(m[1]!.replace(/'s$/, ""), ctx);
     return library && library.ref !== "you" ? [{ type: "dig", n: 1, count: 1, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false, library }] : null;
   }

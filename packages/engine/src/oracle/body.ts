@@ -1673,6 +1673,13 @@ function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell
   const fixedTo = /^[Cc]hoose a player$/.test(s) ? /^That player adds ((?:\{[WUBRGC]\})+)\.?$/.exec(sentences[si + 1] ?? "") : null;
   if (fixedTo && ctx.activated && sentences.length === si + 2 && !ctx.chosenOpponent && !ctx.eventPlayer && ctx.lastPlayerTarget === undefined)
     return { effects: [{ type: "choosePlayer", prompt: `to add ${fixedTo[1]}` }, { type: "addMana", mana: fixedTo[1]!, who: { ref: "chosenPlayer", nth: 0 } }], skip: 1 };
+  // Deepfathom Echo: "~ explores. Then you may have it become a copy of another creature you control until end of turn."
+  // The creature it copies is chosen as this resolves, not targeted, any other creature you control then (none: it stays
+  // itself); a copy of its copiable values (CR 707.2), over at end of turn, so it has no such trigger until then (rulings).
+  if (!spell && /^(?:Then y|Y)ou may have it become a copy of another creature you control until end of turn$/.test(s) && before[before.length - 1]?.type === "explore") {
+    const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", notSource: true, text: "another creature you control" };
+    return { effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, upTo: true, action: "choose", prompt: "click another creature you control for ~ to become a copy of until end of turn, then choose it (or choose none)." }, { type: "becomeCopy", what: { ref: "self" }, of: { ref: "created" }, duration: "endOfTurn" }], skip: 0 };
+  }
   // Cytoshape: "Choose a nonlegendary creature on the battlefield. Target creature becomes a copy of that creature until end
   // of turn." Polymorphous Rush: "Any number of target creatures you control each become a copy of that creature until end of
   // turn." Only the creatures becoming copies are targeted; the one copied is chosen as it resolves, anyone's, a target too
@@ -18993,6 +19000,10 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
   // from it and exile that card. ... as the exiled card" (Pick the Brain): what the sentence just read exiled.
   ctx.exiledTarget = last?.type === "exile" && last.what.ref === "target" && !last.what.n ? last.what.index : undefined;
   ctx.exiledFromHand = last?.type === "takeFromHand" && last.action === "exile" && last.n === undefined && !last.until;
+  // God-Pharaoh's Gift: "you may exile a creature card from your graveyard. If you do, create a token that's a copy of that
+  // card": the one card exiled, while it's still that card in exile (ObjRef chosenFromYard, CR 400.7).
+  const yardExile = last?.type === "may" && !last.pay && last.effects.length === 1 ? last.effects[0] : last;
+  if (yardExile?.type === "chooseFromGraveyard" && yardExile.dest === "exile" && yardExile.n === 1 && !yardExile.who && !yardExile.chooser && !yardExile.nAmount) ctx.chosenFromYard = true;
   // "Create a 2/2 red Mutant creature token. It gains haste until end of turn. Destroy it at the beginning of the next end
   // step" (Old Hob): an instruction about the tokens just created leaves "it" meaning them.
   if (last && "what" in last && (last.what as ObjRef).ref === "created" && (ctx.lastCreated || ctx.lastCreatedAny)) return;
@@ -19660,6 +19671,14 @@ function wholeTextForms(text: string, selfEntered: boolean): AbilityBody | strin
   // Arlinn, the Pack's Hope: "Until your next turn, you may cast creature spells as though they had flash, and each
   // creature you control enters with an additional +1/+1 counter on it.": two effects of the same duration.
   text = text.replace(/^Until your next turn, (you may cast creature spells as though they had flash), and (each creature you control enters with an additional \+1\/\+1 counter on it)\.$/, "Until your next turn, $1. Until your next turn, $2.");
+  // Split Decision: "Choose target instant or sorcery spell. Starting with you, each player votes for denial or
+  // duplication. If denial gets more votes, counter the spell. If duplication gets more votes or the vote is tied, copy
+  // the spell. You may choose new targets for the copy." One target, chosen as it's cast (CR 115.1, 601.2c), the vote as
+  // it resolves (CR 701.38a); "the spell" is that target both times.
+  text = text.replace(/^Choose target (instant or sorcery spell)\. (Starting with you, each player votes for ([a-z]+) or ([a-z]+)\.) If \3 gets more votes, counter the spell\. If \4 gets more votes or the vote is tied, copy the spell\./, "$2 If $3 gets more votes, counter target $1. If $4 gets more votes or the vote is tied, copy that spell.");
+  // Cybership: "put the top two cards of that player's library onto the battlefield face down under your control. They're
+  // 2/2 Cyberman artifact creatures." One instruction: they enter that way (sentences/zones.ts).
+  text = text.replace(/^([Pp]ut the top [a-z]+ cards of that player's library) onto the battlefield face down under your control\. They're 2\/2 Cyberman artifact creatures\.$/, "$1 onto the battlefield under your control as face-down 2/2 Cyberman artifact creatures.");
   // Wargling: "until end of turn, ~ gets +1/+0 and creatures you control gain trample": two effects of the same duration,
   // the group fixed as it resolves either way (CR 611.2c).
   text = text.replace(/^[Uu]ntil end of turn, (~ gets [+-]\d+\/[+-]\d+) and (creatures you control gain [a-z]+)\.$/, (_, a: string, b: string) => `${a.charAt(0).toUpperCase()}${a.slice(1)} until end of turn. ${b.charAt(0).toUpperCase()}${b.slice(1)} until end of turn.`);

@@ -1569,6 +1569,20 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Molten Sentry: "As ~ enters, flip a coin. If the coin comes up heads, ~ enters as a 5/2 creature with haste. If it
+    // comes up tails, ~ enters as a 2/5 creature with defender.": the same two forms, the coin picking one (CR 705.2: heads
+    // or tails, no one wins or loses), part of its copiable values (CR 707.2); a creature entering as a copy of it flips
+    // for itself, one becoming a copy of it later takes what it is (rulings).
+    const flipForms = /^As ~ enters, flip a coin\. If the coin comes up heads, ~ enters as (an? \d+\/\d+ creature with [a-z]+)\. If it comes up tails, ~ enters as (an? \d+\/\d+ creature with [a-z]+)\.$/.exec(line);
+    if (flipForms) {
+      const parsed = [flipForms[1]!, flipForms[2]!].map((t) => /^an? (\d+)\/(\d+) creature with (flying|vigilance|defender|reach|trample|haste|deathtouch|lifelink)$/.exec(t));
+      if (out.entersForms || parsed.some((f) => !f)) out.unsupported.push(raw);
+      else {
+        out.entersForms = parsed.map((f) => ({ except: { pt: [Number(f![1]), Number(f![2])] as [number, number], keywords: [capital(f![3]!)] }, text: f![0] }));
+        out.entersFormsFlip = true;
+      }
+      continue;
+    }
     const selfExtra = new RegExp(`^~ enters with (an|a|one|two|three) additional ${COUNTER} counters? on it\\.$`).exec(line);
     if (selfExtra) {
       (out.entersWithAdditional ??= []).push({ counter: counterKind(selfExtra[2]!), n: /^an?$/.test(selfExtra[1]!) ? 1 : num(selfExtra[1]!) });
@@ -6406,6 +6420,15 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     const act = parseActivated(line);
+    // Bullseye, Death Dealer: "{3}, {T}, Sacrifice an artifact or discard a nonland card: ...", Tidal Control's "Pay 2 life
+    // or {2}: ...": one ability whose last cost is a choice of two, made as it's activated (CR 602.2b, 601.2b), compiled
+    // as one ability per cost, the same choice from the menu (as The Shards above).
+    const either = !act || act === "fail" ? eitherLastCost(line) : null;
+    const eitherActs = either?.map((l) => parseActivated(l));
+    if (eitherActs?.every((a) => a && a !== "fail")) {
+      for (const a of eitherActs) out.activated.push(bindThisAbility(a as ActivatedAbility, line));
+      continue;
+    }
     if (act) {
       // "Sacrifice six creatures named ~" (Shadowborn Apostle): this card's name; a copy has it too (CR 707.2).
       if (act !== "fail") for (const [i, c] of (act.costs ?? []).entries()) if (c.kind === "sacrifice" && c.filter.named === "~") act.costs![i] = { ...c, filter: { ...c.filter, named: d.name, text: c.filter.text.replace(/~/g, d.name) } };
@@ -6708,6 +6731,20 @@ function wantedSpent(out: CompiledCard): SpentReq[] {
  * "Becomes a copy of ..., except it has this ability": the copy gets this ability's own text (CR 707.9a), which
  * refers to itself with "~" like any rules text, so the copy's own name takes its place.
  */
+/**
+ * "[costs, ]A or B: effect", A and B each a whole cost (a mana cost, or one starting with its verb: "Sacrifice an artifact
+ * or discard a nonland card"): the two activated abilities' lines, one with each. Null for other lines ("Sacrifice an
+ * artifact or creature" is one cost).
+ */
+function eitherLastCost(line: string): [string, string] | null {
+  const first = "(?:Sacrifice|Discard|Pay|Exile|Tap|Return|Remove|Put)\\b";
+  const then = "(?:sacrifice|discard|pay|exile|tap|return|remove|put)\\b";
+  const m = new RegExp(`^((?:[^:"]+?, )?)((?:${first}|\\{)[^:",]*?) or ((?:${then}|\\{)[^:",]*?): ([^]+)$`).exec(line);
+  if (!m) return null;
+  const second = m[3]!.charAt(0).toUpperCase() + m[3]!.slice(1);
+  return [`${m[1]}${m[2]}: ${m[4]}`, `${m[1]}${second}: ${m[4]}`];
+}
+
 function bindThisAbility<T extends object>(ability: T, line: string): T {
   const visit = (v: unknown): void => {
     if (Array.isArray(v)) return v.forEach(visit);

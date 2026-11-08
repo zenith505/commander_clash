@@ -322,7 +322,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const orYard = !!s.resolving?.scratch?.payDiff;
       // Join forces: the amount was ours to choose (payX), so pay it.
       const joining = !!s.resolving?.scratch?.join;
-      const ok = !!taps && (orLose || orYard || joining || (player(s, pid).life > life + 5 && wantsMay(s, pid)));
+      // Tester of the Tangential, Isareth the Awakener: the X we chose (above) was the decision.
+      const ownX = !!paidXReflexive(s) && s.resolving?.scratch?.payX !== undefined && s.resolving.scratch.payX !== "none";
+      const ok = !!taps && (orLose || orYard || joining || ownX || (player(s, pid).life > life + 5 && wantsMay(s, pid)));
       return ok ? [...taps!, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
     }
     // Clash (CR 701.30a): keep a card we'd like to draw on top, put the rest on the bottom.
@@ -1401,6 +1403,28 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const n = joinForcesAmount(s, pid, Math.max(...nums));
         return [{ type: "chooseOption", player: pid, choice: n > 0 ? String(n) : "none" }];
       }
+      const reflexive = paidXReflexive(s);
+      const self = s.resolving?.item.sourceId ? s.objects[s.resolving.item.sourceId] : undefined;
+      if (reflexive) {
+        // Tester of the Tangential: "move X +1/+1 counters from ~ onto another target creature": as many as it has, when
+        // we have another creature to take them.
+        const move = allEffects(reflexive.effects).find((x) => x.type === "removeAnyCounters" && x.moveN && x.what.ref === "self");
+        if (move?.type === "removeAnyCounters") {
+          const have = self ? (move.kinds ?? []).reduce((a, k) => a + Math.max(0, self.counters[k] ?? 0), 0) : 0;
+          const other = s.battlefield.some((b) => b !== self?.id && controllerOf(s, obj(s, b)) === pid && objIsType(s, obj(s, b), "Creature"));
+          const n = Math.min(have, Math.max(...nums));
+          return [{ type: "chooseOption", player: pid, choice: other && n > 0 && nums.includes(n) ? String(n) : "none" }];
+        }
+        // Isareth the Awakener: "return target creature card with mana value X from your graveyard": X is the mana value of
+        // the best such card we can pay for.
+        const spec = reflexive.targets.find((t) => t.kind === "card" && t.xRange?.key === "manaValue" && t.xRange.at === "exact");
+        if (spec) {
+          const { xRange: _, ...rest } = spec;
+          const cards = player(s, pid).graveyard.filter((id) => nums.includes(mv(s, id)) && printedMatches(rest, defOf(s, obj(s, id))));
+          const best = chooseSearch(s, pid, cards, 1)[0];
+          return [{ type: "chooseOption", player: pid, choice: best ? String(mv(s, best)) : "none" }];
+        }
+      }
       const draws = s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "draw");
       const most = Math.max(...nums.filter((n) => !draws || n < player(s, pid).library.length - 1), -1);
       return [{ type: "chooseOption", player: pid, choice: most > 0 ? String(most) : "none" }];
@@ -2146,6 +2170,17 @@ function chooseBottom(s: GameState, pid: PlayerId, count: number): string[] {
 }
 
 const mv = (s: GameState, id: string) => defMv(defOf(s, obj(s, id)));
+
+/**
+ * The reflexive ability of a resolving "you may pay {X}. When you do, ..." whose X bots choose for what it does: Tester of
+ * the Tangential's "move X +1/+1 counters from ~", Isareth the Awakener's "target creature card with mana value X".
+ */
+function paidXReflexive(s: GameState): AbilityBody | undefined {
+  const r = s.resolving && allEffects(s.resolving.body.effects).flatMap((x) => (x.type === "may" && x.payX && !x.payX.times && !x.payX.color ? x.effects : [])).find((x) => x.type === "reflexive");
+  if (r?.type !== "reflexive") return undefined;
+  const b = r.body;
+  return allEffects(b.effects).some((x) => x.type === "removeAnyCounters" && x.moveN && x.what.ref === "self") || b.targets.some((t) => t.kind === "card" && t.xRange?.key === "manaValue" && t.xRange.at === "exact" && t.owner === "you") ? b : undefined;
+}
 
 /** Ward costs of the opponents' permanents among these targets (each permanent once). */
 export function wardCosts(s: GameState, pid: PlayerId, targets: TargetChoice[]): string[] {

@@ -2050,7 +2050,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           // "Take none" says it's optional; "up to" only reads well with a number.
           // "Any number of ... with total mana value 4 or less" (Ao, the Dawn Sky): the total is the limit.
           const what = e.totalMv !== undefined && (count >= 99 || max > 1) ? `${count >= 99 ? "any number of" : `up to ${count}`} ${kind.replace(/\bcard\b/, "cards")}` : e.oneOfEach ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
-          const to = e.landsOnto ? "(lands onto the battlefield tapped, the others into your hand)" : e.into === "hand" ? "into your hand" : e.into === "graveyard" ? `into ${from === pid ? "your" : `${player(s, from).name}'s`} graveyard` : e.into === "exile" ? `into exile${e.playFree ? " (you may cast it this turn without paying its mana cost)" : e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : from === pid ? "back on top of your library" : `back on top of ${player(s, from).name}'s library`;
+          const to = e.landsOnto ? "(lands onto the battlefield tapped, the others into your hand)" : e.into === "hand" ? "into your hand" : e.into === "graveyard" ? `into ${from === pid ? "your" : `${player(s, from).name}'s`} graveyard` : e.into === "exile" ? `into exile${e.playFree ? " (you may cast it this turn without paying its mana cost)" : e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : e.into === "cyberman" ? "onto the battlefield face down (2/2 Cyberman artifact creature)" : from === pid ? "back on top of your library" : `back on top of ${player(s, from).name}'s library`;
           const rest = e.rest === "graveyard" ? (from === pid ? "into your graveyard" : `into ${player(s, from).name}'s graveyard`) : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "exile" ? "into exile" : e.rest === "keep" ? "left on top for now" : from !== pid ? `on the bottom of ${player(s, from).name}'s library` : "on the bottom of your library";
           // Guided Passage: another player picks, for `p` (an opponent you chose, so the cards that help you least).
           const chooser = e.chooser ? players(s, e.chooser, ctx).find((x) => !player(s, x).lost) : undefined;
@@ -2074,7 +2074,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         }
       }
       const names = (ids: ObjectId[]) => ids.map((id) => defOf(s, obj(s, id)).name).join(", ");
-      const faceDown = e.into === "manifest" || e.into === "cloak" ? e.into : undefined;
+      const faceDown = e.into === "manifest" || e.into === "cloak" || e.into === "cyberman" ? e.into : undefined;
       // The Key to the Vault: the exiled card cast (or not) as this resolves, after the rest went to the bottom (CR 608.2g).
       const castExiled = (): "paused" | undefined => {
         if (!e.castFree || sc.castingTarget !== undefined) return;
@@ -2130,7 +2130,8 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         sc.arranged = undefined;
       }
       const rest = looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library");
-      if (found.length && faceDown) log(s, `${p.name} ${faceDown}s ${found.length === 1 ? "a card" : `${found.length} cards`}: ${found.length === 1 ? "a" : "each a"} face-down 2/2 creature${faceDown === "cloak" ? " with ward {2}" : ""}.`);
+      if (found.length && faceDown === "cyberman") log(s, `${p.name} puts ${found.length === 1 ? "a card" : `${found.length} cards`} from the top of ${from === p.id ? "their" : `${player(s, from).name}'s`} library onto the battlefield face down: ${found.length === 1 ? "a" : "each a"} 2/2 Cyberman artifact creature.`);
+      else if (found.length && faceDown) log(s, `${p.name} ${faceDown}s ${found.length === 1 ? "a card" : `${found.length} cards`}: ${found.length === 1 ? "a" : "each a"} face-down 2/2 creature${faceDown === "cloak" ? " with ward {2}" : ""}.`);
       else if (found.length && e.into === "exile") log(s, `${p.name} exiles ${names(found)}${e.playFree ? " and may cast it this turn without paying its mana cost" : e.play ? " and may play it this turn" : ""}.`);
       else if (found.length && e.into === "graveyard") log(s, `${p.name} puts ${names(found)} into ${from === pid ? "their" : `${player(s, from).name}'s`} graveyard.`);
       else if (found.length && !e.landsOnto) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);

@@ -1,7 +1,7 @@
 # Roadmap
 
-30,540 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,716 of
+30,557 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,724 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2363,6 +2363,30 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 309 took cards back off the "Out after round N" lists, most played first: "You may have ~ enter as a copy of any
+   creature on the battlefield, except it's a Wall in addition to its other types and has defender. When you do, tap the
+   copied creature and it doesn't untap during its controller's untap step for as long as you control ~" (Wall of Stolen
+   Identity: a reflexive trigger, CR 603.12; the lock ends for good once you lose control of it, CR 611.2b, rulings; a bot
+   copies an opponent's creature; a browser test); "any creature card in a graveyard that was put there from the
+   battlefield this turn, except it's a Phyrexian" (Activated Sleeper); "If a nontoken creature an opponent controls would
+   die, exile it instead. When you do, you may pay {2}. If you do, create a 1/1 ... Pest creature token with "..."" (Valentin,
+   Dean of the Vein: Nemata's template, its text ending in a quoted ability); "At the beginning of each opponent's upkeep,
+   you manifest the top card of that player's library" (Thieving Amalgam, Orochi Soul-Reaver's manifest); "Choose target
+   instant or sorcery spell. Starting with you, each player votes for denial or duplication. If denial gets more votes,
+   counter the spell. If duplication gets more votes or the vote is tied, copy the spell" (Split Decision: one target,
+   CR 701.38a; bots weigh the spell's mana value and whose it is); "put the top two cards of that player's library onto
+   the battlefield face down under your control. They're 2/2 Cyberman artifact creatures" (Cybership: dig `into`
+   "cyberman", lands too, CR 708.2a); "you may exile a creature card from your graveyard. If you do, create a token that's
+   a copy of that card, except it's a 4/4 black Zombie" (God-Pharaoh's Gift: the card exiled is ObjRef chosenFromYard,
+   copied as printed, rulings); "~ explores. Then you may have it become a copy of another creature you control until end
+   of turn" (Deepfathom Echo: chosen as it resolves, not targeted, its counters still count, rulings; a browser test). +8,
+   30,548 of 31,936 on main after B147 (30,557 with B148).
+   Out after round 309 (looked at, not done): Jinnie Fay, Jetmir's Second, Mirrormind Crown, Moonlit Meditation and Esix,
+   Fractal Bloom (still the optional token replacement: "you may instead create ..." needs a choice that can pause token
+   creation, which about a dozen effects do without pausing today); Spectral Searchlight and Radiant Lotus (mana for
+   another player, chosen inside a mana ability); Filigree Vector (still two "any number of target" groups in one
+   ability); Breathkeeper Seraph (a granted "you may return it ... at the beginning of your next upkeep", whose "your" is
+   the paired creature's controller); Espers to Magicite (a reflexive target among the cards exiled this way).
    Round 308 took cards back off the "Out after round N" lists, most played first: "For each opponent, choose up to one
    target creature that player controls. ~ deals X damage to each of those creatures. You create a Mutagen token for
    each creature dealt damage this way" (Shellshock: Count damagedThisWayCount, none with X 0); "Ward—Collect evidence 4"

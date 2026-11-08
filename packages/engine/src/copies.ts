@@ -125,7 +125,11 @@ function excepted<T extends Pick<CardDef, "name" | "supertypes" | "types" | "sub
   const name = except.name ?? base.name;
   // "~" in an added ability is the copy itself (CR 707.9a).
   // A copy whose exception sets its colors doesn't copy a characteristic-defining ability for them (CR 707.9d): "~ is all colors".
-  const own = except.colors ? base.oracleText.split("\n").filter((l) => !/ is all colors\./.test(l)).join("\n") : base.oracleText;
+  // So does one whose exception sets its power and toughness, for theirs (Soul Separator's rulings: a copy of Sage of
+  // Ancient Lore is still 1/1).
+  const esc = base.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const ptCda = new RegExp(`^(?:${esc}|This creature|This Vehicle)'s (?:power|toughness)\\b[^.]* (?:is|are each) equal to `);
+  const own = base.oracleText.split("\n").filter((l) => !(except.colors && / is all colors\./.test(l)) && !(except.pt && ptCda.test(l))).join("\n");
   const lacks = !except.unlessHas || (!(base.keywords ?? []).includes(except.unlessHas) && !new RegExp(`^${except.unlessHas}\\b`, "mi").test(base.oracleText));
   const text = [own, ...(except.keywords?.length ? [except.keywords.join(", ")] : []), ...(lacks ? (except.text ?? []) : []).map((x) => x.replace(/~/g, name))].filter(Boolean).join("\n");
   const typeLine = `${[...supertypes, ...types].join(" ")}${subtypes.length ? ` — ${subtypes.join(" ")}` : ""}`;

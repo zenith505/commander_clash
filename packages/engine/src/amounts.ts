@@ -374,6 +374,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const types = new Set((ctx.event?.group ?? []).flatMap((g) => (s.objects[g.id] ? defOf(s, s.objects[g.id]!).types : [])));
       return types.size;
     }
+    case "sacrificedTotalPower":
+      return (ctx.sacrificed ?? []).reduce((n, l) => n + (l.power ?? 0), 0);
     case "totalPowerOf":
       return refObjects(s, c.of, ctx).filter((o) => o.zone === "battlefield").reduce((n, o) => n + (view(o)?.power ?? 0), 0);
     case "lifeLostThisWay":

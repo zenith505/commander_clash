@@ -980,7 +980,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // spell), remembered by the delayed trigger as its event player (CR 603.7), at the next end step to begin.
     if (ctx.eventPlayer && when === "nextEndStep" && refs.size === 0 && /^[Tt]hat player draws /.test(m[1]!) && allEffects(inner).every((y) => y.type === "draw" && y.who.ref === "eventPlayer"))
       return [{ type: "delayed", when, effects: inner, text: m[1]!, event: { player: { ref: "eventPlayer" } } }];
-    if (!players || refs.size !== 1 || when === "yourNextUpkeep") return null;
+    // Cycle of Life: "At the beginning of your next upkeep, put a +1/+1 counter on that creature": about the target as it is
+    // now (CR 603.7c), at the next upkeep of this ability's controller to begin.
+    if (!players || refs.size !== 1 || (when === "yourNextUpkeep" && !refs.has("target"))) return null;
     const [ref] = refs;
     // "Target creature you control gets +2/+2 until end of turn. Return it to its owner's hand at the beginning of the next
     // end step" (Dragon Mask), "Sacrifice those creatures ..." (Tears of Rage, Wake the Dead), "Exile that token ..."

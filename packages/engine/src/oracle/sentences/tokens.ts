@@ -119,6 +119,10 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Create a black Spirit creature token. Its power is equal to that creature's power and its toughness is equal to that
   // creature's toughness" (body.ts joins them): fixed as it's created, from that creature as it last existed on the
   // battlefield (rulings on Broken Visage, Kalitas) or that card as it last existed in the graveyard (Ritual of the Returned).
+  // Soul Separator: "Create a black Zombie creature token with power equal to that card's power and toughness equal to
+  // that card's toughness": the same, written out.
+  if ((m = /^([Cc]reate a) ([a-z]+ [A-Z][a-z]+ creature token) with power equal to (that card|that creature)'s power and toughness equal to \3's toughness$/.exec(s)))
+    return parseSentence(`${m[1]} 0/0 ${m[2]} with power and toughness equal to ${m[3]}'s`, ctx);
   if ((m = /^([Cc]reate a 0\/0 (?:[a-z]+ [A-Z][a-z]+ creature token|colorless [A-Z][a-z]+ artifact creature token named [A-Z][a-z]+ that's attacking)) with power and toughness equal to (that creature|that card|~)'s$/.exec(s))) {
     const fx = parseSentence(m[1]!, ctx);
     const tok = fx?.length === 1 ? fx[0] : undefined;

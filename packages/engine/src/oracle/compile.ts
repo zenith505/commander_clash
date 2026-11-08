@@ -570,6 +570,10 @@ export function compile(d: CardDef): CompiledCard {
       // Howl of the Hunt: "When ~ enters, if enchanted creature is a Wolf or Werewolf, untap that creature": the enchanted
       // creature the condition is about.
       .replace(/^(When ~ enters, if enchanted creature is an? [A-Z][a-z]+(?: or [A-Z][a-z]+)?), untap that creature\.$/m, "$1, untap enchanted creature.")
+      // Earthbind: "if enchanted creature has flying, ~ deals 2 damage to that creature and ~ gains "Enchanted creature
+      // loses flying."": the damage to the enchanted creature, then the Aura gains a static ability for as long as it's this
+      // object (CR 400.7), with the timestamp of its gaining it (CR 613.7a), so flying gained later still applies (rulings).
+      .replace(/^(When ~ enters, if enchanted creature has flying, ~ deals \d+ damage to) that creature and (~ gains "Enchanted creature loses flying\.")$/m, "$1 enchanted creature. $2")
       // Arcades Sabboth: "Each untapped creature you control gets +0/+2 as long as it's not attacking": each creature you
       // control while it's untapped and not attacking, itself too (rulings), checked continuously (CR 611.3a).
       .replace(/^Each untapped creature you control gets ([+-]\d+\/[+-]\d+) as long as it's not attacking\.$/m, "Each untapped nonattacking creature you control gets $1.")
@@ -4515,6 +4519,25 @@ export function compile(d: CardDef): CompiledCard {
     const untapInstead = new RegExp(`^If a permanent with an? ${COUNTER} counter on it would untap during its controller's untap step, remove all \\1 counters from it instead\\.$`).exec(line);
     if (untapInstead) {
       out.untapRemovesCounters = counterKind(untapInstead[1]!);
+      continue;
+    }
+    // Circling Vultures: "You may discard ~ any time you could cast an instant." (CR 116.2e): a special action, so not an
+    // activated ability (rulings: Pithing Needle doesn't stop it).
+    if (line === "You may discard ~ any time you could cast an instant.") {
+      out.discardAnyTime = true;
+      continue;
+    }
+    // Rasputin Dreamweaver: "~ can't have more than seven dream counters on it" (CR 122.4, 704.5r).
+    const maxCounters = new RegExp(`^~ can't have more than ${NUM} ${COUNTER} counters on it\\.$`).exec(line);
+    if (maxCounters && !/^[+-]/.test(maxCounters[2]!)) {
+      (out.maxCounters ??= []).push({ counter: counterKind(maxCounters[2]!), n: num(maxCounters[1]!) as number });
+      continue;
+    }
+    // Bewitching Leechcraft's granted "If ~ would untap during your untap step, remove a +1/+1 counter from it instead. If you
+    // do, untap it.": a replacement effect on that creature's untapping in its controller's untap step (CR 614.1a, 502.3);
+    // with no counter to remove it doesn't untap. Each instance counts (see untapStep in game.ts).
+    if (line === "If ~ would untap during your untap step, remove a +1/+1 counter from it instead. If you do, untap it.") {
+      out.untapRemovesOwnCounter = 1;
       continue;
     }
     if (line === "Skip your draw step.") {

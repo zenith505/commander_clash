@@ -1275,6 +1275,13 @@ export function parseTargetPhrase(
     target?: true;
   } = {},
 ): TargetSpec | null {
+  // Cycle of Life: "target creature you cast this turn": one that entered this turn as a spell you cast, not one put onto
+  // the battlefield by an effect (rulings), whoever controls it now.
+  const castYou = /^((?:target )?creature) you cast this turn$/i.exec(phrase.trim());
+  if (castYou) {
+    const rest = parseTargetPhrase(castYou[1]!, opts);
+    return rest?.kind === "object" ? { ...rest, castByYouThisTurn: true, text: "target creature you cast this turn" } : null;
+  }
   // Regicide: "creature that's one or more of the colors chosen as you drafted cards named ~": no colors were chosen
   // without a draft, so nothing fits (TargetSpec.drafted, oracle/draft.ts).
   const drafted = /^(.+?) that's one or more of the colors chosen as you drafted cards named ~$/.exec(phrase);
@@ -1481,6 +1488,15 @@ export function parseTargetPhrase(
   if (adv) {
     const rest = parseTargetPhrase(`${adv[1] ?? ""}${adv[2]}${adv[3]}`, opts);
     return rest?.kind === "card" && !rest.many ? { ...rest, hasAdventure: true, text: `target ${phrase.trim().replace(/^target /i, "")}` } : null;
+  }
+  // Break the Ice: "target land that is snow or could produce {C}": a snow land, or one whose mana abilities could make {C}
+  // (CR 106.7; even one that couldn't be activated now, rulings).
+  const snowOr = /^((?:target |each )?land) that is snow or could produce \{([WUBRGC])\}$/i.exec(phrase.trim());
+  if (snowOr) {
+    const rest = parseTargetPhrase(snowOr[1]!, opts);
+    if (rest?.kind !== "object") return null;
+    const base = { kind: "object" as const, types: [], text: "" };
+    return { ...rest, anyOf: [{ ...base, supertypes: ["Snow"], text: "snow" }, { ...base, couldProduce: snowOr[2]! as "W" | "U" | "B" | "R" | "G" | "C", text: `could produce {${snowOr[2]}}` }], text: phrase.trim().toLowerCase().replace("{c}", "{C}") };
   }
   // Magewright's Stone: "creature that has an activated ability with {T} in its cost", printed or granted (rulings).
   const tapAb = / that has an activated ability with \{T\} in its cost$/.exec(phrase.trim());

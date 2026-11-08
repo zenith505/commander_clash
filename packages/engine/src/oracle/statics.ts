@@ -975,6 +975,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   let m: RegExpExecArray | null;
   // Hazoret, Godseeker: "~ can't attack or block unless you have max speed" (CR 702.179e: speed 4).
   if (text === "you have max speed") return { kind: "maxSpeed" };
+  // Rasputin Dreamweaver: "if ~ started the turn untapped": as the turn began, before anything untapped (rulings: an
+  // intervening "if", CR 603.4).
+  if (text === "~ started the turn untapped") return { kind: "self", is: "startedTurnUntapped" };
   // Chandra, Fire of Kaladesh: "If ~ has dealt 3 or more damage this turn": all the damage this object dealt this turn,
   // to anything, under any controller (TurnLog.sourceDamage, by the object it is now, CR 400.7).
   if ((m = new RegExp(`^~ has dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "selfDealtDamageThisTurn", n: num(m[1]!) };
@@ -1827,6 +1830,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "control", who: "you", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, min: num(m[1] ?? m[2]!), sameCreatureType: true };
   // Maze's Mantle: "if enchanted creature has toxic": any toxic N (CR 702.164a).
   if (text === "enchanted creature has toxic") return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], toxic: true, text: "creature with toxic" } };
+  // Earthbind: "if enchanted creature has flying": the keyword as it is now (as the trigger resolves too, CR 603.4).
+  if ((m = /^enchanted creature has (flying|first strike|trample|haste|reach|vigilance|deathtouch|lifelink|menace|defender)$/.exec(text)))
+    return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], keywords: [capital(m[1]!)], text: `creature with ${m[1]}` } };
   // Bride's Gown: "an Equipment named Groom's Finery is attached to a creature you control": whoever controls that
   // Equipment, "you" the controller of the source (rulings).
   if ((m = /^an Equipment named (.+) is attached to a creature you control$/.exec(text)))

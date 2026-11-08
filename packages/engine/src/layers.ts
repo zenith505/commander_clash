@@ -1363,6 +1363,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         const lk = sourceZc !== undefined && (src.zoneChanges ?? 0) !== sourceZc ? s.lastKnown?.[sourceId] : undefined;
         return (lk && lk.zc === sourceZc ? !!lk.tapped : src.tapped) === (cond.is === "tapped");
       }
+      if (cond.is === "startedTurnUntapped") return src.zone === "battlefield" && !!s.turnLog?.startedUntapped?.includes(`${src.id}@${src.zoneChanges ?? 0}`);
       if (cond.is === "devoured") return (src.devoured ?? 0) > 0;
       if (cond.is === "monstrous") return !!src.monstrous; // CR 701.37b
       if (cond.is === "renowned") return !!src.renowned; // CR 702.112b

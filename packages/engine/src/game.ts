@@ -9,7 +9,7 @@ import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layo
 import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
-import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
+import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
@@ -18,7 +18,7 @@ import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTarg
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
-import { canAttachTo } from "./effects/run-permanents";
+import { canAttachTo, turnFaceDown } from "./effects/run-permanents";
 import { rollDice } from "./effects/run-dice";
 import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
@@ -96,7 +96,7 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
     turnOrder: setup.map((_, i) => i),
     players: [],
     objects: {},
-    cards: { [FACE_DOWN.oracleId]: FACE_DOWN, [FACE_DOWN_WARD.oracleId]: FACE_DOWN_WARD, [FACE_DOWN_FOREST.oracleId]: FACE_DOWN_FOREST, [FACE_DOWN_CYBERMAN.oracleId]: FACE_DOWN_CYBERMAN },
+    cards: { [FACE_DOWN.oracleId]: FACE_DOWN, [FACE_DOWN_WARD.oracleId]: FACE_DOWN_WARD, [FACE_DOWN_FOREST.oracleId]: FACE_DOWN_FOREST, [FACE_DOWN_CYBERMAN.oracleId]: FACE_DOWN_CYBERMAN, [FACE_DOWN_HORROR.oracleId]: FACE_DOWN_HORROR },
     battlefield: [],
     stack: [],
     triggerQueue: [],
@@ -1528,6 +1528,15 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   }
   // "This creature enters prepared" (CR 722.3a): the copy of its prepare spell is created as it enters (722.3c).
   if (printed.entersPrepared) becomePrepared(s, o);
+  // Ixidron: every other nontoken creature already on the battlefield turns face down as it enters (rulings: there's never
+  // a moment it's on the battlefield with them face up, so "whenever another creature enters" abilities of theirs don't
+  // see it; one entering at the same time stays face up). A face-down one stays as it is (rulings), and a double-faced
+  // one can't be turned face down (CR 712.16): turnFaceDown checks both. Each may be turned face up for its morph or
+  // disguise cost, if it has one (CR 702.37e).
+  if (printed.entersTurnOthersFaceDown) {
+    const name = defOf(s, o).name;
+    for (const other of s.battlefield.filter((x) => x !== id && s.objects[x] && !s.objects[x]!.isToken && objIsType(s, s.objects[x]!, "Creature"))) turnFaceDown(s, obj(s, other), "morph", name);
+  }
   // Heightened Awareness: "As ~ enters, discard your hand" (CR 614.1c), before what its entering triggers.
   if (printed.entersDiscardHand) discardCards(s, controllerOf(s, o), [...player(s, controllerOf(s, o)).hand]);
   // Urborg Lhurgoyf: "mill three cards for each time it was kicked", as it enters (rulings: it doesn't use the stack).
@@ -5876,7 +5885,10 @@ export function castProblem(
   // (its targets chosen, the cast is all announced: compile requires a target).
   const beholdFlashCost = compileCard(d).flashIfKicked ? compileCard(d).kicker?.extraCosts?.[0] : undefined;
   const beholdFlash = beholdFlashCost?.kind === "reveal" && (!!choices?.kicks?.includes(0) || (!targets && !!s.objects[id] && beholdCandidates(s, pid, s.objects[id]!, beholdFlashCost).length > 0));
-  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || beholdFlash || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid));
+  // Tegwyll's Scouring: begun as though it had flash when there are enough creatures to tap (CR 601.3c), then only with them
+  // tapped (castSpell treats kicks left out as none).
+  const tapFlash = beholdFlashCost?.kind === "tap" && (!!choices?.kicks?.includes(0) || (choices?.kicks === undefined && !!s.objects[id] && tapCostCandidates(s, pid, s.objects[id]!, beholdFlashCost).length >= beholdFlashCost.n));
+  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || beholdFlash || tapFlash || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid));
   // Offering (CR 702.48a): with a permanent sacrificed for it; before its costs are chosen, when there's one to sacrifice.
   const offered = !!compileCard(d).offering && (choices ? choices.offering !== undefined : offeringCandidates(s, pid, id).length > 0);
   if (!free && !instantSpeed && !offered && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
@@ -6938,7 +6950,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const or = compileCard(d).costOr;
   if (or && choices.costOr === undefined) throw new RulesError(`choose how to pay ${d.name}'s additional cost: ${or.map((x) => x.text).join(" or ")}`);
   const specs = withSplices({ targets: spellTargets(s, id, modes, undefined, castHow(choices)), effects: [], text: "" }, splicedBodies(s, choices.splice)).targets;
-  const problem = castProblem(s, p.id, id, specs.length ? (targets ?? []) : undefined, spell?.modal ? modes : undefined, convoke, improvise, x, choices);
+  // Tegwyll's Scouring: cast as though it had flash only with its tapping paid (kicks left out are none).
+  const problem = castProblem(s, p.id, id, specs.length ? (targets ?? []) : undefined, spell?.modal ? modes : undefined, convoke, improvise, x, compileCard(d).flashIfKicked && choices.kicks === undefined ? { ...choices, kicks: [] } : choices);
   if (problem) throw new RulesError(problem);
   // What pays a cost beyond mana (which creatures are sacrificed, which cards discarded) is chosen as it's cast (CR
   // 601.2h): a cast that doesn't say can't skip the cost. As for abilities (activateAbility).
@@ -9890,6 +9903,7 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   if (pend.totalMv !== undefined && found.reduce((n, id) => n + defMv(defOf(s, obj(s, id))), 0) > pend.totalMv) throw new RulesError(`choose cards with total mana value ${pend.totalMv} or less`);
   if (pend.shareLandType && !shareLandType(found.map((id) => defOf(s, obj(s, id)))))
     throw new RulesError("choose cards that share a land type");
+  if (pend.oneName && found.some((id) => !sameName(defOf(s, obj(s, id)).name, defOf(s, obj(s, found[0]!)).name))) throw new RulesError("choose cards with the same name");
   if (pend.oneOfEach && !oneOfEachFits(pend.oneOfEach, found.map((id) => defOf(s, obj(s, id)))))
     throw new RulesError(`find one card for each: ${pend.oneOfEach.map((f) => f.text).join(", ")}`);
   r.scratch = { ...r.scratch, found };

@@ -1,7 +1,7 @@
 # Roadmap
 
-30,492 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,692 of
+30,508 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,705 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2363,6 +2363,53 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 306 took cards back off the "Out after round N" lists, most played first: "Each opponent separates the creatures
+   they control into two piles. For each opponent, you choose one of their piles. Each opponent sacrifices the creatures
+   in their chosen pile" (Make an Example: each separates their own in turn order, CR 101.4, then all the chosen piles
+   are sacrificed at once; "their chosen pile" is the one you chose, rulings; a browser test); "Separate all creatures
+   target player controls into two piles. Destroy all creatures in the pile of that player's choice. They can't be
+   regenerated" (Do or Die, CR 700.3: creatures only, a "Destroy pile" button, a browser test); "For each player, exile
+   up to one target nonland permanent that player controls. For each permanent exiled this way, its controller cloaks
+   the top card of their library" (Unexplained Absence, CR 701.58a); "Target opponent chooses a creature they control.
+   You gain control of it" and "Choose a creature you control. Each other creature you control becomes a copy of that
+   creature until end of turn" (Sakashima's Will: not targeted, the creature gained by the first mode can be the one
+   copied when both are chosen, rulings; a browser test); "Target creature's owner shuffles it into their library, then
+   faces a villainous choice — They lose 5 life, or they shuffle another creature they own into their library" (This
+   Is How It Ends: any creature they own, whoever controls it; bots don't take a life loss that would lose them the
+   game, CR 104.3b; a browser test); "Create a 0/0 ... Thopter ..., then put a +1/+1 counter on it for each card put
+   into your graveyard this way" after the piles (Intrude on the Mind); "As ~ enters, turn all other nontoken creatures
+   face down" (Ixidron: before it's on the battlefield, so their "another creature enters" abilities don't see it, and
+   not the ones entering with it, rulings; each can be turned face up for its morph cost, CR 702.37e); "turn any number
+   of target tapped nontoken creatures face down. They're 2/2 Horror creatures" (Illithid Harvester, FaceDownKind
+   "horror", CR 708.2a). +8, 30,491 of 31,936 (30,499 with B144).
+   Out after round 306 (looked at, not done): Bend or Break (each player separates their lands, and an opponent of each
+   player's choice picks the pile: a chooser chosen per player); Fight or Flight and Stand or Fall (piles that limit
+   which creatures can attack or block this turn); Midnight Crusader Shuttle (a creature gained until end of turn that's
+   tapped and attacking that player); Genesis of the Daleks's chapter IV (the total power of Daleks that died this
+   turn); Hot Pursuit (still out, as noted before). Bot gap: a bot casts Ixidron even when it turns more of its own
+   creatures face down than its opponents'.
+   Round 305 took cards back off the "Out after round N" lists, most played first: "Eminence — Whenever another nontoken
+   Wizard you control enters, if ~ is in the command zone or on the battlefield, you may pay {1}. If you do, create a
+   token that's a copy of that Wizard. The token gains haste" (Inalla, Archmage Ritualist); "Whenever a Dragon you
+   control dies while this card is in your graveyard, you may pay {1}{B}" (Boneyard Scourge: not when it dies at the
+   same time as the Dragon, since it wasn't in the graveyard yet, rulings, CR 603.10a); "Whenever one or more cards
+   leave your graveyard, you may create a 1/1 ... Insect creature token, then put a number of +1/+1 counters on it equal
+   to the greatest mana value among those cards. Do this only once each turn" (Amzu, Swarm's Hunger: declining lets it
+   trigger again, CR 603.2h); "you get {E}, then it gets +X/+X ..., where X is the amount of {E} you have" and
+   "Reconfigure—Pay {2} or {E}{E}{E}" (Razorfield Ripper: four reconfigure abilities, a browser test); "target
+   enchantment deals damage equal to its mana value to its controller unless that player sacrifices it" (Enchanter's
+   Bane: that player chooses, itself a legal target, a browser test); "you may pay {3} and sacrifice it. If you do,
+   choose a land you control. Then search your library for up to two basic land cards which have the same name as the
+   chosen land" (Canoptek Wraith: the found cards share one name, a land you control's, the picker dims the others, a
+   browser test); "You may cast ~ as though it had flash by tapping three untapped creatures you control with flying in
+   addition to paying its other costs" (Tegwyll's Scouring: an optional additional cost, CR 601.2b, 601.3c, a browser
+   test); "Whenever a red source you control deals damage to one or more permanents and/or players" (The Red Terror:
+   once for each source in each batch of damage, CR 603.2c). +8, 30,491 of 31,936 with B142 to B144.
+   Out after round 305 (looked at, not done): Spell Queller (casting the exiled card when it leaves: needs the exiled
+   card linked to its leaves trigger); Karplusan Minotaur ("any target of an opponent's choice" in a triggered ability
+   with a coin flip cumulative upkeep); Toggo, Goblin Weaponsmith (a named Equipment token granting an ability with a
+   sacrifice of that token); Jace, Architect of Thought (a delayed "until your next turn, whenever a creature an opponent
+   controls attacks" and a search of every player's library).
    Round 304 took cards back off the "Out after round N" lists, most played first: "Choose a creature card and/or a land
    card from among them" with "If X is 5 or more, instead put the chosen cards onto the battlefield or into your hand"
    (Green Sun's Twilight: at least one if there is one, both the same way, rulings; a browser test); "If X is 5 or more,
@@ -6670,7 +6717,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creatures you control to tap this combat if ~ is untapped" (CR 508.1f), checked as attackers are declared. Bots pay to
   untap their best creatures (on their own upkeep with half their lands at most), cast Yare and Blaze only on their own
   creature while attacked, block every attacker with a Blazed creature, and keep Johan back when two other creatures can
-  attack. Browser tests for the pay-to-untap picker. +9 (30,492 of 31,936 with B144).
+  attack. Browser tests for the pay-to-untap picker. +9 (30,508 of 31,936 with rounds 305 and 306).
 - Out after round B144 (looked at, not done): Merseine ("pay enchanted creature's mana cost" as a cost, activated only
   by that creature's controller), Yare (done in round B145) and Blaze of Glory (done in round B145) ("target creature defending player controls" on a spell, with
   several defending players, CR 508.5a), North Star (mana spent as though any type for one spell), Lumbering Laundry

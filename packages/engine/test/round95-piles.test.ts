@@ -39,8 +39,8 @@ const pickOpp = (s: GameState, opp: PlayerId) => (s.pending?.kind === "chooseOpt
 describe("two piles (CR 700.3)", () => {
   it("parse", () => {
     for (const d of [fof, augury, epiphany, uthuun, unesh, clearSkies] as CardDef[]) expect(isFullySupported(d), d.name).toBe(true);
-    // Its other sentence counts the cards put into the graveyard this way: not done, so it stays out.
-    expect(isFullySupported(intrude)).toBe(false);
+    // Its other sentence counts the cards put into the graveyard this way: done in round 306 (test/round306.test.ts).
+    expect(isFullySupported(intrude)).toBe(true);
     expect(compileCard(clearSkies).triggers.find((x) => x.body.effects[0]?.type === "piles")?.body.effects[0]).toMatchObject({ type: "piles", n: { count: { kind: "basicLandTypes" } } });
   });
 

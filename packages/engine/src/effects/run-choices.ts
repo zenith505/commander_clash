@@ -1358,7 +1358,7 @@ function lifeOnly(o: PunisherOption): o is { pay: UnlessPays } {
 /** What a punisher's option reads as on its button: "Discard a card", "Sacrifice a nonland permanent", "Pay {2}". */
 export function punisherLabel(o: PunisherOption): string {
   if ("discard" in o) return o.filter ? `Discard ${o.discard === 1 ? (/^[aeiou]/i.test(o.filter.text) ? "an" : "a") : o.discard} ${o.filter.text}` : o.discard === 1 ? "Discard a card" : `Discard ${o.discard} cards`;
-  if ("sacrifice" in o) return (o.n ?? 1) > 1 ? `Sacrifice ${o.n} ${o.sacrifice.text.replace(/\b(creature|land|artifact|permanent)\b/, "$1s")}` : `Sacrifice ${o.sacrifice.sourceHost ? "the" : /^[aeiou]/i.test(o.sacrifice.text) ? "an" : "a"} ${o.sacrifice.text}`;
+  if ("sacrifice" in o) return (o.n ?? 1) > 1 ? `Sacrifice ${o.n} ${o.sacrifice.text.replace(/\b(creature|land|artifact|permanent)\b/, "$1s")}` : `Sacrifice ${o.sacrifice.sourceHost || o.sacrifice.objectId !== undefined || o.sacrifice.targetObject !== undefined ? "the" : /^[aeiou]/i.test(o.sacrifice.text) ? "an" : "a"} ${o.sacrifice.text}`;
   if ("damage" in o) return `Be dealt ${o.damage} damage`;
   if ("allow" in o) return o.allow;
   if ("halfLife" in o) return `Pay half your life, rounded ${o.halfLife}`;
@@ -1405,7 +1405,8 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
     // A lone "unless pays life equal to ..." (Essence Vortex) stays with paidUnless, which counts it as it asks.
     const chosen = !!e.mode || e.options.length > 1;
     // Archfiend of Spite: "sacrifice that many permanents": that many as the choices start.
-    const options = e.options.map((o) => ("damage" in o && typeof o.damage !== "number" ? { damage: amountNow(s, o.damage, ctx) } : "sacrifice" in o && o.nAmount !== undefined ? { sacrifice: o.sacrifice, n: Math.max(1, amountNow(s, o.nAmount, ctx)) } : chosen && lifeOnly(o) ? { pay: { cost: "", life: Math.max(0, amountNow(s, o.pay.lifeAmount!, ctx)) } } : o));
+    // Enchanter's Bane: "sacrifices it": only that target, as it is now (nothing to sacrifice if it's gone).
+    const options = e.options.map((o) => ("sacrifice" in o && o.sacrifice.targetObject !== undefined ? { ...o, sacrifice: (({ targetObject: i, ...r }) => ({ ...r, objectId: objects(s, { ref: "target", index: i! }, ctx)[0]?.id ?? "" }))(o.sacrifice) } : "damage" in o && typeof o.damage !== "number" ? { damage: amountNow(s, o.damage, ctx) } : "sacrifice" in o && o.nAmount !== undefined ? { sacrifice: o.sacrifice, n: Math.max(1, amountNow(s, o.nAmount, ctx)) } : chosen && lifeOnly(o) ? { pay: { cost: "", life: Math.max(0, amountNow(s, o.pay.lifeAmount!, ctx)) } } : o));
     const doomed = e.effects.length === 1 && e.effects[0]!.type === "destroy" ? objects(s, e.effects[0]!.what, ctx)[0]?.id : undefined;
     // For the bots: damage counted as the choices start (Osseous Sticktwister's "equal to its power", Craig Boone's counters).
     const dmg = e.effects.length === 1 && e.effects[0]!.type === "damage" ? e.effects[0]! : undefined;
@@ -1417,7 +1418,7 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
     sc.punish = { queue: apnap(s, players(s, e.who, ctx)), picked: {}, made: {}, round: 0, times, picks, options, ...punisherHarm(e), ...(dmgN !== undefined && !hurt ? { lose: dmgN } : {}), ...(loseN !== undefined ? { lose: loseN } : {}), ...(hurt && dmg?.type === "damage" ? { hurts: { id: hurt.id, n: dmgN ?? (typeof dmg.amount === "number" ? dmg.amount : 0) }, lose: undefined } : {}), ...(doomed ? { destroys: doomed } : {}), ...(e.mode ? { mode: e.mode } : {}) };
   }
   const fixLife = (o: PunisherOption) => (!!e.mode || e.options.length > 1) && lifeOnly(o);
-  if (e.options.some((o) => ("damage" in o && typeof o.damage !== "number") || ("sacrifice" in o && o.nAmount !== undefined) || fixLife(o))) e = { ...e, options: e.options.map((o, i) => ("damage" in o || ("sacrifice" in o && o.nAmount !== undefined) || fixLife(o) ? sc.punish!.options[i]! : o)) };
+  if (e.options.some((o) => ("damage" in o && typeof o.damage !== "number") || ("sacrifice" in o && (o.nAmount !== undefined || o.sacrifice.targetObject !== undefined)) || fixLife(o))) e = { ...e, options: e.options.map((o, i) => ("damage" in o || ("sacrifice" in o && (o.nAmount !== undefined || o.sacrifice.targetObject !== undefined)) || fixLife(o) ? sc.punish!.options[i]! : o)) };
   // "A permanent of their choice that shares a card type with it" (Braids): the types of what was sacrificed this way.
   if (e.options.some((o) => "sacrifice" in o && o.sacrifice.sharesTypeWithSacrificed)) {
     const types = [...new Set((s.resolving!.sacrificedThisWay ?? []).flatMap((k) => k.types ?? []))];

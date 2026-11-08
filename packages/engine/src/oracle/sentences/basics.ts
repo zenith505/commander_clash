@@ -396,6 +396,19 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || who.ref === "you" || !options) return null;
     return [{ type: "punisher", who, options, effects: [{ type: "loseLife", who: { ref: "punished" }, n: amt(m[2]!) }] }];
   }
+  // Enchanter's Bane: "target enchantment deals damage equal to its mana value to its controller unless that player
+  // sacrifices it": the enchantment's controller as it resolves decides (CR 608.2d); kept, it deals the damage (its mana
+  // value then, CR 202.3), and sacrificed, nothing. It may target Enchanter's Bane itself (rulings).
+  if ((m = /^target (enchantment|artifact|creature) deals damage equal to its mana value to its controller unless that player sacrifices it$/i.exec(s))) {
+    const spec = parseTargetPhrase(m[1]!);
+    if (spec?.kind !== "object") return null;
+    const index = ctx.targets.length;
+    addTarget(ctx, { ...spec, text: `target ${m[1]}` });
+    ctx.lastObjectTarget = index;
+    const it = { ref: "target" as const, index };
+    const damage: Effect = { type: "damage", amount: { count: { kind: "manaValue", of: it } }, to: { ref: "targetController", index }, by: { target: index } };
+    return [{ type: "punisher", who: { ref: "targetController", index }, options: [{ sacrifice: { ...spec, targetObject: index, text: m[1]! } }], effects: [damage], penalty: `Take damage from the ${m[1]} equal to its mana value` }];
+  }
   // Ogre Marauder: "it gains "~ can't be blocked" until end of turn unless defending player sacrifices a creature of their
   // choice": the defending player decides as it resolves (CR 608.2d), and the creature gains the ability only if they don't.
   if ((m = /^(?:it|~) (gains "~ can't be blocked" until end of turn) unless defending player (sacrifices a creature of their choice)$/.exec(s))) {
@@ -2102,5 +2115,7 @@ export function sameNameRef(ref: string, ctx: Ctx): SameNameRef | null {
   // Doubling Chant (as parseBody joins its two sentences): one card for each creature you control.
   if (ref === "each creature you control") return { permanents: { kind: "object", types: ["Creature"], text: "creature you control" }, each: true };
   if (ref === "a card in your graveyard") return { yourGraveyard: true };
+  // Canoptek Wraith (rewritten in triggers.ts): "the chosen land", a land you control chosen as it resolves.
+  if (ref === "a land you control") return { permanents: { kind: "object", types: ["Land"], text: "land you control" } };
   return null;
 }

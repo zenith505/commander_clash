@@ -80,6 +80,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(fu[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "turnFaceDown", what, as: "cyberman" }] : null;
   }
+  // Illithid Harvester (joined by parseBody): each target a nameless, colorless 2/2 Horror creature (rulings); a
+  // double-faced one can't be turned face down (rulings, CR 712.16).
+  if ((fu = /^[Tt]urn (any number of target tapped nontoken creatures) face down as 2\/2 Horror creatures$/.exec(s))) {
+    const what = parseObject(fu[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "turnFaceDown", what, as: "horror" }] : null;
+  }
   // Wall of Deceit, Mischievous Quanar, Obscuring Aether: "Turn ~ face down" (an activated ability of its own): a 2/2 with
   // no text (CR 708.2a).
   if (/^[Tt]urn ~ face down$/.test(s)) return [{ type: "turnFaceDown", what: { ref: "self" }, as: "morph" }];
@@ -1066,6 +1072,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Riches: "Each opponent chooses a creature they control. You gain control of those creatures.": each opponent in turn
   // order picks one, not targeted (rulings), then control of all of them changes at once, indefinitely.
+  // This Is How It Ends's villainous option: "they shuffle another creature they own into their library": that player
+  // chooses one of the creatures they own (anyone may control it) as it's done, and it's shuffled into their library.
+  if (/^They shuffle another creature they own into their library$/.test(s) && ctx.eventPlayer) {
+    const filter = pickFilter("creature");
+    return filter?.kind === "object" ? [{ type: "pick", who: { ref: "eventPlayer" }, filter: { ...filter, owner: "you", text: "creature they own" }, n: 1, action: "choose", anyController: true }, { type: "shuffleIntoLibrary", what: { ref: "created" } }] : null;
+  }
+  if (/^Target opponent chooses a creature they control and you gain control of it$/.test(s)) {
+    const who = parsePlayer("target opponent", ctx);
+    const filter = pickFilter("creature");
+    return who?.ref === "target" && filter ? [{ type: "pick", who, filter, n: 1, action: "choose" }, { type: "continuous", what: { ref: "created" }, mods: [{ kind: "control" }], duration: "game" }] : null;
+  }
   if (/^Each opponent chooses a creature they control and you gain control of those creatures$/.test(s)) {
     const filter = pickFilter("creature");
     return filter ? [{ type: "pick", who: { ref: "eachOpponent" }, filter, n: 1, action: "choose" }, { type: "continuous", what: { ref: "created" }, mods: [{ kind: "control" }], duration: "game" }] : null;
@@ -2075,6 +2092,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Iteration), "Those tokens gain haste" (Mirror March): keywords with no duration last for as long as it stays on
   // the battlefield (CR 611.2a; a new object after a zone change, CR 400.7).
   // Cocoon: "that creature gains flying", the creature it enchants (locked in as it resolves, CR 611.2c).
+  // Inalla, Archmage Ritualist: "create a token that's a copy of that Wizard. The token gains haste": the token just
+  // created (read as "That token").
+  if (/^The token gains [a-z ,]+$/.test(s)) s = s.replace(/^The token/, "That token");
   if ((m = /^([Tt]arget .+?|It|That token|That creature|That artifact|That [A-Z][a-z]+|They|Those tokens|The token created this way|Enchanted creature) (gains? .+)$/.exec(s)) && !/ until | this turn$/.test(m[2]!)) {
     const what = parseObject(m[1]!, ctx);
     const mods = what && (what.ref === "target" || what.ref === "created" || (what.ref === "attached" && m[1] === "Enchanted creature")) ? parseChanges(m[2]!) : null;

@@ -1804,6 +1804,8 @@ export interface DamageMod {
   counter?: CounterKind;
   /** With op "mill" or "counters" (Szadek, Lord of Secrets): the player the damage would have been dealt to mills that many cards instead. */
   mill?: true;
+  /** With `mill` (Crumbling Sanctuary): that player exiles that many cards from the top of their library instead, not a mill (CR 701.17a). */
+  exileTop?: true;
   n?: number;
   amount?: Amount;
   up?: true;
@@ -1833,6 +1835,8 @@ export interface DamageMod {
   while?: StaticCondition;
   /** "The next time ... would deal damage": the next damage event only (Dark Sphere, Impulsive Maneuvers). */
   nextTime?: true;
+  /** Well-Laid Plans: "... to a creature by another creature if they share a color": only when the source, as it deals the damage, and the permanent it's dealt to share a color, and aren't the same object. */
+  shareColor?: true;
   text: string;
 }
 
@@ -5864,6 +5868,12 @@ export interface TriggeredAbility {
   zone?: "graveyard" | "exile";
   /** For "state": the game state that triggers it, checked whenever state-based actions are (CR 603.8). */
   state?: StaticCondition;
+  /**
+   * For "state": "Whenever a creature has four or more fuse counters on it" (Bomb Squad): a state of each permanent
+   * matching this (CR 603.8), which triggers once for each such permanent (the subject, "it") and not again for that one
+   * until that instance has resolved or left the stack.
+   */
+  stateEach?: TargetSpec;
   /** For "castSpell": who casts it, and what kind of spell ("noncreature spell", "instant or sorcery spell"). */
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
   /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
@@ -7054,6 +7064,8 @@ export interface CompiledCard {
   returnInsteadOfLearn?: true;
   /** Possessed Portal: "If a player would draw a card, that player skips that draw instead" (CR 614.1b). */
   skipsAllDraws?: true;
+  /** Living Conundrum: "If you would draw a card while your library has no cards in it, skip that draw instead" (CR 614.1b): its controller's draws from an empty library. */
+  skipsDrawsFromEmptyLibrary?: true;
   /** Crackling Emergence: "If enchanted land would be destroyed, instead sacrifice ~ and that land gains indestructible until end of turn" (CR 614.1a). */
   sacrificeInsteadOfEnchantedDestroyed?: true;
   exileInsteadOfDying?: {
@@ -7344,6 +7356,16 @@ export interface CompiledCard {
   counterShield?: true | "always" | "perOne";
   /** Bloatfly Swarm's counterShield: then each player gets a rad counter for each +1/+1 counter removed this way. */
   counterShieldRad?: true;
+  /**
+   * Magma Pummeler's counterShield: "When one or more counters are removed from ~ this way, it deals that much damage to
+   * any target", a reflexive trigger (CR 603.12) once for each damage event, "that much" being the counters removed then.
+   */
+  counterShieldReflect?: AbilityBody;
+  /**
+   * Sekki, Seasons' Guide's counterShield ("always"): "and create that many 1/1 colorless Spirit creature tokens": one for
+   * each 1 damage, however many counters it had, also when the damage can't be prevented (rulings).
+   */
+  counterShieldTokens?: TokenSpec;
   /**
    * Phyrexian Hydra: "If damage would be dealt to ~, prevent that damage. Put a -1/-1 counter on ~ for each 1 damage
    * prevented this way." Damage that can't be prevented is dealt as usual, with no counters (rulings).

@@ -235,6 +235,7 @@ export function dealDamage(
     const event = opts.combat ? `${s.turn}:${s.combatsThisTurn ?? 0}:${s.step}` : undefined;
     const has = o.counters["+1/+1"] ?? 0;
     if (abilitiesOf(s, o).counterShield === "always" || has > 0 || (event && o.phantomEvent === event)) {
+      const sameEvent = !!event && o.phantomEvent === event;
       if (has) {
         const off = Math.min(n, has);
         o.counters["+1/+1"] = has - off;
@@ -242,6 +243,14 @@ export function dealDamage(
         invalidateCharacteristics(s);
         log(s, `${off} +1/+1 counter${off === 1 ? " is" : "s are"} removed from ${targetName}.`);
         countersRemoved(s, o, "+1/+1", off);
+        // Magma Pummeler: its reflexive trigger, once for the damage event (CR 603.12): combat damage from several
+        // sources at once (CR 510.2) adds to the one already waiting.
+        const reflect = abilitiesOf(s, o).counterShieldReflect;
+        if (reflect) {
+          const waiting = sameEvent ? s.triggerQueue.find((q) => q.sourceId === o.id && q.index === -1 && q.body?.text === reflect.text && q.sourceZc === (o.zoneChanges ?? 0)) : undefined;
+          if (waiting?.event) waiting.event = { ...waiting.event, amount: (waiting.event.amount ?? 0) + off };
+          else s.triggerQueue.push({ sourceId: o.id, sourceCardId: cardIdOf(o), controller: controllerOf(s, o), index: -1, body: reflect, sourceZc: o.zoneChanges ?? 0, event: { amount: off } });
+        }
         // Bloatfly Swarm: "then give each player a rad counter for each +1/+1 counter removed this way".
         if (abilitiesOf(s, o).counterShieldRad)
           for (const pid of s.turnOrder) {
@@ -249,6 +258,18 @@ export function dealDamage(
             const got = putPlayerCounters(s, pid, "rad", off);
             if (got) log(s, `${s.players[pid]!.name} gets ${got} rad counter${got === 1 ? "" : "s"}.`);
           }
+      }
+      // Sekki, Seasons' Guide: a token for each 1 damage, prevented or not (rulings).
+      const tokens = abilitiesOf(s, o).counterShieldTokens;
+      if (tokens) {
+        const me = controllerOf(s, o);
+        const name = targetName;
+        enterTogether(s, () => {
+          const batch = tokenBatch(s, me, tokens, n);
+          for (let i = 0; i < batch.same; i++) createToken(s, me, tokens);
+          log(s, `${player(s, me).name} creates ${batch.same} ${tokens.name} token${batch.same === 1 ? "" : "s"} (${name}).`);
+          createExtraTokens(s, me, batch.extra);
+        });
       }
       o.phantomEvent = event;
       if (canPreventDamage(s) && !unpreventable(src, !!opts.combat)) {
@@ -477,7 +498,7 @@ type ShieldOp =
   | { kind: "prevent"; to: Rec; n: number; srcName: string; toName: string; rule?: string; src?: DamageSource; card?: string }
   | { kind: "redirect"; to: Rec; shield: string; n: number; srcName: string; fromName: string; toName: string; card: string; rule?: boolean }
   /** A damage amount replacement or a prevention effect that changes the amount (see DamageMod): `from` became `n`. */
-  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** Damage to a player: who. */ player?: PlayerId; /** A "next time" one, used up now. */ once?: string; /** Lichenthrope: the counters put on `id` instead, by `by`. */ counters?: { id: ObjectId; counter: string; by: PlayerId }; /** Kill-Suit Cultist: the creature destroyed instead. */ destroy?: ObjectId ; /** Undead Alchemist, Szadek: `player` mills `from - n` cards instead. */ mill?: true }
+  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** Damage to a player: who. */ player?: PlayerId; /** A "next time" one, used up now. */ once?: string; /** Lichenthrope: the counters put on `id` instead, by `by`. */ counters?: { id: ObjectId; counter: string; by: PlayerId }; /** Kill-Suit Cultist: the creature destroyed instead. */ destroy?: ObjectId ; /** Undead Alchemist, Szadek: `player` mills `from - n` cards instead. */ mill?: true; /** Crumbling Sanctuary: `player` exiles that many from the top of their library instead. */ exileTop?: true }
   /** The Mindskinner's additional effect (CR 615.5): each opponent of `by` mills `n` cards, even if the damage couldn't be prevented (615.12). */
   | { kind: "mill"; by: PlayerId; n: number; card: string; /** `by` mills it themselves (Angel of Suffering). */ self?: true; /** Gloom Surgeon: `by` exiles that many from the top of their library instead (not a mill, CR 701.17a). */ exile?: true }
   /** Khârn the Betrayer's additional effect (CR 615.5): `to` gains control of it, after any prevention. */
@@ -758,6 +779,11 @@ function modApplies(s: GameState, m: LiveMod, e: DamageEvent, preventing: boolea
     }
     if (!ok) return false;
   }
+  // Well-Laid Plans: the source and the creature it's dealt to share a color (CR 105.4), and aren't the same object.
+  if (d.shareColor) {
+    const o = "object" in e.to ? s.objects[e.to.object] : undefined;
+    if (!o || (ref && ref.object === o.id) || !characteristics(s, o).colors.some((c) => e.src.colors.includes(c))) return false;
+  }
   return !d.while || (!!d.from && staticConditionNow(s, d.while, d.from, d.you));
 }
 
@@ -789,6 +815,7 @@ function modLabel(s: GameState, m: LiveMod): string {
     : d.op === "raiseTo" || d.op === "setTo" ? `Make it ${modExtra(s, m)}`
     : d.op === "counters" && d.mill ? `Put that many ${d.counter} counters on ${m.card} and mill that many cards instead`
     : d.op === "counters" ? `Put that many ${d.counter} counters on ${d.to?.self ? "it" : m.card} instead`
+    : d.op === "mill" && d.exileTop ? "Exile that many cards from the top of the library instead"
     : d.op === "mill" ? "Mill that many cards instead"
     : d.op === "destroy" ? "Destroy it instead"
     : "Prevent it";
@@ -1068,7 +1095,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         const before = at[i]!;
         at[i] = modAmount(s, m, before);
         seen[i]!.add(m.key);
-        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}), ...toPlayer(to), ...(m.mod.op === "counters" && m.holder ? { counters: { id: m.holder.id, counter: m.mod.counter!, by: m.mod.you } } : {}), ...(m.mod.op === "destroy" && "object" in to ? { destroy: to.object } : {}), ...(m.mod.mill && "player" in to ? { mill: true as const } : {}) });
+        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}), ...toPlayer(to), ...(m.mod.op === "counters" && m.holder ? { counters: { id: m.holder.id, counter: m.mod.counter!, by: m.mod.you } } : {}), ...(m.mod.op === "destroy" && "object" in to ? { destroy: to.object } : {}), ...(m.mod.mill && "player" in to ? { mill: true as const, ...(m.mod.exileTop ? { exileTop: true as const } : {}) } : {}) });
       }
     };
     // How much of the damage a shield takes from each source's: `pick` chooses one at a time, among the options in the
@@ -1402,11 +1429,18 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
       } else if (op.counters) {
         swapLater.push({ ...op.counters, n: op.from - op.n });
         log(s, `${op.card}: ${op.from} damage from ${op.srcName}${op.mill ? ` to ${op.toName}` : ""} is replaced by ${op.from - op.n} ${op.counters.counter} counter${op.from - op.n === 1 ? "" : "s"}${op.mill ? " and a mill" : ""}.`);
-      } else if (op.mill) log(s, `${op.card}: ${op.from} damage from ${op.srcName} to ${op.toName} is replaced by a mill.`);
+      } else if (op.mill) log(s, `${op.card}: ${op.from} damage from ${op.srcName} to ${op.toName} is replaced by ${op.exileTop ? "exiling cards from the top of the library" : "a mill"}.`);
       else if (op.prevent) log(s, `${op.from - op.n} damage from ${op.srcName} to ${op.toName} is prevented (${op.card}).`);
       else log(s, `${op.card}: ${op.srcName} deals ${op.n} damage to ${op.toName} instead of ${op.from}.`);
       if (op.mill && op.player !== undefined && !player(s, op.player).lost && op.from - op.n > 0) {
         const p = player(s, op.player);
+        if (op.exileTop) {
+          // Crumbling Sanctuary: not a mill (CR 701.17a), so nothing that changes or counts milling applies.
+          const top = p.library.slice(0, op.from - op.n);
+          for (const id of top) moveObject(s, id, "exile");
+          log(s, `${p.name} exiles the top ${top.length === 1 ? "card" : `${top.length} cards`} of their library (${op.card}).`);
+          continue;
+        }
         const n = millCount(s, op.player, op.from - op.n);
         for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard", { milled: true });
         log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"} (${op.card}).`);

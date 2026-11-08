@@ -2430,7 +2430,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (!options.length) return;
         if (options.length > 1) {
           sc.auraAsking = me.id;
-          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "enchant", options: options.map(auraHostKey), labels: auraHostLabels(s, options), prompt: `choose the ${e.host === "anyPermanent" || e.host === "sameController" ? "permanent" : e.host === "sameType" ? "permanent" : "creature"} to attach ${defOf(s, me).name} to` };
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "enchant", options: options.map(auraHostKey), labels: auraHostLabels(s, options), prompt: `choose the ${e.host === "anyPermanent" ? "permanent" : "creature"} to attach ${defOf(s, me).name} to` };
           return "paused";
         }
         hosts[me.id] = auraHostKey(options[0]!);

@@ -3274,7 +3274,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, castOnly: true };
           log(s, `${player(s, ctx.controller).name} may cast ${defOf(s, o).name} this turn.`);
         }
-      if (e.chooser && found.length === 1) s.resolving!.chosenFromYard = { id: found[0]!, zc: obj(s, found[0]!).zoneChanges ?? 0 };
+      // God-Pharaoh's Gift: "you may exile a creature card from your graveyard. If you do, ... that card": the one exiled.
+      if ((e.chooser || (e.dest === "exile" && e.n === 1)) && found.length === 1) s.resolving!.chosenFromYard = { id: found[0]!, zc: obj(s, found[0]!).zoneChanges ?? 0 };
       s.resolving!.yardChosen = found;
       if (e.milled) s.resolving!.did = found.length > 0;
       if (e.milled && (e.dest ?? "hand") === "hand") s.resolving!.putIntoHand = found;

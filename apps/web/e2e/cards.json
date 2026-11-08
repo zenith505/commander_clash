@@ -6907,6 +6907,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0c0d6c7e-a7cc-49e0-bf84-3fc33dd10b90",
+  "name": "Deepfathom Echo",
+  "manaCost": "{2}{G}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Merfolk Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Merfolk",
+   "Spirit"
+  ],
+  "oracleText": "At the beginning of combat on your turn, this creature explores. Then you may have it become a copy of another creature you control until end of turn. (To have this creature explore, reveal the top card of your library. Put that card into your hand if it's a land. Otherwise, put a +1/+1 counter on this creature, then put the card back or put it into your graveyard.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Explore"
+  ],
+  "commanderLegal": "legal",
+  "set": "lci",
+  "releasedAt": "2023-11-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0a1dc797-7531-4494-afe6-add6ac3f74c0",
   "name": "Defiler of Vigor",
   "manaCost": "{3}{G}{G}",
@@ -31592,6 +31627,37 @@
   "set": "csp",
   "releasedAt": "2006-07-21",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "92c58354-e106-402f-8348-6c7cdb67c6df",
+  "name": "Wall of Stolen Identity",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Shapeshifter Wall",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Shapeshifter",
+   "Wall"
+  ],
+  "oracleText": "You may have this creature enter as a copy of any creature on the battlefield, except it's a Wall in addition to its other types and has defender. When you do, tap the copied creature and it doesn't untap during its controller's untap step for as long as you control this creature.",
+  "power": "0",
+  "toughness": "0",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c19",
+  "releasedAt": "2019-08-23",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

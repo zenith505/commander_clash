@@ -328,7 +328,10 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // "A copy of the exiled card" after "you may exile an artifact or creature card from your hand. If you do" (Nexus of
     // Becoming): that card, copied as it is in exile (CR 707.2).
     const fromHand = ctx.mayExiledFromHand && /^(?:the exiled card|it|that card)$/.test(m[4]!);
-    const what0 = fromHand ? { ref: "exiledFromHand" as const } : costCard ? { ref: "costExiled" as const } : ofCard ? { ref: "target" as const, index: cardTargets[0]!, card: true as const } : linkedCard ? { ref: "linkedCard" as const } : sacrificed ? { ref: "sacrificed" as const } : parseObject(m[4]!, ctx, /\bcard\b/.test(m[4]!) && /^target /.test(m[4]!));
+    // God-Pharaoh's Gift: "a copy of that card" after "you may exile a creature card from your graveyard. If you do": that
+    // card in exile, copied as it is there (CR 707.2).
+    const fromYard = !fromHand && ctx.chosenFromYard && m[4] === "that card" && !ctx.targets.length;
+    const what0 = fromYard ? { ref: "chosenFromYard" as const } : fromHand ? { ref: "exiledFromHand" as const } : costCard ? { ref: "costExiled" as const } : ofCard ? { ref: "target" as const, index: cardTargets[0]!, card: true as const } : linkedCard ? { ref: "linkedCard" as const } : sacrificed ? { ref: "sacrificed" as const } : parseObject(m[4]!, ctx, /\bcard\b/.test(m[4]!) && /^target /.test(m[4]!));
     // "A copy of that card" about a creature that died (Myrkul, Lord of Bones): of the card, not of the creature it was
     // as it last existed (rulings).
     const what = what0?.ref === "subjectCard" && m[4] === "that card" ? { ...what0, printed: true as const } : what0;

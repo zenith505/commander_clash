@@ -1105,7 +1105,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // A land card (Echoing Deeps): a nonbasic one, the one with the most rules text.
       const landValue = (x: string) => (defOf(s, obj(s, x)).supertypes.includes("Basic") ? 0 : 1 + (defOf(s, obj(s, x)).oracleText?.length ?? 0) / 1000);
       const value = (x: string) => (obj(s, x).zone === "graveyard" ? (isType(defOf(s, obj(s, x)), "Land") ? landValue(x) : 0) : worth(s, pid, obj(s, x))) + mv(s, x);
-      const best = ok.sort((a, b) => value(b) - value(a))[0];
+      // Wall of Stolen Identity: the copied creature is tapped and stays tapped, so an opponent's is better.
+      const locks = !!pend.objectId && s.objects[pend.objectId] && compileCard(defOf(s, obj(s, pend.objectId))).entersAsCopy?.tapCopied;
+      const theirs = locks ? ok.filter((x) => controllerOf(s, obj(s, x)) !== pid) : [];
+      const best = (theirs.length ? theirs : ok).sort((a, b) => value(b) - value(a))[0];
       return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
     }
     // The Mimeoplasm: the other card exiled gives +1/+1 counters equal to its power, so the one with the greatest power.

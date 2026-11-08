@@ -1322,7 +1322,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const o = e.moveTo && (!to || to.id === o0?.id) ? undefined : o0;
       const sc = (s.resolving!.scratch ??= {});
       const picked = (sc.countersPicked ??= {});
-      const n = !o ? 0 : e.moveTo ? Object.entries(o.counters).reduce((a, [k, b]) => a + (!e.kinds || e.kinds.includes(k) ? Math.max(0, b) : 0), 0) : amountNow(s, e.n, ctx);
+      const n = !o ? 0 : e.moveTo && !e.moveN ? Object.entries(o.counters).reduce((a, [k, b]) => a + (!e.kinds || e.kinds.includes(k) ? Math.max(0, b) : 0), 0) : amountNow(s, e.n, ctx);
       const left = (k: string) => (o!.counters[k] ?? 0) - (picked[k] ?? 0);
       const count = () => Object.values(picked).reduce((a, b) => a + b, 0);
       while (o && count() < n && !sc.countersDone) {

@@ -1,6 +1,6 @@
 // Sentences that act on permanents: destroy, tap, connive, regenerate, counters, gaining control, continuous changes until end of turn.
 
-import type { AmountExpr, Count, Effect, Modification, ObjRef, TargetSpec } from "../../abilities";
+import type { Amount, AmountExpr, Count, Effect, Modification, ObjRef, TargetSpec } from "../../abilities";
 import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num, capital, singular, X } from "../words";
 import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "../targets";
 import { addTarget, parseBody } from "../body";
@@ -1207,6 +1207,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = new RegExp(`^(?:[Yy]ou may )?[Mm]ove any number of ${COUNTER} counters from ~ onto (another target .+)$`).exec(s))) {
     const to = parseObject(m[2]!, ctx);
     return to?.ref === "target" && !to.n ? [{ type: "removeAnyCounters", what: { ref: "self" }, n: 0, upTo: true, moveTo: to, kinds: [counterKind(m[1]!)] }] : null;
+  }
+  // Tester of the Tangential: "move X +1/+1 counters from ~ onto another target creature": that many of that kind, all of
+  // them if it has fewer (rulings on Blaster, Morale Booster), each removed and put on that one; none if that one is gone
+  // or is ~ (CR 122.5).
+  if ((m = new RegExp(`^Move (X|two|three|four|five) ${COUNTER} counters from ~ onto (another target .+)$`).exec(s))) {
+    const to = parseObject(m[3]!, ctx);
+    const n: Amount = m[1] === "X" ? { count: { kind: "x" } } : num(m[1]!);
+    return to?.ref === "target" && !to.n ? [{ type: "removeAnyCounters", what: { ref: "self" }, n, moveTo: to, moveN: true, kinds: [counterKind(m[2]!)] }] : null;
   }
   // Bioshift: "Move any number of +1/+1 counters from target creature onto another target creature with the same
   // controller": that kind only, as many as you choose as it resolves; with the two controlled by different players by

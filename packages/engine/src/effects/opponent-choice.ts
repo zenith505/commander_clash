@@ -66,3 +66,16 @@ export function withStandIns(s: GameState, specs: TargetSpec[], targets: TargetC
 
 /** The targets as their controller chooses them: the ones an opponent chooses are skipped then (they come as none). */
 export const forController = (specs: TargetSpec[]): TargetSpec[] => specs.map((t) => (t.chosenBy === "opponent" ? { ...t, skip: true as const } : t));
+
+/**
+ * "An opponent chooses one —" (Fatal Lore): "target creatures that player controls" in the chosen mode is controlled by the
+ * opponent who chose it (TargetSpec controller "modeChooser"), bound for good as it's cast (CR 700.2e, 601.2c).
+ */
+export function bindModeChooser(specs: TargetSpec[], chooser: PlayerId | undefined): TargetSpec[] {
+  if (chooser === undefined) return specs;
+  return specs.map((t) => {
+    if (t.controller !== "modeChooser") return t;
+    const { controller: _, ...rest } = t;
+    return { ...rest, controlledBy: chooser };
+  });
+}

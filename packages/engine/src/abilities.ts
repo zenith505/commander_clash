@@ -863,7 +863,8 @@ export interface TargetSpec {
    * player"): "eventPlayer", made concrete as `controlledBy` once the trigger knows that player.
    */
   /** "chosenPlayer": "creatures that player controls" after "Choose a player ..." (The Black Gate), bound as it resolves (fixMods). */
-  controller?: "you" | "opponent" | "eventPlayer" | "enchanted" | "chosenPlayer";
+  /** "modeChooser": "target creatures that player controls" in a mode an opponent chose (Fatal Lore), bound to them as it's cast (bindModeChooser). */
+  controller?: "you" | "opponent" | "eventPlayer" | "enchanted" | "chosenPlayer" | "modeChooser";
   /** "Creatures the monarch controls" (Azure Fleet Admiral): controlled by the player who is the monarch now (CR 725). */
   monarchControls?: true;
   controlledBy?: PlayerId;
@@ -1558,6 +1559,8 @@ export type PlayerRef =
   | { ref: "couldntPick" }
   /** Gift's "the chosen player": the opponent the gift was promised to (CR 702.174a). */
   | { ref: "giftee" }
+  /** "An opponent chooses one —" (Misfortune, Fatal Lore): "that player", the opponent who chose the spell's mode (StackItem.modeChooser). */
+  | { ref: "modeChooser" }
   /** "That player" after "Clash with an opponent" (Pollen Lullaby, Captivating Glance): the opponent clashed with (CR 701.30b). */
   | { ref: "clashOpponent" }
   /** "Players dealt damage this way" (Aurelia's Fury): by this spell's or ability's damage so far. */
@@ -3819,6 +3822,13 @@ export type Effect =
    */
   | { type: "duelReveal"; between: PlayerRef[] }
   /** "You may repeat this process any number of times" (Ad Nauseam): `effects` (none of which waits on a choice), then the controller decides whether to go again, each time after seeing the result (rulings). */
+  /**
+   * Shrouded Lore, Forgotten Lore: "Target opponent chooses a card in your graveyard. You may pay {B}. If you do, repeat this
+   * process except that opponent can't choose a card already chosen for ~. Then put the last chosen card into your hand."
+   * `who` chooses, then its controller may pay `pay` for another choice among the cards not chosen yet, as long as there is
+   * one (rulings); the last card chosen goes into its controller's hand.
+   */
+  | { type: "loreChoices"; who: PlayerRef; pay: string }
   | { type: "repeatMay"; effects: Effect[]; text: string; /** Kindle the Carnage: offered again only while its controller has a card in hand (not a library, as Ad Nauseam's); each pass discards anew. */ needsHand?: true }
   /** Sunforger: the card a search with dest "cast" found, cast from the library without paying its mana cost (CR 608.2g). */
   | { type: "castSearched" }
@@ -5221,6 +5231,11 @@ export interface AbilityBody {
     randomUnless?: StaticCondition;
     /** "You may choose two" (Shadrix Silverquill): no modes at all, or `min` to `max` of them. */
     optional?: true;
+    /**
+     * "An opponent chooses one —" (Misfortune, Fatal Lore, Library of Lat-Nam): an opponent chooses the mode as it's cast,
+     * the caster choosing which opponent (CR 700.2e, 601.2b), then the caster its targets (601.2c; rulings on Fatal Lore).
+     */
+    chooser?: "opponent";
     /** "Each mode must target a different player" (Shadrix Silverquill): no target of one mode is a target of another. */
     distinctTargets?: true;
     /** "Choose up to X, where X is the number of Lesson cards in your graveyard" (Bumi, King of Three Trials): `max` is the most there are modes; this caps it, counted as a triggered ability is put on the stack (CR 603.3c; PendingTrigger.maxModes). */

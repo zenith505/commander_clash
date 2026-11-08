@@ -229,7 +229,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "couldButDidntAttack" && (o.couldAttack !== s.turn || o.attacked?.turn === s.turn)) return false;
   if (spec.controller === "you" && c.controller !== controller) return false;
   if (spec.controller === "opponent" && c.controller === controller) return false;
-  if (spec.controller === "eventPlayer" || spec.controller === "enchanted" || spec.controller === "chosenPlayer" || (spec.controlledBy !== undefined && c.controller !== spec.controlledBy)) return false;
+  if (spec.controller === "eventPlayer" || spec.controller === "enchanted" || spec.controller === "chosenPlayer" || spec.controller === "modeChooser" || (spec.controlledBy !== undefined && c.controller !== spec.controlledBy)) return false;
   if (spec.notControlledBy !== undefined && c.controller === spec.notControlledBy) return false;
   if (spec.monarchControls && c.controller !== s.monarch) return false;
   if (spec.protector === "eventPlayer" || (spec.protector === "opponent" && (o.protector === undefined || o.protector === controller)) || (spec.protectedBy !== undefined && o.protector !== spec.protectedBy)) return false;

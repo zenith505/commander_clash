@@ -179,7 +179,25 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
   }
   // Among another player's permanents (Split the Party): the first of them, if they're still in the game.
   const among = e.among ? players(s, e.among, ctx)[0] : undefined;
+  // Tariff: the player who has just picked pays that creature's mana cost or doesn't, before the next one picks (rulings).
+  const payForPick = (): "paused" | void => {
+    if (!e.unlessManaCost) return;
+    const done = (sc.tariffDone ??= []);
+    for (const pid of apnap(s, who)) {
+      if (done.includes(pid) || sc.chosen?.[pid] === undefined) continue;
+      const o = sc.chosen[pid]![0] !== undefined ? s.objects[sc.chosen[pid]![0]!] : undefined;
+      // A face-down creature or a token with no mana cost: an unpayable cost (CR 118.6, 708.2).
+      const cost = o?.zone === "battlefield" && !o.faceDown ? defOf(s, o).manaCost.replace(/\{X\}/g, "") : "";
+      const name = o ? defOf(s, o).name : "";
+      const paid = o?.zone === "battlefield" && defOf(s, o).manaCost && !o.faceDown ? paidUnless(s, ctx, pid, { cost: cost || "{0}" }, src, name, `you sacrifice ${name}`) : false;
+      if (paid === "paused") return "paused";
+      if (paid) sc.chosen[pid] = [];
+      sc.paid = undefined;
+      done.push(pid);
+    }
+  };
   while (sc.queue.length) {
+    if (payForPick() === "paused") return "paused";
     const pid = sc.queue[0]!;
     const n = nFor[pid] ?? 0;
     // "One of those Dragons" (Zurgo and Ojutai): those still on the battlefield as the objects they were, whoever controls them now.
@@ -245,6 +263,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     sc.chosen![pid] = options;
     sc.queue.shift();
   }
+  if (payForPick() === "paused") return "paused";
   // "Put a +1/+1 counter on a creature you control. It gains ...": "it" is the one picked, while it's that object (CR 400.7).
   if ((e.action === "counters" || e.action === "choose" || e.action === "flicker") && s.resolving) s.resolving.created = apnap(s, who).flatMap((pid) => sc.chosen?.[pid] ?? []).filter((id) => s.objects[id]?.zone === "battlefield");
   // "Unattach an Equipment from a creature you control. If you do, tap that creature" (Akiri, Fearless Voyager): it stays

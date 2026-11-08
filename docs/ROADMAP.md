@@ -1,6 +1,6 @@
 # Roadmap
 
-30,574 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,581 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,724 of
 9,979 (97%).
 
@@ -6877,6 +6877,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   graveyard, CR 113.6m). Dodgy Jalopy (scavenge with a "*" power: its power in the graveyard by its characteristic-defining
   ability, CR 604.3, fixed as the cost exiles it, rulings). Bots use these through the existing paths (graveyard abilities
   in the declare attackers step, emerge, scavenge). +9 (30,574 of 31,936 with B148, B149 and round 309).
+- Round B151 (least played first, from the list and the skip lists): Dralnu's Pet ("If ~ was kicked, it enters with
+  flying and with X +1/+1 counters on it, where X is the discarded card's mana value": the card its discard kicker
+  discarded, kept on the spell, CR 614.1c). Natural Balance (each player keeps five lands and sacrifices the rest, then each
+  player who controls fewer than five lands may search for up to the difference in basic land cards, put onto the
+  battlefield, CR 101.4 order). Nahiri's Sacrifice ("As an additional cost to cast this spell, sacrifice an artifact or
+  creature with mana value X": X chosen first, only the X some permanent fits can be announced, CR 107.3a, 601.2b; the
+  X picker offers the greatest one). Vizkopa Confessor ("pay any amount of life. Target opponent reveals that many cards
+  from their hand. You choose one of them and exile it", CR 119.4, 701.20a; the bot pays enough to see the whole hand
+  without going below 20 life). Tariff (each player sacrifices the creature with the greatest mana value they control
+  unless they pay its mana cost, a tie theirs to break; {X} in it is 0, CR 107.3h; no mana cost or face down, it can't
+  be paid, CR 118.6). Meddle and Quicksilver Dragon ("If target spell has only one target and that target is a
+  creature / ~, change that spell's target to another creature": a spell with two targets, a player target, or one
+  that's left is unchanged, CR 115.7a, rulings). +7 (30,581 of 31,936 with B148, B149, B150 and round 309).
+- Out after round B151 (looked at, not done): Thelon's Chant and Tourach's Chant (the player who put a land onto the
+  battlefield isn't tracked), Gloom (the tax would apply to mana abilities too, which take no cost increase here), Spoils
+  of War (X as you cast it from the cards in an opponent's graveyard), Selective Snare (a creature type chosen as it's
+  cast), Sutured Ghoul (a characteristic-defining power and toughness from the cards it exiled), Preferred Selection (a
+  look held across the may decision), Graceful Takedown (two target groups that must differ), Glass Asp and Nafs Asp
+  (a payment any time before the draw step, as a special action), Noxious Vapors (keeping one card of each color in
+  hand), Kodama of the Center Tree, Reflecting Mirror.
 - Out after round B150 (looked at, not done): Boneyard Mycodrax (its scavenge compiles now; its "other creature cards in
   your graveyard" power doesn't yet), the never-examined names still left (Ring of Ma'rûf and the other wishes, Seafarer's
   Quay and the other banding grants, Cyclopean Tomb, False Orders, Mirror-Shield Hoplite, Chorus of the Conclave, Temporal

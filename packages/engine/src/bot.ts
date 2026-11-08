@@ -1446,6 +1446,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // keeping 15 life and cards in our library.
     if (pend.kind === "chooseOption" && pend.what === "payLife") {
       const p = player(s, pid);
+      // Vizkopa Confessor: "Target opponent reveals that many cards from their hand. You choose one of them and exile it":
+      // the more they reveal, the better the card we get to exile; never more than their hand, keeping 20 life.
+      const take = s.resolving && allEffects(s.resolving.body.effects).find((x) => x.type === "takeFromHand" && x.reveal !== undefined);
+      if (take) {
+        const t = (s.resolving!.item.targets ?? []).find((x) => x.kind === "player");
+        const theirs = t?.kind === "player" ? player(s, t.id).hand.length : 0;
+        return [{ type: "chooseOption", player: pid, choice: String(Math.max(0, Math.min(pend.numberRange?.max ?? 0, p.life - 20, theirs))) }];
+      }
       const n = Math.max(0, Math.min(pend.numberRange?.max ?? 0, p.life - 15, p.library.length - 2, 5 - p.hand.length));
       return [{ type: "chooseOption", player: pid, choice: String(n) }];
     }
@@ -3095,6 +3103,10 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     if (castExtraCosts(d, { via, alt }).some((c) => c.kind === "sacrifice" && c.optional)) xs.push(0);
     // Rottenmouth Viper: each one sacrificed makes it cheaper, so as few as we can cast it with.
     if (compileCard(d).sacrificedReduction && !via && !alt) xs = Array.from({ length: most + 1 }, (_, i) => i);
+    // Nahiri's Sacrifice: "sacrifice an artifact or creature with mana value X": the mana values of the ones we'd give up,
+    // the most first.
+    const mvSac = castExtraCosts(d, { via, alt }).find((c): c is Extract<AdditionalCost, { kind: "sacrifice" }> => c.kind === "sacrifice" && !!c.mvX);
+    if (mvSac) xs = [...new Set(sacrificePool(s, pid, { ...mvSac, filter: { ...mvSac.filter, manaValue: undefined } }, new Set()).map((o) => mv(s, o.id)))].filter((x) => x >= 1).sort((a, b) => b - a);
   }
   // Nahiri's Lithoforming: "Sacrifice X lands ... You may play X additional lands this turn": no more lands than we have
   // in hand to play again.

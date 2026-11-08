@@ -2167,6 +2167,19 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Dralnu's Pet: "If ~ was kicked, it enters with flying and with X +1/+1 counters on it, where X is the discarded card's
+    // mana value": the card its kicker's discard cost discarded, as it is in the graveyard (GameObject.costDiscarded), both
+    // only if it was kicked (CR 614.1c), so it has flying from the moment it enters (rulings).
+    const kickedFlyingX = /^If ~ was kicked, it enters with ([a-z]+) and with X \+1\/\+1 counters on it, where X is the discarded card's mana value\.$/.exec(line);
+    if (kickedFlyingX) {
+      const mods = parseGrants(kickedFlyingX[1]!);
+      if (out.entersWithCounters || out.entersKicked || !out.kicker?.extraCosts?.some((c) => c.kind === "discard") || !mods || mods.some((m) => m.kind !== "addKeywords")) out.unsupported.push(raw);
+      else {
+        out.entersWithCounters = { counter: "+1/+1", n: { count: { kind: "discardedManaValue" } } };
+        out.entersKicked = [{ mods }];
+      }
+      continue;
+    }
     // Voidpouncer: "If ~ was kicked, it enters with two +1/+1 counters and a trample counter on it and with haste": both
     // kinds of counters and the keyword, all only if it was kicked (CR 614.1c).
     const kickedTwo = new RegExp(`^If ~ was kicked, it enters with ${NUM} \\+1/\\+1 counters? and ${NUM} ${COUNTER} counters? on it and with (.+?)\\.$`).exec(line);
@@ -7454,7 +7467,7 @@ function checkX(d: CardDef, out: CompiledCard) {
   // Or in an additional cost: "As an additional cost to cast this spell, pay X life" (CR 107.3a).
   // Or in its kicker cost, "Kicker {X}" (0 unless it was kicked).
   // Or in an alternative cost: "Foretell {X}{X}{W}", "Madness {X}{B}{B}" (0 unless that cost was paid, CR 107.3a).
-  const cardX = parseManaCost(d.manaCost).hasX || !!out.additionalCosts?.some((c) => "x" in c && c.x) || !!out.kicker?.costs.some((c) => parseManaCost(c).hasX) || parseManaCost(out.foretell ?? "").hasX || parseManaCost(out.madness ?? "").hasX;
+  const cardX = parseManaCost(d.manaCost).hasX || !!out.additionalCosts?.some((c) => ("x" in c && c.x) || (c.kind === "sacrifice" && c.mvX)) || !!out.kicker?.costs.some((c) => parseManaCost(c).hasX) || parseManaCost(out.foretell ?? "").hasX || parseManaCost(out.madness ?? "").hasX;
   const bad = (what: string) => out.unsupported.push(what);
   // Glittering Lion: "~ loses "Prevent all damage ..."": one of its own printed static abilities, by its text.
   out.activated = out.activated.filter((a) => {

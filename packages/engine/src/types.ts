@@ -637,6 +637,8 @@ export interface GameObject {
   webSlung?: LastKnown;
   /** Cast for an emerge cost (CR 702.119a), while a spell and as the permanent it became: the creature sacrificed to pay it, as it last existed (Adipose Offspring). */
   emergeSacrificed?: LastKnown;
+  /** While a spell and as the permanent it became: the cards its costs discarded (CardDef keys), for "the discarded card's mana value" as it enters (Dralnu's Pet). */
+  costDiscarded?: string[];
   /** As a spell: which of its CompiledCard.costOr ways to pay was chosen (Lethal Throwdown). */
   costOrPaid?: number;
   /** As a spell, and as the permanent it became: it was bargained (CR 702.166b). */
@@ -2814,6 +2816,7 @@ export interface Resolving {
     keepRest?: { queue: PlayerId[]; slot: number; kept: Record<string, ObjectId[]>; /** Restore Balance: the fewest any of them controls, counted as it starts. */ fewest?: number; /** Killing Wave: the life paid for each one kept. */ lifeEach?: number };
     paid?: boolean; // the answer to "unless that player pays ..."
     payQueue?: PlayerId[]; // "each opponent sacrifices ... unless they pay": players still to choose whether to pay, in APNAP order
+    tariffDone?: PlayerId[]; // Tariff: players who have decided whether to pay for the creature they picked
     paidBy?: PlayerId[]; // and those who paid
     newTarget?: TargetChoice; // "change the target of target spell": the new one, chosen as this resolves (CR 115.7a)
     /** Ward with a choice of costs (UnlessPays.orElse): "0" or "1", the one its payer chose, or "none". */

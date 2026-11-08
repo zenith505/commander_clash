@@ -585,6 +585,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         return;
       }
       phaseOut(s, ids);
+      // Teferi, Timeless Voyager: "Until the end of your next turn, they can't phase in" (only those that phased out
+      // directly; what's attached to them phases in with them, CR 702.26g).
+      if (e.lockedUntilYourNextTurnEnds)
+        for (const id of ids) {
+          const p = s.objects[id]!.phased;
+          if (s.objects[id]!.zone === "phasedOut" && p && !p.indirect) p.lock = { turnOf: ctx.controller, sinceTurn: s.turn };
+        }
       return;
     }
     case "earthbend": {
@@ -2415,15 +2422,15 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         // Simic Guildmage: controlled by the controller of the permanent it's attached to; Enchantment Alteration: sharing a
         // type, creature or land, with it, as it is now. Neither if it isn't attached to a permanent now.
         const was = me.attachedTo ? s.objects[me.attachedTo] : undefined;
-        if (e.host && was?.zone !== "battlefield") return;
+        if (e.host && e.host !== "anyPermanent" && was?.zone !== "battlefield") return;
         const wasTypes = e.host === "sameType" ? (["Creature", "Land"] as const).filter((t) => objIsType(s, was!, t)) : [];
         const fits = (h: GameObject) =>
-          e.host === "sameController" ? controllerOf(s, h) === controllerOf(s, was!) : e.host === "sameType" ? wasTypes.some((t) => objIsType(s, h, t)) : objIsType(s, h, "Creature");
+          e.host === "anyPermanent" ? h.zone === "battlefield" : e.host === "sameController" ? controllerOf(s, h) === controllerOf(s, was!) : e.host === "sameType" ? wasTypes.some((t) => objIsType(s, h, t)) : objIsType(s, h, "Creature");
         const options = auraHostOptions(s, me, controllerOf(s, me)).flatMap((h) => ("attachTo" in h && h.attachTo !== me.attachedTo && fits(obj(s, h.attachTo)) ? [h] : []));
         if (!options.length) return;
         if (options.length > 1) {
           sc.auraAsking = me.id;
-          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "enchant", options: options.map(auraHostKey), labels: auraHostLabels(s, options), prompt: `choose the creature to attach ${defOf(s, me).name} to` };
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "enchant", options: options.map(auraHostKey), labels: auraHostLabels(s, options), prompt: `choose the ${e.host === "anyPermanent" || e.host === "sameController" ? "permanent" : e.host === "sameType" ? "permanent" : "creature"} to attach ${defOf(s, me).name} to` };
           return "paused";
         }
         hosts[me.id] = auraHostKey(options[0]!);

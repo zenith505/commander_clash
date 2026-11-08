@@ -1857,14 +1857,25 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, `${name} is exiled with ${e.n} time counter${e.n === 1 ? "" : "s"} on it.`);
       return;
     }
-    case "destroy":
-      for (const o of objects(s, e.what, ctx)) {
+    case "destroy": {
+      let list = objects(s, e.what, ctx);
+      // Capricious Efreet: one of those still legal, chosen at random as it resolves, nobody acting in between (rulings).
+      if (e.oneAtRandom) {
+        list = list.filter((o) => o.zone === "battlefield");
+        if (list.length > 1) {
+          const pick = list[Math.floor(nextRandom(s) * list.length)]!;
+          log(s, `${src} chooses ${defOf(s, pick).name} at random.`);
+          list = [pick];
+        }
+      }
+      for (const o of list) {
         // As it last existed, for "for each creature destroyed this way" (CR 608.2h).
         const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)), controller: controllerOf(s, o) };
         // "If that creature dies this way": it was put into a graveyard (CR 700.4), not exiled or moved elsewhere instead.
         if (destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}.`, e.noRegen === "creatures" ? objIsType(s, o, "Creature") : !!e.noRegen, ctx.controller) && s.resolving) (s.resolving.destroyed ??= []).push({ ...before, ...(s.objects[o.id]?.zone === "graveyard" ? { died: true as const } : {}) });
       }
       return;
+    }
     case "removeDamageShield":
       for (const o of objects(s, e.what, ctx)) {
         o.removeDamageShields = (o.removeDamageShields ?? 0) + 1;

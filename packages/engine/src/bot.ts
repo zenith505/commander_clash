@@ -2542,6 +2542,21 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     }
     return null;
   }
+  // Capricious Efreet: "choose target nonland permanent you control and up to two target nonland permanents you don't
+  // control. Destroy one of them at random": our least valuable one, and the two most valuable of the others.
+  const randomKill = body.effects.length === 1 && body.effects[0]!.type === "destroy" && body.effects[0]!.oneAtRandom ? body.effects[0]! : undefined;
+  if (randomKill?.type === "destroy" && randomKill.what.ref === "target" && randomKill.what.index === 0 && body.targets.length === (randomKill.what.n ?? 1)) {
+    const src = sourceId ? botSource(s, sourceId) : undefined;
+    const ids = (i: number) => legalTargets(s, body.targets[i]!, pid, undefined, src, sourceId).flatMap((t) => (t.kind === "object" ? [t.id] : []));
+    const ours = ids(0).sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)));
+    if (!ours[0]) return null;
+    const out: TargetChoice[] = [{ kind: "object", id: ours[0] }];
+    for (let i = 1; i < body.targets.length; i++) {
+      const best = ids(i).filter((id) => !out.some((t) => t.kind === "object" && t.id === id)).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0];
+      out.push(best ? { kind: "object", id: best } : { kind: "none" });
+    }
+    return out;
+  }
   // A Licid: in our main phase, an Aura on our best creature if it helps what it enchants (Gliding, Nurturing Licid), on
   // an opponent's otherwise (Calming, Leeching, Dominating Licid). Bots don't pay to end the effect.
   if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "becomeLicid" && sourceId) {

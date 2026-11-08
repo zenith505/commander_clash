@@ -4127,7 +4127,7 @@ function LibrarySearch({
         <header>
           <strong>
             {pending.piles
-              ? `${pending.source}: separate ${pending.forPlayer !== undefined ? `${s.players[pending.forPlayer]!.name}'s` : "your"} revealed cards into two piles. Choose the cards for the first pile`
+              ? `${pending.source}: separate ${pending.forPlayer !== undefined ? `${s.players[pending.forPlayer]!.name}'s` : "your"} ${pending.exiled ? "exiled" : "revealed"} cards into two piles. Choose the cards for the first pile`
               : dig && (pending.hand !== undefined || pending.forPlayer !== undefined || pending.exiled)
               ? `${pending.source}: choose ${pending.what} ${dig.to}`
               : dig

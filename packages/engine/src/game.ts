@@ -3007,6 +3007,14 @@ function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number
       log(s, `${p.name} would draw from an empty library: ${nameOf(s, ormos)} gets ${n} +1/+1 counter${n === 1 ? "" : "s"} instead.`);
       return true;
     }
+    // Living Conundrum: "skip that draw instead" (CR 614.1b; with Ormos the player's choice, CR 616.1, the counters taken):
+    // nothing is drawn from an empty library (CR 704.5b), and the draws after this one go on, each skipped in turn while
+    // the library stays empty (rulings).
+    const conundrum = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).skipsDrawsFromEmptyLibrary);
+    if (conundrum) {
+      skipDraw(s, pid, conundrum);
+      return true;
+    }
     // Out of the Tombs: a creature card from the graveyard instead, chosen by its player; with none, they lose (CR
     // 614.1a). Either way nothing was drawn from an empty library (CR 704.5b), and the draws after this go on.
     const tombs = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawEmptyReturn);

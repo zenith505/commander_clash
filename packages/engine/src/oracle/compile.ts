@@ -14,13 +14,13 @@ import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAb
 import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses, parseActivateCondition } from "./statics";
 import { parseTrigger } from "./triggers";
 import { KEYWORD_WORDS, parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
-import { parseBody, usesX, scaleAmount } from "./body";
+import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
 import { PLANESWALKER_TYPES, parseGroup, parseTargetPhrase } from "./targets";
 import { backupTriggers, parseGrants } from "./grants";
 import { dungeonTriggers } from "./dungeons";
-import { parseCountMod, parseCopyExcept, PREDEFINED_TOKENS } from "./tokens";
+import { parseCountMod, parseCopyExcept, parseToken, PREDEFINED_TOKENS } from "./tokens";
 import { parseCardNameChoice, parseSearchFilter } from "./search";
 import { addStriation, simpleKeywords, striations } from "./striations";
 import { draftLine } from "./draft";
@@ -3202,6 +3202,13 @@ export function compile(d: CardDef): CompiledCard {
       out.skipsAllDraws = true;
       continue;
     }
+    // Living Conundrum: a replacement effect (CR 614.1b) on each of its controller's draws while their library is empty,
+    // so nothing is drawn and the game isn't lost for it (CR 704.5b); asked for again for each draw (rulings: with fewer
+    // cards than draws, the cards are drawn and the rest skipped).
+    if (line === "If you would draw a card while your library has no cards in it, skip that draw instead.") {
+      out.skipsDrawsFromEmptyLibrary = true;
+      continue;
+    }
     if (line === "If an opponent would draw two or more cards, instead you and that player each draw a card.") {
       out.splitsBigDraws = true;
       continue;
@@ -4752,6 +4759,33 @@ export function compile(d: CardDef): CompiledCard {
     if (/^If damage would be dealt to ~ while it has a \+1\/\+1 counter on it, prevent that damage, remove that many \+1\/\+1 counters from (?:~|it), then give each player a rad counter for each \+1\/\+1 counter removed this way\.$/.test(line)) {
       out.counterShield = true;
       out.counterShieldRad = true;
+      continue;
+    }
+    // Magma Pummeler: "..., prevent that damage and remove that many +1/+1 counters from it. When one or more counters are
+    // removed from ~ this way, it deals that much damage to any target": the same, and a reflexive trigger (CR 603.12)
+    // once for each damage event that removed counters, "that much" being as many as were removed (rulings: all of them
+    // when the damage is more).
+    if (line === "If damage would be dealt to ~ while it has a +1/+1 counter on it, prevent that damage and remove that many +1/+1 counters from it. When one or more counters are removed from ~ this way, it deals that much damage to any target.") {
+      const body = parseBody("~ deals X damage to any target.");
+      if (!body) {
+        out.unsupported.push(raw);
+        continue;
+      }
+      out.counterShield = true;
+      out.counterShieldReflect = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: "~ deals that much damage to any target." };
+      continue;
+    }
+    // Sekki, Seasons' Guide: "If damage would be dealt to ~, prevent that damage, remove that many +1/+1 counters from ~,
+    // and create that many 1/1 colorless Spirit creature tokens": Protean Hydra's shield, and a token for each 1 damage,
+    // however many counters it had, also for damage that can't be prevented (rulings).
+    if (line === "If damage would be dealt to ~, prevent that damage, remove that many +1/+1 counters from ~, and create that many 1/1 colorless Spirit creature tokens.") {
+      const token = parseToken(1, 1, "colorless Spirit");
+      if (!token) {
+        out.unsupported.push(raw);
+        continue;
+      }
+      out.counterShield = "always";
+      out.counterShieldTokens = token;
       continue;
     }
     // Rock Hydra: "For each 1 damage that would be dealt to ~, if it has a +1/+1 counter on it, remove a +1/+1 counter from

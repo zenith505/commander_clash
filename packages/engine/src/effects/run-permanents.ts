@@ -169,8 +169,11 @@ export function reselectOptions(s: GameState, o: GameObject): { key: string; lab
     .filter((x) => x.key !== now);
 }
 
-/** Counters that hurt the permanent they're on: -1/-1 shrinks it, stun keeps it from untapping (CR 122.1d). */
-export const harmfulCounter = (k: string) => k === "-1/-1" || k === "stun";
+/**
+ * Counters that hurt the permanent they're on: -1/-1 shrinks it, stun keeps it from untapping (CR 122.1d); Mine Layer's
+ * mine counters and Bomb Squad's fuse counters mark it to be destroyed.
+ */
+export const harmfulCounter = (k: string) => k === "-1/-1" || k === "stun" || k === "mine" || k === "fuse";
 
 /** Changing permanents: tap, counters, connive, explore, renown, evolve, continuous effects, attaching. */
 export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {

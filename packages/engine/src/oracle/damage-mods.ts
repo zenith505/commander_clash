@@ -146,6 +146,22 @@ export function parseDamageMod(line: string): StaticAbility | null {
     const mod: DamageMod = { op: toMill[2] ? "counters" : "mill", ...(toMill[2] ? { counter: "+1/+1" as const } : {}), mill: true, combat: "only", to: { players: "all" }, ...(byP.by ? { by: byP.by } : {}), text: line };
     return { affects: { kind: "self" }, mods: [{ kind: "damageMod", mod }], text: line };
   }
+  // Crumbling Sanctuary: "If damage would be dealt to a player, that player exiles that many cards from the top of their
+  // library instead": a replacement, not prevention, like Undead Alchemist's mill (CR 614.1a), from any source, combat or
+  // not, to every player; with no cards in the library the damage does nothing (rulings).
+  if (line === "If damage would be dealt to a player, that player exiles that many cards from the top of their library instead.") {
+    const mod: DamageMod = { op: "mill", mill: true, exileTop: true, to: { players: "all" }, text: line };
+    return { affects: { kind: "self" }, mods: [{ kind: "damageMod", mod }], text: line };
+  }
+  // Well-Laid Plans: "Prevent all damage that would be dealt to a creature by another creature if they share a color":
+  // each creature source's damage to each creature (CR 615.1a), compared as the damage would be dealt (CR 609.7b, 105.4:
+  // colorless shares no color), never a creature's damage to itself.
+  if (line === "Prevent all damage that would be dealt to a creature by another creature if they share a color.") {
+    const byP = parseBy("a creature source", false);
+    if (!byP?.by) return null;
+    const mod: DamageMod = { op: "prevent", prevent: true, by: byP.by, to: { objects: { kind: "object", types: ["Creature"], text: "creature" } }, shareColor: true, text: line };
+    return { affects: { kind: "self" }, mods: [{ kind: "damageMod", mod }], text: line };
+  }
   // Force Bubble: "If damage would be dealt to you, put that many depletion counters on ~ instead": a replacement, not
   // prevention (rulings: the damage is neither dealt nor prevented), the counters on ~ for each source's damage to you.
   const toCountersYou = /^If damage would be dealt to you, put that many ([a-z]+) counters on ~ instead\.?$/.exec(line);

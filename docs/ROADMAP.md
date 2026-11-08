@@ -1,6 +1,6 @@
 # Roadmap
 
-30,540 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,557 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,716 of
 9,979 (97%).
 
@@ -6818,6 +6818,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   land card ...": decided in turn order, then those players search). Mana Maze ("Players can't cast spells that share a
   color with the spell most recently cast this turn", CR 601.3; a colorless spell or none cast yet this turn allows any).
   +9 (30,549 of 31,936 with B145-B147 and rounds 305-308).
+- Round B149 (least played first, from the list): counters that mark a permanent for later. Mine Layer ("Whenever a land
+  with a mine counter on it becomes tapped, destroy it"; "When ~ leaves the battlefield, remove all mine counters from all
+  lands"), Sporogenesis ("Whenever a creature with a fungus counter on it dies, create a 1/1 green Saproling creature token
+  for each fungus counter on that creature", counted as it last existed, CR 603.10a; its leaving removes every fungus
+  counter even with another Sporogenesis around, rulings) and Bomb Squad ("Whenever a creature has four or more fuse
+  counters on it, remove all fuse counters from it and destroy it. That creature deals 4 damage to its controller": a
+  state trigger, CR 603.8, for each creature in that state, not again for that one until it has resolved; two Squads each
+  trigger, and a regenerated creature still loses the counters and deals the damage, rulings). Damage replaced or
+  prevented in new ways: Crumbling Sanctuary ("If damage would be dealt to a player, that player exiles that many cards
+  from the top of their library instead": not a mill, CR 701.17a; nothing with an empty library, rulings), Magma Pummeler
+  (prevented and that many +1/+1 counters removed, then a reflexive trigger, CR 603.12, once for each damage event,
+  dealing as much damage as counters were removed), Sekki, Seasons' Guide (prevented, counters removed and a 1/1 Spirit
+  for each 1 damage, also past its counters and when the damage can't be prevented, rulings) and Well-Laid Plans ("Prevent
+  all damage that would be dealt to a creature by another creature if they share a color", CR 615.1a, 105.4). Living
+  Conundrum: its controller's draws from an empty library are skipped (CR 614.1b, the game isn't lost for them, CR
+  704.5b), and it's a 10/10 flier with vigilance while the library is empty. Bots treat mine and fuse counters as
+  harmful. +8 (30,557 of 31,936 with B145-B148 and rounds 305-308).
+- Out after round B149 (looked at, not done): Dralnu, Lich Lord (damage replaced by sacrificing that many permanents,
+  chosen in the middle of the damage event), Rain of Gore (a life gain replacement that depends on whether a spell or
+  ability caused the gain and who controls it; gainLife doesn't know its cause), Lich (life gain replaced by draws, which Lich's
+  Mastery does with a trigger instead; "sacrifice that many nontoken permanents. If you can't, you lose the game").
 - Out after round B148 (looked at, not done): Liberated Livestock (for each token created, an Aura from your hand and/or
   graveyard put onto the battlefield attached to it), Rogues' Gallery (a target slot per color, a multicolored card
   filling only one), Sungold Sentinel (a color chosen as the ability resolves for hexproof from it and "can't be blocked

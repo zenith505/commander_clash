@@ -6680,8 +6680,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
-    // rounds B153, B152, B151, B148 and 311's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    // rounds B153, B152, B151, B148, 311 and 312's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
+    const faceDown = roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);
@@ -19952,6 +19952,21 @@ function round311Sentence(s: string, sentences: string[], si: number, ctx: Ctx, 
     if (!trigger || trigger === "fail" || trigger.event !== "selfDealsCombatDamageToPlayer" || trigger.body.targets.length || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return "fail";
     const creature: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
     return { effect: { type: "if", cond: { kind: "youDid" }, effects: [{ type: "pick", who: { ref: "you" }, filter: creature, n: 1, action: "choose", anyController: true, prompt: `click a creature (anyone's), then choose it: whenever it deals combat damage to a player this turn, ${azra[1]!}.` }, { type: "floatingTrigger", trigger, until: "endOfTurn", aboutCreated: true }] }, next: si + 2 };
+  }
+  return null;
+}
+
+function round312Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  // Honor the Past: "Return target creature card ... from your graveyard to the battlefield. It's an artifact. (It's no
+  // longer a creature.)": it enters as an artifact only, without its creature types (CR 205.1a; CR 614.12), from then on,
+  // like the Enduring cycle's "It's an enchantment".
+  if (/^It's an artifact\.?$/.test(s)) {
+    const prev = effects[effects.length - 1];
+    if (prev?.type !== "putOntoBattlefield" || prev.what.ref !== "target" || prev.what.n || prev.becomes || prev.alsoMods || prev.faceDown) return "fail";
+    const spec = ctx.targets[prev.what.index];
+    if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => ty !== "Creature")) return "fail";
+    effects.pop();
+    return { effect: { ...prev, becomes: { types: ["Artifact"], subtypes: [] } }, next: si + 1 };
   }
   return null;
 }

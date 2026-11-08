@@ -615,6 +615,17 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (!sc.n) return runEffect(s, paid, ctx);
         return runEffect(s, { type: "punisher", who: { ref: "you" }, options: [{ discard: sc.n }], mode: "ifNone", effects: [{ type: "sacrifice", what: { ref: "self" } }], otherwise: [paid], thenText: "sacrifice ~ (cumulative upkeep)" }, ctx);
       }
+      // Sheltering Ancient: that many +1/+1 counters among creatures opponents control, chosen as it's paid, the same one or
+      // different ones (rulings); none to put for no age counters. With no creature an opponent controls it can't be paid,
+      // so it's sacrificed (rulings, CR 118.3).
+      if (e.oppCreatureCounter) {
+        if (!sc.n) return runEffect(s, paid, ctx);
+        const creature: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creatures your opponents control" };
+        const opps = opponents(s, ctx.controller);
+        if (!s.battlefield.some((id) => objIsType(s, obj(s, id), "Creature") && opps.includes(controllerOf(s, obj(s, id))))) return runEffect(s, { type: "sacrifice", what: { ref: "self" } }, ctx);
+        const put: Effect = { type: "distribute", counter: e.oppCreatureCounter, n: sc.n, filter: creature, of: { ref: "eachOpponent" } };
+        return runEffect(s, { type: "may", effects: [put, paid], otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Put ${sc.n} ${e.oppCreatureCounter} counter${sc.n === 1 ? "" : "s"} on creatures your opponents control to keep ~ (cumulative upkeep)`, keep: true }, ctx);
+      }
       // Wall of Shards: whether to pay first, then an opponent for each age counter (the same or different ones, rulings),
       // only ones who can gain life (CR 119.7); then each chosen gains it all at once, as one payment (CR 702.24a). With no
       // such opponent it can't be paid (CR 118.3); with no age counter there's nothing to pay.

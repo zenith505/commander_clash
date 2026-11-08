@@ -2335,7 +2335,9 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // attackers of that declaration.
   // Aloy, Savior of Meridian: "discover X, where X is the greatest power among them": the attackers of the group.
   // Witch-king, Sky Scourge: "exile the top X cards of your library, where X is their total power": the same attackers.
-  if (event === "creaturesYouControlAttack") bodyText = bodyText.replace(/, where X is the greatest power among them\.$/, ", where X is the greatest power among those creatures.").replace(/, where X is their total power\. You may play those cards this turn\.$/, ", where X is the total power of those creatures. You may play those cards this turn.");
+  // Vulpine Harvester: "return target artifact card ... if its mana value is less than or equal to their total power": the
+  // same attackers, their power as it resolves, as they last existed if they've left (rulings).
+  if (event === "creaturesYouControlAttack") bodyText = bodyText.replace(/ if its mana value is less than or equal to their total power\.$/, " if its mana value is less than or equal to the total power of those creatures.").replace(/, where X is the greatest power among them\.$/, ", where X is the greatest power among those creatures.").replace(/, where X is their total power\. You may play those cards this turn\.$/, ", where X is the total power of those creatures. You may play those cards this turn.");
   // Vulture, Feathered Fiend: "Whenever one or more creatures you control with flying deal combat damage to a player, put a
   // +1/+1 counter on each of those creatures": the ones that dealt that player combat damage.
   const dealtThose = event === "creaturesYouControlDealCombatDamageToPlayer" && /^put an? \+1\/\+1 counter on each of those creatures and draw a card\.?$/.test(bodyText);
@@ -3041,6 +3043,8 @@ function payToUntapTrigger(raw: string): TriggeredAbility | "fail" | null {
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const untapPaid = payToUntapTrigger(raw);
   if (untapPaid) return untapPaid;
+  const r312 = round312Trigger(raw);
+  if (r312) return r312;
   // Johan: "At the beginning of combat on your turn, you may have ~ gain "~ can't attack" until end of combat. If you do,
   // attacking doesn't cause creatures you control to tap this combat if ~ is untapped.": it can't attack this combat, and
   // while it's untapped as attackers are declared, your attacking creatures don't tap (CR 508.1f).
@@ -5583,4 +5587,42 @@ function unX(text: string, original: string): string {
   const words = [...original.matchAll(/\bthat (?:much|many)\b/g)].map((m) => m[0]);
   let i = 0;
   return text.replace(/\bX\b/g, (x) => words[i++] ?? x);
+}
+
+/** Round 312's trigger templates, read before the others. */
+function round312Trigger(raw: string): TriggeredAbility | "fail" | null {
+  // Tom, Bert, and William: "When ~ die, if they were a creature, return them to the battlefield. They're an artifact.
+  // (They're no longer a creature.)" A plural name ("they", CR 201.5): only a creature dies (CR 700.4), so the intervening
+  // if (CR 603.4) holds whenever it triggers. It returns under the control of the trigger's controller, who puts it there
+  // (CR 110.2a), as an artifact only: its creature types go, its supertype stays (CR 205.1a), from then on.
+  if (/^When ~ die, if they were a creature, return them to the battlefield\. They're an artifact\.(?: \(They're no longer a creature\.\))?$/.test(raw))
+    return {
+      event: "selfDies",
+      body: {
+        targets: [],
+        effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, becomes: { types: ["Artifact"], subtypes: [] } }],
+        text: "If they were a creature, return them to the battlefield. They're an artifact.",
+      },
+    };
+  // Fang, Roku's Companion: "When ~ dies, if he wasn't a Spirit, return this card to the battlefield under your control.
+  // He's a Spirit in addition to his other types." The same intervening if as Otherworldly Escort's "if it's not a Spirit"
+  // (CR 603.4, as it last existed, CR 603.10a), and "it's a Spirit in addition to its other types" as it enters (CR 614.12,
+  // 205.1b).
+  const fang = /^When ~ dies, if ~ wasn't an? ([A-Z][a-z]+), return ~ to the battlefield under your control\. He's an? \1 in addition to ~'s other types\.$/.exec(raw);
+  if (fang) return parseTrigger(`When ~ dies, if it's not a ${fang[1]}, return it to the battlefield under your control. It's a ${fang[1]} in addition to its other types.`);
+  // Mistbind Clique: "When a Faerie is championed with ~, tap all lands target player controls." (CR 702.72c).
+  const championed = /^When an? ([A-Z][a-z]+) is championed with ~, (.+)$/.exec(raw);
+  if (championed) {
+    if (!CREATURE_TYPES.has(championed[1]!)) return "fail";
+    const body = parseBody(championed[2]!, {});
+    return body ? { event: "selfChampions", body, championedSubtype: championed[1]! } : "fail";
+  }
+  // Donna Noble: "Whenever ~ or a creature it's paired with is dealt damage, ~ deals that much damage to target opponent":
+  // ~'s own damage trigger, and its soulbond partner's (CR 702.95), each event's damage "that much".
+  const paired = /^Whenever ~ or a creature it's paired with is dealt damage, (.+)$/.exec(raw);
+  if (paired) {
+    const t = parseTrigger(`Whenever ~ is dealt damage, ${paired[1]!}`);
+    return t && t !== "fail" && t.event === "selfIsDealtDamage" && !t.minDamage && !t.firstDealtEachTurn ? { ...t, orPaired: true } : "fail";
+  }
+  return null;
 }

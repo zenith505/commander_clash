@@ -537,6 +537,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const o = ex && s.objects[ex.id];
     return o && o.zone === "exile" && (o.zoneChanges ?? 0) === ex.zc ? [o] : [];
   }
+  if (ref.ref === "searchFound") return (s.resolving?.searchFound ?? []).map((id) => s.objects[id]).filter((o): o is GameObject => o?.zone === ref.zone);
   if (ref.ref === "chosenFromYard") {
     const c = s.resolving?.chosenFromYard;
     const o = c && s.objects[c.id];

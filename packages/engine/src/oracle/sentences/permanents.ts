@@ -1198,6 +1198,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const to = parseObject(m[2]!, ctx);
     return to?.ref === "target" && !to.n ? [{ type: "removeAnyCounters", what: { ref: "self" }, n: 0, upTo: true, moveTo: to, kinds: [counterKind(m[1]!)] }] : null;
   }
+  // Bioshift: "Move any number of +1/+1 counters from target creature onto another target creature with the same
+  // controller": that kind only, as many as you choose as it resolves; with the two controlled by different players by
+  // then, the second target is illegal and none move (rulings).
+  if ((m = new RegExp(`^Move any number of ${COUNTER} counters from (target [^,]+?) onto (another target .+)$`).exec(s))) {
+    const from = parseObject(m[2]!, ctx);
+    const to = from?.ref === "target" && !from.n ? parseObject(m[3]!, ctx) : null;
+    return from && to?.ref === "target" && !to.n ? [{ type: "removeAnyCounters", what: from, n: 0, upTo: true, moveTo: to, kinds: [counterKind(m[1]!)] }] : null;
+  }
   // Rikku, Resourceful Guardian: "Move a counter from target creature an opponent controls onto target creature you
   // control": two targets that can't be the same object (their controllers differ), so no "another" is needed.
   if ((m = new RegExp(`^Move (?:a|one) (?:(?<kind>${COUNTER}) )?counter from (?<from>target [a-z]+ an opponent controls) onto (?<to>target [a-z]+ you control)$`, "i").exec(s))) {
@@ -1371,6 +1379,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     ctx.lastObjectTarget = undefined;
     ctx.lastTargets = { index: first, n: 2 };
     return [{ type: "counters", what: { ref: "target", index: first, n: 2 }, counter: counterKind(m[1]!), n: x, divided: true }];
+  }
+  // Invoke Justice: "distribute four +1/+1 counters among any number of creatures and/or Vehicles target player controls":
+  // the player is a target, the permanents are chosen as it resolves (rulings), among what that player controls then.
+  if ((m = new RegExp(`^Distribute ${NUMX} ${COUNTER} counters among any number of (creatures and/or Vehicles|creatures) (target player|target opponent) controls$`, "i").exec(s))) {
+    const filter = m[3] === "creatures" ? pickFilter("creatures") : parseTargetPhrase("creature or Vehicle");
+    const n = amt(m[1]!);
+    const of = filter && n ? parsePlayer(m[4]!, ctx) : null;
+    return filter?.kind === "object" && n && of?.ref === "target" ? [{ type: "distribute", counter: counterKind(m[2]!), n, filter: { ...filter, text: `${m[3]!} ${m[4]!.replace(/^target /, "that ")} controls` }, of }] : null;
   }
   // "Distribute X +1/+1 counters among any number of creatures you control" (Blessing of Frost), "distribute a number of
   // +1/+1 counters equal to the number of +1/+1 counters on ~ among ..." (Vastwood Hydra): no targets, divided as it

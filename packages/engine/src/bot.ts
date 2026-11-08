@@ -412,6 +412,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const ranked = [...pend.cards].sort((a, b) => handWorth(s, b) - handWorth(s, a));
       return [{ type: "searchLibrary", player: pid, found: [pid === s.resolving.item.controller ? ranked[1]! : ranked[0]!] }];
     }
+    // Signal the Clans: only cards with different names give a card, so the best of each name.
+    if (pend.kind === "searchLibrary" && !pend.dig && s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "search" && !!x.randomOfDistinct)) {
+      const seen = new Set<string>();
+      const found = chooseSearch(s, pid, pend.cards, pend.cards.length).filter((id) => !seen.has(defOf(s, obj(s, id)).name) && !!seen.add(defOf(s, obj(s, id)).name)).slice(0, pend.max);
+      return [{ type: "searchLibrary", player: pid, found }];
+    }
     if (pend.kind === "searchLibrary" && pend.what === "one of those creatures to copy") return [{ type: "searchLibrary", player: pid, found: [[...pend.cards].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
     if (pend.kind === "searchLibrary" && pend.zonesOf !== undefined) {
       const rank = (id: string) => (s.objects[id]!.zone === "hand" ? 1 : 0);

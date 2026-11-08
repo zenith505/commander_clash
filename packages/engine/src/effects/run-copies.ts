@@ -24,7 +24,9 @@ export function copiedValues(s: GameState, ref: ObjRef, ctx: ResolveCtx): CardDe
   if (ref.ref === "subjectCard" && ctx.lki?.copyKey) return key(ctx.lki.copyKey);
   // Lazav, Familiar Stranger: "a copy of that card", the card exiled this way: exactly what's printed on it (rulings, CR
   // 707.2), the front face of a double-faced card (CR 712.8a).
-  if (ref.ref === "chosenFromYard") {
+  // Scion of the Ur-Dragon: the card the search put into the graveyard, as printed (CR 707.2), the front face of a
+  // double-faced card (CR 712.8a); removing it from the graveyard later changes nothing (rulings).
+  if (ref.ref === "chosenFromYard" || ref.ref === "searchFound") {
     const o = objects(s, ref, ctx)[0];
     return o && o.zone !== "battlefield" && o.zone !== "stack" && !o.isToken ? restingDef(s.cards[o.cardId]!) : undefined;
   }

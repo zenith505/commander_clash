@@ -1,8 +1,8 @@
 # Roadmap
 
-30,443 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,679 of
-9,979 (96%).
+30,461 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,692 of
+9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -2378,7 +2378,7 @@ line blocks.
    any number of creatures and/or Vehicles target player controls" (Invoke Justice: chosen as it resolves, the returned
    permanent included, rulings; a browser test); replicate costs that aren't mana, "Tap an untapped Dalek you control"
    (Exterminate!, a different one each time, summoning sick ones too, CR 302.6; a browser test), "Tap an untapped Horror
-   you control" (Psionic Ritual) and "Pay {E}{E}{E}" (Reiterating Bolt). +10.
+   you control" (Psionic Ritual) and "Pay {E}{E}{E}" (Reiterating Bolt). +10, 30,461 of 31,936.
    Out after round 304 (looked at, not done): Night Soil ("Exile two creature cards from a single graveyard" as a cost:
    the cost picker only offers your own graveyard); Karn, Living Legacy ("Pay any amount of mana" as an effect, and an
    emblem whose ability's cost taps an artifact); Moxite Refinery, Abstruse Appropriation, Oskar, Araumi, Ride the

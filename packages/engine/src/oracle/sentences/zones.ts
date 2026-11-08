@@ -90,6 +90,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     return who ? [{ type: "exileHandOrPermanent", who }] : null;
   }
+  // Lich's Mastery: "for each 1 life you lost, exile a permanent you control or a card from your hand or graveyard" (read
+  // as "exile that many ..." in its "whenever you lose life" trigger, triggers.ts): any mix of the three (rulings).
+  if (/^[Ee]xile X permanents you control and\/or cards from your hand and\/or graveyard$/.test(s)) return [{ type: "exileHandOrPermanent", who: { ref: "you" }, graveyard: true, n: amt("X") }];
   // Court of Locthwain: "until end of turn, you may cast a spell from among cards exiled with ~ without paying its mana
   // cost": one spell, from the cards its linked exile took (compile.ts links it, CR 607.2a).
   // Idol of Endurance: "... a creature spell from among ...": only a spell of that kind.
@@ -1198,6 +1201,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Put up to seven permanent cards from your hand onto the battlefield" (Ugin, the Spirit Dragon), "you may put up to
   // two creature cards ..." (Smuggler's Surprise): any number of them up to that many.
   // "Put up to X land cards from your hand and/or graveyard onto the battlefield tapped" (Worldsoul's Rage): from either zone.
+  // Cryptic Gateway: "You may put a creature card from your hand that shares a creature type with each creature tapped this
+  // way onto the battlefield": with each of the creatures its cost tapped, not necessarily the same type (rulings).
+  if (ctx.activated && (m = /^(You may )?[Pp]ut a creature card from your hand that shares a creature type with each creature tapped this way onto the battlefield$/.exec(s)))
+    return [{ type: "putFromHand", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card that shares a creature type with each creature tapped" }, may: !!m[1], kinOfCostTapped: true }];
   // Yuna's Decision: "you may put a creature card and/or a land card from your hand onto the battlefield": up to one of
   // each, put onto the battlefield at the same time; a card that's both (Dryad Arbor) counts as either.
   if ((m = /^[Yy]ou may put an? ([a-z]+) card and\/or an? ([a-z]+) card from your hand onto the battlefield$/.exec(s))) {
@@ -2131,6 +2138,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     const among = pickFilter(m[2]!.replace(/s$/, ""));
     return who && among?.kind === "object" ? [{ type: "keepRest", who, keep: [{ filter: among, n: num(m[3]!) }], among }] : null;
+  }
+  // Stick Together: "Each player chooses a party from among creatures they control, then sacrifices the rest": for each of
+  // Cleric, Rogue, Warrior and Wizard, up to one creature of that type, each creature only once (CR 700.8b, 700.8d); then
+  // the other creatures are sacrificed at once.
+  if (/^Each player chooses a party from among creatures they control, then sacrifices the rest$/.test(s)) {
+    const creature: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+    return [{ type: "keepRest", who: { ref: "eachPlayer" }, keep: (["Cleric", "Rogue", "Warrior", "Wizard"] as const).map((t) => ({ filter: { ...creature, subtypes: [t], text: t }, n: 1, upTo: true as const, notKept: true as const })), among: creature }];
   }
   if ((m = /^(.+?) chooses (.+?),? (?:then|and) (?:sacrifices (?:the rest|all other creatures they control)|the rest are destroyed)$/.exec(s))) {
     const destroy = / the rest are destroyed$/.test(s);

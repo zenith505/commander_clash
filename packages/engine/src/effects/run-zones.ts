@@ -207,7 +207,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         sc.queue.shift();
         continue;
       }
-      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: options.length, min: 0, anyNumber: true, ...(e.prompt ? { prompt: e.prompt.replace(/~/g, src) } : {}), ...(e.differentNames ? { differentNames: true as const } : {}) };
+      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: options.length, min: 0, anyNumber: true, ...(e.prompt ? { prompt: e.prompt.replace(/~/g, src) } : {}), ...(e.differentNames ? { differentNames: true as const } : {}), ...(e.differentPowers ? { differentPowers: true as const } : {}) };
       return "paused";
     }
     if (!n || (e.upTo && !options.length)) {
@@ -577,7 +577,8 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
       const options0 = among(pid).filter((id) => objectMatches(s, { ...k0.filter, controller: "you" }, obj(s, id), pid, false));
       // "Unless they pay X life": as many as they can pay for, any number with X 0 (CR 119.4).
       const k = k0.fewest ? { ...k0, n: kr.fewest ?? 0 } : k0.maxTotalPower !== undefined ? { ...k0, n: options0.length } : e.payLife !== undefined ? { ...k0, n: lifeEach > 0 ? Math.floor(payableLife(s, pid) / lifeEach) : options0.length } : k0;
-      const options = options0;
+      // Stick Together: a creature already in the party fills no second slot (CR 700.8b).
+      const options = k.notKept ? options0.filter((id) => !kept.includes(id)) : options0;
       const max = Math.min(k.n, options.length);
       // Nothing to choose between: all of them are kept.
       if (!k.upTo && options.length <= k.n) {
@@ -597,7 +598,9 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
         s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "bounce", what: k.filter.text, options, count: max, prompt: `click ${/^[AEIOU]/.test(k.filter.text) ? "an" : "a"} ${k.filter.text} of yours to return to its owner's hand.` };
         return "paused";
       }
-      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...(k.upTo ? { min: 0 } : {}), ...(e.destroy ? { destroy: true as const } : {}), ...(e.bounce ? { bounce: true as const } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}), ...(e.payLife !== undefined ? { payLife: lifeEach } : {}), ...(e.sparesTypeOfKept ? { sparesKin: true as const } : {}) };
+      // Stick Together: which slot of the party this is.
+      const party = k.notKept ? { prompt: `choose your party: click up to one ${k.filter.text} of yours${kr.slot < e.keep.length - 1 ? ` (then ${e.keep.slice(kr.slot + 1).map((x) => `a ${x.filter.text}`).join(", ")})` : ""}. Creatures not in your party are sacrificed.` } : {};
+      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...party, ...(k.upTo ? { min: 0 } : {}), ...(e.destroy ? { destroy: true as const } : {}), ...(e.bounce ? { bounce: true as const } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}), ...(e.payLife !== undefined ? { payLife: lifeEach } : {}), ...(e.sparesTypeOfKept ? { sparesKin: true as const } : {}) };
       return "paused";
     }
     kr.queue.shift();
@@ -1953,26 +1956,43 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Each chooses in turn order (APNAP, CR 101.4) a card in their hand, unrevealed, or a permanent they control; then all
       // the chosen ones are exiled simultaneously (rulings).
       const sc = (s.resolving!.scratch ??= {});
-      const st = (sc.handOrPermanent ??= { queue: apnap(s, players(s, e.who, ctx)), picks: [] });
+      // Lich's Mastery: that many from the hand, the graveyard and the battlefield, any mix, one at a time; all of them when
+      // there aren't more (rulings).
+      const many = e.n !== undefined ? Math.max(0, amountNow(s, e.n, ctx)) : 1;
+      const st = (sc.handOrPermanent ??= { queue: apnap(s, players(s, e.who, ctx)), picks: [], ...(e.n !== undefined ? { left: many } : {}) });
       while (st.queue.length) {
         const pid = st.queue[0]!;
         const p = player(s, pid);
-        const perms = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid);
-        const options = [...p.hand, ...perms];
-        if (p.lost || !options.length) {
+        const perms = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !st.picks.includes(id));
+        const hand = p.hand.filter((id) => !st.picks.includes(id));
+        const yard = e.graveyard ? p.graveyard.filter((id) => !st.picks.includes(id)) : [];
+        const options = [...hand, ...yard, ...perms];
+        const next = () => {
           st.queue.shift();
+          if (e.n !== undefined) st.left = many;
+        };
+        if (p.lost || !options.length || st.left === 0) {
+          next();
           continue;
         }
-        s.pending = { kind: "chooseOption", player: pid, source: src, what: "exileHandOrPermanent", options, labels: [...p.hand.map((id) => `${defOf(s, obj(s, id)).name} (hand)`), ...perms.map((id) => nameOf(s, id))], prompt: "exile a card from your hand or a permanent you control" };
+        if (st.left !== undefined && options.length <= st.left) {
+          st.picks.push(...options);
+          next();
+          continue;
+        }
+        const which = st.left !== undefined && many > 1 ? ` (${many - st.left + 1} of ${many})` : "";
+        s.pending = { kind: "chooseOption", player: pid, source: src, what: "exileHandOrPermanent", options, labels: [...hand.map((id) => `${defOf(s, obj(s, id)).name} (hand)`), ...yard.map((id) => `${defOf(s, obj(s, id)).name} (graveyard)`), ...perms.map((id) => nameOf(s, id))], prompt: e.graveyard ? `exile a permanent you control or a card from your hand or graveyard${which}` : "exile a card from your hand or a permanent you control" };
         return "paused";
       }
       sc.handOrPermanent = undefined;
-      for (const id of st.picks) {
+      const gone = st.picks.filter((id) => ["hand", "battlefield", ...(e.graveyard ? ["graveyard"] : [])].includes(obj(s, id).zone));
+      for (const id of gone) {
         const o = obj(s, id);
-        if (o.zone !== "hand" && o.zone !== "battlefield") continue;
-        log(s, `${player(s, o.zone === "hand" ? o.owner : controllerOf(s, o)).name} exiles ${o.zone === "hand" ? `${defOf(s, o).name} from their hand` : nameOf(s, o.id)}.`);
-        moveObject(s, id, "exile");
+        log(s, `${player(s, o.zone === "battlefield" ? controllerOf(s, o) : o.owner).name} exiles ${o.zone === "hand" ? `${defOf(s, o).name} from their hand` : o.zone === "graveyard" ? `${defOf(s, o).name} from their graveyard` : nameOf(s, o.id)}.`);
       }
+      enterTogether(s, () => {
+        for (const id of gone) moveObject(s, id, "exile");
+      });
       invalidateCharacteristics(s);
       return;
     }
@@ -2664,7 +2684,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // existed on the battlefield (rulings).
         const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
         const most = !e.lesserPower ? Infinity : me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? power(s, me) : (ctx.lki?.power ?? (ctx.sourceId ? s.lastKnown?.[ctx.sourceId]?.power : undefined) ?? -Infinity);
-        const cards = [...player(s, from).hand, ...(e.orGraveyard ? p.graveyard : [])].filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.lesserPower || power(s, obj(s, id)) < most) && (!e.auraSwap || swapFits(id)));
+        // Cryptic Gateway: sharing a creature type with each creature tapped, each as it is now or last existed (CR 608.2h).
+        const tapped = (ctx.costTapped ?? []).map((t) => {
+          const o = s.objects[t.id];
+          const now = o?.zone === "battlefield" && (o.zoneChanges ?? 0) === t.zc ? creatureTypesOf(s, o) : undefined;
+          return now ?? (t.types === "all" ? "all" : new Set(t.types));
+        });
+        const kin = (id: ObjectId) => !e.kinOfCostTapped || (tapped.length > 0 && tapped.every((t) => shareCreatureType(t, creatureTypesOf(s, obj(s, id)))));
+        const cards = [...player(s, from).hand, ...(e.orGraveyard ? p.graveyard : [])].filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.lesserPower || power(s, obj(s, id)) < most) && (!e.auraSwap || swapFits(id)) && kin(id));
         const upTo = e.upTo === undefined ? Infinity : amountNow(s, e.upTo, ctx);
         // "You may put a land card from your hand onto the battlefield. If you don't, ..." (Hakbal): whether one was put.
         s.resolving!.did = false;

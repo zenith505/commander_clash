@@ -2071,7 +2071,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       if (e.attackTax) {
         p.attackTaxUntil = [...(p.attackTaxUntil ?? []), e.attackTax];
-        log(s, `Until ${p.name}'s next turn, creatures can't attack them${e.attackTax.planeswalkers ? " or planeswalkers they control" : ""} unless their controller pays {${e.attackTax.n}} for each.`);
+        log(s, `Until ${p.name}'s next turn, creatures can't attack them${e.attackTax.planeswalkers ? " or planeswalkers they control" : ""} unless their controller pays ${e.attackTax.life ? `${e.attackTax.life} life` : `{${e.attackTax.n}}`} for each.`);
       }
       if (e.unattackable) {
         p.unattackableUntil = true;

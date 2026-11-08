@@ -72,6 +72,9 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // "Whenever a source deals damage to ~, that source's controller ..." (Phyrexian Obliterator): once for each source
   // that deals it damage at the same time; "that source's controller" is that player (rulings).
   [/^Whenever a source deals damage to ~, (.+)$/, "selfDealtDamageBySource"],
+  // Archfiend of Spite: the same, for a source an opponent controls as it deals the damage; "that source's controller" is
+  // the player who controls it as the ability resolves (rulings, see TriggerEventInfo.sourceOf).
+  [/^Whenever a source an opponent controls deals damage to ~, (.+)$/, "selfDealtDamageByOpponentSource"],
   [/^Whenever another creature you control enters, (.+)$/, "anotherCreatureYouControlEnters"],
   [/^Whenever another creature enters the battlefield under your control, (.+)$/, "anotherCreatureYouControlEnters"],
   // Landfall
@@ -4165,6 +4168,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Erestor of the Council: "Whenever players finish voting, ..." (CR 701.38): its body reads the votes cast.
   const votesDone = /^Whenever players finish voting, (.+)$/.exec(line);
   if (votesDone) {
+    // Model of Unity: "you and each opponent who voted for a choice you voted for may scry 2": each of them may, deciding in
+    // turn order, then those who do scry (rulings: they look at the same time, then choose in turn order).
+    const unity = /^you and each opponent who voted for a choice you voted for may (scry \d+)\.$/.exec(votesDone[1]!);
+    if (unity) {
+      const b = parseBody(`Each player may ${unity[1]}.`, { votesEvent: true });
+      const e = b?.effects.length === 1 ? b.effects[0] : undefined;
+      return b && e?.type === "eachMay" && e.who.ref === "eachPlayer" && !b.targets.length ? { event: "playersFinishVoting", body: { ...b, effects: [{ ...e, who: { ref: "youAndVotedWithYou" } }] } } : "fail";
+    }
     const body = parseBody(votesDone[1]!, { votesEvent: true });
     return body ? { event: "playersFinishVoting", body } : "fail";
   }
@@ -5220,6 +5231,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // Cradle of Vitality: "put a +1/+1 counter on target creature for each 1 life you gained": one counter per life of
       // that one life-gaining event (rulings), as "that many".
       if (event === "youGainLife") text = text.replace(/\bput a \+1\/\+1 counter on (target creature) for each 1 life you gained\.$/, "put that many +1/+1 counters on $1.");
+      // Lich's Mastery: "for each 1 life you lost, exile a permanent you control or a card from your hand or graveyard": that
+      // many, of that one life-losing event.
+      if (event === "youLoseLife") text = text.replace(/^for each 1 life you lost, exile a permanent you control or a card from your hand or graveyard\.$/, "exile that many permanents you control and/or cards from your hand and/or graveyard.");
       // False Cure: "that player loses 2 life for each 1 life they gained": twice the life of that one life-gaining event.
       if (event === "playerGainsLife") text = text.replace(/^that player loses 2 life for each 1 life they gained\.$/, "that player loses twice that much life.");
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
@@ -5229,7 +5243,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         if (!/^the other chosen player also loses that much life\.$/.test(text)) return "fail" as const;
         text = "that player loses that much life.";
       }
-      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfIsDealtCombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "playerGainsLife" || event === "opponentLosesLife" || event === "playerLosesLife" || event === "youLoseLife" || event === "youPayLife" || event === "youUntapInUntapStep" || playerDealt;
+      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfIsDealtCombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealtDamageByOpponentSource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "playerGainsLife" || event === "opponentLosesLife" || event === "playerLosesLife" || event === "youLoseLife" || event === "youPayLife" || event === "youUntapInUntapStep" || playerDealt;
       // "With mana value less than or equal to that damage" (Aisha of Sparks and Smoke, Covert Technician): the damage dealt.
       const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "playerGainsLife" && event !== "opponentLosesLife" && event !== "playerLosesLife" && event !== "youLoseLife" && event !== "youPayLife" && event !== "youUntapInUntapStep" && !playerDealt;
       const thatMuch = amount && (/\bthat (?:much|many)\b/.test(text) || (damage && /\bless than or equal to that damage\b/.test(text)));
@@ -5242,7 +5256,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
       const left = event === "selfDies" || event === "selfDiesOrExiled" || event === "selfExiledCrafting" || event === "selfToGraveyard" || event === "selfLeaves";
-      if (event === "selfDealtDamageBySource") text = text.replace(/\bthat source's controller\b/g, "that player");
+      if (event === "selfDealtDamageBySource" || event === "selfDealtDamageByOpponentSource") text = text.replace(/\bthat source's controller\b/g, "that player");
       if (event === "selfAttacksUnblocked" && /^Whenever ~ attacks a player and isn't blocked, /.test(line)) text = text.replace(/\b[Tt]hat player\b/g, (w) => (w[0] === "T" ? "Defending player" : "defending player"));
       // "At the beginning of each player's upkeep, ~ deals 1 damage to them" (Roiling Vortex): that player.
       if (event === "eachUpkeep" || event === "eachDrawStep") text = text.replace(/^~ deals (\d+) damage to them\.$/, "~ deals $1 damage to that player.");
@@ -5261,7 +5275,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // much life": the attacking player is the active player (CR 506.2), parsed as "that player" and then made that one.
       const attackingPlayer = event === "selfIsDealtCombatDamage" && /\battacking player\b/.test(text) && !/\b(?:that|defending|the active) player\b/.test(text);
       if (attackingPlayer) text = text.replace(/\battacking player\b/g, "that player");
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: attackingPlayer || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "playerLosesLife" || event === "opponentBecomesMonarch" || event === "anotherPlayerLosesGame" || event === "opponentGainsLife" || event === "playerGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "opponentIsDealtNoncombatDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", selfEntered: event === "selfEnters", clashed: event === "youClash", ...(event === "youExert" ? { subject: true } : {}), ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: attackingPlayer || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "playerLosesLife" || event === "opponentBecomesMonarch" || event === "anotherPlayerLosesGame" || event === "opponentGainsLife" || event === "playerGainsLife" || event === "selfDealtDamageBySource" || event === "selfDealtDamageByOpponentSource" || event === "opponentIsDealtDamage" || event === "opponentIsDealtNoncombatDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", selfEntered: event === "selfEnters", clashed: event === "youClash", ...(event === "youExert" ? { subject: true } : {}), ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
       // Brood of Cockroaches: "When ~ is put into your graveyard from the battlefield, at the beginning of the next end step,
       // you lose 1 life and return ~ to your hand": one delayed trigger doing both (rulings), about the card in the
       // graveyard now; if it has left there by then, it stays where it went (CR 400.7).

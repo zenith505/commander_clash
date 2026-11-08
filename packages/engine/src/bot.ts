@@ -36,6 +36,7 @@ import {
   attackCostOptions,
   attackCostsPayable,
   attackTaxOf,
+  attackLifeCost,
   attackYouLimit,
   attackAllIfOne,
   combatLimit,
@@ -708,6 +709,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Battle for Bretagard: "For each of them, create a token that's a copy of it": one of each name, the best first.
     if (pend.kind === "pickPermanents" && pend.differentNames && pend.action === "choose") return [{ type: "pickPermanents", player: pid, ids: differentlyNamed(s, [...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))) }];
+    // Sigarda's Vanguard: double strike for its own creatures, one of each power, the best of each first (others' creatures
+    // would only gain it too).
+    if (pend.kind === "pickPermanents" && pend.differentPowers && pend.action === "choose") {
+      const seen = new Set<number>();
+      const ids = pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).filter((id) => {
+        const pw = power(s, obj(s, id));
+        if (seen.has(pw)) return false;
+        seen.add(pw);
+        return true;
+      });
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
     // "Remove a lore counter from each of any number of Sagas you control. Put a +1/+1 counter on ~ for each lore counter
     // removed this way" (Garnet): each of ours that has one, for the counters, and its chapter comes again.
     const removing = pend.kind === "pickPermanents" && pend.action === "choose" && pend.anyNumber ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
@@ -749,6 +762,27 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "pickPermanents" && phasing?.type === "phaseOut" && phasing.what.ref === "created")
       return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, pend.count) }];
     if (pend.kind === "pickPermanents" && pend.min !== undefined && pend.action !== "keep") return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
+    // Stick Together: for this slot of the party, the creature the most valuable whole party (this slot and the ones still
+    // to come, each creature once) uses, or none.
+    const partyFx = pend.kind === "pickPermanents" && pend.action === "keep" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    const partySlot = s.resolving?.scratch?.keepRest?.slot;
+    if (pend.kind === "pickPermanents" && partyFx?.type === "keepRest" && partySlot !== undefined && partyFx.keep[partySlot]?.notKept) {
+      const slots = partyFx.keep.slice(partySlot);
+      const kept = s.resolving!.scratch!.keepRest!.kept[pid] ?? [];
+      const mine = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature") && !kept.includes(id));
+      const fits = slots.map((k) => mine.filter((id) => objectMatches(s, { ...k.filter, controller: "you" }, obj(s, id), pid, false)));
+      let best: { value: number; first?: ObjectId } = { value: -1 };
+      const walk = (i: number, used: ObjectId[], value: number) => {
+        if (i === slots.length) {
+          if (value > best.value) best = { value, ...(used[0] !== "" && used[0] !== undefined ? { first: used[0] } : {}) };
+          return;
+        }
+        walk(i + 1, [...used, ""], value);
+        for (const id of fits[i]!) if (!used.includes(id)) walk(i + 1, [...used, id], value + Math.max(1, worth(s, pid, obj(s, id))));
+      };
+      walk(0, [], 0);
+      return [{ type: "pickPermanents", player: pid, ids: best.first && pend.options.includes(best.first) ? [best.first] : [] }];
+    }
     // Slaughter the Strong: our best creatures that fit in the total power, those with no power (or less) first.
     if (pend.kind === "pickPermanents" && pend.action === "keep" && pend.maxTotalPower !== undefined) {
       const ids: ObjectId[] = [];
@@ -1040,7 +1074,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const perms = pend.options.filter((o) => obj(s, o).zone === "battlefield");
       const token = perms.find((o) => obj(s, o).isToken && !obj(s, o).isCommander);
       const spare = (o: string) => (isType(defOf(s, obj(s, o)), "Land") ? (lands(s, pid) >= 5 ? -1 : 2) : mv(s, o));
-      const pick = token ?? [...inHand].sort((a, b) => spare(a) - spare(b))[0] ?? [...perms].sort((a, b) => mv(s, a) - mv(s, b))[0]!;
+      // Lich's Mastery: graveyard cards first; the permanent that keeps us in the game (it says "You can't lose the game")
+      // only when nothing else is left.
+      const yard = pend.options.filter((o) => obj(s, o).zone === "graveyard").sort((a, b) => mv(s, a) - mv(s, b));
+      const keeps = (o: string) => (abilitiesOf(s, obj(s, o)).cantLose === "you" ? 1000 : 0);
+      const pick = yard[0] ?? token ?? [...inHand].sort((a, b) => spare(a) - spare(b))[0] ?? [...perms].sort((a, b) => keeps(a) + mv(s, a) - keeps(b) - mv(s, b))[0]!;
       return [{ type: "chooseOption", player: pid, choice: pick }];
     }
     // Eladamri: the biggest creature card in hand, else the top card of the library (it may be one).
@@ -5091,6 +5129,12 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         if (plan) return plan;
         continue;
       }
+      // Osgir, the Reconstructor: two copies of the most valuable artifact card in our graveyard we can pay for.
+      if (ab.costs?.some((c) => c.kind === "exileFromGraveyard" && c.mvX)) {
+        const plan = exileMvXPlan(s, pid, o, i, ab);
+        if (plan) return plan;
+        continue;
+      }
       if (abilityCostsHaveX(ab) && discardX === undefined && !(energyX > 0) && !(energyTargetX >= 3) && !(counterX > 0)) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
       if (allEffects(ab.body.effects).some((e) => e.type === "endTurn")) continue; // Sundial of the Infinite, Obeka: bots don't end their turn early
@@ -5846,7 +5890,10 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
         .filter((x) => !manaAbilitiesOn(s, x).some((m) => m.tap) || late)
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
       // Weight of Conscience: the cheapest ones with a creature type in common.
-      const picked = c.shareCreatureType ? shareablePick(s, c, pool.map((x) => x.id)) : pool.length >= c.n ? pool.slice(0, c.n).map((x) => x.id) : null;
+      // Cryptic Gateway: the cheapest that each share a creature type with the biggest creature card in hand that has enough.
+      const kin = ab.body.effects.some((e) => e.type === "putFromHand" && e.kinOfCostTapped);
+      const gate = kin ? player(s, pid).hand.map((h) => obj(s, h)).filter((h) => isType(defOf(s, h), "Creature")).sort((a, b) => defMv(defOf(s, b)) - defMv(defOf(s, a))).map((h) => pool.filter((x) => shareCreatureType(creatureTypesOf(s, x), creatureTypesOf(s, h)))).find((fit) => fit.length >= c.n) : undefined;
+      const picked = kin ? (gate ? gate.slice(0, c.n).map((x) => x.id) : null) : c.shareCreatureType ? shareablePick(s, c, pool.map((x) => x.id)) : pool.length >= c.n ? pool.slice(0, c.n).map((x) => x.id) : null;
       if (!picked) return null;
       out.tap = [...(out.tap ?? []), ...picked];
     } else if (c.kind === "reveal" && !c.orControl && !c.x) {
@@ -5943,6 +5990,19 @@ function sacrificeMvXPlan(s: GameState, pid: PlayerId, o: GameObject, i: number,
       const plan = planActivate(s, pid, o.id, i, t, undefined, undefined, x, { sacrifice: [c.id] });
       if (plan) return plan;
     }
+  }
+  return null;
+}
+
+/** Osgir, the Reconstructor ("{X}, {T}, Exile an artifact card with mana value X from your graveyard: Create two tokens that are copies of the exiled card"): the card with the greatest mana value we can pay X for, never a land. */
+function exileMvXPlan(s: GameState, pid: PlayerId, o: GameObject, i: number, ab: ActivatedAbility): Action[] | null {
+  if (ab.body.modal || ab.body.targets.length || !ab.body.effects.every((e) => e.type === "createTokenCopy" && e.what.ref === "costExiled")) return null;
+  const cost = ab.costs!.find((c) => c.kind === "exileFromGraveyard" && c.mvX)!;
+  const cards = player(s, pid).graveyard.filter((c) => cost.kind === "exileFromGraveyard" && !!cost.filter && printedMatches(cost.filter, defOf(s, obj(s, c))) && !isType(defOf(s, obj(s, c)), "Land")).sort((a, b) => defMv(defOf(s, obj(s, b))) - defMv(defOf(s, obj(s, a))));
+  for (const card of cards) {
+    const x = defMv(defOf(s, obj(s, card)));
+    const plan = planActivate(s, pid, o.id, i, undefined, undefined, undefined, x, { exileCards: [card] });
+    if (plan) return plan;
   }
   return null;
 }
@@ -6810,7 +6870,9 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
     // Phyrexian symbols the pool can't pay take 2 life each (Norn's Annex): not down to 10 or less.
     const symbols = parseManaCost(tax).symbols.filter((x) => x.kind === "phyrexian").length;
     const taps = tax && !(symbols && player(s, pid).life - 2 * symbols <= 10) ? planMana(s, pid, parseManaCost(tax)) : tax ? null : [];
-    if (taps) {
+    // Sivitri, Dragon Master: the life it costs, paid only while that leaves more than 10.
+    const lifeTax = attackLifeCost(s, declared);
+    if (taps && (!lifeTax || (payableLife(s, pid) >= lifeTax && player(s, pid).life - lifeTax - 2 * symbols > 10))) {
       if (declared.length === 1 && characteristics(s, obj(s, declared[0]!.attacker)).cantAttackAlone) declared = [];
       if (declared.some((a) => withoutCompany(s, a.attacker, declared))) declared = declared.filter((a) => !withoutCompany(s, a.attacker, declared));
       return [...(declared.length ? taps : []), { type: "declareAttackers", player: pid, attacks: declared }];

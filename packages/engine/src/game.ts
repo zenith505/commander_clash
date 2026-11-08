@@ -791,6 +791,9 @@ export function moveObject(
   // A creature tapped for a station ability that's still on the stack: its power as it last existed (rulings on station).
   if (fromZone === "battlefield")
     for (const item of s.stack) if (item.stationed?.id === id && item.stationed.zc === (o.zoneChanges ?? 0)) item.stationed.power = power(s, o);
+  // Cryptic Gateway: a creature its cost tapped, with the creature types it last had (CR 608.2h).
+  if (fromZone === "battlefield")
+    for (const item of s.stack) for (const t of item.costTapped ?? []) if (t.id === id && t.zc === (o.zoneChanges ?? 0)) t.types = typesList(creatureTypesOf(s, o));
   // A copy of a spell anywhere but the stack ceases to exist (CR 707.10a); it isn't a card, so nothing sees it arrive.
   if (o.spellCopy && to !== "stack" && to !== "battlefield") {
     delete s.objects[id];
@@ -7793,12 +7796,12 @@ export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the type chosen for the source (linked, CR 607.2d).
     const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, src?.chosen) } : c0;
     const c = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, src?.id, src?.attachedTo) } : c1;
-    return xCost(c) ? { ...c, n: x ?? 0 } : (c.kind === "discard" || c.kind === "sacrifice") && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c;
+    return xCost(c) ? { ...c, n: x ?? 0 } : (c.kind === "discard" || c.kind === "sacrifice" || c.kind === "exileFromGraveyard") && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c;
   });
 }
 
 /** "Discard a card with mana value X" (Kozilek, the Great Distortion): X announced, then a card with that mana value. */
-const mvXCost = (c: AdditionalCost) => (c.kind === "discard" || c.kind === "sacrifice") && !!c.mvX && !!c.filter;
+const mvXCost = (c: AdditionalCost) => (c.kind === "discard" || c.kind === "sacrifice" || c.kind === "exileFromGraveyard") && !!c.mvX && !!c.filter;
 
 /** Does the ability have an X to announce in a cost beyond mana, as Chatterfang's "Sacrifice X Squirrels"? */
 export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.energyX || !!ab.removeCounters?.x || !!ab.costs?.some((c) => xCost(c) || mvXCost(c));
@@ -8661,14 +8664,18 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   // "Discard a card with mana value X: Counter target spell with mana value X" (Kozilek): before X is announced, the
   // ability can be activated if some X works for both the cost and the target (CR 107.3a, 602.2b).
   // Sidisi, Regent of the Mire: "Sacrifice a creature you control with mana value X" the same way.
-  if (x === undefined && ab.costs?.some((c) => (c.kind === "discard" || c.kind === "sacrifice") && c.mvX)) {
+  if (x === undefined && ab.costs?.some((c) => (c.kind === "discard" || c.kind === "sacrifice" || c.kind === "exileFromGraveyard") && c.mvX)) {
+    // Osgir, the Reconstructor: an X the card fits but the mana doesn't is "not enough mana" (autopay decides).
+    let short: string | null = null;
     for (let n = 0; n <= 20; n++) {
-      if (abilityProblem(s, pid, id, index, targets, modes, tapCreatures, n, costs)) continue;
+      const p = abilityProblem(s, pid, id, index, targets, modes, tapCreatures, n, costs);
+      if (p && /not enough mana/.test(p)) short ??= p;
+      if (p) continue;
       // Without targets chosen, the check above lets any X target; here the target must have mana value n too.
       const b = settleDivided(s, withModes(ab.body, modes), { controller: pid, sourceId: id, x: n }, false);
       if (targets || !b.targets.length || hasLegalTargetsFor(s, b.targets, pid, sourceQuality(s, id), id)) return null;
     }
-    return abilityProblem(s, pid, id, index, targets, modes, tapCreatures, 0, costs);
+    return short ?? abilityProblem(s, pid, id, index, targets, modes, tapCreatures, 0, costs);
   }
   let body = settleDivided(s, withModes(ab.body, modes), { controller: pid, sourceId: id, x: x ?? 0 }, !targets);
   const manySpecs = body.targets.filter((t) => t.many === "any" && !t.skip);
@@ -9141,6 +9148,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const costExiled: { id: ObjectId; zc: number }[] = [];
   const sacrificed = ab.costs?.length ? payExtraCosts(s, p, activatedCosts(ab, x, o), costs ?? {}, lki, costCardNames, costDiscarded, costExiled) : [];
   const tappedOne = ab.costs?.some((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x) && costs?.tap?.length === 1 ? costs.tap[0] : undefined;
+  // Cryptic Gateway: the creatures its cost tapped, for "each creature tapped this way".
+  const tappedKin = JSON.stringify(body.effects).includes('"kinOfCostTapped":true') ? (costs?.tap ?? []).flatMap((t) => (s.objects[t] ? [{ id: t, zc: s.objects[t]!.zoneChanges ?? 0, types: typesList(creatureTypesOf(s, s.objects[t]!)) }] : [])) : [];
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
   if (ab.grantSourceCost?.action === "sacrifice" && granter?.zone === "battlefield" && (granter.zoneChanges ?? 0) === ab.grantSourceCost.zc) moveObject(s, granter.id, "graveyard", { sacrificed: true, cost: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
@@ -9168,6 +9177,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(costDiscarded.length ? { costDiscarded } : {}),
     ...(removedCount !== undefined ? { countersRemoved: removedCount } : {}),
     ...(costExiled.length ? { costExiled } : {}),
+    ...(tappedKin.length ? { costTapped: tappedKin } : {}),
+    ...(body.targets.some((t) => t.blockingEquipped) && o.attachedTo && s.objects[o.attachedTo] ? { hostThen: { id: o.attachedTo, zc: s.objects[o.attachedTo]!.zoneChanges ?? 0 } } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
     // "Tap an untapped creature you control: ... where X is the power of the creature tapped this way" (Keldon Battlewagon).
     ...(!ab.station && tappedOne !== undefined ? { stationed: { id: tappedOne, zc: obj(s, tappedOne).zoneChanges ?? 0, power: power(s, obj(s, tappedOne)) } } : {}),
@@ -9409,6 +9420,8 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   if (n !== ids.length || n > pend.count || n < (pend.min ?? pend.count))
     throw new RulesError(pend.min === undefined ? `choose exactly ${pend.count} of the permanents offered` : `choose at most ${pend.count} of the permanents offered`);
   if (pend.differentNames && !namesDiffer(s, ids)) throw new RulesError("choose permanents with different names");
+  // Sigarda's Vanguard: every power different, as they are now (rulings).
+  if (pend.differentPowers && new Set(ids.map((id) => power(s, obj(s, id)))).size !== ids.length) throw new RulesError("choose creatures with different powers");
   if (pend.maxTotalPower !== undefined && ids.reduce((t, id) => t + power(s, obj(s, id)), 0) > pend.maxTotalPower) throw new RulesError(`choose creatures with total power ${pend.maxTotalPower} or less`);
   if (pend.attackCost) {
     attackCostPaid(s, p, ids);
@@ -9983,8 +9996,10 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "exileHandOrPermanent") {
     const st = r.scratch?.handOrPermanent;
     if (!st || !pend.options.includes(choice)) throw new RulesError("choose a card in your hand or a permanent you control");
-    st.queue.shift();
     st.picks.push(choice);
+    // Lich's Mastery: one of that many, asked again until they're all chosen (the resolution moves on at 0).
+    if (st.left !== undefined) st.left--;
+    else st.queue.shift();
     log(s, `${player(s, pend.player).name} chooses ${s.objects[choice]?.zone === "hand" ? "a card in their hand" : (pend.labels?.[pend.options.indexOf(choice)] ?? "a permanent")} (${pend.source}).`);
     continueResolution(s);
     return;
@@ -10353,6 +10368,8 @@ export function creatureTypesOf(s: GameState, o: GameObject): Set<string> | "all
   const d = defOf(s, o);
   return everyCreatureType(d) ? "all" : new Set(d.subtypes.filter((t) => CREATURE_TYPES.has(t)));
 }
+/** A creatureTypesOf result as plain JSON (state holds no Sets). */
+export const typesList = (t: Set<string> | "all"): string[] | "all" => (t === "all" ? "all" : [...t]);
 export const shareCreatureType = (a: Set<string> | "all", b: Set<string> | "all") =>
   a === "all" ? b === "all" || b.size > 0 : b === "all" ? a.size > 0 : [...a].some((t) => b.has(t));
 
@@ -11038,7 +11055,22 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
  */
 export function attackTaxPer(s: GameState, defender: PlayerId, planeswalker = false, attacker?: ObjectId): number {
   const { generic, mana } = attackTaxParts(s, defender, planeswalker, attacker);
-  return generic + mana.length;
+  return generic + mana.length + attackLifePer(s, defender, planeswalker);
+}
+
+/** Sivitri, Dragon Master: the life attacking `defender` (or, with `planeswalker`, a planeswalker they control) costs for each creature. */
+function attackLifePer(s: GameState, defender: PlayerId, planeswalker: boolean): number {
+  return (s.players[defender]?.attackTaxUntil ?? []).reduce((n, t) => n + (!planeswalker || t.planeswalkers ? (t.life ?? 0) : 0), 0);
+}
+
+/** The life a declaration of attackers costs (Sivitri, Dragon Master), paid along with any mana (CR 508.1g-h, 119.4). */
+export function attackLifeCost(s: GameState, attacks: { attacker?: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[]): number {
+  return attacks.reduce((n, a) => {
+    if (a.planeswalker === undefined) return n + attackLifePer(s, a.defender, false);
+    // A battle isn't the player's planeswalker, so attacking it costs no life.
+    const pw = s.objects[a.planeswalker];
+    return n + (pw && objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === a.defender ? attackLifePer(s, a.defender, true) : 0);
+  }, 0);
 }
 
 /**
@@ -11532,11 +11564,18 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   // Attack costs are totalled and paid, with mana abilities activated first (CR 508.1g-i).
   // A Phyrexian symbol is paid with its color's mana from the pool, otherwise 2 life (CR 107.4f, 119.4).
   const tax = attackCost(s, attacks);
+  // Sivitri, Dragon Master: life, paid with the mana; only with that much life (CR 119.4).
+  const lifeTax = attackLifeCost(s, attacks);
+  if (lifeTax && payableLife(s, p.id) < lifeTax) throw new RulesError(`attacking with these creatures costs ${lifeTax} life, and ${p.name} can't pay it`);
   if (tax) {
-    const paid = spendFromPool(s, p.id, parseManaCost(tax), "other", 0, payableLife(s, p.id));
+    const paid = spendFromPool(s, p.id, parseManaCost(tax), "other", 0, payableLife(s, p.id) - lifeTax);
     if (!paid) throw new RulesError(`attacking these players costs ${tax}: add the mana first`);
     payLife(s, p.id, paid.lifePaid);
     log(s, `${p.name} pays ${tax}${paid.lifePaid ? ` (${paid.lifePaid} life)` : ""} to attack.`);
+  }
+  if (lifeTax) {
+    payLife(s, p.id, lifeTax);
+    log(s, `${p.name} pays ${lifeTax} life to attack.`);
   }
   // The attackers become tapped at the same time (CR 508.1f): "one or more ... become tapped" triggers once.
   batchTaps(s, () => {

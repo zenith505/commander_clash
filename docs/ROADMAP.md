@@ -1,6 +1,6 @@
 # Roadmap
 
-30,531 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,540 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,716 of
 9,979 (97%).
 
@@ -6782,7 +6782,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   player's library", each shown only to you in the log. Bots pay Tester's X for as many counters as it has when they have
   another creature, and Isareth's X for the best creature card in their graveyard. A browser test for Bullseye's two cost
   entries. +7 (30,523 of 31,936 with B145 and rounds 305-307).
-- Out after round B146 (looked at, not done): Tamanoa and Blaze Commando ("whenever a noncreature source / an instant or
+- Round B147 (least played first, from the skip lists): triggers on one source's damage in one damage event (CR 120.3,
+  603.2c), all it dealt then added up as "that much" (Justice's rulings), extending round 305's event for The Red Terror:
+  Tamanoa ("Whenever a noncreature source you control deals damage, you gain that much life": any source without the
+  creature type, a cycled creature card's ability not, rulings), Blaze Commando ("Whenever an instant or sorcery spell you
+  control deals damage") and Flame Channeler ("When a spell you control deals damage, transform ~"): a spell on the stack
+  (CR 112.1, rulings), not creatures a spell has fight nor a spell's reflexive or delayed ability, and Justice ("Whenever
+  a red creature or spell deals damage, ~ deals that much damage to that creature's or spell's controller": anyone's red
+  creature permanent, CR 109.2, or red spell; that controller as it resolves while the source is still that object, CR
+  608.2h). "~ deals 3 damage to target player or planeswalker and 3 damage to target creature" (Punish the Enemy, Arc
+  Trail and 58 other cards) was dealt as two damage events; now both parts are dealt at once as it resolves, one event
+  (CR 120.3, Blaze Commando's rulings), the compiled effects otherwise as before (Effect damage `sameEvent`). Master of
+  Barbs ("Whenever one or more opponents are dealt noncombat damage"): once for each damage event, from any source.
+  Satyr Firedancer ("Whenever an instant or sorcery spell you control deals damage to an opponent, ~ deals that much
+  damage to target creature that player controls"). Briarbridge Patrol ("Whenever ~ deals damage to one or more
+  creatures, investigate"): once for each event (rulings). Greatbow Doyen and Ohabi Caleria ("Whenever an Archer you
+  control deals damage to a creature"): once for each creature each Archer permanent dealt damage, combat or not
+  (rulings); Doyen's damage dealt by that Archer to the creature's controller as the ability resolves. +9 (30,540 of
+  31,936 with B145-B146 and rounds 305-308).
+- Out after round B147 (looked at, not done): Ogre Enforcer ("can't be destroyed by lethal damage unless lethal damage
+  dealt by a single source is marked on it": damage marked per source, which removing damage has to clear too), Sea Troll
+  ("if ~ blocked or was blocked by a blue creature this turn": the colors of its blocks this turn, as they were),
+  Hostility (a prevention replacement that creates a token for each 1 damage prevented this way).
+- Out after round B146 (looked at, not done): Tamanoa (done in round B147) and Blaze Commando (done in round B147) ("whenever a noncreature source / an instant or
   sorcery spell you control deals damage": once per source and damage event, which Lane A's round 305, PR #452, adds for
   The Red Terror; merged now, so they're next), Bargaining Table (still: the opponent chosen as it's activated sets X), Foraging
   Wickermaw (a mana ability that also makes ~ the color of the mana it made), Isu the Abominable ("you may pay {G}, {W},

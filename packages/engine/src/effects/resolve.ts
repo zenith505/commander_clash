@@ -196,9 +196,11 @@ export function continueResolution(s: GameState): Resolution {
     }
     if (r.next >= r.body.effects.length) break;
     if (!r.scratch) s.leftTogether = undefined; // a new instruction, not one resuming after a choice
+    // "~ deals 3 damage to target player and 3 damage to target creature": both parts at once (Effect damage `sameEvent`).
+    const together = sameDamageEvent(r.body.effects[r.next]!, r.body.effects[r.next + 1]);
     // An instruction's taps happen at the same time (CR 608.2c): "one or more ... become tapped" triggers once.
-    if (batchTaps(s, () => runAsking(s, r.body.effects[r.next]!, ctx)) === "paused") return "paused";
-    r.next++;
+    if (batchTaps(s, () => runAsking(s, together ?? r.body.effects[r.next]!, ctx)) === "paused") return "paused";
+    r.next += together ? 2 : 1;
     r.scratch = undefined;
   }
   s.leftTogether = undefined;
@@ -998,6 +1000,20 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       return [controllerOf(s, o)];
     }
   }
+}
+
+/**
+ * A damage effect and the `sameEvent` one after it as one effect, dealt at once (CR 120.3): the second recipient in
+ * `also` with its own amount, one amount for a recipient that's both (`merge`). Only when nothing else about them differs.
+ */
+function sameDamageEvent(a: Effect, b: Effect | undefined): Effect | undefined {
+  if (a.type !== "damage" || b?.type !== "damage" || !b.sameEvent || a.also || b.also || a.alsoAmount !== undefined || a.merge || b.merge) return undefined;
+  const { amount: _a, to: _t, ...restA } = a;
+  const { amount: _b, to: _u, sameEvent: _s, ...restB } = b;
+  if (JSON.stringify(restA) !== JSON.stringify(restB) || a.divided || a.evenly || a.excessToController || a.preventOf !== undefined) return undefined;
+  // Each its own amount per player or per permanent, or a choice of player or planeswalker for the second: apart, as before.
+  if (/"eachOne"|"attachedToAffected"/.test(JSON.stringify([a.amount, b.amount])) || b.to.ref === "playerOrPlaneswalker") return undefined;
+  return { ...a, also: [b.to], alsoAmount: b.amount, merge: true };
 }
 
 export function runEffect(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | void {

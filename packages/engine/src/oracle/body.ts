@@ -1686,6 +1686,15 @@ function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell
   return null;
 }
 
+/** Ghouls' Night Out: "They're black Zombies in addition to their other colors and types and they gain decayed". Undefined
+ * when the sentence isn't that form; null when it is but can't be read. */
+function decayedZombieMods(sentence: string | undefined): Modification[] | null | undefined {
+  const m = /^They're (white|blue|black|red|green) ([A-Z][a-z]+)s in addition to their other colors and types and they gain decayed$/.exec(sentence?.replace(/\.$/, "") ?? "");
+  if (!m) return undefined;
+  const mods = CREATURE_TYPES.has(m[2]!) ? parseBecomes(`a ${m[1]} ${m[2]} in addition to its other colors and types`) : null;
+  return mods ? [...mods, { kind: "addKeywords", keywords: ["Decayed"] }] : null;
+}
+
 function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfAttacking?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~")
@@ -5550,15 +5559,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // opponent controls or without flying.
     // Ajani Unrelenting: "~ deals 4 damage to each creature except for tokens you control": each creature an opponent
     // controls or that isn't a token.
-    const exceptTokens = /^~ deals (\d+) damage to each creature except for tokens you control$/.exec(s);
-    if (exceptTokens) {
-      const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], anyOf: [{ kind: "object", controller: "opponent", text: "an opponent controls" }, { kind: "object", token: false, text: "nontoken" }], text: "creature except for tokens you control" };
-      effects.push({ type: "damage", amount: Number(exceptTokens[1]), to: { ref: "each", filter } });
-      continue;
-    }
-    const sweep = /^~ deals (\d+) damage to each creature except for creatures you control with flying$/.exec(s);
+    const sweep = /^~ deals (\d+) damage to each creature except for (creatures you control with flying|tokens you control)$/.exec(s);
     if (sweep) {
-      const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], anyOf: [{ kind: "object", controller: "opponent", text: "an opponent controls" }, { kind: "object", notKeywords: ["Flying"], text: "without flying" }], text: "creature except for creatures you control with flying" };
+      const other: TargetSpec = sweep[2] === "tokens you control" ? { kind: "object", token: false, text: "nontoken" } : { kind: "object", notKeywords: ["Flying"], text: "without flying" };
+      const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], anyOf: [{ kind: "object", controller: "opponent", text: "an opponent controls" }, other], text: `creature except for ${sweep[2]}` };
       effects.push({ type: "damage", amount: Number(sweep[1]), to: { ref: "each", filter } });
       continue;
     }
@@ -9471,10 +9475,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!filter?.types?.length || filter.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
       // Ghouls' Night Out: "They're black Zombies in addition to their other colors and types and they gain decayed": each
       // as it enters (CR 614.12), from then on; decayed even if it isn't a creature then (rulings).
-      const ghouls = /^They're (white|blue|black|red|green) ([A-Z][a-z]+)s in addition to their other colors and types and they gain decayed$/.exec(sentences[si + 2]?.replace(/\.$/, "") ?? "");
-      const ghoulMods = ghouls && CREATURE_TYPES.has(ghouls[2]!) ? parseBecomes(`a ${ghouls[1]} ${ghouls[2]} in addition to its other colors and types`) : null;
-      if (ghouls && !ghoulMods) return null;
-      effects.push({ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachPlayer" }, youChoose: true, ...(ghoulMods ? { alsoMods: [...ghoulMods, { kind: "addKeywords", keywords: ["Decayed"] }] } : {}) });
+      const ghoulMods = decayedZombieMods(sentences[si + 2]);
+      if (ghoulMods === null) return null;
+      effects.push({ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachPlayer" }, youChoose: true, ...(ghoulMods ? { alsoMods: ghoulMods } : {}) });
       si += ghoulMods ? 2 : 1;
       continue;
     }

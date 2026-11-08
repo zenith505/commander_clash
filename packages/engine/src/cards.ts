@@ -55,8 +55,10 @@ export const FACE_DOWN_FOREST: CardDef = { oracleId: "face-down-forest", name: "
  * and no color (rulings), no other types or abilities (CR 708.2a).
  */
 export const FACE_DOWN_CYBERMAN: CardDef = { oracleId: "face-down-cyberman", name: "Face-down Cyberman", manaCost: "", cmc: 0, typeLine: "Artifact Creature — Cyberman", supertypes: [], types: ["Artifact", "Creature"], subtypes: ["Cyberman"], oracleText: "", power: "2", toughness: "2", colors: [], colorIdentity: [], keywords: [] };
+/** Illithid Harvester's: "They're 2/2 Horror creatures" (CR 708.2a): no name or color, Horror its only subtype. */
+export const FACE_DOWN_HORROR: CardDef = { oracleId: "face-down-horror", name: "Face-down Horror", manaCost: "", cmc: 0, typeLine: "Creature — Horror", supertypes: [], types: ["Creature"], subtypes: ["Horror"], oracleText: "", power: "2", toughness: "2", colors: [], colorIdentity: [], keywords: [] };
 /** The copiable values a face-down permanent has (CR 708.2). */
-const faceDownDef = (o: GameObject): CardDef => (o.faceDown === "forest" ? FACE_DOWN_FOREST : o.faceDown === "cyberman" ? FACE_DOWN_CYBERMAN : withWard(o) ? FACE_DOWN_WARD : FACE_DOWN);
+const faceDownDef = (o: GameObject): CardDef => (o.faceDown === "forest" ? FACE_DOWN_FOREST : o.faceDown === "cyberman" ? FACE_DOWN_CYBERMAN : o.faceDown === "horror" ? FACE_DOWN_HORROR : withWard(o) ? FACE_DOWN_WARD : FACE_DOWN);
 
 /**
  * Its copiable values before face-down status (CR 613.2a): the latest copy effect that began after it entered

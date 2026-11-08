@@ -1869,6 +1869,11 @@ export function compile(d: CardDef): CompiledCard {
       out.entersMillPerKick = num(millKicked[1]!);
       continue;
     }
+    // Ixidron: "As ~ enters, turn all other nontoken creatures face down." (its reminder text is gone by now).
+    if (line === "As ~ enters, turn all other nontoken creatures face down." && !isSpell) {
+      out.entersTurnOthersFaceDown = true;
+      continue;
+    }
     // Heightened Awareness: "As ~ enters, discard your hand." (CR 614.1c).
     if (line === "As ~ enters, discard your hand.") {
       out.entersDiscardHand = true;

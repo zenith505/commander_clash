@@ -2363,6 +2363,31 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands.
+   Round 306 took cards back off the "Out after round N" lists, most played first: "Each opponent separates the creatures
+   they control into two piles. For each opponent, you choose one of their piles. Each opponent sacrifices the creatures
+   in their chosen pile" (Make an Example: each separates their own in turn order, CR 101.4, then all the chosen piles
+   are sacrificed at once; "their chosen pile" is the one you chose, rulings; a browser test); "Separate all creatures
+   target player controls into two piles. Destroy all creatures in the pile of that player's choice. They can't be
+   regenerated" (Do or Die, CR 700.3: creatures only, a "Destroy pile" button, a browser test); "For each player, exile
+   up to one target nonland permanent that player controls. For each permanent exiled this way, its controller cloaks
+   the top card of their library" (Unexplained Absence, CR 701.58a); "Target opponent chooses a creature they control.
+   You gain control of it" and "Choose a creature you control. Each other creature you control becomes a copy of that
+   creature until end of turn" (Sakashima's Will: not targeted, the creature gained by the first mode can be the one
+   copied when both are chosen, rulings; a browser test); "Target creature's owner shuffles it into their library, then
+   faces a villainous choice — They lose 5 life, or they shuffle another creature they own into their library" (This
+   Is How It Ends: any creature they own, whoever controls it; bots don't take a life loss that would lose them the
+   game, CR 104.3b; a browser test); "Create a 0/0 ... Thopter ..., then put a +1/+1 counter on it for each card put
+   into your graveyard this way" after the piles (Intrude on the Mind); "As ~ enters, turn all other nontoken creatures
+   face down" (Ixidron: before it's on the battlefield, so their "another creature enters" abilities don't see it, and
+   not the ones entering with it, rulings; each can be turned face up for its morph cost, CR 702.37e); "turn any number
+   of target tapped nontoken creatures face down. They're 2/2 Horror creatures" (Illithid Harvester, FaceDownKind
+   "horror", CR 708.2a). +8, 30,491 of 31,936.
+   Out after round 306 (looked at, not done): Bend or Break (each player separates their lands, and an opponent of each
+   player's choice picks the pile: a chooser chosen per player); Fight or Flight and Stand or Fall (piles that limit
+   which creatures can attack or block this turn); Midnight Crusader Shuttle (a creature gained until end of turn that's
+   tapped and attacking that player); Genesis of the Daleks's chapter IV (the total power of Daleks that died this
+   turn); Hot Pursuit (still out, as noted before). Bot gap: a bot casts Ixidron even when it turns more of its own
+   creatures face down than its opponents'.
    Round 305 took cards back off the "Out after round N" lists, most played first: "Eminence — Whenever another nontoken
    Wizard you control enters, if ~ is in the command zone or on the battlefield, you may pay {1}. If you do, create a
    token that's a copy of that Wizard. The token gains haste" (Inalla, Archmage Ritualist); "Whenever a Dragon you

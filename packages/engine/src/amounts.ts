@@ -783,6 +783,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return new Set((s.resolving?.countersPutThisWay ?? []).map((x) => `${x.id}@${x.zc}`)).size;
     case "flipsWon":
       return c.lost ? Math.max(0, (s.resolving?.flipped?.flips ?? (s.resolving?.flipped ? 1 : 0)) - (s.resolving?.flipped?.wins ?? 0)) : (s.resolving?.flipped?.wins ?? 0);
+    case "pilesToGraveyard":
+      return (s.resolving?.pilesToGraveyard ?? []).length;
     case "milledThisWay":
       return (s.resolving?.milled ?? []).filter((m) => !!s.objects[m.id] && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[m.id]!)))).length;
     case "drawnThisWay":
@@ -1644,6 +1646,8 @@ function describeCount(c: Count): string {
       return "the drawn card's mana value";
     case "milledThisWay":
       return `#${c.filter?.text ?? "card"}s milled this way`;
+    case "pilesToGraveyard":
+      return "#cards put into the graveyard this way";
     case "asCast":
       return `${describeCount(c.of)} as cast`;
     case "discardedTypes":

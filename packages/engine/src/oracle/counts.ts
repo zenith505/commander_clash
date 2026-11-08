@@ -654,6 +654,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const filter = parseSearchFilter(m[1]!);
     return filter ? count({ kind: "milledThisWay", filter }) : null;
   }
+  // Intrude on the Mind: "for each card put into your graveyard this way", after the piles: the pile put there (one put
+  // somewhere else instead by a replacement doesn't count).
+  if (each && ctx?.afterPilesGraveyard && /^card put into your graveyard this way$/i.test(p)) return count({ kind: "pilesToGraveyard" });
   // Struggle for Project Purity: "Each opponent draws a card. You draw a card for each card drawn this way."
   if (each && /^card drawn this way$/i.test(p)) return count({ kind: "drawnThisWay" });
   // Smuggler's Share: "for each opponent who drew two or more cards this turn", "... who had two or more lands enter the

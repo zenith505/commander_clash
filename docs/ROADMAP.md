@@ -1,7 +1,7 @@
 # Roadmap
 
-30,461 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,692 of
+30,469 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,699 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2363,6 +2363,28 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands.
+   Round 305 took cards back off the "Out after round N" lists, most played first: "Eminence — Whenever another nontoken
+   Wizard you control enters, if ~ is in the command zone or on the battlefield, you may pay {1}. If you do, create a
+   token that's a copy of that Wizard. The token gains haste" (Inalla, Archmage Ritualist); "Whenever a Dragon you
+   control dies while this card is in your graveyard, you may pay {1}{B}" (Boneyard Scourge: not when it dies at the
+   same time as the Dragon, since it wasn't in the graveyard yet, rulings, CR 603.10a); "Whenever one or more cards
+   leave your graveyard, you may create a 1/1 ... Insect creature token, then put a number of +1/+1 counters on it equal
+   to the greatest mana value among those cards. Do this only once each turn" (Amzu, Swarm's Hunger: declining lets it
+   trigger again, CR 603.2h); "you get {E}, then it gets +X/+X ..., where X is the amount of {E} you have" and
+   "Reconfigure—Pay {2} or {E}{E}{E}" (Razorfield Ripper: four reconfigure abilities, a browser test); "target
+   enchantment deals damage equal to its mana value to its controller unless that player sacrifices it" (Enchanter's
+   Bane: that player chooses, itself a legal target, a browser test); "you may pay {3} and sacrifice it. If you do,
+   choose a land you control. Then search your library for up to two basic land cards which have the same name as the
+   chosen land" (Canoptek Wraith: the found cards share one name, a land you control's, the picker dims the others, a
+   browser test); "You may cast ~ as though it had flash by tapping three untapped creatures you control with flying in
+   addition to paying its other costs" (Tegwyll's Scouring: an optional additional cost, CR 601.2b, 601.3c, a browser
+   test); "Whenever a red source you control deals damage to one or more permanents and/or players" (The Red Terror:
+   once for each source in each batch of damage, CR 603.2c). +8, 30,469 of 31,936.
+   Out after round 305 (looked at, not done): Spell Queller (casting the exiled card when it leaves: needs the exiled
+   card linked to its leaves trigger); Karplusan Minotaur ("any target of an opponent's choice" in a triggered ability
+   with a coin flip cumulative upkeep); Toggo, Goblin Weaponsmith (a named Equipment token granting an ability with a
+   sacrifice of that token); Jace, Architect of Thought (a delayed "until your next turn, whenever a creature an opponent
+   controls attacks" and a search of every player's library).
    Round 304 took cards back off the "Out after round N" lists, most played first: "Choose a creature card and/or a land
    card from among them" with "If X is 5 or more, instead put the chosen cards onto the battlefield or into your hand"
    (Green Sun's Twilight: at least one if there is one, both the same way, rulings; a browser test); "If X is 5 or more,

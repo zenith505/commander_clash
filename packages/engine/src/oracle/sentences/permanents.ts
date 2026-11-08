@@ -2065,6 +2065,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Iteration), "Those tokens gain haste" (Mirror March): keywords with no duration last for as long as it stays on
   // the battlefield (CR 611.2a; a new object after a zone change, CR 400.7).
   // Cocoon: "that creature gains flying", the creature it enchants (locked in as it resolves, CR 611.2c).
+  // Inalla, Archmage Ritualist: "create a token that's a copy of that Wizard. The token gains haste": the token just
+  // created (read as "That token").
+  if (/^The token gains [a-z ,]+$/.test(s)) s = s.replace(/^The token/, "That token");
   if ((m = /^([Tt]arget .+?|It|That token|That creature|That artifact|That [A-Z][a-z]+|They|Those tokens|The token created this way|Enchanted creature) (gains? .+)$/.exec(s)) && !/ until | this turn$/.test(m[2]!)) {
     const what = parseObject(m[1]!, ctx);
     const mods = what && (what.ref === "target" || what.ref === "created" || (what.ref === "attached" && m[1] === "Enchanted creature")) ? parseChanges(m[2]!) : null;

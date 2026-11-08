@@ -374,6 +374,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const types = new Set((ctx.event?.group ?? []).flatMap((g) => (s.objects[g.id] ? defOf(s, s.objects[g.id]!).types : [])));
       return types.size;
     }
+    case "eventGroupGreatestMv":
+      // The cards' own mana values, as they were in the graveyard (CR 202.3, 608.2h): wherever they went, their printed cards.
+      return Math.max(0, ...(ctx.event?.group ?? []).flatMap((g) => (s.objects[g.id] && s.cards[s.objects[g.id]!.cardId] ? [defMv(s.cards[s.objects[g.id]!.cardId]!)] : [])));
     case "sacrificedTotalPower":
       return (ctx.sacrificed ?? []).reduce((n, l) => n + (l.power ?? 0), 0);
     case "totalPowerOf":
@@ -562,6 +565,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return Math.max(0, STARTING_LIFE - (s.players[ctx.controller]?.life ?? STARTING_LIFE)); // CR 103.4: 40 in Commander (CR 903.7)
     case "experience":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.players[pid]!.experience ?? 0), 0);
+    case "energy":
+      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.players[pid]!.energy ?? 0), 0);
     case "poison":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.players[pid]!.poison ?? 0), 0);
     case "rad":
@@ -1416,6 +1421,8 @@ function describeCount(c: Count): string {
       return "the total power of those creatures";
     case "eventGroupCardTypes":
       return "#card types among those cards";
+    case "eventGroupGreatestMv":
+      return "the greatest mana value among those cards";
     case "totalPowerOf":
       return "the total power of those creatures";
     case "lifeLostThisWay":
@@ -1445,6 +1452,8 @@ function describeCount(c: Count): string {
       return "life below starting";
     case "experience":
       return "experience counters";
+    case "energy":
+      return "{E}";
     case "poison":
       return "poison counters";
     case "rad":

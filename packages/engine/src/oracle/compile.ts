@@ -5204,6 +5204,21 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Tegwyll's Scouring: "You may cast ~ as though it had flash by tapping three untapped creatures you control with flying
+    // in addition to paying its other costs": begun as though it had flash when there are three to tap (CR 601.3c), the
+    // tapping an optional additional cost paid like kicker, which it must then be cast with when it couldn't be cast at
+    // sorcery speed (flashIfKicked); at sorcery speed it isn't paid (it's the price of the flash only).
+    const flashTap = /^You may cast ~ as though it had flash by (tapping [^.]+?) in addition to paying its other costs\.$/.exec(line);
+    if (flashTap) {
+      const text = flashTap[1]!.replace(/^tapping/, "tap");
+      const cost = parseAdditionalCost(text);
+      if (cost?.kind !== "tap" || cost.x || out.kicker || !isSpell || d.keywords.includes("Flash") || d.types.includes("Instant")) out.unsupported.push(raw);
+      else {
+        out.kicker = { costs: [""], extraCosts: [cost], text, optional: true };
+        out.flashIfKicked = true;
+      }
+      continue;
+    }
     // Timely Ward: "You may cast ~ as though it had flash if it targets a commander": one of its targets, as it's cast, is
     // a commander (CR 903.3); starting to cast it then needs a commander on the battlefield.
     if (line === "You may cast ~ as though it had flash if it targets a commander.") {
@@ -5551,29 +5566,36 @@ export function compile(d: CardDef): CompiledCard {
     }
     // CR 702.151a: "[Cost]: Attach this permanent to another target creature you control. Activate only as a sorcery"
     // and "[Cost]: Unattach this permanent. Activate only if this permanent is attached to a creature and only as a sorcery."
-    const reconfigure = /^Reconfigure ((?:\{[^}]+\})+)$/.exec(line);
+    // Razorfield Ripper: "Reconfigure—Pay {2} or {E}{E}{E}": each of the two abilities with a choice of costs, made as it's
+    // activated (CR 602.2b, 601.2b), compiled as one ability per cost (as Bloodthorn Flail's equip).
+    const reconfigureOr = /^Reconfigure—Pay ((?:\{(?:\d+|[WUBRGC])\})+) or ((?:\{E\})+)\.$/.exec(line);
+    const reconfigure = /^Reconfigure ((?:\{[^}]+\})+)$/.exec(line) ?? reconfigureOr;
     if (reconfigure && d.subtypes.includes("Equipment") && !out.reconfigure) {
-      const mana = reconfigure[1]!;
       out.reconfigure = true;
-      out.activated.push(
-        {
-          manaCost: mana,
-          tap: false,
-          sacrificeSelf: false,
-          sorcerySpeed: true,
-          body: { targets: [{ kind: "object", types: ["Creature"], controller: "you", notSource: true, text: "another target creature you control" }], effects: [{ type: "attach", what: { ref: "target", index: 0 } }], text: "Attach ~ to another target creature you control." },
-          text: `Reconfigure ${mana}: attach ~ to another target creature you control.`,
-        },
-        {
-          manaCost: mana,
-          tap: false,
-          sacrificeSelf: false,
-          sorcerySpeed: true,
-          activateIf: { kind: "self", is: "attachedToCreature" },
-          body: { targets: [], effects: [{ type: "unattachSelf" }], text: "Unattach ~." },
-          text: `Reconfigure ${mana}: unattach ~.`,
-        },
-      );
+      const energy = reconfigureOr ? reconfigureOr[2]!.length / 3 : 0;
+      for (const mana of reconfigureOr ? [reconfigureOr[1]!, ""] : [reconfigure[1]!]) {
+        const cost = mana ? { manaCost: mana } : { manaCost: "", energyCost: energy };
+        const shown = mana || reconfigureOr![2]!;
+        out.activated.push(
+          {
+            ...cost,
+            tap: false,
+            sacrificeSelf: false,
+            sorcerySpeed: true,
+            body: { targets: [{ kind: "object", types: ["Creature"], controller: "you", notSource: true, text: "another target creature you control" }], effects: [{ type: "attach", what: { ref: "target", index: 0 } }], text: "Attach ~ to another target creature you control." },
+            text: `Reconfigure ${shown}: attach ~ to another target creature you control.`,
+          },
+          {
+            ...cost,
+            tap: false,
+            sacrificeSelf: false,
+            sorcerySpeed: true,
+            activateIf: { kind: "self", is: "attachedToCreature" },
+            body: { targets: [], effects: [{ type: "unattachSelf" }], text: "Unattach ~." },
+            text: `Reconfigure ${shown}: unattach ~.`,
+          },
+        );
+      }
       continue;
     }
     // "Partner—Friends forever" and the other "partner—[text]" abilities only matter for deck building (CR 702.124i; see
@@ -7165,7 +7187,7 @@ function checkCastingLinks(out: CompiledCard) {
   const tapPowIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"stationPower"');
   if (tapPowIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => tapPowIn(ab) && !ab.station && ab.costs?.filter((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x && c.filter.kind === "object" && !!c.filter.types?.includes("Creature")).length !== 1)) bad = true;
   // Molten Exhale: a cast as though it had flash is checked for its behold once its targets are chosen (castProblem).
-  if (out.flashIfKicked && !out.spell?.targets.length) bad = true;
+  if (out.flashIfKicked && !out.spell?.targets.length && out.kicker?.extraCosts?.[0]?.kind !== "tap") bad = true;
   // Dragon's Fire: "the power of that card or creature" is the one beheld for the spell's own optional behold cost.
   const beheldIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"beheldPower"');
   if (beheldIn([out.triggers, out.statics, out.activated]) || (beheldIn(out.spell) && !(out.kicker?.optional && out.kicker.extraCosts?.length === 1 && out.kicker.extraCosts[0]!.kind === "reveal" && !!out.kicker.extraCosts[0]!.orControl && out.kicker.extraCosts[0]!.n === 1))) bad = true;

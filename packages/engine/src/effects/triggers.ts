@@ -1570,6 +1570,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const ctrl = controllerOf(s, w);
       add(w, ctrl, (e, t) => e === "permanentTurnedFaceUp" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false) && (!t.turnedByYou || ev.by === ctrl), undefined, undefined, o);
     }
+    // Deathmist Raptor: from its owner's graveyard, "a permanent you control" being its owner's (CR 113.6m, 113.8).
+    fromGraveyards((w, owner) => add(w, owner, (e, t) => e === "permanentTurnedFaceUp" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, owner, false) && (!t.turnedByYou || ev.by === owner), undefined, undefined, o));
   } else if (ev.type === "attacks") {
     const o = obj(s, ev.id);
     causedBy = { event: "attacks", objs: [{ o, controller: controllerOf(s, o) }] };

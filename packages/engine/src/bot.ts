@@ -293,6 +293,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const n = s.resolving?.scratch?.n ?? 0;
       return [{ type: "chooseMay", player: pid, yes: player(s, pid).library.length > n + 10 && n <= 4 }];
     }
+    // Johan: give up its own attack when two or more other creatures of ours could attack untapped and stay back as blockers.
+    if (pend.kind === "chooseMay" && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "attackWithoutTapping")) {
+      const others = s.battlefield.filter((id) => id !== s.resolving!.item.sourceId && controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature") && !obj(s, id).tapped && !objHasKeyword(s, obj(s, id), "Vigilance"));
+      return [{ type: "chooseMay", player: pid, yes: others.length >= 2 }];
+    }
     if (pend.kind === "chooseMay" && pend.pay && pend.keep) {
       // Echo and cumulative upkeep: keep it while the price stays reasonable (CR 702.30a, 702.24a).
       const { mana, life = 0, energy = 0 } = pend.pay;
@@ -454,6 +459,24 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         if (ids.length < pend.count && attackCostsPayable(s, pid, rest, [...ids, id])) ids.push(id);
       }
       return [{ type: "pickPermanents", player: pid, ids }];
+    }
+    // Thelon's Curse: "pay {U} for each creature chosen this way": the best creatures we can pay for. On our own upkeep only
+    // with half our lands at most, so the turn's spells still have mana; on another player's, as many as we can, to block.
+    if (pend.kind === "pickPermanents" && pend.payEach) {
+      const per = parseManaCost(pend.payEach);
+      const best = [...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+      const cap = s.activePlayer === pid ? Math.floor(lands(s, pid) / 2 / Math.max(1, manaValue(per))) : best.length;
+      let ids: ObjectId[] = [];
+      let taps: Action[] = [];
+      for (let k = Math.min(cap, best.length); k > 0; k--) {
+        const plan = planMana(s, pid, parseManaCost(pend.payEach.repeat(k)));
+        if (plan) {
+          ids = best.slice(0, k);
+          taps = plan;
+          break;
+        }
+      }
+      return [...taps, { type: "pickPermanents", player: pid, ids }];
     }
     if (pend.kind === "pickPermanents" && pend.action === "pile") return [{ type: "pickPermanents", player: pid, ids: evenPiles(s, pid, pend.options, (id) => permanentWorth(s, pid, id)) }];
     // Choosing among an opponent's revealed cards (Gifts Ungiven, Intuition): the ones they'd least like where the chosen
@@ -2363,6 +2386,16 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     const rest = pickTargets(s, pid, { ...printed, targets: printed.targets.map((t) => (t.chosenBy === "opponent" ? (({ chosenBy: _, ...r }) => ({ ...r, skip: true as const }))(t) : t)) }, forced, sourceId, x);
     if (!rest && chosenBy.length < printed.targets.length) return null;
     return printed.targets.map((t, i): TargetChoice => (t.chosenBy === "opponent" ? { kind: "none" } : (rest?.[i] ?? { kind: "none" })));
+  }
+  // Yare, Blaze of Glory: "target creature defending player controls": only one of ours, while we're attacked, untapped
+  // before blockers are declared (to block more) or blocking after; never an opponent's (the effects help the creature).
+  if (printed.targets.length === 1 && printed.targets[0]!.defendingAny) {
+    const all = legalTargets(s, printed.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const attacked = s.battlefield.some((id) => obj(s, id).attacking === pid);
+    const blocksDone = s.step !== "declareAttackers" && s.step !== "beginCombat";
+    const ours = all.filter((t) => t.kind === "object" && controllerOf(s, obj(s, t.id)) === pid && (blocksDone ? obj(s, t.id).blocking !== undefined : !obj(s, t.id).tapped)).sort((a, b) => (a.kind === "object" && b.kind === "object" ? toughness(s, obj(s, b.id)) - toughness(s, obj(s, a.id)) : 0));
+    if (forced) return ours[0] ? [ours[0]] : all[0] ? [all[0]] : null;
+    return attacked && ours[0] ? [ours[0]] : null;
   }
   // "Any number of target creatures": each one there could be, as an "up to" target (CR 601.2c); none there, not worth it.
   const body = offerMany(s, printed, pid, x, sourceId ? botSource(s, sourceId) : undefined, sourceId);
@@ -7169,6 +7202,20 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
     for (const o of [b, ...helpers]) {
       used.add(o.id);
       blocks.push({ blocker: o.id, attacker: at.id });
+    }
+  }
+  // Blaze of Glory: one that must block each attacking creature blocks every one it can (CR 509.1c), with helpers against
+  // menace.
+  for (const b of mine.filter((o) => characteristics(s, o).mustBlockEach && !used.has(o.id))) {
+    used.add(b.id);
+    for (const at of incoming) {
+      if (blocks.filter((x) => x.blocker === b.id).length >= maxBlocks(s, b) || blockProblem(s, b, at)) continue;
+      const helpers = mine.filter((o) => o.id !== b.id && !used.has(o.id) && !blockProblem(s, o, at)).sort((x, y) => toughness(s, y) - toughness(s, x)).slice(0, blockersNeeded(s, at) - 1);
+      if (helpers.length < blockersNeeded(s, at) - 1) continue;
+      for (const o of [b, ...helpers]) {
+        used.add(o.id);
+        blocks.push({ blocker: o.id, attacker: at.id });
+      }
     }
   }
   // Slayer's Cleaver: "must be blocked by an Eldrazi if able": our sturdiest one of those blocks it, with helpers against

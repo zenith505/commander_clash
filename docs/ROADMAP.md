@@ -1,6 +1,6 @@
 # Roadmap
 
-30,483 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,492 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,692 of
 9,979 (97%).
 
@@ -2354,7 +2354,7 @@ line blocks.
    Cloak and Dagger, Entwined (a nonland card from the hand or the chosen creature, exiled until it leaves); Close Encounter
    (an additional cost choosing a creature or a warped card in exile); Captured by the Consulate (changing a single
    target); Next of Kin; Phyrexian Portal (an opponent's face-down piles, chosen blind); Magnetic Web, Raging River,
-   Defensive Formation, Sorrow's Path, Blaze of Glory (block requirements and damage assignment); Piracy (tapping lands you
+   Defensive Formation, Sorrow's Path, Blaze of Glory (done in round B145) (block requirements and damage assignment); Piracy (tapping lands you
    don't control for mana); Aetherplasm (put onto the battlefield blocking); Lightform (manifest, then becoming an Aura);
    Cathedral of Serra and the other "bands with other" lands; Mangara's Tome and Aladdin's Lamp (a draw replaced); All
    Hallow's Eve (scream counters in exile); Land Equilibrium; Disciple of Caelus Nin (permanents can't phase in);
@@ -2362,7 +2362,7 @@ line blocks.
    stack); Damping Engine; Dimensional Breach; Phyrexian Splicer (a keyword chosen as a cost, then the target with it);
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
-   Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands.
+   Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
    Round 304 took cards back off the "Out after round N" lists, most played first: "Choose a creature card and/or a land
    card from among them" with "If X is 5 or more, instead put the chosen cards onto the battlefield or into your hand"
    (Green Sun's Twilight: at least one if there is one, both the same way, rulings; a browser test); "If X is 5 or more,
@@ -4645,7 +4645,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   +1/+1 until end of turn for each creature blocking it" (Barreling Attack). +17 (27,305 of 31,936 with main and Lane A round 200).
 - Known limits there: Paroxysm with an empty library takes the "Otherwise" branch (nothing is revealed).
 - Out after round B32: Ceaseless Searblades (activating a mana ability of an Elemental must trigger it; mana
-  activations don't report their source), Yare ("target creature defending player controls" on a spell, with several
+  activations don't report their source), Yare (done in round B145) ("target creature defending player controls" on a spell, with several
   defending players), Mercenaries ("Any player may activate this ability"), Heroism (a pay-or-prevent per creature).
 - Round B33 (harder skipped cards, least played first): a card's own name in an ability it grants is a name, not the
   object with the ability (CR 201.4b: Sound the Call, Deathpact Angel, Rekindling Phoenix, Food Fight), "If the exiled
@@ -4714,7 +4714,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   and Flame Discharge ("modified creature you controlled as you cast ~"), Ardent Dustspeaker (an instant or sorcery
   card to the bottom as a may-cost), Break Out (a revealed card's mana value deciding a second may), Turf War
   (contested counters), Capricious Efreet (destroy one of three targets at random), Touch of Moonglove (a creature
-  dealt damage by that creature dying this turn), Thelon's Curse (each player's upkeep may-pay per tapped blue
+  dealt damage by that creature dying this turn), Thelon's Curse (done in round B145) (each player's upkeep may-pay per tapped blue
   creature), Pick Up the Pace ("a creature you control that entered this turn attacks" and play "as long as you
   attacked this turn").
 - Round B36 (harder skipped cards, least played first): "put it on the bottom of its owner's library instead" of
@@ -5190,7 +5190,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   battlefield), Isu the Abominable (a choice of payment), Etched Slith ("target permanent or opponent"), Reiterating
   Bolt (an energy additional cost), Dodgy Jalopy (scavenge with a variable power), Chancellor of the Dross (opening-hand
   reveals), Words of Worship, Garruk, Curse Breaker (its −4), Kaima, Infernal Kirin, Celestial Judgment and Ancestral
-  Knowledge (new mechanics), Fatal Fissure (a delayed trigger with a target of its own), Mudslide and Dream Tides (pay
+  Knowledge (new mechanics), Fatal Fissure (a delayed trigger with a target of its own), Mudslide (done in round B145) and Dream Tides (done in round B145) (pay
   {2} for each of any number of creatures to untap: a new picker), Incriminate (two targets controlled by the same
   player, like Cannibalize).
 - Round B56 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 17,000): "distribute two
@@ -6656,8 +6656,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   4 or more unless the damage would finish the player, and take the Mantle's or Gaze's damage only to kill an opponent's
   creature without giving up a lethal attack. A browser test for Cunning Giant's creature choice. +8 (30,483 of 31,936
   with B143 and round 304).
+- Round B145 (least played first, from the skip lists): Thelon's Curse, Magnetic Mountain, Dream Tides and Mudslide ("At
+  the beginning of each player's upkeep, that player may choose any number of tapped blue creatures they control and pay
+  {U} for each creature chosen this way. If the player does, untap those creatures."): the upkeep's player clicks the ones
+  to untap and pays for all of them at once; if the whole payment can't be made, none is and none untap (rulings on
+  Mudslide). Reclamation and Flooded Woodlands: each black (green) creature declared as an attacker costs its controller
+  a land of theirs, paid as attackers are declared like Exalted Dragon's cost (CR 508.1g-i). Yare and Blaze of Glory:
+  "target creature defending player controls" on a spell is any defending player's, each opponent of the active player
+  during the combat phase in Commander (CR 802.2, 506.2; the caster chooses among them by choosing the target, CR 802.2a,
+  508.5a), no one's outside it; Blaze of Glory's "It blocks each attacking creature this turn if able" makes each
+  attacker it could block a requirement (CR 509.1c), with a second blocker against menace, never a tapped creature
+  (rulings). Johan: "you may have ~ gain "~ can't attack" until end of combat. If you do, attacking doesn't cause
+  creatures you control to tap this combat if ~ is untapped" (CR 508.1f), checked as attackers are declared. Bots pay to
+  untap their best creatures (on their own upkeep with half their lands at most), cast Yare and Blaze only on their own
+  creature while attacked, block every attacker with a Blazed creature, and keep Johan back when two other creatures can
+  attack. Browser tests for the pay-to-untap picker. +9 (30,492 of 31,936 with B144).
 - Out after round B144 (looked at, not done): Merseine ("pay enchanted creature's mana cost" as a cost, activated only
-  by that creature's controller), Yare and Blaze of Glory ("target creature defending player controls" on a spell, with
+  by that creature's controller), Yare (done in round B145) and Blaze of Glory (done in round B145) ("target creature defending player controls" on a spell, with
   several defending players, CR 508.5a), North Star (mana spent as though any type for one spell), Lumbering Laundry
   (looking at face-down creatures), Guard Dogs (a prevention shield tied to a permanent chosen as it resolves), Butcher
   Orgg (combat damage divided among the player and their creatures).
@@ -6752,7 +6767,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   it resolved), Expel the Unworthy (a kicker that changes what the spell can target), Kill-Suit Cultist (done in round B135) and Goblin
   Psychopath (damage replaced by a destroy or redirected, ordered with other shields, CR 616.1, as Lichenthrope).
 - Out after round B114 (looked at, not done): Titania's Song (its effect continuing until end of turn after it leaves the
-  battlefield), Fortunate Few (each player in turn choosing a nonland permanent not already chosen), Magnetic Mountain
+  battlefield), Fortunate Few (each player in turn choosing a nonland permanent not already chosen), Magnetic Mountain (done in round B145)
   (paying {4} for each of any number of chosen creatures), Equipoise (phasing out the excess, one permanent type after
   another).
 - Out after round B113 (looked at, not done): Kaervek's Spite (done in round B131) (sacrificing all permanents you control as an additional
@@ -6883,7 +6898,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B91 (looked at, not done): Goblin Test Pilot (done in round B136) (a target chosen at random as an activated ability is
   activated: the activation, the bots and the UI would all need to leave the target to chance), Flying Drone (a colored
   activation cost reduction, "if another creature with flying entered the battlefield under your control this turn"),
-  Suppress (done in round B127) (a hand exiled face down until the end step of that player's next turn), Yare ("target creature defending
+  Suppress (done in round B127) (a hand exiled face down until the end step of that player's next turn), Yare (done in round B145) ("target creature defending
   player controls" when several players are attacked), Matopi Golem (a trigger when a regeneration shield is used, done in round B132), Rock
   Hydra and Lichenthrope (replacements for each 1 damage, and Rock Hydra's counters removed even if the damage can't be
   prevented), Quenchable Fire ("unless that player pays {U} before that step": a payment any time before the upkeep).

@@ -5671,6 +5671,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4ed27607-21a8-4bc3-997e-6d2242313f6d",
+  "name": "Coral Merfolk",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Merfolk",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Merfolk"
+  ],
+  "oracleText": "",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m20",
+  "releasedAt": "2019-07-12",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9ffb5615-124e-4848-9e0d-120851bd50e5",
   "name": "Corpseweft",
   "manaCost": "{2}{B}",
@@ -28524,6 +28554,33 @@
   "releasedAt": "2022-09-09",
   "rarity": "uncommon",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f6880f71-a05a-4752-ba33-ffbc450606bf",
+  "name": "Thelon's Curse",
+  "manaCost": "{G}{G}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Blue creatures don't untap during their controllers' untap steps.\nAt the beginning of each player's upkeep, that player may choose any number of tapped blue creatures they control and pay {U} for each creature chosen this way. If the player does, untap those creatures.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fem",
+  "releasedAt": "1994-11-01",
+  "rarity": "rare",
+  "layout": "normal",
   "gameChanger": false
  },
  {

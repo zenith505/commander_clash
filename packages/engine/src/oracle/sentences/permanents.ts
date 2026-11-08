@@ -700,6 +700,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject("those creatures", ctx);
     return what?.ref === "affected" ? [{ type: "continuous", what, mods: [{ kind: "cantBeSacrificedBy", player: "you" }], duration: "endOfTurn" }] : null;
   }
+  // Blaze of Glory: "It blocks each attacking creature this turn if able" (CR 509.1c).
+  if ((m = /^(it|that creature) blocks each attacking creature this turn if able$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what ? [{ type: "continuous", what, mods: [{ kind: "mustBlockEach" }], duration: "endOfTurn" }] : null;
+  }
   // Domineering Will: "They block this turn if able": the creatures the sentence before named (those creatures).
   if ((m = /^(target .+?|it|that creature|each creature(?: your opponents control)?) blocks this turn if able$/i.exec(s)) || (m = /^(those creatures|they) block this turn if able$/i.exec(s))) {
     const what = parseObject(/^they$/i.test(m[1]!) ? "those creatures" : m[1]!, ctx);

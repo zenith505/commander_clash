@@ -635,6 +635,8 @@ export interface GameObject {
   sneak?: LastKnown;
   /** Cast using web-slinging (CR 702.188a), while a spell and as the permanent it became: the creature returned to pay for it, as it last existed. */
   webSlung?: LastKnown;
+  /** Cast for an emerge cost (CR 702.119a), while a spell and as the permanent it became: the creature sacrificed to pay it, as it last existed (Adipose Offspring). */
+  emergeSacrificed?: LastKnown;
   /** As a spell: which of its CompiledCard.costOr ways to pay was chosen (Lethal Throwdown). */
   costOrPaid?: number;
   /** As a spell, and as the permanent it became: it was bargained (CR 702.166b). */
@@ -725,6 +727,9 @@ export interface GameObject {
   protector?: PlayerId;
   /** How many permanents it devoured as it entered (CR 702.82b), for "for each creature it devoured". */
   devoured?: number;
+  /** The creature types of each permanent it devoured, as it last existed ("all" for a changeling), for "the number of
+   * Goblins it devoured" (Voracious Dragon). Only when it devoured one. */
+  devouredTypes?: (string[] | "all")[];
   /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife): how much was paid, for "the life paid as it entered". */
   lifePaidAsEntered?: number;
   /**
@@ -1103,6 +1108,8 @@ export interface StackItem {
   costDiscarded?: string[];
   /** "Remove all +1/+1 counters from ~" paid as a cost: how many were removed (Sage of Hours, "counters removed this way"). */
   countersRemoved?: number;
+  /** Scavenge from a card whose power is "*" (Dodgy Jalopy): its power as it last existed in the graveyard, before the cost exiled it (CR 702.97a, rulings). */
+  scavengedPower?: number;
   /** The cards an "Exile a card from your hand" cost exiled, as the objects they became there: "the exiled card" (Jhoira of the Ghitu). */
   costExiled?: { id: ObjectId; zc: number }[];
   /**
@@ -2425,8 +2432,10 @@ export interface TriggerEventInfo {
   evidence?: true;
   /** A permanent's enters trigger, or a cast trigger: how much mana from Treasures was spent to cast that spell (CR 106.3). */
   treasureSpent?: number;
-  /** A permanent's enters trigger: its spell's surge, spectacle or prowl cost was paid (CR 702.117a, 702.137a, 702.76a). */
-  castAlt?: "surge" | "spectacle" | "prowl";
+  /** A permanent's enters trigger: its spell's surge, spectacle, prowl or emerge cost was paid (CR 702.117a, 702.137a, 702.76a, 702.119a). */
+  castAlt?: "surge" | "spectacle" | "prowl" | "emerge";
+  /** A permanent's enters trigger: the creature sacrificed to pay its spell's emerge cost, as it last existed (Adipose Offspring, CR 702.119a). */
+  emergeSacrificed?: LastKnown;
   /** A permanent's enters trigger, or a cast trigger: the mana spent to cast that spell by type (CR 601.2h). */
   spent?: SpentMana;
   /** A permanent's enters trigger, or a "when you cast this spell" one: how much mana was spent to cast that spell (CR 601.2h). */

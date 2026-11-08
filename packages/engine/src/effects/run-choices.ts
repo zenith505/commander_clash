@@ -1028,7 +1028,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "altPaid"
             ? e.cond.alt === "mayhem"
               ? s.resolving!.item.kind === "spell" && s.objects[s.resolving!.item.objectId ?? ""]?.castVia === "mayhem"
-              : (s.resolving!.item.kind === "spell" ? s.objects[s.resolving!.item.objectId ?? ""]?.castAlt : ctx.event?.castAlt) === e.cond.alt
+              : ((a) => a === e.cond.alt || (e.cond.alt === "emerge" && a === "grantedEmerge"))(s.resolving!.item.kind === "spell" ? s.objects[s.resolving!.item.objectId ?? ""]?.castAlt : ctx.event?.castAlt)
             : e.cond.kind === "returnedNonbasicLandType"
             ? !!ctx.lki?.returnedSubtypes?.some((t) => LAND_TYPES.has(t) && !["Plains", "Island", "Swamp", "Mountain", "Forest"].includes(t))
             : e.cond.kind === "sacrificedSuspected"

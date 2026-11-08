@@ -640,6 +640,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (ctx?.eachChose && /^opponents? who investigated this way$/i.test(p)) return count({ kind: "players", opponents: true, choseThisWay: true });
   // Kefka, Court Mage: "for each card type among cards discarded this way" (CR 205.2a: card types, not supertypes or subtypes).
   if (each && /^card type among cards discarded this way$/i.test(p)) return count({ kind: "discardedTypes" });
+  // Wanderwine Farewell: "for each permanent returned to its owner's hand this way": each the spell's return put into a hand,
+  // a token too (it goes there before it ceases to exist, CR 111.7), not a commander sent to the command zone instead
+  // (CR 903.9b); compile checks the spell returns permanents before it.
+  if (each && ctx?.spell && /^permanent returned to its owner's hand this way$/.test(p)) return count({ kind: "returnedFromCount" });
   // Sweep (Plow Through Reito): "for each Plains returned this way", "the number of Mountains returned this way".
   if (ctx?.bouncedAny && (m = /^(?:the number of )?([A-Z][a-z]+) returned this way$/.exec(p)) && (each || p.startsWith("the number")) && singularWord(m[1]!) === singularWord(ctx.bouncedAny))
     return count({ kind: "bouncedThisWayCount" });
@@ -938,6 +942,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "For each creature it devoured" (CR 702.82b): only the permanent's own abilities know what it devoured.
   if (/^creatures? (?:it|~) devoured$/i.test(p) && (ctx === null || ctx.selfIt)) return count({ kind: "devoured" });
+  // Voracious Dragon: "the number of Goblins it devoured": each creature it devoured that was a Goblin as it last existed on
+  // the battlefield (rulings).
+  if ((m = /^([A-Z][a-z]+)s (?:it|~) devoured$/.exec(p)) && (ctx === null || ctx.selfIt)) return count({ kind: "devoured", subtype: m[1]! });
   if (/^times ~ has mutated$/i.test(p)) return count({ kind: "mutations" });
   // Spiny Starfish: "for each time it regenerated this turn": the permanent's own abilities only.
   if (each && (m = /^time (it|~) regenerated this turn$/i.exec(p)) && ctx && !ctx.subject && !ctx.subjectIt && (m[1] === "~" || ctx.selfIt || ctx.lastObjectTarget === undefined)) return count({ kind: "regenerations" });
@@ -984,6 +991,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Ninja's Blades: "draw a card, then discard a card. That player loses life equal to the discarded card's mana value."
   // Pyromancy: "equal to the mana value of the discarded card" (a discard cost's card, X counted as 0, rulings).
   if (/^(?:the discarded card's mana value|the mana value of the discarded card)$/i.test(p) && ctx) return count({ kind: "discardedManaValue" });
+  // Nahiri's Wrath: "the total mana value of the discarded cards", those its "discard X cards" cost discarded, each as it is
+  // in the graveyard (StackItem.costDiscarded).
+  if (/^the total mana value of the discarded cards$/i.test(p) && ctx?.spell) return count({ kind: "discardedManaValue" });
   // Morbid Curiosity: "the mana value of the sacrificed permanent" is "the sacrificed permanent's mana value".
   if ((m = /^the (power|toughness|mana value) of the sacrificed (creature|artifact|enchantment|permanent)$/i.exec(p))) p = `the sacrificed ${m[2]}'s ${m[1]}`;
   // Ellie and Alan, Paleontologists: "where X is the mana value of the exiled card" is "the exiled card's mana value".

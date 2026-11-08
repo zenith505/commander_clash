@@ -691,6 +691,26 @@ export function parseCostKeyword(
   }
   if ((m = /^Scavenge ((?:\{[^}]+\})+)$/.exec(line))) {
     const cost = m[1]!;
+    // Dodgy Jalopy: a "*" power from its characteristic-defining ability, which works in the graveyard too (CR 604.3), as
+    // the card is exiled to pay the cost (rulings); compile checks the card has one.
+    if (d.power === "*" && plainMana(cost))
+      return {
+        activated: {
+          manaCost: cost,
+          tap: false,
+          sacrificeSelf: false,
+          sorcerySpeed: true,
+          zone: "graveyard",
+          exileSelf: true,
+          scavengeVariable: true,
+          body: {
+            targets: [{ kind: "object", types: ["Creature"], text: "target creature" }],
+            effects: [{ type: "counters", what: { ref: "target", index: 0 }, counter: "+1/+1", n: { count: { kind: "scavengedPower" } } }],
+            text: "Put a number of +1/+1 counters equal to this card's power on target creature.",
+          },
+          text: `Scavenge ${cost}`,
+        },
+      };
     if (!plainMana(cost) || !/^\d+$/.test(d.power ?? "")) return "fail";
     const n = Number(d.power);
     return {

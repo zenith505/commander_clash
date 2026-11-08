@@ -454,6 +454,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.poisonLost ?? 0;
     case "bouncedThisWayCount":
       return (s.resolving?.bouncedThisWay ?? []).filter((b) => b.returned).length;
+    case "returnedFromCount":
+      return s.resolving?.returnedFrom?.length ?? 0;
+    case "scavengedPower":
+      return Math.max(0, s.resolving?.item.scavengedPower ?? 0);
     case "opponentsReturnedFrom":
       return new Set((s.resolving?.returnedFrom ?? []).filter((p) => opponents(s, ctx.controller).includes(p))).size;
     case "surveilTopThisWay":
@@ -894,7 +898,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (!o) return 0;
       const zc = o.zoneChanges ?? 0;
       const same = ctx.sourceZc === undefined || zc === ctx.sourceZc || (zc === ctx.sourceZc + 1 && o.zone !== "battlefield");
-      return same ? (o.devoured ?? 0) : 0;
+      if (!same) return 0;
+      if (c.subtype) return (o.devouredTypes ?? []).filter((t) => t === "all" || t.includes(c.subtype!)).length;
+      return o.devoured ?? 0;
     }
     case "lifePaidAsEntered": {
       // "The life paid as it entered" (Minion of the Wastes): the source as that permanent, also after it left (CR 608.2h).
@@ -972,7 +978,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.kind === "manaValue" && c.total) return refObjects(s, c.of, ctx).reduce((n, o) => n + defMv(defOf(s, o)), 0);
       // Not sacrificed for a cost: what the ability sacrificed as it resolved ("You may sacrifice another creature. If you do,
       // ... that creature's power", Disciple of Freyalise).
-      if (c.of.ref === "sacrificed") return Math.max(0, (ctx.sacrificed?.[0] ?? s.resolving?.sacrificedThisWay?.at(-1))?.[c.kind] ?? 0);
+      // Adipose Offspring: its enters trigger's "the sacrificed creature" is the one sacrificed for its emerge cost.
+      if (c.of.ref === "sacrificed") return Math.max(0, (ctx.sacrificed?.[0] ?? s.resolving?.sacrificedThisWay?.at(-1) ?? ctx.event?.emergeSacrificed)?.[c.kind] ?? 0);
       // A dies trigger's subject (the card the creature became in the graveyard): as the creature last existed on the
       // battlefield, also once the card has left the graveyard again before the trigger resolves, not as the card is now
       // (CR 603.10a, 608.2h, 113.7a).
@@ -1357,7 +1364,10 @@ function describeCount(c: Count): string {
     case "surveilTopThisWay":
       return "#cards put on top";
     case "bouncedThisWayCount":
+    case "returnedFromCount":
       return "#returned";
+    case "scavengedPower":
+      return "its power";
     case "opponentsReturnedFrom":
       return "#opponents whose creatures were returned";
     case "bouncedThisWayPower":

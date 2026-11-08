@@ -1072,6 +1072,7 @@ export function moveObject(
     o.castInMain = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
     o.webSlung = undefined;
+    o.emergeSacrificed = undefined;
     o.bargained = undefined; // and whether it was bargained (CR 702.166b)
     o.costOrPaid = undefined; // and which of its either-or costs was paid
     o.evidence = undefined; // and whether evidence was collected for it (CR 701.59c)
@@ -1161,7 +1162,7 @@ export function moveObject(
     o.face = undefined;
     registerRoom(s, cardIdOf(o));
   }
-  if (to === "battlefield") o.devoured = undefined; // kept elsewhere for "for each creature it devoured" (CR 608.2h)
+  if (to === "battlefield") o.devoured = o.devouredTypes = undefined; // kept elsewhere for "for each creature it devoured" (CR 608.2h)
   if (to === "battlefield") o.lifePaidAsEntered = undefined; // and for "the life paid as it entered"
   if (to === "battlefield") o.mutations = undefined; // and for "the number of times ~ has mutated"
   o.counters = countersStay ? { ...lastCounters } : {};
@@ -7216,6 +7217,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // "Exile a creature you control" (Fear of Abduction): the same (CompiledCard.costExileLinked).
   if (costExiled.length && (compileCard(d).additionalCosts?.some((c) => c.kind === "reveal" && c.exile) || compileCard(d).costExileLinked)) (s.linkedExile ??= {})[`${o.id}@${(o.zoneChanges ?? 0) + 1}`] = costExiled;
   if (sacrificed.length) item.sacrificed = sacrificed;
+  // Emerge (CR 702.119a): the creature sacrificed for it, for its permanent's "the sacrificed creature's toughness".
+  if (isEmerge(choices.alt) && sacrificed.length) o.emergeSacrificed = sacrificed[0];
   if (discarded.length) item.costDiscarded = discarded;
   if (choices.alt === "sneak") o.sneak = returned;
   // Cast using web-slinging (CR 702.188a): the creature it returned, for "the returned creature".
@@ -9420,6 +9423,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
   if (ab.grantSourceCost?.action === "sacrifice" && granter?.zone === "battlefield" && (granter.zoneChanges ?? 0) === ab.grantSourceCost.zc) moveObject(s, granter.id, "graveyard", { sacrificed: true, cost: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
+  // Dodgy Jalopy: its power in the graveyard as it's exiled for scavenge (rulings), by its characteristic-defining ability.
+  const scavengedPower = ab.scavengeVariable && o.zone === "graveyard" ? cardPT(s, o, "power") : undefined;
   // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).
   if (ab.exileSelf && (ab.zone !== undefined || (o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc))) moveObject(s, id, "exile");
   if (ab.returnSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, ab.toLibraryBottom ? "library" : "hand"); // "library": to the bottom
@@ -9443,6 +9448,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(costCardNames.length ? { costCardNames } : {}),
     ...(costDiscarded.length ? { costDiscarded } : {}),
     ...(removedCount !== undefined ? { countersRemoved: removedCount } : {}),
+    ...(scavengedPower !== undefined ? { scavengedPower } : {}),
     ...(costExiled.length ? { costExiled } : {}),
     ...(tappedKin.length ? { costTapped: tappedKin } : {}),
     ...(body.targets.some((t) => t.blockingEquipped) && o.attachedTo && s.objects[o.attachedTo] ? { hostThen: { id: o.attachedTo, zc: s.objects[o.attachedTo]!.zoneChanges ?? 0 } } : {}),
@@ -10667,9 +10673,14 @@ function devourChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x
       totals.toughness += toughness(s, x);
     }
   }
+  const types: (string[] | "all")[] = [];
   for (const id of ids) {
     const x = s.objects[id];
     if (x?.zone !== "battlefield") continue;
+    if (!devour?.bounce) {
+      const t = creatureTypesOf(s, x);
+      types.push(t === "all" ? "all" : [...t]);
+    }
     if (devour?.bounce) {
       // Rescuer Sphinx: returned instead (CR 614.12).
       log(s, `${player(s, controllerOf(s, x)).name} returns ${defOf(s, x).name} to its owner's hand as ${d.name} enters.`);
@@ -10682,7 +10693,10 @@ function devourChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x
     n++;
   }
   s.leftTogether = undefined;
-  if (!devour?.bounce) o.devoured = n;
+  if (!devour?.bounce) {
+    o.devoured = n;
+    o.devouredTypes = n ? types : undefined;
+  }
   if (devour?.defines === "total") {
     // Its power and toughness become those totals (layer 7b, CR 613.4b) for as long as it's on the battlefield.
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: d.name, sourceId: o.id, duration: "game", affected: [o.id], mods: [{ kind: "setPT", power: totals.power, toughness: totals.toughness }] });

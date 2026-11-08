@@ -6680,8 +6680,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
-    // rounds B153, B152, B151, B148, 311 and 312's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    // rounds B153, B152, B151, B148, 311, 312 and 313's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
+    const faceDown = roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);
@@ -19967,6 +19967,44 @@ function round312Sentence(s: string, sentences: string[], si: number, ctx: Ctx, 
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => ty !== "Creature")) return "fail";
     effects.pop();
     return { effect: { ...prev, becomes: { types: ["Artifact"], subtypes: [] } }, next: si + 1 };
+  }
+  return null;
+}
+
+function round313Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  // Armed and Armored: "Choose a Dwarf you control. Attach any number of Equipment you control to it.": the Dwarf is
+  // chosen as it resolves, then any number of Equipment you control that could be attached to it (CR 701.3a-b); with no
+  // Dwarf, nothing is attached (rulings).
+  const chooseOne = /^Choose an? ([A-Z][a-z]+) you control$/.exec(s);
+  if (chooseOne && /^Attach any number of Equipment you control to it\.?$/.test(sentences[si + 1] ?? "")) {
+    const filter = parseTargetPhrase(`${chooseOne[1]} you control`);
+    if (filter?.kind !== "object" || !filter.subtypes?.length) return "fail";
+    effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, text: `${chooseOne[1]} you control` }, n: 1, action: "choose", prompt: `choose ${/^[AEIOU]/.test(chooseOne[1]!) ? "an" : "a"} ${chooseOne[1]} you control to attach Equipment to` });
+    return { effect: { type: "attachAny", host: -1, equipment: true, toChosen: true }, next: si + 2 };
+  }
+  // Suppression Ray: "Tap all creatures target player controls. You may pay any amount of {E}. If you do, choose up to that
+  // many creatures tapped this way. Put a stun counter on each of them.": X energy chosen as it resolves, at most what you
+  // have (CR 107.14), then up to X of the creatures that became tapped (rulings: not those already tapped), each getting a
+  // stun counter (CR 122.1d).
+  if (ctx.spell && /^Tap all creatures target player controls$/.test(s) && /^You may pay any amount of \{E\}\.?$/.test(sentences[si + 1] ?? "") && /^If you do, choose up to that many creatures tapped this way\.?$/.test(sentences[si + 2] ?? "") && /^Put a stun counter on each of them\.?$/.test(sentences[si + 3] ?? "")) {
+    const before = ctx.targets.length;
+    const tap = parseOne(s, ctx);
+    if (tap?.length !== 1 || tap[0]!.type !== "tap" || ctx.targets.length !== before + 1) return "fail";
+    const creature = parseTargetPhrase("creature");
+    if (!creature) return "fail";
+    effects.push({ ...tap[0]!, noteTapped: true });
+    const pick: Effect = { type: "pick", who: { ref: "you" }, filter: { ...creature, kind: "object", text: "creature tapped this way" }, n: { count: { kind: "x" } }, action: "counters", counter: { kind: "stun", n: 1 }, upTo: true, anyController: true, fromTapped: true };
+    return { effect: { type: "may", effects: [pick], pay: {}, payX: { energy: true }, text: "pay any amount of {E}. If you do, put a stun counter on each of up to that many creatures tapped this way" }, next: si + 4 };
+  }
+  // Incinerator of the Guilty: "you may collect evidence X. When you do, ~ deals X damage to each creature and planeswalker
+  // that player controls.": X chosen as it resolves (CR 107.1c), the evidence collected (CR 701.59a), then a reflexive
+  // trigger (CR 603.12) whose X is that X; "that player" is still the one dealt combat damage.
+  if (/^[Yy]ou may collect evidence X$/.test(s) && si + 2 === sentences.length && !ctx.spell) {
+    const when = /^When you do, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
+    if (!when || !/^~ deals X damage to each creature and planeswalker that player controls$/.test(when[1]!)) return "fail";
+    const reflexive = reflexiveBody(when[1]!, ctx, false, false, false);
+    if (!reflexive) return "fail";
+    return { effect: { type: "may", effects: [{ type: "collectEvidence", n: 0, nX: true }, { type: "reflexive", body: reflexive }], pay: {}, payX: { evidence: true }, text: `collect evidence X. When you do, ${when[1]}` }, next: si + 2 };
   }
   return null;
 }

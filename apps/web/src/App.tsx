@@ -19,6 +19,9 @@ import {
   planEndEffect,
   endableEffect,
   endEffectProblem,
+  planIgnoreEffect,
+  ignorableBy,
+  ignoreEffectProblem,
   forageWays,
   untapChoiceProblem,
   unlockCost,
@@ -455,7 +458,7 @@ type BuybackPick = { draft: CastDraft; label: string; cost: string; /** A cost t
 type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boolean; name: ReturnType<typeof kickerName>; chosen: number[]; /** "Kicker—Sacrifice two lands": the cost in words. */ text?: string };
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
-type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; faceUp?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined; faceUp?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined; faceUp?: undefined } | { faceUp: FaceUpDraft; draft?: undefined; activate?: undefined; mana?: undefined }) & {
+type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; faceUp?: undefined; ignore?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined; faceUp?: undefined; ignore?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined; faceUp?: undefined; ignore?: undefined } | { faceUp: FaceUpDraft; draft?: undefined; activate?: undefined; mana?: undefined; ignore?: undefined } | { /** Paying to ignore this permanent's effect this turn (CR 116.2d): Volrath's Curse, Lost in Thought. */ ignore: string; draft?: undefined; activate?: undefined; mana?: undefined; faceUp?: undefined }) & {
   kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "offering" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice" | "lifeFor" | "craft" | "counterOn";
   label: string;
   /** "Any number of": fewer than `n` are fine, down to this many (splice). */
@@ -948,6 +951,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   /** Done picking what to sacrifice, discard or exile: carry on casting or activating. */
   function finishCostPick(pick: CostPick) {
     setCostPick(null);
+    if (pick.ignore !== undefined) {
+      const costs = { [pick.kind]: pick.chosen };
+      if (s) dispatch(planIgnoreEffect(s, HUMAN, pick.ignore, costs) ?? [{ type: "ignoreEffect", player: HUMAN, objectId: pick.ignore, costs }]);
+      return;
+    }
     if (pick.mana) {
       // A mana ability that taps other permanents too (Springleaf Drum).
       const plan = s && planManaAbility(s, HUMAN, pick.mana.objectId, pick.mana.ability, pick.mana.mana, pick.chosen, pick.mana.extra);
@@ -1396,6 +1404,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     // A permanent with an effect you may pay to end (a Licid that's an Aura), whoever controls it now (CR 116.2c).
     if (o.zone === "battlefield" && endableEffect(s, HUMAN, o.id)) return setMenu(o.id);
+    // A permanent whose effect you may pay to ignore this turn (Leonin Arbiter, Volrath's Curse; CR 116.2d).
+    if (o.zone === "battlefield" && ignorableBy(s, HUMAN, o.id)) return setMenu(o.id);
     // Another player's permanent with an ability any player may activate (Feral Hydra, Quicksilver Wall).
     if (o.zone === "battlefield" && controllerOf(s, o) !== HUMAN && abilitiesOf(s, o).activated.some((ab) => ab.anyPlayer && (!ab.ownerOnly || o.owner === HUMAN) && (!ab.opponentsOnly || opponents(s, controllerOf(s, o)).includes(HUMAN)))) return setMenu(o.id);
     if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN) return;
@@ -1805,6 +1815,16 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onEndEffect={() => {
                 setMenu(null);
                 dispatch(planEndEffect(s, HUMAN, menu) ?? [{ type: "endEffect", player: HUMAN, objectId: menu }]);
+              }}
+              onIgnore={() => {
+                setMenu(null);
+                const ig = ignorableBy(s, HUMAN, menu);
+                const c = ig?.costs?.[0];
+                const label = `Ignore ${cardOf(s, menu).name}'s effect this turn`;
+                // Volrath's Curse: a permanent of your choice; Lost in Thought: three cards from your graveyard.
+                if (c?.kind === "sacrifice") return setCostPick({ ignore: menu, kind: "sacrifice", label, what: "sacrifice a permanent", n: 1, candidates: s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === HUMAN), chosen: [] });
+                if (c?.kind === "exileFromGraveyard") return setCostPick({ ignore: menu, kind: "exileCards", label, what: `exile ${c.n} cards from your graveyard`, n: c.n, candidates: [...s.players[HUMAN]!.graveyard], chosen: [] });
+                dispatch(planIgnoreEffect(s, HUMAN, menu) ?? [{ type: "ignoreEffect", player: HUMAN, objectId: menu }]);
               }}
               onTurnFaceUp={(way, form) => {
                 setMenu(null);
@@ -2567,7 +2587,7 @@ function CostPickBar({ pick, valid = true, onDone, onSkip, onCancel }: { pick: C
         <strong>{pick.label}</strong>: {pick.what} (click {pick.n === 1 ? "it" : "them"})
       </span>
       <button disabled={pick.chosen.length !== pick.n || !valid} onClick={onDone}>
-        {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "counterOn" ? `${pick.what.startsWith("blight") ? "Blight" : "Put the counter"} and ${pick.draft ? "cast" : "activate"}` : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
+        {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "counterOn" ? `${pick.what.startsWith("blight") ? "Blight" : "Put the counter"} and ${pick.draft ? "cast" : "activate"}` : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : pick.ignore ? "Sacrifice" : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
       </button>
       {onSkip && <button onClick={onSkip}>Cast without</button>}
       <button className="ghost" onClick={onCancel}>
@@ -2641,7 +2661,7 @@ function CardChoice({
   );
 }
 
-/** A number to choose secretly (Wheel of Misfortune), a bid of life (Illicit Auction: "Don't bid" passes), life paid round after round (Plague of Vermin: "Pay no life"), or how much life or energy to pay (Necrodominance, Galvanic Discharge, Minion of the Wastes as it enters): any whole number in the range the decision allows. */
+/** A number to choose secretly (Wheel of Misfortune), a bid of life (Illicit Auction: "Don't bid" passes), life paid round after round (Plague of Vermin: "Pay no life"), or how much life or energy to pay (Necrodominance, Galvanic Discharge, Minion of the Wastes as it enters), or the X of "you may collect evidence X" (Incinerator of the Guilty): any whole number in the range the decision allows. */
 function NumberChoice({ pending, dispatch }: { pending: Extract<NonNullable<GameState["pending"]>, { kind: "chooseOption" }>; dispatch: ReturnType<typeof useGame>["dispatch"] }) {
   const range = pending.numberRange ?? { min: 0, max: 999 };
   const [n, setN] = useState(range.min);
@@ -2659,10 +2679,15 @@ function NumberChoice({ pending, dispatch }: { pending: Extract<NonNullable<Game
       <button className="ghost" disabled={n >= range.max} onClick={() => set(n + 1)} aria-label="Number plus one">
         +
       </button>
-      <button onClick={done}>{pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payLifeRound" ? `Pay ${n} life` : pending.what === "payEnergy" ? `Pay ${n} energy` : pending.what === "bid" ? `Bid ${n} life` : `Choose ${n}`}</button>
+      <button onClick={done}>{pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payLifeRound" ? `Pay ${n} life` : pending.what === "payEnergy" ? `Pay ${n} energy` : pending.what === "evidenceX" ? `Collect evidence ${n}` : pending.what === "bid" ? `Bid ${n} life` : `Choose ${n}`}</button>
       {pending.what === "bid" && pending.options.includes("pass") && (
         <button className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: "pass" }])}>
           Don't bid
+        </button>
+      )}
+      {pending.what === "evidenceX" && (
+        <button className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: "none" }])}>
+          Don't collect evidence
         </button>
       )}
       {pending.what === "payLifeRound" && (
@@ -4446,6 +4471,7 @@ function AbilityMenu({
   onTurnFaceUp,
   onUnlock,
   onEndEffect,
+  onIgnore,
   onClose,
 }: {
   s: GameState;
@@ -4485,6 +4511,8 @@ function AbilityMenu({
   onUnlock: (door: number) => void;
   /** "You may pay {W} to end this effect" (a Licid): pay it, a special action (CR 116.2c). */
   onEndEffect: () => void;
+  /** "Any player may pay {2} for that player to ignore this effect until end of turn" (Leonin Arbiter): a special action (CR 116.2d). */
+  onIgnore: () => void;
   onClose: () => void;
 }) {
   const o = s.objects[objectId]!;
@@ -4512,11 +4540,24 @@ function AbilityMenu({
   // Airbend's "{2} rather than its mana cost", "without paying its mana cost" (Release to the Wind).
   const exiledFor = o.zone === "exile" && o.mayPlay?.player === HUMAN ? o.mayPlay : undefined;
   const asTypes = byTypeChoices(s, o, HUMAN);
+  // Leonin Arbiter, Volrath's Curse: pay to ignore its effect this turn, whoever controls it (CR 116.2d).
+  const ignoreButton = (() => {
+    const ig = ignorableBy(s, HUMAN, objectId);
+    if (!ig) return null;
+    // With the cards or the permanent still to choose, only whether it could be done with some choice.
+    const problem = ig.costs ? (ig.costs[0]?.kind === "exileFromGraveyard" ? (s.players[HUMAN]!.graveyard.length < ig.costs[0].n ? `you need ${ig.costs[0].n} cards in your graveyard` : s.priority !== HUMAN || s.pending ? "you can do that only while you have priority" : null) : s.priority !== HUMAN || s.pending ? "you can do that only while you have priority" : null) : planIgnoreEffect(s, HUMAN, objectId) ? null : ignoreEffectProblem(s, HUMAN, objectId);
+    return (
+      <button disabled={!!problem} title={problem ?? "A special action: it doesn't use the stack."} onClick={onIgnore}>
+        Ignore {seenCardOf(s, objectId).name}&apos;s effect this turn: {ig.mana ? <ManaCost cost={ig.mana} size="sm" /> : ig.costs?.[0]?.kind === "sacrifice" ? "sacrifice a permanent" : "exile three cards from your graveyard"}
+      </button>
+    );
+  })();
   // Another player's permanent: only its abilities any player may activate (CR 602.2), which you'd control (CR 113.8).
   if (o.zone === "battlefield" && controllerOf(s, o) !== HUMAN)
     return (
       <div className="ability-menu">
         <strong>{d.name}</strong>
+        {ignoreButton}
         {abilitiesOf(s, o).activated.map((ab, i) => {
           if (!ab.anyPlayer || (ab.ownerOnly && o.owner !== HUMAN) || (ab.opponentsOnly && !opponents(s, controllerOf(s, o)).includes(HUMAN))) return null;
           const problem = abilityProblem(s, HUMAN, objectId, i);
@@ -4680,6 +4721,7 @@ function AbilityMenu({
           )
         );
       })()}
+      {ignoreButton}
       {upWays.flatMap((upCost, way) => {
         // Aquamorph Entity: what it becomes is chosen as it's turned face up (CR 614.1e), a button for each.
         const forms = faceUpFormsOf(s, o);
@@ -5180,7 +5222,7 @@ function Controls({
         ))}
       </div>
     );
-  if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "bid" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy" || pending.what === "payLifeRound") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
+  if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "bid" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy" || pending.what === "evidenceX" || pending.what === "payLifeRound") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
   if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "faceUpForm" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "chosenObject" || pending.what === "anchor" || pending.what === "playerWord" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "unlessWay" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "addOrRemoveCounter" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser" || pending.what === "modeChooser" || pending.what === "direction" || pending.what === "skipChoice" || pending.what === "payLifeOrDestroy" || ((pending.what === "textFrom" || pending.what === "textTo" || pending.what === "typeOrder") && pending.options.length <= 10)) && pending.player === HUMAN)
     return (
       <div className="controls">

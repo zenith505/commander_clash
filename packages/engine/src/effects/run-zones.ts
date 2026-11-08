@@ -207,9 +207,11 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const group = e.fromGroup ? (ctx.event?.group ?? []).filter((g) => s.objects[g.id]?.zone === "battlefield" && (obj(s, g.id).zoneChanges ?? 0) === g.zc).map((g) => g.id) : undefined;
     // "On either of them" (Call of the Death-Dweller): the permanents the targets became, still on the battlefield.
     const ofTargets = e.fromTargets ? objects(s, { ref: "target", index: e.fromTargets.index, n: e.fromTargets.n }, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id) : undefined;
+    // Suppression Ray: "creatures tapped this way", the ones that became tapped (rulings), still those objects.
+    const tappedHere = e.fromTapped ? (r.tappedIds ?? []).filter((c) => s.objects[c.id]?.zone === "battlefield" && (obj(s, c.id).zoneChanges ?? 0) === c.zc && objectMatches(s, e.filter, obj(s, c.id), pid, false)).map((c) => c.id) : undefined;
     // Grenzo's Rebuttal: among the permanents of the player to this one's left (the next in turn order, CR 101.4).
     const left = e.amongLeft ? nearestOpponent(s, pid, "left") : undefined;
-    const options0 = e.amongLeft ? (left === undefined ? [] : pickOptions(s, e, left, ctx.sourceId, ctx.sourceZc)) : ofTargets ?? group ?? (e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId, ctx.sourceZc)) : pickOptions(s, e, pid, ctx.sourceId, ctx.sourceZc));
+    const options0 = e.amongLeft ? (left === undefined ? [] : pickOptions(s, e, left, ctx.sourceId, ctx.sourceZc)) : tappedHere ?? ofTargets ?? group ?? (e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId, ctx.sourceZc)) : pickOptions(s, e, pid, ctx.sourceId, ctx.sourceZc));
     // Labyrinth Raptor: only creatures blocking the trigger's subject now, the same attacking object (CR 400.7, 509.1h).
     const attacker = e.filter.blockingSubject && ctx.subject ? s.objects[ctx.subject.id] : undefined;
     const options1 = !e.filter.blockingSubject ? options0 : attacker && attacker.zone === "battlefield" && (attacker.zoneChanges ?? 0) === ctx.subject!.zc && attacker.attacking !== undefined ? options0.filter((id) => !!attacker.blockedBy?.includes(id) && obj(s, id).blocking?.includes(attacker.id)) : [];

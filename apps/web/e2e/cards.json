@@ -1569,6 +1569,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3d5b6151-d985-423b-8ade-f00958bbd3f6",
+  "name": "Armed and Armored",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Vehicles you control become artifact creatures until end of turn. Choose a Dwarf you control. Attach any number of Equipment you control to it.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b4dbbf56-d7df-4183-bb48-cfc6b4d0468f",
   "name": "Armored Skyhunter",
   "manaCost": "{3}{W}",
@@ -6787,6 +6813,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3584a055-5220-4721-89f8-de33f779122f",
+  "name": "Damping Engine",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "A player who controls more permanents than each other player can't play lands or cast artifact, creature, or enchantment spells. That player may sacrifice a permanent of their choice for that player to ignore this effect until end of turn.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ulg",
+  "releasedAt": "1999-02-15",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "615b4189-e800-408b-99e0-71ae7089b937",
   "name": "Dance with Calamity",
   "manaCost": "{7}{R}",
@@ -8351,6 +8399,67 @@
   "set": "tmp",
   "releasedAt": "1997-10-14",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "88f9075c-ea96-4f8d-b0d1-e5e244e824c1",
+  "name": "Dwarven Soldier",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Creature — Dwarf Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dwarf",
+   "Soldier"
+  ],
+  "oracleText": "Whenever this creature blocks or becomes blocked by one or more Orcs, this creature gets +0/+2 until end of turn.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fem",
+  "releasedAt": "1994-11-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b40c5f3e-7080-4828-9215-79727c7a911f",
+  "name": "Dwarven Trader",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Creature — Dwarf",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dwarf"
+  ],
+  "oracleText": "",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "hml",
+  "releasedAt": "1995-10-01",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -13914,6 +14023,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9b7d037f-3269-4e3b-9744-a977acb69c67",
+  "name": "Incinerator of the Guilty",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Creature — Dragon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "Flying, trample\nWhenever this creature deals combat damage to a player, you may collect evidence X. When you do, this creature deals X damage to each creature and planeswalker that player controls. (To collect evidence X, exile cards with total mana value X or greater from your graveyard.)",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "723a66c3-2c2c-411c-bba5-922e8601981b",
   "name": "Indominus Rex, Alpha",
   "manaCost": "{1}{U/B}{U/B}{G}{G}",
@@ -16465,6 +16607,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a33f6070-590c-4be8-9180-b1ac2608cbc4",
+  "name": "Leonin Arbiter",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Cat Cleric",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Cat",
+   "Cleric"
+  ],
+  "oracleText": "Players can't search libraries. Any player may pay {2} for that player to ignore this effect until end of turn.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "som",
+  "releasedAt": "2010-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d5f72164-441e-4e04-8b2b-0d6ab618d22e",
   "name": "Leonin Bola",
   "manaCost": "{1}",
@@ -17164,6 +17337,36 @@
   "set": "mh2",
   "releasedAt": "2021-06-18",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "820ba630-c543-491c-8c77-ada69b01c79d",
+  "name": "Lost in Thought",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature can't attack or block, and its activated abilities can't be activated. Its controller may exile three cards from their graveyard for that player to ignore this effect until end of turn.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "jud",
+  "releasedAt": "2002-05-27",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -22777,6 +22980,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8539f295-5d58-4436-a73a-b9277c4c7795",
+  "name": "Rampant Growth",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9d2d6479-531c-4ce1-b52b-00e36fa63b64",
   "name": "Rancor",
   "manaCost": "{G}",
@@ -25600,6 +25829,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e842a4e5-ea0b-43ae-9ed8-93e30f4e7b8a",
+  "name": "Short Sword",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +1/+1.\nEquip {1} ({1}: Attach to target creature you control. Equip only as a sorcery.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "dom",
+  "releasedAt": "2018-04-27",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b83a3ba0-249e-4c39-bbf0-cb005413f7d2",
   "name": "Show and Tell",
   "manaCost": "{2}{U}",
@@ -28099,6 +28354,71 @@
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "b592568b-11b0-4081-90a7-30cfb9c1ba80",
+  "name": "Suppression Ray // Orderly Plaza",
+  "manaCost": "{3}{W/U}{W/U}",
+  "cmc": 5,
+  "typeLine": "Sorcery // Land",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Tap all creatures target player controls. You may pay any amount of {E}. If you do, choose up to that many creatures tapped this way. Put a stun counter on each of them. (If a permanent with a stun counter would become untapped, remove one from it instead.)",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "uncommon",
+  "layout": "modal_dfc",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Suppression Ray",
+    "manaCost": "{3}{W/U}{W/U}",
+    "typeLine": "Sorcery",
+    "supertypes": [],
+    "types": [
+     "Sorcery"
+    ],
+    "subtypes": [],
+    "oracleText": "Tap all creatures target player controls. You may pay any amount of {E}. If you do, choose up to that many creatures tapped this way. Put a stun counter on each of them. (If a permanent with a stun counter would become untapped, remove one from it instead.)",
+    "colors": [
+     "U",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/0/c/0cccd328-457a-48ab-97fb-4bc319db2e60.jpg?1783911225",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/0/c/0cccd328-457a-48ab-97fb-4bc319db2e60.jpg?1783911225"
+   },
+   {
+    "name": "Orderly Plaza",
+    "manaCost": "",
+    "typeLine": "Land",
+    "supertypes": [],
+    "types": [
+     "Land"
+    ],
+    "subtypes": [],
+    "oracleText": "This land enters tapped.\n{T}: Add {W} or {U}.",
+    "colors": [],
+    "imageUrl": "https://cards.scryfall.io/normal/back/0/c/0cccd328-457a-48ab-97fb-4bc319db2e60.jpg?1783911225",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/0/c/0cccd328-457a-48ab-97fb-4bc319db2e60.jpg?1783911225"
+   }
+  ]
  },
  {
   "oracleId": "56719f6a-1a6c-4c0a-8d21-18f7d7350b68",
@@ -31937,6 +32257,36 @@
   "commanderLegal": "legal",
   "set": "mom",
   "releasedAt": "2023-04-21",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f4ff3efb-c9ed-4451-a7f2-5ff52ffb6cab",
+  "name": "Volrath's Curse",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature can't attack or block, and its activated abilities can't be activated. That creature's controller may sacrifice a permanent of their choice for that player to ignore this effect until end of turn.\n{1}{U}: Return this Aura to its owner's hand.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

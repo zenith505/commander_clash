@@ -2378,7 +2378,7 @@ line blocks.
    it." (Armed and Armored: chosen as it resolves, none attached with no Dwarf, rulings); "you may collect evidence X.
    When you do, ~ deals X damage to each creature and planeswalker that player controls" (Incinerator of the Guilty: X
    chosen as it resolves up to the graveyard's total mana value, then the cards, CR 701.59a; evidence 0 collects no
-   cards, rulings; a browser test for each prompt). +9 Commander-legal.
+   cards, rulings; a browser test for each prompt). +7 Commander-legal, 30,626 of 31,936 with round 312, B151 and B152.
    Out after round 313 (looked at, not done): Kusari-Gama (as after round 312); Urgent Necropsy ("collect evidence X,
    where X is the total mana value of the permanents this spell targets": an additional cost counted from the targets
    chosen in the same casting step); Eumidian Wastewaker, Hierophant Bio-Titan, Firkraag and Moxite Refinery (still

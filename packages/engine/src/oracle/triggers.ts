@@ -2950,7 +2950,36 @@ function oathTrigger(what: string, may: string, whole: string): TriggeredAbility
   return { event: "eachUpkeep", body: { targets: [target], effects: [{ type: "eachMay", who: { ref: "eventPlayer" }, effects: inner.effects, text, each: true, ...need }], text: whole } };
 }
 
+/**
+ * Thelon's Curse, Magnetic Mountain, Dream Tides, Mudslide: "At the beginning of each player's upkeep, that player may
+ * choose any number of tapped blue creatures they control and pay {U} for each creature chosen this way. If the player
+ * does, untap those creatures.": the upkeep's player chooses them all as it resolves, pays for all of them at once, then
+ * they untap together; if the whole payment can't be made, none is, and none untap (rulings on Mudslide).
+ */
+function payToUntapTrigger(raw: string): TriggeredAbility | "fail" | null {
+  const m = /^At the beginning of each player's upkeep, that player may choose any number of tapped (.+?) they control and pay (\{(?:\d+|[WUBRG])\}) for each creature chosen this way\. If the player does, untap those creatures\.$/.exec(raw);
+  if (!m) return null;
+  const which = m[1]!.replace(/^creatures without flying$/, "creature without flying").replace(/^(non)?(white|blue|black|red|green) creatures$/, "$1$2 creature");
+  const spec = pickFilter(which);
+  if (spec?.kind !== "object" || spec.controller || !spec.types?.includes("Creature") || spec.types.length !== 1 || spec.tapped !== undefined) return "fail";
+  const filter: TargetSpec = { ...spec, tapped: true, text: `tapped ${which}` };
+  const each = m[2]!;
+  const pick: Effect = { type: "pick", who: { ref: "eventPlayer" }, filter, n: 0, action: "choose", anyNumber: true, payEach: each, prompt: `click any number of your tapped ${which.replace(/creature/, "creatures")} to untap, paying ${each} for each, then pay and untap them` };
+  return { event: "eachUpkeep", body: { targets: [], effects: [pick, { type: "untap", what: { ref: "created" } }], text: raw.replace(/^At the beginning of each player's upkeep, /, "") } };
+}
+
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
+  const untapPaid = payToUntapTrigger(raw);
+  if (untapPaid) return untapPaid;
+  // Johan: "At the beginning of combat on your turn, you may have ~ gain "~ can't attack" until end of combat. If you do,
+  // attacking doesn't cause creatures you control to tap this combat if ~ is untapped.": it can't attack this combat, and
+  // while it's untapped as attackers are declared, your attacking creatures don't tap (CR 508.1f).
+  if (/^At the beginning of combat on your turn, you may have ~ gain "(?:~|⟪source⟫) can't attack" until end of combat\. If you do, attacking doesn't cause creatures you control to tap this combat if ~ is untapped\.$/.test(raw)) {
+    const base = parseTrigger("At the beginning of combat on your turn, ~ gets +1/+0 until end of turn.");
+    if (!base || base === "fail") return "fail";
+    const text = "have ~ gain \"~ can't attack\" until end of combat; if you do, attacking doesn't cause creatures you control to tap this combat while ~ is untapped";
+    return { ...base, body: { targets: [], effects: [{ type: "may", effects: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "cantAttack" }], duration: "endOfCombat" }, { type: "attackWithoutTapping" }], text }], text: raw.replace(/^At the beginning of combat on your turn, /, "") } };
+  }
   // Fasting: "When you draw a card, destroy ~.": "when" triggers each time like "whenever" (CR 603.2).
   if (/^When you draw a card, /.test(raw)) return parseTrigger(raw.replace(/^When you draw a card, /, "Whenever you draw a card, "));
   // Eye of Singularity: "a permanent other than a basic land" is a nonbasic permanent: only lands are basic (CR 205.4c).

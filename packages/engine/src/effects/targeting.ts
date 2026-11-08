@@ -231,6 +231,9 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.controller === "opponent" && c.controller === controller) return false;
   if (spec.controller === "eventPlayer" || spec.controller === "enchanted" || spec.controller === "chosenPlayer" || spec.controller === "modeChooser" || (spec.controlledBy !== undefined && c.controller !== spec.controlledBy)) return false;
   if (spec.notControlledBy !== undefined && c.controller === spec.notControlledBy) return false;
+  // Yare: "creature defending player controls": a defending player's, each opponent of the active player during the combat
+  // phase (CR 802.2, 506.2), no one's otherwise.
+  if (spec.defendingAny && (!inCombatPhase(s) || c.controller === s.activePlayer)) return false;
   if (spec.monarchControls && c.controller !== s.monarch) return false;
   if (spec.protector === "eventPlayer" || (spec.protector === "opponent" && (o.protector === undefined || o.protector === controller)) || (spec.protectedBy !== undefined && o.protector !== spec.protectedBy)) return false;
   if (spec.tapped !== undefined && !!o.tapped !== spec.tapped) return false;

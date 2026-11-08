@@ -801,6 +801,13 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     if (spec?.kind !== "object" || spec.controller || spec.xRange || spec.bound || spec.chosen) return null;
     return { ref: "target", index: addTarget(ctx, { ...spec, defendingOfSource: true, text: `target ${m[1]!}` }) };
   }
+  // Yare, Blaze of Glory: "target creature defending player controls" on a spell: any defending player's (TargetSpec.defendingAny).
+  const anyDefending = !cards && ctx.spell && !ctx.selfAttacking && !ctx.eventPlayer && !ctx.defending ? / defending player controls$/i.exec(m[1]!) : null;
+  if (anyDefending) {
+    const spec = parseTargetPhrase(m[1]!.slice(0, anyDefending.index), { target: true });
+    if (spec?.kind !== "object" || spec.controller || spec.xRange || spec.bound || spec.chosen) return null;
+    return { ref: "target", index: addTarget(ctx, { ...spec, defendingAny: true, text: `target ${m[1]!}` }) };
+  }
   const [phrase, theirs] = thatPlayerControls(m[1]!, ctx);
   // "Target creature card of the chosen type" (From the Rubble, Dawn-Blessed Pennant): the creature type chosen as its
   // source entered, filled in on its abilities (cards.ts abilitiesOf); compile checks the source makes that choice.

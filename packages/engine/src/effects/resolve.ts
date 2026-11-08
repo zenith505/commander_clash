@@ -1374,6 +1374,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileIfLeaves":
     case "noRegen":
     case "noCombatDamage":
+    case "attackWithoutTapping":
     case "lookAtHand":
     case "lookAtFaceDown":
     case "sacrifice":

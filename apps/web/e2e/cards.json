@@ -19218,6 +19218,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a84cc828-8d1b-4e61-a13f-60124e2ee35f",
+  "name": "Nahiri's Sacrifice",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, sacrifice an artifact or creature with mana value X.\nNahiri's Sacrifice deals X damage divided as you choose among any number of target creatures.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "one",
+  "releasedAt": "2023-02-10",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "613a8774-165e-4cf6-ad43-124f9ffc9980",
   "name": "Nautiloid Ship",
   "manaCost": "{4}",

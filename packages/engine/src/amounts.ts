@@ -49,6 +49,8 @@ export interface AmountCtx {
   treasureSpent?: number;
   /** What was sacrificed to cast the spell, as it last existed. */
   sacrificed?: LastKnown[];
+  /** The cards the costs of the spell its permanent was discarded (Dralnu's Pet's kicker, GameObject.costDiscarded). */
+  costDiscarded?: string[];
   /** A station ability's tapped creature (CR 702.184a). */
   stationed?: { id: ObjectId; zc: number; power: number };
   /** The creature type or color chosen ("for each creature of the chosen type"). */
@@ -423,7 +425,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const done = s.resolving?.discardedAll ?? [];
       if (done.length && c.greatest) return Math.max(0, ...done.map((id) => (s.objects[id] ? defMv(defOf(s, s.objects[id]!)) : 0)));
       if (done.length) return done.reduce((n, id) => n + (s.objects[id] ? defMv(defOf(s, s.objects[id]!)) : 0), 0);
-      return (s.resolving?.item.costDiscarded ?? []).reduce((n, k) => n + (s.cards[k] ? defMv(s.cards[k]!) : 0), 0);
+      return (ctx.costDiscarded ?? s.resolving?.item.costDiscarded ?? []).reduce((n, k) => n + (s.cards[k] ? defMv(s.cards[k]!) : 0), 0);
     }
     case "revealedManaValue": {
       const rv = s.resolving?.revealed;

@@ -730,9 +730,13 @@ export interface TargetSpec {
    * stack, though the ability's controller still controls it and targets it (rulings: hexproof is checked against the
    * controller). "eventPlayer" is the trigger's player (whose upkeep it is, the player ~ attacks), "subjectController"
    * the controller of the object the trigger is about (Death Match's entering creature), "opponent" an opponent the
-   * ability's controller chooses first (PendingTrigger.targetChooser).
+   * ability's controller chooses first (PendingTrigger.targetChooser). "Opponent" in a spell or an activated ability
+   * (Evangelize, Magus of the Arena): chosen by that opponent as it's cast or activated (CR 601.2c, 602.2b;
+   * CostChoices.targetChoosers and chooserPicks, effects/opponent-choice.ts).
    */
   chosenBy?: "eventPlayer" | "subjectController" | "opponent";
+  /** "Target creature of an opponent's choice they control" (Evangelize): controlled by the opponent chosen to choose it (bindChoosers). */
+  chooserControls?: true;
   keywords?: string[]; // "creature with flying"
   /** "Creatures you control with toxic" (Skrelv's Hive): any toxic ability, whatever its number (CR 702.164). */
   toxic?: true;

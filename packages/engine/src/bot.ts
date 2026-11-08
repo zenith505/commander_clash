@@ -130,13 +130,14 @@ import {
   discardKeywordKinds,
   auraHostOptions,
   lastDrawnInHand,
+  deferredChoice,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { prepareSpellOf } from "./prepare";
 import { castingBody, castTimeTargets, compileCard } from "./oracle";
-import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PendingDecision, type PlayerId, type StackItem } from "./types";
+import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PendingDecision, type PlayerId, type StackItem, type DeferredAct } from "./types";
 import { evalAmount } from "./amounts";
 import { CHOSEN_HEXPROOF, CHOSEN_PARITY_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
@@ -167,6 +168,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const range = t.both ? modeRange(printed, true) : printed.modal?.distinctTargets ? [pend.min, pend.max] : undefined;
       const body = range ? { ...printed, modal: { ...printed.modal!, min: range[0]!, max: range[1]! } } : printed;
       return [{ type: "chooseModes", player: pid, modes: chooseModes(s, pid, body, true, t.sourceId)!.modes }];
+    }
+    if (pend.kind === "chooseTargets" && pend.deferred) {
+      // A target of another player's spell or ability "of an opponent's choice", as it's cast or activated (askChoosers).
+      const dc = deferredChoice(s, pend.deferred);
+      const any = legalTargets(s, pend.specs[0]!, pend.controller ?? pid, undefined, botSource(s, pend.sourceId), pend.sourceId)[0];
+      return [{ type: "chooseTargets", player: pid, targets: dc ? targetForOther(s, pid, pend.controller ?? pid, dc.body, pend.sourceId, dc.slot, dc.targets) : [any ?? { kind: "none" }] }];
     }
     if (pend.kind === "chooseTargets") {
       const t = s.triggerQueue[0]!;
@@ -925,6 +932,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Wall of Shards: the life to the opponent who has the most already, where it matters least.
     // "Target ... of an opponent's choice" (Mausoleum Turnkey): any one of them will choose against us; the next in turn order.
+    if (pend.kind === "chooseOption" && pend.what === "targetChooser" && pend.deferred) return [{ type: "chooseOption", player: pid, choice: bestChooser(s, pid, pend.options, pend.deferred) }];
     if (pend.kind === "chooseOption" && pend.what === "targetChooser") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Plague of Vermin: Rats for life we can spare (keeping 20) in the first round only, so the rounds end.
     if (pend.kind === "chooseOption" && pend.what === "payLifeRound") {
@@ -2118,12 +2126,41 @@ function targetGuard(s: GameState, pid: PlayerId, effects: Effect[], i: number, 
   return (t) => tests.some((f) => f(t));
 }
 
-/** Whether what an ability does to its one target is bad for that target's controller: removal, damage, -3/-3. */
-function harmsChosenTarget(body: AbilityBody): boolean {
+/** Whether what an ability does to its target `i` is bad for that target's controller: removal, damage, -3/-3. */
+function harmsChosenTarget(body: AbilityBody, i = 0): boolean {
   // Inside "that player may" (Effect eachMay) too.
   const flat = (es: Effect[]): Effect[] => es.flatMap((e) => (e.type === "eachMay" ? flat(e.effects) : [e]));
   const effects = flat(body.effects);
-  return !!harmfulTargets({ ...body, effects })[0] || allEffects(effects).some((e) => e.type === "continuous" && e.what.ref === "target" && e.what.index === 0 && modsAreHarmful(e.mods));
+  return (
+    !!harmfulTargets({ ...body, effects })[i] ||
+    allEffects(effects).some(
+      (e) =>
+        (e.type === "continuous" && e.what.ref === "target" && e.what.index === i && modsAreHarmful(e.mods)) ||
+        // Nova Pentacle: damage dealt to it instead.
+        (e.type === "damageRule" && e.rule.redirect?.ref === "target" && e.rule.redirect.index === i),
+    )
+  );
+}
+
+/**
+ * The opponent we ask to choose a target of our spell or ability "of an opponent's choice" (askChoosers): the one whose
+ * likely choice (targetForOther, as they'd choose) is the best for us.
+ */
+function bestChooser(s: GameState, pid: PlayerId, options: string[], d: DeferredAct): string {
+  const dc = deferredChoice(s, d);
+  if (!dc || options.length < 2) return options[0]!;
+  const o = s.objects[d.act.objectId];
+  const sourceId = o?.id ?? d.act.objectId;
+  const harm = harmsChosenTarget(dc.body, dc.slot);
+  const score = (q: PlayerId) => {
+    const spec = { ...dc.body.targets[dc.slot]!, ...(dc.body.targets[dc.slot]!.chooserControls ? { controlledBy: q } : {}) };
+    const body = { ...dc.body, targets: dc.body.targets.map((t, i) => (i === dc.slot ? spec : t)) };
+    const t = targetForOther(s, q, pid, body, sourceId, dc.slot, dc.targets)[0];
+    if (t?.kind !== "object" || !s.objects[t.id]) return 0;
+    const v = worth(s, pid, obj(s, t.id));
+    return isMine(s, pid, t) === harm ? -v : v;
+  };
+  return [...options].sort((a, b) => score(Number(b)) - score(Number(a)))[0]!;
 }
 
 /**
@@ -2131,9 +2168,28 @@ function harmsChosenTarget(body: AbilityBody): boolean {
  * chosenBy): legal for the controller (rulings), and the best for us, our most valuable if what it does helps, else
  * theirs (an opponent's), our least valuable only when there's nothing else.
  */
-function targetForOther(s: GameState, pid: PlayerId, controller: PlayerId, body: AbilityBody, sourceId: ObjectId): TargetChoice[] {
-  const all = legalTargets(s, body.targets[0]!, controller, undefined, botSource(s, sourceId), sourceId);
-  const harm = harmsChosenTarget(body);
+function targetForOther(s: GameState, pid: PlayerId, controller: PlayerId, body: AbilityBody, sourceId: ObjectId, slot = 0, chosen: TargetChoice[] = []): TargetChoice[] {
+  const spec = body.targets[slot]!;
+  const all = legalTargets(s, spec, controller, undefined, botSource(s, sourceId), sourceId).filter((t) => canChooseTarget(s, body.targets, chosen.slice(0, slot), slot, t, controller, botSource(s, sourceId), sourceId));
+  // "Target creature of an opponent's choice they control" (Evangelize, Echo Chamber, Preacher): what it does is for its
+  // controller, so our least valuable one; to fight their creature (Magus of the Arena), one that kills it and survives,
+  // or survives, or else the least valuable.
+  if (spec.chooserControls) {
+    const fight = allEffects(body.effects).find((e) => e.type === "fight" && ((e.a.ref === "target" && e.a.index === slot) || (e.b.ref === "target" && e.b.index === slot)));
+    const otherRef = fight?.type === "fight" ? (fight.a.ref === "target" && fight.a.index === slot ? fight.b : fight.a) : undefined;
+    const other = otherRef?.ref === "target" ? chosen[otherRef.index] : undefined;
+    const foe = other?.kind === "object" ? s.objects[other.id] : undefined;
+    const rank = (t: TargetChoice) => {
+      if (t.kind !== "object") return 0;
+      const o = obj(s, t.id);
+      if (!foe) return -worth(s, pid, o);
+      const kills = power(s, o) >= toughness(s, foe);
+      const lives = power(s, foe) < toughness(s, o);
+      return (kills && lives ? 2000 : lives ? 1000 : kills ? 500 : 0) - worth(s, pid, o);
+    };
+    return [[...all].sort((a, b) => rank(b) - rank(a))[0] ?? { kind: "none" }];
+  }
+  const harm = harmsChosenTarget(body, slot);
   const score = (t: TargetChoice) => {
     if (t.kind !== "object") return t.kind === "player" ? (t.id === pid) !== harm ? 1 : -1 : 0;
     const o = obj(s, t.id);
@@ -2173,6 +2229,18 @@ function withFlagbearer(s: GameState, pid: PlayerId, printed: AbilityBody, targe
 }
 
 function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced = false, sourceId?: string, x = 0): TargetChoice[] | null {
+  // "Target ... of an opponent's choice" (askChoosers): an opponent chooses those, so we leave them none. Only when
+  // whatever they choose is theirs (or another opponent's) and what it does is good for us: gaining control of it or a
+  // copy (Evangelize, Echo Chamber, Preacher), destroying lands and creatures we don't control (Volcanic Offering). Not a
+  // fight (Magus of the Arena) or a target that can be ours (Cuombajj Witches, Diaochan, Nova Pentacle).
+  const chosenBy = printed.targets.flatMap((t, i) => (t.chosenBy === "opponent" ? [i] : []));
+  if (chosenBy.length) {
+    const fights = allEffects(printed.effects).some((e) => e.type === "fight");
+    if (!forced && (fights || chosenBy.some((i) => printed.targets[i]!.controller !== "opponent"))) return null;
+    const rest = pickTargets(s, pid, { ...printed, targets: printed.targets.map((t) => (t.chosenBy === "opponent" ? (({ chosenBy: _, ...r }) => ({ ...r, skip: true as const }))(t) : t)) }, forced, sourceId, x);
+    if (!rest && chosenBy.length < printed.targets.length) return null;
+    return printed.targets.map((t, i): TargetChoice => (t.chosenBy === "opponent" ? { kind: "none" } : (rest?.[i] ?? { kind: "none" })));
+  }
   // "Any number of target creatures": each one there could be, as an "up to" target (CR 601.2c); none there, not worth it.
   const body = offerMany(s, printed, pid, x, sourceId ? botSource(s, sourceId) : undefined, sourceId);
   const many = manySlot(printed.targets);

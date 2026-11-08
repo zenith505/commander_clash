@@ -21,4 +21,5 @@ export { isSuspended, enterAttacking } from "./run-zones";
 export { canPayNow, timesPay } from "./run-choices";
 export { COLOR_NAMES, describePay, describeDest, describeMods } from "./describe";
 export { inCombat, attackDefault, attackingYouNow, echoDue, evolves, fireEvent, processTriggerQueue, checkStateTriggers, checkLostControl, closeZoneBatch, triggerBody, pushTrigger, type TriggerSourceEvent } from "./triggers";
+export { chooserSlots, bindChoosers, withChooserPicks, chooserChoices, withStandIns, forController } from "./opponent-choice";
 export { doesNothingNow, harmfulTargets, modsAreHarmful, damageTo, lethalDamage, estimate } from "./heuristics";

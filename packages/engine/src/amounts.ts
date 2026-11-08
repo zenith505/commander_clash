@@ -338,6 +338,16 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const linked = src ? (s.linkedExile?.[`${src.id}@${src.zoneChanges ?? 0}`] ?? []) : [];
       if (c.ever) return linked.length;
+      // Keen-Eyed Curator: the card types among them (CR 205.2a: `types` has no supertypes or subtypes), the cards' own in exile; a
+      // face-down card has none (CR 708.2a).
+      if (c.cardTypes) {
+        const types = new Set<string>();
+        for (const l of linked) {
+          const o = s.objects[l.id];
+          if (o?.zone === "exile" && (o.zoneChanges ?? 0) === l.zc && !o.faceDown) for (const t of defOf(s, o).types) types.add(t);
+        }
+        return types.size;
+      }
       return linked.filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc && (!c.filter || (!s.objects[l.id]!.faceDown && printedMatches(c.filter, defOf(s, s.objects[l.id]!))))).length;
     }
     case "linkedExiledMv": {
@@ -1436,7 +1446,7 @@ function describeCount(c: Count): string {
     case "countersRemovedThisWay":
       return "#counters removed";
     case "linkedExiled":
-      return "#cards exiled with it";
+      return c.cardTypes ? "#card types among cards exiled with it" : "#cards exiled with it";
     case "linkedExiledPT":
       return `the exiled creature card's ${c.stat}`;
     case "linkedExiledMv":

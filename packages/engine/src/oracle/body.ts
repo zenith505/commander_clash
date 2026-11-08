@@ -2167,6 +2167,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Killian, Decisive Mentor: "tap up to one target creature and goad it": two instructions, in order.
   // Karazikar, the Eye Tyrant: "tap target creature that player controls and goad it", the same.
   text = text.replace(/^([Tt]ap (?:up to one )?target creature(?: (?:that player|defending player|an opponent) controls)?) and goad it\./, "$1. Goad it.");
+  // Kros, Defense Contractor: "tap that creature and goad it" (the trigger's "that creature" read as "it"): the same.
+  text = text.replace(/^([Tt]ap it) and goad it\./, "$1. Goad it.");
   // Tamiyo's Compleation: "tap enchanted permanent. If it's an Equipment, unattach it.": "it" is the enchanted permanent.
   text = text.replace(/^tap enchanted permanent\. If it's an Equipment, unattach it\.$/, "Tap enchanted permanent. Unattach enchanted permanent if it's an Equipment.");
   // Bhaal, Lord of Murder: "put a +1/+1 counter on target creature and goad it": the same, counter first.
@@ -6606,7 +6608,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
     // rounds B152, B151, B148, 311, 312 and 313's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    const faceDown = roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);
@@ -19960,4 +19962,22 @@ function round310Rewrites(text: string): string {
   // "it" is ~, checked as the ability resolves, after the counter.
   text = text.replace(/(put an? [a-z]+ counter on ~\. If there are [a-z]+ or more [a-z]+ counters on ~, sacrifice) it\./, "$1 ~.");
   return text;
+}
+
+/** Round 314's sentences, kept out of parseBodyText (TS2563). */
+function round314Sentence(s: string, sentences: string[], si: number, ctx: Ctx): { effect: Effect; next: number } | "fail" | null {
+  const next = (i: number) => sentences[si + i]?.replace(/\.$/, "") ?? "";
+  // Radiant Scrollwielder: "exile an instant or sorcery card at random from your graveyard. You may cast it this turn. If
+  // a spell cast this way would be put into your graveyard, exile it instead." Cast the usual way, paying its costs and
+  // following timing rules (rulings); the card is yours, so its owner's graveyard is the only one it could go to (CR
+  // 400.3), the same as Dire Fleet Daredevil's "into a graveyard".
+  if (/^[Ee]xile an instant or sorcery card at random from your graveyard$/.test(s) && next(1) === "You may cast it this turn" && next(2) === "If a spell cast this way would be put into your graveyard, exile it instead")
+    return { effect: { type: "randomFromGraveyard", dest: "exilePlay", filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" }, exileAfter: true }, next: si + 3 };
+  // Brazen Cannonade: "exile the top card of your library. Until end of combat on your next turn, you may play that card."
+  // Face up (rulings), played the usual way; over as the end of combat step of your next turn ends (CR 511.3).
+  if (/^[Ee]xile the top card of your library$/.test(s) && next(1) === "Until end of combat on your next turn, you may play that card") {
+    ctx.exiledTop = true;
+    return { effect: { type: "impulse", n: 1, until: "yourNextCombat" }, next: si + 2 };
+  }
+  return null;
 }

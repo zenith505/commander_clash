@@ -911,7 +911,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (e.cause) return ctx.cause && s.stack.some((x) => x.id === ctx.cause) ? newTargets(s, ctx, ctx.cause, src) : undefined;
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
-      return newTargets(s, ctx, t.id, src, e.allOrNone);
+      return newTargets(s, ctx, t.id, src, e.allOrNone, e.changeAny);
     }
     case "counterEach": {
       // Each spell on the stack it matches as it resolves, one at a time (CR 701.6a); this spell itself is excluded
@@ -1561,7 +1561,7 @@ function changeATargetToSelf(s: GameState, ctx: ResolveCtx, stackId: string, by:
  * keeping any, legal or not, and changing others to legal ones. Its new targets become targets of it ("becomes the
  * target" triggers, ward); the ones it keeps don't again. With nothing it could change to, nothing is asked.
  */
-function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string, allOrNone?: true): "paused" | void {
+function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string, allOrNone?: true, changeAny?: true): "paused" | void {
   const item = s.stack.find((x) => x.id === stackId);
   const o = item?.objectId ? s.objects[item.objectId] : undefined;
   if (!item || (item.kind === "spell" && !o)) return;
@@ -1575,7 +1575,7 @@ function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string, 
       log(s, `${item.description} has no other legal targets, so its targets stay the same.`);
       return;
     }
-    s.pending = { kind: "newTargets", player: ctx.controller, source: by, spell: item.description, stackId: item.id, controller: item.controller, specs, current, ...(allOrNone ? { allOrNone } : {}) };
+    s.pending = { kind: "newTargets", player: ctx.controller, source: by, spell: item.description, stackId: item.id, controller: item.controller, specs, current, ...(allOrNone ? { allOrNone } : {}), ...(changeAny ? { changeAny } : {}) };
     return "paused";
   }
   const next = sc.retargets;

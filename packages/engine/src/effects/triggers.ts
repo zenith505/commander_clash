@@ -1053,6 +1053,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // controller, once for each such creature, "it" being that creature.
         for (const w of watchers)
           if (controllerOf(s, w) === you) add(w, you, (e, t) => e === "creatureYouControlAttacksUnblocked" && !t.zone && !!t.attacker && !(t.attacker.other && w.id === o.id) && objectMatches(s, t.attacker.filter, o, you, false), undefined, undefined, o, undefined, undefined, undefined, { player: o.attacking });
+        // Gaze of Pain: "Until end of turn, whenever a creature you control attacks and isn't blocked, ..." (CR 603.7b).
+        fromFloating((src, ctrl, triggers) => ctrl === you && add(src, ctrl, (e, t) => e === "creatureYouControlAttacksUnblocked" && !!t.attacker && objectMatches(s, t.attacker.filter, o, ctrl, false), triggers, undefined, o, undefined, undefined, undefined, { player: o.attacking }));
         add(o, you, (e, t) => e === "selfAttacksUnblocked" && (!t.attacksPlayer || !o.attackingPermanent), undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
         addHosted(o, (e) => e === "selfAttacksUnblocked", undefined, o, { player: o.attacking });
       }

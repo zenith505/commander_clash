@@ -1300,6 +1300,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "castTargetFree":
     case "destroy":
     case "regenerate":
+    case "removeDamageShield":
     case "exile":
     case "returnLinked":
     case "exileFaceDown":

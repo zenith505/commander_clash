@@ -3,7 +3,7 @@
 // and Volrath's Curse (the enchanted creature's controller sacrifices a permanent).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, putOnBattlefield, setup } from "./helpers";
+import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
 import { abilityProblem, applyAction, castProblem, characteristics, power, controlsMostPermanents, landsAllowed, botActions, potentialAttackers, ignorableBy, ignoreEffectProblem, invalidateCharacteristics, isFullySupported, legalActions, planCast, planIgnoreEffect, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -50,8 +50,9 @@ const growth = (): CardDef => ({"oracleId":"8539f295-5d58-4436-a73a-b9277c4c7795
 const pinger = () => bear({ name: "Test Pinger", oracleText: "{T}: Test Pinger deals 1 damage to any target.", power: "3", toughness: "3" });
 const forestsOnField = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]!.name === "Forest").length;
 
+const incinerator = (): CardDef => ({"oracleId":"9b7d037f-3269-4e3b-9744-a977acb69c67","name":"Incinerator of the Guilty","manaCost":"{4}{R}{R}","cmc":6,"typeLine":"Creature — Dragon","supertypes":[],"types":["Creature"],"subtypes":["Dragon"],"oracleText":"Flying, trample\nWhenever this creature deals combat damage to a player, you may collect evidence X. When you do, this creature deals X damage to each creature and planeswalker that player controls. (To collect evidence X, exile cards with total mana value X or greater from your graveyard.)","power":"6","toughness":"6","colors":["R"],"colorIdentity":["R"],"keywords":["Flying","Trample"],"layout":"normal","gameChanger":false} as CardDef);
 describe("round 313", () => {
-  it("are fully supported", () => supported(arbiter(), lost(), curse(), damping(), ray(), armed()));
+  it("are fully supported", () => supported(arbiter(), lost(), curse(), damping(), ray(), armed(), incinerator()));
 });
 
 describe("round 313: Leonin Arbiter", () => {
@@ -312,5 +313,62 @@ describe("round 313: Armed and Armored", () => {
     const [e1, e2] = [putOnBattlefield(s0, ap, sword("Test Sword A")), putOnBattlefield(s0, ap, sword("Test Sword B"))];
     const s = settle(run(s0, planCast(s0, ap, ids[0]!)));
     expect([e1, e2].map((id) => s.objects[id]!.attachedTo)).toEqual([d, d]);
+  });
+});
+
+describe("round 313: Incinerator of the Guilty", () => {
+  const hit = (ask: boolean) => {
+    const { s: s0, ap, opp } = setup([]);
+    const me = putOnBattlefield(s0, ap, incinerator());
+    const yard = [card("Test Six", "Sorcery", "{4}{R}{R}"), card("Test Two", "Instant", "{1}{R}"), card("Test Land", "Land")].map((d) => inZone(s0, ap, d, "graveyard"));
+    const theirs = [putOnBattlefield(s0, opp, bear({ name: "Test Small" })), putOnBattlefield(s0, opp, card("Test Big", "Creature — Giant", "{5}{G}", { power: "5", toughness: "5" }))];
+    const other = putOnBattlefield(s0, s0.turnOrder.find((p) => p !== ap && p !== opp)!, bear({ name: "Test Elsewhere" }));
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: me, defender: opp }] } as Action);
+    for (let i = 0; i < 200 && !(ask && s.pending?.player === ap) && !(!ask && s.step === "endCombat"); i++) s = s.pending ? act(s, botActions(s, s.pending.player)[0]!) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, ap, opp, me, yard, theirs, other };
+  };
+
+  it("chooses X up to the graveyard's total mana value, collects evidence X, then deals X damage to each creature that player controls", () => {
+    let { s, ap, opp, yard, theirs, other } = hit(true);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap, what: "evidenceX", numberRange: { min: 0, max: 8 } });
+    expect(() => act(s, { type: "chooseOption", player: ap, choice: "9" })).toThrow();
+    s = act(s, { type: "chooseOption", player: ap, choice: "2" });
+    expect(s.pending).toMatchObject({ kind: "collectEvidence", player: ap, n: 2 });
+    // Mana value 0 isn't enough.
+    expect(() => act(s, { type: "collectEvidence", player: ap, ids: [yard[2]!] })).toThrow();
+    s = settle(act(s, { type: "collectEvidence", player: ap, ids: [yard[1]!] }), ap);
+    expect(zone(s, yard[1]!)).toBe("exile");
+    expect(zone(s, yard[0]!)).toBe("graveyard");
+    expect(zone(s, theirs[0]!)).toBe("graveyard");
+    expect(zone(s, theirs[1]!)).toBe("battlefield");
+    expect(s.objects[theirs[1]!]!.damage).toBe(2);
+    expect(zone(s, other)).toBe("battlefield");
+    expect(s.players[opp]!.life).toBe(40 - 6);
+  });
+
+  it("choosing not to collect evidence does nothing; picking no cards for X > 0 is not collecting it either", () => {
+    let { s, ap, yard, theirs } = hit(true);
+    const no = settle(act(s, { type: "chooseOption", player: ap, choice: "none" }), ap);
+    expect(no.pending).toBeFalsy();
+    expect(no.objects[theirs[0]!]!.zone).toBe("battlefield");
+    s = act(s, { type: "chooseOption", player: ap, choice: "6" });
+    s = settle(act(s, { type: "collectEvidence", player: ap, ids: [] }), ap);
+    expect(s.objects[theirs[0]!]!.damage ?? 0).toBe(0);
+    expect(yard.map((id) => zone(s, id))).toEqual(["graveyard", "graveyard", "graveyard"]);
+  });
+
+  it("collect evidence 0: no cards, no damage, but evidence is collected (rulings)", () => {
+    let { s, ap, yard } = hit(true);
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "0" }), ap);
+    expect(s.pending).toBeFalsy();
+    expect(yard.map((id) => zone(s, id))).toEqual(["graveyard", "graveyard", "graveyard"]);
+    expect(s.log.some((l) => /collects evidence 0/.test(l.text))).toBe(true);
+  });
+
+  it("the bot picks the X that kills the most it can and exiles the cards for it", () => {
+    const { s: s0, theirs } = hit(false);
+    const s = settle(s0);
+    expect(theirs.map((id) => zone(s, id))).toEqual(["graveyard", "graveyard"]);
   });
 });

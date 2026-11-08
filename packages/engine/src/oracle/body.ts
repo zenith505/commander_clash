@@ -19921,6 +19921,16 @@ function round313Sentence(s: string, sentences: string[], si: number, ctx: Ctx, 
     const pick: Effect = { type: "pick", who: { ref: "you" }, filter: { ...creature, kind: "object", text: "creature tapped this way" }, n: { count: { kind: "x" } }, action: "counters", counter: { kind: "stun", n: 1 }, upTo: true, anyController: true, fromTapped: true };
     return { effect: { type: "may", effects: [pick], pay: {}, payX: { energy: true }, text: "pay any amount of {E}. If you do, put a stun counter on each of up to that many creatures tapped this way" }, next: si + 4 };
   }
+  // Incinerator of the Guilty: "you may collect evidence X. When you do, ~ deals X damage to each creature and planeswalker
+  // that player controls.": X chosen as it resolves (CR 107.1c), the evidence collected (CR 701.59a), then a reflexive
+  // trigger (CR 603.12) whose X is that X; "that player" is still the one dealt combat damage.
+  if (/^[Yy]ou may collect evidence X$/.test(s) && si + 2 === sentences.length && !ctx.spell) {
+    const when = /^When you do, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
+    if (!when || !/^~ deals X damage to each creature and planeswalker that player controls$/.test(when[1]!)) return "fail";
+    const reflexive = reflexiveBody(when[1]!, ctx, false, false, false);
+    if (!reflexive) return "fail";
+    return { effect: { type: "may", effects: [{ type: "collectEvidence", n: 0, nX: true }, { type: "reflexive", body: reflexive }], pay: {}, payX: { evidence: true }, text: `collect evidence X. When you do, ${when[1]}` }, next: si + 2 };
+  }
   return null;
 }
 

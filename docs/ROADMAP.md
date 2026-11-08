@@ -525,7 +525,7 @@ line blocks.
    Phoenix, Celestus Sanctifier), and "look at the top two cards of your library. Put one of them into your graveyard"
    (Jace, the Living Guildpact). Rules fix: "half X, rounded down" where X is defined elsewhere (a spell's X) kept the
    whole X.
-   Out after round 193 (looked at, not done): Shilgengar, Sire of Famine (done in round 270), Armed and Armored ("choose a Dwarf you
+   Out after round 193 (looked at, not done): Shilgengar, Sire of Famine (done in round 270), Armed and Armored (done in round 313) ("choose a Dwarf you
    control. Attach any number of Equipment you control to it"), World War Hulk, Hatchery Sliver, Magus Lucea Kane, Make
    Your Own Luck, Lilah, Undefeated Slickshot, Soulcipher Board ("remove an omen counter ... then if it has no omen
    counters on it, transform it").
@@ -586,7 +586,7 @@ line blocks.
    Sidisi, Regent of the Mire (done in round 266), Unidentified
    Hovership ("the exiled card's owner manifests dread"), Geth's Summons, Sphinx of Foresight (opening-hand reveal),
    Eruth, Tranquil Frillback (done in round 267), Yusri, Blitzball Stadium, Underdark Rift,
-   Colfenor's Urn, Dragon's Fire (done in round 299), Leonin Arbiter, Sigurd, Protection Racket, Sin Prodder, Osgir (done in round 302), Nine-Fingers Keene (done in round 295),
+   Colfenor's Urn, Dragon's Fire (done in round 299), Leonin Arbiter (done in round 313), Sigurd, Protection Racket, Sin Prodder, Osgir (done in round 302), Nine-Fingers Keene (done in round 295),
    Phyrexian Processor. Smaller gap: Rakdos, the Showstopper with Krark's Thumb keeps heads for your own creatures and
    tails for the others without asking.
    Round 197 went on from the top: blight N as a cost (CR 701.68: Gristle Glutton, Sting-Slinger, Spiral into
@@ -898,7 +898,7 @@ line blocks.
    mana cost for as long as it remains exiled" (Spelljack, Kheru Spellsnatcher); "cast target instant or sorcery card
    from a graveyard, and mana of any type can be spent" (Quistis Trepe). +21 (27,813 of 31,936 with round 210 and Lane B rounds B40 to B42).
    Out after round 211 (looked at, not done): Tegwyll's Scouring (flash by tapping three flyers as an additional cost);
-   The Kenriths' Royal Funeral (done in round 303) (a cost cut counted from linked exiled cards); Suppression Ray ("choose up to that many
+   The Kenriths' Royal Funeral (done in round 303) (a cost cut counted from linked exiled cards); Suppression Ray (done in round 313) ("choose up to that many
    creatures tapped this way"); Baba Lysaga, Night Witch ("sacrifice up to three permanents" as a cost, then card types
    among them); Dargo, the Shipwrecker (optional sacrifices as a cost that cut it); Curse of Misfortunes (a Curse not
    sharing a name with one attached to that player); Archmage Ascension (done in round 297) (a "would draw" replacement by a search);
@@ -2359,10 +2359,30 @@ line blocks.
    Cathedral of Serra and the other "bands with other" lands; Mangara's Tome and Aladdin's Lamp (a draw replaced); All
    Hallow's Eve (scream counters in exile); Land Equilibrium; Disciple of Caelus Nin (permanents can't phase in);
    Advancing the Spirit (power-up costs); Spy Kit (all names); Lightning Storm (an ability activated while it's on the
-   stack); Damping Engine; Dimensional Breach; Phyrexian Splicer (a keyword chosen as a cost, then the target with it);
+   stack); Damping Engine (done in round 313); Dimensional Breach; Phyrexian Splicer (a keyword chosen as a cost, then the target with it);
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 313 took cards back off the "Out after round N" lists, most played first: paying to ignore a permanent's effect
+   until end of turn, a special action (CR 116.2d) offered from that permanent's menu, with nothing on the stack:
+   "Players can't search libraries. Any player may pay {2} for that player to ignore this effect until end of turn"
+   (Leonin Arbiter: each player pays for themselves, each Arbiter on its own, as it is now, CR 400.7), "Enchanted
+   creature doesn't untap ... Its controller may exile three cards from their graveyard for that player to ignore this
+   effect until end of turn" (Lost in Thought, the cards picked in a window), "That creature's controller may sacrifice a
+   permanent of their choice for that player to ignore this effect" (Volrath's Curse) and "A player who controls more
+   permanents than each other player can't play lands or cast artifact, creature, or enchantment spells. That player may
+   sacrifice a permanent for that player to ignore this effect until end of turn" (Damping Engine); bots pay when it lets
+   them search, cast or attack; "Tap all creatures target player controls. You may pay any amount of {E}. If you do,
+   choose up to that many creatures tapped this way. Put a stun counter on each of them." (Suppression Ray: only those
+   that became tapped, rulings, CR 122.1d); "Choose a Dwarf you control. Attach any number of Equipment you control to
+   it." (Armed and Armored: chosen as it resolves, none attached with no Dwarf, rulings); "you may collect evidence X.
+   When you do, ~ deals X damage to each creature and planeswalker that player controls" (Incinerator of the Guilty: X
+   chosen as it resolves up to the graveyard's total mana value, then the cards, CR 701.59a; evidence 0 collects no
+   cards, rulings; a browser test for each prompt). +9 Commander-legal.
+   Out after round 313 (looked at, not done): Kusari-Gama (as after round 312); Urgent Necropsy ("collect evidence X,
+   where X is the total mana value of the permanents this spell targets": an additional cost counted from the targets
+   chosen in the same casting step); Eumidian Wastewaker, Hierophant Bio-Titan, Firkraag and Moxite Refinery (still
+   out, for the reasons in their earlier lists).
    Round 312 took cards back off the "Out after round N" lists, most played first: "When ~ die, if they were a creature,
    return them to the battlefield. They're an artifact." (Tom, Bert, and William: a plural name; it returns under the
    control of the trigger's controller, CR 110.2a, as an artifact only, its creature types gone and Legendary kept, CR
@@ -2572,7 +2592,7 @@ line blocks.
    Out after round 304 (looked at, not done): Night Soil ("Exile two creature cards from a single graveyard" as a cost:
    the cost picker only offers your own graveyard); Karn, Living Legacy ("Pay any amount of mana" as an effect, and an
    emblem whose ability's cost taps an artifact); Moxite Refinery, Abstruse Appropriation, Oskar, Araumi, Ride the
-   Avalanche, Panoptic Projektor, Read the Runes, Draco, Azra Oddsmaker, Leonin Arbiter, Incinerator of the Guilty, Baba
+   Avalanche, Panoptic Projektor, Read the Runes, Draco, Azra Oddsmaker, Leonin Arbiter (done in round 313), Incinerator of the Guilty (done in round 313), Baba
    Lysaga, Archelos and Hatchery Sliver (still out, for the reasons in their earlier notes).
    Round 303 took cards back off the "Out after round N" lists, most played first: "Reveal the top six cards of your
    library. You may put up to one land card from among them onto the battlefield tapped and up to one Elf card from
@@ -2598,7 +2618,7 @@ line blocks.
    the Dead Tide (its cost "Exile cards from your graveyard equal to the number of opponents you have"; granting encore
    now works); Obsidian Charmaw (a cost cut counting "each land your opponents control that could produce {C}", near Lane B's round B140 template, left for it); Lumbering Battlement
    (the exile until it leaves isn't linked yet); Spectral Searchlight, Greater Gargadon, Ride the Avalanche, Panoptic
-   Projektor, Read the Runes, Draco, Azra Oddsmaker, Leonin Arbiter, Incinerator of the Guilty, Baba Lysaga, Archelos and
+   Projektor, Read the Runes, Draco, Azra Oddsmaker, Leonin Arbiter (done in round 313), Incinerator of the Guilty (done in round 313), Baba Lysaga, Archelos and
    Hatchery Sliver (still out, for the reasons in their earlier notes).
    Round 302 took cards back off the "Out after round N" lists, most played first: "Whenever players finish voting, each
    opponent who voted for a choice you didn't vote for loses 2 life" (Grudge Keeper: with extra votes, only an opponent
@@ -2620,8 +2640,8 @@ line blocks.
    equipped creature. Flip a coin" (Plasma Caster: the creature it equipped as the ability was activated, rulings).
    +10, 30,425 of 31,936 with B139.
    Out after round 302 (looked at, not done): Spectral Searchlight and Greater Gargadon (their templates are in Lane B's
-   open round B139); Ride the Avalanche, Panoptic Projektor, Read the Runes, Draco, Azra Oddsmaker, Leonin Arbiter,
-   Incinerator of the Guilty, Baba Lysaga, Archelos and Hatchery Sliver (still out, for the reasons in their earlier
+   open round B139); Ride the Avalanche, Panoptic Projektor, Read the Runes, Draco, Azra Oddsmaker, Leonin Arbiter (done in round 313),
+   Incinerator of the Guilty (done in round 313), Baba Lysaga, Archelos and Hatchery Sliver (still out, for the reasons in their earlier
    notes).
    Round 301 took cards back off the "Out after round N" lists, most played first: "the next spell you cast this turn"
    permissions. An alternative cost (CR 118.9) offered only to that spell and used up by it whichever cost is paid
@@ -2649,7 +2669,7 @@ line blocks.
    that spell's mana value); Panoptic Projektor (a cost cut for the next face-down creature spell: face-down costs aren't
    reduced by "next spell" effects yet); Read the Runes (the sacrifices chosen first, then the discards for the rest, in
    one step: rulings); Draco (an upkeep "unless you pay {10}" cut by {2} for each basic land type: a punisher cost with
-   its own reduction); Azra Oddsmaker, Spectral Searchlight, Leonin Arbiter, Incinerator of the Guilty, Baba Lysaga,
+   its own reduction); Azra Oddsmaker, Spectral Searchlight, Leonin Arbiter (done in round 313), Incinerator of the Guilty (done in round 313), Baba Lysaga,
    Archelos and Hatchery Sliver (still out, for the reasons in their earlier notes).
    Round 300 took cards back off the "Out after round N" lists, most played first: an {X} in an alternative cost (CR
    107.3a), announced as the card is cast that way: "Warp {X}{G}" (Broodguard Elite) and "Surge {X}{R}" (Fall of the
@@ -2699,7 +2719,7 @@ line blocks.
    one kicker-like cost each, not a second one); Mirrormind Crown, Esix, Moonlit Meditation and Jinnie Fay
    (tokens created instead as copies of something else: a token-creation replacement); Spectral Searchlight (another
    player chooses the color of mana it adds); Firkraag, Cunning Instigator ("had to attack this combat": attack
-   requirements aren't remembered); Leonin Arbiter (a special action any player may take, paying {2} to search, needs a
+   requirements aren't remembered); Leonin Arbiter (done in round 313) (a special action any player may take, paying {2} to search, needs a
    button and a bot policy); Hive Mind (copies of each instant or sorcery spell for every other player, each targeting
    for its new controller).
    Round 298 took cards back off the "Out after round N" lists, most played first: "each opponent exiles a card from
@@ -2806,7 +2826,7 @@ line blocks.
    Quay, Shelkin Brownie ("bands with other"); Oracle en-Vec (chosen creatures attack next turn, the others can't); False
    Orders, Balduvian Warlord, General Jarkeld (a blocker removed, then blocking another attacker); Takklemaggot; Jötun Grunt
    (cumulative upkeep paid with cards from a single graveyard each time); Soul Echo; Goblin Artisans; Ice Cauldron (noted
-   mana); Illusionary Mask; Stand or Fall and Camouflage (piles of blockers); Volrath's Curse and Lost in Thought (a cost
+   mana); Illusionary Mask; Stand or Fall and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
    paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
    spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (other players' graveyards as yours);
    Pygmy Hippo; Snowblind (Y counts the toughness the effect changes); Glyph of Delusion and Glyph of Reincarnation
@@ -7395,7 +7415,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Lord (blocked by other lines).
 - Collect evidence (CR 701.59) works as an optional additional cost, an alternative cost, an ability's cost and a "you
   may" on resolution; still out: ward—collect evidence (Axebane Ferox), bestow with it (Detective's Phoenix), "collect
-  evidence X" (Incinerator of the Guilty, Urgent Necropsy), "if evidence was collected, instead" (Analyze the Pollen,
+  evidence X" as a cost (Urgent Necropsy; Incinerator of the Guilty's done in round 313), "if evidence was collected, instead" (Analyze the Pollen,
   Extract a Confession), and cards blocked by other lines (Cryptex, Polygraph Orb, Hedge Whisperer (done in round B127), Lamplight Phoenix,
   Memory Vampire, Tenth District Hero, Deadly Cover-Up).
 - Mana from a Treasure (CR 106.3) is tracked; still out: Devour Intellect ("instead" with a choice), Kalain's

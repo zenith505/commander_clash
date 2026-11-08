@@ -2661,7 +2661,7 @@ function CardChoice({
   );
 }
 
-/** A number to choose secretly (Wheel of Misfortune), a bid of life (Illicit Auction: "Don't bid" passes), life paid round after round (Plague of Vermin: "Pay no life"), or how much life or energy to pay (Necrodominance, Galvanic Discharge, Minion of the Wastes as it enters): any whole number in the range the decision allows. */
+/** A number to choose secretly (Wheel of Misfortune), a bid of life (Illicit Auction: "Don't bid" passes), life paid round after round (Plague of Vermin: "Pay no life"), or how much life or energy to pay (Necrodominance, Galvanic Discharge, Minion of the Wastes as it enters), or the X of "you may collect evidence X" (Incinerator of the Guilty): any whole number in the range the decision allows. */
 function NumberChoice({ pending, dispatch }: { pending: Extract<NonNullable<GameState["pending"]>, { kind: "chooseOption" }>; dispatch: ReturnType<typeof useGame>["dispatch"] }) {
   const range = pending.numberRange ?? { min: 0, max: 999 };
   const [n, setN] = useState(range.min);
@@ -2679,10 +2679,15 @@ function NumberChoice({ pending, dispatch }: { pending: Extract<NonNullable<Game
       <button className="ghost" disabled={n >= range.max} onClick={() => set(n + 1)} aria-label="Number plus one">
         +
       </button>
-      <button onClick={done}>{pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payLifeRound" ? `Pay ${n} life` : pending.what === "payEnergy" ? `Pay ${n} energy` : pending.what === "bid" ? `Bid ${n} life` : `Choose ${n}`}</button>
+      <button onClick={done}>{pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payLifeRound" ? `Pay ${n} life` : pending.what === "payEnergy" ? `Pay ${n} energy` : pending.what === "evidenceX" ? `Collect evidence ${n}` : pending.what === "bid" ? `Bid ${n} life` : `Choose ${n}`}</button>
       {pending.what === "bid" && pending.options.includes("pass") && (
         <button className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: "pass" }])}>
           Don't bid
+        </button>
+      )}
+      {pending.what === "evidenceX" && (
+        <button className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: "none" }])}>
+          Don't collect evidence
         </button>
       )}
       {pending.what === "payLifeRound" && (
@@ -5217,7 +5222,7 @@ function Controls({
         ))}
       </div>
     );
-  if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "bid" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy" || pending.what === "payLifeRound") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
+  if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "bid" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy" || pending.what === "evidenceX" || pending.what === "payLifeRound") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
   if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "faceUpForm" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "chosenObject" || pending.what === "anchor" || pending.what === "playerWord" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "unlessWay" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "addOrRemoveCounter" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser" || pending.what === "modeChooser" || pending.what === "direction" || pending.what === "skipChoice" || pending.what === "payLifeOrDestroy" || ((pending.what === "textFrom" || pending.what === "textTo" || pending.what === "typeOrder") && pending.options.length <= 10)) && pending.player === HUMAN)
     return (
       <div className="controls">

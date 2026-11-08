@@ -4,7 +4,7 @@
 import { expect, test } from "@playwright/test";
 import { characteristics, invalidateCharacteristics } from "@cc/engine";
 import { LANDS, idsOf, one, open, pageErrors, scene } from "./scene";
-import { card, clickPlayer, controls, menu, modal, resolveUntil } from "./ui";
+import { attack, card, clickPlayer, controls, menu, modal, passTo, resolveUntil } from "./ui";
 
 test("Leonin Arbiter: pay {2} from Ana's Arbiter's menu, then Rampant Growth can search", async ({ page }) => {
   const s = scene({ hand: ["Rampant Growth"], board: LANDS, library: ["Forest"] }, [{ board: ["Leonin Arbiter"] }]);
@@ -134,5 +134,34 @@ test("Armed and Armored: Smuggler's Copter becomes a creature; choose Dwarven So
   expect([after.objects[splitter]!.attachedTo, after.objects[sword]!.attachedTo]).toEqual([soldier, soldier]);
   expect(after.objects[trader]!.attachedTo).toBeUndefined();
   expect(characteristics(after, after.objects[copter]!).types).toContain("Creature");
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Incinerator of the Guilty: after combat damage, choose X = 2 and collect evidence 2; each of Ana's creatures takes 2", async ({ page }) => {
+  const s = scene({ board: ["Incinerator of the Guilty"], yard: ["Hill Giant", "Shock", "Forest"] }, [{ board: ["Grizzly Bears", "Craw Wurm"] }]);
+  const [dragon, bears, wurm] = [one(s, "Incinerator of the Guilty"), one(s, "Grizzly Bears"), one(s, "Craw Wurm")];
+  const [giant, shock] = [idsOf(s, "Hill Giant", "graveyard", 0)[0]!, idsOf(s, "Shock", "graveyard", 0)[0]!];
+  await open(page, s);
+  await passTo(page, "declareAttackers");
+  await attack(page, [[dragon, 1]]);
+  await resolveUntil(page, (st) => st.pending?.kind === "chooseOption" && st.pending.what === "evidenceX" && st.pending.player === 0);
+  const bar = controls(page);
+  await expect(bar).toContainText("you may collect evidence X: choose X");
+  await expect(bar.getByRole("button", { name: "Don't collect evidence" })).toBeVisible();
+  await bar.getByRole("button", { name: "Number plus one" }).click();
+  await bar.getByRole("button", { name: "Number plus one" }).click();
+  await bar.getByRole("button", { name: "Collect evidence 2" }).click();
+  const pick = modal(page);
+  await expect(pick).toContainText("you may collect evidence 2");
+  await pick.locator(`[data-pick="${shock}"]`).click();
+  await expect(pick.getByRole("button", { name: "Done" })).toBeDisabled();
+  await pick.locator(`[data-pick="${shock}"]`).click();
+  await pick.locator(`[data-pick="${giant}"]`).click();
+  await pick.getByRole("button", { name: "Done" }).click();
+  const after = await resolveUntil(page, (st) => st.objects[bears]!.zone === "graveyard" && st.stack.length === 0);
+  expect(after.objects[giant]!.zone).toBe("exile");
+  expect(after.objects[shock]!.zone).toBe("graveyard");
+  expect(after.objects[wurm]!.zone).toBe("battlefield");
+  expect(after.objects[wurm]!.damage).toBe(2);
   expect(pageErrors(page)).toEqual([]);
 });

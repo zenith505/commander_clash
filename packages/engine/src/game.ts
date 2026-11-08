@@ -10472,6 +10472,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "evidenceX") {
+    // "You may collect evidence X": the X chosen, then the cards (CR 701.59a); "none" doesn't collect any.
+    (r.scratch ??= {}).payX = choice;
+    log(s, choice === "none" ? `${p.name} chooses not to collect evidence.` : `${p.name} chooses X = ${choice} for ${pend.source}.`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "payX") {
     // "You may pay {X}": the X chosen (CR 107.1c), paid next.
     (r.scratch ??= {}).payX = choice;

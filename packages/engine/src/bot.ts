@@ -1502,6 +1502,21 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const spells = pend.options.filter((id) => !isType(defOf(s, obj(s, id)), "Land")).sort((a, b) => mv(s, b) - mv(s, a));
       return [{ type: "chooseOption", player: pid, choice: spells[0] ?? pend.options[0]! }];
     }
+    if (pend.kind === "chooseOption" && pend.what === "evidenceX") {
+      // Incinerator of the Guilty: the X that destroys the most of the damaged player's creatures and planeswalkers, the
+      // smallest such X, collected from cards it doesn't need in its graveyard; none if it destroys nothing.
+      const victim = s.resolving?.item.event?.player;
+      const most = pend.numberRange?.max ?? 0;
+      const dies = (o: GameObject) => (objIsType(s, o, "Creature") && !objHasKeyword(s, o, "Indestructible") ? Math.max(1, toughness(s, o) - (o.damage ?? 0)) : objIsType(s, o, "Planeswalker") ? Math.max(1, o.counters.loyalty ?? 0) : Infinity);
+      const needs = victim === undefined ? [] : s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === victim).map(dies).filter((n) => n <= most);
+      let best = 0;
+      let kills = 0;
+      for (const x of [...new Set(needs)].sort((a, b) => a - b)) {
+        const k = needs.filter((n) => n <= x).length;
+        if (k > kills && spareEvidence(s, pid, x)) [best, kills] = [x, k];
+      }
+      return [{ type: "chooseOption", player: pid, choice: best ? String(best) : "none" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "payEnergy") {
       const most = pend.numberRange?.max ?? 0;
       // Aether Spike: "Counter that spell unless its controller pays {1} for each {E} paid this way": more than its

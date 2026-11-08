@@ -3095,6 +3095,15 @@ function parseStaticLine(line: string): StaticAbility | null {
     const filter: TargetSpec = { ...spec, controller: "you", text: one };
     return { affects: { kind: "self" }, mods: [{ kind: "ownAttackCost", action: ownCost[1] === "return" ? "bounce" : "sacrifice", filter, n }], text: line };
   }
+  // Reclamation, Flooded Woodlands: "Black creatures can't attack unless their controller sacrifices a land of their choice
+  // for each black creature they control that's attacking": each black creature declared as an attacker costs its
+  // controller a land of theirs, paid as attackers are declared (CR 508.1g-i), its color as it's declared.
+  const colorSac = /^(White|Blue|Black|Red|Green) creatures can't attack unless their controller sacrifices a land of their choice for each (white|blue|black|red|green) creature they control that's attacking$/.exec(text);
+  if (colorSac && colorSac[1]!.toLowerCase() === colorSac[2]) {
+    const affects = parseAffected(`${colorSac[1]} creatures`);
+    if (!affects) return null;
+    return { affects, mods: [{ kind: "ownAttackCost", action: "sacrifice", filter: { kind: "object", types: ["Land"], notTypes: [], notColors: [], controller: "you", text: "land" }, n: 1 }], text: line };
+  }
   // Elephant Grass: "Nonblack creatures can't attack you unless their controller pays {2} for each creature they control
   // that's attacking you": only the nonblack attackers cost {2} each, their colors as attackers are declared (CR 508.1g-h).
   const colorTax = /^Non(white|blue|black|red|green) creatures can't attack you unless their controller pays \{(\d+)\} for each creature they control that's attacking you$/.exec(text);

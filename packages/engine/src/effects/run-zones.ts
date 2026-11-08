@@ -207,7 +207,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         sc.queue.shift();
         continue;
       }
-      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: options.length, min: 0, anyNumber: true, ...(e.prompt ? { prompt: e.prompt.replace(/~/g, src) } : {}), ...(e.differentNames ? { differentNames: true as const } : {}), ...(e.differentPowers ? { differentPowers: true as const } : {}), ...(e.minTotalPower !== undefined ? { minTotalPower: e.minTotalPower } : {}) };
+      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: options.length, min: 0, anyNumber: true, ...(e.prompt ? { prompt: e.prompt.replace(/~/g, src) } : {}), ...(e.differentNames ? { differentNames: true as const } : {}), ...(e.differentPowers ? { differentPowers: true as const } : {}), ...(e.minTotalPower !== undefined ? { minTotalPower: e.minTotalPower } : {}), ...(e.payEach ? { payEach: e.payEach } : {}) };
       return "paused";
     }
     if (!n || (e.upTo && !options.length)) {
@@ -4080,6 +4080,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         log(s, `That face-down creature is ${realDefOf(s, o).name}.`, ctx.controller);
       }
       return;
+    case "attackWithoutTapping": {
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc)) me.attackWithoutTappingCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0 };
+      return;
+    }
     case "noCombatDamage":
       if (e.asUnblocked) {
         for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") o.unblockedDamageTurn = s.turn;

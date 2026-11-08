@@ -299,6 +299,8 @@ export interface Characteristics {
   /** "Must be blocked by an Eldrazi if able" (Slayer's Cleaver): each filter one of its blockers must fit, if able (CR 509.1c). */
   mustBeBlockedBy?: TargetSpec[];
   mustBlock: boolean;
+  /** Blaze of Glory: blocks each attacking creature it can, if able (CR 509.1c). */
+  mustBlockEach: boolean;
   /** Doran: assigns combat damage by its toughness, always or only while its toughness is greater than its power. */
   assignsToughness: boolean;
   assignsToughnessIfGreater: boolean;
@@ -441,6 +443,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     mustBeBlocked: false,
     allMustBlock: false,
     mustBlock: false,
+    mustBlockEach: false,
     assignsToughness: false,
     assignsToughnessIfGreater: false,
     assignsAbsPower: false,
@@ -2026,6 +2029,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantBeEquipped":
     case "attackAsThoughHaste":
     case "mustBlock":
+    case "mustBlockEach":
       c[m.kind] = true;
       return;
     case "allMustBlock":

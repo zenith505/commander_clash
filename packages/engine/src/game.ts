@@ -584,7 +584,7 @@ export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string
  */
 export function paysManaNow(s: GameState): boolean {
   const pd = s.pending;
-  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && blocksMayCost(s, pd.player)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid" || s.objects[pd.objectId]?.zone === "command" || costFloorInPlay(s)));
+  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && blocksMayCost(s, pd.player)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "pickPermanents" && !!pd.payEach) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid" || s.objects[pd.objectId]?.zone === "command" || costFloorInPlay(s)));
 }
 
 function requireNoPending(s: GameState) {
@@ -865,6 +865,7 @@ export function moveObject(
   o.noRegenTurn = undefined;
   o.noCombatDamageTurn = undefined; // a new object (CR 400.7)
   o.noCombatDamageCombat = undefined;
+  o.attackWithoutTappingCombat = undefined;
   o.attacked = undefined;
   o.foughtTurn = undefined;
   o.combatHitTurn = undefined;
@@ -9745,6 +9746,15 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
     return;
   }
   if (!r?.scratch?.queue) throw new RulesError("nothing to pick");
+  // Thelon's Curse: "pay {U} for each creature chosen this way": the whole payment at once, from the pool (mana abilities
+  // first, CR 605.3a); if it can't all be paid, none is, and nothing is chosen (rulings on Mudslide).
+  if (pend.payEach && ids.length) {
+    const cost = pend.payEach.repeat(ids.length);
+    const paid = spendFromPool(s, p.id, parseManaCost(cost), "other", 0, payableLife(s, p.id));
+    if (!paid) throw new RulesError(`not enough mana in your pool to pay ${cost}`);
+    payLife(s, p.id, paid.lifePaid ?? 0);
+    log(s, `${p.name} pays ${cost} for ${pend.source}.`);
+  }
   // Krenko's Buzzcrusher: picked by this player for the player whose turn it is to be picked for (pick `youChoose`).
   r.scratch.chosen![pend.pickFor ?? p.id] = ids;
   r.scratch.queue.shift();
@@ -11882,11 +11892,13 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   }
   // The attackers become tapped at the same time (CR 508.1f): "one or more ... become tapped" triggers once.
   batchTaps(s, () => {
+    // Johan: while it's untapped, attacking doesn't cause the creatures its controller controls to tap this combat.
+    const noTap = s.battlefield.some((id) => { const j = obj(s, id); return !j.tapped && j.attackWithoutTappingCombat?.turn === s.turn && j.attackWithoutTappingCombat.combat === (s.combatsThisTurn ?? 0) && controllerOf(s, j) === p.id; });
     for (const a of attacks) {
       const o = obj(s, a.attacker);
       o.attacking = a.defender;
       if (a.planeswalker !== undefined) o.attackingPermanent = attackingPermanentOf(s, a.planeswalker);
-      if (!objHasKeyword(s, o, "Vigilance")) tapPermanent(s, o, true); // CR 508.1f
+      if (!objHasKeyword(s, o, "Vigilance") && !noTap) tapPermanent(s, o, true); // CR 508.1f
       const before = o.attacked?.turn === s.turn ? o.attacked : undefined;
       const players = [...(before?.players ?? []), ...(a.planeswalker === undefined ? [a.defender] : [])];
       const battle = before?.battle || (a.planeswalker !== undefined && !!s.objects[a.planeswalker] && objIsType(s, obj(s, a.planeswalker), "Battle"));
@@ -12251,7 +12263,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
 export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { blocker: ObjectId; attacker: ObjectId }[]): string | null {
   const incoming = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking === pid);
   const demanding = incoming.filter((a) => characteristics(s, a).allMustBlock || characteristics(s, a).mustBeBlocked || !!characteristics(s, a).allMustBlockBy || !!characteristics(s, a).mustBeBlockedBy);
-  const provoked = creaturesOf(s, pid).filter((o) => provokerOf(s, o) || characteristics(s, o).mustBlock);
+  const provoked = creaturesOf(s, pid).filter((o) => provokerOf(s, o) || characteristics(s, o).mustBlock || characteristics(s, o).mustBlockEach);
   if (!demanding.length && !provoked.length) return null;
   const blocking = new Map<ObjectId, ObjectId[]>();
   for (const b of blocks) blocking.set(b.blocker, [...(blocking.get(b.blocker) ?? []), b.attacker]);
@@ -12281,6 +12293,15 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
     if (!characteristics(s, b).mustBlock || blocking.has(b.id)) continue;
     if (incoming.some((at) => !cannot(b, at) && mine.filter((o) => o.id !== b.id && !cannot(o, at)).length >= blockersNeeded(s, at) - 1))
       return `${characteristics(s, b).name} must block this turn if able`;
+  }
+  // Blaze of Glory: "It blocks each attacking creature this turn if able": each attacker it can block is a requirement, with
+  // another creature able to block beside it against menace (CR 509.1c), as many as it can block (CR 509.1a).
+  for (const b of mine) {
+    if (!characteristics(s, b).mustBlockEach) continue;
+    const at = blocking.get(b.id) ?? [];
+    if (at.length >= maxBlocks(s, b)) continue;
+    const skipped = incoming.find((a) => !at.includes(a.id) && !cannot(b, a) && mine.filter((o) => o.id !== b.id && !cannot(o, a)).length >= blockersNeeded(s, a) - 1);
+    if (skipped) return `${characteristics(s, b).name} must block each attacking creature it can if able (${characteristics(s, skipped).name} too)`;
   }
   for (const at of demanding) {
     const ac = characteristics(s, at);

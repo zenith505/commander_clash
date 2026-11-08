@@ -195,7 +195,8 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const options2 = e.leaving ? pickLeaving(s, e, options1, pid, ctx) : options1;
     // Feast of Worms: "another land": not the target, if it survived (an indestructible one).
     const other = e.otherThanTarget !== undefined ? objects(s, { ref: "target", index: e.otherThanTarget }, ctx).map((o) => o.id) : [];
-    const options3 = other.length ? options2.filter((id) => !other.includes(id)) : options2;
+    // Burning of Xinye: "you destroy four lands you control": not one with indestructible (rulings, CR 702.12b).
+    const options3 = (other.length ? options2.filter((id) => !other.includes(id)) : options2).filter((id) => !(e.destroyable && !e.least && objHasKeyword(s, obj(s, id), "indestructible")));
     // Kamiz, Obscura Oculus: "with lesser power" than the target, as it is now (after it connived).
     const than = e.lesserPowerThanTarget !== undefined ? objects(s, { ref: "target", index: e.lesserPowerThanTarget }, ctx).find((o) => o.zone === "battlefield") : undefined;
     const options = e.lesserPowerThanTarget === undefined ? options3 : than ? options3.filter((id) => power(s, obj(s, id)) < power(s, than)) : [];

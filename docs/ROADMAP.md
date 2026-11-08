@@ -1,6 +1,6 @@
 # Roadmap
 
-30,406 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,415 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,669 of
 9,979 (96%).
 
@@ -783,7 +783,7 @@ line blocks.
    battlefield with ~"), Briarbridge Patrol ("deals damage to one or more creatures"), Mutated Cultist (done in round 300) ("remove all
    counters from target permanent or opponent"), Elminster ("the number of cards looked at while scrying"), Sivitri, Dragon Master (an attack tax paid in life), Obsidian Charmaw ("lands that could produce
    {C}"), Dramatist's Puppet and Quarry Hauler (put or remove a counter of each kind, a choice per kind), Aquamorph
-   Entity (its "is turned face up" path).
+   Entity (done in round B139) (its "is turned face up" path).
    Round 207 went on from the top: "each creature card in your graveyard has unearth {2}{B}" and the same for artifact
    cards or "that's a Cleric, Rogue, Warrior, and/or Wizard" (Sedris, the Traitor King, Mishra, Tamer of Mak Fawa, Solemn
    Doomguide) and "each outlaw creature card in your graveyard has encore {X}, where X is its mana value" (Graywater's
@@ -3111,7 +3111,7 @@ line blocks.
    Smaller gaps from round 116: bots never use "target creature it's
    blocking" abilities (Tinder Wall, Wall of Corpses, Goblin Snowman; bots activate abilities in their own main phase
    only); bots stop paying Lim-Dûl's Vault life after four looks; round 115's Assault
-   Suit, Brass Herald, Vigean Intuition, Sages of the Anima and Serra's Emissary (kindred) are
+   Suit, Brass Herald, Vigean Intuition, Sages of the Anima (done in round B139) and Serra's Emissary (kindred) are
    still out.
    Smaller gaps from round 114: "target player adds two mana in any combination
    of colors" (another player adding it) is out; Quicksilver Fountain (each player floods a land of
@@ -6492,6 +6492,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   only while they control no creature and an opponent does. Browser tests for Invoke the Ancients' two counter choices,
   Kindle the Carnage's repeat prompt and Expel the Unworthy kicked and unkicked. +9 (30,385 of 31,936 with B137 and
   round 299).
+- Round B139 (least played first, from the skip lists): Cytoshape and Polymorphous Rush (a creature on the battlefield,
+  anyone's, chosen as the spell resolves without targeting, CR 608.2d; the targets become copies of it until end of turn,
+  CR 707.2), Burning of Xinye (you destroy four lands you control of your choice, then the target opponent four of theirs,
+  never an indestructible one, CR 701.8; then the damage), Sages of the Anima (each draw replaced by a reveal of the top
+  three, CR 614.1a, creature cards to hand and the rest on the bottom in the order you choose), Aquamorph Entity (5/1 or
+  1/5 as it enters or is turned face up, CR 614.1e: chosen with the special action, a Turn face up button for each form,
+  or asked when an effect turns it face up; part of its copiable values, so a creature becoming a copy of it has the
+  chosen size and a Clone entering as a copy chooses again, rulings), Mister Immortal (an ability activated from exile
+  as well as the graveyard, from the exile viewer), Valleymaker ("Choose a player. That player adds {G}{G}{G}": a mana
+  ability, CR 605.1a, that resolves at once with a sacrifice cost and pauses for the player; autopay never uses it),
+  Obstinate Familiar and Pursuit of Knowledge (optional draw replacements, CR 614.1a: "Skip this draw" and "Put a study
+  counter on ~ instead" beside the plain draw). Bots answer the forms, bring Mister Immortal back from exile, put study
+  counters until there are three and skip a draw only with five or fewer cards left in the library. Browser tests for
+  each new prompt and button. +9 (30,415 of 31,936 with B138, rounds 300 and 301).
+- Out after round B139 (looked at, not done): Tourach's Chant and Thelon's Chant (the player who put a land onto the
+  battlefield, not its controller, rulings: not tracked), Jötun Grunt (cumulative upkeep paid in pairs of cards from one
+  graveyard), Meddle ("if target spell has only one target and that target is a creature": a condition on the spell's
+  targets as it resolves), Drafna's Restoration, Sutured Ghoul, Twinning Glass and Pardic Dragon, still out for the
+  reasons in the earlier lists.
 - Out after round B138 (looked at, not done): Kodama of the Center Tree (soulshift X counted from the Spirits on the
   battlefield just before it died, Spirits dying with it included, CR 603.10a), Lantern Flare (X in its cleave cost).
 - Out after round B136 (looked at, not done): Forgotten Lore (an opponent chooses again each time you pay {G}),
@@ -6507,9 +6526,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Magus of the Arena and Evangelize (a target chosen by an opponent).
 - Out after round B132 (looked at, not done): Bullseye and Death Dealer (still an activation cost with "or" between two
   costs), Misfortune, Fatal Lore and Library of Lat-Nam (still a mode chosen by an opponent as it's cast, CR 700.2e).
-- Out after round B131 (looked at, not done): Mister Immortal (an ability activated from exile, which neither the UI nor
+- Out after round B131 (looked at, not done): Mister Immortal (done in round B139) (an ability activated from exile, which neither the UI nor
   the bots offer).
-- Out after round B130 (looked at, not done): Molten Sentry and Aquamorph Entity (a coin flip or a choice as it enters,
+- Out after round B130 (looked at, not done): Molten Sentry and Aquamorph Entity (done in round B139) (a coin flip or a choice as it enters,
   or is turned face up, that a creature becoming a copy of it later takes too, rulings: the engine's "enters as" effect
   isn't copied), Glass Asp, Nafs Asp and Sabertooth Cobra ("unless they pay {2} before that step": a payment any time
   before a step begins).
@@ -6520,10 +6539,10 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (X set by the opponent chosen as it's activated), Selective Snare (a creature type chosen as it's cast).
 - Out after round B127 (looked at, not done): Sutured Ghoul (an enters replacement exiling any number of creature cards
   and a characteristic-defining P/T linked to them, CR 607.2a), Goblin Test Pilot (done in round B136) (a target chosen at random as it's
-  activated), Valleymaker (a mana ability with a sacrifice cost whose mana goes to another player), Escaped Shapeshifter
+  activated), Valleymaker (done in round B139) (a mana ability with a sacrifice cost whose mana goes to another player), Escaped Shapeshifter
   (a layer 6 ability-adding effect that depends on what opponents' creatures have, CR 613.8), Snowblind (Y counted from
   the toughness the effect itself changes), Sirocco (a punisher per revealed card, done in round B132), Nivmagus Elemental (exiling a spell
-  you control from the stack as a cost), Burning of Xinye ("destroys four lands they control", chosen by each player,
+  you control from the stack as a cost), Burning of Xinye (done in round B139) ("destroys four lands they control", chosen by each player,
   isn't parsed).
 - Out after round B126 (looked at, not done): Kill-Suit Cultist ("the first time damage would be dealt to that creature
   this turn, destroy it instead": a destroy-instead damage replacement ordered with prevention, CR 616.1, that the damage
@@ -6546,7 +6565,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   says can't be enchanted by it (Consecrate Land), wasting the Aura.
 - Out after round B121 (looked at, not done): Rain of Gore (life gain "a spell or ability would cause": the cause of a
   life gain isn't tracked, and lifelink isn't one, rulings), Wall of Shadows ("spells that can target only Walls" depends
-  on every target of every mode, not the ones chosen), Obstinate Familiar ("you may skip that draw instead": the draw
+  on every target of every mode, not the ones chosen), Obstinate Familiar (done in round B139) ("you may skip that draw instead": the draw
   replacement offers no way to decline), Breaking // Entering (its Entering half is still unsupported).
 - Out after round B119 (looked at, not done): Gloom (activated abilities of white enchantments cost {3} more: mana
   abilities too, and their cost paths take no tax), Kodama of the Center Tree (soulshift X, X counted as the trigger
@@ -6590,7 +6609,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   this turn: only "from hand or library" is counted).
 - Out after round B108 (looked at, not done): Fade Away (for each creature, a payment or a sacrifice, all players' choices
   announced in turn order before any sacrifice, rulings), Crypsis ("protection from creatures your opponents control":
-  relative to the protected creature's controller, creature cards owned by an opponent too, rulings), Mister Immortal
+  relative to the protected creature's controller, creature cards owned by an opponent too, rulings), Mister Immortal (done in round B139)
   (an ability activated from exile: no activation from exile yet).
 - Out after round B107 (looked at, not done): Isu the Abominable ("you may pay {G}, {W}, or {U}": a choice of payment), Time
   to Reflect and You Cannot Pass! (done in round B110) (a creature that blocked or was blocked by a Zombie / legendary creature: what the other
@@ -6612,7 +6631,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   buyback part of the total cost, rulings), Elderwood Scion (spells that target it cost {2} less or more: a cost that
   depends on the targets chosen, and on who casts the spell).
 - Out after round B103 (looked at, not done): The Three Seasons ("Choose three cards in each graveyard": a pick in every
-  graveyard, not targeted), Pursuit of Knowledge (an optional draw replacement beside dredge and Abundance), Dralnu, Lich
+  graveyard, not targeted), Pursuit of Knowledge (done in round B139) (an optional draw replacement beside dredge and Abundance), Dralnu, Lich
   Lord (damage replaced by sacrificing permanents: the same CR 616.1 order question as Phytohydra), Northampton Farm (its
   exile isn't linked yet, and "each other card" after the one returned), Ancient Hellkite (done in round B112) ("defending player" in an
   activated ability's target: needs binding as it's activated, like triggers do), Infectious Rage (done in round B131) (a random creature it
@@ -6678,7 +6697,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   toughness from the cards exiled as it enters), Soul Separator (a copy token "except it's 1/1" plus a token with that
   card's power and toughness), Magus of the Mind (play lands and cast spells from among the exiled cards free this turn),
   Hallowed Moonlight (done in round B137) ("if a creature would enter and it wasn't cast"), Welcome to the Fold (a madness-paid X changing the
-  toughness limit), Obstinate Familiar (a may skip of each draw). Bot gaps: bots never use the Shattered Seraph cycle's
+  toughness limit), Obstinate Familiar (done in round B139) (a may skip of each draw). Bot gaps: bots never use the Shattered Seraph cycle's
   hand ability (bots skip "Exile ~ from your hand" abilities).
 - Out after round B93 (looked at, not done): Bewitching Leechcraft ("If ~ would untap during your untap step, remove a
   +1/+1 counter from it instead": with Freyalise's Winds too, its controller would order the two replacements, CR 616.1),
@@ -6735,7 +6754,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   what happens to it and who is dealt damage), Write into Being (manifest one of the top two cards), Samite Elder (done in round B117)
   (protection from each of a target permanent's colors).
 - Out after round B82 (looked at, not done): Builder's Bane (destroy X target artifacts: a variable number of
-  targets), Burning of Xinye (each player destroys lands of their choice), Sirocco and Wand of Ith (a punisher per
+  targets), Burning of Xinye (done in round B139) (each player destroys lands of their choice), Sirocco and Wand of Ith (a punisher per
   revealed card, done in round B132), Stench of Evil (a punisher per land destroyed), Gargantuan Gorilla (a snow Forest sacrifice
   condition and a mutual damage ability).
 - Out after round B81 (looked at, not done): Kaervek's Spite (done in round B131) (an additional cost of sacrificing all permanents and
@@ -6745,10 +6764,10 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Elastic Ally ("power greater than its base power"), Whirlwind, Killer Cyclone ("one or more creatures that entered
   this turn attack a player": a batch attack trigger naming the player), Titania, Rugged Rumbler (done in round B122) (an "or" additional
   cost and an "or" ward cost).
-- Out after round B79 (looked at, not done): Aquamorph Entity (a choice as it's turned face up: the special action
+- Out after round B79 (looked at, not done): Aquamorph Entity (done in round B139) (a choice as it's turned face up: the special action
   can't pause yet), Volrath's Laboratory and Riptide Replicator (tokens of the chosen color and creature type), Barbed
   Foliage ("loses flanking" has to remove the trigger), Sunglasses of Urza, Knight of Valor, Grifter's Blade (done in round B136), Halfdane,
-  Bronze Horse (done in round B135), Mister Immortal (activated from exile), Wall of Deceit (done in round 271) and Backslide (turn a creature face down),
+  Bronze Horse (done in round B135), Mister Immortal (done in round B139) (activated from exile), Wall of Deceit (done in round 271) and Backslide (turn a creature face down),
   Sarkhan's Whelp (done in round B105), Dredging Claw, Defiant Vanguard (done in round B108). Known gaps: Dormant Gomazoa doesn't trigger when a spell's target is
   changed to you; a non-mana echo cost (Echo—discard) doesn't count as "echo cost is paid".
 - Out after round B78 (looked at, not done): Master of Barbs ("one or more opponents are dealt noncombat damage": no
@@ -6794,7 +6813,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   linked yet; "choose a card exiled with ~, you may play it this turn"), Purgatory (pay {4} and 2 life at upkeep to
   return a card exiled with it, the exile from a "put into your graveyard" trigger not linked yet).
 - Out after round B71 (looked at, not done): Say Its Name ("Exile this card and two other cards named ~ from your
-  graveyard" as a cost), Valleymaker ("Choose a player. That player adds {G}{G}{G}" is a mana ability with a sacrifice
+  graveyard" as a cost), Valleymaker (done in round B139) ("Choose a player. That player adds {G}{G}{G}" is a mana ability with a sacrifice
   cost, which would use the stack here, see the mana abilities gap below), Sewers of Estark ("If it's blocking, prevent
   all combat damage that would be dealt this combat by it and each creature it's blocking"), Benevolent Blessing (only
   the Auras and Equipment you control already attached), Tunnel Vision (reveal until a named card, then the rest into the
@@ -6914,7 +6933,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - City's blessing text: "those creatures get +2/+2 instead", "half the creatures they control", "has hexproof and
   can't be blocked", "exile those tokens unless you have the city's blessing".
 - Becoming a copy: double-faced cards (CR 707.8, they're unsupported entirely); copies chosen without targeting
-  (Cytoshape, Deepfathom Echo, Sakashima's Will, Polymorphous Rush); "for as long as" durations (Assimilation Aegis,
+  (Deepfathom Echo, Sakashima's Will; Cytoshape and Polymorphous Rush done in round B139); "for as long as" durations (Assimilation Aegis,
   Blade of Shared Souls, Zygon Infiltrator, Secret Invasion); copying an exiled card (Dimir Doppelganger, The
   Mimeoplasm, Dermotaxi, Lazav, Wearer of Faces, Niko); targets "with mana value X" (Lazav, the Multifarious,
   Likeness Looter, The Mycosynth Gardens), "with a counter on it" (Volrath), "of the chosen type" (Mirror of the
@@ -7052,9 +7071,6 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Granted flashback is only "until end of turn" with the card's mana cost (Snapcaster Mage, Past in Flames); a
   static grant (Lier, Disciple of the Drowned) is not modeled.
 
-- Mana abilities with costs other than {T} and mana (Ashnod's Altar, Phyrexian Altar and about 50 other supported
-  cards) use the stack like other activated abilities; they shouldn't (CR 605.3b). Exert as a mana-ability cost
-  (Oasis Ritualist, Arena of Glory) stays unsupported until that's fixed.
 - Monstrosity X and "when ~ becomes monstrous" that uses X (Polukranos, Hydra Broodmaster); "becomes monstrous" on
   legendary names shortened without a comma (Hythonia). Combat Celebrant's exert ("untap all other creatures you
   control and after this phase, there is an additional combat phase"). "Whenever a source deals damage, if it

@@ -1539,16 +1539,22 @@ export function compile(d: CardDef): CompiledCard {
     // Corrupted Shapeshifter, Primal Plasma, Primal Clay: "As ~ enters, it becomes your choice of a 3/3 creature with
     // flying, a 2/5 creature with vigilance, or a 0/12 creature with defender": set power and toughness and maybe a
     // keyword or a creature type, as it enters (CR 208.2b, 614.12). Primal Clay's "artifact creature" is what it is anyway.
-    const forms = /^As ~ enters, it becomes your choice of (.+?)( in addition to its other types)?\.$/.exec(line);
+    // Aquamorph Entity: "As ~ enters or is turned face up, it becomes your choice of 5/1 or 1/5": a replacement both ways
+    // (CR 614.1e), chosen as it's turned face up too, so it's turned face up as that size (rulings); a face-down
+    // permanent has no abilities as it enters (CR 708.2).
+    const forms = /^As ~ enters( or is turned face up)?, it becomes your choice of (.+?)( in addition to its other types)?\.$/.exec(line);
     if (forms) {
       const isArtifact = d.types.includes("Artifact");
-      const parsed = forms[1]!.split(/, (?:or )?/).map((t) => /^an? (\d+)\/(\d+) (?:([A-Z][a-z]+) )?(artifact )?creature(?: with (flying|vigilance|defender|reach|trample|haste|deathtouch|lifelink))?$/.exec(t));
-      if (out.entersForms || parsed.length < 2 || parsed.some((f) => !f || (f[4] && !isArtifact) || (f[3] && !forms[2]))) out.unsupported.push(raw);
-      else
+      const bare = forms[2]!.split(/,? or /).map((t) => /^(\d+)\/(\d+)$/.exec(t));
+      const parsed = bare.every(Boolean) && !forms[3] ? bare : forms[2]!.split(/, (?:or )?/).map((t) => /^an? (\d+)\/(\d+) (?:([A-Z][a-z]+) )?(artifact )?creature(?: with (flying|vigilance|defender|reach|trample|haste|deathtouch|lifelink))?$/.exec(t));
+      if (out.entersForms || parsed.length < 2 || parsed.some((f) => !f || (f[4] && !isArtifact) || (f[3] && !forms[3])) || (forms[1] && !d.keywords.some((k) => k === "Morph" || k === "Megamorph"))) out.unsupported.push(raw);
+      else {
         out.entersForms = parsed.map((f) => ({
           except: { pt: [Number(f![1]), Number(f![2])] as [number, number], ...(f![5] ? { keywords: [capital(f![5])] } : {}), ...(f![3] ? { addSubtypes: [f![3]] } : {}) },
           text: f![0],
         }));
+        if (forms[1]) out.faceUpForms = true;
+      }
       continue;
     }
     const selfExtra = new RegExp(`^~ enters with (an|a|one|two|three) additional ${COUNTER} counters? on it\\.$`).exec(line);
@@ -3270,6 +3276,19 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "If you would draw a card, you may instead choose land or nonland and reveal cards from the top of your library until you reveal a card of the chosen kind. Put that card into your hand and put all other cards revealed this way on the bottom of your library in any order.") {
       out.drawAbundance = true;
+      continue;
+    }
+    if (line === "If you would draw a card, you may skip that draw instead.") {
+      out.drawMaySkip = true;
+      continue;
+    }
+    const mayCounter = new RegExp(`^If you would draw a card, you may put an? ${COUNTER} counter on ~ instead\\.$`).exec(line);
+    if (mayCounter) {
+      out.drawMayCounter = counterKind(mayCounter[1]!);
+      continue;
+    }
+    if (line === "If you would draw a card, instead reveal the top three cards of your library. Put all creature cards revealed this way into your hand and the rest on the bottom of your library in any order.") {
+      out.drawRevealCreatures = 3;
       continue;
     }
     if (line === "If you would draw a card, instead look at the top three cards of your library, then put one into your hand and the rest into your graveyard.") {

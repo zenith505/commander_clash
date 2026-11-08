@@ -623,6 +623,10 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // Gryff's Boon: "Return ~ from your graveyard to the battlefield attached to target creature."
   // Sandman, Shifting Scoundrel: "Return ~ and target land card from your graveyard to the battlefield tapped."
   // Slimefoot and Squee: "Return this card and up to one other target creature card from your graveyard ...".
+  // Mister Immortal: "Return this card from your graveyard or from exile to the battlefield tapped": it works from either
+  // zone (CR 113.6k), where "~" is the card; a face-down card in exile has no abilities (CR 406.3, 708.2).
+  const orExile = /^Return ~ from your graveyard or from exile to the battlefield(?: tapped)?\.$/.test(effectText);
+  if (orExile) effectText = effectText.replace(" or from exile", "");
   const returnsSelf = /^(?:Return ~ and (?:up to one other )?target [a-z]+ card from your graveyard to the battlefield(?: tapped)?|Return ~ from your graveyard to (?:your hand|the battlefield(?:(?: tapped)?(?: with (?:a|two|three) (?:\+1\/\+1|finality) counters? on (?:it|~))?| attached to target creature(?: you control(?: with power \d+ or less)?)?)?)|Put ~ from your graveyard into your library (?:second|third) from the top|Put ~ from your graveyard on top of your library|Put ~ from your graveyard onto the battlefield transformed)\./.test(effectText) ||
     // Nim Devourer: "Return this card from your graveyard to the battlefield, then sacrifice a creature." (it may be the one).
     effectText === "Return ~ from your graveyard to the battlefield, then sacrifice a creature.";
@@ -732,6 +736,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     body,
     text: raw,
     ...(fromYard ? { zone: "graveyard" as const, ...(returnsSelf || (inYard && !/Exile ~ from your graveyard/.test(costs)) ? {} : { exileSelf: true }) } : {}),
+    ...(orExile ? { orExile: true as const } : {}),
     ...(exileOwn ? { exileSelf: true } : {}),
     ...(bounceOwn ? { returnSelf: true as const } : {}),
     ...(bottomOwn ? { returnSelf: true as const, toLibraryBottom: true as const } : {}),
@@ -770,7 +775,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
 /** Instructions that move a card to or from a library (CR 605.1a): an ability with one isn't a mana ability. */
 const LIBRARY_EFFECTS = new Set<Effect["type"]>(["draw", "mill", "putInLibrary", "exileTop", "revealTopToHand", "surveil", "handToTop", "shuffleIntoLibrary", "shuffleSpell", "taintedPact", "shuffleZones", "search", "dig", "impulse", "cascade", "discover", "ripple", "explore", "hideaway", "recruit", "connive", "orderTop", "scry", "clash", "revealTop", "putInGraveyard", "castFromAmong"]);
 /** Instructions that don't: what mana abilities do besides adding mana (Pristine Talisman's life, Glittering Stockpile's counter). */
-const MANA_RIDERS = new Set<Effect["type"]>(["addMana", "choose", "roll", "if", "may", "gainLife", "loseLife", "damage", "counters", "removeCounters", "removeSelfCounter", "delayed", "tap", "untap", "getEnergy", "poison", "skipUntap", "continuous", "sacrifice"]);
+const MANA_RIDERS = new Set<Effect["type"]>(["addMana", "choose", "choosePlayer", "roll", "if", "may", "gainLife", "loseLife", "damage", "counters", "removeCounters", "removeSelfCounter", "delayed", "tap", "untap", "getEnergy", "poison", "skipUntap", "continuous", "sacrifice"]);
 
 /**
  * Whether an activated ability's effect makes it a mana ability (CR 605.1a): no target, it could add mana, and it

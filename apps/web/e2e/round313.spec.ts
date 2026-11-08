@@ -2,7 +2,7 @@
 // Arbiter (an opponent's) for {2}, then a search works; Lost in Thought by exiling three cards from your graveyard;
 // Volrath's Curse by sacrificing a permanent.
 import { expect, test } from "@playwright/test";
-import { invalidateCharacteristics } from "@cc/engine";
+import { characteristics, invalidateCharacteristics } from "@cc/engine";
 import { LANDS, idsOf, one, open, pageErrors, scene } from "./scene";
 import { card, clickPlayer, controls, menu, modal, resolveUntil } from "./ui";
 
@@ -111,5 +111,28 @@ test("Suppression Ray: tap Ana's creatures, pay 1 energy, then stun Hill Giant (
   expect(after.objects[elves]!.counters.stun ?? 0).toBe(0);
   expect([giant, bears, elves].map((id) => after.objects[id]!.tapped)).toEqual([true, true, true]);
   expect(after.players[0]!.energy).toBe(1);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Armed and Armored: Smuggler's Copter becomes a creature; choose Dwarven Soldier, then attach Bonesplitter and Short Sword to it", async ({ page }) => {
+  const s = scene({ hand: ["Armed and Armored"], board: [...LANDS, "Dwarven Trader", "Dwarven Soldier", "Bonesplitter", "Short Sword", "Smuggler's Copter"] });
+  const [trader, soldier, splitter, sword, copter] = [one(s, "Dwarven Trader"), one(s, "Dwarven Soldier"), one(s, "Bonesplitter"), one(s, "Short Sword"), one(s, "Smuggler's Copter")];
+  await open(page, s);
+  await card(page, "Armed and Armored", s).click();
+  await resolveUntil(page, (st) => st.pending?.kind === "pickPermanents" && st.pending.action === "choose");
+  const bar = controls(page);
+  await expect(bar).toContainText("choose a Dwarf you control to attach Equipment to");
+  await page.locator(`[data-obj="${soldier}"]`).first().click();
+  await bar.getByRole("button", { name: "Choose", exact: true }).click();
+  const attaching = await resolveUntil(page, (st) => st.pending?.kind === "pickPermanents" && st.pending.action === "attach");
+  expect(attaching.pending?.kind === "pickPermanents" && [...attaching.pending.options].sort()).toEqual([splitter, sword].sort());
+  await expect(bar).toContainText("attach to Dwarven Soldier");
+  await page.locator(`[data-obj="${splitter}"]`).first().click();
+  await page.locator(`[data-obj="${sword}"]`).first().click();
+  await bar.getByRole("button", { name: /^Attach/ }).first().click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending);
+  expect([after.objects[splitter]!.attachedTo, after.objects[sword]!.attachedTo]).toEqual([soldier, soldier]);
+  expect(after.objects[trader]!.attachedTo).toBeUndefined();
+  expect(characteristics(after, after.objects[copter]!).types).toContain("Creature");
   expect(pageErrors(page)).toEqual([]);
 });

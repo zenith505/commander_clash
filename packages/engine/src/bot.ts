@@ -862,6 +862,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const phasing = pend.kind === "pickPermanents" && pend.action === "choose" && pend.min === 0 ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
     if (pend.kind === "pickPermanents" && phasing?.type === "phaseOut" && phasing.what.ref === "created")
       return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, pend.count) }];
+    // Armed and Armored: the Equipment to put on the Dwarf just chosen.
+    const toChosen = pend.kind === "pickPermanents" && pend.action === "attach" ? s.resolving?.body.effects[s.resolving.next] : undefined;
+    if (pend.kind === "pickPermanents" && toChosen?.type === "attachAny" && toChosen.toChosen) return [{ type: "pickPermanents", player: pid, ids: attachPicks(s, pid, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.min !== undefined && pend.action !== "keep") return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     // Stick Together: for this slot of the party, the creature the most valuable whole party (this slot and the ones still
     // to come, each creature once) uses, or none.
@@ -6061,7 +6064,9 @@ function flipBranchWorth(s: GameState, pid: PlayerId, o: GameObject, effects: Ef
 function attachPicks(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId[] {
   const item = s.resolving?.item;
   const e = item?.body?.effects.find((x) => x.type === "attachAny");
-  const t = e?.type === "attachAny" ? (e.self && item?.sourceId ? ({ kind: "object", id: item.sourceId } as const) : item!.targets?.[e.host]) : undefined;
+  // Armed and Armored: the Dwarf just chosen.
+  const chosen = e?.type === "attachAny" && e.toChosen ? s.resolving?.created?.find((id) => s.objects[id]?.zone === "battlefield") : undefined;
+  const t = e?.type === "attachAny" ? (chosen ? ({ kind: "object", id: chosen } as const) : e.self && item?.sourceId ? ({ kind: "object", id: item.sourceId } as const) : item!.targets?.[e.host]) : undefined;
   if (!t || (t.kind !== "object" && t.kind !== "player")) return [];
   const host = t.kind === "object" ? s.objects[t.id] : undefined;
   const ourHost = host ? controllerOf(s, host) === pid : t.id === pid;

@@ -2254,8 +2254,11 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const me = e.self && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const returned = !!me && (s.resolving?.created ?? []).includes(me.id);
       if (e.self && (!me || me.zone !== "battlefield" || (!returned && ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc))) return;
-      const t = me ? ({ kind: "object", id: me.id } as const) : ctx.targets[e.host];
-      if (!t || (!me && !ctx.legal[e.host])) return;
+      // Armed and Armored: the permanent just chosen, if it's still there.
+      const chosenHost = e.toChosen ? (s.resolving?.created ?? []).map((id) => s.objects[id]).find((o) => o?.zone === "battlefield") : undefined;
+      if (e.toChosen && !chosenHost) return;
+      const t = me ? ({ kind: "object", id: me.id } as const) : chosenHost ? ({ kind: "object", id: chosenHost.id } as const) : ctx.targets[e.host];
+      if (!t || (!me && !chosenHost && !ctx.legal[e.host])) return;
       const host = t.kind === "object" ? s.objects[t.id] : undefined;
       if (t.kind === "object" && host?.zone !== "battlefield") return;
       const sc = (s.resolving!.scratch ??= {});

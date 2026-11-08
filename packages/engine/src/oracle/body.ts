@@ -19816,6 +19816,16 @@ function round312Sentence(s: string, sentences: string[], si: number, ctx: Ctx, 
 }
 
 function round313Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  // Armed and Armored: "Choose a Dwarf you control. Attach any number of Equipment you control to it.": the Dwarf is
+  // chosen as it resolves, then any number of Equipment you control that could be attached to it (CR 701.3a-b); with no
+  // Dwarf, nothing is attached (rulings).
+  const chooseOne = /^Choose an? ([A-Z][a-z]+) you control$/.exec(s);
+  if (chooseOne && /^Attach any number of Equipment you control to it\.?$/.test(sentences[si + 1] ?? "")) {
+    const filter = parseTargetPhrase(`${chooseOne[1]} you control`);
+    if (filter?.kind !== "object" || !filter.subtypes?.length) return "fail";
+    effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, text: `${chooseOne[1]} you control` }, n: 1, action: "choose", prompt: `choose ${/^[AEIOU]/.test(chooseOne[1]!) ? "an" : "a"} ${chooseOne[1]} you control to attach Equipment to` });
+    return { effect: { type: "attachAny", host: -1, equipment: true, toChosen: true }, next: si + 2 };
+  }
   // Suppression Ray: "Tap all creatures target player controls. You may pay any amount of {E}. If you do, choose up to that
   // many creatures tapped this way. Put a stun counter on each of them.": X energy chosen as it resolves, at most what you
   // have (CR 107.14), then up to X of the creatures that became tapped (rulings: not those already tapped), each getting a

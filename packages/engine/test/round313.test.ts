@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, putOnBattlefield, setup } from "./helpers";
-import { abilityProblem, applyAction, castProblem, controlsMostPermanents, landsAllowed, botActions, potentialAttackers, ignorableBy, ignoreEffectProblem, invalidateCharacteristics, isFullySupported, legalActions, planCast, planIgnoreEffect, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilityProblem, applyAction, castProblem, characteristics, power, controlsMostPermanents, landsAllowed, botActions, potentialAttackers, ignorableBy, ignoreEffectProblem, invalidateCharacteristics, isFullySupported, legalActions, planCast, planIgnoreEffect, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -44,13 +44,14 @@ const lost = (): CardDef => ({"oracleId":"820ba630-c543-491c-8c77-ada69b01c79d",
 const curse = (): CardDef => ({"oracleId":"f4ff3efb-c9ed-4451-a7f2-5ff52ffb6cab","name":"Volrath's Curse","manaCost":"{1}{U}","cmc":2,"typeLine":"Enchantment — Aura","supertypes":[],"types":["Enchantment"],"subtypes":["Aura"],"oracleText":"Enchant creature\nEnchanted creature can't attack or block, and its activated abilities can't be activated. That creature's controller may sacrifice a permanent of their choice for that player to ignore this effect until end of turn.\n{1}{U}: Return this Aura to its owner's hand.","colors":["U"],"colorIdentity":["U"],"keywords":["Enchant"],"layout":"normal"});
 const damping = (): CardDef => ({"oracleId":"3584a055-5220-4721-89f8-de33f779122f","name":"Damping Engine","manaCost":"{4}","cmc":4,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"A player who controls more permanents than each other player can't play lands or cast artifact, creature, or enchantment spells. That player may sacrifice a permanent of their choice for that player to ignore this effect until end of turn.","colors":[],"colorIdentity":[],"keywords":[],"layout":"normal"});
 const ray = (): CardDef => ({"oracleId":"b592568b-11b0-4081-90a7-30cfb9c1ba80","name":"Suppression Ray // Orderly Plaza","manaCost":"{3}{W/U}{W/U}","cmc":5,"typeLine":"Sorcery // Land","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Tap all creatures target player controls. You may pay any amount of {E}. If you do, choose up to that many creatures tapped this way. Put a stun counter on each of them. (If a permanent with a stun counter would become untapped, remove one from it instead.)","colors":["U","W"],"colorIdentity":["U","W"],"keywords":[],"layout":"modal_dfc","faces":[{"name":"Suppression Ray","manaCost":"{3}{W/U}{W/U}","typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Tap all creatures target player controls. You may pay any amount of {E}. If you do, choose up to that many creatures tapped this way. Put a stun counter on each of them. (If a permanent with a stun counter would become untapped, remove one from it instead.)","colors":["U","W"]},{"name":"Orderly Plaza","manaCost":"","typeLine":"Land","supertypes":[],"types":["Land"],"subtypes":[],"oracleText":"This land enters tapped.\n{T}: Add {W} or {U}.","colors":[]}]} as CardDef);
+const armed = (): CardDef => ({"oracleId":"3d5b6151-d985-423b-8ade-f00958bbd3f6","name":"Armed and Armored","manaCost":"{1}{W}","cmc":2,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Vehicles you control become artifact creatures until end of turn. Choose a Dwarf you control. Attach any number of Equipment you control to it.","colors":["W"],"colorIdentity":["W"],"keywords":[],"layout":"normal"});
 const growth = (): CardDef => ({"oracleId":"8539f295-5d58-4436-a73a-b9277c4c7795","name":"Rampant Growth","manaCost":"{1}{G}","cmc":2,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.","colors":["G"],"colorIdentity":["G"],"keywords":[],"layout":"normal"});
 
 const pinger = () => bear({ name: "Test Pinger", oracleText: "{T}: Test Pinger deals 1 damage to any target.", power: "3", toughness: "3" });
 const forestsOnField = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]!.name === "Forest").length;
 
 describe("round 313", () => {
-  it("are fully supported", () => supported(arbiter(), lost(), curse(), damping(), ray()));
+  it("are fully supported", () => supported(arbiter(), lost(), curse(), damping(), ray(), armed()));
 });
 
 describe("round 313: Leonin Arbiter", () => {
@@ -256,5 +257,60 @@ describe("round 313: Suppression Ray", () => {
     expect(s.objects[big]!.counters.stun).toBe(1);
     expect(s.objects[small]!.counters.stun ?? 0).toBe(0);
     expect(s.players[ap]!.energy).toBe(0);
+  });
+});
+
+describe("round 313: Armed and Armored", () => {
+  const vehicle = () => card("Test Vehicle", "Artifact — Vehicle", "{2}", { power: "4", toughness: "4", oracleText: "Crew 3" });
+  const sword = (name: string) => card(name, "Artifact — Equipment", "{1}", { oracleText: "Equipped creature gets +2/+0.\nEquip {2}" });
+  const dwarf = (name: string) => card(name, "Creature — Dwarf", "{R}", { power: "1", toughness: "1" });
+
+  it("makes your Vehicles creatures, then attaches the Equipment you choose to the Dwarf you choose", () => {
+    const { s: s0, ap, opp, ids } = setup([armed()]);
+    const v = putOnBattlefield(s0, ap, vehicle());
+    const theirV = putOnBattlefield(s0, opp, vehicle());
+    const [d1, d2] = [putOnBattlefield(s0, ap, dwarf("Test Dwarf A")), putOnBattlefield(s0, ap, dwarf("Test Dwarf B"))];
+    const [e1, e2, e3] = [putOnBattlefield(s0, ap, sword("Test Sword A")), putOnBattlefield(s0, ap, sword("Test Sword B")), putOnBattlefield(s0, ap, sword("Test Sword C"))];
+    s0.objects[e3!]!.attachedTo = d1;
+    const theirs = putOnBattlefield(s0, opp, sword("Test Their Sword"));
+    invalidateCharacteristics(s0);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)), ap);
+    expect(characteristics(s, s.objects[v]!).types).toEqual(expect.arrayContaining(["Artifact", "Creature"]));
+    expect(characteristics(s, s.objects[theirV]!).types).not.toContain("Creature");
+    // The Dwarf, chosen as it resolves.
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", action: "choose" });
+    expect(s.pending?.kind === "pickPermanents" && [...s.pending.options].sort()).toEqual([d1, d2].sort());
+    s = settle(act(s, { type: "pickPermanents", player: ap, ids: [d2!] }), ap);
+    // Then any number of your Equipment, the one on the other Dwarf too, not an opponent's.
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", action: "attach" });
+    expect(s.pending?.kind === "pickPermanents" && s.pending.options).not.toContain(theirs);
+    s = settle(act(s, { type: "pickPermanents", player: ap, ids: [e1!, e3!] }), ap);
+    expect(s.objects[e1!]!.attachedTo).toBe(d2);
+    expect(s.objects[e3!]!.attachedTo).toBe(d2);
+    expect(s.objects[e2!]!.attachedTo).toBeUndefined();
+    expect(power(s, s.objects[d2!]!)).toBe(5);
+    // Until end of turn: the Vehicle isn't a creature on the next turn.
+    s.turn += 1;
+    s.effects = s.effects.filter((e) => e.duration !== "endOfTurn");
+    invalidateCharacteristics(s);
+    expect(characteristics(s, s.objects[v]!).types).not.toContain("Creature");
+  });
+
+  it("with no Dwarf, only the Vehicles become creatures (rulings)", () => {
+    const { s: s0, ap, ids } = setup([armed()]);
+    const v = putOnBattlefield(s0, ap, vehicle());
+    const e1 = putOnBattlefield(s0, ap, sword("Test Sword A"));
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)), ap);
+    expect(s.pending).toBeFalsy();
+    expect(characteristics(s, s.objects[v]!).types).toContain("Creature");
+    expect(s.objects[e1]!.attachedTo).toBeUndefined();
+  });
+
+  it("the bot puts all its Equipment on its Dwarf", () => {
+    const { s: s0, ap, ids } = setup([armed()]);
+    const d = putOnBattlefield(s0, ap, dwarf("Test Dwarf A"));
+    const [e1, e2] = [putOnBattlefield(s0, ap, sword("Test Sword A")), putOnBattlefield(s0, ap, sword("Test Sword B"))];
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    expect([e1, e2].map((id) => s.objects[id]!.attachedTo)).toEqual([d, d]);
   });
 });

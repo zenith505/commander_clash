@@ -3764,7 +3764,7 @@ export type Effect =
    * "Attach any number of Auras and Equipment you control to target permanent or player" (Ardenn): chosen as it resolves
    * (rulings) among those that could be attached to target `host` (CR 701.3a-b), then attached to it.
    */
-  | { type: "attachAny"; host: number; /** "Attach any number of Equipment you control" (Beatrix, Loyal General): only Equipment, not Auras. */ equipment?: true; /** Heavenly Blademaster: "to it": the source itself, not a target (`host` unused). */ self?: true; /** Yuffie, Materia Hunter: "you may attach an Equipment you control to ~": at most one. */ one?: true }
+  | { type: "attachAny"; host: number; /** "Attach any number of Equipment you control" (Beatrix, Loyal General): only Equipment, not Auras. */ equipment?: true; /** Heavenly Blademaster: "to it": the source itself, not a target (`host` unused). */ self?: true; /** Yuffie, Materia Hunter: "you may attach an Equipment you control to ~": at most one. */ one?: true; /** Armed and Armored: "Choose a Dwarf you control. Attach any number of Equipment you control to it.": to the permanent the "choose" pick before it chose (`host` unused). */ toChosen?: true }
   /** "Attach all Equipment you control to ~" (Balan, Wandering Knight): each of `filter` that could be attached to the source (CR 701.3a-b). */
   | { type: "attachAll"; filter: TargetSpec; /** Rhuk, Hexgold Nabber: "all Equipment attached to that creature": the trigger's subject's, now, or as it last existed if it died (CR 603.10a). */ fromSubject?: true }
   /** Unbound Flourishing: "double the value of X" of the spell whose casting triggered this, if it's still on the stack. */

@@ -1,6 +1,6 @@
 # Roadmap
 
-30,548 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,557 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,724 of
 9,979 (97%).
 
@@ -2380,7 +2380,7 @@ line blocks.
    a copy of that card, except it's a 4/4 black Zombie" (God-Pharaoh's Gift: the card exiled is ObjRef chosenFromYard,
    copied as printed, rulings); "~ explores. Then you may have it become a copy of another creature you control until end
    of turn" (Deepfathom Echo: chosen as it resolves, not targeted, its counters still count, rulings; a browser test). +8,
-   30,548 of 31,936 on main after B147.
+   30,548 of 31,936 on main after B147 (30,557 with B148).
    Out after round 309 (looked at, not done): Jinnie Fay, Jetmir's Second, Mirrormind Crown, Moonlit Meditation and Esix,
    Fractal Bloom (still the optional token replacement: "you may instead create ..." needs a choice that can pause token
    creation, which about a dozen effects do without pausing today); Spectral Searchlight and Radiant Lotus (mana for

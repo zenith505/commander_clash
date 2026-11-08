@@ -6667,6 +6667,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3584a055-5220-4721-89f8-de33f779122f",
+  "name": "Damping Engine",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "A player who controls more permanents than each other player can't play lands or cast artifact, creature, or enchantment spells. That player may sacrifice a permanent of their choice for that player to ignore this effect until end of turn.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ulg",
+  "releasedAt": "1999-02-15",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "615b4189-e800-408b-99e0-71ae7089b937",
   "name": "Dance with Calamity",
   "manaCost": "{7}{R}",
@@ -16293,6 +16315,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a33f6070-590c-4be8-9180-b1ac2608cbc4",
+  "name": "Leonin Arbiter",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Cat Cleric",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Cat",
+   "Cleric"
+  ],
+  "oracleText": "Players can't search libraries. Any player may pay {2} for that player to ignore this effect until end of turn.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "som",
+  "releasedAt": "2010-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d5f72164-441e-4e04-8b2b-0d6ab618d22e",
   "name": "Leonin Bola",
   "manaCost": "{1}",
@@ -16992,6 +17045,36 @@
   "set": "mh2",
   "releasedAt": "2021-06-18",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "820ba630-c543-491c-8c77-ada69b01c79d",
+  "name": "Lost in Thought",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature can't attack or block, and its activated abilities can't be activated. Its controller may exile three cards from their graveyard for that player to ignore this effect until end of turn.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "jud",
+  "releasedAt": "2002-05-27",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -22495,6 +22578,32 @@
   "commanderLegal": "legal",
   "set": "rna",
   "releasedAt": "2019-01-25",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8539f295-5d58-4436-a73a-b9277c4c7795",
+  "name": "Rampant Growth",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -31634,6 +31743,36 @@
   "commanderLegal": "legal",
   "set": "mom",
   "releasedAt": "2023-04-21",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f4ff3efb-c9ed-4451-a7f2-5ff52ffb6cab",
+  "name": "Volrath's Curse",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature can't attack or block, and its activated abilities can't be activated. That creature's controller may sacrifice a permanent of their choice for that player to ignore this effect until end of turn.\n{1}{U}: Return this Aura to its owner's hand.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

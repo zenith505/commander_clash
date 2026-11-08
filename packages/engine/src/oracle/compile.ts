@@ -5151,6 +5151,42 @@ export function compile(d: CardDef): CompiledCard {
       out.playersCantSearch = true;
       continue;
     }
+    // CR 116.2d: "Any player may pay {2} for that player to ignore this effect until end of turn" (Leonin Arbiter); "Its
+    // controller may exile three cards from their graveyard ..." (Lost in Thought), "That creature's controller may
+    // sacrifice a permanent of their choice ..." (Volrath's Curse): a special action any time they have priority (rulings),
+    // after which the effect doesn't apply to that player until end of turn.
+    const ignore = /^(.+?\.) (Any player|Its controller|That creature's controller|That player) may (pay (\{\d+\})|sacrifice a permanent of their choice|exile three cards from their graveyard) for that player to ignore this effect until end of turn\.$/.exec(line);
+    if (ignore && !out.ignorable) {
+      const extra = ignore[4] ? null : parseAdditionalCost(/^sacrifice/.test(ignore[3]!) ? "Sacrifice a permanent" : "Exile three cards from your graveyard");
+      const cost = ignore[4] ? { mana: ignore[4] } : extra ? { costs: [extra] } : null;
+      if (!cost) {
+        out.unsupported.push(raw);
+        continue;
+      }
+      const text = `${ignore[3]} to ignore ~'s effect this turn`;
+      if (ignore[1] === "Players can't search libraries." && ignore[2] === "Any player") {
+        out.playersCantSearch = true;
+        out.ignorable = { who: "any", ...cost, text };
+        continue;
+      }
+      // Damping Engine: the player who controls the most permanents, while they do (rulings).
+      const most = /^A player who controls more permanents than each other player can't play lands or cast (artifact, creature, or enchantment) spells\.$/.exec(ignore[1]!);
+      const mostFilter = most && ignore[2] === "That player" ? parseTargetPhrase(`${most[1]} spell`) : null;
+      if (mostFilter?.kind === "spell") {
+        out.mostPermanentsCant = { ...mostFilter, text: `${most![1]} spell` };
+        out.ignorable = { who: "mostPermanents", ...cost, text };
+        continue;
+      }
+      // An Aura's effect on the creature it enchants: that creature's controller, whoever that is now.
+      const st = (ignore[2] === "Its controller" || ignore[2] === "That creature's controller") && /^Enchanted creature /.test(ignore[1]!) ? parseStatic(ignore[1]!) : null;
+      if (st && st.affects.kind === "attached" && !st.condition && d.subtypes.includes("Aura")) {
+        out.statics.push({ ...st, condition: { kind: "notIgnored" }, text: line });
+        out.ignorable = { who: "attachedController", ...cost, text };
+        continue;
+      }
+      out.unsupported.push(raw);
+      continue;
+    }
     if (line === "You control your opponents while they're searching their libraries.") {
       out.controlsOpponentSearches = true;
       continue;

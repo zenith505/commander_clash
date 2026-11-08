@@ -3,7 +3,7 @@ import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { MANA_ABILITY_OFFSET, activatedAsMana, payableActivatedMana, manaAbilityCost, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, costIsPaid, spellHow, definedX, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, sylexed, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
+import { abilityProblem, costIsPaid, spellHow, definedX, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, ignorableBy, ignoreEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, sylexed, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
@@ -869,6 +869,19 @@ export function planEndEffect(s: GameState, pid: PlayerId, id: ObjectId): Action
   if (problem && !/not enough mana/.test(problem)) return null;
   const taps = problem ? planMana(s, pid, parseManaCost(e.endable!.cost)) : [];
   return taps ? [...taps, { type: "endEffect", player: pid, objectId: id }] : null;
+}
+
+/**
+ * Tap mana to pay to ignore this permanent's effect this turn (Leonin Arbiter; CR 116.2d), then do it, or null if that can't
+ * be done now. `costs`: the permanent sacrificed or the cards exiled, when that's the cost (Volrath's Curse, Lost in Thought).
+ */
+export function planIgnoreEffect(s: GameState, pid: PlayerId, id: ObjectId, costs?: CostChoices): Action[] | null {
+  const ig = ignorableBy(s, pid, id);
+  if (!ig) return null;
+  const problem = ignoreEffectProblem(s, pid, id, costs);
+  if (problem && !/not enough mana/.test(problem)) return null;
+  const taps = problem && ig.mana ? planMana(s, pid, parseManaCost(ig.mana)) : [];
+  return taps ? [...taps, { type: "ignoreEffect", player: pid, objectId: id, ...(costs ? { costs } : {}) }] : null;
 }
 
 /** Tap mana for a card's plot cost, then plot it (CR 702.170a), or null if that can't be done now. */

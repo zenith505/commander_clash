@@ -22,7 +22,7 @@ import { canAttachTo, turnFaceDown } from "./effects/run-permanents";
 import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
 import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
-import { characteristics, controllerOf, enchantableBy, everyCreatureType, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
+import { characteristics, controllerOf, enchantableBy, everyCreatureType, ignoredBy, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
 import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, reduceSymbolsByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
@@ -461,6 +461,10 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "endEffect":
       requireNoPending(s);
       endEffect(s, p, action.objectId);
+      break;
+    case "ignoreEffect":
+      requireNoPending(s);
+      ignoreEffect(s, p, action.objectId, action.costs);
       break;
     case "foretell":
       requireNoPending(s);
@@ -5179,6 +5183,8 @@ export function landsAllowed(s: GameState, pid: PlayerId): number {
   if (s.cantPlayLandsThisTurn?.some((c) => c.player === pid && c.turn === s.turn)) return 0;
   // Territorial Dispute: "Players can't play lands."
   if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).playersCantPlayLands)) return 0;
+  // Damping Engine: "A player who controls more permanents than each other player can't play lands".
+  if (mostPermanentsBan(s, pid)) return 0;
   // Aggressive Mining: "You can't play lands."
   if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).youCantPlayLands && controllerOf(s, obj(s, id)) === pid)) return 0;
   // Rock Jockey: "You can't play lands if ~ was cast this turn".
@@ -7424,6 +7430,10 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number, 
       if (controllerOf(s, o) === pid && printedMatches(f, d)) return `${characteristics(s, o).name}: you can't cast ${f.text.replace(/ spell$/, "")} spells`;
     for (const f of abilitiesOf(s, o).opponentsCantCast ?? [])
       if (controllerOf(s, o) !== pid && printedMatches(f, d)) return `${characteristics(s, o).name}: opponents can't cast ${f.text.replace(/ spell$/, "")} spells`;
+    // Damping Engine, while `pid` controls the most permanents and hasn't paid to ignore it this turn (CR 116.2d).
+    const damping = abilitiesOf(s, o).mostPermanentsCant;
+    if (damping && printedMatches(damping, d) && !ignoredBy(s, o, pid) && controlsMostPermanents(s, pid))
+      return `${characteristics(s, o).name}: a player who controls more permanents than each other player can't cast ${damping.text.replace(/ spell$/, "")} spells`;
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
     for (const f of abilitiesOf(s, o).enchantedControllerCantCast ?? [])
       if (host?.zone === "battlefield" && controllerOf(s, host) === pid && printedMatches(f, d)) return `${characteristics(s, o).name}: enchanted creature's controller can't cast ${f.text.replace(/ spell$/, "")} spells`;
@@ -13448,6 +13458,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
   }
   for (const id of s.battlefield) for (const door of [0, 1]) if (unlockProblem(s, pid, id, door) === null) out.push({ type: "unlockDoor", player: pid, objectId: id, door });
   for (const id of s.battlefield) if (endEffectProblem(s, pid, id) === null) out.push({ type: "endEffect", player: pid, objectId: id });
+  for (const id of s.battlefield) if (!ignorableBy(s, pid, id)?.costs && ignoreEffectProblem(s, pid, id) === null) out.push({ type: "ignoreEffect", player: pid, objectId: id });
   // "You may play lands from your graveyard" (Crucible of Worlds).
   if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid))
     for (const id of p.graveyard) if (mayPlayLandFromGraveyard(s, obj(s, id), pid) && !nameLandBan(s, pid, defOf(s, obj(s, id)))) out.push({ type: "playLand", player: pid, objectId: id });
@@ -13746,6 +13757,78 @@ function endEffect(s: GameState, p: Player, id: ObjectId) {
   s.effects = s.effects.filter((x) => x !== e);
   invalidateCharacteristics(s);
   log(s, `${p.name} pays ${e.endable!.cost} to end ${e.sourceName}'s effect.`);
+  s.passedInSuccession = [];
+}
+
+/**
+ * CR 116.2d: the ability of this permanent's whose effect `pid` may pay to ignore this turn (CompiledCard.ignorable), if
+ * they may: anyone for Leonin Arbiter, the enchanted creature's controller for Lost in Thought; not once they have.
+ */
+export function ignorableBy(s: GameState, pid: PlayerId, id: ObjectId): CompiledCard["ignorable"] {
+  const o = s.objects[id];
+  if (!o || o.zone !== "battlefield" || o.faceDown || player(s, pid).lost) return undefined;
+  const ig = abilitiesOf(s, o).ignorable;
+  if (!ig || ignoredBy(s, o, pid)) return undefined;
+  if (ig.who === "mostPermanents" && !controlsMostPermanents(s, pid)) return undefined;
+  if (ig.who === "attachedController") {
+    const host = o.attachedTo !== undefined ? s.objects[o.attachedTo] : undefined;
+    if (!host || host.zone !== "battlefield" || controllerOf(s, host) !== pid) return undefined;
+  }
+  return ig;
+}
+
+/** Damping Engine: `pid` controls more permanents than each other player still in the game. */
+export function controlsMostPermanents(s: GameState, pid: PlayerId): boolean {
+  const n = (q: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === q).length;
+  const mine = n(pid);
+  return s.players.every((q) => q.id === pid || q.lost || n(q.id) < mine);
+}
+
+/** Damping Engine's "can't" for `pid` now: a permanent of it that applies to them (not ignored this turn, CR 116.2d). */
+function mostPermanentsBan(s: GameState, pid: PlayerId): { o: GameObject; filter: TargetSpec } | undefined {
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const filter = abilitiesOf(s, o).mostPermanentsCant;
+    if (filter && !ignoredBy(s, o, pid) && controlsMostPermanents(s, pid)) return { o, filter };
+  }
+  return undefined;
+}
+
+/**
+ * Why `pid` can't pay to ignore this permanent's effect this turn now (with the mana in their pool, and `costs` choosing
+ * what's sacrificed or exiled), or null. A special action any time they have priority (CR 116.2d): nothing responds to it.
+ */
+export function ignoreEffectProblem(s: GameState, pid: PlayerId, id: ObjectId, costs?: CostChoices): string | null {
+  const ig = ignorableBy(s, pid, id);
+  if (!ig) return "there's no effect of that permanent's you may pay to ignore";
+  if (s.priority !== pid || s.pending) return "you can do that only while you have priority";
+  const o = obj(s, id);
+  if (ig.costs) {
+    const cp = extraCostProblem(s, pid, o, ig.costs, costs, `ignore ${defOf(s, o).name}'s effect`, "special");
+    if (cp) return cp;
+  } else if (costs && Object.keys(costs).length) return "it has no costs to choose";
+  if (ig.mana && !canPayFromPool(s, pid, parseManaCost(ig.mana), "other")) return `not enough mana to ignore ${defOf(s, o).name}'s effect (${ig.mana})`;
+  return null;
+}
+
+/** Pay to ignore a permanent's effect until end of turn (CR 116.2d), then get priority again (CR 116.3). */
+function ignoreEffect(s: GameState, p: Player, id: ObjectId, costs?: CostChoices) {
+  const problem = ignoreEffectProblem(s, p.id, id, costs);
+  if (problem) throw new RulesError(problem);
+  const o = obj(s, id);
+  const ig = ignorableBy(s, p.id, id)!;
+  // What pays it is chosen as it's paid: no skipping a cost by not saying.
+  if (ig.costs?.some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError("choose what to pay that cost with");
+  const name = defOf(s, o).name;
+  const zc = o.zoneChanges ?? 0;
+  if (ig.mana) spendFromPool(s, p.id, parseManaCost(ig.mana), "other");
+  if (ig.costs) payExtraCosts(s, p, ig.costs, { ...costs });
+  // Volrath's Curse with its creature sacrificed: the Aura is still there until state-based actions, and still paid for.
+  const was = o.ignoredBy?.turn === s.turn && o.ignoredBy.zc === zc ? o.ignoredBy.players : [];
+  o.ignoredBy = { turn: s.turn, zc, players: [...was, p.id] };
+  invalidateCharacteristics(s);
+  const paid = ig.mana ? `pays ${ig.mana}` : ig.costs?.[0]?.kind === "sacrifice" ? "sacrifices a permanent" : "exiles three cards from their graveyard";
+  log(s, `${p.name} ${paid} to ignore ${name}'s effect this turn.`);
   s.passedInSuccession = [];
 }
 

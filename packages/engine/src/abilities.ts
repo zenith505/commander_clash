@@ -2166,6 +2166,11 @@ export interface StaticAbility {
  */
 export type StaticCondition =
   /**
+   * CR 116.2d (Lost in Thought, Volrath's Curse): the controller of the creature this is attached to hasn't paid this turn to
+   * ignore its effect (CompiledCard.ignorable, GameObject.ignoredBy).
+   */
+  | { kind: "notIgnored" }
+  /**
    * Wiitigo: "if it has blocked or been blocked since your last upkeep"; Shape of the Wiitigo: "if enchanted creature
    * attacked or blocked since your last upkeep": this object (or the creature it's attached to) was declared as an
    * attacker (`attacked`) or a blocker (`blocked`), or became blocked (`wasBlocked`), in your previous upkeep's turn or
@@ -7763,6 +7768,21 @@ export interface CompiledCard {
   opponentsCantSearch?: true;
   /** Mindlock Orb: "Players can't search libraries." Stranglehold's rule for every player, its controller too. */
   playersCantSearch?: true;
+  /**
+   * CR 116.2d: "Any player may pay {2} for that player to ignore this effect until end of turn" (Leonin Arbiter), "Its
+   * controller may exile three cards from their graveyard ..." (Lost in Thought), "That creature's controller may sacrifice
+   * a permanent of their choice ..." (Volrath's Curse): a special action `who` may take any time they have priority, paying
+   * one of these costs, after which this permanent's effect from that ability doesn't apply to them this turn
+   * (GameObject.ignoredBy). `attachedController`: the controller of the creature it's attached to; `mostPermanents`: a
+   * player who controls more permanents than each other player (Damping Engine, rulings).
+   */
+  ignorable?: { who: "any" | "attachedController" | "mostPermanents"; mana?: string; costs?: AdditionalCost[]; text: string };
+  /**
+   * Damping Engine: "A player who controls more permanents than each other player can't play lands or cast artifact,
+   * creature, or enchantment spells": these spells, and lands, for that player while they do (with `ignorable`'s
+   * "mostPermanents", unless they paid to ignore it this turn).
+   */
+  mostPermanentsCant?: TargetSpec;
   /** "Players can't play lands." (Territorial Dispute): no land plays for anyone, whatever lets them (CR 305.2, 101.2). */
   playersCantPlayLands?: true;
   /** "You can't play lands." (Aggressive Mining): no land plays for its controller (CR 305.2, 101.2). */

@@ -203,6 +203,11 @@ export interface GameObject {
   id: ObjectId;
   cardId: string; // key into GameState.cards
   /**
+   * CR 116.2d: the players who paid this turn to ignore this permanent's effect (CompiledCard.ignorable), as this object
+   * (`zc`, CR 400.7). Each permanent with the ability is paid for on its own (rulings on Leonin Arbiter).
+   */
+  ignoredBy?: { turn: number; zc: number; players: PlayerId[] };
+  /**
    * The face of its card that's up, an index into CardDef.faces (faces.ts): the half of a split card or the face of a
    * modal double-faced card cast (CR 709.3, 712.11b), an Adventure (715.3), a transformed permanent's back face
    * (712.8e), a flipped permanent (710.1b). Unset, it has its card's resting characteristics. Only on the stack and the
@@ -3097,6 +3102,11 @@ export type Action =
   | { type: "unlockDoor"; player: PlayerId; objectId: ObjectId; door: number }
   /** Pay to end an effect on this permanent that says "you may pay ... to end this effect" (a Licid; CR 116.2c). */
   | { type: "endEffect"; player: PlayerId; objectId: ObjectId }
+  /**
+   * Pay to ignore this permanent's effect until end of turn (CompiledCard.ignorable): a special action (CR 116.2d). `costs`:
+   * the permanent sacrificed or the graveyard cards exiled, when that's the cost.
+   */
+  | { type: "ignoreEffect"; player: PlayerId; objectId: ObjectId; costs?: CostChoices }
   /** Circling Vultures: "You may discard ~ any time you could cast an instant." Discarding it is a special action (CR 116.2e). */
   | { type: "discardAnyTime"; player: PlayerId; objectId: ObjectId }
   /** Foretell a card from your hand: pay {2} and exile it face down, a special action (CR 116.2h, 702.143a). */

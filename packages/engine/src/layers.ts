@@ -719,6 +719,12 @@ export function uniqueMostPlayer(s: GameState, stat: MostStat, count: (p: Player
   return top.length === 1 ? top[0]![0] : undefined;
 }
 
+/** CR 116.2d: `pid` paid this turn to ignore this permanent's effect (CompiledCard.ignorable), as this object. */
+export function ignoredBy(s: GameState, o: GameObject, pid: PlayerId): boolean {
+  const i = o.ignoredBy;
+  return !!i && i.turn === s.turn && i.zc === (o.zoneChanges ?? 0) && i.players.includes(pid);
+}
+
 function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, chars: CharMap, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number, subjectId?: ObjectId, subjectZc?: number): boolean {
   const src = s.objects[sourceId]!;
   const yard = () => s.players[you]?.graveyard.map((id) => defOf(s, s.objects[id]!)) ?? [];
@@ -745,6 +751,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const since = (p?.upkeepTurn === s.turn && s.step === "upkeep" ? p.lastUpkeepTurn : p?.upkeepTurn) ?? 0;
       const turns = [...(cond.attacked ? [o.attackedTurns?.at(-1)] : []), ...(cond.blocked ? [o.blockedTurn] : []), ...(cond.wasBlocked ? [o.becameBlockedTurn] : [])];
       return turns.some((t) => t !== undefined && t >= since);
+    }
+    case "notIgnored": {
+      // CR 116.2d: the enchanted creature's controller, as the layers so far have it, hasn't paid this turn to ignore it.
+      const who = src.attachedTo !== undefined ? chars.get(src.attachedTo)?.controller : undefined;
+      return who === undefined || !ignoredBy(s, src, who);
     }
     case "selfInCommand":
       return src.zone === "command";

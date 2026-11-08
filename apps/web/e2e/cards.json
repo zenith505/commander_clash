@@ -1313,6 +1313,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6beec974-891f-4354-8621-ac403c07509a",
+  "name": "Archfiend of Spite",
+  "manaCost": "{5}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Creature — Demon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Demon"
+  ],
+  "oracleText": "Flying\nWhenever a source an opponent controls deals damage to this creature, that source's controller loses that much life unless they sacrifice that many permanents of their choice.\nMadness {3}{B}{B} (If you discard this card, discard it into exile. When you do, cast it for its madness cost or put it into your graveyard.)",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying",
+   "Madness"
+  ],
+  "commanderLegal": "legal",
+  "set": "c19",
+  "releasedAt": "2019-08-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5966c464-5f63-4c71-9317-e2ca79da5aba",
   "name": "Archmage Ascension",
   "manaCost": "{2}{U}",
@@ -5819,6 +5852,28 @@
   "commanderLegal": "legal",
   "set": "blb",
   "releasedAt": "2024-08-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "abdc1c92-1434-47d3-abaa-debe047903b9",
+  "name": "Cryptic Gateway",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Tap two untapped creatures you control: You may put a creature card from your hand that shares a creature type with each creature tapped this way onto the battlefield.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -15344,6 +15399,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "785c306c-471c-4699-8ab2-43c253d569cf",
+  "name": "Lich's Mastery",
+  "manaCost": "{3}{B}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Legendary Enchantment",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Hexproof\nYou can't lose the game.\nWhenever you gain life, draw that many cards.\nWhenever you lose life, for each 1 life you lost, exile a permanent you control or a card from your hand or graveyard.\nWhen Lich's Mastery leaves the battlefield, you lose the game.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Hexproof"
+  ],
+  "commanderLegal": "legal",
+  "set": "dom",
+  "releasedAt": "2018-04-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2270daaf-252d-40c4-bed5-bd46ae15f041",
   "name": "Liesa, Shroud of Dusk",
   "manaCost": "{2}{W}{W}{B}",
@@ -19025,6 +19110,43 @@
   "set": "rna",
   "releasedAt": "2019-01-25",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "add020f8-a6ae-4ce1-8d4e-f48f3fd14767",
+  "name": "Osgir, the Reconstructor",
+  "manaCost": "{2}{R}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Giant Artificer",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Giant",
+   "Artificer"
+  ],
+  "oracleText": "Vigilance\n{1}, Sacrifice an artifact: Target creature you control gets +2/+0 until end of turn.\n{X}, {T}, Exile an artifact card with mana value X from your graveyard: Create two tokens that are copies of the exiled card. Activate only as a sorcery.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "c21",
+  "releasedAt": "2021-04-23",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -23772,6 +23894,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "147d8a1f-fe82-4078-a281-29a2eed4c750",
+  "name": "Sigarda's Vanguard",
+  "manaCost": "{4}{W}",
+  "cmc": 5,
+  "typeLine": "Creature — Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flash\nFlying\nWhenever this creature enters or attacks, choose any number of creatures with different powers. Those creatures gain double strike until end of turn.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "mic",
+  "releasedAt": "2021-09-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8aed54cb-d1bb-45ad-adbe-38e55d84ff31",
   "name": "Silence",
   "manaCost": "{W}",
@@ -23961,6 +24116,39 @@
   "set": "dbl",
   "releasedAt": "2022-01-28",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5cf86603-cc47-4644-890a-0997c694817f",
+  "name": "Sivitri, Dragon Master",
+  "manaCost": "{2}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Sivitri",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Sivitri"
+  ],
+  "oracleText": "+1: Until your next turn, creatures can't attack you or planeswalkers you control unless their controller pays 2 life for each of those creatures.\n−3: Search your library for a Dragon card, reveal it, put it into your hand, then shuffle.\n−7: Destroy all non-Dragon creatures.\nSivitri, Dragon Master can be your commander.",
+  "loyalty": "4",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dmc",
+  "releasedAt": "2022-09-09",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -25479,6 +25667,32 @@
   "commanderLegal": "legal",
   "set": "dmu",
   "releasedAt": "2022-09-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4abda0ad-0a2b-4bd9-81c7-56329e62311d",
+  "name": "Stick Together",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player chooses a party from among creatures they control, then sacrifices the rest. (To choose a party, choose up to one each of Cleric, Rogue, Warrior, and Wizard.)",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

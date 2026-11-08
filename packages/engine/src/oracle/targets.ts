@@ -191,6 +191,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   }
   // Erestor of the Council: "each opponent who voted for a choice you voted for", in the vote that triggered it.
   if (x === "each opponent who voted for a choice you voted for" && ctx.votesEvent) return { ref: "votedWithYou" };
+  // Grudge Keeper: "each opponent who voted for a choice you didn't vote for": only those who voted for none of yours (rulings).
+  if (x === "each opponent who voted for a choice you didn't vote for" && ctx.votesEvent) return { ref: "votedNoneOfYours" };
   if (x === "each player") return { ref: "eachPlayer" };
   // Blightning: "... to target player or planeswalker. That player or that planeswalker's controller discards two cards":
   // the player it targets, or the planeswalker's controller.
@@ -1668,6 +1670,13 @@ export function parseTargetPhrase(
   // "Target creature blocking ~" (Master of Arms), "... blocking or blocked by ~" (Cromat), "it" being ~. Only a target:
   // it's checked as targets are (lesserPowerOk), not in a group.
   const blocking = opts.target ? / blocking( or blocked by)? (?:it|~)$/.exec(p) : null;
+  // Plasma Caster: "target creature that's blocking equipped creature": checked the same way, against the creature the
+  // Equipment was attached to as the ability was activated (rulings).
+  const blockingHost = opts.target ? / that's blocking equipped creature$/.exec(p) : null;
+  if (blockingHost) {
+    extra.blockingEquipped = true;
+    p = p.slice(0, blockingHost.index);
+  }
   if (blocking) {
     extra.blockingSource = blocking[1] ? "either" : "blocking";
     p = p.slice(0, blocking.index);

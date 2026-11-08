@@ -1376,16 +1376,20 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
     // Protection Racket: "pay life equal to that card's mana value", likewise (a payment of 0 life can always be made, CR 119.4).
     // A lone "unless pays life equal to ..." (Essence Vortex) stays with paidUnless, which counts it as it asks.
     const chosen = !!e.mode || e.options.length > 1;
-    const options = e.options.map((o) => ("damage" in o && typeof o.damage !== "number" ? { damage: amountNow(s, o.damage, ctx) } : chosen && lifeOnly(o) ? { pay: { cost: "", life: Math.max(0, amountNow(s, o.pay.lifeAmount!, ctx)) } } : o));
+    // Archfiend of Spite: "sacrifice that many permanents": that many as the choices start.
+    const options = e.options.map((o) => ("damage" in o && typeof o.damage !== "number" ? { damage: amountNow(s, o.damage, ctx) } : "sacrifice" in o && o.nAmount !== undefined ? { sacrifice: o.sacrifice, n: Math.max(1, amountNow(s, o.nAmount, ctx)) } : chosen && lifeOnly(o) ? { pay: { cost: "", life: Math.max(0, amountNow(s, o.pay.lifeAmount!, ctx)) } } : o));
     const doomed = e.effects.length === 1 && e.effects[0]!.type === "destroy" ? objects(s, e.effects[0]!.what, ctx)[0]?.id : undefined;
     // For the bots: damage counted as the choices start (Osseous Sticktwister's "equal to its power", Craig Boone's counters).
     const dmg = e.effects.length === 1 && e.effects[0]!.type === "damage" ? e.effects[0]! : undefined;
     const dmgN = dmg?.type === "damage" && typeof dmg.amount !== "number" ? Math.max(0, amountNow(s, dmg.amount, ctx)) : undefined;
+    // Archfiend of Spite: "loses that much life", counted as the choices start.
+    const lost = e.effects.length === 1 && e.effects[0]!.type === "loseLife" ? e.effects[0]!.n : undefined;
+    const loseN = lost !== undefined && typeof lost !== "number" ? Math.max(0, amountNow(s, lost, ctx)) : undefined;
     const hurt = dmg?.type === "damage" && "index" in dmg.to && dmg.to.ref === "target" ? objects(s, { ref: "target", index: dmg.to.index }, ctx)[0] : undefined;
-    sc.punish = { queue: apnap(s, players(s, e.who, ctx)), picked: {}, made: {}, round: 0, times, picks, options, ...punisherHarm(e), ...(dmgN !== undefined && !hurt ? { lose: dmgN } : {}), ...(hurt && dmg?.type === "damage" ? { hurts: { id: hurt.id, n: dmgN ?? (typeof dmg.amount === "number" ? dmg.amount : 0) }, lose: undefined } : {}), ...(doomed ? { destroys: doomed } : {}), ...(e.mode ? { mode: e.mode } : {}) };
+    sc.punish = { queue: apnap(s, players(s, e.who, ctx)), picked: {}, made: {}, round: 0, times, picks, options, ...punisherHarm(e), ...(dmgN !== undefined && !hurt ? { lose: dmgN } : {}), ...(loseN !== undefined ? { lose: loseN } : {}), ...(hurt && dmg?.type === "damage" ? { hurts: { id: hurt.id, n: dmgN ?? (typeof dmg.amount === "number" ? dmg.amount : 0) }, lose: undefined } : {}), ...(doomed ? { destroys: doomed } : {}), ...(e.mode ? { mode: e.mode } : {}) };
   }
   const fixLife = (o: PunisherOption) => (!!e.mode || e.options.length > 1) && lifeOnly(o);
-  if (e.options.some((o) => ("damage" in o && typeof o.damage !== "number") || fixLife(o))) e = { ...e, options: e.options.map((o, i) => ("damage" in o || fixLife(o) ? sc.punish!.options[i]! : o)) };
+  if (e.options.some((o) => ("damage" in o && typeof o.damage !== "number") || ("sacrifice" in o && o.nAmount !== undefined) || fixLife(o))) e = { ...e, options: e.options.map((o, i) => ("damage" in o || ("sacrifice" in o && o.nAmount !== undefined) || fixLife(o) ? sc.punish!.options[i]! : o)) };
   // "A permanent of their choice that shares a card type with it" (Braids): the types of what was sacrificed this way.
   if (e.options.some((o) => "sacrifice" in o && o.sacrifice.sharesTypeWithSacrificed)) {
     const types = [...new Set((s.resolving!.sacrificedThisWay ?? []).flatMap((k) => k.types ?? []))];
@@ -1603,6 +1607,7 @@ function describePenalty(s: GameState, e: Extract<Effect, { type: "punisher" }>,
   if (e.thenText) return `${player(s, ctx.controller).name} ${e.thenText}`;
   const lose = e.effects.length === 1 && e.effects[0]!.type === "loseLife" ? e.effects[0]!.n : undefined;
   if (typeof lose === "number") return `Lose ${lose} life`;
+  if (lose !== undefined) return `Lose ${Math.max(0, amountNow(s, lose, ctx))} life`;
   const d = punisherHarm(e).discards;
   return d ? `Discard ${d} cards` : "Take the penalty";
 }

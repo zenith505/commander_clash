@@ -25,6 +25,7 @@ import {
   unlockProblem,
   restingDef,
   faceUpWays,
+  faceUpFormsOf,
   turnFaceUpProblem,
   delveRoom,
   graveyardCast,
@@ -1787,7 +1788,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 setMenu(null);
                 dispatch(planEndEffect(s, HUMAN, menu) ?? [{ type: "endEffect", player: HUMAN, objectId: menu }]);
               }}
-              onTurnFaceUp={(way) => {
+              onTurnFaceUp={(way, form) => {
                 setMenu(null);
                 // "Disguise {X}{3}{W}": X first, chosen as it's turned face up (CR 107.3d).
                 const up = faceUpWays(s, s.objects[menu]!)[way];
@@ -1796,7 +1797,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                   return setXPick({ mode: "faceUp", objectId: menu, way, label: `Turn face up (${up.kind})`, cost: up.cost, max, value: max });
                 }
                 if (up?.costs) return continueFaceUp({ objectId: menu, way });
-                dispatch(planTurnFaceUp(s, HUMAN, menu, way) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: menu, ...(way ? { way } : {}) }]);
+                dispatch(planTurnFaceUp(s, HUMAN, menu, way, 0, undefined, form) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: menu, ...(way ? { way } : {}), ...(form !== undefined ? { form } : {}) }]);
               }}
               onClose={() => setMenu(null)}
             />
@@ -2245,6 +2246,8 @@ function canCastFromGraveyard(s: GameState, id: string, via: CastFromGraveyardKi
 
 /** A card exiled with "you may play it until ..." that you could play now. */
 function exileOptions(s: GameState, id: string): boolean {
+  // Mister Immortal: an ability that works from exile too (ActivatedAbility.orExile).
+  if (s.objects[id]!.owner === HUMAN && abilitiesOf(s, s.objects[id]!).activated.some((ab, i) => ab.orExile && planActivate(s, HUMAN, id, i) !== null)) return true;
   if (!mayPlayFromExile(s, s.objects[id]!, HUMAN)) return false;
   if (foretoldCast(s, HUMAN, s.objects[id]!)) return canCastAlt(s, id, "foretell");
   // Valgavoth's cards: only for life (its "pay life equal to its mana value").
@@ -4446,7 +4449,7 @@ function AbilityMenu({
   /** For a card in hand with foretell: pay {2} and exile it face down, to cast it on a later turn (CR 702.143a). */
   onForetell: () => void;
   /** For your face-down permanent: turn it face up. */
-  onTurnFaceUp: (way: number) => void;
+  onTurnFaceUp: (way: number, form?: number) => void;
   /** For your Room: unlock this locked door by paying its mana cost (CR 709.5e). */
   onUnlock: (door: number) => void;
   /** "You may pay {W} to end this effect" (a Licid): pay it, a special action (CR 116.2c). */
@@ -4640,11 +4643,16 @@ function AbilityMenu({
           )
         );
       })()}
-      {upWays.map((upCost, way) => (
-        <button key={`up${way}`} disabled={!planTurnFaceUp(s, HUMAN, objectId, way)} title={turnFaceUpProblem(s, HUMAN, objectId, way) ?? "A special action: it doesn't use the stack."} onClick={() => onTurnFaceUp(way)}>
-          Turn face up: {upCost.kind === "manifest" || upCost.kind === "cloak" ? "mana cost" : upCost.kind} {upCost.text ?? <ManaCost cost={upCost.cost} size="sm" />}
-        </button>
-      ))}
+      {upWays.flatMap((upCost, way) => {
+        // Aquamorph Entity: what it becomes is chosen as it's turned face up (CR 614.1e), a button for each.
+        const forms = faceUpFormsOf(s, o);
+        return (forms ? forms.map((_, i) => i) : [undefined]).map((form) => (
+          <button key={`up${way}-${form ?? ""}`} data-face-up-form={form} disabled={!planTurnFaceUp(s, HUMAN, objectId, way, 0, undefined, form)} title={turnFaceUpProblem(s, HUMAN, objectId, way) ?? "A special action: it doesn't use the stack."} onClick={() => onTurnFaceUp(way, form)}>
+            Turn face up: {upCost.kind === "manifest" || upCost.kind === "cloak" ? "mana cost" : upCost.kind} {upCost.text ?? <ManaCost cost={upCost.cost} size="sm" />}
+            {form !== undefined ? ` as ${forms![form]!.text}` : null}
+          </button>
+        ));
+      })}
       {inYard &&
         graveyardWays(s, o, HUMAN).flatMap((g) => {
           // Muldrotha: an artifact creature can use the artifact or the creature permission, the player's choice (rulings).
@@ -4734,7 +4742,8 @@ function AbilityMenu({
       {abilitiesOf(s, o).activated.map((ab, i) => {
         // From your hand, only cycling and the like; from your graveyard, unearth; on the battlefield, everything else.
         // Commander ninjutsu works from the command zone too (CR 702.49d).
-        if ((ab.zone ?? "battlefield") !== o.zone && !(ab.orCommand && o.zone === "command")) return null;
+        // Mister Immortal's works from exile too.
+        if ((ab.zone ?? "battlefield") !== o.zone && !(ab.orCommand && o.zone === "command") && !(ab.orExile && o.zone === "exile")) return null;
         const problem = abilityProblem(s, HUMAN, objectId, i);
         const ok = !problem || (/not enough mana/.test(problem) && planActivate(s, HUMAN, objectId, i) !== null);
         // A mana ability with a choice of mana (CR 605.1a): a button for each, like a land's.
@@ -5135,7 +5144,7 @@ function Controls({
       </div>
     );
   if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "bid" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy" || pending.what === "payLifeRound") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "chosenObject" || pending.what === "anchor" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "unlessWay" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "addOrRemoveCounter" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser" || pending.what === "direction" || pending.what === "skipChoice" || pending.what === "payLifeOrDestroy" || ((pending.what === "textFrom" || pending.what === "textTo" || pending.what === "typeOrder") && pending.options.length <= 10)) && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "faceUpForm" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "chosenObject" || pending.what === "anchor" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "unlessWay" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "addOrRemoveCounter" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser" || pending.what === "direction" || pending.what === "skipChoice" || pending.what === "payLifeOrDestroy" || ((pending.what === "textFrom" || pending.what === "textTo" || pending.what === "typeOrder") && pending.options.length <= 10)) && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

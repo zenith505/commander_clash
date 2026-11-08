@@ -576,7 +576,8 @@ export function activatedAsMana(ab: ActivatedAbility): ManaAbility | null {
   const top = ab.body.effects;
   const adds = allEffects(top).filter((e) => e.type === "addMana");
   const e = adds.length === 1 && top.includes(adds[0]!) ? adds[0]! : undefined;
-  if (e?.type !== "addMana") return null;
+  // Valleymaker: mana that goes to a player chosen as it resolves isn't its controller's to count on.
+  if (e?.type !== "addMana" || e.who) return null;
   let produces: ManaAbility["produces"];
   if (e.mana && e.times === undefined) produces = { kind: "fixed", mana: [...e.mana.matchAll(/\{([WUBRGC])\}/g)].map((x) => x[1] as ManaType) };
   else if (!e.mana && e.chosen && top.some((c) => c.type === "choose" && c.choice === "color")) produces = { kind: "oneOf", options: [...COLORS], amount: e.chosen };

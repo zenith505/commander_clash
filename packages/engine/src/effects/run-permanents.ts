@@ -1,6 +1,6 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
 import { abilitiesOf, realDefOf, enchantOf, basePowerNow, cardIdOf, defOf, roomOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { turnFaceUpByEffect, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
+import { turnFaceUpByEffect, faceUpFormsOf, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
 import { nextRandom } from "../rng";
 import { characteristics, controllerOf, enchantableBy, invalidateCharacteristics } from "../layers";
 import { countersRemoved, countersStay, putPlayerCounters, putCounters, removableCounters, tokenBatch, withModular, withPutter } from "../counters";
@@ -313,7 +313,18 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "turnFaceDown":
       for (const o of objects(s, e.what, ctx)) turnFaceDown(s, o, e.as, src);
       return;
-    case "turnFaceUp":
+    case "turnFaceUp": {
+      // Aquamorph Entity: what it becomes, chosen by its controller as it's turned face up (CR 614.1e), asked before
+      // any of them is turned face up (nothing happens in between).
+      const forms = e.revealOnly ? undefined : (s.resolving?.scratch?.faceUpForms ?? {});
+      if (forms && s.resolving)
+        for (const o of objects(s, e.what, ctx)) {
+          const options = o.zone === "battlefield" && !characteristics(s, o).cantTurnFaceUp && !(e.ifCreatureCard && !isType(realDefOf(s, o), "Creature")) ? faceUpFormsOf(s, o) : undefined;
+          if (!options || forms[o.id] !== undefined) continue;
+          const name = defOf(s, { ...o, faceDown: undefined }).name;
+          s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: name, what: "faceUpForm", about: o.id, options: options.map((_, i) => String(i)), labels: options.map((f) => f.text), prompt: `choose what ${name} becomes as it's turned face up` };
+          return "paused";
+        }
       for (const o of objects(s, e.what, ctx)) {
         // Hauntwoods Shrieker: reveal it (CR 701.20a), then turn it face up only if the card is a creature card as printed
         // (rulings: effects on the permanent don't count; a double-faced card's front face).
@@ -322,9 +333,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           continue;
         }
         if (e.ifCreatureCard && !isType(realDefOf(s, o), "Creature")) continue;
-        turnFaceUpByEffect(s, o, src, ctx.controller);
+        turnFaceUpByEffect(s, o, src, ctx.controller, forms?.[o.id]);
       }
       return;
+    }
     case "tap":
     case "untap": {
       let tapped = 0;

@@ -1,6 +1,6 @@
 # Roadmap
 
-30,565 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,574 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,724 of
 9,979 (97%).
 
@@ -6876,7 +6876,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   to an opponent, you may pay {2}. If you do, return this card from your graveyard to your hand": watched from its owner's
   graveyard, CR 113.6m). Dodgy Jalopy (scavenge with a "*" power: its power in the graveyard by its characteristic-defining
   ability, CR 604.3, fixed as the cost exiles it, rulings). Bots use these through the existing paths (graveyard abilities
-  in the declare attackers step, emerge, scavenge). +9 (30,566 of 31,936 with B148 and B149).
+  in the declare attackers step, emerge, scavenge). +9 (30,574 of 31,936 with B148, B149 and round 309).
 - Out after round B150 (looked at, not done): Boneyard Mycodrax (its scavenge compiles now; its "other creature cards in
   your graveyard" power doesn't yet), the never-examined names still left (Ring of Ma'rûf and the other wishes, Seafarer's
   Quay and the other banding grants, Cyclopean Tomb, False Orders, Mirror-Shield Hoplite, Chorus of the Conclave, Temporal

@@ -212,6 +212,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     ctx.parley = true;
     return [{ type: "parleyReveal" }];
   }
+  // Dakra Mystic: "You may put the revealed cards into their owners' graveyards", decided once all are revealed (rulings),
+  // after a parley reveal.
+  if (/^(?:[Yy]ou may p|P|p)ut the revealed cards into their owners' graveyards$/.test(s) && ctx.parley) return /^[Yy]ou may/.test(s) ? [{ type: "may", effects: [{ type: "parleyToGraveyards" }], text: "put the revealed cards into their owners' graveyards" }] : [{ type: "parleyToGraveyards" }];
   // Naya Soulbeast: "~ enters with X +1/+1 counters on it, where X is the total mana value of all cards revealed this way" in
   // its own cast trigger: the spell enters with them if it resolves (CR 614.1c; rulings: known once the trigger resolves).
   // (The "where X is" amount is put in for X afterwards.)

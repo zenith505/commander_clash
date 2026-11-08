@@ -1,7 +1,7 @@
 # Roadmap
 
-30,395 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,665 of
+30,406 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,669 of
 9,979 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2363,6 +2363,34 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands.
+   Round 301 took cards back off the "Out after round N" lists, most played first: "the next spell you cast this turn"
+   permissions. An alternative cost (CR 118.9) offered only to that spell and used up by it whichever cost is paid
+   (rulings on Marshland Bloodcaster): "The next red or green creature spell you cast this turn can be cast without paying
+   its mana cost" (World War Hulk's chapter I, with "Until end of turn, double its power and toughness and it gains
+   trample" for its chapter III target) and "Rather than pay the mana cost of the next spell you cast this turn, you may pay
+   life equal to that spell's mana value" (Marshland Bloodcaster, X at 0, CR 107.3b), both in the card's menu (browser
+   tests; the bot takes the free one, and the life one while it keeps 15 life); "can be cast as though it had flash. That
+   spell can't be countered. That creature enters with an additional +1/+1 counter on it" all for the same next creature
+   spell, at normal timing too, two of them adding two counters (Savage Summoning, rulings); "Whenever you scry, the next
+   instant or sorcery spell you cast this turn costs {X} less", X the cards looked at (Elminster). And more: "Each creature
+   you control that you've put one or more +1/+1 counters on this turn has hexproof" (Kid Loki: counters you put, CR
+   122.6); "Whenever one or more noncreature permanents are returned to hand ... only once each turn" (Tameshi, Reality
+   Architect: from the battlefield only, rulings); "you may have this creature's base power and toughness become equal to
+   that creature's power and toughness until end of turn" (Eldrazi Mimic, layer 7b, rulings); "Target creature you control
+   and up to one other target legendary creature you control each deal damage equal to their power to target creature you
+   don't control" (Friendly Rivalry, rulings); "You may put the revealed cards into their owners' graveyards. If you don't,
+   each player draws a card" after a parley reveal (Dakra Mystic: not a mill, CR 701.13a); "Put the bottom card of your
+   library into your graveyard. If it's a creature card with power less than or equal to ~'s power, put it onto the
+   battlefield" (Grenzo, Dungeon Warden: from exile too if a replacement put it there, and its last known power, rulings);
+   "a Treasure token for each creature you controlled that dealt combat damage to a player this turn" (Excess: controlled as
+   it dealt it, rulings). +11, 30,406 of 31,936 with B138.
+   Out after round 301 (looked at, not done): Ride the Avalanche ("When you next cast a spell this turn, put X +1/+1
+   counters on up to one target creature, where X is the mana value of that spell": a delayed trigger with a target and
+   that spell's mana value); Panoptic Projektor (a cost cut for the next face-down creature spell: face-down costs aren't
+   reduced by "next spell" effects yet); Read the Runes (the sacrifices chosen first, then the discards for the rest, in
+   one step: rulings); Draco (an upkeep "unless you pay {10}" cut by {2} for each basic land type: a punisher cost with
+   its own reduction); Azra Oddsmaker, Spectral Searchlight, Leonin Arbiter, Incinerator of the Guilty, Baba Lysaga,
+   Archelos and Hatchery Sliver (still out, for the reasons in their earlier notes).
    Round 300 took cards back off the "Out after round N" lists, most played first: an {X} in an alternative cost (CR
    107.3a), announced as the card is cast that way: "Warp {X}{G}" (Broodguard Elite) and "Surge {X}{R}" (Fall of the
    Titans), an {X} the mana cost has too; "Foretell {X}{X}{W}" with "If this spell was foretold, create X of those tokens

@@ -6245,6 +6245,15 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   }
   // As Foretold, Rooftop Storm: {0}, while one of `pid`'s permanents lets them (castProblem checks it's for this spell).
   if (alt === "payZero") return s && pid !== undefined && s.battlefield.some((id) => (controllerOf(s, obj(s, id)) === pid || compileCard(defOf(s, obj(s, id))).payZero?.eachPlayerFirst || compileCard(defOf(s, obj(s, id))).payZero?.anyPlayer) && compileCard(defOf(s, obj(s, id))).payZero && characteristics(s, obj(s, id)).hasPrintedAbilities) ? { kind: "payZero", mana: "{0}" } : undefined;
+  // World War Hulk: "The next red or green creature spell you cast this turn can be cast without paying its mana cost";
+  // Marshland Bloodcaster: "Rather than pay the mana cost of the next spell you cast this turn, you may pay life equal to
+  // that spell's mana value", X at 0 (rulings, CR 107.3b). An alternative cost (CR 118.9) for that spell only.
+  if (alt === "nextFree" || alt === "nextLife") {
+    if (!s || pid === undefined || !nextCastAlt(s, pid, d, alt === "nextFree" ? "free" : "life")) return undefined;
+    if (alt === "nextFree") return { kind: "nextFree", mana: "", text: "without paying its mana cost" };
+    const n = manaValue(parseManaCost(d.manaCost));
+    return { kind: "nextLife", mana: "", costs: [{ kind: "payLife", n }], text: `pay ${n} life` };
+  }
   // Demon of Fate's Design: life equal to the spell's mana value, X at 0 (rulings); castProblem checks it covers this spell.
   if (alt === "lifeForMv") {
     if (!s || pid === undefined || !s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && compileCard(defOf(s, obj(s, id))).payZero?.life && characteristics(s, obj(s, id)).hasPrintedAbilities)) return undefined;
@@ -6461,6 +6470,9 @@ export const payZeroFlash = (s: GameState, pid: PlayerId, o: GameObject, life: f
   return ok.some((p) => compileCard(defOf(s, p)).payZero!.energy === least && compileCard(defOf(s, p)).payZero!.flash);
 };
 
+/** A "next spell you cast this turn" alternative cost waiting for `pid`'s spell `d` (World War Hulk, Marshland Bloodcaster). */
+const nextCastAlt = (s: GameState, pid: PlayerId, d: CardDef, kind: "free" | "life") => !!s.nextCast?.some((r) => r.alt === kind && r.controller === pid && r.turn === s.turn && printedMatches(r.filter, d));
+
 /** The alternative costs `pid` could cast this card for: its own, Fist of Suns' and Conspiracy Unraveler's (CR 118.9). */
 export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNullable<CompiledCard["altCosts"]> {
   const own = compileCard(defOf(s, o)).altCosts ?? [];
@@ -6471,7 +6483,7 @@ export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNull
   const sling = grantedWebSlinging(s, pid, defOf(s, o));
   const blitz = grantedBlitz(s, pid, defOf(s, o));
   const emerge = grantedEmerge(s, pid, defOf(s, o));
-  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
+  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(["evidence" as const, "nextFree" as const, "nextLife" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -6763,6 +6775,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   if (choices.alt === "energyForSpell") log(s, `${p.name} pays energy rather than ${d.name}'s mana cost (${characteristics(s, payZeroSource(s, p.id, o, "energy")!).name}).`);
   if (choices.alt === "genericMv") log(s, `${p.name} pays generic mana rather than ${d.name}'s mana cost (${characteristics(s, payZeroSource(s, p.id, o, "generic")!).name}).`);
+  if (choices.alt === "nextFree") log(s, `${p.name} casts ${d.name} without paying its mana cost (the next such spell this turn).`);
+  if (choices.alt === "nextLife") log(s, `${p.name} pays life rather than ${d.name}'s mana cost (the next spell this turn).`);
   if (choices.alt === "lifeForMv") {
     const by = payZeroSource(s, p.id, o, true)!;
     ((s.turnLog ??= {}).payZeroUsed ??= []).push(`${by.id}@${by.zoneChanges ?? 0}`);
@@ -6840,7 +6854,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
     (choices.prototyped && choices.alt !== "prototype" ? " prototyped" : "") +
-    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "lifeForMv" ? " for life" : choices.alt === "genericMv" ? " for generic mana" : choices.alt === "energyForSpell" ? " for energy" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt.replace(/^granted(.)/, (_, c: string) => c.toLowerCase())} cost` : "") +
+    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "lifeForMv" || choices.alt === "nextLife" ? " for life" : choices.alt === "nextFree" ? " without paying its mana cost" : choices.alt === "genericMv" ? " for generic mana" : choices.alt === "energyForSpell" ? " for energy" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt.replace(/^granted(.)/, (_, c: string) => c.toLowerCase())} cost` : "") +
     (madness && o.castAlt === "madness" ? " for its madness cost" : madness && o.castAlt === "miracle" ? " for its miracle cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (choices.splice?.length ? `, splicing ${choices.splice.map((c) => nameOf(s, c)).join(" and ")} onto it` : "") +

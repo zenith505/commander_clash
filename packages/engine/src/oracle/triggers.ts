@@ -3418,7 +3418,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, ").replace(/^Whenever one or more (\+1\/\+1 )?counters are put on one or more ([A-Z][a-z]+)s you control, /, (x, k: string | undefined, type: string) => (CREATURE_TYPES.has(type) ? `Whenever one or more ${k ?? ""}counters are put on ${/^[AEIOU]/.test(type) ? "an" : "a"} ${type} you control, ` : x)).replace(/^Whenever you put a (\+1\/\+1 )?counter on (a creature you control|another creature you control|another creature|a creature), /, "Whenever you put one or more $1counters on $2, ").replace(/^Whenever you tap one or more untapped creatures your opponents control, /, "Whenever you tap an untapped creature an opponent controls, ")
       // Molten Lavamancer: "Whenever a source you control deals noncombat damage to one or more of your opponents during
       // your turn, ...": once for each source and opponent, only the first each turn doing anything: the same.
-      .replace(/^Whenever a source you control deals noncombat damage to one or more of your opponents( during your turn)?, /, "Whenever a source you control deals noncombat damage to an opponent$1, "));
+      .replace(/^Whenever a source you control deals noncombat damage to one or more of your opponents( during your turn)?, /, "Whenever a source you control deals noncombat damage to an opponent$1, ")
+      // Tameshi, Reality Architect: "Whenever one or more noncreature permanents are returned to hand": anyone's, from the
+      // battlefield to its owner's hand (CR 404.2; rulings: not cards from other zones), the first each turn: the same.
+      .replace(/^Whenever one or more (noncreature |nonland )?permanents are returned to hand, /, "Whenever a $1permanent is returned to its owner's hand, "));
     return t && t !== "fail" && !t.oncePerTurn && t.event !== "state" ? { ...t, oncePerTurn: true } : "fail";
   }
   // Acrobatic Cheerleader: "This ability triggers only once.": never again for this object, even if it's countered

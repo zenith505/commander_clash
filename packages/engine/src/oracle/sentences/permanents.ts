@@ -205,7 +205,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Double ~'s power until end of turn" (Tifa Lockhart), "double target creature's power and toughness": the same, for
   // one creature. "Triple target creature's power and toughness" (Tifa's Limit Break): +X/+Y, twice each (CR 701.11b-c).
   // Junk Jet: "Double equipped creature's power until end of turn": the creature it's attached to as this resolves.
-  if ((m = /^([Dd]ouble|[Tt]riple) (~'s|target creature's|that creature's|its|equipped creature's|enchanted creature's) (power|toughness|power and toughness) until end of turn$/.exec(s))) {
+  if ((m = /^([Dd]ouble|[Tt]riple) (~'s|target creature's|target creature you control's|that creature's|its|equipped creature's|enchanted creature's) (power|toughness|power and toughness) until end of turn$/.exec(s))) {
     const what = parseObject(m[2] === "its" ? "it" : m[2]!.slice(0, -2), ctx);
     if (!what || isGroup(what)) return null;
     return [{ type: "doublePT", what, power: m[3] !== "toughness", toughness: m[3] !== "power", ...(/^t/i.test(m[1]!) ? { triple: true as const } : {}) }];

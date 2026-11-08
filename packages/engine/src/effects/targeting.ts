@@ -705,6 +705,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (spec.kind === "any") return (!spec.opponent || t.id !== controller) && (!spec.dealtDamageThisTurn || !!s.damagedThisTurn?.includes(t.id));
     if (spec.kind !== "player") return false;
     if (spec.notEventPlayer || t.id === spec.notPlayer) return false;
+    if (spec.outnumbers && !outnumbersOk(s, spec.outnumbers, t.id)) return false;
     return !spec.opponent || t.id !== controller;
   }
   if (t.kind === "stack") {
@@ -1038,6 +1039,24 @@ export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: Targe
   if (spec.notSourceHost && t.kind === "object" && sourceId && t.id === s.objects[sourceId]?.attachedTo) return false;
   if (!lesserPowerOk(s, spec, t, sourceId)) return false;
   return !(spec.distinctFrom ?? []).some((j) => sameTarget(chosen[j], t)) && relatedOk(s, spec, chosen, t) && totalOk(s, specs, chosen, i, t);
+}
+
+/**
+ * "Target player who controls more creatures than they do and is their opponent" (Oath of Druids, TargetSpec.outnumbers):
+ * an opponent of the trigger's player with more of `stat` than they have (fewer, with `fewer`), now; checked as it's chosen
+ * and again as it resolves (CR 608.2b, rulings).
+ */
+function outnumbersOk(s: GameState, c: NonNullable<TargetSpec["outnumbers"]>, them: PlayerId): boolean {
+  if (c.than === "eventPlayer" || them === c.than || !opponents(s, c.than).includes(them)) return false;
+  const stat = (pid: PlayerId) => {
+    const p = s.players[pid]!;
+    if (c.stat === "life") return p.life;
+    if (c.stat === "hand") return p.hand.length;
+    if (c.stat === "creatureCardsInGraveyard") return p.graveyard.filter((id) => isType(defOf(s, obj(s, id)), "Creature")).length;
+    const type = c.stat === "lands" ? "Land" : "Creature";
+    return s.battlefield.filter((id) => objIsType(s, obj(s, id), type) && controllerOf(s, obj(s, id)) === pid).length;
+  };
+  return c.fewer ? stat(them) < stat(c.than) : stat(them) > stat(c.than);
 }
 
 /** "Target opponent who has more life than you do as you activate this ability" (TargetSpec.comparedToYou), as it's chosen. */

@@ -1141,6 +1141,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // one of the four, chosen as it resolves (CR 608.2d); the keyword with no duration lasts indefinitely (rulings).
   const counterOrGains = /^Put a \+1\/\+1 counter on (target [^.]+?) or that creature gains ((?:[a-z]+(?: [a-z]+)?, )+)or ([a-z]+(?: [a-z]+)?)\.$/.exec(text.trim());
   if (counterOrGains) return counterOrKeyword(counterOrGains, text.trim(), opts);
+  // Flaming Gambit: "That player or that planeswalker's controller may choose a creature they control and have ~ deal that
+  // damage to it instead" (redirectableDamage).
+  if (opts.spell && /^~ deals X damage to target player or planeswalker\. That player or that planeswalker's controller may choose a creature they control and have ~ deal that damage to it instead\.$/.test(text.trim())) return redirectableDamage(text.trim(), opts);
   // Shrouded Lore, Forgotten Lore: an opponent chooses again each time you pay (Effect loreChoices).
   const lore = opts.spell ? /^Target opponent chooses a card in your graveyard\. You may pay (\{[WUBRG]\})\. If you do, repeat this process except that opponent can't choose a card already chosen for ~\. Then put the last chosen card into your hand\.$/.exec(text.trim()) : null;
   if (lore) {
@@ -18141,6 +18144,25 @@ function counterOrKeyword(m: RegExpExecArray, text: string, opts: Parameters<typ
  * instructions ("You put ...", "You draw ..."), "that player" in it read as a trigger's player and then made the opponent
  * who chose the mode (PlayerRef "modeChooser", TargetSpec controller "modeChooser"). Or null.
  */
+/**
+ * Flaming Gambit: "~ deals X damage to target player or planeswalker. That player or that planeswalker's controller may
+ * choose a creature they control and have ~ deal that damage to it instead.": as it resolves, that player chooses one of
+ * their creatures or none (CR 608.2d; it isn't targeted), then the damage goes to that creature, or else to the target.
+ */
+function redirectableDamage(text: string, opts: Parameters<typeof parseBody>[1]): AbilityBody | null {
+  const base = parseBody("~ deals X damage to target player or planeswalker.", opts);
+  const hit = base?.effects.length === 1 && base.targets.length === 1 ? base.effects[0]! : undefined;
+  if (hit?.type !== "damage") return null;
+  return {
+    targets: base!.targets,
+    effects: [
+      { type: "pick", who: { ref: "targetOrController", index: 0 }, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "choose", upTo: true, prompt: "choose a creature you control for ~ to deal its damage to instead, or none" },
+      { type: "if", cond: { kind: "createdNone" }, effects: [hit], otherwise: [{ ...hit, to: { ref: "created" } }] },
+    ],
+    text,
+  };
+}
+
 function opponentChosenModes(text: string, opts: Parameters<typeof parseBody>[1]): AbilityBody | null {
   const m = /^An opponent chooses one —\s*((?:•[^•]+)+)$/.exec(text);
   if (!m) return null;

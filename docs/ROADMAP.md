@@ -1,6 +1,6 @@
 # Roadmap
 
-30,468 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,475 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,692 of
 9,979 (97%).
 
@@ -245,7 +245,7 @@ line blocks.
    leaving out the one that entered), Oketra's Last Mercy and Long Rest ("lands you control don't untap during your
    next untap step", lands that enter later too), Trench Behemoth and Sizzling Soloist ("attacks during its
    controller's next combat phase if able"), Brotherhood Outcast (an Aura card returned to the battlefield), Fury Charm
-   (time counters on a suspended card), Exterminate! (done in round 304) (replicate by tapping a Dalek), Flaming Gambit (the player
+   (time counters on a suspended card), Exterminate! (done in round 304) (replicate by tapping a Dalek), Flaming Gambit (done in round B143) (the player
    redirects the damage to a creature), Drach'Nyen ("the exiled card's power"), Kalamax ("whenever you copy an instant
    spell"), Extinction Event (odd or even), Fateful Handoff (done in round 276),
    Reprocess (sacrifice any number of three kinds), Wave of Rats ("if it dealt combat damage to a player this turn"),
@@ -323,7 +323,7 @@ line blocks.
    Unites the Elves, Exquisite Archangel, Kellan, Planar
    Trailblazer, Najal, Rescue from the Underworld, Seal of the Guildpact (done in round 299), Fear of Infinity, Elderscale Wurm, Cradle of
    Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order,
-   Scheming Fence, Oath of Lieges, Helm of Obedience, Concerted Effort, Belbe's Portal, Edgewall Innkeeper, Simic
+   Scheming Fence, Oath of Lieges (done in round B143), Helm of Obedience, Concerted Effort, Belbe's Portal, Edgewall Innkeeper, Simic
    Manipulator, Endless Whispers, Burn from Within, Skyfire Phoenix (done in round 276), Contagion, Gutter Grime, Coffin Queen, Genesis
    Storm, Grim Return, Infernal Offering, Varolz, Undercellar Sweep, Wave of Vitriol, Martyrdom, Soul-Scar Mage,
    Remembrance, Spy Network, Dimir Doppelganger, Jailbreak, Inverter of Truth, Immovable Rod, Hypergenesis, Soul
@@ -2728,7 +2728,7 @@ line blocks.
    a static text change); The Animus, King Narfi's Betrayal, Wizard's Spellbook and the rest of the most played
    remaining names, as listed in earlier rounds' notes (copies of cards in exile, casting from among exiled cards).
    Out after round 280 (looked at, not done): Wild Evocation (a random card from hand cast "if able" as the trigger
-   resolves); Oath of Druids (a target chosen by the upkeep player among opponents with more creatures, then reveal until
+   resolves); Oath of Druids (done in round B143) (a target chosen by the upkeep player among opponents with more creatures, then reveal until
    a creature); Fraying Line (rope counters each upkeep, or everything without one is exiled); Whims of the Fates (three
    piles of permanents and one chosen at random); Glimpse of Tomorrow (non-Aura permanents first, then Auras attached as
    they enter); Abstract Performance (a face-down pile exiled from the library, then a free cast from the other pile);
@@ -5110,7 +5110,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Mancha, Encumbered Reejerey (done in round B112) ("while" trigger conditions), Entrails Feaster (done in round B112), Ichorid (done in round B116), Nether Shadow (done in round B116), Cursed Rack (done in round B104),
   Celestial Kirin (done in round B116), Skyfire Kirin (done in round B116), Lumaret's Favor (done in round B117), Definitely Not a Turtle (done in round B116), Advice from the Fae (done in round B116), Petals of Insight (done in round B116),
   Rowdy Crew (done in round B116), Thijarian Witness (done in round B131), Riptide Replicator (supported already), Teferi's Response (done in round B116), Dawn Evangel (done in round B116), Earthbind, plus the multi-line
-  or new-mechanic cards in the same range (Oath of Scholars, Oath of Ghouls, Soul of Shandalar, Kenku Artificer, Harsh
+  or new-mechanic cards in the same range (Oath of Scholars (done in round B143), Oath of Ghouls (done in round B143), Soul of Shandalar, Kenku Artificer, Harsh
   Justice, Bill Potts and others).
 - Round B53 (cards no earlier round wrote down, least played first, EDHREC rank about 22,000 to 19,700):
   "If this spell was kicked, you gain life equal to that card's mana value. Otherwise, you lose that much life"
@@ -6621,6 +6621,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   bots choose the card worth least to you and pay while they can). Browser tests for choosing who chooses, your targets
   after their mode, a bot's spell asking you for the mode and "draw up to three", Soul Ransom's ability on Ana's Aura
   and Shrouded Lore's Pay. +7 (30,458 of 31,936 with B141 and round 303).
+- Round B143 (least played first, from the skip lists): the Oaths (Oath of Druids, Oath of Lieges, Oath of Mages, Oath
+  of Scholars, Oath of Ghouls): "At the beginning of each player's upkeep, that player chooses target player who controls
+  more creatures than they do and is their opponent" (more lands, more life, more cards in hand; Ghouls: fewer creature
+  cards in their graveyard). The upkeep's player chooses the target for the Oath's controller (TargetSpec.chosenBy, so
+  hexproof counts against the controller), an opponent of theirs that outnumbers them (TargetSpec.outnumbers): with none
+  the trigger is removed (CR 603.3d), and it doesn't resolve if that's no longer true (CR 608.2b, rulings). Then "the
+  first player may ..." as the one doing it: Druids' reveal until a creature card (onto the battlefield under their
+  control, the rest into their graveyard), Lieges' basic land onto the battlefield under their control (rulings), Mages'
+  1 damage from the Oath to the target, Scholars' "discard their hand and draw three cards", Ghouls' creature card back to
+  hand. Bots take what the Oath offers, but keep a hand of three or more (Scholars) and don't reveal with no creature card
+  left in the library (Druids). Retriever Phoenix: "As long as ~ is in your graveyard, if you would learn, you may instead
+  return ~ to the battlefield" (CR 614.1a), asked before the learn's discard, only while it's in the learner's graveyard
+  as they're told to learn (rulings; it comes back with its own learn trigger still on the stack if it died with it
+  there); bots always take it back. Flaming Gambit: the target player (or the target planeswalker's controller) chooses
+  one of their creatures or none as it resolves (not targeted, so hexproof doesn't matter), and the X damage goes there
+  instead; bots move it to a creature that survives it, or to their least valuable one when it would kill them. Browser
+  tests for the Oath's target and question on your upkeep, the Phoenix's question and Flaming Gambit's creature choice.
+  +7 (30,475 of 31,936 with B142 and rounds 303-304).
+- Out after round B143 (looked at, not done): Preferred Selection (the two cards looked at should be shown with the
+  "sacrifice ~ and pay {2}{G}{G}" question, a look with no prompt yet, and that sacrifice-and-pay "you may" isn't parsed).
 - Out after round B142 (looked at, not done): Decaying Soil (a dies trigger granted by threshold needs a look-back,
   CR 603.10a), Nivmagus Elemental (a cost that exiles a spell from the stack), Benthic Explorers (untapping an
   opponent's land as a mana ability's cost), Charmed Pendant (mana by the milled card's mana symbols, instant-speed
@@ -6645,7 +6665,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Torrent of Stone's Mountains onto an Arcane spell that also sacrifices a creature) isn't offered or is refused as it's
   cast, though the rules allow paying both.
 - Out after round B133 (looked at, not done): Tamanoa (noncreature sources' damage as one event), Graceful Takedown,
-  Imperiosaur (mana spent only from basic lands), Flaming Gambit (the target player redirects the damage to a creature),
+  Imperiosaur (mana spent only from basic lands), Flaming Gambit (done in round B143) (the target player redirects the damage to a creature),
   Magus of the Arena (done in round B141) and Evangelize (done in round B141) (a target chosen by an opponent).
 - Out after round B132 (looked at, not done): Bullseye and Death Dealer (still an activation cost with "or" between two
   costs), Misfortune (done in round B142), Fatal Lore (done in round B142) and Library of Lat-Nam (done in round B142) (still a mode chosen by an opponent as it's cast, CR 700.2e).
@@ -6861,7 +6881,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   end of turn), Sharkey, Tyrant of the Shire, Woodcaller Automaton, Dancing Sword, Elemental Resonance, Bat Colony.
 - Out after round B86 (looked at, not done): Goblin Maskmaker (cost reduction for face-down spells), Bortuk
   Bonerattle (a destination chosen by mana value against domain), Nick Fury (put onto the battlefield tapped and
-  attacking from the hand), Oath of Mages (a target chosen by another player), Glyph of Life (done in round B130), Mob Mentality,
+  attacking from the hand), Oath of Mages (done in round B143) (a target chosen by another player), Glyph of Life (done in round B130), Mob Mentality,
   Breaking // Entering, Darigaaz, Grime Gorger, Naya Soulbeast.
 - Out after round B85 (looked at, not done): Grave Consequences (done in round B135) (each player exiles any number from their own
   graveyard, then a count per player), Magus of the Arena (done in round B141) (a target chosen by an opponent), Paragon of Modernity
@@ -7121,7 +7141,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - "Becomes tapped": "another ... becomes tapped", "during your turn", "for the first time each turn", "while it has a
   -1/-1 counter", granted ("Elves you control have \"Whenever this creature becomes tapped ...\""); filters with
   colors in only some alternatives (Royal Decree's "a Swamp, Mountain, black permanent, or red permanent", done in round B111).
-- Learn: nobody has a sideboard, so it's always "you may discard a card; if you do, draw a card". Retriever Phoenix.
+- Learn: nobody has a sideboard, so it's always "you may discard a card; if you do, draw a card". Retriever Phoenix (done in round B143).
 - "Mana a land could produce" for Gates (Gond Gate, Plaza of Harmony), "basic land" (Star Compass), "that land"
   (Benthic Explorers), Incubation Druid's "three mana of that type instead".
 - "Multicolored creatures you control have ..." and other statics on multicolored or colorless permanents (Maze

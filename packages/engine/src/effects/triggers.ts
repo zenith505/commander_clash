@@ -2948,7 +2948,7 @@ function triggerBodyAsIs(s: GameState, t: PendingTrigger): AbilityBody {
   const who = t.event?.player;
   // Colfenor: "other target creature card": not the card that died (TargetSpec.notSubject).
   if (t.subject && body.targets.some((x) => x.notSubject)) return { ...body, targets: body.targets.map((x) => (x.notSubject ? { ...x, notId: t.subject!.id } : x)) };
-  const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || x.attackingWhom === "eventPlayer" || !!x.notEventPlayer || !!x.sameNameAsCause || !!x.anyOf?.some(isEvent);
+  const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || x.attackingWhom === "eventPlayer" || !!x.notEventPlayer || x.outnumbers?.than === "eventPlayer" || !!x.sameNameAsCause || !!x.anyOf?.some(isEvent);
   if (!body.targets.some(isEvent) && !body.modal?.modes.some((m) => m.targets?.some(isEvent))) return body;
   const fix = (x0: TargetSpec): TargetSpec => {
     const x = x0.anyOf ? { ...x0, anyOf: x0.anyOf.map(fix) } : x0;
@@ -2964,6 +2964,8 @@ function triggerBodyAsIs(s: GameState, t: PendingTrigger): AbilityBody {
       return { ...rest, notPlayer: who };
     }
     if (x.attackingWhom === "eventPlayer" && who !== undefined) return fix({ ...x, attackingWhom: who });
+    // Oath of Druids: "who controls more creatures than they do and is their opponent": the upkeep's player.
+    if (x.outnumbers?.than === "eventPlayer" && who !== undefined) return fix({ ...x, outnumbers: { ...x.outnumbers, than: who } });
     if (x.protector === "eventPlayer" && who !== undefined) {
       const { protector: _, ...rest } = x;
       return fix({ ...rest, protectedBy: who });

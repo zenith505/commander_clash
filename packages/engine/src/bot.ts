@@ -675,6 +675,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "pickPermanents" && pend.action === "enlist") return [{ type: "pickPermanents", player: pid, ids: chooseEnlist(s, pid, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "unblocked") return [{ type: "pickPermanents", player: pid, ids: chooseUnblocked(s, pid, pend.options) }];
+    // Cunning Giant: its combat damage to the most valuable creature it kills, unless it would finish the player it's attacking.
+    if (pend.kind === "pickPermanents" && pend.action === "damageCreature") {
+      const c = s.creatureDamageChoice;
+      const at = c?.current ? s.objects[c.current] : undefined;
+      const n = at ? combatDamageOf(s, at) : 0;
+      const finishes = !!at && at.attacking !== undefined && !at.attackingPermanent && player(s, at.attacking).life <= n;
+      const kills = pend.options.map((id) => obj(s, id)).filter((x) => !objHasKeyword(s, x, "Indestructible") && (objHasKeyword(s, at!, "Deathtouch") || toughness(s, x) - (x.damage ?? 0) <= n));
+      const best = finishes ? undefined : kills.sort((a, b) => power(s, b) + toughness(s, b) - (power(s, a) + toughness(s, a)))[0];
+      return [{ type: "pickPermanents", player: pid, ids: best && power(s, best) + toughness(s, best) >= 4 ? [best.id] : [] }];
+    }
     // Indominus Rex: a card only for a keyword counter no card chosen so far gives (each counter draws a card back), the
     // cheapest first.
     if (pend.kind === "pickPermanents" && pend.action === "discard" && pend.objectId) {
@@ -4393,6 +4403,19 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   }
   // Obeka, Brute Chronologist: "the player whose turn it is may end the turn": bots don't end their own turn early.
   if (r && e?.type === "eachMay" && e.effects.some((x) => x.type === "endTurn")) return false;
+  // Farrel's Mantle, Gaze of Pain: our unblocked attacker deals its damage to the target creature instead of combat damage:
+  // only to an opponent's creature it kills, and not when the combat damage would finish the player it's attacking.
+  const instead = r && e?.type === "eachMay" && e.each && e.effects.some((x) => x.type === "noCombatDamage" && x.what.ref === "subject") ? e.effects.find((x) => x.type === "damage" && x.by === "subject") : undefined;
+  if (r && instead?.type === "damage") {
+    const t = r.item.targets?.[0];
+    const victim = t?.kind === "object" ? s.objects[t.id] : undefined;
+    const attacker = r.item.subject ? s.objects[r.item.subject.id] : undefined;
+    if (!victim || victim.zone !== "battlefield" || !attacker || attacker.zone !== "battlefield" || controllerOf(s, victim) === pid) return false;
+    const n = power(s, attacker) + (typeof instead.amount === "object" && "plus" in instead.amount ? Number(instead.amount.plus ?? 0) : 0);
+    const kills = !objHasKeyword(s, victim, "Indestructible") && (objHasKeyword(s, attacker, "Deathtouch") || toughness(s, victim) - (victim.damage ?? 0) <= n);
+    const finishes = attacker.attacking !== undefined && !attacker.attackingPermanent && player(s, attacker.attacking).life <= combatDamageOf(s, attacker);
+    return kills && !finishes;
+  }
   // The Oaths: what the first player may do is theirs (TargetSpec.outnumbers): Oath of Scholars' new hand only for a small
   // one, Oath of Druids' reveal only with a creature card left to find (else it mills the whole library); the rest always.
   if (r && e?.type === "eachMay" && e.each && r.body.targets[0]?.outnumbers) {
@@ -6995,6 +7018,15 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
       const d = !attackProblem(s, o, target) ? target : opps.find((x) => !attackProblem(s, o, x));
       if (d !== undefined) attacks.push({ attacker: o.id, defender: d });
     }
+  // Viashino Bey: with it attacking, all the others that can join it (CR 508.1d); Ekundu Cyclops joins any attack.
+  if (attacks.length) {
+    const bey = attacks.some((a) => abilitiesOf(s, obj(s, a.attacker)).allAttackIfSelfAttacks);
+    for (const o of potentialAttackers(s, pid)) {
+      if (attacks.some((a) => a.attacker === o.id) || walkerBound.some((a) => a.attacker === o.id) || !(bey || abilitiesOf(s, o).attacksIfOneAttacks)) continue;
+      const d = !attackProblem(s, o, target) ? target : opps.find((x) => !attackProblem(s, o, x));
+      if (d !== undefined) attacks.push({ attacker: o.id, defender: d });
+    }
+  }
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
   // Scarred Puma stays home without a black or green creature beside it (CR 508.1c).

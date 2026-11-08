@@ -6173,6 +6173,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4f94ce97-5b2d-42fb-ac8e-c64075fe1af2",
+  "name": "Cunning Giant",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Creature — Giant",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Giant"
+  ],
+  "oracleText": "If this creature is unblocked, you may have it assign its combat damage to a creature defending player controls.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "p02",
+  "releasedAt": "1998-06-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "981298e6-ddee-49c0-9377-f47f019b4138",
   "name": "Currency Converter",
   "manaCost": "{1}",
@@ -13068,6 +13098,36 @@
   "set": "dbl",
   "releasedAt": "2022-01-28",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1451b623-8214-4d81-9436-62dbe8b79539",
+  "name": "Hulking Goblin",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Creature — Goblin",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin"
+  ],
+  "oracleText": "This creature can't block.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "por",
+  "releasedAt": "1997-05-01",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

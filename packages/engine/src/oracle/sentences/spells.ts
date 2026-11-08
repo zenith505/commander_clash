@@ -1124,6 +1124,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const spec = parseTargetPhrase(m[1]!);
     return spec?.kind === "spell" ? [{ type: "newTargets", index: addTarget(ctx, { ...spec, text: `target ${m[1]!}` }), allOrNone: true }] : null;
   }
+  // Sideswipe: "You may change any targets of target Arcane spell" (CR 115.7c).
+  if ((m = /^You may change any targets of target (Arcane spell)$/.exec(s))) {
+    const spec = parseTargetPhrase(m[1]!);
+    return spec?.kind === "spell" ? [{ type: "newTargets", index: addTarget(ctx, { ...spec, text: `target ${m[1]!}` }), changeAny: true }] : null;
+  }
   // Deflecting Swat, Redirect: "You may choose new targets for target spell or ability" (CR 115.7d).
   if ((m = /^You may choose new targets for target (spell or ability|(?:instant or sorcery )?spell)$/i.exec(s))) {
     const spec = m[1] === "spell or ability" ? { ...stackSpec("spell or ability"), text: "target spell or ability" } : parseTargetPhrase(m[1]!);

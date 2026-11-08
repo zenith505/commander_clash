@@ -745,9 +745,14 @@ function champion(s: GameState, filter: TargetSpec, ctx: ResolveCtx, src: string
   const pick = s.objects[sc.chosen?.[pid]?.[0] ?? ""];
   if (pick?.zone === "battlefield") {
     log(s, `${player(s, pid).name} exiles ${defOf(s, pick).name} (${src}'s champion).`);
+    const was = characteristics(s, pick);
+    const wasTypes = { subtypes: [...was.subtypes], allTypes: !!was.allCreatureTypes };
     moveObject(s, pick.id, "exile");
     const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     if (me) me.championed = { id: pick.id, zc: pick.zoneChanges ?? 0, by: ctx.sourceZc ?? 0 };
+    // "When a Faerie is championed with ~" (Mistbind Clique): it's championed even if ~ has left (CR 702.72c), but then
+    // ~ isn't there to trigger.
+    if (me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc)) fireEvent(s, { type: "championed", id: me.id, card: pick.id, ...wasTypes });
     return;
   }
   const here = objects(s, { ref: "self" }, ctx)[0];

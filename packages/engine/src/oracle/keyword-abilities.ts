@@ -378,6 +378,15 @@ export function parseCostKeyword(
           body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, discardCost: true }], text: "Cumulative upkeep—discard a card: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you discard a card for each age counter on it." },
         },
       };
+    // Sheltering Ancient: "Cumulative upkeep—Put a +1/+1 counter on a creature an opponent controls": a creature an opponent
+    // controls for each age counter, the same one or different ones, any opponents', untargeted (rulings).
+    if (/^Cumulative upkeep—Put a \+1\/\+1 counter on a creature an opponent controls\.?$/.test(line))
+      return {
+        trigger: {
+          event: "yourUpkeep",
+          body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, oppCreatureCounter: "+1/+1" }], text: "Cumulative upkeep—put a +1/+1 counter on a creature an opponent controls: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you put a +1/+1 counter on a creature an opponent controls for each age counter on it." },
+        },
+      };
     // Wall of Shards: "Cumulative upkeep—An opponent gains 1 life": an opponent chosen for each age counter, the same one or
     // different ones (rulings), each able to gain life (CR 119.7), then all of it paid at once or none (CR 702.24a).
     if (/^Cumulative upkeep—An opponent gains 1 life\.?$/.test(line))

@@ -373,6 +373,10 @@ export function normalizeSelf(d: CardDef): string {
   // Stangg: "create Stangg Twin, a legendary 3/4 red and green Human Warrior creature token": the token's name, the card's
   // name and one more word.
   if (full) t = t.replace(new RegExp(`(\\b[Cc]reate )(${esc(full)} [A-Z][\\w'-]*)(?=, a legendary )`, "g"), (_, a: string, n: string) => `${a}\u0001${tokenNames.push(n) - 1}\u0001`);
+  // Icingdeath, Frost Tyrant: "create Icingdeath, Frost Tongue, a legendary white Equipment artifact token": the token's
+  // name, the card's short name (CR 201.5c) and other words after a comma, a name of its own (CR 111.4), not the card.
+  const commaName = full.split(",")[0]!;
+  if (full && commaName !== full) t = t.replace(new RegExp(`(\\b[Cc]reate )(${esc(commaName)}, [A-Z][\\w'-]*(?: [A-Z][\\w'-]*)*)(?=, a legendary )`, "g"), (m: string, a: string, n: string) => (n === full ? m : `${a}\u0001${tokenNames.push(n) - 1}\u0001`));
   // Kookus: "a creature named Keeper of Kookus" is another card's name with its name in it.
   const otherNames: string[] = [];
   if (full) t = t.replace(new RegExp(`(\\bnamed )((?:[A-Z][\\w'-]*|of|the)(?: (?:[A-Z][\\w'-]*|of|the))* ${esc(full)})(?![\\w'-])`, "g"), (_, a: string, n: string) => `${a}\u0002${otherNames.push(n) - 1}\u0002`);

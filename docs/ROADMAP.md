@@ -1,7 +1,7 @@
 # Roadmap
 
-30,587 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,732 of
+30,595 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,733 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -283,7 +283,7 @@ line blocks.
    Satoru, Catapult Fodder, From Father to Son, Besmirch, Sly Instigator, Strategic Betrayal, Wasitora, Millicent,
    Unnatural Moonrise, Rally the Ancestors, Ever After, Olivia, Mobilized for War, Kurbis, Vile Redeemer and others),
    taking the easy ones.
-   Out after round 180: Tom, Bert, and William and Fang, Roku's Companion (returning as another type), Spellweaver
+   Out after round 180: Tom, Bert, and William and Fang, Roku's Companion (both done in round 312) (returning as another type), Spellweaver
    Helix, Ian Malcolm, Chaotician, New Way Forward, Grenzo, Dungeon Warden, Trove Warden, The Nipton Lottery, Emergent
    Sequence, The Seventh Doctor, Lucy MacLean, Treacherous Greed ("a creature that dealt damage this
    turn"), Foggy Swamp Visions, Gate to the Afterlife (done in round B71), Galloping
@@ -566,7 +566,7 @@ line blocks.
    (Kozilek's Return, Ugin's Binding).
    Out after round 195 (looked at, not done): Tablet of the Guilds (done in round 296) (two colors chosen), Puca's Covenant (done in round 295), Call of the
    Death-Dweller ("put a deathtouch counter on either of them"), Myth Unbound (done in round 296) (a trigger in the command zone), Siona,
-   Captain of the Pyleas ("becomes attached"), Soul Diviner (a chosen counter kind), Icingdeath, Frost Tyrant (its token
+   Captain of the Pyleas ("becomes attached"), Soul Diviner (a chosen counter kind), Icingdeath, Frost Tyrant (done in round 312) (its token
    is named like part of it), Toggo, Goblin Weaponsmith (a quoted ability inside a quoted ability), Domineering Will,
    Immerwolf, Frenzied Saddlebrute (done in round 297).
    Round 196 went on from the top: "amass Orcs 5, mill five cards, then" (Sauron, Lord of the Rings), "Add X {G} or X
@@ -744,7 +744,7 @@ line blocks.
    Out after round 204 (looked at, not done): Codie, Ravenous Codex ("prepared spell" isn't defined yet), Glissa's
    Retriever (a mandatory "exile it. When you do"), Leaves from the Vine (done in round B106) (a type-or-subtype filter), Behold the
    Unspeakable (a pausing scry inside "Otherwise"), Song of Blood (done in round B127), Indulge // Excess, Harald Unites the Elves, Rent Is
-   Due, Search Elemental, Estinien Varlineau.
+   Due, Search Elemental, Estinien Varlineau (done in round 312).
    Round 205 went on from the top: "if it's the first time that creature has become tapped this turn" (CR 603.4: Captain
    America, Living Legend), "an opponent attacks one or more planeswalkers you control" (Mila, Crafty Companion) and Lukka,
    Wayward Bonder ("draw two cards instead", "Exile it at the beginning of your next upkeep"), "whenever you copy an
@@ -923,7 +923,7 @@ line blocks.
    browser test (Tetzimoc); "you may exile it. You may play that card from exile this turn" (Norin); "each opponent's
    maximum hand size is equal to seven minus the number of those card types" (Winter, Misanthropic Guide). +24 (27,867
    of 31,936 with rounds 210, 211 and B40 to B43).
-   Out after round 212 (looked at, not done): Sheltering Ancient (cumulative upkeep putting a counter on an opponent's
+   Out after round 212 (looked at, not done): Sheltering Ancient (done in round 312) (cumulative upkeep putting a counter on an opponent's
    creature); Power Sink (done in round 304) ("tap all lands with mana abilities"); Zilortha (lethal damage by power everywhere); Ravenous
    Slime (a die replacement); Astral Drift and Paranormal Analyst ("whenever you manifest dread" and cycling triggers);
    Rowan, Scion of War; Aven Courier (done in round 296); Galactus. Eligeth with Kenessos: Kenessos's "scry one more" applies first (draws
@@ -2363,6 +2363,27 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 312 took cards back off the "Out after round N" lists, most played first: "When ~ die, if they were a creature,
+   return them to the battlefield. They're an artifact." (Tom, Bert, and William: a plural name; it returns under the
+   control of the trigger's controller, CR 110.2a, as an artifact only, its creature types gone and Legendary kept, CR
+   205.1a) and "Return target creature card ... to the battlefield. It's an artifact." (Honor the Past: the same); "When
+   Fang dies, if he wasn't a Spirit, return this card to the battlefield under your control. He's a Spirit in addition to
+   his other types." (Fang, Roku's Companion: Otherworldly Escort's intervening if, CR 603.4, 603.10a); "Cumulative
+   upkeep—Put a +1/+1 counter on a creature an opponent controls" (Sheltering Ancient: the counters divided among any
+   opponents' creatures, untargeted, sacrificed if no opponent controls a creature, rulings; a browser test); "the number
+   of your opponents who were dealt combat damage by ~ or a Dragon this turn" (Estinien Varlineau: this object, CR 400.7,
+   or a Dragon as it dealt the damage); "return target artifact card ... if its mana value is less than or equal to their
+   total power" (Vulpine Harvester: the attacking Phyrexians' power as it resolves, as they last existed if gone,
+   rulings); "Whenever ~ or a creature it's paired with is dealt damage" (Donna Noble: the soulbond partner's damage
+   events too, CR 702.95, twice if both are dealt damage at once, rulings); "When a Faerie is championed with ~"
+   (Mistbind Clique: CR 702.72c, only while the Clique is still there); "create Icingdeath, Frost Tongue, a legendary
+   white Equipment artifact token with "...," "...," and equip {2}" (Icingdeath, Frost Tyrant: the card's short name
+   inside the token's name is the token's name, CR 111.4). +8 Commander-legal (Honor the Past is an Arena-only
+   card outside that count), 30,595 of 31,936 with round 311.
+   Out after round 312 (looked at, not done): Kusari-Gama ("each other creature defending player controls" when the
+   equipped creature damages a blocking creature: CR 802.2a makes that the player the equipped creature attacks, or one
+   the controller chooses when it isn't attacking, and the trigger doesn't know which yet); Old-Growth Troll, Harold and
+   Bob and Bronzehide Lion (still returning as an Aura with granted abilities, next to Tom's template).
    Round 311 took cards back off the "Out after round N" lists, most played first: "Exile two target creatures controlled
    by different players. Each of those creatures' controllers reveals cards from the top of their library until they
    reveal a creature card, puts that card onto the battlefield, then shuffles the rest into their library" (Divergent
@@ -3800,7 +3821,7 @@ line blocks.
    - "With power / mana value less than or equal to <amount>" works for targets, groups, searches and free casts, and
      "you may ... if that creature's power is less than or equal to" (Nimbus Champion); still out: "that damage" in other
      trigger shapes (Broodcaller Scourge), Old Man of the Sea, Sphere of Annihilation, Quag Feast
-     ("the chosen permanent"), Titan's Presence (a reveal cost), Vulpine Harvester ("their total power"), Sundering
+     ("the chosen permanent"), Titan's Presence (a reveal cost), Vulpine Harvester (done in round 312) ("their total power"), Sundering
      Archaic (colors spent).
    - "Your team" is "you" (CR 102.4), as is Azra Bladeseeker's "each player on your team", and "Partner with" works (27
      cards); still out: "each of your teammates" (Imperial Mask), Combo Attack, surge (Fall of the Titans, done in round 300). Pir and other
@@ -7352,14 +7373,14 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   combat's beginning of combat step but not in an added main phase; check the rulings before relying on it. Random
   discards as a cost: bots use them only with spare cards in hand.
 - "Skip your next draw step" (Fatigue) and other one-time skips; Ad Nauseam's repeat.
-- Champion triggers about the championed card (Mistbind Clique's "when a Faerie is championed"); reinforce X;
+- Champion triggers about the championed card (Mistbind Clique's "when a Faerie is championed", done in round 312); reinforce X;
   Dodecapod's "with two +1/+1 counters". Prototype can't be chosen for free casts ("without paying its mana
   cost") yet.
 - Blocking: "whenever ~ blocks two or more creatures" (Lairwatch Giant), "for each creature it's blocking" (Guardian
   of the Gateless), "an additional creature for each Equipment attached" (Kemba's Legion (done in round B106)), Yare's "creature
   defending player controls". A blocker's damage among several attackers is divided automatically, like an
   attacker's among several blockers.
-- Soulbond: "whenever ~ or a creature it's paired with is dealt damage" (Donna Noble, also Doctor's companion);
+- Soulbond: "whenever ~ or a creature it's paired with is dealt damage" (Donna Noble, done in round 312);
   granted trigger Breathkeeper Seraph's "at the beginning of your next upkeep".
 - Faceless One ("choose a color before the game begins"). The sample decks have one commander each; two commanders (partners or a Background) work
   in the engine and `sample-decks.json` (`secondCommander`) but no sample deck uses them yet.

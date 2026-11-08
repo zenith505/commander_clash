@@ -242,6 +242,15 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const token: TokenSpec = { name: m[1]!, named: true, legendary: true, colors, types: ["Artifact"], subtypes: ["Equipment"], keywords: [], abilities: `${text}\nEquip ${m[4]!}` };
     return compileQuoted(text) ? [{ type: "createToken", who: { ref: "you" }, n: 1, token }] : null;
   }
+  // Icingdeath, Frost Tyrant: "create Icingdeath, Frost Tongue, a legendary white Equipment artifact token with "Equipped
+  // creature gets +2/+0," "Whenever equipped creature attacks, tap target creature defending player controls," and equip
+  // {2}": the same, a name with a comma and two quoted abilities.
+  if ((m = /^(?:You )?[Cc]reate ([A-Z][\w'-]*, [A-Z][\w'-]*(?: [A-Z][\w'-]*)*), a legendary (colorless|white|blue|black|red|green) Equipment artifact token with "([^"]+?),?" "([^"]+?),?" and equip (\{\d+\})$/.exec(s))) {
+    const texts = [m[3]!, m[4]!].map((x) => x.replace(/^([^.]*[^.])$/, "$1."));
+    const colors = m[2] === "colorless" ? [] : [COLOR_WORDS[m[2]!]!];
+    const token: TokenSpec = { name: m[1]!, named: true, legendary: true, colors, types: ["Artifact"], subtypes: ["Equipment"], keywords: [], abilities: `${texts.join("\n")}\nEquip ${m[5]!}` };
+    return texts.every((x) => compileQuoted(x)) ? [{ type: "createToken", who: { ref: "you" }, n: 1, token }] : null;
+  }
   // Tamiyo, Compleated Sage: "Create Tamiyo's Notebook, a legendary colorless Book artifact token with "Spells you cast cost
   // {2} less to cast" and "{T}: Draw a card."": a named legendary noncreature token with its abilities (CR 111.4, 205.4d).
   if ((m = /^(?:You )?[Cc]reate ([A-Z][\w'-]*(?: [A-Z][\w'-]*)*), a legendary colorless (Book )?artifact token with "([^"]+)"(?: and "([^"]+)")?$/.exec(s))) {

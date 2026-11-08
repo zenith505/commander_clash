@@ -1735,6 +1735,8 @@ export interface TurnLog {
    * it ("*": every creature type), each creature once (Admiral Beckett Brass: "dealt combat damage by three or more Pirates").
    */
   combatDamagedByTypes?: Record<number, { key: string; types: string[] }[]>;
+  /** For each player, the creatures (`id@zoneChanges`) they controlled that dealt combat damage to a player this turn, controlled as they dealt it (Excess). */
+  combatDamagersBy?: Record<number, string[]>;
   /** The players dealt combat damage by a legendary creature, legendary as it dealt it (Blitzball). */
   legendaryCombatDamaged?: PlayerId[];
   /**
@@ -1898,7 +1900,7 @@ export interface GameState {
   /** Cards in graveyards that gained flashback until end of turn (Snapcaster Mage), as they are there. */
   flashbackGrants?: { id: ObjectId; zc: number; /** Escape with this cost instead (The Grim Captain's Locker, CR 702.138a). */ escape?: { mana: string; exile: number }; /** "You may cast this card from your graveyard" instead (Case of the Uneaten Feast). */ cast?: true }[];
   /** "When you next cast an instant or sorcery spell this turn, copy that spell": delayed triggers on a cast (CR 603.7). */
-  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true; /** "Has storm" (Crackling Spellslinger): the spell's own storm ability triggers (CR 702.40a). */ storm?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true; /** It can't be countered (Mistrise Village). */ uncounterable?: true; /** It can be cast as though it had flash (Progenitor's Icon). */ flash?: true; /** Soulfire Grand Master: it goes to its owner's hand instead of the graveyard as it resolves. */ toHand?: true; /** The X of the spell that made it (Storm King's Thunder's "copy that spell X times"). */ x?: number }[];
+  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true; /** "Has storm" (Crackling Spellslinger): the spell's own storm ability triggers (CR 702.40a). */ storm?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true; /** It can't be countered (Mistrise Village). */ uncounterable?: true; /** It can be cast as though it had flash (Progenitor's Icon). */ flash?: true; /** Soulfire Grand Master: it goes to its owner's hand instead of the graveyard as it resolves. */ toHand?: true; /** Savage Summoning: the creature enters with this counter too. */ counter?: string; /** World War Hulk, Marshland Bloodcaster: an alternative cost for that spell (AltCostKind "nextFree", "nextLife"). */ alt?: "free" | "life"; /** The X of the spell that made it (Storm King's Thunder's "copy that spell X times"). */ x?: number }[];
   /**
    * "Until end of turn, whenever you cast a spell, ...": delayed triggered abilities with a stated duration, which trigger
    * every time their event happens until then (CR 603.7b). Their source is the spell or the source of the ability that made
@@ -2492,7 +2494,7 @@ export interface Resolving {
   /** The cards it revealed, for "each green mana symbol in those cards' mana costs" (Phosphorescent Feast). */
   revealedFromHandIds?: ObjectId[];
   /** The land and nonland cards its parleyReveal instruction revealed ("for each nonland card revealed this way"). */
-  parley?: { land: number; nonland: number; /** Their total mana value (Naya Soulbeast). */ mv?: number };
+  parley?: { land: number; nonland: number; /** Their total mana value (Naya Soulbeast). */ mv?: number; /** The cards revealed (Dakra Mystic). */ ids?: ObjectId[] };
   /** The mana value of the card its last revealUntil instruction found, if it found one (Yuna's Whistle's reflexive X). */
   revealedUntilMv?: number;
   /** How many cards the last revealUntil revealed, the one found included ("the number of cards revealed this way", Madcap Experiment). */

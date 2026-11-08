@@ -1714,6 +1714,13 @@ export function parseTargetPhrase(
     extra.turnedFaceUpThisTurn = true;
     p = p.slice(0, turnedUp.index);
   }
+  // Kid Loki: "each creature you control that you've put one or more +1/+1 counters on this turn": you put them (CR
+  // 122.6, as it entered too), on this object.
+  const plusOnes = / that you've put one or more \+1\/\+1 counters on this turn$/.exec(p);
+  if (plusOnes) {
+    extra.plusOnesByYouThisTurn = true;
+    p = p.slice(0, plusOnes.index);
+  }
   // "Each green creature that entered this turn" (Oran-Rief, the Vastwood).
   const entered = / that entered (?:the battlefield )?this turn$/.exec(p);
   if (entered) {

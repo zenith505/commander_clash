@@ -2103,8 +2103,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       s.nextCast = s.nextCast!.filter((x) => x !== d);
       // "Has cascade": the spell's own cascade ability triggers (CR 702.85a). "Can be cast as though it had flash": used
       // up now, whenever it was cast.
-      if (d.flash) continue;
-      if (d.uncounterable) {
+      // An alternative cost for it (World War Hulk, Marshland Bloodcaster): used up likewise, whichever cost was paid
+      // (rulings on Marshland Bloodcaster).
+      if (d.flash || d.alt) continue;
+      // Savage Summoning: "That creature enters with an additional +1/+1 counter on it" (CR 614.1c), one for each such
+      // effect (rulings).
+      if (d.counter) {
+        if (spell) spell.extraCounters = { ...spell.extraCounters, [d.counter]: (spell.extraCounters?.[d.counter] ?? 0) + 1 };
+      } else if (d.uncounterable) {
         if (spell) spell.uncounterableCast = true;
       } else if (d.cascade && spell) {
         nextCastCascade = true;

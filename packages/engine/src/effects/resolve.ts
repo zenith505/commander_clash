@@ -1554,6 +1554,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "revealedUntilToBottom":
     case "forEachRevealed":
     case "parleyReveal":
+    case "parleyToGraveyards":
     case "revealRevealed":
     case "spellToHand":
     case "discard":

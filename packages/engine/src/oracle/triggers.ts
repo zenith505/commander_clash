@@ -2937,6 +2937,21 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // the one doing it (eachMay's each: "their library" is theirs, "the second player" is the target).
   const oath = /^At the beginning of each player's upkeep, that player chooses target player (?:who (controls more creatures|controls more lands|has more life|has more cards in hand) than they do|whose graveyard has (fewer creature cards) in it than their graveyard does) and is their opponent\. The first player may (.+)\.$/.exec(raw);
   if (oath) return oathTrigger(oath[1] ?? oath[2]!, oath[3]!, raw.replace(/^At the beginning of each player's upkeep, /, ""));
+  // Farrel's Mantle: the enchanted creature's controller decides as it resolves (rulings: they decide even when the Aura is
+  // someone else's), the Aura's controller having chosen the target, never the enchanted creature itself (rulings). The
+  // creature deals the damage; doing it means it assigns no combat damage this turn (CR 510.1; not prevention, rulings).
+  // Gaze of Pain: the same for each creature you control, its controller ("you") deciding (a delayed trigger, body.ts).
+  const mantle = raw === "Whenever enchanted creature attacks and isn't blocked, its controller may have it deal damage equal to its power plus 2 to another target creature. If that player does, the attacking creature assigns no combat damage this turn.";
+  const gaze = raw === "Whenever a creature you control attacks and isn't blocked, you may choose to have it deal damage equal to its power to a target creature. If you do, it assigns no combat damage this turn.";
+  if (mantle || gaze) {
+    const base = parseTrigger(`${raw.replace(/, (?:its controller|you) may .*$/, "")}, it gets +1/+0 until end of turn.`);
+    if (!base || base === "fail" || base.event !== (mantle ? "selfAttacksUnblocked" : "creatureYouControlAttacksUnblocked")) return "fail";
+    const power = { count: { kind: "power" as const, of: { ref: "subject" as const } }, ...(mantle ? { plus: 2 } : {}) };
+    const deal: Effect[] = [{ type: "damage", amount: power, to: { ref: "target", index: 0 }, by: "subject" }, { type: "noCombatDamage", what: { ref: "subject" } }];
+    const text = mantle ? "have it deal damage equal to its power plus 2 to another target creature; if they do, it assigns no combat damage this turn" : "have it deal damage equal to its power to target creature; if you do, it assigns no combat damage this turn";
+    const target: TargetSpec = { kind: "object", types: ["Creature"], ...(mantle ? { notSourceHost: true as const } : {}), text: mantle ? "another target creature" : "target creature" };
+    return { ...base, body: { targets: [target], effects: [{ type: "eachMay", who: { ref: "subjectController" }, effects: deal, text, each: true }], text: raw.replace(/^Whenever [^,]+, /, "") } };
+  }
   // Bladegriff Prototype: "destroy target nonland permanent of that player's choice that one of your opponents controls":
   // the damaged player chooses it among the permanents the controller's opponents control (rulings), read as "of
   // their choice" on "target nonland permanent an opponent controls".

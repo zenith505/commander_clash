@@ -308,6 +308,8 @@ export interface GameObject {
   copyGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string };
   /** Regeneration shields made this turn (CR 701.19a); each replaces one destruction. */
   regenShields?: number;
+  /** Pyramids: "The next time ~ would be destroyed this turn, remove all damage marked on it instead": such shields made this turn. */
+  removeDamageShields?: number;
   /** The shields among regenShields with a "When it regenerates this way" rider (Matopi Golem), oldest first; the rest have none. */
   regenRiders?: RegenRider[];
   /** How many times it regenerated (a shield or a static regeneration replaced its destruction) during `turn` (Spiny Starfish). */
@@ -1655,7 +1657,7 @@ export type PendingDecision =
    * "You may choose new targets for target spell or ability" (CR 115.7d): keep them all, or choose them again; any kept
    * may be illegal, any changed must be legal for that spell, whose controller is `controller`.
    */
-  | { kind: "newTargets"; player: PlayerId; source: string; spell: string; stackId: string; controller: PlayerId; specs: TargetSpec[]; current: TargetChoice[]; /** "Change the targets" (CR 115.7a): change every target or none. */ allOrNone?: true }
+  | { kind: "newTargets"; player: PlayerId; source: string; spell: string; stackId: string; controller: PlayerId; specs: TargetSpec[]; current: TargetChoice[]; /** "Change the targets" (CR 115.7a): change every target or none. */ allOrNone?: true; /** "Change any targets" (CR 115.7c): any of them, each to another legal one, never to none. */ changeAny?: true }
   /** "Change the target of target spell" (CR 115.7a): pick the spell's new target among `options`, the legal ones. */
   | { kind: "changeTarget"; player: PlayerId; source: string; spell: string; stackId: string; index: number; spec: TargetSpec; current: TargetChoice; options: TargetChoice[] }
   /** A modal triggered ability is being put on the stack (CR 603.3c). `legal[i]`: mode i can be chosen (CR 700.2b). */
@@ -2231,6 +2233,8 @@ export interface GameState {
    * their combat damage as though they weren't blocked, and those creatures (CR 510.1).
    */
   unblockedChoice?: { turn: number; step: Step; asked: PlayerId[]; ids: ObjectId[] };
+  /** Cunning Giant: the unblocked attackers asked this combat damage step, the one being asked, and the creature each assigns its combat damage to. */
+  creatureDamageChoice?: { turn: number; step: Step; asked: ObjectId[]; current?: ObjectId; to: Record<ObjectId, ObjectId> };
   /** "Can't block with more than one creature this combat" (Mirri, Weatherlight Duelist): each player's limit, until the end of combat step ends. */
   blockLimits?: { player: PlayerId; n: number }[];
   /** Attackers just declared, waiting on their enlist choices (CR 508.1g) before "whenever ~ attacks" triggers. */

@@ -3283,6 +3283,22 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsAttackAll = true;
       continue;
     }
+    // Viashino Bey: a requirement on its controller's other creatures once it's declared as an attacker (CR 508.1d; rulings:
+    // "not a triggered ability. It is a constraint on declaring an attack").
+    if (line === "If ~ attacks, all creatures you control attack if able.") {
+      out.allAttackIfSelfAttacks = true;
+      continue;
+    }
+    // Ekundu Cyclops: a requirement on it once another creature its controller controls is declared as an attacker (CR 508.1d).
+    // Cunning Giant: an exception to CR 510.1a, chosen as its combat damage is assigned (game.ts askDamageToCreature).
+    if (line === "If ~ is unblocked, you may have it assign its combat damage to a creature defending player controls.") {
+      out.unblockedToCreature = true;
+      continue;
+    }
+    if (line === "If a creature you control attacks, ~ also attacks if able.") {
+      out.attacksIfOneAttacks = true;
+      continue;
+    }
     if (line === "If you would draw a card while your library has no cards in it, instead put five +1/+1 counters on ~.") {
       out.drawEmptyCounters = 5;
       continue;

@@ -1124,6 +1124,7 @@ export function moveObject(
   o.regenShields = undefined;
   o.regenRiders = undefined;
   o.regenerated = undefined;
+  o.removeDamageShields = undefined;
   o.preventNext = undefined;
   o.redirectNext = undefined;
   o.activatedThisTurn = undefined;
@@ -2417,6 +2418,16 @@ export function useShieldCounter(s: GameState, o: GameObject, what: string): boo
  */
 export function destroyPermanent(s: GameState, o: GameObject, message: string, noRegen = false, /** The controller of the spell or ability destroying it (Cobra Trap). */ by?: PlayerId): boolean {
   if (objHasKeyword(s, o, "Indestructible")) return false;
+  // Pyramids: "The next time target land would be destroyed this turn, remove all damage marked on it instead" (CR 614.1a,
+  // 614.8: not regeneration, so "can't be regenerated" doesn't stop it, and it isn't tapped). Its controller would use
+  // this one-turn shield before a shield counter or a regeneration shield (CR 616.1).
+  if ((o.removeDamageShields ?? 0) > 0) {
+    o.removeDamageShields! -= 1;
+    o.damage = 0;
+    o.deathtouchDamage = false;
+    log(s, `All damage is removed from ${defOf(s, o).name} instead of it being destroyed.`);
+    return false;
+  }
   if (useShieldCounter(s, o, "it being destroyed")) return false;
   const name = defOf(s, o).name;
   // "It can't be regenerated (this turn)": its shields don't apply (CR 701.19c); they stay for later.
@@ -3634,6 +3645,7 @@ function advanceStep(s: GameState): void {
     for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
     for (const id of s.battlefield) obj(s, id).provokedAlso = undefined;
     s.unblockedChoice = undefined; // made for this combat's damage steps
+    s.creatureDamageChoice = undefined;
     s.blockLimits = undefined;
   }
   const next = STEP_ORDER[STEP_ORDER.indexOf(s.step) + 1]!;
@@ -3684,6 +3696,7 @@ export function endTheTurn(s: GameState, item?: StackItem): void {
   for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
   for (const id of s.battlefield) obj(s, id).provokedAlso = undefined;
   s.unblockedChoice = undefined;
+  s.creatureDamageChoice = undefined;
   s.blockLimits = undefined;
   // The phases and steps skipped go with the ones added after them (CR 500.8) and the end steps added to this one.
   s.addedPhases = undefined;
@@ -4413,6 +4426,7 @@ function finishCleanup(s: GameState) {
     o.deathtouchDamage = false;
     o.regenShields = undefined; // "this turn" effects end
     o.regenRiders = undefined;
+    o.removeDamageShields = undefined;
     o.preventNext = undefined;
     o.redirectNext = undefined;
     o.saddled = undefined; // "until end of turn" (CR 702.171b)
@@ -9542,6 +9556,8 @@ function chooseNewTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
     if (targets.some((t, i) => changed[i] && (pend.specs[i]?.divided || part(pend.current[i]) !== undefined) && (t.kind === "none" || pend.current[i]?.kind === "none"))) throw new RulesError("the number of targets of a divided amount can't change");
     // "Change the targets" (CR 115.7a): each target to another legal one, all of them or none; never to nothing.
     if (pend.allOrNone && changed.some((c) => c) && targets.some((t, i) => (pend.current[i]?.kind ?? "none") !== "none" && (!changed[i] || t.kind === "none"))) throw new RulesError("change all of its targets, or none of them");
+    // "Change any targets" (CR 115.7c): a changed target goes to another legal one, never to nothing (115.7a).
+    if (pend.changeAny && targets.some((t, i) => changed[i] && (t.kind === "none" || (pend.current[i]?.kind ?? "none") === "none"))) throw new RulesError("a target can only be changed to another legal target");
     const kept = targets.map((t, i) => (!changed[i] ? pend.current[i]! : part(pend.current[i]) !== undefined && (t.kind === "object" || t.kind === "player") ? { ...t, amount: part(pend.current[i]) } : t));
     const q = stackItemQuality(s, item);
     for (let i = 0; i < targets.length; i++) {
@@ -9642,7 +9658,7 @@ function chooseHandToTop(s: GameState, p: Player, ids: ObjectId[]) {
 function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
-  if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && pend.action !== "unblocked" && pend.action !== "band" && pend.action !== "exert" && pend.action !== "keepTapped" && pend.action !== "untapLimited" && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
+  if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && pend.action !== "unblocked" && pend.action !== "damageCreature" && pend.action !== "band" && pend.action !== "exert" && pend.action !== "keepTapped" && pend.action !== "untapLimited" && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
   if (ids.some((id) => !pend.options.includes(id))) throw new RulesError("choose from the permanents offered");
   const n = new Set(ids).size;
   if (n !== ids.length || n > pend.count || n < (pend.min ?? pend.count))
@@ -9681,6 +9697,17 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   }
   if (pend.action === "band") {
     bandChosen(s, ids);
+    return;
+  }
+  if (pend.action === "damageCreature") {
+    const c = s.creatureDamageChoice!;
+    if (ids.length) {
+      c.to[c.current!] = ids[0]!;
+      log(s, `${p.name} has ${nameOf(s, c.current!)} assign its combat damage to ${nameOf(s, ids[0]!)}.`);
+    }
+    c.current = undefined;
+    s.pending = null;
+    if (!askUnblocked(s)) dealCombatDamage(s, s.step === "firstStrikeDamage");
     return;
   }
   if (pend.action === "unblocked") {
@@ -11781,6 +11808,17 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     const idle = potentialAttackers(s, p.id).find((o) => !seen.has(o.id) && opps.some((d) => free(o, d)) && !withoutCompany(s, o.id, [...attacks, { attacker: o.id }]));
     if (idle) throw new RulesError(`${defOf(s, idle).name} has to attack too: all creatures ${p.name} controls attack if able once one does (${nameOf(s, toll)})`);
   }
+  // Viashino Bey: once it's declared as an attacker, all its controller's creatures attack if able; Ekundu Cyclops: once
+  // another creature its controller controls is, it attacks if able (CR 508.1d). Neither has to attack itself, and a
+  // limit on attackers already reached is a restriction they can't break (CR 508.1c).
+  if (attacks.length && attacks.length < limit) {
+    const idleOk = (o: GameObject) => !seen.has(o.id) && opps.some((d) => free(o, d)) && !withoutCompany(s, o.id, [...attacks, { attacker: o.id }]);
+    const bey = attacks.find((a) => abilitiesOf(s, obj(s, a.attacker)).allAttackIfSelfAttacks);
+    const idle = bey ? potentialAttackers(s, p.id).find(idleOk) : undefined;
+    if (bey && idle) throw new RulesError(`${defOf(s, idle).name} has to attack too: all creatures ${p.name} controls attack if able once ${nameOf(s, bey.attacker)} does`);
+    const cyclops = potentialAttackers(s, p.id).find((o) => abilitiesOf(s, o).attacksIfOneAttacks && idleOk(o));
+    if (cyclops) throw new RulesError(`${defOf(s, cyclops).name} has to attack too: it attacks if able once a creature ${p.name} controls does`);
+  }
   // Goaded: it attacks a player other than the ones who goaded it, if it can (CR 701.15b, 508.1d). Each goad is a
   // requirement, and the attack must obey as many as it can: attacking a planeswalker obeys none of them (rulings).
   // One that has to attack a planeswalker (Gideon) as well obeys as many of all its requirements as it can (CR 508.1d):
@@ -12388,6 +12426,29 @@ function askUnblocked(s: GameState): boolean {
     s.pending = { kind: "pickPermanents", player: pid, source: "Combat damage", action: "unblocked", what: "blocked creature to assign its combat damage as though it weren't blocked", options: ids, count: ids.length, min: 0 };
     return true;
   }
+  return askDamageToCreature(s);
+}
+
+/**
+ * Cunning Giant: "If ~ is unblocked, you may have it assign its combat damage to a creature defending player controls"
+ * (CR 510.1a's exception): its controller chooses one or none for it in each combat damage step it deals damage in, as the
+ * damage is assigned. "Defending player" is the player it's attacking, or the controller of the planeswalker it's attacking
+ * (CR 508.5). True if asked.
+ */
+function askDamageToCreature(s: GameState): boolean {
+  let c = s.creatureDamageChoice;
+  if (!c || c.turn !== s.turn || c.step !== s.step) c = s.creatureDamageChoice = { turn: s.turn, step: s.step, asked: [], to: {} };
+  const fs = s.step === "firstStrikeDamage";
+  for (const at of attackers(s)) {
+    if (c.asked.includes(at.id) || at.blockedBy || at.attacking === undefined || !abilitiesOf(s, at).unblockedToCreature || !dealsDamageThisStep(s, at, fs) || assignsNoCombatDamage(s, at) || combatDamageOf(s, at) <= 0) continue;
+    c.asked.push(at.id);
+    const defender = at.attacking;
+    const options = s.battlefield.filter((id) => objIsType(s, obj(s, id), "Creature") && controllerOf(s, obj(s, id)) === defender);
+    if (!options.length) continue;
+    c.current = at.id;
+    s.pending = { kind: "pickPermanents", player: controllerOf(s, at), source: nameOf(s, at.id), action: "damageCreature", what: `creature ${player(s, defender).name} controls for ${nameOf(s, at.id)} to assign its combat damage to`, options, count: 1, min: 0 };
+    return true;
+  }
   return false;
 }
 
@@ -12456,6 +12517,13 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
     const unblocked = (s.unblockedChoice?.turn === s.turn && s.unblockedChoice.step === s.step && s.unblockedChoice.ids.includes(at.id)) || at.unblockedDamageTurn === s.turn;
     // To the player or planeswalker it attacks; nothing if that planeswalker has left combat (CR 506.4c).
     const target = attackedRecipient(s, at);
+    // Cunning Giant: all of it to the creature its controller chose (askDamageToCreature).
+    const cd = s.creatureDamageChoice;
+    const toCreature = !at.blockedBy && cd?.turn === s.turn && cd.step === s.step ? cd.to[at.id] : undefined;
+    if (toCreature !== undefined && s.objects[toCreature]?.zone === "battlefield") {
+      hits.push({ source: at, toObject: obj(s, toCreature), amount: dmg });
+      continue;
+    }
     if (!at.blockedBy || unblocked) {
       toRecipient(at, target, dmg);
       continue;

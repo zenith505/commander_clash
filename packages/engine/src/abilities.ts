@@ -37,7 +37,7 @@ export interface FaceDownPlay {
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
 /** "choose": "Choose a creature you control. It gains indestructible until end of turn": only picked; "it" is that one. */
-export type PickAction = /** Indominus Rex, Alpha: cards in hand discarded as it enters. */ "discard" | "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "untapLimited" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld" | "unattach" | /** Liliana of the Veil: the permanents for the first of two piles. */ "pile" | /** "Exile any number of creatures you control, then return them" (Another Round): the ones to flicker next. */ "flicker" | /** "Defending player exiles two permanents they control" (Bane of Bala Ged). */ "exile" | /** Nulltread Gargantuan: "put a creature you control on top of its owner's library". */ "libraryTop";
+export type PickAction = /** Indominus Rex, Alpha: cards in hand discarded as it enters. */ "discard" | "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | /** Cunning Giant: the creature an unblocked attacker assigns its combat damage to. */ "damageCreature" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "untapLimited" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld" | "unattach" | /** Liliana of the Veil: the permanents for the first of two piles. */ "pile" | /** "Exile any number of creatures you control, then return them" (Another Round): the ones to flicker next. */ "flicker" | /** "Defending player exiles two permanents they control" (Bane of Bala Ged). */ "exile" | /** Nulltread Gargantuan: "put a creature you control on top of its owner's library". */ "libraryTop";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -2649,6 +2649,8 @@ export type Effect =
   /** "Exchange its power and the power of target creature it's blocking until end of combat" (Serene Master): CR 701.12g. */
   | { type: "exchangePower"; what: ObjRef; duration: "endOfTurn" | "endOfCombat" }
   | { type: "destroy"; what: ObjRef; /** "It can't be regenerated." "creatures": "Creatures destroyed this way can't be regenerated" (Catastrophe), only those that are creatures as they're destroyed. */ noRegen?: boolean | "creatures" }
+  /** Pyramids: "The next time target land would be destroyed this turn, remove all damage marked on it instead" (CR 614.1a): a one-turn destruction shield, not regeneration (game.ts destroyPermanent). */
+  | { type: "removeDamageShield"; what: ObjRef }
   /** "Regenerate ~": a shield that replaces its next destruction this turn (CR 701.19a). */
   | {
       type: "regenerate";
@@ -4240,6 +4242,8 @@ export type Effect =
        * changes to another legal one, or none does; if one can't change, none can (rulings).
        */
       allOrNone?: true;
+      /** Sideswipe: "You may change any targets of target Arcane spell" (CR 115.7c): any number of them, each to another legal one, never to none. */
+      changeAny?: true;
     }
   /**
    * "Gain control of target spell" (Commandeer): its controller becomes this ability's controller; a permanent spell
@@ -7332,6 +7336,12 @@ export interface CompiledCard {
   /** "No more than one creature can attack each combat" (Silent Arbiter); `attackYou`: "... can attack you each combat" (Crawlspace), its controller only, not their planeswalkers (rulings). */
   /** War's Toll: "If a creature an opponent controls attacks, all creatures that opponent controls attack if able" (CR 508.1d): a requirement on each opponent's creatures once any of them is declared as an attacker. */
   opponentsAttackAll?: true;
+  /** Viashino Bey: "If ~ attacks, all creatures you control attack if able" (CR 508.1d): its controller's other creatures, once it's declared as an attacker. */
+  allAttackIfSelfAttacks?: true;
+  /** Cunning Giant: "If ~ is unblocked, you may have it assign its combat damage to a creature defending player controls" (game.ts askDamageToCreature). */
+  unblockedToCreature?: true;
+  /** Ekundu Cyclops: "If a creature you control attacks, ~ also attacks if able" (CR 508.1d): it, once another creature its controller controls is declared as an attacker. */
+  attacksIfOneAttacks?: true;
   combatLimit?: { attack?: number; block?: number; attackYou?: number; /** "No more than one creature can attack ~ each combat" (The Eternal Wanderer). */ attackSelf?: number; /** "As long as ~ is tapped, no more than one creature can attack you each combat" (Mirri, Weatherlight Duelist). */ attackYouIfTapped?: number };
   /** "You may activate loyalty abilities of planeswalkers you control on any player's turn any time you could cast an instant." (Teferi, Temporal Archmage's emblem) */
   loyaltyAtInstantSpeed?: true;

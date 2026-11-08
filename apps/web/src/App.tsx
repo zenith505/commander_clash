@@ -133,6 +133,7 @@ import {
   foretellCostOf,
   foretoldCast,
   plotProblem,
+  discardAnyTimeProblem,
   plotCost,
   plottedCast,
   compileCard,
@@ -1769,6 +1770,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onForetell={() => {
                 setMenu(null);
                 dispatch(planForetell(s, HUMAN, menu) ?? [{ type: "foretell", player: HUMAN, objectId: menu }]);
+              }}
+              onDiscardAnyTime={() => {
+                setMenu(null);
+                dispatch([{ type: "discardAnyTime", player: HUMAN, objectId: menu }]);
               }}
               onUnlock={(door) => {
                 setMenu(null);
@@ -4402,6 +4407,7 @@ function AbilityMenu({
   onSuspend,
   onPlot,
   onForetell,
+  onDiscardAnyTime,
   onTurnFaceUp,
   onUnlock,
   onEndEffect,
@@ -4436,6 +4442,8 @@ function AbilityMenu({
   onPlot: () => void;
   /** For a card in hand with foretell: pay {2} and exile it face down, to cast it on a later turn (CR 702.143a). */
   onForetell: () => void;
+  /** Circling Vultures: "You may discard ~ any time you could cast an instant", a special action (CR 116.2e). */
+  onDiscardAnyTime: () => void;
   /** For your face-down permanent: turn it face up. */
   onTurnFaceUp: (way: number, form?: number) => void;
   /** For your Room: unlock this locked door by paying its mana cost (CR 709.5e). */
@@ -4453,6 +4461,7 @@ function AbilityMenu({
   const suspend = o.zone === "hand" ? compileCard(d).suspend : undefined;
   const plot = o.zone === "hand" ? plotCost(s, HUMAN, d) : undefined;
   const foretell = o.zone === "hand" ? foretellCostOf(s, o, d) : undefined;
+  const discardAnyTime = o.zone === "hand" && !!compileCard(d).discardAnyTime;
   // A foretold card: cast only for its foretell cost (CR 702.143a).
   const foretold = foretoldCast(s, HUMAN, o) ? foretellCostOf(s, o, d) : undefined;
   // A manifested card with morph can be turned face up either way (CR 701.40c).
@@ -4596,6 +4605,11 @@ function AbilityMenu({
       {foretell && (
         <button disabled={!planForetell(s, HUMAN, objectId)} title={foretellProblem(s, HUMAN, objectId) ?? `Exile it face down now (only you can see it). On a later turn you may cast it for ${foretell}.`} onClick={onForetell}>
           Foretell <ManaCost cost="{2}" size="sm" />
+        </button>
+      )}
+      {discardAnyTime && (
+        <button disabled={!!discardAnyTimeProblem(s, HUMAN, objectId)} title={discardAnyTimeProblem(s, HUMAN, objectId) ?? "Discard it now (any time you could cast an instant). It doesn't use the stack."} onClick={onDiscardAnyTime}>
+          Discard
         </button>
       )}
       {plot && (

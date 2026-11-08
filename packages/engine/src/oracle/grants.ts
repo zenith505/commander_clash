@@ -95,11 +95,12 @@ function namesGrantSource(c: CompiledCard): boolean {
  * "room abilities trigger an additional time", a draw replacement (Scion of Halaster), and "you can't lose the game and
  * your opponents can't win the game" (The Book of Exalted Deeds; read by gameEndBlocked in game.ts), and "You have no
  * maximum hand size" (Nerd Rage's; read by hasNoMaxHandSize in game.ts for its controller). Ones that give
- * keywords join layer 6 once granted (computeLayers in layers.ts); ones that change types, colors or other abilities
+ * keywords (or remove them) join layer 6 once granted (computeLayers in layers.ts); ones that change types, colors or other abilities
  * would have to come out of earlier layers than the one that grants them, so they stay out.
  */
-const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional", "roomsTwice", "firstDrawLook", "cantLose", "cantWin", "triggersAgain", "exileIfLeavesSelf", "exileInsteadOfDying", "noMaxHandSize", "targetTax", "combatLimit"]);
-export const grantedStaticOk = (mods: Modification[]) => mods.every((m) => (m.kind === "addKeywords" || !["2", "4", "5", "6"].includes(layerOf(m))) && !(m.kind === "definePT" && (m.power === undefined || m.toughness === undefined)));
+const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional", "roomsTwice", "firstDrawLook", "cantLose", "cantWin", "triggersAgain", "exileIfLeavesSelf", "exileInsteadOfDying", "noMaxHandSize", "targetTax", "combatLimit", "untapRemovesOwnCounter"]);
+// Earthbind's granted "Enchanted creature loses flying" (removeKeywords) joins layer 6 the same way.
+export const grantedStaticOk = (mods: Modification[]) => mods.every((m) => (m.kind === "addKeywords" || m.kind === "removeKeywords" || !["2", "4", "5", "6"].includes(layerOf(m))) && !(m.kind === "definePT" && (m.power === undefined || m.toughness === undefined)));
 
 /**
  * Can an effect give this quoted ability to an object? It's one ability we can run: triggered, activated or mana

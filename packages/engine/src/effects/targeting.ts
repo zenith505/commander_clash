@@ -2,7 +2,7 @@ import { ANY_COUNTER, isRealKicker, NON_AURA_ENCHANTMENT } from "../abilities";
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, PickAction, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
 import { compileCard, compileGranted } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
-import { abilitiesOf, basicLandManaAbility, basePower, basePowerNow, baseToughness, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
+import { abilitiesOf, basicLandManaAbility, basePower, basePowerNow, baseToughness, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, toughness, wasCastThisTurn, withCastThisTurn } from "../cards";
 import { attackedDuringLastTurn, attackedPlaneswalker, creatureTypesOf, inCombatPhase, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, mostCommonColors, staticConditionNow, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem, withModes } from "../modes";
@@ -13,6 +13,7 @@ import { COLOR_NAMES } from "./describe";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { defMv, hasName, isDoubleFacedDef, isTransformed, sameName } from "../faces";
 import { isSuspended } from "./run-zones";
+import { landCouldProduce } from "../manaabilities";
 
 const CARD_TYPES = new Set(["Artifact", "Battle", "Creature", "Enchantment", "Kindred", "Land", "Planeswalker", "Instant", "Sorcery"]);
 
@@ -270,6 +271,8 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.noManaAbility && hasManaAbility(s, o, c)) return false;
   if (spec.tapAbility && !((ab) => ab.mana.some((m) => m.tap) || ab.activated.some((a) => a.tap))(abilitiesOf(s, o))) return false;
   if (spec.nonManaActivated && !hasNonManaActivated(s, o, c)) return false;
+  if (spec.castByYouThisTurn && !(wasCastThisTurn(s, o) && o.castBy === controller)) return false;
+  if (spec.couldProduce && !landCouldProduce(s, o).includes(spec.couldProduce)) return false;
   if (spec.commander !== undefined && !!o.isCommander !== spec.commander) return false;
   if (spec.status && !hasStatus(s, o, c, spec.status, view, controller)) return false;
   if (spec.suspected && o.suspected === undefined) return false;

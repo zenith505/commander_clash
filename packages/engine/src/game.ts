@@ -474,6 +474,10 @@ export function applyInPlace(s: GameState, action: Action): void {
       requireNoPending(s);
       foretellCard(s, p, action.objectId);
       break;
+    case "discardAnyTime":
+      requireNoPending(s);
+      discardAnyTime(s, p, action.objectId);
+      break;
     case "assist":
       assistPays(s, p, action.n);
       break;
@@ -993,6 +997,9 @@ export function moveObject(
   // zone wasn't, rulings).
   const castFromHand = fromZone === "stack" && o.castFrom === "hand" && !o.spellCopy;
   const castFromGraveyard = fromZone === "stack" && o.castFrom === "graveyard" && !o.spellCopy;
+  // Cycle of Life: "target creature you cast this turn": the player who cast the spell it was (CR 601.2), kept as it
+  // resolves into this permanent.
+  const castBy = fromZone === "stack" && to === "battlefield" && !o.spellCopy ? o.castBy : undefined;
   o.discardedTurn = undefined;
   o.foretold = undefined; // a spell that was foretold is cast without moving it here; anywhere else it's a new object
   if (fromZone === "stack") {
@@ -1204,6 +1211,7 @@ export function moveObject(
   o.castFromHand = to === "battlefield" && castFromHand ? true : undefined;
   o.castFromGraveyard = to === "battlefield" && castFromGraveyard ? true : undefined;
   o.wasCast = to === "battlefield" && fromZone === "stack" && !o.spellCopy ? true : undefined;
+  o.castBy = castBy;
   o.enteredFromGraveyard = to === "battlefield" && fromZone === "graveyard" ? true : undefined;
   o.enteredFromHand = to === "battlefield" && fromZone === "hand" ? true : undefined;
   o.enteredFromExile = to === "battlefield" && fromZone === "exile" ? true : undefined;
@@ -3923,6 +3931,9 @@ function startNextTurn(s: GameState, skipping = false) {
   s.damagedThisTurn = undefined;
   s.damageThisTurn = undefined;
   s.turnLog = undefined;
+  // Rasputin Dreamweaver: which permanents that care started this turn untapped (before the untap step, CR 502.3).
+  const startedUntapped = s.battlefield.filter((id) => !obj(s, id).tapped && abilitiesOf(s, obj(s, id)).triggers.some((t) => t.ifCond?.kind === "self" && t.ifCond.is === "startedTurnUntapped")).map((id) => `${id}@${obj(s, id).zoneChanges ?? 0}`);
+  if (startedUntapped.length) s.turnLog = { startedUntapped };
   s.extraEndSteps = undefined;
   s.extraUpkeeps = undefined;
   s.upkeepPhase = undefined;
@@ -4083,6 +4094,25 @@ function untapStep(s: GameState, keep: ObjectId[], limited?: ObjectId[]): void {
         log(s, `${nameOf(s, o.id)} doesn't untap: its ${winds} counters are removed instead.`);
         fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: winds });
         continue;
+      }
+      // Bewitching Leechcraft: "If this creature would untap during your untap step, remove a +1/+1 counter from it instead.
+      // If you do, untap it." (CR 614.1a). With two, the second applies to the untap the first leaves (CR 616.1), so it
+      // takes a counter for each; one it can't remove keeps it tapped.
+      const leech = o.tapped ? abilitiesOf(s, o).untapRemovesOwnCounter ?? 0 : 0;
+      if (leech) {
+        const had = o.counters["+1/+1"] ?? 0;
+        const removed = Math.min(had, leech);
+        if (removed) {
+          o.counters["+1/+1"] = had - removed;
+          countersRemoved(s, o, "+1/+1", removed);
+          invalidateCharacteristics(s);
+          if (had === removed) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "+1/+1" });
+        }
+        if (removed < leech) {
+          log(s, `${nameOf(s, o.id)} doesn't untap${removed ? `: ${removed === 1 ? "a +1/+1 counter is" : `${removed} +1/+1 counters are`} removed` : ""}.`);
+          continue;
+        }
+        log(s, `${nameOf(s, o.id)} untaps: ${removed === 1 ? "a +1/+1 counter is" : `${removed} +1/+1 counters are`} removed instead.`);
       }
       if (o.tapped) untapped++;
       untapPermanent(s, o); // CR 502.3
@@ -6835,6 +6865,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     closeZoneBatch(s);
   }
   o.castFrom = castFrom;
+  o.castBy = p.id;
   o.castVia = via?.kind;
   o.buyback = choices.buyback || undefined;
   const paidHow = s.pending?.kind === "castFree" ? s.pending.how : undefined;
@@ -8332,6 +8363,8 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), ...(o.suspected !== undefined ? { suspected: true as const } : {}), ...(ch.supertypes.includes("Legendary") ? { legendary: true as const } : {}), types: [...ch.types], subtypes: [...ch.subtypes], colors: [...ch.colors], ...(ch.allCreatureTypes && ch.types.includes("Creature") ? { allCreatureTypes: true as const } : {}), ...(ch.types.includes("Land") ? { couldProduce: landCouldProduce(s, o) } : {}) });
         log(s, `${p.name} sacrifices ${nameOf(s, id)}.`);
         moveObject(s, id, "graveyard", { sacrificed: true, cost: true, ...(emergeSpell ? { emerged: true as const } : {}) });
+        // Sword of the Ages: "those creature cards", the cards they became (CR 400.7).
+        if (o.zone === "graveyard") Object.assign(sacrificed[sacrificed.length - 1]!, { id, cardZc: o.zoneChanges ?? 0 });
       }
     } else if (c.kind === "discard" && c.random) {
       // Chosen by the game as the cost is paid (CR 701.9b); a spell being cast is on the stack already (CR 601.2a).
@@ -12400,6 +12433,19 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
         countersRemoved(s, o, "-1/-1", n);
       }
     }
+    // Rasputin Dreamweaver: "~ can't have more than seven dream counters on it": all but that many are removed (CR 122.4,
+    // 704.5r), also from a permanent that already had more as it became a copy or gained the ability (rulings).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      for (const cap of abilitiesOf(s, o).maxCounters ?? []) {
+        const extra = (o.counters[cap.counter] ?? 0) - cap.n;
+        if (extra <= 0) continue;
+        o.counters[cap.counter] = cap.n;
+        countersRemoved(s, o, cap.counter, extra);
+        invalidateCharacteristics(s);
+        changed = true;
+      }
+    }
     // Legend rule (704.5j): the rest of each group go to the graveyard, all but the one its controller chose (asked at the
     // start of this pass, askLegendRule). Not while another choice waits: they're checked again once it's made.
     const keep = s.legendKeep ?? [];
@@ -12859,6 +12905,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
     if (suspendProblem(s, pid, id) === null) out.push({ type: "suspend", player: pid, objectId: id, ...(compileCard(defOf(s, o)).suspend?.x ? { x: 1 } : {}) });
     if (plotProblem(s, pid, id) === null) out.push({ type: "plot", player: pid, objectId: id });
     if (foretellProblem(s, pid, id) === null) out.push({ type: "foretell", player: pid, objectId: id });
+    if (discardAnyTimeProblem(s, pid, id) === null) out.push({ type: "discardAnyTime", player: pid, objectId: id });
   }
   for (const id of s.battlefield) for (const door of [0, 1]) if (unlockProblem(s, pid, id, door) === null) out.push({ type: "unlockDoor", player: pid, objectId: id, door });
   for (const id of s.battlefield) if (endEffectProblem(s, pid, id) === null) out.push({ type: "endEffect", player: pid, objectId: id });
@@ -13013,6 +13060,27 @@ export function foretellProblem(s: GameState, pid: PlayerId, id: ObjectId): stri
  * Foretell a card (CR 702.143a): pay {2} and exile it face down. Only its owner may look at it (the others see that a
  * card was foretold); it can be cast for its foretell cost after this turn.
  */
+/**
+ * Why `pid` can't discard this card with its "You may discard ~ any time you could cast an instant" right now, or null
+ * (Circling Vultures). Doing so is a special action, any time they have priority (CR 116.2e).
+ */
+export function discardAnyTimeProblem(s: GameState, pid: PlayerId, id: ObjectId): string | null {
+  const o = s.objects[id];
+  if (!o || o.zone !== "hand" || o.owner !== pid) return "only a card in your hand can be discarded this way";
+  const d = defOf(s, o);
+  if (!compileCard(d).discardAnyTime) return `${d.name} can't be discarded this way`;
+  if (s.priority !== pid || s.pending) return "you don't have priority";
+  return null;
+}
+
+/** Circling Vultures: discard it, a special action (CR 116.2e); its owner gets priority again afterward (CR 116.3). */
+function discardAnyTime(s: GameState, p: Player, id: ObjectId) {
+  const problem = discardAnyTimeProblem(s, p.id, id);
+  if (problem) throw new RulesError(problem);
+  discardCards(s, p.id, [id]);
+  s.passedInSuccession = [];
+}
+
 function foretellCard(s: GameState, p: Player, id: ObjectId) {
   const problem = foretellProblem(s, p.id, id);
   if (problem) throw new RulesError(problem);

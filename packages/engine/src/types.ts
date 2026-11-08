@@ -2734,6 +2734,8 @@ export interface Resolving {
     mayInstead?: boolean;
     /** Transmute Artifact (Effect search `payDiff`): the card found costs more than the sacrificed artifact, so paying the difference was asked (the answer is `may`). */
     payDiff?: boolean;
+    /** Signal the Clans: the random pick from the revealed cards is made (search `randomOfDistinct`). */
+    randomPicked?: boolean;
     castNow?: { id: ObjectId }; // the card "you may cast that card" offered (Effect castNow)
     /** A vote (Effect "vote"): players still to vote in turn order, the votes left for the one voting, and their pick. */
     vote?: { queue: PlayerId[]; left?: number; may?: number; pick?: string; /** "Each player may choose ..." (Druid of Purification): one optional pick each, not a vote. */ choose?: true };

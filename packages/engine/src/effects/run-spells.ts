@@ -1293,6 +1293,12 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
     return;
   }
   if (item.objectId && cantBeCountered(s, item)) {
+    // Power Sink: its controller may still pay, to avoid what not paying does.
+    if (unless?.askAnyway) {
+      const paid = paidUnless(s, ctx, item.controller, unless, by, what);
+      if (paid === "paused") return paid;
+      if (s.resolving) s.resolving.unlessPaid = paid;
+    }
     log(s, `${item.description} can't be countered.`); // CR 101.2
     return;
   }

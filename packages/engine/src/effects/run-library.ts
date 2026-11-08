@@ -1481,6 +1481,19 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           return "paused";
         }
       }
+      // Signal the Clans: one of the revealed cards at random, only if there are as many as it says with different names;
+      // the others stay in the library, shuffled into it (rulings).
+      if (e.randomOfDistinct && searchers.length === 1 && exiledFor(searchers[0]!) === undefined && !sc.randomPicked) {
+        sc.randomPicked = true;
+        const entry = searchedBy.find((x) => x.pid === searchers[0]!)!;
+        const named = entry.found.map((id) => defOf(s, obj(s, id)).name);
+        if (named.length) log(s, `${player(s, searchers[0]!).name} reveals ${named.join(", ")}.`);
+        const pool = [...entry.found];
+        shuffle(s, pool);
+        entry.found = pool.length === amountNow(s, e.n, ctx) && new Set(named).size === named.length ? pool.slice(0, 1) : [];
+        if (entry.found.length) log(s, `${defOf(s, obj(s, entry.found[0]!)).name} is chosen at random.`);
+        else if (named.length) log(s, `Not ${amountNow(s, e.n, ctx)} cards with different names, so none is put into ${player(s, searchers[0]!).name}'s hand.`);
+      }
       const condNow = !!e.condDest && staticConditionNow(s, e.condDest.cond, ctx.sourceId ?? r.item.objectId!, ctx.controller);
       const unpaid = !!sc.payDiff && sc.may !== true;
       const instead = !!sc.mayInstead && sc.may === true;
@@ -2021,7 +2034,8 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         // Rip, Spawn Hunter: "with different powers": at most one for each power among them.
         const powers = e.differentPowers ? new Set(options.map((id) => characteristics(s, obj(s, id)).power)).size : undefined;
         const max = Math.max(0, Math.min(count, options.length, sc.looked.length - (e.minRest ?? 0), eachMost ?? Infinity, powers ?? Infinity, e.payLife ? Math.floor(payableLife(s, pid) / e.payLife) : Infinity));
-        const min = e.required ? max : e.upTo || e.filter ? 0 : max;
+        // Green Sun's Twilight: "Choose a creature card and/or a land card": one at least, when there is one.
+        const min = e.required ? max : e.atLeastOne ? Math.min(1, max) : e.upTo || e.filter ? 0 : max;
         if (!e.sacrificeFirst) log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of ${from === pid ? "their" : `${player(s, from).name}'s`} library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
         // Getaway Barrel: a random one of those that match, no choice (rng.ts).
         if (e.pickRandom && max > 0 && options.length > max) {
@@ -2071,6 +2085,16 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         return;
       };
       if (sc.castingTarget !== undefined && e.castFree) return;
+      // Green Sun's Twilight: "put the chosen cards onto the battlefield or into your hand": all of them the same way,
+      // chosen once they're chosen (rulings).
+      if (e.orHand && !sc.moved) {
+        if (found.length && sc.either === undefined) {
+          const them = found.length === 1 ? names(found) : "them";
+          s.pending = { kind: "chooseOption", player: p.id, source: src, what: "either", options: ["0", "1"], labels: [`Put ${names(found)} onto the battlefield`, `Put ${them} into your hand`], prompt: "choose one" };
+          return "paused";
+        }
+        if (sc.either === 1) return dig(s, { ...e, into: "hand", orHand: undefined, tapped: undefined }, ctx, src, pid);
+      }
       // Resuming after the owner ordered the rest for the bottom: the cards taken have already moved.
       if (sc.moved) return toBottom(s, from, looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library"), src, false) ?? castExiled();
       // An Aura put onto the battlefield: its controller chooses what it enchants as it enters (CR 303.4f), or it stays

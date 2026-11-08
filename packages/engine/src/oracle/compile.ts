@@ -1983,6 +1983,21 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // "Replicate—Tap an untapped Dalek you control." (Exterminate!): a replicate cost that isn't mana (CR 702.56a, 118.8),
+    // paid like multikicker, a different untapped one tapped for each time (it needn't have haste: no {T} symbol, CR
+    // 302.6).
+    // "Replicate—Pay {E}{E}{E}." (Reiterating Bolt): three energy for each time (CR 107.14).
+    const replicateTap = /^Replicate—(Tap an untapped [A-Z][a-z]+ you control|Pay (?:\{E\})+)\.$/.exec(line);
+    if (replicateTap) {
+      const energy = /^Pay ((?:\{E\})+)$/.exec(replicateTap[1]!);
+      const cost: AdditionalCost | null = energy ? { kind: "payEnergy", n: energy[1]!.length / 3 } : parseAdditionalCost(replicateTap[1]!.replace(/^T/, "t"));
+      if (out.kicker || !cost || (cost.kind !== "tap" && cost.kind !== "payEnergy") || cost.n < 1 || (cost.kind === "tap" && cost.n !== 1)) out.unsupported.push(raw);
+      else {
+        out.kicker = { costs: [""], multi: true, replicate: true, extraCosts: [cost], text: replicateTap[1]!.replace(/^T/, "t") };
+        out.triggers.push({ event: "selfCast", body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "kicked", newTargets: true }], text: "Replicate: copy ~ for each time its replicate cost was paid." } });
+      }
+      continue;
+    }
     // Offspring (CR 702.175a): "You may pay an additional [cost] as you cast this spell" and "When this permanent enters,
     // if its offspring cost was paid, create a token that's a copy of it, except it's 1/1." Squad (CR 702.157a): "As an
     // additional cost to cast this spell, you may pay [cost] any number of times" and "When this creature enters, if its

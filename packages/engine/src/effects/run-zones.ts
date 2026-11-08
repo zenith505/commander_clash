@@ -1835,6 +1835,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}.`, e.noRegen === "creatures" ? objIsType(s, o, "Creature") : !!e.noRegen, ctx.controller) && s.resolving) (s.resolving.destroyed ??= []).push({ ...before, ...(s.objects[o.id]?.zone === "graveyard" ? { died: true as const } : {}) });
       }
       return;
+    case "removeDamageShield":
+      for (const o of objects(s, e.what, ctx)) {
+        o.removeDamageShields = (o.removeDamageShields ?? 0) + 1;
+        log(s, `The next time ${defOf(s, o).name} would be destroyed this turn, all damage marked on it is removed instead.`);
+      }
+      return;
     case "regenerate":
       for (const o of objects(s, e.what, ctx)) {
         o.regenShields = (o.regenShields ?? 0) + 1;

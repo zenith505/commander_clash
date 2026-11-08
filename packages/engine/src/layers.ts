@@ -127,6 +127,8 @@ export interface Characteristics {
   hasPrintedAbilities: boolean;
   /** "Lose ... ward" (Shay Cormac): its ward abilities, printed or gained before, don't trigger; one gained later does (CR 613.7). */
   wardLost?: true;
+  /** "Loses flanking" (Barbed Foliage): its printed flanking triggers don't work, and flanking granted before is gone; flanking granted later works (CR 702.25a, 613.7). */
+  flankingLost?: true;
   /** It lost all abilities, the mana abilities of its basic land types too (CR 305.6). */
   landAbilitiesLost?: true;
   /** Abilities effects gave it, as text ("~" is this object), in layer 6 order. */
@@ -1709,6 +1711,15 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       for (const k of m.keywords) if (c.sparedBy) delete c.sparedBy[k.toLowerCase()];
       if (c.sparedBy && m.keywords.some((k) => sameCI(k, "Protection"))) for (const k of Object.keys(c.sparedBy)) if (k.startsWith("protection from ")) delete c.sparedBy[k];
       if (m.keywords.some((k) => sameCI(k, "Ward"))) c.wardLost = true;
+      // Flanking is a triggered ability as well as a keyword (CR 702.25a): every instance it has so far goes.
+      if (m.keywords.some((k) => sameCI(k, "Flanking"))) {
+        c.flankingLost = true;
+        const keep = c.grantedAbilities.map((g) => g !== "Flanking");
+        if (keep.includes(false)) {
+          c.grantedAt = c.grantedAt?.filter((_, i) => keep[i]);
+          c.grantedAbilities = c.grantedAbilities.filter((_, i) => keep[i]);
+        }
+      }
       return;
     case "cantHaveKeywords":
       c.cantHave = [...new Set([...(c.cantHave ?? []), ...m.keywords])];

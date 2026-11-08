@@ -597,6 +597,8 @@ export function parseChanges(text: string): Modification[] | null {
     } else if (/^loses? all abilities$/i.test(p)) out.push({ kind: "loseAllAbilities" });
     // Hammerheim: "loses all landwalk abilities": every kind of landwalk (CR 702.14), whatever land it names (layer 6).
     else if (/^loses? all landwalk abilities$/i.test(p)) out.push({ kind: "removeKeywords", keywords: ["Landwalk"] });
+    // Barbed Foliage: "loses flanking": the keyword and its triggered ability, every instance (CR 702.25a-b; layers.ts).
+    else if (/^loses? flanking$/i.test(p)) out.push({ kind: "removeKeywords", keywords: ["Flanking"] });
     // Amoeboid Changeling: "loses all creature types" (layer 4).
     else if (/^loses? all creature types$/i.test(p)) out.push({ kind: "loseCreatureTypes" });
     // Arcum's Weathervane, Thermal Flux: "is no longer snow", "isn't snow until end of turn": the snow supertype goes

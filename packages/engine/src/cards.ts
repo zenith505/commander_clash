@@ -370,7 +370,7 @@ export const NO_ABILITIES: CompiledCard = { triggers: [], activated: [], mana: [
  */
 export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
   const c = characteristics(s, o);
-  let own = withGranted(c.hasPrintedAbilities ? withoutLost(compileCard(defOf(s, o)), c.lostActivated, c.lostStatics) : NO_ABILITIES, c.grantedAbilities);
+  let own = withGranted(c.hasPrintedAbilities ? withoutFlanking(withoutLost(compileCard(defOf(s, o)), c.lostActivated, c.lostStatics), c.flankingLost) : NO_ABILITIES, c.grantedAbilities);
   // Decayed's triggered ability (CR 702.147a), however it got the keyword: printed, granted, or from a decayed counter.
   if (c.keywords.includes("Decayed")) own = withDecayed(own);
   // "{U}: Counter target spell with the chosen name" (Declaration of Naught): its targets are the name chosen for it.
@@ -398,6 +398,15 @@ export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
   const lent = o.zone === "battlefield" && c.hasPrintedAbilities ? exiledLentTo(s, o) : [];
   if (lent.length) own = withLent(own, lent);
   return own.borrows && o.zone === "battlefield" && !borrowing ? withBorrowed(s, o, own) : own;
+}
+
+const noFlankingCache = new WeakMap<CompiledCard, CompiledCard>();
+/** "Loses flanking" (Barbed Foliage): its printed flanking triggers (CR 702.25a) go. */
+function withoutFlanking(own: CompiledCard, lost: true | undefined): CompiledCard {
+  if (!lost) return own;
+  let hit = noFlankingCache.get(own);
+  if (!hit) noFlankingCache.set(own, (hit = { ...own, triggers: own.triggers.filter((t) => !t.body.text?.startsWith("Flanking:")) }));
+  return hit;
 }
 
 /** The abilities permanents its owner controls give this graveyard card (CompiledCard.yardGrants), in battlefield order. */

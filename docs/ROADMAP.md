@@ -1,6 +1,6 @@
 # Roadmap
 
-30,483 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,491 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,699 of
 9,979 (97%).
 
@@ -754,7 +754,7 @@ line blocks.
    its power was different from its base power" as it last existed (CR 608.2h: Jason Bright, Glowing Prophet), "a nonland
    card of an opponent's choice" (Tasigur, the Golden Fang), "~ or a legendary creature" and "sacrifice X Foods"
    (Campsite Cuisine), "If the sacrificed permanent was a Treasure / Vehicle" (Evereth, Viceroy of Plunder, Hellish
-   Sideswipe), "up to eight target permanents" (Lorthos, the Tidemaker), "Desert lands from your graveyard" (Hazezon,
+   Sideswipe (done in round B144)), "up to eight target permanents" (Lorthos, the Tidemaker), "Desert lands from your graveyard" (Hazezon,
    Shaper of Sand), "attacking modified creatures" (Iron Man, Armored Avenger), "any number of legendary and/or enchantment
    cards" (Nashi, Searcher in the Dark), "Scouts, Pirates, and/or Rogues" and "You may cast it. If you don't" (Vaan, Street
    Thief, Boss Uramon, Mordor Trebuchet), granted renown and "a renowned creature" (CR 702.112: Aragorn, Hornburg Hero),
@@ -2404,7 +2404,7 @@ line blocks.
    browser test); "You may cast ~ as though it had flash by tapping three untapped creatures you control with flying in
    addition to paying its other costs" (Tegwyll's Scouring: an optional additional cost, CR 601.2b, 601.3c, a browser
    test); "Whenever a red source you control deals damage to one or more permanents and/or players" (The Red Terror:
-   once for each source in each batch of damage, CR 603.2c). +8, 30,483 of 31,936 with B142 and B143.
+   once for each source in each batch of damage, CR 603.2c). +8, 30,491 of 31,936 with B142 to B144.
    Out after round 305 (looked at, not done): Spell Queller (casting the exiled card when it leaves: needs the exiled
    card linked to its leaves trigger); Karplusan Minotaur ("any target of an opponent's choice" in a triggered ability
    with a coin flip cumulative upkeep); Toggo, Goblin Weaponsmith (a named Equipment token granting an ability with a
@@ -3952,7 +3952,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   it blocked or was blocked by something this turn); Lifelace and Purelace (a color change on a spell); Ronom Hulk
   (protection from snow); Wandering Mage, Samite Censer-Bearer, Pearl Shard, Elvish Healer, Orim's Touch (prevention
   forms not parsed yet: per-target amounts, "if it's a green creature, 2 instead"); Desert Nomads (done in round B104) (prevent damage
-  from Deserts); Balduvian Fallen (mana spent on a cumulative upkeep payment); Viashino Bey (an attack requirement
+  from Deserts); Balduvian Fallen (mana spent on a cumulative upkeep payment); Viashino Bey (done in round B144) (an attack requirement
   that depends on the declaration itself); Heroism (per-attacker pay-or-prevent); Ogre Enforcer (lethal damage from a
   single source); Groffskithur (done in round B129) ("target card named ~" in a graveyard: a target filter by the source's name); Urborg
   Panther (a cost that sacrifices creatures by name); Sworn Defender (done in round B135) and Lesser Werewolf (power-dependent combat
@@ -4313,7 +4313,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   instead" (checked as it resolves, rulings). +39 (26,469 with round 185, which did the Shards too).
 - Skipped there, with reasons: Lifelace and Purelace still (a color change on a spell); Brine Comber (its back face); Browse
   (exiling the rest of the cards looked at); Gremlin Mine ("up to four" charge counters removed); Agonizing Memories
-  (the two cards' order on the library); Purging Scythe, Pyramids and Dragon Hunter (not looked at in depth yet).
+  (the two cards' order on the library); Purging Scythe, Pyramids (done in round B144) and Dragon Hunter (not looked at in depth yet).
 - Round B16 (harder skipped cards, least played first): "Return this card from your graveyard to the battlefield with a
   finality counter on it" activations (Grim Repriser, Proctor of Potential, Resurrected Cultist, Balustrade Wurm, CR
   122.1h) with "an opponent has been dealt noncombat damage this turn" and "you've scried or surveilled this turn";
@@ -4665,7 +4665,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   test), Threshold's "is black/white and has ..." (Wayward Angel, Repentant Vampire), Infernal Caretaker's "return all
   Zombie cards from all graveyards", Durkwood Tracker's bite of an attacking creature. +19 (27,265 of 31,936 with main and Lane A round 199).
 - Known limits there: bots don't activate Painbringer (an X cost they skip) and may value Baki's Curse at 0.
-- Out after round B31: Ekundu Cyclops (an attack requirement that depends on the declaration itself, like Viashino
+- Out after round B31: Ekundu Cyclops (done in round B144) (an attack requirement that depends on the declaration itself, like Viashino
   Bey), Taste of Paradise (optional additional costs, Lane A's round 197 template; left to it), Liquid Fire (done in round B136) (a number
   chosen as a cost), Goblin Test Pilot (done in round B136) (a random target for an activated ability), Emberwilde Djinn ("pay {R}{R} or 2
   life"), Carrion Wurm ("any player may exile three", done in round B132), Matopi Golem (a regeneration shield's rider, done in
@@ -6686,6 +6686,28 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   instead; bots move it to a creature that survives it, or to their least valuable one when it would kill them. Browser
   tests for the Oath's target and question on your upkeep, the Phoenix's question and Flaming Gambit's creature choice.
   +7 (30,475 of 31,936 with B142 and rounds 303-304).
+- Round B144 (least played first, from the skip lists): Viashino Bey ("If ~ attacks, all creatures you control attack if
+  able") and Ekundu Cyclops ("If a creature you control attacks, ~ also attacks if able"): requirements once a creature is
+  declared as an attacker, like War's Toll (CR 508.1d; rulings: not a trigger, and not a requirement on Bey itself), never
+  past a limit on attackers or a cost to attack. Barbed Foliage: "it loses flanking" takes the keyword and every flanking
+  trigger it has so far, printed or granted; flanking granted later works (CR 702.25a, 613.7). Sideswipe: "change any
+  targets of target Arcane spell" (CR 115.7c): any of them, each to another legal one, never to none. Pyramids: "the next
+  time target land would be destroyed this turn, remove all damage marked on it instead" (CR 614.1a), a one-turn shield
+  that isn't regeneration (no tapping, "can't be regenerated" doesn't stop it), used before a shield counter or a
+  regeneration shield. Cunning Giant: unblocked, its controller chooses a creature the player it's attacking (or that
+  planeswalker's controller, CR 508.5) controls, or none, in each combat damage step, and all its combat damage goes there
+  (CR 510.1a's exception). Farrel's Mantle and Gaze of Pain: an unblocked creature deals damage equal to its power (plus 2)
+  to a target creature instead of combat damage; for the Mantle the Aura's controller chooses the target (never the
+  enchanted creature) and the enchanted creature's controller decides (rulings); Gaze of Pain's delayed trigger lasts the
+  turn (CR 603.7b). Bots attack with everything beside Bey, bring the Cyclops along, have the Giant kill a creature worth
+  4 or more unless the damage would finish the player, and take the Mantle's or Gaze's damage only to kill an opponent's
+  creature without giving up a lethal attack. A browser test for Cunning Giant's creature choice. +8 (30,483 of 31,936
+  with B143 and round 304).
+- Out after round B144 (looked at, not done): Merseine ("pay enchanted creature's mana cost" as a cost, activated only
+  by that creature's controller), Yare and Blaze of Glory ("target creature defending player controls" on a spell, with
+  several defending players, CR 508.5a), North Star (mana spent as though any type for one spell), Lumbering Laundry
+  (looking at face-down creatures), Guard Dogs (a prevention shield tied to a permanent chosen as it resolves), Butcher
+  Orgg (combat damage divided among the player and their creatures).
 - Out after round B143 (looked at, not done): Preferred Selection (the two cards looked at should be shown with the
   "sacrifice ~ and pay {2}{G}{G}" question, a look with no prompt yet, and that sacrifice-and-pay "you may" isn't parsed).
 - Out after round B142 (looked at, not done): Decaying Soil (a dies trigger granted by threshold needs a look-back,
@@ -6904,7 +6926,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creatures, a layer 6 dependency), Spoils of War (X set by an opponent's graveyard as you cast it), Drain Life, Soul Burn
   and Consume Spirit ("Spend only black mana on X" on a spell, with cost reductions), Emblazoned Golem (one mana of each
   color on X), Fatal Lore (done in round B142) (an opponent chooses the mode), Echo Chamber (done in round B141) (an opponent chooses the target), Butcher Orgg and
-  Cunning Giant (combat damage assigned to other creatures).
+  Cunning Giant (done in round B144) (combat damage assigned to other creatures).
 - Out after round B91 (looked at, not done): Goblin Test Pilot (done in round B136) (a target chosen at random as an activated ability is
   activated: the activation, the bots and the UI would all need to leave the target to chance), Flying Drone (a colored
   activation cost reduction, "if another creature with flying entered the battlefield under your control this turn"),
@@ -6917,7 +6939,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (done in round 272), Blaze Commando and Flame Channeler (an instant or sorcery spell dealing damage to
   anything, once per instruction), Shorecrasher Elemental (done in round B129) and Skittish Valesk (returning or turning a permanent face
   down), Preferred Selection, Scrying Glass, Hedron Alignment, Ertai's Familiar (done in round B128), Death-Mask Duplicant, Relive the Past (done in round B128).
-- Out after round B89 (looked at, not done): Barbed Foliage ("loses flanking": flanking is a triggered ability granted
+- Out after round B89 (looked at, not done): Barbed Foliage (done in round B144) ("loses flanking": flanking is a triggered ability granted
   by the keyword, not just a keyword to remove), Brothers Yamazaki (an exception to the legend rule), Rogue Skycaptain
   and Rohgahh of Kher Keep ("an opponent gains control of ~"), Stangg and Dance of the Many (linked tokens that leave
   with their source), Sengir Nosferatu (done in round B129) (a token's ability returns an exiled card named ~), Splintering Wind,
@@ -7203,7 +7225,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Cycling: Astral Slide's "you may exile target creature. If you do, return that card at the beginning of the next end
   step", Decree of Justice's "you may pay {X}" when cycled, Gavi's alternative cycling cost.
 - "Assigns no combat damage" after a destroy or gain control (Floral Spuzzem, Goblin Vandal, Kukemssa Pirates) and on
-  Auras ("the first creature", Laccolith Rig, Farrel's Mantle); Gaze of Pain.
+  Auras ("the first creature", Laccolith Rig, Farrel's Mantle (done in round B144)); Gaze of Pain (done in round B144).
 - Opening hand: revealing cards (the Chancellors, Gemstone Caverns' luck counter, CR 103.6b). Role tokens and Walker
   tokens (CR 111.10d, 111.10j-r). Shalai's "you, planeswalkers you control, and other creatures you control have
   hexproof"; protection or hexproof for players from a source other than "you have".

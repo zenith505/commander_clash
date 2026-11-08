@@ -1128,6 +1128,12 @@ function prevAsDamageRule(e: Effect | undefined): Extract<Effect, { type: "damag
 export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfAttacking?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
   // Vildin-Pack Alpha: "Whenever a Werewolf you control enters, you may transform it": the whole instruction, about the
   // permanent that entered while it's still that object (CR 400.7); one that can't transform doesn't (CR 701.27c).
+  // "Target creature of an opponent's choice they control" (Evangelize, Magus of the Arena), "any target of an opponent's
+  // choice" (Cuombajj Witches), "... of an opponent's choice you don't control" (Volcanic Offering), "An opponent chooses
+  // target creature they control. Create a token that's a copy of that creature" (Echo Chamber): read without the
+  // chooser, then each of those targets marked as chosen by an opponent its controller chooses, as it's cast or activated
+  // (TargetSpec.chosenBy "opponent", CR 601.2c, 602.2b; rulings). "Of your choice" beside one (Diaochan) is an ordinary target.
+  if ((opts.spell || opts.activated) && (/\btarget\b[^.]*? of an opponent's choice\b/.test(text) || /^An opponent chooses target creature they control\. /.test(text))) return opponentChosenTargets(text, opts);
   if (opts.subjectIt && !opts.selfIt && /^you may transform it\.$/.test(text)) return { targets: [], effects: [{ type: "may", effects: [{ type: "transform", what: { ref: "subject" } }], text: "transform it" }], text };
   // Dazzling Denial: "Counter target spell unless its controller pays {2}. If you control a Bird, counter that spell unless
   // its controller pays {4} instead." One counter, with the cost the condition sets as it resolves (CR 608.2c).
@@ -18077,6 +18083,35 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
 }
 
 /** "{2}{U}", "3 life", "{E}{E}", "{1} and 2 life": a cost paid as an ability resolves. */
+/** parseBody's "target ... of an opponent's choice" (TargetSpec.chosenBy "opponent"): the body, or null. */
+function opponentChosenTargets(text: string, opts: Parameters<typeof parseBody>[1]): AbilityBody | null {
+  const echo = /^An opponent chooses target creature they control\. (.*?)\bthat creature\b(.*)$/s.exec(text);
+  const src = echo ? `${echo[1]!}target creature of an opponent's choice they control${echo[2]!}` : text;
+  const marks: { at: number; controls: boolean; text: string }[] = [];
+  let out = "";
+  let last = 0;
+  for (const m of src.matchAll(/\b((?:[Aa]ny )?[Tt]arget(?:(?! target\b)[^.,])*?) of (an opponent's|your) choice( they control)?\b/g)) {
+    out += src.slice(last, m.index);
+    if (m[2] === "an opponent's") marks.push({ at: out.length, controls: !!m[3], text: m[0].replace(/^Target/, "target") });
+    out += m[3] ? `${m[1]!} an opponent controls` : m[1]!;
+    last = m.index + m[0].length;
+  }
+  out += src.slice(last);
+  if (!marks.length || /\bchoice\b/.test(out.replace(/\bof their choice\b|\bsource of your choice\b/g, ""))) return null;
+  const body = parseBody(out, opts);
+  const count = (t: string) => (t.match(/\b[Tt]arget\b/g) ?? []).length;
+  if (!body || body.modal || body.targets.length !== count(out)) return null;
+  const targets = [...body.targets];
+  for (const m of marks) {
+    const i = count(out.slice(0, m.at));
+    const spec = targets[i];
+    // "They control": parsed as "an opponent controls", then bound to the chosen opponent (bindChoosers).
+    if (!spec || spec.chosenBy || spec.many || spec.optional || spec.random || (m.controls && spec.controller !== "opponent")) return null;
+    targets[i] = { ...spec, chosenBy: "opponent", ...(m.controls ? { chooserControls: true as const } : {}), text: m.text };
+  }
+  return { ...body, targets, text };
+}
+
 export function parsePayCost(text: string): PayCost | null {
   let m: RegExpExecArray | null;
   if ((m = /^((?:\{E\})+)$/.exec(text))) return { energy: m[1]!.length / 3 };

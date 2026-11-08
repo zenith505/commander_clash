@@ -60,6 +60,7 @@ import {
   planActivate,
   spellTargets,
   offerTargets,
+  forController,
   sourceQuality,
   spellQuality,
   copyTargetQuality,
@@ -608,7 +609,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (pending?.kind === "chooseTargets") {
       // Choosing the target of another player's ability ("target creature of your choice", TargetSpec.chosenBy): legal for them.
       const specs = offerTargets(s!, pending.specs, pending.controller ?? HUMAN, pending.x ?? 0, sourceQuality(s!, pending.sourceId), pending.sourceId);
-      const forWhom = pending.controller !== undefined && pending.controller !== HUMAN ? `You choose the target for ${s!.players[pending.controller]!.name}'s ability: ` : "";
+      const forWhom = pending.controller !== undefined && pending.controller !== HUMAN ? (pending.deferred ? `${s!.players[pending.controller]!.name} asks you to choose a target for ` : `You choose the target for ${s!.players[pending.controller]!.name}'s ability: `) : "";
       setTargeting({ mode: "trigger", specs, chosen: skipped(specs, []), label: `${forWhom}${pending.description}` });
     } else if (pending?.kind === "copyTargets") setTargeting({ mode: "copy", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source === pending.copyOf.replace(/ \(X=\d+\)$/, "") ? `${pending.copyOf} (copy)` : `${pending.source}: copy of ${pending.copyOf}`}${pending.left > 1 ? ` (${pending.left} copies left)` : ""}` });
     else if (pending?.kind === "changeTarget") setTargeting({ mode: "change", specs: [pending.spec], chosen: [], label: `${pending.source}: the new target of ${pending.spell}` });
@@ -801,7 +802,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     const body = withModes(ab.body, modes);
     // "Any number of target ...": an "up to" target for each there could be (CR 601.2c).
-    const offered = offerTargets(s, body.targets, HUMAN, x ?? 0, sourceQuality(s, objectId), objectId);
+    // "Target ... of an opponent's choice" (Magus of the Arena): that opponent chooses it, after you choose yours.
+    const offered = forController(offerTargets(s, body.targets, HUMAN, x ?? 0, sourceQuality(s, objectId), objectId));
+    if (offered.length && offered.every((t) => t.skip) && body.targets.some((t) => t.chosenBy === "opponent")) return continueActivate({ objectId, index, modes, x, targets: offered.map(() => ({ kind: "none" as const })), ...(pick ? { pick } : {}) });
     // Goblin Test Pilot: "any target chosen at random", which the game picks as it's activated.
     if (offered.length && !body.targets.some((t) => t.random)) return setTargeting({ mode: "activate", objectId, index, specs: offered, chosen: skipped(offered, []), label, modes, x });
     continueActivate({ objectId, index, modes, x, ...(pick ? { pick } : {}) });
@@ -1066,7 +1069,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // "Any number of target ...": an "up to" target for each there could be, "up to X" no more than X (CR 601.2c).
     // The spliced cards' targets come after the spell's own (CR 702.47b).
     const own = spellTargets(s, d.objectId, d.modes, d.alt, castHow({ ...(d.alt ? { alt: d.alt } : {}), ...(d.kicks ? { kicks: d.kicks } : {}), ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}), ...(d.teamwork ? { teamwork: d.teamwork } : {}), ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}) }));
-    const specs = offerTargets(s, d.splice?.length ? withSplices({ targets: own, effects: [], text: "" }, splicedBodies(s, d.splice)).targets : own, HUMAN, d.x ?? 0, sourceQuality(s, d.objectId), d.objectId);
+    // "Target ... of an opponent's choice" (Evangelize): that opponent chooses it, after you choose yours.
+    const specs = forController(offerTargets(s, d.splice?.length ? withSplices({ targets: own, effects: [], text: "" }, splicedBodies(s, d.splice)).targets : own, HUMAN, d.x ?? 0, sourceQuality(s, d.objectId), d.objectId));
     // Every target skipped: it's cast as if it had none.
     if (d.targets === undefined && specs.length && specs.every((t) => t.skip)) return continueCast({ ...d, targets: specs.map(() => ({ kind: "none" })) });
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: skipped(specs, []), label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });

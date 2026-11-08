@@ -1,7 +1,7 @@
 # Roadmap
 
-30,425 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,678 of
+30,443 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,963 of 4,988 (99%), top 10,000: 9,679 of
 9,979 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2381,7 +2381,7 @@ line blocks.
    "Whenever Yidris deals combat damage to a player, as you cast spells from your hand this turn, they gain cascade"
    (each spell from your hand for the rest of the turn); "Target creature card in your graveyard gains embalm until end
    of turn. The embalm cost is equal to its mana cost" (Cursecloth Wrappings: on the graveyard's menu, X as 0, nothing
-   for a card with no mana cost, a browser test). +8, 30,442 of 31,936 with B139 and B140.
+   for a card with no mana cost, a browser test). +8, 30,451 of 31,936 with B141.
    Out after round 303 (looked at, not done): Oskar, Rubbish Reclaimer ("costs {1} less for each different mana value
    among cards in your graveyard", and casting the discarded card from the graveyard as the trigger resolves); Araumi of
    the Dead Tide (its cost "Exile cards from your graveyard equal to the number of opponents you have"; granting encore
@@ -2699,7 +2699,7 @@ line blocks.
    and the 127 swaps that still leave a line the engine can't read (30 cards; repeated words such as "both red and red"
    or "a Plains or a Plains", Defiler of Faith's cost line, Hazezon Tamar's token colors, card-specific wordings such as
    Tithe's and Wood Elemental's) aren't offered, to bots or in the UI. +10, 29,961 of 31,936 with B113 and B114.
-   Out after round 282 (looked at, not done): Arena (an activated ability's second target chosen by an opponent);
+   Out after round 282 (looked at, not done): Arena (done in round B141) (an activated ability's second target chosen by an opponent);
    Jinxed Choker (its end step trigger gives it to target opponent, who puts the counter on it; its other line is now
    read).
    Out after round 281 (looked at, not done): Balduvian Shaman (a target "that doesn't have cumulative upkeep" and a
@@ -2884,7 +2884,7 @@ line blocks.
    Out after round 242 (looked at, not done): Frontline Heroism (the copy must target the token it created; with a
    token doubler its controller picks which, CR 707.10e); Optimus Prime, Autobot Leader ("the chosen creature" after
    bolster, and a floating "when that creature deals combat damage this turn"); The War Doctor (phasing out and exile
-   batch triggers); Saving Grace (redirecting damage to itself); Volcanic Offering (a target an opponent chooses);
+   batch triggers); Saving Grace (redirecting damage to itself); Volcanic Offering (done in round B141) (a target an opponent chooses);
    Riftmarked Knight (the token its suspend makes, with flanking and protection from white); Roiling Horror (done in round B111) (its
    characteristic-defining P/T counts a life difference); Watcher of Hours ("you remove a time counter", a choice of
    which); Jaya's Phoenix and Repeated Reverberation (copy the next loyalty ability); Coveted Falcon, Shadow Kin, Arna
@@ -3560,7 +3560,7 @@ line blocks.
    - Tap-or-untap variants: Telekinetic Bonds, Tolarian Kraken, Chain Stasis. Berserker's Frenzy ("before combat or
      during combat before blockers are declared"). Arcum's Sleigh and Kjeldoran Guard ("only if defending player
      controls ..."), Grizzled Wolverine's "only if a creature blocks it", Ashen Ghoul's "creature cards above it" (done in round B131).
-     Coastal Wizard, Lady Sun, Diaochan, Maddening Imp, Norritt, Arcum's Whistle, Blood Frenzy and Berserk are out on
+     Coastal Wizard, Lady Sun, Diaochan (done in round B141), Maddening Imp, Norritt, Arcum's Whistle, Blood Frenzy and Berserk are out on
      their other lines.
    Left from the round after cascade ("when you lose control of", face-down exile, attach target Equipment,
    harmonize, paradigm, demonstrate):
@@ -3809,7 +3809,7 @@ line blocks.
    Left from the untap/entwine/distribute/job select/bargain round:
    - "For as long as ~ remains tapped" (27 of 40 legal supported): dynamic target filters (Vedalken Shackles' "power less
      than or equal to the number of Islands", Old Man of the Sea, Entrancing Lyre's X, Seasinger (done in round B131)), "a creature of an
-     opponent's choice" (Preacher), "isn't of the chosen type" (Callous Oppressor), "other than ~" (Hisoka's Guard),
+     opponent's choice" (Preacher (done in round B141)), "isn't of the chosen type" (Callous Oppressor), "other than ~" (Hisoka's Guard),
      attacking/blocked filters (Ice Floe, Whip Vine), "loses all abilities" (Immovable Rod), "when ~ becomes untapped
      or ..." delayed triggers from an activated ability (Coffin Queen, Tawnos's Coffin, The Pandorica), Giant Oyster's counters, Hivis's Dragon filter, Hedge
      Whisperer and The Blackstaff of Waterdeep's animation (both done in round B127).
@@ -4922,7 +4922,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (combat damage replaced by counters and milling), Rain of Gore (life gain from spells and abilities turned into loss),
   Infernal Darkness (mana from lands changed to {B}), Pako (fetch counters on exiled cards), Goddric (celebration makes
   it a Dragon with a granted ability), Bend or Break (piles chosen by an opponent), Meandering Towershell (returns
-  attacking on your next turn), Diaochan (a target chosen by an opponent), Triton Tactics (creatures blocked by those
+  attacking on your next turn), Diaochan (done in round B141) (a target chosen by an opponent), Triton Tactics (creatures blocked by those
   creatures), Blood Spatter Analysis ("Then sacrifice it if ... When you do").
 - Round B47 (harder skipped cards, least played first): "becomes a blue Dragon Illusion ..., loses all abilities, and
   gains flying" (Dance of the Skywise, and Dragonshift with it), "If that creature is black or red, destroy it"
@@ -5326,7 +5326,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   count, CR 605.1b), "If this spell's mayhem cost was paid" (Sandman's Quicksand, CR 702.187b). +23, 22 of them
   Commander-legal (28,534 of 31,936).
 - Out after round B61 (looked at, not done): Nullstone Gargoyle (the first noncreature spell each turn by any player),
-  Grimdancer (a choice of two counters from three), Cuombajj Witches and Trial of Agony (an opponent chooses a target),
+  Grimdancer (a choice of two counters from three), Cuombajj Witches (done in round B141) and Trial of Agony (an opponent chooses a target),
   Magus of the Abyss (done in round B110) (a target "of their choice": the upkeep player chooses it), Abuelo's Awakening (a returned
   artifact that's also a 1/1 Spirit creature with X more counters), Faith's Shield (fateful hour: you and your
   permanents gain protection), Chandra's Phoenix (damage dealt by a red instant or sorcery spell or red planeswalker you
@@ -5431,7 +5431,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   trigger resolves), Rinoa, Angel Wing (returning one of the attacking creatures that died, from any owner's graveyard),
   Tide of War ("Whenever one or more creatures block" and sacrifices by each controller), Countersculpt ("behold a Jace
   or pay {1}"), Druid of the Emerald Grove (a d20 that splits the searched cards), Sphinx's Approach ("exile ~ and four
-  cards named ~"), Faces of the Past (creatures that share a creature type with it), Diaochan, Artful Beauty (a target
+  cards named ~"), Faces of the Past (creatures that share a creature type with it), Diaochan, Artful Beauty (done in round B141) (a target
   of an opponent's choice).
 - Round B66 (eight from the B10 list, and Stormwild Capridor, Kentaro, the Smiling Cat, Majestic Myriarch and
   Thunderous Orator from EDHREC rank about 19,700 up): "If damage would be dealt to you, prevent that damage. You gain
@@ -6259,7 +6259,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cards exiled from the top of its controller's library, even damage that can't be prevented, rulings, CR 615.12). Bots
   answer threats with Turn the Tables (at their biggest attacker), Aegis of Honor and Reverberation. No new prompts. +10
   (30,073 of 31,936 with B119 and rounds 286 and 287).
-- Out after round B120 (looked at, not done): Nova Pentacle (a target creature an opponent of your choice chooses, rulings),
+- Out after round B120 (looked at, not done): Nova Pentacle (done in round B141) (a target creature an opponent of your choice chooses, rulings),
   Lichenthrope, Force Bubble (done in round B135) and Crumbling Sanctuary (damage replaced by counters or exiled cards: a replacement that isn't
   a prevention, so it applies to damage that can't be prevented and is ordered with the shields, CR 616.1; the damage rules
   only prevent or redirect), Eye for an Eye (the damage is dealt and the same amount dealt to the source's controller),
@@ -6572,6 +6572,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   are exiled). Bots don't discard Circling Vultures, bounce Cycle of Life or activate Sword of the Ages. Browser tests for
   Circling Vultures' Discard button and Sword of the Ages' sacrifice picker. +9 (30,434 of 31,936 with B139 and rounds 300 to
   302).
+- Round B141 (least played first, from the skip lists): "target ... of an opponent's choice" in a spell or an activated
+  ability (Evangelize, Preacher, Arena, Magus of the Arena, Cuombajj Witches, Diaochan, Artful Beauty, Echo Chamber's "an
+  opponent chooses target creature they control", Volcanic Offering, Nova Pentacle). As it's cast or activated, its
+  controller chooses their own targets, then an opponent for each such target (only one who has something to choose; the
+  only one, without a question), and that opponent chooses it (CR 601.2c, 602.2b; rulings: not a choice made on
+  resolution). The cast or activation waits, unchanged, while they choose (checked first with a stand-in target), and goes
+  on once the last one is chosen, also when it's cast without paying its mana cost as cascade resolves. The target must be
+  legal for the controller (hexproof counts, rulings); "they control" is bound to that opponent for good, so the spell
+  doesn't resolve if someone else controls it by then (rulings on Evangelize); Volcanic Offering's two choosers can be
+  different opponents and may choose what its caster already chose (rulings). Bots choose for others their least valuable
+  creature for a control or copy effect, one that wins a fight, or else as for triggers (Nova Pentacle's redirected damage
+  counts as harm); bots cast Evangelize and Volcanic Offering (asking the opponent whose likely choice is best for them).
+  They don't activate Magus of the Arena, Arena, Cuombajj Witches, Diaochan or Nova Pentacle, whose opponent-chosen target
+  can hurt them, and their ability heuristics don't pick Echo Chamber or Preacher yet. Browser tests for choosing the opponent, a single chooser, your own
+  targets first and a bot's spell asking you. +9 (30,443 of 31,936 with B140 and round 302).
+- Out after round B141 (looked at, not done): Misfortune and Fatal Lore ("an opponent chooses one": the mode chosen by an
+  opponent as it's cast, then Fatal Lore's targets; the same wait could carry it).
 - Out after round B140 (looked at, not done): nothing new; the cards still on the B139 and earlier lists are out for the
   reasons given there.
 - Out after round B139 (looked at, not done): Tourach's Chant and Thelon's Chant (the player who put a land onto the
@@ -6591,7 +6608,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cast, though the rules allow paying both.
 - Out after round B133 (looked at, not done): Tamanoa (noncreature sources' damage as one event), Graceful Takedown,
   Imperiosaur (mana spent only from basic lands), Flaming Gambit (the target player redirects the damage to a creature),
-  Magus of the Arena and Evangelize (a target chosen by an opponent).
+  Magus of the Arena (done in round B141) and Evangelize (done in round B141) (a target chosen by an opponent).
 - Out after round B132 (looked at, not done): Bullseye and Death Dealer (still an activation cost with "or" between two
   costs), Misfortune, Fatal Lore and Library of Lat-Nam (still a mode chosen by an opponent as it's cast, CR 700.2e).
 - Out after round B131 (looked at, not done): Mister Immortal (done in round B139) (an ability activated from exile, which neither the UI nor
@@ -6625,7 +6642,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   optional draw-step skip with a counter rider), Matopi Golem and Skeleton Scavengers (a rider on one regeneration
   shield, a choice among shields; done in round B132), Thirsting Axe (combat damage dealt to creatures this turn isn't tracked), Heat Wave (done in round B136) (a
   block tax paid in life), Rohgahh of Kher Keep (payment to keep the Kobolds, then control of all of them to an opponent),
-  Evangelize and Echo Chamber (a target an opponent chooses for your spell or ability).
+  Evangelize (done in round B141) and Echo Chamber (done in round B141) (a target an opponent chooses for your spell or ability).
 - Out after round B122 (looked at, not done): Tamanoa and Briarbridge Patrol (once for each damage event, which a spell
   dealing damage to several things doesn't report as one yet), Guardian Beast ("can't be enchanted" for other permanents
   while it's untapped, with "doesn't remove Auras already attached" and a control rule), Tetravus (its tokens' plain "can't be
@@ -6668,8 +6685,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (splice costs that aren't mana: sacrificing lands, tapping creatures, exiling cards), Grip of Phyresis (done in round B131) (attaching the
   Equipment to the Germ just created), Anti-Magic Aura (done in round B122) ("can't be enchanted by other Auras"). Possessed Portal's skip isn't
   offered against a replacement that applies only to a draw from an empty library, as with Notion Thief.
-- Out after round B110 (looked at, not done): Evangelize, Preacher, Arena, Magus of the Arena, Cuombajj Witches, Diaochan,
-  Artful Beauty, Echo Chamber, Nova Pentacle and Volcanic Offering (a target "of an opponent's choice" in a spell or an
+- Out after round B110 (looked at, not done): Evangelize (done in round B141), Preacher (done in round B141), Arena (done in round B141), Magus of the Arena (done in round B141), Cuombajj Witches (done in round B141), Diaochan,
+  Artful Beauty (done in round B141), Echo Chamber (done in round B141), Nova Pentacle (done in round B141) and Volcanic Offering (done in round B141) (a target "of an opponent's choice" in a spell or an
   activated ability: chosen by that opponent while it's cast or activated, CR 601.2c, which can't pause yet; only
   triggered abilities ask).
 - Out after round B109 (looked at, not done): Chainer's Torment (done in round B121) (an X/X token that deals X damage to you, each token if
@@ -6682,7 +6699,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B107 (looked at, not done): Isu the Abominable ("you may pay {G}, {W}, or {U}": a choice of payment), Time
   to Reflect and You Cannot Pass! (done in round B110) (a creature that blocked or was blocked by a Zombie / legendary creature: what the other
   creature was when the block happened, rulings, which the turn's block log doesn't keep), Heroic Feast (as many targets as
-  the life gained), Bioshift (moving any number of counters), Erithizon (done in round B110), Mausoleum Turnkey (done in round B110) and Evangelize (a target chosen by
+  the life gained), Bioshift (moving any number of counters), Erithizon (done in round B110), Mausoleum Turnkey (done in round B110) and Evangelize (done in round B141) (a target chosen by
   another player), Titania, Rugged Rumbler (done in round B122) (a ward cost with a choice).
 - Out after round B106 (looked at, not done): Tamanoa ("Whenever a noncreature source you control deals damage": once for
   each source's damage event, which single-target damage doesn't report as one yet), Mercadia's Downfall (each attacking
@@ -6781,7 +6798,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   your choice instead: a choice as the land is tapped), Escaped Shapeshifter (keywords and protection read from opponents'
   creatures, a layer 6 dependency), Spoils of War (X set by an opponent's graveyard as you cast it), Drain Life, Soul Burn
   and Consume Spirit ("Spend only black mana on X" on a spell, with cost reductions), Emblazoned Golem (one mana of each
-  color on X), Fatal Lore (an opponent chooses the mode), Echo Chamber (an opponent chooses the target), Butcher Orgg and
+  color on X), Fatal Lore (an opponent chooses the mode), Echo Chamber (done in round B141) (an opponent chooses the target), Butcher Orgg and
   Cunning Giant (combat damage assigned to other creatures).
 - Out after round B91 (looked at, not done): Goblin Test Pilot (done in round B136) (a target chosen at random as an activated ability is
   activated: the activation, the bots and the UI would all need to leave the target to chance), Flying Drone (a colored
@@ -6809,7 +6826,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   attacking from the hand), Oath of Mages (a target chosen by another player), Glyph of Life (done in round B130), Mob Mentality,
   Breaking // Entering, Darigaaz, Grime Gorger, Naya Soulbeast.
 - Out after round B85 (looked at, not done): Grave Consequences (done in round B135) (each player exiles any number from their own
-  graveyard, then a count per player), Magus of the Arena (a target chosen by an opponent), Paragon of Modernity
+  graveyard, then a count per player), Magus of the Arena (done in round B141) (a target chosen by an opponent), Paragon of Modernity
   (exactly three colors of mana spent on an activation), Scarwood Bandits (an "Unless an opponent pays" lead clause on
   an activated ability).
 - Out after round B84 (looked at, not done): Traveling Plague (done in round B131) (an Aura returned from the graveyard needs an attach
@@ -6846,7 +6863,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   to the chosen color), Grim Contest (done in round B113) (each deals damage equal to its toughness to the other: a fight by toughness).
 - Out after round B77 (looked at, not done): Consecrate Land (done in round B122) ("can't be enchanted by other Auras": no rule for it yet),
   Corpseweft (done in round B128) ("Exile one or more creature cards from your graveyard" as a cost, X from how many), Ruin in Their Wake
-  (where a found card goes depends on controlling a land named Wastes, with a "may"), Evangelize ("target creature of an
+  (where a found card goes depends on controlling a land named Wastes, with a "may"), Evangelize (done in round B141) ("target creature of an
   opponent's choice": an opponent picks the target).
 - Out after round B76 (looked at, not done): Mind Roots (done in round B112) (a land card discarded this way onto the battlefield: no
   effect for cards a discard just moved yet), Mark for Death (done in round B113) ("Other creatures that player controls can't block this

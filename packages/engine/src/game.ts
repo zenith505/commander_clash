@@ -20,6 +20,7 @@ import { blightOptions, countersBanned, countersRemoved, countersStay, putCounte
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { canAttachTo } from "./effects/run-permanents";
 import { rollDice } from "./effects/run-dice";
+import { bindChoosers, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, enchantableBy, everyCreatureType, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
 import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
@@ -63,6 +64,7 @@ import {
   type ZoneName,
   STARTING_LIFE,
   type TurnRule,
+  type DeferredAct,
 } from "./types";
 
 export const COMMANDER_DAMAGE_LIMIT = 21; // CR 903.10a
@@ -366,22 +368,10 @@ export function applyInPlace(s: GameState, action: Action): void {
         askAssist(s, p, action);
         break;
       }
-      if (freeCastOf(s, p.id) === action.objectId) {
-        // Cascade's "you may cast it without paying its mana cost", as the ability resolves.
-        castSpell(s, p, action.objectId, action.targets, action.modes, undefined, undefined, action.x, action);
-        s.pending = null;
-        continueResolution(s);
-        break;
-      }
-      requireNoPending(s);
-      castSpell(s, p, action.objectId, action.targets, action.modes, action.convoke, action.improvise, action.x, action);
-      s.passedInSuccession = [];
+      runCast(s, p, action);
       break;
     case "activateAbility":
-      // A mana ability can be activated wherever mana abilities can (CR 605.3a); abilityProblem says which it is.
-      if (!paysManaNow(s)) requireNoPending(s);
-      manaAbility = activateAbility(s, p, action.objectId, action.index, action.targets, action.modes, action.tapCreatures, action.x, action.costs, action.mana, action.extra);
-      s.passedInSuccession = [];
+      manaAbility = runActivate(s, p, action);
       break;
     case "chooseModes":
       chooseTriggerModes(s, p, action.modes);
@@ -5455,6 +5445,138 @@ const controlsLegendaryCreatureOrPlaneswalker = (s: GameState, pid: PlayerId) =>
     return controllerOf(s, ob) === pid && c.supertypes.includes("Legendary") && (c.types.includes("Creature") || c.types.includes("Planeswalker"));
   });
 
+/**
+ * A spell's or activated ability's targets "of an opponent's choice" (TargetSpec.chosenBy "opponent"): each bound to the
+ * opponent chosen for it, with that opponent's pick in its slot, or a stand-in while it's still to be picked (with no
+ * targets given, only the specs are bound). Or why not: the opponents chosen aren't opponents, or the controller chose
+ * one of those targets.
+ */
+function chooserProblem(s: GameState, pid: PlayerId, specs0: TargetSpec[], targets: TargetChoice[] | undefined, choices: CostChoices | undefined, src: SourceQuality, sourceId: ObjectId): { specs: TargetSpec[]; targets: TargetChoice[] | undefined } | string {
+  const { choosers, picks } = chooserChoices(choices);
+  const slots = chooserSlots(specs0);
+  if (choosers.length > slots.length || picks.length > choosers.length) return "more opponents' choices than targets they choose";
+  const opps = opponents(s, pid).filter((q) => !player(s, q).lost);
+  if (choosers.some((q) => !opps.includes(q))) return "choose an opponent in the game to choose that target";
+  const specs = bindChoosers(specs0, choosers);
+  if (!targets) return { specs, targets };
+  const merged = withChooserPicks(specs, targets, picks);
+  if (typeof merged === "string") return merged;
+  if (picks.some((t) => t.kind === "none")) return "that target must be chosen";
+  const full = withStandIns(s, specs, merged, pid, src, sourceId);
+  return typeof full === "string" ? full : { specs, targets: full };
+}
+
+/** Casting a spell: as it's cast without paying its mana cost while an ability resolves (cascade), or with priority. */
+function runCast(s: GameState, p: Player, action: Extract<Action, { type: "castSpell" }>) {
+  if (freeCastOf(s, p.id) === action.objectId) {
+    // Cascade's "you may cast it without paying its mana cost", as the ability resolves.
+    if (askChoosers(s, p, action, s.pending ?? undefined)) return;
+    castSpell(s, p, action.objectId, action.targets, action.modes, undefined, undefined, action.x, action);
+    s.pending = null;
+    continueResolution(s);
+    return;
+  }
+  requireNoPending(s);
+  if (askChoosers(s, p, action)) return;
+  castSpell(s, p, action.objectId, action.targets, action.modes, action.convoke, action.improvise, action.x, action);
+  s.passedInSuccession = [];
+}
+
+/** Activating an ability; whether it was a mana ability, which has resolved (CR 605.3b). */
+function runActivate(s: GameState, p: Player, action: Extract<Action, { type: "activateAbility" }>): boolean {
+  // A mana ability can be activated wherever mana abilities can (CR 605.3a); abilityProblem says which it is.
+  if (!paysManaNow(s)) requireNoPending(s);
+  if (askChoosers(s, p, action)) return false;
+  const mana = activateAbility(s, p, action.objectId, action.index, action.targets, action.modes, action.tapCreatures, action.x, action.costs, action.mana, action.extra);
+  s.passedInSuccession = [];
+  return mana;
+}
+
+/**
+ * "Target ... of an opponent's choice" in a spell or an activated ability (TargetSpec.chosenBy "opponent"): as it's cast
+ * or activated, its controller chooses an opponent for each such target (the only one there is, if so, or one who has
+ * something to choose), then that opponent chooses it (CR 601.2c, 602.2b; rulings on Evangelize, Cuombajj Witches, Magus
+ * of the Arena: its controller chooses their own targets first). Nothing happens until the last one is chosen, so the
+ * cast is checked first with stand-ins for those targets (chooserProblem), and asked again as each choice comes in.
+ * Whether it asked; `restore`, the decision it's cast during.
+ */
+function askChoosers(s: GameState, p: Player, act: DeferredAct["act"], restore?: PendingDecision): boolean {
+  const o = s.objects[act.objectId];
+  if (!o) return false;
+  const cast = act.type === "castSpell";
+  const ab = cast ? undefined : abilitiesOf(s, o).activated[act.index];
+  if (!cast && (!ab || ab.mana)) return false;
+  const specs = cast ? spellTargets(s, act.objectId, act.modes, act.alt, castHow(convertChoices(o, act))) : withModes(ab!.body, act.modes).targets;
+  const slots = chooserSlots(specs);
+  if (!slots.length) return false;
+  const choices = cast ? act : (act.costs ?? {});
+  const { choosers, picks } = chooserChoices(choices);
+  if (picks.length >= slots.length) return false;
+  const targets = act.targets ?? (slots.length === specs.length ? specs.map((): TargetChoice => ({ kind: "none" })) : undefined);
+  if (!targets) throw new RulesError("choose its targets");
+  const problem = cast ? castProblem(s, p.id, act.objectId, targets, act.modes, act.convoke, act.improvise, act.x, act) : abilityProblem(s, p.id, act.objectId, act.index, targets, act.modes, act.tapCreatures, act.x, act.costs ?? {});
+  if (problem) throw new RulesError(problem);
+  const k = picks.length;
+  const slot = slots[k]!;
+  const name = defOf(s, o).name;
+  const what = specs[slot]!.text;
+  const withChoices = (c: CostChoices): DeferredAct["act"] => (act.type === "castSpell" ? { ...act, targets, ...c } : { ...act, targets, costs: { ...act.costs, ...c } });
+  let chooser = choosers[k];
+  if (chooser === undefined) {
+    // Only an opponent with something to choose: choosing another would make it illegal to cast (CR 601.2c).
+    const src = cast ? undefined : sourceQuality(s, o.id);
+    const able = opponents(s, p.id).filter((q) => !player(s, q).lost && legalTargets(s, bindChoosers(specs, [...choosers, q])[slot]!, p.id, undefined, src, o.id).length);
+    if (!able.length) throw new RulesError(`nothing can be chosen for ${what}`);
+    if (able.length > 1) {
+      s.pending = { kind: "chooseOption", player: p.id, source: name, what: "targetChooser", options: able.map(String), labels: able.map((q) => player(s, q).name), prompt: `which opponent chooses ${what.replace(/ of an opponent's choice/, "")}?`, deferred: { act: withChoices({}), ...(restore ? { restore } : {}) } };
+      return true;
+    }
+    chooser = able[0]!;
+  }
+  const next = withChoices({ targetChoosers: [...choosers.slice(0, k), chooser] });
+  const spec = bindChoosers(specs, [...choosers.slice(0, k), chooser])[slot]!;
+  s.pending = { kind: "chooseTargets", player: chooser, sourceId: o.id, specs: [spec], description: cast ? name : describeAbility(defOf(s, o), ab!.text), controller: p.id, deferred: { act: next, ...(restore ? { restore } : {}) } };
+  log(s, `${p.name} asks ${player(s, chooser).name} to choose ${what.replace(/ of an opponent's choice/, "")} for ${name}.`);
+  return true;
+}
+
+/**
+ * What a spell being cast or an ability being activated does, while an opponent chooses one of its targets (askChoosers),
+ * its targets bound to the opponents chosen so far and the ones chosen in their slots; and the slot being chosen. For bots.
+ */
+export function deferredChoice(s: GameState, d: DeferredAct): { body: AbilityBody; targets: TargetChoice[]; slot: number } | undefined {
+  const o = s.objects[d.act.objectId];
+  if (!o) return undefined;
+  const act = d.act;
+  const printed = act.type === "castSpell" ? compileCard(castDef(s, act.objectId, act.alt)).spell : abilitiesOf(s, o).activated[act.index]?.body;
+  if (!printed) return undefined;
+  const { choosers, picks } = chooserChoices(act.type === "castSpell" ? act : act.costs);
+  const body = withModes(printed, act.modes);
+  const bound = { ...body, targets: bindChoosers(body.targets, choosers) };
+  const merged = withChooserPicks(bound.targets, act.targets ?? [], picks);
+  const slot = chooserSlots(bound.targets)[picks.length];
+  return typeof merged === "string" || slot === undefined ? undefined : { body: bound, targets: merged, slot };
+}
+
+/** An opponent's choice for a spell being cast or an ability being activated (askChoosers): it goes on. */
+function resumeDeferred(s: GameState, d: DeferredAct, c: CostChoices) {
+  const act = d.act.type === "castSpell" ? { ...d.act, ...c } : { ...d.act, costs: { ...d.act.costs, ...c } };
+  s.pending = d.restore ?? null;
+  const caster = player(s, act.player);
+  if (act.type === "castSpell") runCast(s, caster, act);
+  else runActivate(s, caster, act);
+}
+
+/** The body bound to the opponents chosen to choose its targets, and the targets with their picks (chooserProblem checked them). */
+function withChosenTargets(body: AbilityBody, targets: TargetChoice[] | undefined, choices: CostChoices | undefined): [AbilityBody, TargetChoice[]] {
+  const { choosers, picks } = chooserChoices(choices);
+  const bound = { ...body, targets: bindChoosers(body.targets, choosers) };
+  const merged = withChooserPicks(bound.targets, targets ?? [], picks);
+  if (typeof merged === "string") throw new RulesError(merged);
+  if (chooserSlots(bound.targets).some((i) => merged[i]!.kind === "none")) throw new RulesError("an opponent still chooses one of its targets");
+  return [bound, merged];
+}
+
 export function castProblem(
   s: GameState,
   pid: PlayerId,
@@ -5731,6 +5853,13 @@ export function castProblem(
     const sp = spliceProblem(s, pid, id, choices.splice);
     if (sp) return sp;
     specs = withSplices({ targets: specs, effects: [], text: "" }, splicedBodies(s, choices.splice)).targets;
+  }
+  // "Target ... of an opponent's choice" (Evangelize): the opponents' picks so far, and a stand-in for each still to come
+  // (askChoosers), so it can be cast if each could be chosen (CR 601.2c).
+  if (chooserSlots(specs).length) {
+    const cp = chooserProblem(s, pid, specs, targets, choices, sq, id);
+    if (typeof cp === "string") return cp;
+    [specs, targets] = [cp.specs, cp.targets];
   }
   if (specs.length) {
     // A spell's colors are its card's (CR 702.16b: protection stops spells of that color). Before its optional costs
@@ -6757,6 +6886,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     const fit = fitMany(body, targets ?? [], manyX(s, body.targets, p.id, id, x)) as Exclude<ReturnType<typeof fitMany>, string>;
     [body, targets] = [fit.body, fit.targets];
   }
+  // "Target creature of an opponent's choice they control" (Evangelize): the opponents' picks (askChoosers), its targets
+  // bound to those opponents for good (rulings: as it resolves, and for a new target).
+  if (body && chooserSlots(body.targets).length) [body, targets] = withChosenTargets(body, targets, choices);
   // Spliced cards' text, after the spell's own (CR 702.47c); the cards stay in your hand, revealed.
   if (body && choices.splice?.length) body = withSplices(body, splicedBodies(s, choices.splice));
   const fromCommand = o.zone === "command";
@@ -8697,6 +8829,12 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   }
   // Goblin Test Pilot: "any target chosen at random" is picked by the game as it's activated (rulings), not by the player.
   if (body.targets.length === 1 && body.targets[0]!.random && !targets?.length) targets = undefined;
+  // "Target creature of an opponent's choice they control" (Magus of the Arena): as for spells (castProblem).
+  if (chooserSlots(body.targets).length) {
+    const cp = chooserProblem(s, pid, body.targets, targets, costs, sourceQuality(s, id), id);
+    if (typeof cp === "string") return cp;
+    [body, targets] = [{ ...body, targets: cp.specs }, cp.targets];
+  }
   if (body.targets.length) {
     const src = sourceQuality(s, id);
     const tp = targets ? (targetProblem(s, body.targets, targets, pid, src, id) ?? flagbearerProblem(s, body.targets, targets, pid, src, id, manySpecs)) : hasLegalTargetsFor(s, body.targets, pid, src, id) ? null : "no legal targets";
@@ -9057,6 +9195,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     const fit = fitMany(body, targets ?? [], manyX(s, body.targets, p.id, id, x)) as Exclude<ReturnType<typeof fitMany>, string>;
     [body, targets] = [fit.body, fit.targets];
   }
+  if (chooserSlots(body.targets).length) [body, targets] = withChosenTargets(body, targets, costs);
   const manaPick = ab.mana ? manaAbilityPick(s, p.id, o, index, mana, extra) : undefined;
   if (!ab.mana && (mana !== undefined || extra !== undefined)) throw new RulesError(`${d.name}'s ability isn't a mana ability`);
   // The source as it was activated, for "whenever an opponent activates an ability of a creature".
@@ -9372,6 +9511,16 @@ function chooseNewTarget(s: GameState, p: Player, target: TargetChoice) {
 function chooseTriggerTargets(s: GameState, p: Player, targets: TargetChoice[]) {
   const pend = s.pending;
   if (pend?.kind !== "chooseTargets" || pend.player !== p.id) throw new RulesError("no targets to choose");
+  if (pend.deferred) {
+    // A target of a spell or ability being cast or activated, chosen by this opponent (askChoosers): legal for its
+    // controller, checked as it goes on.
+    const t = targets[0];
+    if (targets.length !== 1 || !t || t.kind === "none") throw new RulesError(`choose ${pend.specs[0]!.text.replace(/ of an opponent's choice/, "")}`);
+    const prev = chooserChoices(pend.deferred.act.type === "castSpell" ? pend.deferred.act : pend.deferred.act.costs).picks;
+    log(s, `${p.name} chooses ${describeTargets(s, [t]).replace(/^ targeting /, "")} for ${pend.description}.`);
+    resumeDeferred(s, pend.deferred, { chooserPicks: [...prev, t] });
+    return;
+  }
   const t = s.triggerQueue[0]!;
   // "Any number of target creatures": as many as were chosen (CR 601.2c, 603.3d).
   // Another player choosing the target for the ability's controller (TargetSpec.chosenBy): legal for the controller.
@@ -9669,6 +9818,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (!pend.options.includes(choice) && !inRange) throw new RulesError(`${choice} isn't ${pend.what === "color" ? "a color" : pend.what === "creatureType" ? "a creature type" : pend.numberRange ? `a number from ${pend.numberRange.min} to ${pend.numberRange.max}` : "an option"} you can choose`);
   s.pending = null;
+  if (pend.what === "targetChooser" && pend.deferred) {
+    // A spell's or activated ability's (askChoosers): that opponent chooses it next, as it's cast or activated.
+    const prev = chooserChoices(pend.deferred.act.type === "castSpell" ? pend.deferred.act : pend.deferred.act.costs).choosers;
+    resumeDeferred(s, pend.deferred, { targetChoosers: [...prev, Number(choice)] });
+    return;
+  }
   if (pend.what === "targetChooser") {
     // "Target ... of an opponent's choice": that opponent chooses it next, as the trigger is put on the stack.
     const t = s.triggerQueue[0];

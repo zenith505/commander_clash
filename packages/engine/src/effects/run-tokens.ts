@@ -206,8 +206,10 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "createTokenCopy": {
       if (e.each) {
         // One copy of each of them (`n` of each, Doppelgang), their copiable values as they are now (CR 707.2), all created at once.
-        const objs = objects(s, e.what, ctx);
-        const bases = objs.map((o) => copiableDef(s, o));
+        // Red Sun's Twilight: each one destroyed this way, its copiable values as it last existed on the battlefield.
+        const destroyed = e.ofDestroyed ? (s.resolving?.destroyed ?? []).filter((x) => objectMatches(s, e.ofDestroyed!, x.o, ctx.controller, false, undefined, x.ch)) : undefined;
+        const objs = destroyed ? [] : objects(s, e.what, ctx);
+        const bases = destroyed ? destroyed.flatMap((x) => { const lk = s.lastKnown?.[x.o.id]; const d = lk && lk.zc === (x.o.zoneChanges ?? 0) && lk.copyKey ? s.cards[lk.copyKey] : undefined; return d ? [d] : []; }) : objs.map((o) => copiableDef(s, o));
         const n = amountNow(s, e.n, ctx);
         if (s.resolving) s.resolving.created = [];
         enterTogether(s, () => {

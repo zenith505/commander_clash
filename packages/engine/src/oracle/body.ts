@@ -1467,6 +1467,26 @@ function wandPunisher(who: PlayerRef, landLife: number): Effect {
 }
 
 function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell: boolean, before: Effect[]): { effects: Effect[]; skip: number } | null {
+  // Power Sink: "Counter target spell unless its controller pays {X}. If that player doesn't, they tap all lands with mana
+  // abilities they control and lose all unspent mana.": only if they didn't pay (CR 608.2c), even when the spell can't be
+  // countered; lands with a mana ability of any kind, granted ones too, tapped but not for mana (rulings).
+  const prevCounter = before[before.length - 1];
+  if (s === "If that player doesn't, they tap all lands with mana abilities they control and lose all unspent mana" && prevCounter?.type === "counterSpell" && prevCounter.unless && prevCounter.index !== undefined) {
+    prevCounter.unless.askAnyway = true;
+    const who: PlayerRef = { ref: "targetController", index: prevCounter.index };
+    return { effects: [{ type: "if", cond: { kind: "unlessPaid" }, effects: [], otherwise: [{ type: "tap", what: { ref: "each", filter: { kind: "object", types: ["Land"], notTypes: [], notColors: [], manaAbility: true, text: "land with a mana ability" }, of: who } }, { type: "loseUnspentMana", who }] }], skip: 0 };
+  }
+  // Red Sun's Twilight: "Destroy up to X target artifacts. If X is 5 or more, for each artifact destroyed this way, create a
+  // token that's a copy of it. Those tokens gain haste. Exile them at the beginning of the next end step.": a copy of each
+  // one that was destroyed (not of one still legal that wasn't, rulings), as it last existed (CR 608.2h, 707.2).
+  const copyDestroyed = /^If X is (\d+) or more, for each (artifact|creature|permanent) destroyed this way, create a token that's a copy of it$/.exec(s);
+  if (copyDestroyed && before[before.length - 1]?.type === "destroy" && sentences[si + 1] === "Those tokens gain haste" && /^Exile them at the beginning of the next end step\.?$/.test(sentences[si + 2] ?? "")) {
+    const filter = parseTargetPhrase(copyDestroyed[2]!);
+    if (filter?.kind !== "object") return null;
+    const haste: Effect = { type: "continuous", what: { ref: "created" }, mods: [{ kind: "addKeywords", keywords: ["Haste"] }], duration: "game" };
+    const exileThem: Effect = { type: "delayed", when: "nextEndStep", each: "created", effects: [{ type: "exile", what: { ref: "subject" } }], text: "exile ~" };
+    return { effects: [{ type: "if", cond: { kind: "xAtLeast", n: Number(copyDestroyed[1]) }, effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "self" }, each: true, ofDestroyed: { ...filter, text: copyDestroyed[2]! } }, haste, exileThem] }], skip: 2 };
+  }
   // Sigarda's Vanguard: "choose any number of creatures with different powers. Those creatures gain double strike until end
   // of turn.": anyone's creatures, chosen as it resolves, not targeted, no two with the same power (rulings); one alone is
   // a set too.
@@ -19444,6 +19464,20 @@ function landThenCardDig(text: string): AbilityBody | null {
   };
 }
 
+/** Green Sun's Twilight: "Reveal the top X plus one cards of your library. Choose a creature card and/or a land card from
+ * among them. Put those cards into your hand and the rest on the bottom of your library in a random order. If X is 5 or
+ * more, instead put the chosen cards onto the battlefield or into your hand and the rest on the bottom of your library in
+ * a random order." One creature card and/or one land card (a card that's both counts as either), at least one if there is
+ * one; with X 5 or more both onto the battlefield or both into your hand (rulings), the rest to the bottom (CR 401.4). */
+function greenSunsTwilight(text: string): AbilityBody | null {
+  const m = /^Reveal the top X plus one cards of your library\. Choose (an? [a-z]+ card) and\/or (an? [a-z]+ card) from among them\. Put those cards into your hand and the rest on the bottom of your library in a random order\. If X is (\d+) or more, instead put the chosen cards onto the battlefield or into your hand and the rest on the bottom of your library in a random order\.$/.exec(text.trim());
+  const specs = m ? [m[1]!, m[2]!].map((w) => parseSearchFilter(w.replace(/^an? /, ""))) : [];
+  if (!m || specs.some((f) => !f)) return null;
+  const anyOf = specs as TargetSpec[];
+  const dig = (into: "hand" | "battlefield"): Effect => ({ type: "dig", n: { count: { kind: "x" }, plus: 1 }, count: 2, upTo: true, atLeastOne: true, oneOfEach: anyOf, filter: { kind: "card", anyOf, text: `${m[1]!.replace(/^an? /, "")} and/or ${m[2]!}` }, into, ...(into === "battlefield" ? { orHand: true as const } : {}), rest: "bottom", random: true, reveal: true });
+  return { targets: [], effects: [{ type: "if", cond: { kind: "xAtLeast", n: Number(m[3]) }, effects: [dig("battlefield")], otherwise: [dig("hand")] }], text };
+}
+
 /** Whole-text forms and rewrites, run by parseBodyText before its sentence loop: a body, or the rewritten text. */
 function wholeTextForms(text: string, selfEntered: boolean): AbilityBody | string {
   // Fblthp, the Lost: "When ~ enters, draw a card. If it entered from your library or was cast from your library, draw two
@@ -19455,6 +19489,19 @@ function wholeTextForms(text: string, selfEntered: boolean): AbilityBody | strin
   text = text.replace(/^Until your next turn, (you may cast creature spells as though they had flash), and (each creature you control enters with an additional \+1\/\+1 counter on it)\.$/, "Until your next turn, $1. Until your next turn, $2.");
   const twoDigs = landThenCardDig(text);
   if (twoDigs) return twoDigs;
+  // Scion of the Ur-Dragon: "Search your library for a Dragon permanent card and put it into your graveyard. If you do, ~
+  // becomes a copy of that card until end of turn. Then shuffle.": a copy of the card put into the graveyard (none if it
+  // went elsewhere), then the shuffle.
+  const scion = /^Search your library for (an? [A-Z][a-z]+ permanent card) and put it into your graveyard\. If you do, ~ becomes a copy of that card until end of turn\. Then shuffle\.$/.exec(text.trim());
+  const scionFilter = scion && parseSearchFilter(scion[1]!.replace(/^an? /, ""));
+  if (scionFilter) return { targets: [], effects: [{ type: "search", filter: scionFilter, n: 1, upTo: false, reveal: false, dest: { zone: "graveyard" }, noShuffle: true }, { type: "becomeCopy", what: { ref: "self" }, of: { ref: "searchFound", zone: "graveyard" }, duration: "endOfTurn" }, { type: "shuffle", who: { ref: "you" } }], text };
+  // Signal the Clans: "Search your library for three creature cards and reveal them. If you reveal three cards with
+  // different names, choose one of them at random and put that card into your hand. Shuffle the rest into your library."
+  const signal = /^Search your library for (two|three|four) ([a-z]+ cards) and reveal them\. If you reveal \1 cards with different names, choose one of them at random and put that card into your hand\. Shuffle the rest into your library\.$/.exec(text.trim());
+  const signalFilter = signal && parseSearchFilter(signal[2]!.replace(/s$/, ""));
+  if (signal && signalFilter) return { targets: [], effects: [{ type: "search", filter: signalFilter, n: num(signal[1]!), upTo: true, reveal: true, dest: { zone: "hand" }, randomOfDistinct: true }], text };
+  const sunsTwilight = greenSunsTwilight(text);
+  if (sunsTwilight) return sunsTwilight;
   // Contractual Safeguard: "Choose a kind of counter on a creature you control. Put a counter of that kind on each other
   // creature you control." (see the "counterKindToOthers" effect).
   text = text.replace(/(^|\. )Choose a kind of counter on a creature you control\. Put a counter of that kind on each other creature you control\./, "$1Choose a kind of counter on a creature you control and put a counter of that kind on each other creature you control.");

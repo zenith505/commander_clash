@@ -1111,7 +1111,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         r.countersRemoved = (r.countersRemoved ?? 0) + removed;
         return;
       }
-      const options = s.battlefield.filter((id) => (e.move ? id !== self!.id && objectMatches(s, e.filter, obj(s, id), ctx.controller, false) : objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), ctx.controller, false)));
+      // Invoke Justice: what that player controls as it resolves, nothing if they're no longer a legal target.
+      const among = e.of ? players(s, e.of, ctx) : undefined;
+      const options = s.battlefield.filter((id) => (e.move ? id !== self!.id && objectMatches(s, e.filter, obj(s, id), ctx.controller, false) : among ? among.includes(controllerOf(s, obj(s, id))) && objectMatches(s, e.filter, obj(s, id), ctx.controller, false) : objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), ctx.controller, false)));
       if (n <= 0 || !options.length) return;
       let parts = sc.distributed;
       if (!parts && options.length === 1 && !e.move) parts = { [options[0]!]: n };

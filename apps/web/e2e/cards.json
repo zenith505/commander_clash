@@ -7680,6 +7680,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "75960649-93a4-4d56-b40f-f9fcbb4341d4",
+  "name": "Echo Chamber",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{4}, {T}: An opponent chooses target creature they control. Create a token that's a copy of that creature. That token gains haste until end of turn. Exile the token at the beginning of the next end step. Activate only as a sorcery.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5715ed43-395c-4877-99a7-8e28e7bf9dce",
   "name": "Eclipsed Realms",
   "manaCost": "",
@@ -8519,6 +8541,34 @@
   "commanderLegal": "legal",
   "set": "khc",
   "releasedAt": "2021-02-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "23a60803-6b0f-48ee-aa3b-12a3c5fc62cf",
+  "name": "Evangelize",
+  "manaCost": "{4}{W}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Buyback {2}{W}{W} (You may pay an additional {2}{W}{W} as you cast this spell. If you do, put this card into your hand as it resolves.)\nGain control of target creature of an opponent's choice they control.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Buyback"
+  ],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -16250,6 +16300,39 @@
   "set": "mkm",
   "releasedAt": "2024-02-09",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "44865261-16f8-42d2-a388-a57173142eb0",
+  "name": "Magus of the Arena",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Creature — Human Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "{3}, {T}: Tap target creature you control and target creature of an opponent's choice they control. Those creatures fight each other. (Each deals damage equal to its power to the other.)",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Fight"
+  ],
+  "commanderLegal": "legal",
+  "set": "plc",
+  "releasedAt": "2007-02-02",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -466,6 +466,13 @@ export function voteWins(s: GameState, option: string, orTie: boolean): boolean 
   return orTie && top > 1;
 }
 
+/** "Each color with the most votes or tied for most votes" (Council Guardian): this choice got the most votes, maybe with others. */
+export function voteAmongMost(s: GameState, option: string): boolean {
+  const tally = voteTally(s);
+  const n = tally.get(option) ?? 0;
+  return n > 0 && n === Math.max(0, ...tally.values());
+}
+
 /**
  * "Each permanent with the most votes or tied for most votes" (ObjRef "voted"), or with `any` "each permanent chosen this
  * way": still those objects (CR 400.7).

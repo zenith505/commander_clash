@@ -239,7 +239,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       const picker = e.youChoose ? ctx.controller : pid;
       // The ability's own words otherwise (Sunder the Gateway: "click an Incubator token you control to transform it").
       const own = e.prompt?.replace(/~/g, src).replace("{player}", picker === pid ? "yours" : `${player(s, pid).name}'s`);
-      s.pending = { kind: "pickPermanents", player: picker, source: src, action: e.action, ...(fate && picker === pid ? { prompt: fate } : own ? { prompt: own } : {}), what: e.least ? `${e.filter.text} with the least ${e.least}` : e.greatest ? `${e.filter.text} with the greatest ${e.greatest === "power" ? "power" : "mana value"}` : e.filter.text, options, count: n, ...(e.counter ? { counter: e.counter.kind } : {}), ...(among !== undefined && among !== pid ? { of: among } : {}), ...(picker !== pid ? { of: pid, pickFor: pid } : {}) };
+      s.pending = { kind: "pickPermanents", player: picker, source: src, action: e.action, ...(fate && picker === pid ? { prompt: fate } : own ? { prompt: own } : {}), what: e.least ? `${e.filter.text} with the least ${e.least}` : e.greatest ? `${e.filter.text} with the greatest ${e.greatest === "power" ? "power" : "mana value"}` : e.filter.text, options, count: n, ...(e.counter ? { counter: e.counter.kind } : {}), ...(among !== undefined && among !== pid ? { of: among } : {}), ...(picker !== pid ? { of: pid, pickFor: pid } : {}), ...(e.differentPowers ? { differentPowers: true as const } : {}) };
       return "paused";
     }
     sc.chosen![pid] = options;

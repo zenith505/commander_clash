@@ -1558,6 +1558,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
   for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, ...c });
   if (printed.entersAnchor) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "anchor" });
+  if (printed.entersEachPlayerChooses) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "playerWord", options: printed.entersEachPlayerChooses });
   // Dauntless Bodyguard: "As ~ enters, choose another creature you control" (CR 614.12).
   if (printed.entersChooseObject) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "chosenObject" });
   if (printed.entersAttachedToYours) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "attachHost" });
@@ -7382,6 +7383,10 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number, 
       return `${characteristics(s, o).name}: noncreature spells with mana value ${o.chosen.number} can't be cast`;
     if (abilitiesOf(s, o).opponentsNoncreatureMvAboveLands && controllerOf(s, o) !== pid && value !== undefined && !isType(d, "Creature") && value > s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length)
       return `${characteristics(s, o).name}: opponents can't cast noncreature spells with mana value greater than the number of lands they control`;
+    // Mana Maze: the spell's colors as it would be cast (CR 601.3), against the last spell cast this turn's as it was cast.
+    const lastColors = abilitiesOf(s, o).cantCastSharingLastColor && o.zone === "battlefield" ? (s.castThisTurn ?? []).at(-1)?.colors : undefined;
+    if (lastColors?.some((c) => d.colors.includes(c)))
+      return `${characteristics(s, o).name}: players can't cast spells that share a color with the spell most recently cast this turn`;
     if (abilitiesOf(s, o).opponentsCantCastEven && controllerOf(s, o) !== pid && value !== undefined && value % 2 === 0)
       return `${characteristics(s, o).name}: opponents can't cast spells with even mana values`;
     for (const b of abilitiesOf(s, o).cantBeCast ?? []) {
@@ -10170,6 +10175,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
       return;
     }
+    if (pend.what === "playerWord") {
+      // Archangel of Strife: this player's word; the next player is asked next (askEntersChoice), then it has entered.
+      if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(" or ")}`);
+      o.chosen = { ...o.chosen, byPlayer: { ...o.chosen?.byPlayer, [p.id]: choice } };
+      log(s, `${p.name} chooses ${choice} for ${pend.source}.`);
+      invalidateCharacteristics(s);
+      if (entry) s.entersChoices!.unshift(entry);
+      return;
+    }
     if (pend.what === "readAhead") {
       // Read ahead: it enters with the chosen number of lore counters (CR 702.155b, 714.3b).
       const n = Number(choice);
@@ -10229,7 +10243,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -10977,6 +10991,22 @@ function askEntersChoice(s: GameState): boolean {
       s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "sacrificeInstead", options, labels: options.map((id) => `Sacrifice ${nameOf(s, id)}`), objectId: o.id, prompt: `sacrifice a ${filter.text} for it to enter` };
       return true;
     }
+    if (c.what === "playerWord") {
+      // Archangel of Strife: "each player chooses war or peace": the active player first, then each other player in turn
+      // order (CR 101.4, rulings), each one still in the game (CR 800.4a), knowing the earlier choices.
+      const ap = s.turnOrder.indexOf(s.activePlayer);
+      const order = [...s.turnOrder.slice(ap), ...s.turnOrder.slice(0, ap)].filter((x) => !player(s, x).lost);
+      const next = order.find((x) => o.chosen?.byPlayer?.[x] === undefined);
+      if (next === undefined) {
+        q.shift();
+        if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
+        continue;
+      }
+      const words = c.options ?? [];
+      const said = Object.entries(o.chosen?.byPlayer ?? {}).map(([p, w]) => `${player(s, Number(p)).name} chose ${w}`).join(", ");
+      s.pending = { kind: "chooseOption", player: next, source: defOf(s, o).name, what: "playerWord", options: words, labels: words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)), objectId: o.id, prompt: `choose ${words.join(" or ")}${said ? ` (${said})` : ""}` };
+      return true;
+    }
     if (c.what === "anchor") {
       // "As ~ enters, choose Khans or Dragons" (CR 614.12b).
       const words = compileCard(defOf(s, o)).entersAnchor ?? [];
@@ -11077,6 +11107,16 @@ function askEntersChoice(s: GameState): boolean {
       }
       s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "lifeAsEnters", options: ["0"], numberRange: { min: 0, max }, objectId: o.id, prompt: `pay any amount of life as it enters (up to ${max})` };
       return true;
+    }
+    if (c.what === "number" && c.random?.length) {
+      // Haktos the Unscarred: "choose 2, 3, or 4 at random": no one chooses, the rng does (CR 614.12, rulings).
+      const n = c.random[Math.floor(nextRandom(s) * c.random.length)]!;
+      q.shift();
+      o.chosen = withChoice(o.chosen, "number", String(n));
+      log(s, `${defOf(s, o).name}'s number is chosen at random: ${n}.`);
+      invalidateCharacteristics(s);
+      if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
+      continue;
     }
     if (c.what === "number") {
       const r = c.range ?? { min: 0, max: 999 };

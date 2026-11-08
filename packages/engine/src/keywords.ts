@@ -162,6 +162,7 @@ export function canonicalKeyword(text: string): string | undefined {
   if (q === "the chosen player") return CHOSEN_PLAYER_PROTECTION;
   if (q === "the chosen card type") return CHOSEN_TYPE_PROTECTION;
   if (q === "each mana value of the chosen quality") return CHOSEN_PARITY_PROTECTION;
+  if (q === "each mana value other than the chosen number") return CHOSEN_NUMBER_EXCEPT_PROTECTION;
   if (q === "creatures of the chosen type") return CHOSEN_CREATURE_TYPE_PROTECTION;
   // Samite Elder: "each of that permanent's colors", the same (its one target's colors as it resolves).
   if (q === "each of that creature's colors" || q === "each of that permanent's colors") return TARGET_COLORS_PROTECTION;
@@ -279,6 +280,12 @@ export const CAST_SPELL_COLORS_PROTECTION = "Protection from each of that spell'
  * values" or "... even ...", the quality chosen as it entered (CR 614.12, 702.16a); with no choice made, none (rulings).
  */
 export const CHOSEN_PARITY_PROTECTION = "Protection from each mana value of the chosen quality";
+/**
+ * Haktos the Unscarred: "~ has protection from each mana value other than the chosen number": bound as "Protection from
+ * mana values other than 3", the number chosen as it entered (CR 702.16a): every other mana value, not just the numbers
+ * that could have been chosen; with no number chosen, none (rulings).
+ */
+export const CHOSEN_NUMBER_EXCEPT_PROTECTION = "Protection from each mana value other than the chosen number";
 /** "Protection from the chosen card type" (Serra's Emissary): the card type chosen as the source entered (CR 702.16a). */
 export const CHOSEN_TYPE_PROTECTION = "Protection from the chosen card type";
 /**
@@ -292,9 +299,11 @@ export const CARD_TYPE_PLURAL: Record<string, string> = { Artifact: "artifacts",
  * Keywords with "the chosen color" filled in; without a choice, that protection is dropped. `identity`: the colors in the
  * color identity of the commanders of the effect's controller, undefined if they have none.
  */
-export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[], cardType?: string, creatureType?: string, chosenKeywords?: readonly string[], ownColors?: readonly string[], landType?: string, parity?: "odd" | "even") =>
+export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[], cardType?: string, creatureType?: string, chosenKeywords?: readonly string[], ownColors?: readonly string[], landType?: string, parity?: "odd" | "even", chosenNumber?: number) =>
   keywords.flatMap((k) =>
-    k === CHOSEN_PARITY_PROTECTION
+    k === CHOSEN_NUMBER_EXCEPT_PROTECTION
+      ? chosenNumber !== undefined ? [`Protection from mana values other than ${chosenNumber}`] : []
+      : k === CHOSEN_PARITY_PROTECTION
       ? parity ? [`Protection from ${parity} mana values`] : []
       : k === OWN_COLORS_HEXPROOF || k === OWN_COLORS_PROTECTION
       ? (ownColors ?? []).filter((c) => COLOR_WORD[c]).map((c) => `${k === OWN_COLORS_HEXPROOF ? "Hexproof" : "Protection"} from ${COLOR_WORD[c]}`)
@@ -356,6 +365,9 @@ export function protectedFrom(keywords: readonly string[], src: SourceQuality, h
     // has mana value 0, and a spell's counts its X (rulings, CR 202.3).
     if (q === "odd mana values" && (src.manaValue ?? 0) % 2 === 1) return true;
     if (q === "even mana values" && (src.manaValue ?? 0) % 2 === 0) return true;
+    // Haktos's chosen number: a source whose mana value is any other (a token that isn't a copy has 0, rulings).
+    const except = /^mana values other than (\d+)$/.exec(q);
+    if (except && (src.manaValue ?? 0) !== Number(except[1])) return true;
     const mv = /^mana value (\d+) or (less|greater)$/.exec(q);
     if (mv && (mv[2] === "less" ? (src.manaValue ?? 0) <= Number(mv[1]) : (src.manaValue ?? 0) >= Number(mv[1]))) return true;
     const st = creatureTypeOfPlural(q);

@@ -359,6 +359,8 @@ export type Count =
   | { kind: "drawnRevealedMv" }
   /** "For each creature card put into a graveyard this way" after a mill (Dread Summons): the milled cards that went there and match. */
   | { kind: "milledThisWay"; filter?: TargetSpec }
+  /** Intrude on the Mind: "for each card put into your graveyard this way", after a "piles" instruction: the pile put there. */
+  | { kind: "pilesToGraveyard" }
   /** "The number of rad counters you have", "the total number of rad counters among players" (`who` unset; CR 728). */
   | { kind: "rad"; who?: PlayerRef }
   /** Lumbering Megasloth: "for each counter among players and permanents": every counter of every kind on each player still in the game and each permanent (CR 122.1). */
@@ -3118,7 +3120,7 @@ export type Effect =
    * creature." (CR 708.2, FaceDownKind "cyberman"); Wall of Deceit's "Turn ~ face down": a 2/2 with no text (708.2a, `as` "morph": turned face up again only by a morph
    * ability it has, 702.37e). Not one that's face down already (708.2b), nor a double-faced one (712.16).
    */
-  | { type: "turnFaceDown"; what: ObjRef; as: "cyberman" | "morph" }
+  | { type: "turnFaceDown"; what: ObjRef; as: "cyberman" | "morph" | "horror" }
   /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
   | { type: "suspect"; what: ObjRef; no?: true }
   /** Amy Pond: "choose a suspended card you own and remove that many time counters from it", chosen as it resolves. */
@@ -3150,7 +3152,20 @@ export type Effect =
    */
   | { type: "returnHeld"; under: "owner" | "you"; at?: "nextEndStep"; thenExile?: true; /** "With a vigilance counter and a lifelink counter on it" (Gilraen): each enters with one of each (CR 122.6). */ counters?: CounterKind[] }
   /** "Separate all permanents target player controls into two piles. That player sacrifices all permanents in the pile of their choice." (Liliana of the Veil, CR 700.3). */
-  | { type: "permanentPiles"; who: PlayerRef }
+  | {
+      type: "permanentPiles";
+      who: PlayerRef;
+      /** "Separate all creatures target player controls" (Do or Die): only permanents of these types. */
+      types?: string[];
+      /** Do or Die: "Destroy all creatures in the pile of that player's choice. They can't be regenerated." */
+      destroy?: true;
+      /**
+       * Make an Example: "Each opponent separates the creatures they control into two piles. For each opponent, you choose
+       * one of their piles. Each opponent sacrifices the creatures in their chosen pile": each of `who` separates their own,
+       * you choose, and then all of the chosen piles are sacrificed at once.
+       */
+      theySeparate?: true;
+    }
   /** A delayed flicker's return: the exiled card, while it's still in exile as that object. */
   /** A delayed flicker's return: its subject, or with `cards` each of those cards, if still the same objects in exile. */
   /** "Each opponent can't block with more than one creature this combat" (Mirri, Weatherlight Duelist; CR 509.1b): for each of those players, until the combat ends. */
@@ -7035,6 +7050,11 @@ export interface CompiledCard {
    * discarded card has, one of each kind however many cards have it (rulings).
    */
   entersDiscardKeywords?: string[];
+  /**
+   * Ixidron: "As ~ enters, turn all other nontoken creatures face down. (They're 2/2 creatures.)": the ones already on the
+   * battlefield, before it's there (not those entering with it, rulings; CR 614.1c), each a plain 2/2 (CR 708.2a).
+   */
+  entersTurnOthersFaceDown?: true;
   /** Urborg Lhurgoyf: "As ~ enters, mill three cards for each time it was kicked" (rulings: no trigger, CR 614.1c). */
   entersMillPerKick?: number;
   /**

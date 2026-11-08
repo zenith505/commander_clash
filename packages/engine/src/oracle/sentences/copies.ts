@@ -113,6 +113,8 @@ function parseOf(text: string, ctx: Ctx): ObjRef | null {
   if (/^that (artifact|enchantment|land|token)$/.test(text) && ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
   // Court of Vantress (rewritten in body.ts): the target an earlier sentence chose, not the token another made.
   if (/^the chosen permanent$/.test(text) && ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
+  // Sakashima's Will: "Choose a creature you control. ... that creature": the one you chose as it resolves (not targeted).
+  if (/^that creature$/.test(text) && ctx.lastChosen && ctx.lastCreated) return { ref: "created" };
   const of = parseObject(text, ctx, /\bcards?\b/.test(text) && /\btarget\b/.test(text));
   return of && !isGroup(of) && !("n" in of && (of.n ?? 1) > 1) ? of : null;
 }

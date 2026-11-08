@@ -3877,32 +3877,82 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "permanentPiles": {
-      // CR 700.3: you separate every permanent the player controls into two piles (one can be empty, and an Aura can go
-      // in a different pile from what it enchants: rulings); that player chooses one, and all of it is sacrificed at once.
+      // CR 700.3: every permanent the player controls (Do or Die: every creature) is separated into two piles (one can be
+      // empty, and an Aura can go in a different pile from what it enchants: rulings); a pile is chosen, and all of it is
+      // sacrificed (or destroyed) at once. Liliana of the Veil, Do or Die: you separate, that player chooses. Make an
+      // Example: each opponent separates their own, in turn order (CR 101.4), then you choose one of each of their piles
+      // ("their chosen pile" is the one you chose, rulings), and all of those piles are sacrificed at once.
       const sc = (s.resolving!.scratch ??= {});
-      const pid = players(s, e.who, ctx)[0];
-      if (pid === undefined) return;
-      if (!sc.looked) {
-        sc.looked = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid);
-        if (!sc.looked.length) return;
-        sc.queue = [ctx.controller];
+      const what = e.types?.length ? e.types.map((t) => t.toLowerCase()).join(" or ") : "permanent";
+      const fits = (o: GameObject) => !e.types?.length || e.types.some((t) => objIsType(s, o, t));
+      const names = (ids: ObjectId[]) => (ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : `no ${what}s`);
+      if (!sc.pileOf) {
+        const pids = e.theySeparate ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1);
+        sc.pileOf = {};
+        for (const pid of pids) {
+          const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && fits(obj(s, id)));
+          if (ids.length) sc.pileOf[pid] = ids;
+        }
+        sc.queue = Object.keys(sc.pileOf).map(Number);
         sc.chosen = {};
-        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "pile", what: "permanent", options: sc.looked, count: sc.looked.length, min: 0, anyNumber: true, of: pid };
+        sc.pileChoices = {};
+      }
+      const pileOf = sc.pileOf as Record<number, ObjectId[]>;
+      const order = Object.keys(pileOf).map(Number);
+      if (!order.length) return;
+      // Separating: the next player in the queue, or you for Liliana of the Veil and Do or Die.
+      const next = sc.queue![0];
+      if (next !== undefined && sc.chosen![next] === undefined) {
+        const separator = e.theySeparate ? next : ctx.controller;
+        const theirs = separator === next ? "you control" : `${player(s, next).name} controls`;
+        const rule = e.theySeparate
+          ? `${player(s, ctx.controller).name} chooses one of them, and you sacrifice the ${what}s in it.`
+          : `${player(s, next).name} chooses one of them, and all ${what}s in it are ${e.destroy ? "destroyed (they can't be regenerated)" : "sacrificed"}.`;
+        s.pending = { kind: "pickPermanents", player: separator, source: src, action: "pile", what, options: pileOf[next]!, count: pileOf[next]!.length, min: 0, anyNumber: true, of: next, pickFor: next, ...(e.types?.length || e.theySeparate ? { prompt: `separate all ${what}s ${theirs} into two piles: click the ones for the first pile (the rest form the second). ${rule}` } : {}) };
         return "paused";
       }
-      const names = (ids: ObjectId[]) => (ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "no permanents");
-      const one = sc.chosen?.[ctx.controller] ?? [];
-      const two = sc.looked.filter((id) => !one.includes(id));
-      if (sc.pileChoice === undefined) {
-        log(s, `${player(s, ctx.controller).name} separates ${player(s, pid).name}'s permanents into two piles: ${names(one)}; and ${names(two)}.`);
-        s.pending = { kind: "chooseOption", player: pid, source: src, what: "pile", options: ["0", "1"], labels: [`Pile 1: ${names(one)}`, `Pile 2: ${names(two)}`], piles: [one, two], of: pid, sacrificePile: true, prompt: "choose the pile of your permanents to sacrifice" };
+      // Choosing: you for each opponent's piles (Make an Example), or that player (Liliana, Do or Die).
+      if (sc.pileChoice !== undefined) {
+        const done = order.find((pid) => sc.pileChoices![pid] === undefined)!;
+        sc.pileChoices![done] = sc.pileChoice;
+        sc.pileChoice = undefined;
+      }
+      const pilesOf = (pid: number): [ObjectId[], ObjectId[]] => {
+        const one = sc.chosen![pid] ?? [];
+        return [one, pileOf[pid]!.filter((id) => !one.includes(id))];
+      };
+      const undecided = order.find((pid) => sc.pileChoices![pid] === undefined);
+      if (undecided !== undefined) {
+        const [one, two] = pilesOf(undecided);
+        const separator = e.theySeparate ? undecided : ctx.controller;
+        log(s, `${player(s, separator).name} separates ${separator === undecided ? `their ${what}s` : `${player(s, undecided).name}'s ${what}s`} into two piles: ${names(one)}; and ${names(two)}.`);
+        const chooser = e.theySeparate ? ctx.controller : undecided;
+        const verb = e.destroy ? "destroy" : "sacrifice";
+        s.pending = {
+          kind: "chooseOption",
+          player: chooser,
+          source: src,
+          what: "pile",
+          options: ["0", "1"],
+          labels: [`Pile 1: ${names(one)}`, `Pile 2: ${names(two)}`],
+          piles: [one, two],
+          of: undecided,
+          sacrificePile: true,
+          ...(e.destroy ? { destroyPile: true as const } : {}),
+          prompt: chooser === undecided ? `choose the pile of your ${what}s to ${verb}` : `choose the pile of ${player(s, undecided).name}'s ${what}s that they sacrifice`,
+        };
         return "paused";
       }
-      for (const id of sc.pileChoice === 0 ? one : two) {
+      // All at once (CR 608.2c): every chosen pile, as it is now.
+      const gone = order.flatMap((pid) => pilesOf(pid)[sc.pileChoices![pid]!]!.map((id) => ({ pid, id })));
+      for (const { pid, id } of gone) {
         const o = s.objects[id];
-        if (o?.zone !== "battlefield" || controllerOf(s, o) !== pid || !canBeSacrificed(s, o)) continue;
-        log(s, `${player(s, pid).name} sacrifices ${defOf(s, o).name}.`);
-        moveObject(s, id, "graveyard", { sacrificed: true });
+        if (o?.zone !== "battlefield" || controllerOf(s, o) !== pid) continue;
+        if (e.destroy) destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}.`, true, ctx.controller);
+        else if (canBeSacrificed(s, o)) {
+          log(s, `${player(s, pid).name} sacrifices ${defOf(s, o).name}.`);
+          moveObject(s, id, "graveyard", { sacrificed: true });
+        }
       }
       return;
     }
@@ -4130,7 +4180,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const n = counts.get(pid)! * (e.times ?? 1);
         if (!n) continue;
         // Stench of Evil: a punisher once for each of theirs ("repeat this process", Effect punisher `times`).
-        for (const inner of e.effects) if (runEffect(s, inner.type === "createToken" || inner.type === "draw" || inner.type === "search" || inner.type === "loseLife" || inner.type === "gainLife" ? { ...inner, n } : inner.type === "punisher" ? { ...inner, times: n } : inner, { ...ctx, eachOne: pid }) === "paused") return "paused";
+        for (const inner of e.effects) if (runEffect(s, inner.type === "createToken" || inner.type === "draw" || inner.type === "search" || inner.type === "loseLife" || inner.type === "gainLife" ? { ...inner, n } : inner.type === "punisher" ? { ...inner, times: n } : inner.type === "dig" ? { ...inner, n, count: n } : inner, { ...ctx, eachOne: pid }) === "paused") return "paused";
         done.push(pid);
         // The next player's search starts afresh (its queue, count and found cards are in the scratch).
         s.resolving!.scratch = { forEachDone: done };

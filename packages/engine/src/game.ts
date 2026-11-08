@@ -9,7 +9,7 @@ import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layo
 import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
-import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
+import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
@@ -18,7 +18,7 @@ import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTarg
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
-import { canAttachTo } from "./effects/run-permanents";
+import { canAttachTo, turnFaceDown } from "./effects/run-permanents";
 import { rollDice } from "./effects/run-dice";
 import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
@@ -96,7 +96,7 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
     turnOrder: setup.map((_, i) => i),
     players: [],
     objects: {},
-    cards: { [FACE_DOWN.oracleId]: FACE_DOWN, [FACE_DOWN_WARD.oracleId]: FACE_DOWN_WARD, [FACE_DOWN_FOREST.oracleId]: FACE_DOWN_FOREST, [FACE_DOWN_CYBERMAN.oracleId]: FACE_DOWN_CYBERMAN },
+    cards: { [FACE_DOWN.oracleId]: FACE_DOWN, [FACE_DOWN_WARD.oracleId]: FACE_DOWN_WARD, [FACE_DOWN_FOREST.oracleId]: FACE_DOWN_FOREST, [FACE_DOWN_CYBERMAN.oracleId]: FACE_DOWN_CYBERMAN, [FACE_DOWN_HORROR.oracleId]: FACE_DOWN_HORROR },
     battlefield: [],
     stack: [],
     triggerQueue: [],
@@ -1527,6 +1527,15 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   }
   // "This creature enters prepared" (CR 722.3a): the copy of its prepare spell is created as it enters (722.3c).
   if (printed.entersPrepared) becomePrepared(s, o);
+  // Ixidron: every other nontoken creature already on the battlefield turns face down as it enters (rulings: there's never
+  // a moment it's on the battlefield with them face up, so "whenever another creature enters" abilities of theirs don't
+  // see it; one entering at the same time stays face up). A face-down one stays as it is (rulings), and a double-faced
+  // one can't be turned face down (CR 712.16): turnFaceDown checks both. Each may be turned face up for its morph or
+  // disguise cost, if it has one (CR 702.37e).
+  if (printed.entersTurnOthersFaceDown) {
+    const name = defOf(s, o).name;
+    for (const other of s.battlefield.filter((x) => x !== id && s.objects[x] && !s.objects[x]!.isToken && objIsType(s, s.objects[x]!, "Creature"))) turnFaceDown(s, obj(s, other), "morph", name);
+  }
   // Heightened Awareness: "As ~ enters, discard your hand" (CR 614.1c), before what its entering triggers.
   if (printed.entersDiscardHand) discardCards(s, controllerOf(s, o), [...player(s, controllerOf(s, o)).hand]);
   // Urborg Lhurgoyf: "mill three cards for each time it was kicked", as it enters (rulings: it doesn't use the stack).

@@ -134,6 +134,8 @@ export interface Ctx {
   afterMillOne?: boolean;
   /** The instruction before was a mill, anyone's: "for each creature card put into a graveyard this way" (Dread Summons). */
   afterAnyMill?: boolean;
+  /** The last instruction was a "piles" one putting a pile into your graveyard (Intrude on the Mind). */
+  afterPilesGraveyard?: boolean;
   /** The instruction before was a search for one card that exiles it (Seek): "the exiled card" is that card. */
   afterSearchExileOne?: boolean;
   /** The instruction before was a destroy: "the number of Mountains put into a graveyard this way" (Volcanic Eruption). */
@@ -3739,6 +3741,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // number of colors of mana spent to cast ~.": three instructions in order, the same X for each.
   text = text.replace(/^Target player draws X cards, ~ deals X damage to any target, and you gain X life, (where X is [^.]+)\.$/, "Target player draws X cards, $1. ~ deals X damage to any target, $1. You gain X life, $1.");
   // Riches: one instruction about the creatures chosen (sentences/permanents.ts).
+  // This Is How It Ends: "Target creature's owner shuffles it into their library, then faces a villainous choice — ...":
+  // the shuffle, then that owner's villainous choice (CR 701.55a).
+  text = text.replace(/^Target creature's owner shuffles it into their library, then faces a villainous choice — /, "Target creature's owner shuffles it into their library. Then its owner faces a villainous choice — ");
+  // Sakashima's Will: "Target opponent chooses a creature they control. You gain control of it.": that player picks one
+  // as it resolves (not targeted), and you control it from then on.
+  text = text.replace(/^Target opponent chooses a creature they control\. You gain control of it\.$/, "Target opponent chooses a creature they control and you gain control of it.");
   text = text.replace(/^Each opponent chooses a creature they control\. You gain control of those creatures\.$/, "Each opponent chooses a creature they control and you gain control of those creatures.");
   // Promise of Tomorrow: "sacrifice ~ and return all cards exiled with it to the battlefield under your control": two
   // instructions, the cards its other ability exiled (CR 607.2a) returned even though ~ has just left.
@@ -3899,6 +3907,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Artificial Evolution: "... replacing all instances of one creature type with another. The new creature type can't be
   // Wall." One instruction: Wall isn't offered as the new word.
   text = text.replace(/(by replacing all instances of one creature type with another)\. The new creature type can't be Wall\./, "$1 except Wall.");
+  // Illithid Harvester: "turn any number of target tapped nontoken creatures face down. They're 2/2 Horror creatures."
+  // One instruction (FaceDownKind "horror", CR 708.2a).
+  text = text.replace(/\b([Tt]urn any number of target tapped nontoken creatures face down)\. They're 2\/2 Horror creatures\./, "$1 as 2/2 Horror creatures.");
   // Cyber Conversion: "Turn target creature face down. It's a 2/2 Cyberman artifact creature." One instruction: it's turned
   // face down as that (FaceDownKind "cyberman", rulings).
   text = text.replace(/\b([Tt]urn target creature face down)\. It's a 2\/2 Cyberman artifact creature\./, "$1 as a 2/2 Cyberman artifact creature.");
@@ -4036,6 +4047,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\b(enchanted player) mills X cards, where X is the number of cards put into their graveyard/g, "$1 mills X cards, where X is the number of cards put into enchanted player's graveyard");
   // Liliana of the Veil's two sentences are one effect: the piles, then the sacrifice of the chosen one (CR 700.3).
   text = text.replace(/\bSeparate all permanents (target player|target opponent) controls into two piles\. That player sacrifices all permanents in the pile of their choice\./g, "Separate all permanents $1 controls into two piles for that player to sacrifice the pile of their choice.");
+  // Do or Die: "Separate all creatures target player controls into two piles. Destroy all creatures in the pile of that
+  // player's choice. They can't be regenerated."; Make an Example: "Each opponent separates the creatures they control
+  // into two piles. For each opponent, you choose one of their piles. Each opponent sacrifices the creatures in their
+  // chosen pile.": one effect each (CR 700.3).
+  text = text.replace(/\bSeparate all creatures (target player|target opponent) controls into two piles\. Destroy all creatures in the pile of that player's choice\. They can't be regenerated\./g, "Separate all creatures $1 controls into two piles for that player to choose the pile to destroy without regeneration.");
+  text = text.replace(/\bEach opponent separates the creatures they control into two piles\. For each opponent, you choose one of their piles\. Each opponent sacrifices the creatures in their chosen pile\./g, "Each opponent separates the creatures they control into two piles for you to choose the pile they sacrifice.");
   // Wellspring: "untap enchanted land. You gain control of that land until end of turn.": that land is the enchanted one.
   text = text.replace(/^untap enchanted land\. You gain control of that land until end of turn\.$/, "untap enchanted land. Gain control of enchanted land until end of turn.");
   // Splintering Wind: "Create a 1/1 green Splinter creature token. It has flying and "Cumulative upkeep {G}."": what the
@@ -4477,6 +4494,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // card's mana value": one target player's card.
     ctx.afterMillOne = last?.type === "mill" && last.n === 1 && (last.who.ref === "you" || last.who.ref === "eventPlayer" || (last.who.ref === "target" && !last.who.n));
     ctx.afterAnyMill = last?.type === "mill";
+    // Kept through "Create a ... token, then put a +1/+1 counter on it for each card put into your graveyard this way".
+    ctx.afterPilesGraveyard = effects.some((x) => x.type === "piles" && x.rest === "graveyard" && !x.pickOne);
     ctx.afterSearchExileOne = last?.type === "search" && last.n === 1 && last.dest.zone === "exile" && !last.upTo;
     ctx.afterDestroy = last?.type === "destroy";
     // "You may discard your hand." (Balin, Loremaster): none discarded this way if you don't.
@@ -14920,6 +14939,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const one = inner?.length === 1 ? inner[0]! : undefined;
       if (prev?.type !== (which === "destroyed" ? "destroy" : "exile") || spec?.kind !== "object" || !one || (one.type !== "createToken" && one.type !== "draw") || one.n !== 1) return null;
       effects.push({ type: "forEachThisWay", which, ...(graveyard ? { graveyard: true as const } : {}), ...(times ? { times } : {}), filter: { ...spec, text: perThisWay[1]! }, effects: [{ ...one, who: { ref: "eachOne" } }] });
+      continue;
+    }
+    // Unexplained Absence: "For each permanent exiled this way, its controller cloaks the top card of their library": each
+    // player who controlled one as it was exiled (CR 608.2h), once for each, in APNAP order (CR 101.4); a cloaked card
+    // is a face-down 2/2 with ward {2} (CR 701.58a).
+    if (/^For each permanent exiled this way, its controller cloaks the top card of their library$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "exile" || prev.until) return null;
+      effects.push({ type: "forEachThisWay", which: "exiled", filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanent" }, effects: [{ type: "dig", n: 1, count: 1, upTo: false, required: true, into: "cloak", rest: "graveyard", reveal: false, who: { ref: "eachOne" } }] });
       continue;
     }
     // Rampant Frogantua: "You may mill that many cards. Put any number of land cards from among them onto the battlefield

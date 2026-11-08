@@ -1,6 +1,6 @@
 # Roadmap
 
-30,586 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,593 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,728 of
 9,979 (97%).
 
@@ -6911,7 +6911,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   unless they pay its mana cost, a tie theirs to break; {X} in it is 0, CR 107.3h; no mana cost or face down, it can't
   be paid, CR 118.6). Meddle and Quicksilver Dragon ("If target spell has only one target and that target is a
   creature / ~, change that spell's target to another creature": a spell with two targets, a player target, or one
-  that's left is unchanged, CR 115.7a, rulings). +7 (30,581 of 31,936 with B148, B149, B150 and round 309).
+  that's left is unchanged, CR 115.7a, rulings). +7 (30,593 of 31,936 with B148-B150 and rounds 309-310).
 - Out after round B151 (looked at, not done): Thelon's Chant and Tourach's Chant (the player who put a land onto the
   battlefield isn't tracked), Gloom (the tax would apply to mana abilities too, which take no cost increase here), Spoils
   of War (X as you cast it from the cards in an opponent's graveyard), Selective Snare (a creature type chosen as it's

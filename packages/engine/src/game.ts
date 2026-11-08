@@ -20,7 +20,7 @@ import { blightOptions, countersBanned, countersRemoved, countersStay, putCounte
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { canAttachTo } from "./effects/run-permanents";
 import { rollDice } from "./effects/run-dice";
-import { bindChoosers, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
+import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, enchantableBy, everyCreatureType, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
 import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
@@ -363,6 +363,8 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "castSpell":
       if (action.assisted !== undefined) throw new RulesError("the assisting player chooses how much they pay");
+      // "An opponent chooses one —" (Misfortune): only that opponent's answer sets the mode (askModeChooser).
+      if (action.chooserModes !== undefined || action.chooserPicks !== undefined) throw new RulesError("an opponent makes that choice");
       if (action.assist !== undefined && freeCastOf(s, p.id) !== action.objectId) {
         requireNoPending(s);
         askAssist(s, p, action);
@@ -5460,14 +5462,14 @@ function chooserProblem(s: GameState, pid: PlayerId, specs0: TargetSpec[], targe
 function runCast(s: GameState, p: Player, action: Extract<Action, { type: "castSpell" }>) {
   if (freeCastOf(s, p.id) === action.objectId) {
     // Cascade's "you may cast it without paying its mana cost", as the ability resolves.
-    if (askChoosers(s, p, action, s.pending ?? undefined)) return;
+    if (askModeChooser(s, p, action, s.pending ?? undefined) || askChoosers(s, p, action, s.pending ?? undefined)) return;
     castSpell(s, p, action.objectId, action.targets, action.modes, undefined, undefined, action.x, action);
     s.pending = null;
     continueResolution(s);
     return;
   }
   requireNoPending(s);
-  if (askChoosers(s, p, action)) return;
+  if (askModeChooser(s, p, action) || askChoosers(s, p, action)) return;
   castSpell(s, p, action.objectId, action.targets, action.modes, action.convoke, action.improvise, action.x, action);
   s.passedInSuccession = [];
 }
@@ -5527,6 +5529,47 @@ function askChoosers(s: GameState, p: Player, act: DeferredAct["act"], restore?:
   const spec = bindChoosers(specs, [...choosers.slice(0, k), chooser])[slot]!;
   s.pending = { kind: "chooseTargets", player: chooser, sourceId: o.id, specs: [spec], description: cast ? name : describeAbility(defOf(s, o), ab!.text), controller: p.id, deferred: { act: next, ...(restore ? { restore } : {}) } };
   log(s, `${p.name} asks ${player(s, chooser).name} to choose ${what.replace(/ of an opponent's choice/, "")} for ${name}.`);
+  return true;
+}
+
+/**
+ * "An opponent chooses one —" (Misfortune, Fatal Lore, Library of Lat-Nam): as it's cast, its caster chooses an opponent
+ * (the only one, without a question), and that opponent chooses the mode when the caster normally would (CR 700.2e,
+ * 601.2b), only one that could be chosen (700.2a); then the caster chooses that mode's targets (601.2c; rulings on Fatal
+ * Lore: "you choose the zero, one, or two targets after that"). Nothing happens until then, as with askChoosers; the cast
+ * is checked first without a mode. Whether it asked; `restore`, the decision it's cast during.
+ */
+function askModeChooser(s: GameState, p: Player, act: Extract<Action, { type: "castSpell" }>, restore?: PendingDecision): boolean {
+  const o = s.objects[act.objectId];
+  if (!o) return false;
+  const modal = compileCard(castDef(s, act.objectId, act.alt)).spell?.modal;
+  if (modal?.chooser !== "opponent") return false;
+  const name = defOf(s, o).name;
+  const keep = restore ? { restore } : {};
+  if (act.chooserModes === undefined) {
+    if (act.modes !== undefined || act.targets?.length) throw new RulesError(`an opponent chooses the mode of ${name}, then you choose its targets`);
+    const problem = castProblem(s, p.id, act.objectId, undefined, undefined, act.convoke, act.improvise, act.x, act);
+    if (problem) throw new RulesError(problem);
+    const opps = opponents(s, p.id).filter((q) => !player(s, q).lost);
+    if (act.modeChooser !== undefined && !opps.includes(act.modeChooser)) throw new RulesError("choose an opponent in the game to choose its mode");
+    if (act.modeChooser === undefined && opps.length > 1) {
+      s.pending = { kind: "chooseOption", player: p.id, source: name, what: "modeChooser", options: opps.map(String), labels: opps.map((q) => player(s, q).name), prompt: `which opponent chooses the mode of ${name}?`, deferred: { act, ...keep } };
+      return true;
+    }
+    const chooser = act.modeChooser ?? opps[0];
+    if (chooser === undefined) throw new RulesError(`no opponent can choose the mode of ${name}`);
+    const next = { ...act, modeChooser: chooser };
+    const legal = modal.modes.map((_, i) => !castProblem(s, p.id, act.objectId, undefined, [i], act.convoke, act.improvise, act.x, { ...next, chooserModes: [i] }));
+    if (!legal.some(Boolean)) throw new RulesError(`${name} has no mode that can be chosen`);
+    s.pending = { kind: "chooseModes", player: chooser, sourceId: o.id, description: `${name}: ${p.name}'s spell, you choose its mode`, min: 1, max: 1, modes: modal.modes.map((m) => m.text), legal, deferred: { act: next, ...keep } };
+    log(s, `${p.name} asks ${player(s, chooser).name} to choose the mode of ${name}.`);
+    return true;
+  }
+  // The mode chosen: its caster's own targets, if it has any (CR 601.2c).
+  if (act.targets !== undefined) return false;
+  const specs = bindModeChooser(spellTargets(s, act.objectId, act.chooserModes, act.alt, castHow(act)), act.modeChooser);
+  if (!specs.length) return false;
+  s.pending = { kind: "chooseTargets", player: p.id, sourceId: o.id, specs, description: name, deferred: { act, own: true, ...keep } };
   return true;
 }
 
@@ -5820,16 +5863,23 @@ export function castProblem(
   const printedCost = parseManaCost(d.manaCost);
   const sq: SourceQuality = { colors: d.colors, types: d.types, subtypes: d.subtypes, supertypes: d.supertypes, name: d.name, spell: true, manaValue: defMv(d) + (printedCost.hasX ? (x ?? 0) * xCount(printedCost) : 0) };
   if (spell?.modal) {
+    // "An opponent chooses one —": that opponent's mode, and no other (askModeChooser, CR 700.2e).
+    const chooser = spell.modal.chooser ? choices?.modeChooser : undefined;
+    if (spell.modal.chooser && modes !== undefined) {
+      if (chooser === undefined || choices?.chooserModes?.join() !== modes.join()) return `an opponent chooses the mode of ${d.name}`;
+      if (!opponents(s, pid).includes(chooser) || player(s, chooser).lost) return "choose an opponent in the game to choose its mode";
+    }
+    const bound = chooser !== undefined ? { ...spell, modal: { ...spell.modal, modes: spell.modal.modes.map((m) => ({ ...m, targets: bindModeChooser(m.targets, chooser) })) } } : spell;
     if (modes === undefined) {
-      if (!canChooseModes(s, spell, pid, sq)) return `${d.name} has no mode that can be chosen`;
+      if (!canChooseModes(s, bound, pid, sq)) return `${d.name} has no mode that can be chosen`;
     } else {
-      const mp = modesProblem(s, spell, modes, pid, sq, bothModes(s, pid, spell, choices));
+      const mp = modesProblem(s, bound, modes, pid, sq, bothModes(s, pid, bound, choices));
       if (mp) return mp;
     }
   }
   // "X damage divided as you choose": the X announced (CR 601.2b, 601.2d).
   // Before targets are chosen, "with mana value X" asks for none in particular: X is announced as it's cast (601.2b).
-  let specs = settleDivided(s, { targets: castTimeTargets(d, spellTargetSpecs(d, modes, castHow(choices))), effects: [], text: "" }, { controller: pid, sourceId: id, x: x ?? 0 }, !targets).targets;
+  let specs = settleDivided(s, { targets: bindModeChooser(castTimeTargets(d, spellTargetSpecs(d, modes, castHow(choices))), spell?.modal?.chooser ? choices?.modeChooser : undefined), effects: [], text: "" }, { controller: pid, sourceId: id, x: x ?? 0 }, !targets).targets;
   // "Any number of target creatures" could take a Flagbearer more (flagbearerProblem).
   const manySpecs = specs.filter((t) => t.many === "any" && !t.skip);
   if (targets && manySlot(specs) >= 0) {
@@ -6871,6 +6921,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (unpicked) throw new RulesError(`choose what to pay ${d.name}'s additional cost with`);
   // The targets it has, cast this way (CR 702.33g): copies of it have the same ones (CR 707.10).
   let body = spell ? settleDivided(s, gateBody(withModes(spell, modes), castHow(choices)), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
+  // "Target creatures that player controls" in a mode an opponent chose (Fatal Lore): theirs, for good (askModeChooser).
+  if (body && spell?.modal?.chooser) body = { ...body, targets: bindModeChooser(body.targets, choices.modeChooser) };
   if (body && manySlot(body.targets) >= 0) {
     // As many targets as were chosen for "any number of target ..." (CR 601.2c); castProblem checked them.
     const fit = fitMany(body, targets ?? [], manyX(s, body.targets, p.id, id, x)) as Exclude<ReturnType<typeof fitMany>, string>;
@@ -7047,6 +7099,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     modes: chosen,
     ...(hasX ? { x: x ?? 0 } : {}),
     ...(compileCard(d).castNumber && choices.number !== undefined ? { chosenNumber: choices.number } : {}),
+    ...(spell?.modal?.chooser && choices.modeChooser !== undefined ? { modeChooser: choices.modeChooser } : {}),
     ...(kicks ? { kicked: kicks } : {}),
     ...(byControl ? { kickedByControl: true as const } : {}),
     // Swallow Whole: the creature tapped for its "tap an untapped creature you control" additional cost (ObjRef costTapped).
@@ -9406,6 +9459,14 @@ function manaAbilityPick(s: GameState, pid: PlayerId, o: GameObject, index: numb
 function chooseTriggerModes(s: GameState, p: Player, modes: number[]) {
   const pend = s.pending;
   if (pend?.kind !== "chooseModes" || pend.player !== p.id) throw new RulesError("no modes to choose");
+  if (pend.deferred) {
+    // "An opponent chooses one —" (askModeChooser): this opponent's mode for another player's spell being cast.
+    if (modes.length !== 1 || !pend.legal[modes[0]!]) throw new RulesError(`choose one of the modes of ${pend.description.split(":")[0]} that can be chosen`);
+    const d = pend.deferred;
+    log(s, `${p.name} chooses "${pend.modes[modes[0]!]}" for ${pend.description.split(":")[0]}.`);
+    resumeDeferred(s, d.act.type === "castSpell" ? { ...d, act: { ...d.act, modes } } : d, { chooserModes: modes });
+    return;
+  }
   const t = s.triggerQueue[0]!;
   const problem = modesProblem(s, triggerBody(s, t), modes, p.id, sourceQuality(s, t.sourceId, t.sourceCardId), !!t.both, t.sourceId);
   // Choosing no modes is allowed for "choose up to"; the ability is then removed (CR 603.3c).
@@ -9501,6 +9562,12 @@ function chooseNewTarget(s: GameState, p: Player, target: TargetChoice) {
 function chooseTriggerTargets(s: GameState, p: Player, targets: TargetChoice[]) {
   const pend = s.pending;
   if (pend?.kind !== "chooseTargets" || pend.player !== p.id) throw new RulesError("no targets to choose");
+  if (pend.deferred?.own) {
+    // The caster's own targets, once an opponent has chosen the mode (askModeChooser): checked as it's cast.
+    const { own: _, ...d } = pend.deferred;
+    resumeDeferred(s, { ...d, act: { ...d.act, targets } }, {});
+    return;
+  }
   if (pend.deferred) {
     // A target of a spell or ability being cast or activated, chosen by this opponent (askChoosers): legal for its
     // controller, checked as it goes on.
@@ -9806,6 +9873,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (!pend.options.includes(choice) && !inRange) throw new RulesError(`${choice} isn't ${pend.what === "color" ? "a color" : pend.what === "creatureType" ? "a creature type" : pend.numberRange ? `a number from ${pend.numberRange.min} to ${pend.numberRange.max}` : "an option"} you can choose`);
   s.pending = null;
+  if (pend.what === "modeChooser") {
+    // "An opponent chooses one —" (askModeChooser): that opponent chooses the mode next, as it's cast.
+    if (!pend.deferred) throw new RulesError("no spell is waiting for its mode");
+    log(s, `${p.name} chooses ${player(s, Number(choice)).name} to choose the mode of ${pend.source}.`);
+    resumeDeferred(s, pend.deferred, { modeChooser: Number(choice) });
+    return;
+  }
   if (pend.what === "targetChooser" && pend.deferred) {
     // A spell's or activated ability's (askChoosers): that opponent chooses it next, as it's cast or activated.
     const prev = chooserChoices(pend.deferred.act.type === "castSpell" ? pend.deferred.act : pend.deferred.act.costs).choosers;

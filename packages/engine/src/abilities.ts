@@ -863,7 +863,8 @@ export interface TargetSpec {
    * player"): "eventPlayer", made concrete as `controlledBy` once the trigger knows that player.
    */
   /** "chosenPlayer": "creatures that player controls" after "Choose a player ..." (The Black Gate), bound as it resolves (fixMods). */
-  controller?: "you" | "opponent" | "eventPlayer" | "enchanted" | "chosenPlayer";
+  /** "modeChooser": "target creatures that player controls" in a mode an opponent chose (Fatal Lore), bound to them as it's cast (bindModeChooser). */
+  controller?: "you" | "opponent" | "eventPlayer" | "enchanted" | "chosenPlayer" | "modeChooser";
   /** "Creatures the monarch controls" (Azure Fleet Admiral): controlled by the player who is the monarch now (CR 725). */
   monarchControls?: true;
   controlledBy?: PlayerId;
@@ -1558,6 +1559,8 @@ export type PlayerRef =
   | { ref: "couldntPick" }
   /** Gift's "the chosen player": the opponent the gift was promised to (CR 702.174a). */
   | { ref: "giftee" }
+  /** "An opponent chooses one —" (Misfortune, Fatal Lore): "that player", the opponent who chose the spell's mode (StackItem.modeChooser). */
+  | { ref: "modeChooser" }
   /** "That player" after "Clash with an opponent" (Pollen Lullaby, Captivating Glance): the opponent clashed with (CR 701.30b). */
   | { ref: "clashOpponent" }
   /** "Players dealt damage this way" (Aurelia's Fury): by this spell's or ability's damage so far. */
@@ -5215,6 +5218,11 @@ export interface AbilityBody {
     randomUnless?: StaticCondition;
     /** "You may choose two" (Shadrix Silverquill): no modes at all, or `min` to `max` of them. */
     optional?: true;
+    /**
+     * "An opponent chooses one —" (Misfortune, Fatal Lore, Library of Lat-Nam): an opponent chooses the mode as it's cast,
+     * the caster choosing which opponent (CR 700.2e, 601.2b), then the caster its targets (601.2c; rulings on Fatal Lore).
+     */
+    chooser?: "opponent";
     /** "Each mode must target a different player" (Shadrix Silverquill): no target of one mode is a target of another. */
     distinctTargets?: true;
     /** "Choose up to X, where X is the number of Lesson cards in your graveyard" (Bumi, King of Three Trials): `max` is the most there are modes; this caps it, counted as a triggered ability is put on the stack (CR 603.3c; PendingTrigger.maxModes). */

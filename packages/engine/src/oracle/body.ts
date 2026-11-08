@@ -1134,6 +1134,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // chooser, then each of those targets marked as chosen by an opponent its controller chooses, as it's cast or activated
   // (TargetSpec.chosenBy "opponent", CR 601.2c, 602.2b; rulings). "Of your choice" beside one (Diaochan) is an ordinary target.
   if ((opts.spell || opts.activated) && (/\btarget\b[^.]*? of an opponent's choice\b/.test(text) || /^An opponent chooses target creature they control\. /.test(text))) return opponentChosenTargets(text, opts);
+  // "An opponent chooses one —" (Misfortune, Fatal Lore, Library of Lat-Nam): a spell's mode chosen by an opponent its caster
+  // chooses (CR 700.2e), "that player" in its modes being that opponent (modal.chooser, opponentChosenModes).
+  if (opts.spell && /^An opponent chooses one —/.test(text.trim())) return opponentChosenModes(text.trim(), opts);
   if (opts.subjectIt && !opts.selfIt && /^you may transform it\.$/.test(text)) return { targets: [], effects: [{ type: "may", effects: [{ type: "transform", what: { ref: "subject" } }], text: "transform it" }], text };
   // Dazzling Denial: "Counter target spell unless its controller pays {2}. If you control a Bird, counter that spell unless
   // its controller pays {4} instead." One counter, with the cost the condition sets as it resolves (CR 608.2c).
@@ -18107,6 +18110,33 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
 }
 
 /** "{2}{U}", "3 life", "{E}{E}", "{1} and 2 life": a cost paid as an ability resolves. */
+/**
+ * parseBody's "An opponent chooses one —" for a spell (modal.chooser "opponent", CR 700.2e): each mode read as its caster's
+ * instructions ("You put ...", "You draw ..."), "that player" in it read as a trigger's player and then made the opponent
+ * who chose the mode (PlayerRef "modeChooser", TargetSpec controller "modeChooser"). Or null.
+ */
+function opponentChosenModes(text: string, opts: Parameters<typeof parseBody>[1]): AbilityBody | null {
+  const m = /^An opponent chooses one —\s*((?:•[^•]+)+)$/.exec(text);
+  if (!m) return null;
+  const modes: AbilityBody[] = [];
+  for (const b of m[1]!.split("•").map((x) => x.trim()).filter(Boolean)) {
+    // "You put ..." is the caster putting them: the same instruction as "Put ...".
+    const own = b.replace(/^You ([a-z])/, (_, c: string) => c.toUpperCase());
+    // Misfortune: "... and gain 4 life", "... and ~ deals 4 damage to that player": two instructions, in that order.
+    const two = /^(.+?) and (gain \d+ life|~ deals \d+ damage to that player)\.$/.exec(own);
+    const src = two ? `${two[1]!}. ${two[2]!.startsWith("gain") ? "You " : ""}${two[2]!}.` : own;
+    const body = parseBody(src, { ...opts, eventPlayer: true });
+    if (!body || body.modal) return null;
+    const rebind = <T>(x: T): T => JSON.parse(JSON.stringify(x).replace(/"ref":"eventPlayer"/g, '"ref":"modeChooser"').replace(/"controller":"eventPlayer"/g, '"controller":"modeChooser"')) as T;
+    const [targets, effects] = [rebind(body.targets), rebind(body.effects)];
+    // Anything else about "that player" isn't understood here.
+    if (JSON.stringify([targets, effects]).includes("eventPlayer")) return null;
+    modes.push({ ...body, targets, effects, text: b });
+  }
+  if (modes.length < 2) return null;
+  return { targets: [], effects: [], text, modal: { min: 1, max: 1, modes, chooser: "opponent" } };
+}
+
 /** parseBody's "target ... of an opponent's choice" (TargetSpec.chosenBy "opponent"): the body, or null. */
 function opponentChosenTargets(text: string, opts: Parameters<typeof parseBody>[1]): AbilityBody | null {
   const echo = /^An opponent chooses target creature they control\. (.*?)\bthat creature\b(.*)$/s.exec(text);

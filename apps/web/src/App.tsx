@@ -1377,7 +1377,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (o.zone === "battlefield" && controllerOf(s, o) !== HUMAN && abilitiesOf(s, o).activated.some((ab) => ab.anyPlayer && (!ab.ownerOnly || o.owner === HUMAN) && (!ab.opponentsOnly || opponents(s, controllerOf(s, o)).includes(HUMAN)))) return setMenu(o.id);
     if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN) return;
     // A card with cycling, evoke or dash: choose between casting (or playing) it and the other way.
-    if (o.zone === "hand" && (handAbilities(s, o.id).length || altCostsFor(s, HUMAN, o).length || compileCard(cardOf(s, o.id)).faceDownCast || compileCard(cardOf(s, o.id)).suspend || compileCard(cardOf(s, o.id)).plot || foretellCostOf(s, o) || compileCard(cardOf(s, o.id)).assist)) return setMenu(o.id);
+    if (o.zone === "hand" && (handAbilities(s, o.id).length || altCostsFor(s, HUMAN, o).length || compileCard(cardOf(s, o.id)).faceDownCast || compileCard(cardOf(s, o.id)).suspend || compileCard(cardOf(s, o.id)).plot || foretellCostOf(s, o) || compileCard(cardOf(s, o.id)).assist || compileCard(cardOf(s, o.id)).discardAnyTime)) return setMenu(o.id);
     // A card with several faces to cast or play it as (a split card's halves, an Adventure, a modal double-faced card's
     // back): choose which.
     if ((o.zone === "hand" || o.zone === "command" || (o.zone === "library" && mayPlayFromTop(s, o, HUMAN)) || (o.zone === "exile" && mayPlayFromExile(s, o, HUMAN) && o.mayPlay?.until !== "adventure")) && (castableFaces(s, o).length || landFaces(s, o).some((f) => f !== 0))) return setMenu(o.id);

@@ -161,7 +161,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       // others as its controller chooses, none too (CR 602.2b, 601.2h), how many announced like an X (CR 107.3a).
       const filter = pickFilter("creature you control");
       if (!filter) return "fail";
-      extra.push({ kind: "sacrifice", filter: { ...filter, text: "creature you control" }, n: 0, x: true, other: true });
+      extra.push({ kind: "sacrifice", filter: { ...filter, text: "creature" }, n: 0, x: true, other: true });
     } else if ((c = new RegExp(`^Sacrifice ~ and ${NUM} (.+)$`).exec(part))) {
       // Mount Doom: "Sacrifice ~ and a legendary artifact": this permanent and another one (CR 602.2b). Glass-Cast Heart:
       // "Sacrifice this artifact and thirteen Blood tokens", each one another permanent (rulings).

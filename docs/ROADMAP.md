@@ -6506,6 +6506,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   counter on ~ instead" beside the plain draw). Bots answer the forms, bring Mister Immortal back from exile, put study
   counters until there are three and skip a draw only with five or fewer cards left in the library. Browser tests for
   each new prompt and button. +9 (30,415 of 31,936 with B138, rounds 300 and 301).
+- Round B140 (least played first, from the skip lists): Riftmarked Knight (a token "with flanking, protection from white,
+  and haste": its flanking trigger comes with it, CR 702.25a), Break the Ice ("land that is snow or could produce {C}",
+  CR 106.7, from the land's mana abilities whether it's tapped or not, rulings; overloaded too), Earthbind (an Aura that
+  gains "Enchanted creature loses flying" as its trigger resolves, with its own timestamp, CR 613.7a, so flying granted
+  later still applies, rulings), Bewitching Leechcraft (a granted replacement of the creature's untapping in its
+  controller's untap step, CR 614.1a: a +1/+1 counter removed or it stays tapped; two of them take two, CR 616.1),
+  Cycle of Life ("target creature you cast this turn": a spell you cast, not a creature put onto the battlefield, then a
+  delayed counter at your next upkeep), Rasputin Dreamweaver ("if ~ started the turn untapped", recorded as each turn
+  begins; "can't have more than seven dream counters", the extra removed as a state-based action, CR 122.4, 704.5r), Soul
+  Separator (the Spirit copy is 1/1 because a copy with a power and toughness exception doesn't copy a characteristic-
+  defining ability, CR 707.9d; the Zombie's size uses the card's characteristic-defining ability in the graveyard,
+  rulings), Circling Vultures (a Discard button in its hand menu, a special action any time you could cast an instant,
+  CR 116.2e), Sword of the Ages ("sacrifice ~ and any number of creatures you control": how many announced like an X,
+  then clicked; the damage is the sacrificed creatures' last-known total power, and only the cards still in the graveyard
+  are exiled). Bots don't discard Circling Vultures, bounce Cycle of Life or activate Sword of the Ages. Browser tests for
+  Circling Vultures' Discard button and Sword of the Ages' sacrifice picker. +9 (30,424 of 31,936 with B139, rounds 300 and
+  301).
+- Out after round B140 (looked at, not done): nothing new; the cards still on the B139 and earlier lists are out for the
+  reasons given there.
 - Out after round B139 (looked at, not done): Tourach's Chant and Thelon's Chant (the player who put a land onto the
   battlefield, not its controller, rulings: not tracked), Jötun Grunt (cumulative upkeep paid in pairs of cards from one
   graveyard), Meddle ("if target spell has only one target and that target is a creature": a condition on the spell's

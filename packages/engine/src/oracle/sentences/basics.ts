@@ -27,7 +27,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const [a, b] = fx as Extract<Effect, { type: "damage" }>[];
     return [
       { ...a!, amount: { count: { kind: "chosenNumber" } } },
-      { ...b!, amount: { count: { kind: "chosenNumber" }, times: -1, plus: Number(m[1]) } },
+      { ...b!, amount: { count: { kind: "chosenNumber" }, times: -1, plus: Number(m[1]) }, sameEvent: true },
     ];
   }
 
@@ -1723,7 +1723,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!.toLowerCase(), ctx);
     return what && isGroup(what) ? [{ type: "eachDealsDamage", what, amount: amt(m[2]!), toController: true }] : null;
   }
-  // "~ deals 2 damage to any target and 1 damage to any other target" (Arc Trail): both at once.
+  // "~ deals 2 damage to any target and 1 damage to any other target" (Arc Trail): both at once, one damage event (CR
+  // 120.3; rulings on Blaze Commando: Punish the Enemy's damage to a player and a creature triggers it once): the second
+  // is dealt with the first (Effect damage `sameEvent`).
   if ((m = new RegExp(`^~ deals ${NUMX} damage to (.+?) and ${NUMX} damage to (.+)$`, "i").exec(s))) {
     // Fear, Fire, Foes!: "... to target creature and 1 damage to each other creature with the same controller": that
     // creature's controller's other creatures (its last known controller if it's gone, CR 608.2h).
@@ -1731,11 +1733,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
       const a = parseDamageRecipient(m[2]!, ctx);
       if (a?.ref !== "target" || a.n || ctx.targets[a.index]?.kind !== "object") return null;
       const b: ObjRef = { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "other creature with the same controller" }, of: { ref: "targetController", index: a.index }, otherThan: a.index };
-      return [{ type: "damage", amount: amt(m[1]!), to: a }, { type: "damage", amount: amt(m[3]!), to: b }];
+      return [{ type: "damage", amount: amt(m[1]!), to: a }, { type: "damage", amount: amt(m[3]!), to: b, sameEvent: true }];
     }
     const a = parseDamageRecipient(m[2]!, ctx);
     const b = a && parseDamageRecipient(m[4]!, ctx);
-    return a && b ? [{ type: "damage", amount: amt(m[1]!), to: a }, { type: "damage", amount: amt(m[3]!), to: b }] : null;
+    return a && b ? [{ type: "damage", amount: amt(m[1]!), to: a }, { type: "damage", amount: amt(m[3]!), to: b, sameEvent: true }] : null;
   }
   // "~ deals 3 damage divided as you choose among one, two, or three targets": how many targets and how much each
   // gets are chosen with the targets, at least 1 each (CR 601.2d); "any number of targets" is one to that many.

@@ -39,6 +39,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ attacks, (.+)$/, "selfAttacks"],
   // Arashin War Beast: once per combat damage step, however many blocking creatures it dealt combat damage to (rulings).
   [/^Whenever ~ deals combat damage to one or more blocking creatures, (.+)$/, "selfDealsCombatDamageToBlockers"],
+  // Briarbridge Patrol: once for each damage event, however many creatures it dealt damage to (rulings).
+  [/^Whenever ~ deals damage to one or more creatures, (.+)$/, "selfDealsDamageToCreatures"],
   // Attacking a planeswalker isn't attacking a player (rulings): see TriggeredAbility.attacksPlayer.
   // "Whenever ~ attacks an opponent" (Kaalia of the Vast): every player it can attack is an opponent (CR 506.2, 102.3).
   [/^Whenever ~ attacks (?:a player|an opponent), (.+)$/, "selfAttacks"],
@@ -182,7 +184,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
 
 const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfDiesOrExiled", "selfExiledCrafting", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
-  "selfDealsDamage", "selfDealsCombatDamage", "selfDealsCombatDamageToBlockers", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfLastCounterRemoved", "selfEchoPaid", "selfTrains", "selfExploits",
+  "selfDealsDamage", "selfDealsCombatDamage", "selfDealsCombatDamageToBlockers", "selfDealsDamageToCreatures", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfLastCounterRemoved", "selfEchoPaid", "selfTrains", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
   "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfIsDealtCombatDamage", "selfBecomesMonstrous", "selfEvolves", "selfMutates", "selfPhasesIn", "selfPhasesOut",
   "selfBecomesUntapped", "selfBecomesCrewed", "selfCrewsVehicle",
@@ -489,6 +491,14 @@ function parseGroupDamagesPlayers(line: string): TriggeredAbility | "fail" | nul
     if (spec?.kind !== "object" || spec.controller || !body || /\b(?:that|those|they|them|it)\b/.test(render[2]!)) return "fail";
     return { event: "groupDealsDamageToPlayers", body, damageGroup: { filter: { ...spec, text: render[1]! }, opponents: true, combat: true, anyController: true } };
   }
+  // Master of Barbs: "Whenever one or more opponents are dealt noncombat damage, ...": once for each damage event that deals
+  // noncombat damage to any of them (CR 120.3, 603.2c), from any source, a spell's too.
+  const barbs = /^Whenever one or more opponents are dealt noncombat damage, (.+)$/.exec(line);
+  if (barbs) {
+    const body = parseBody(barbs[1]!);
+    if (!body || /\b(?:that|those|they|them|it)\b/.test(barbs[1]!)) return "fail";
+    return { event: "groupDealsDamageToPlayers", body, damageGroup: { filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "source" }, opponents: true, noncombat: true, anySource: true, anyController: true } };
+  }
   // Fblthp, Impossibly Lost: "When one or more of your opponents are dealt combat damage during your turn, ...": once for
   // each combat damage step of its controller's turn that deals combat damage to one or more of them, from any source.
   const lost = /^When one or more of your opponents are dealt combat damage during your turn, (.+)$/.exec(line);
@@ -525,6 +535,25 @@ function parseGroupDamagesPlayers(line: string): TriggeredAbility | "fail" | nul
 }
 
 function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | null {
+  // Tamanoa: "Whenever a noncreature source you control deals damage, you gain that much life": any source without the
+  // creature type (rulings), once for each source and damage event, "that much" all it dealt then (CR 120.3, 603.2c).
+  // Blaze Commando: "Whenever an instant or sorcery spell you control deals damage": once each time it deals damage, however
+  // much and to however many (rulings). Flame Channeler: "When a spell you control deals damage", a spell on the stack
+  // (rulings, CR 112.1), not an object a spell has deal damage (a fight).
+  const bySource = /^When(?:ever)? (a noncreature source|an instant or sorcery spell|a spell) you control deals damage, (.+)$/.exec(line);
+  if (bySource) {
+    const dealtBy: NonNullable<TriggeredAbility["dealtBy"]> = bySource[1] === "a noncreature source" ? { noncreature: true } : bySource[1] === "a spell" ? { spell: true } : { spell: true, spellTypes: ["Instant", "Sorcery"] };
+    const body = thatMuchBody(bySource[2]!, {});
+    return body ? { event: "yourSourceDealsDamage", body, dealtBy } : "fail";
+  }
+  // Justice: "Whenever a red creature or spell deals damage, ~ deals that much damage to that creature's or spell's
+  // controller": anyone's red creature permanent or red spell, all it dealt at once added up (rulings).
+  const redSource = /^Whenever an? (white|blue|black|red|green) creature or spell deals damage, (.+)$/.exec(line);
+  if (redSource) {
+    const body = thatMuchBody(redSource[2]!.replace(/\bthat creature's or spell's controller\b/g, "that player"), { eventPlayer: true });
+    const color = ({ white: "W", blue: "U", black: "B", red: "R", green: "G" } as const)[redSource[1] as "white"];
+    return body ? { event: "sourceDealsDamage", body: { ...body, text: redSource[2]! }, sourceColor: color, dealtBy: { creatureOrSpell: true } } : "fail";
+  }
   // "Whenever another source you control deals exactly 1 damage to a permanent or player, ~ deals 2 damage to that
   // permanent or player" (Ghyrson Starn): each source's damage to each permanent or player, that amount after prevention
   // and replacement (it's the damage dealt, CR 120.4); once for each of them dealt at the same time (rulings).
@@ -1189,6 +1218,15 @@ function parseIsDealtDamageTrigger(line: string): TriggeredAbility | "fail" | nu
   return { event: "permanentIsDealtDamage", dealtFilter: { ...filter, text: whose ? `${m[1]!} ${whose}` : m[1]! }, body };
 }
 
+/** A trigger's effect where "that much" is the damage the event dealt (eventAmount); none of "it", "its", "that source". */
+function thatMuchBody(text: string, opts: Parameters<typeof parseBody>[1]): AbilityBody | null {
+  if (/\b(?:it|its|that source|that many|X)\b/.test(text.replace(/\btransform ~/, ""))) return null;
+  const thatMuch = /\bthat much\b/.test(text);
+  const body = parseBody(thatMuch ? text.replace(/\bthat much\b/g, "X") : text, opts);
+  if (!body) return null;
+  return thatMuch ? { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, text) } : body;
+}
+
 /** Valgavoth, Harrower of Souls: "Whenever an opponent loses life for the first time during each of their turns, ..." */
 function parseFirstLifeLossTrigger(line: string): TriggeredAbility | "fail" | null {
   // Cat Collector: "Whenever you gain life for the first time during each of your turns, ...".
@@ -1723,6 +1761,19 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!body) return "fail";
     const yours = toCreature[2] ? { controller: "you" as const } : {};
     return { event: "creatureDealsCombatDamageToCreature", dealer: { filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [toCreature[1]!], ...yours, text: `${toCreature[1]!}${toCreature[2] ?? ""}` }, anyone: true }, body };
+  }
+  // Greatbow Doyen: "Whenever an Archer you control deals damage to a creature, that Archer deals that much damage to that
+  // creature's controller"; Ohabi Caleria: "..., you may pay {2}. If you do, draw a card": combat damage or not (rulings),
+  // once for each creature dealt damage by each Archer permanent (CR 603.2c), not an Archer spell (rulings). The Archer
+  // deals it (the subject); that creature's controller is its controller as it resolves (CR 608.2h).
+  const typeToCreature = /^Whenever an? ([A-Z][a-z]+) you control deals damage to a creature, (.+)$/.exec(line);
+  if (typeToCreature && CREATURE_TYPES.has(typeToCreature[1]!)) {
+    const rest = typeToCreature[2]!.replace(new RegExp(`^that ${typeToCreature[1]!} deals that much damage to that creature's controller\\.$`), "it deals X damage to that player.");
+    if (/\b(?:its controller|that creature|defending player|that much|that many|its|it)\b/i.test(rest.replace(/^it deals X damage to that player\.$/, ""))) return "fail";
+    const body0 = parseBody(rest, { subjectIt: true, eventPlayer: true });
+    if (!body0) return "fail";
+    const body = /\bX\b/.test(rest) ? { ...replaceX(body0, { count: { kind: "eventAmount" } }), text: typeToCreature[2]! } : body0;
+    return { event: "creatureDealsDamageToCreature", dealer: { filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [typeToCreature[1]!], controller: "you", text: `${typeToCreature[1]!} you control` }, anyone: true }, body };
   }
   // Quest for the Gemblades: "Whenever a creature you control deals combat damage to a creature, you may put a quest counter
   // on ~": once for each creature dealt it by each of yours (rulings), whatever the amount.
@@ -3984,7 +4035,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const spellDmg = /^Whenever an? (.+? spell) you control deals damage to an opponent( or battle)?, (.+)$/.exec(line);
   if (spellDmg) {
     const filter = parseTargetPhrase(spellDmg[1]!);
-    const body = filter?.kind === "spell" && !filter.controller ? parseBody(`${spellDmg[3]![0]!.toUpperCase()}${spellDmg[3]!.slice(1)}`) : null;
+    // Satyr Firedancer: "~ deals that much damage to target creature that player controls": the damage that spell dealt
+    // that opponent, and that opponent's creature (chosen as the trigger is put on the stack).
+    const refs = /\b(?:that much|that player)\b/.test(spellDmg[3]!);
+    const body = filter?.kind === "spell" && !filter.controller ? (refs ? thatMuchBody(spellDmg[3]!, { eventPlayer: true }) : parseBody(`${spellDmg[3]![0]!.toUpperCase()}${spellDmg[3]!.slice(1)}`)) : null;
     return body ? { event: "spellYouControlDealsDamage", spellDamage: { filter: filter!, ...(spellDmg[2] ? { orBattle: true as const } : {}) }, body } : "fail";
   }
   // Verity Circle: "Whenever a creature an opponent controls becomes tapped, if it isn't being declared as an attacker":

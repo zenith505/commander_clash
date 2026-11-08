@@ -2381,7 +2381,7 @@ line blocks.
    face down" (Ixidron: before it's on the battlefield, so their "another creature enters" abilities don't see it, and
    not the ones entering with it, rulings; each can be turned face up for its morph cost, CR 702.37e); "turn any number
    of target tapped nontoken creatures face down. They're 2/2 Horror creatures" (Illithid Harvester, FaceDownKind
-   "horror", CR 708.2a). +8, 30,491 of 31,936.
+   "horror", CR 708.2a). +8, 30,491 of 31,936 (30,499 with B144).
    Out after round 306 (looked at, not done): Bend or Break (each player separates their lands, and an opponent of each
    player's choice picks the pile: a chooser chosen per player); Fight or Flight and Stand or Fall (piles that limit
    which creatures can attack or block this turn); Midnight Crusader Shuttle (a creature gained until end of turn that's

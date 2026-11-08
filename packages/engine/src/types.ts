@@ -607,6 +607,8 @@ export interface GameObject {
   castFromGraveyard?: true;
   /** It entered from the stack as a resolving permanent spell (not a copy), for "when ~ enters, if you cast it". */
   wasCast?: true;
+  /** As a spell, the player who cast it; on the battlefield, the player who cast the spell it entered as (Cycle of Life's "creature you cast this turn"). */
+  castBy?: PlayerId;
   /** On the battlefield: it entered from a graveyard, its owner's, for "when ~ enters from a graveyard" (CR 603.6a). */
   enteredFromGraveyard?: true;
   /** On the battlefield: it entered from its owner's hand, cast or not (Thousand-Faced Shadow's "enters from your hand"). */
@@ -1272,6 +1274,8 @@ export interface RegenRider {
 }
 
 export interface LastKnown {
+  /** For a sacrifice cost: the zone changes of the card it became in the graveyard, with `id` (Sword of the Ages' "those creature cards"). */
+  cardZc?: number;
   /** The subtypes of what a "Return a land you control to its owner's hand" cost returned, as it last existed (Wonderscape Sage). */
   returnedSubtypes?: string[];
   /** The object it was (a card keeps its id in its new zone): "another permanent card" than the one sacrificed this way. */
@@ -1651,6 +1655,8 @@ export interface GameEvent {
 
 /** What happened this turn, for the Traps' alternative cost conditions (CR 601.2b). */
 export interface TurnLog {
+  /** Rasputin Dreamweaver's "started the turn untapped": the permanents with such an ability untapped as this turn began, as `id@zoneChanges`. */
+  startedUntapped?: string[];
   /** Players who can't become the monarch this turn (Jared Carthalion, True Heir). */
   cantBecomeMonarch?: PlayerId[];
   /**
@@ -3033,6 +3039,8 @@ export type Action =
   | { type: "unlockDoor"; player: PlayerId; objectId: ObjectId; door: number }
   /** Pay to end an effect on this permanent that says "you may pay ... to end this effect" (a Licid; CR 116.2c). */
   | { type: "endEffect"; player: PlayerId; objectId: ObjectId }
+  /** Circling Vultures: "You may discard ~ any time you could cast an instant." Discarding it is a special action (CR 116.2e). */
+  | { type: "discardAnyTime"; player: PlayerId; objectId: ObjectId }
   /** Foretell a card from your hand: pay {2} and exile it face down, a special action (CR 116.2h, 702.143a). */
   | { type: "foretell"; player: PlayerId; objectId: ObjectId }
   /** Answer to assist: how much of the spell's generic mana to pay from your mana pool (0 to decline). */

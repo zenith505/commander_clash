@@ -120,7 +120,11 @@ export function parseToken(power: number, toughness: number, desc: string, withT
     const text = [vanishing[2]!.charAt(0).toUpperCase() + vanishing[2]!.slice(1), ...(ability !== undefined ? [ability] : [])].join("\n");
     return kws ? { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords: kws, abilities: text } : null;
   }
-  const keywords = kwText ? parseKeywordList(kwText) : [];
+  // Riftmarked Knight: "with flanking, protection from white, and haste": flanking is a triggered ability (CR 702.25a),
+  // kept among the keywords so the token's keyword line writes it out as its trigger, and so it counts as a creature
+  // with flanking for another flanker's trigger (CR 702.25b).
+  const flanking = kwText ? /^flanking(?:,? and |, )(.+)$/.exec(kwText) : null;
+  const keywords = flanking ? (((k) => (k ? ["Flanking", ...k] : null))(parseKeywordList(flanking[1]!))) : kwText ? parseKeywordList(kwText) : [];
   if (!keywords || !subtypes.length) return null;
   return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords, ...(ability !== undefined ? { abilities: ability } : {}) };
 }

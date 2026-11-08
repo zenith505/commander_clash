@@ -661,6 +661,9 @@ export function withGranted(base: CompiledCard, granted: readonly string[]): Com
     // instance adds its own.
     const tax = (base.targetTax ?? 0) + extra.reduce((n, x) => n + (x.targetTax ?? 0), 0);
     if (tax) hit.targetTax = tax;
+    // Bewitching Leechcraft's granted untap replacement: each instance applies in turn (CR 616.1), see untapStep.
+    const leech = (base.untapRemovesOwnCounter ?? 0) + extra.reduce((n, x) => n + (x.untapRemovesOwnCounter ?? 0), 0);
+    if (leech) hit.untapRemovesOwnCounter = leech;
     // Tomik, Orzhov Lawmage's granted "No more than one creature can attack this planeswalker each combat" (CR 508.1c): the
     // smallest limit it has.
     const caps = [base.combatLimit?.attackSelf, ...extra.map((x) => x.combatLimit?.attackSelf)].filter((n): n is number => n !== undefined);

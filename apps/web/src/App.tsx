@@ -1305,8 +1305,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setModePick(null);
     if (pending?.kind === "chooseModes") return dispatch([{ type: "chooseModes", player: HUMAN, modes }]);
     if (!pick) return;
-    if (pick.mode === "cast" && pick.draft) continueCast({ ...pick.draft, modes });
-    else if (pick.mode === "cast") continueCast({ objectId: pick.objectId, modes, convoke: pick.convoke, teamwork: pick.teamwork, ...(pick.face !== undefined ? { face: pick.face } : {}) });
+    // "Choose X" (Doomsday Confluence): X is announced with the modes, as many as were chosen (CR 601.2b).
+    const xs = pick.body.modal?.xCount ? { x: modes.length } : {};
+    if (pick.mode === "cast" && pick.draft) continueCast({ ...pick.draft, modes, ...xs });
+    else if (pick.mode === "cast") continueCast({ objectId: pick.objectId, modes, convoke: pick.convoke, teamwork: pick.teamwork, ...(pick.face !== undefined ? { face: pick.face } : {}), ...xs });
     else useAbility(pick.objectId, pick.index, modes);
   }
 
@@ -2055,7 +2057,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
             <EvidenceChoice
               key={`${pending.source}:${pending.n}`}
               s={s}
-              title={`${pending.source}: you may collect evidence ${pending.n}, exiling cards with total mana value ${pending.n} or more from your graveyard`}
+              title={pending.forUnless ? `${pending.source}: collect evidence ${pending.n}, exiling cards with total mana value ${pending.n} or more from your graveyard` : `${pending.source}: you may collect evidence ${pending.n}, exiling cards with total mana value ${pending.n} or more from your graveyard`}
               n={pending.n}
               cards={evidenceCandidates(s, HUMAN, pending.not)}
               onHover={setHover}
@@ -4297,12 +4299,17 @@ function LibrarySearch({
 function modeMenuProps(s: GameState, pick: ModePick) {
   const m = pick.body.modal!;
   const text = (t: string, i: number) => (m.costs ? `+ ${m.costs[i]} — ${t}` : m.pawprints ? `${"{P}".repeat(m.pawprints[i]!)} — ${t}` : t);
+  const legal = legalModes(s, pick.body, HUMAN, undefined, pick.mode === "activate" ? pick.objectId : undefined);
+  // "Choose X" (Doomsday Confluence): X is how many modes are chosen (CR 601.2b), as many as the mana pays for.
+  const first = legal.findIndex(Boolean);
+  const xMax = m.xCount && pick.mode === "cast" && first >= 0 ? Math.min(m.max, maxX((n) => planCast(s, HUMAN, pick.objectId, undefined, Array.from({ length: n }, () => first), pick.convoke ?? "auto", n))) : undefined;
   return {
     label: pick.label,
     min: m.min,
-    max: m.max,
+    max: xMax ?? m.max,
+    ...(m.xCount ? { xCount: true } : {}),
     modes: m.modes.map((x, i) => text(x.text, i)),
-    legal: legalModes(s, pick.body, HUMAN, undefined, pick.mode === "activate" ? pick.objectId : undefined),
+    legal,
     entwine: m.entwine,
     ...(m.entwineText ? { entwineText: m.entwineText } : {}),
     ...(m.repeat ? { repeat: true } : {}),
@@ -4324,6 +4331,7 @@ function ModeMenu({
   pawprints,
   escalate,
   optional,
+  xCount,
   onDone,
   onCancel,
 }: {
@@ -4345,6 +4353,8 @@ function ModeMenu({
   escalate?: string;
   /** "You may choose two" (Shadrix Silverquill): none at all is allowed too. */
   optional?: boolean;
+  /** "Choose X" (Doomsday Confluence): X is how many are chosen, up to `max` (what the mana pays for). */
+  xCount?: boolean;
   onDone: (modes: number[]) => void;
   onCancel?: () => void;
 }) {
@@ -4364,7 +4374,7 @@ function ModeMenu({
     <div className="ability-menu mode-menu">
       <strong>{label}</strong>
       <span className="muted">
-        {pawprints ? `choose up to ${max} {P} worth of modes (${max - used} left)` : `${optional ? "you may " : ""}choose ${describeCount(min, max)}${optional ? " or none" : ""}`}
+        {pawprints ? `choose up to ${max} {P} worth of modes (${max - used} left)` : xCount ? `choose X modes, X being how many you choose (up to ${max} with your mana): X is ${chosen.length}` : `${optional ? "you may " : ""}choose ${describeCount(min, max)}${optional ? " or none" : ""}`}
         {repeat && !pawprints ? ", the same one more than once if you like" : ""}
         {escalate ? `; escalate ${escalate} for each mode beyond the first` : ""}
       </span>
@@ -5643,7 +5653,9 @@ function Controls({
     const canSacrifice = !sac || pickOptions(s, sac, HUMAN).length >= sac.n;
     // "Ward—Blight 2": only with a creature to put the counters on (CR 701.68b); you pick it after choosing to pay.
     const canBlight = !pending.blight || blightOptions(s, HUMAN, pending.blight).length > 0;
-    const taps = s.players[HUMAN]!.life >= life && s.players[HUMAN]!.hand.length >= discard && canSacrifice && canBlight ? planMana(s, HUMAN, parseManaCost(pending.cost)) : null;
+    // "Ward—Collect evidence 4": only with enough mana value in your graveyard (rulings); you pick the cards after.
+    const canEvidence = !pending.collectEvidence || evidenceValue(s, evidenceCandidates(s, HUMAN)) >= pending.collectEvidence;
+    const taps = s.players[HUMAN]!.life >= life && s.players[HUMAN]!.hand.length >= discard && canSacrifice && canBlight && canEvidence ? planMana(s, HUMAN, parseManaCost(pending.cost)) : null;
     // Ward—Waterbend: mana first, then your artifacts and creatures pay {1} each of the rest (CR 701.67a).
     const water = !taps && pending.waterbend ? autoWaterbend(s, HUMAN, parseManaCost(pending.cost), 0, pending.waterbend, []) : null;
     return (
@@ -5658,6 +5670,8 @@ function Controls({
             "exile all cards from your graveyard"
           ) : discard ? (
             `discard ${discard === 1 ? "a card" : `${discard} cards`}${pending.discardRandom ? " at random" : ""}`
+          ) : pending.collectEvidence ? (
+            `collect evidence ${pending.collectEvidence} (exile cards with total mana value ${pending.collectEvidence} or more from your graveyard)`
           ) : pending.blight ? (
             `blight ${pending.blight} (put ${pending.blight === 1 ? "a -1/-1 counter" : `${pending.blight} -1/-1 counters`} on a creature you control)`
           ) : pending.poison ? (
@@ -5669,7 +5683,7 @@ function Controls({
               pay <ManaCost cost={pending.cost} size="sm" />
             </>
           )}
-          {life && !(pending.cost === "{0}" && !discard && !sac && !pending.blight) ? ` and ${life} life` : ""}
+          {life && !(pending.cost === "{0}" && !discard && !sac && !pending.blight && !pending.collectEvidence) ? ` and ${life} life` : ""}
           {pending.waterbend ? ` (waterbend: your artifacts and creatures can each pay {1} of up to ${pending.waterbend})` : ""} or {pending.otherwise ?? `${pending.what} is countered`}.
         </span>
         <button disabled={!taps && !water} onClick={() => dispatch(water ? [...water.taps, { type: "payUnless", player: HUMAN, pay: true, tap: water.tapped }] : [...(taps ?? []), { type: "payUnless", player: HUMAN, pay: true }])}>

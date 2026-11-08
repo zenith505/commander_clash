@@ -5915,6 +5915,8 @@ export function castProblem(
     } else {
       const mp = modesProblem(s, bound, modes, pid, sq, bothModes(s, pid, bound, choices));
       if (mp) return mp;
+      // "Choose X" (Doomsday Confluence): as many modes as the X announced (CR 601.2b, 700.2d).
+      if (spell.modal.xCount && modes.length !== (x ?? 0)) return `choose X modes for ${d.name}: ${x ?? 0} with X ${x ?? 0}`;
     }
   }
   // "X damage divided as you choose": the X announced (CR 601.2b, 601.2d).
@@ -11237,6 +11239,21 @@ function chooseEvidence(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
   if (pend?.kind !== "collectEvidence" || pend.player !== p.id || !r) throw new RulesError("nothing to collect evidence for");
+  if (pend.forUnless) {
+    // "Ward—Collect evidence 4": the cards are exiled as the counter effect carries on (see paidUnless); none means they
+    // don't pay after all.
+    if (ids.length) {
+      const problem = evidenceProblem(s, p.id, pend.n, ids);
+      if (problem) throw new RulesError(problem);
+      r.scratch = { ...r.scratch, queue: [p.id], chosen: { [p.id]: ids } };
+    } else {
+      log(s, `${p.name} chooses not to collect evidence.`);
+      (r.scratch ??= {}).paid = false;
+    }
+    s.pending = null;
+    continueResolution(s);
+    return;
+  }
   if (ids.length) {
     const problem = evidenceProblem(s, p.id, pend.n, ids, pend.not);
     if (problem) throw new RulesError(problem);
@@ -11314,6 +11331,14 @@ function payUnless(s: GameState, p: Player, pay: boolean, tap?: ObjectId[]) {
       r.scratch.chosen![p.id] = options;
       s.pending = null;
       continueResolution(s);
+      return;
+    }
+    if (pend.collectEvidence) {
+      // "Ward—Collect evidence 4": then which cards, with total mana value 4 or more (CR 701.59a), exiled as the counter
+      // effect carries on (see paidUnless). Without enough they can't choose to (rulings).
+      const problem = evidenceProblem(s, p.id, pend.collectEvidence, undefined);
+      if (problem) throw new RulesError(problem);
+      s.pending = { kind: "collectEvidence", player: p.id, n: pend.collectEvidence, source: pend.source, forUnless: true };
       return;
     }
     if (pend.sacrifice) {

@@ -314,6 +314,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
         // Change of Fortune: "then draw a card for each card you've discarded this turn": for any reason, this discard
         // too (rulings).
         : who.ref === "you" && /^a card for each card you've discarded this turn$/i.test(m[2]) ? parseCount(m[2].replace(/^a card for each /i, ""), ctx)
+        // Ajani Unrelenting: "then draw a card for each creature you control": counted after the discard (CR 608.2c).
+        : who.ref === "you" && /^a card for each creature you control$/i.test(m[2]) ? parseCount(m[2].replace(/^a card for each /i, ""), ctx, true)
         : null;
       if (!n) return null;
       out.push({ type: "draw", who, n });

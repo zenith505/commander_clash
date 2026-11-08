@@ -387,6 +387,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Poison counters as a payment: only while we'd stay well short of ten (CR 704.5c).
     if (pend.kind === "payUnless" && pend.poison) return [{ type: "payUnless", player: pid, pay: (player(s, pid).poison ?? 0) + pend.poison < 8 }];
     // "Ward—Blight 2": pay with a creature of ours that survives the -1/-1 counters, never our commander.
+    // "Ward—Collect evidence 4": pay whenever our graveyard has enough (the cards we'd miss least, see spareEvidence).
+    if (pend.kind === "payUnless" && pend.collectEvidence) return [{ type: "payUnless", player: pid, pay: (spareEvidence(s, pid, pend.collectEvidence) ?? []).length > 0 }];
     if (pend.kind === "payUnless" && pend.blight) return [{ type: "payUnless", player: pid, pay: blightHost(s, pid, blightOptions(s, pid, pend.blight), pend.blight) !== null }];
     if (pend.kind === "payUnless") {
       // Pay for ward whenever we can: the spell or ability was worth casting. Life only while we have that much (CR 119.4),
@@ -3599,6 +3601,12 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
   // "An opponent chooses one —" (Misfortune, Fatal Lore, Library of Lat-Nam): cast without a mode, which that opponent
   // chooses (askModeChooser); each mode is good for us.
   if (printed?.modal?.chooser) return castPlanWithModes(s, pid, id, free, x, via, alt, undefined);
+  // "Choose X" (Doomsday Confluence): exactly X modes, the useful ones in turn; never for X 0, which does nothing.
+  if (printed?.modal?.xCount) {
+    const n = x ?? 0;
+    const xChoice = n >= 1 ? chooseModes(s, pid, { ...printed, modal: { ...printed.modal, min: n, max: n } }, false, id) : null;
+    return xChoice ? castPlanWithModes(s, pid, id, free, x, via, alt, xChoice.modes) : null;
+  }
   const choice = printed?.modal ? chooseModes(s, pid, printed, false, id) : null;
   if (printed?.modal && !choice) return null;
   // Entwine (CR 702.42a): every mode, when we can pay for it and they all have targets.

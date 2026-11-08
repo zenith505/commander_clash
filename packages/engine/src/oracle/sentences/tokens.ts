@@ -105,6 +105,14 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (tok?.type !== "createToken" || !tok.attacking || tok.who.ref !== "you") return null;
     return [{ ...tok, attacking: undefined, tapped: true, attackingEach: true, ...(m[2] ? { orPlaneswalker: true as const } : {}) }];
   }
+  // Furygale Flocking: "For each opponent, create two 3/3 ... tokens with flying that attack that opponent this turn if
+  // able": a group for each opponent, each required to attack that player (not a planeswalker they control, rulings).
+  if ((m = /^[Ff]or each opponent, (create .+? tokens?(?: with [^"]+?)?) that attacks? that (?:player|opponent) this turn if able$/.exec(s))) {
+    const fx = parseSentence(`C${m[1]!.slice(1)}`, ctx);
+    const tok = fx?.length === 1 ? fx[0] : undefined;
+    if (tok?.type !== "createToken" || tok.attacking || tok.tapped || tok.who.ref !== "you" || tok.attachTo) return null;
+    return [{ ...tok, mustAttackEach: true }];
+  }
   // "... creature token named Ajani's Pridemate with "Whenever you gain life, ..."" (Ajani, Strength of the Pride): the
   // same as with the name last.
   // "... token named Lightning Rager with trample, haste, and "..."" (Rite of the Raging Storm) likewise.

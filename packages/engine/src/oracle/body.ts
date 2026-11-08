@@ -1477,6 +1477,86 @@ function wandPunisher(who: PlayerRef, landLife: number): Effect {
  * reads parseFaceDownPlay's: the last effect and the next sentence's index in parseFaceDownPlay's shape (the effects
  * before the last one already pushed), "fail" for one that can't be read, or null when it isn't one of them.
  */
+/** Lane B round B152's sentences (Grenzo's Rebuttal, Muse Vessel, Gauntlets of Chaos), chained before round B151's. */
+function roundB152Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  const out = (fx: Effect[], skip: number) => {
+    effects.push(...fx.slice(0, -1));
+    return { effect: fx[fx.length - 1]!, next: si + 1 + skip };
+  };
+  // Grenzo's Rebuttal: "Starting with you, each player chooses an artifact, a creature, and a land from among the
+  // permanents controlled by the player to their left. Destroy each permanent chosen this way.": the player to their left
+  // is the next in turn order (CR 101.4); not targeted (protection doesn't stop it), each type chosen if there is one, an
+  // artifact creature may be chosen as both, all destroyed at once (rulings).
+  if (/^Starting with you, each player chooses an artifact, a creature, and a land from among the permanents controlled by the player to their left$/.test(s) && /^Destroy each permanent chosen this way\.?$/.test(sentences[si + 1] ?? "")) {
+    const picks: Effect[] = (["Artifact", "Creature", "Land"] as const).map((t, k) => {
+      const word = t.toLowerCase();
+      const filter: TargetSpec = { kind: "object", types: [t], notTypes: [], notColors: [], text: word };
+      return { type: "pick", who: { ref: "eachPlayer" }, filter, n: 1, action: "choose", amongLeft: true, fromYou: true, ...(k ? { addChosen: true as const } : {}), prompt: `click ${k === 0 ? "an" : "a"} ${word} {left} controls. ~ destroys each permanent chosen this way.` };
+    });
+    return out([...picks, { type: "destroy", what: { ref: "created" } }], 1);
+  }
+  // Dubious Challenge: "Look at the top ten cards of your library, exile up to two creature cards from among them, then
+  // shuffle. Target opponent may choose one of the exiled cards and put it onto the battlefield under their control. Put
+  // the rest onto the battlefield under your control.": face up (rulings), the opponent chosen as it's cast (rulings).
+  if (s === "Look at the top ten cards of your library, exile up to two creature cards from among them, then shuffle" && sentences[si + 1]?.replace(/\.$/, "") === "Target opponent may choose one of the exiled cards and put it onto the battlefield under their control" && /^Put the rest onto the battlefield under your control\.?$/.test(sentences[si + 2] ?? "") && ctx.spell) {
+    const filter = parseSearchFilter("creature card");
+    const who = parsePlayer("target opponent", ctx);
+    if (!filter || who?.ref !== "target") return "fail";
+    return out([{ type: "dig", n: 10, count: 2, upTo: true, filter, into: "exile", rest: "shuffle", reveal: false }, { type: "takeOneExiled", who }], 2);
+  }
+  // Muse Vessel: "Choose a card exiled with ~. You may play that card this turn." (linked in compile.ts, CR 607.2a).
+  if (s === "Choose a card exiled with ~" && /^You may play that card this turn\.?$/.test(sentences[si + 1] ?? "") && !ctx.spell) return out([{ type: "mayPlayLinked" }], 1);
+  // Gauntlets of Chaos: "If those permanents are exchanged this way, destroy all Auras attached to them.": only if the
+  // exchange happened (rulings: with one target illegal, nothing is exchanged and no Aura is destroyed).
+  const exchanged = effects[effects.length - 1];
+  if (s === "If those permanents are exchanged this way, destroy all Auras attached to them" && exchanged?.type === "exchangeControl" && exchanged.a.ref === "target" && exchanged.b.ref === "target" && exchanged.b.index === exchanged.a.index + 1)
+    return out([{ type: "if", cond: { kind: "youDid" }, effects: [{ type: "destroy", what: { ref: "target", index: exchanged.a.index, n: 2, attachedToo: { filter: { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" }, only: true } } }] }], 0);
+  return null;
+}
+
+/** Lane B round B151's sentences (Natural Balance), chained before round B148's (parseBodyText is at TS2563's limit). */
+function roundB151Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  const out = (fx: Effect[], skip: number) => {
+    effects.push(...fx.slice(0, -1));
+    return { effect: fx[fx.length - 1]!, next: si + 1 + skip };
+  };
+  const land: TargetSpec = { kind: "object", types: ["Land"], notTypes: [], notColors: [], text: "land" };
+  // Natural Balance: "Each player who controls six or more lands chooses five lands they control and sacrifices the
+  // rest": each player keeps five of theirs, the active player choosing first and the rest sacrificed at once, as with
+  // Keldon Firebombers (CR 101.4); a player with five or fewer lands keeps them all, the same as not being asked.
+  if (s === "Each player who controls six or more lands chooses five lands they control and sacrifices the rest") return out([{ type: "keepRest", who: { ref: "eachPlayer" }, keep: [{ filter: land, n: 5 }], among: land }], 0);
+  // "Each player who controls four or fewer lands may search their library for up to X basic land cards and put them
+  // onto the battlefield, where X is five minus the number of lands they control. Then each player who searched their
+  // library this way shuffles.": the lands counted after the sacrifices; each such player in turn order searches or
+  // not, with their own X; one with five or more has none to find and doesn't search (as Scholarship Sponsor); finding
+  // fewer is allowed (rulings, CR 701.23b); those who searched shuffle.
+  if (s === "Each player who controls four or fewer lands may search their library for up to X basic land cards and put them onto the battlefield, where X is five minus the number of lands they control" && sentences[si + 1]?.replace(/\.$/, "") === "Then each player who searched their library this way shuffles") {
+    const filter = parseSearchFilter("basic land card");
+    const theirs = parseCount("the number of lands that player controls", { ...ctx, eachOne: true });
+    if (!filter || !theirs || theirs.times !== undefined || theirs.plus !== undefined || theirs.negate) return "fail";
+    return out([{ type: "search", who: { ref: "eachPlayer" }, filter, n: { count: theirs.count, times: -1, plus: 5 }, perPlayerN: true, upTo: true, reveal: false, dest: { zone: "battlefield" }, may: true }], 1);
+  }
+  // Tariff: "Each player sacrifices the creature they control with the greatest mana value unless they pay that creature's
+  // mana cost. If two or more creatures a player controls are tied for greatest, that player chooses one.": chosen as it
+  // resolves, the active player first, each picking (among those tied) and then paying its mana cost or not before the
+  // next; those not paid for are sacrificed at once (rulings). The cost is its actual mana cost, colors included.
+  if (s === "Each player sacrifices the creature they control with the greatest mana value unless they pay that creature's mana cost" && sentences[si + 1]?.replace(/\.$/, "") === "If two or more creatures a player controls are tied for greatest, that player chooses one") {
+    const creature: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+    return out([{ type: "pick", who: { ref: "eachPlayer" }, filter: creature, n: 1, action: "sacrifice", greatest: "manaValue", unlessManaCost: true }], 1);
+  }
+  // Vizkopa Confessor: "pay any amount of life. Target opponent reveals that many cards from their hand. You choose one of
+  // them and exile it.": the amount chosen as it resolves (0 is allowed, and then nothing is revealed or exiled), that
+  // many cards of the opponent's choice (all of them if they have no more, CR 609.3), then one of those you choose
+  // (rulings). Paying 0 is the same as not paying, so it's a "may" paying X life (as Necrodominance's). An illegal target
+  // means none of it happens (CR 608.2b).
+  if (/^[Pp]ay any amount of life$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "Target opponent reveals that many cards from their hand" && /^You choose one of them and exile it\.?$/.test(sentences[si + 2] ?? "") && si + 3 === sentences.length) {
+    const who = parsePlayer("target opponent", ctx);
+    if (!who) return "fail";
+    return out([{ type: "may", effects: [{ type: "takeFromHand", who, action: "exile", reveal: { count: { kind: "x" } } }], pay: {}, payX: { life: true }, text: "pay any amount of life. Target opponent reveals that many cards from their hand. You choose one of them and exile it" }], 2);
+  }
+  return null;
+}
+
 function roundB148Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
   const out = (fx: Effect[], skip: number) => {
     effects.push(...fx.slice(0, -1));
@@ -4501,7 +4581,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const hordes = !ctx.spell && !ctx.chosenOpponent && !ctx.eventPlayer && ctx.lastObjectTarget === undefined ? /^[Uu]nless you pay ((?:\{[WUBRG]\})+), tap ~ and sacrifice a land of an opponent's choice$/.exec(s) : null;
     if (hordes) {
       ctx.chosenOpponent = true;
-      const land: TargetSpec = { kind: "object", types: ["Land"], notTypes: [], notColors: [], text: "land" };
+      if (process.env.DBG151) console.log(JSON.stringify([s, sentences, si]));
+  const land: TargetSpec = { kind: "object", types: ["Land"], notTypes: [], notColors: [], text: "land" };
       effects.push({
         type: "may", effects: [], pay: { mana: hordes[1]! }, keep: true,
         otherwise: [{ type: "tap", what: { ref: "self" } }, { type: "choose", choice: "opponent" }, { type: "pick", who: { ref: "chosenPlayer" }, among: { ref: "you" }, filter: land, n: 1, action: "choose", prompt: "click a land of the player whose ~ it is: they sacrifice it." }, { type: "sacrifice", what: { ref: "created" } }],
@@ -6524,8 +6605,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
-    // round B148's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    // rounds B152, B151, B148, 311, 312 and 313's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
+    const faceDown = roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);

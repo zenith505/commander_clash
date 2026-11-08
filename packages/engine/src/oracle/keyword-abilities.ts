@@ -764,6 +764,13 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
   const isX = (w: string) => allowX && w === "X";
   const many = (w: string) => (isX(w) ? { n: 0, x: true as const } : { n: num(w) });
   if (/^forage$/i.test(text)) return { kind: "forage" }; // CR 701.61a
+  // Nahiri's Sacrifice: "sacrifice an artifact or creature with mana value X": X announced as it's cast, then one of
+  // them with exactly that mana value (CR 107.3a, 601.2b, rulings), as Sidisi's ability does.
+  if (allowX && (m = /^sacrifice an? (artifact or creature|artifact|creature) with mana value X$/i.exec(text))) {
+    const spec = parseTargetPhrase(m[1]!);
+    if (spec?.kind !== "object" || spec.controller || spec.combat) return null;
+    return { kind: "sacrifice", filter: { ...spec, text: `${m[1]} with mana value X` }, n: 1, mvX: true };
+  }
   if ((m = new RegExp(`^sacrifice (${NUM.slice(1, -1)}|X) (.+)$`, "i").exec(text)) && (m[1] !== "X" || allowX)) {
     const n = many(m[1]!);
     const phrase = n.n === 1 && !n.x ? m[2]! : m[2]!.split(" ").map(singularWord).join(" ");

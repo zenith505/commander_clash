@@ -8231,6 +8231,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f73bf7c5-e43d-4684-8588-2fb400f2ca31",
+  "name": "Dubious Challenge",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at the top ten cards of your library, exile up to two creature cards from among them, then shuffle. Target opponent may choose one of the exiled cards and put it onto the battlefield under their control. Put the rest onto the battlefield under your control.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "kld",
+  "releasedAt": "2016-09-30",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "01072a45-ab1c-4d19-b493-76cf4aae351e",
   "name": "Duplicity",
   "manaCost": "{3}{U}{U}",
@@ -12255,6 +12281,32 @@
   "commanderLegal": "legal",
   "set": "one",
   "releasedAt": "2023-02-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "afcfcb74-ee64-4528-8498-2e8109ad5142",
+  "name": "Grenzo's Rebuttal",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Create a 4/4 red Ogre creature token. Starting with you, each player chooses an artifact, a creature, and a land from among the permanents controlled by the player to their left. Destroy each permanent chosen this way.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cns",
+  "releasedAt": "2014-06-06",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -18155,6 +18207,30 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3212e47a-5492-4c50-9d4a-6ea562f1a6e1",
+  "name": "Millstone",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}, {T}: Target player mills two cards.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "brr",
+  "releasedAt": "2022-11-18",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d8377869-f8f7-4b4b-93ad-3ad3c4826b1a",
   "name": "Mind Bend",
   "manaCost": "{U}",
@@ -19196,6 +19272,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f7dcb605-c48e-4e21-86e2-0d0bd4bd2ec7",
+  "name": "Muse Vessel",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{3}, {T}: Target player exiles a card from their hand. Activate only as a sorcery.\n{1}: Choose a card exiled with this artifact. You may play that card this turn.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dis",
+  "releasedAt": "2006-05-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c53ba31a-ba27-4e17-9a92-311acb1cab29",
   "name": "Myr Battlesphere",
   "manaCost": "{7}",
@@ -19384,6 +19482,32 @@
   "set": "mat",
   "releasedAt": "2023-05-12",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a84cc828-8d1b-4e61-a13f-60124e2ee35f",
+  "name": "Nahiri's Sacrifice",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, sacrifice an artifact or creature with mana value X.\nNahiri's Sacrifice deals X damage divided as you choose among any number of target creatures.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "one",
+  "releasedAt": "2023-02-10",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -20819,6 +20943,39 @@
   "commanderLegal": "legal",
   "set": "rtr",
   "releasedAt": "2012-10-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a4fa2afe-52fc-4ad0-a694-693cb9c88096",
+  "name": "Pardic Dragon",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Creature — Dragon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "Flying\n{R}: This creature gets +1/+0 until end of turn.\nSuspend 2—{R}{R}\nWhenever an opponent casts a spell, if this card is suspended, that player may put a time counter on this card.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Suspend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

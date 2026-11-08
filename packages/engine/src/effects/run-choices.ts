@@ -207,7 +207,14 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           const first = e.effects[0];
           const text = first?.type === "search" ? sayBound(s, e.text, first.filter, amountCtx(s, ctx)) : e.text;
           const prompt = card ? text.replace("the revealed card", defOf(s, card).name) : e.payEnergy !== undefined ? `${text} (${pay!.energy} energy)` : e.payTimes !== undefined || e.payManaCost ? `${text} (${describePay(pay!) || "{0}"})` : text;
-          s.pending = { kind: "chooseMay", player: ctx.controller, prompt: prompt.replace(/~/g, src), source: src, ...(card ? { card: card.id } : {}), ...(pay ? { pay } : {}), ...(e.keep ? { keep: true } : {}), ...(e.cumulativeUpkeep && ctx.sourceId ? { upkeepOf: ctx.sourceId } : {}) };
+          // Pardic Dragon: "that player may": the event's player decides (none left in the game: not done).
+          const decider = e.decider ? players(s, e.decider, ctx)[0] : ctx.controller;
+          if (decider === undefined) {
+            sc.may = false;
+            r.did = false;
+            return;
+          }
+          s.pending = { kind: "chooseMay", player: decider, prompt: prompt.replace(/~/g, src), source: src, ...(card ? { card: card.id } : {}), ...(pay ? { pay } : {}), ...(e.keep ? { keep: true } : {}), ...(e.cumulativeUpkeep && ctx.sourceId ? { upkeepOf: ctx.sourceId } : {}) };
           return "paused";
         }
       }

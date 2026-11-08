@@ -1059,8 +1059,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       // Rottenmouth Viper: each one sacrificed makes it cheaper, so the X that can be paid runs from the fewest
       // sacrifices the mana allows to as many as there are; the fewest is offered (none payable: the engine says why).
       const range = compiled.sacrificedReduction ? xRange(plan) : undefined;
-      const max = range ? range.max : maxX(plan);
-      const extra = optional?.kind === "sacrifice" ? (compiled.sacrificedReduction ? `sacrifice X ${optional.filter.text.replace(/s?$/, "s")}, each making it {${compiled.sacrificedReduction}} cheaper` : `sacrifice X ${optional.filter.text.replace(/s?$/, "s")} (X can be 0)`) : costX ? (/\b(?:pay|discard|sacrifice|return|exile) X [^.(]*/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
+      // Nahiri's Sacrifice: "sacrifice an artifact or creature with mana value X": only some X work, so the greatest that does.
+      const mvSac = compiled.additionalCosts?.some((c) => c.kind === "sacrifice" && c.mvX);
+      const max = range ? range.max : mvSac ? (Array.from({ length: 21 }, (_, n) => 20 - n).find((n) => !!plan(n)) ?? 0) : maxX(plan);
+      const extra = optional?.kind === "sacrifice" ? (compiled.sacrificedReduction ? `sacrifice X ${optional.filter.text.replace(/s?$/, "s")}, each making it {${compiled.sacrificedReduction}} cheaper` : `sacrifice X ${optional.filter.text.replace(/s?$/, "s")} (X can be 0)`) : costX ? (/\b(?:(?:pay|discard|sacrifice|return|exile) X [^.(]*|sacrifice an? [^.(]*?with mana value X)/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
       return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : card.manaCost), max, value: range ? range.min : optional ? 0 : Math.max(max, compiled.xMin ?? 0), ...(range?.min ? { min: range.min } : !costX && compiled.xMin ? { min: compiled.xMin } : {}), ...(extra ? { extra } : {}) });
     }
     // "Kicker {X}": X is announced once it's kicked (CR 601.2b), "X can't be 0" (Thieving Skydiver).
@@ -5202,7 +5204,7 @@ function Controls({
   }
   // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": which card, or none;
   // the legend rule's "keep which one?" (CR 704.5j); Gilgamesh's "attach one of them": hovering shows each card.
-  if (pending?.kind === "chooseOption" && (pending.what === "castFromHand" || pending.what === "castFromAmong" || pending.what === "impulseChoice" || pending.what === "pileCard" || pending.what === "legend" || pending.what === "revealHandOrTop" || pending.what === "exileHandOrPermanent" || pending.what === "copyOrder" || pending.what === "nextRevealed" || pending.what === "nextExiled" || pending.what === "attachWhich" || pending.what === "predicamentCard" || pending.what === "alternatePick" || pending.what === "struggleExile") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "castFromHand" || pending.what === "castFromAmong" || pending.what === "impulseChoice" || pending.what === "takeExiled" || pending.what === "pileCard" || pending.what === "legend" || pending.what === "revealHandOrTop" || pending.what === "exileHandOrPermanent" || pending.what === "copyOrder" || pending.what === "nextRevealed" || pending.what === "nextExiled" || pending.what === "attachWhich" || pending.what === "predicamentCard" || pending.what === "alternatePick" || pending.what === "struggleExile") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

@@ -892,6 +892,21 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "changeTarget": {
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
+      // Meddle, Quicksilver Dragon: only a spell with one target now (the same thing targeted twice is two, rulings on
+      // Deflection), and that target a creature on the battlefield / ~ itself, still the same object (CR 400.7).
+      if (e.ifOnly) {
+        const item = s.stack.find((x) => x.id === t.id);
+        const chosen = (item?.targets ?? []).filter((x) => x.kind !== "none");
+        const only = chosen.length === 1 && chosen[0]!.kind === "object" ? chosen[0] : undefined;
+        const o = only?.kind === "object" ? s.objects[only.id] : undefined;
+        const same = !!o && o.zone === "battlefield" && (only!.kind !== "object" || only!.zc === undefined || (o.zoneChanges ?? 0) === only!.zc);
+        const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        const fits = same && (e.ifOnly === "creature" ? objIsType(s, o!, "Creature") : !!me && me.id === o!.id && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc));
+        if (!fits) {
+          log(s, `${item?.description ?? "That spell"} doesn't have only one target that is ${e.ifOnly === "creature" ? "a creature" : src}, so ${src} does nothing.`);
+          return;
+        }
+      }
       return e.anyOne ? changeATargetToSelf(s, ctx, t.id, src) : changeTarget(s, ctx, t.id, src, e.unless, e.toSelf, e.all, e.mustBe);
     }
     case "controlSpell": {

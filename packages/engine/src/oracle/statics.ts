@@ -1573,6 +1573,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^your life total is (\d+) or less$/.exec(text))) return { kind: "life", max: Number(m[1]) };
   // Near-Death Experience: "if you have exactly 1 life".
   if ((m = /^you have exactly (\d+) life$/.exec(text))) return { kind: "life", min: Number(m[1]), max: Number(m[1]) };
+  // Living Conundrum: "As long as there are no cards in your library".
+  if (/^there are no cards in your library$/.test(text)) return { kind: "amount", amount: { count: { kind: "cardsInLibrary", who: { ref: "you" } } }, max: 0 };
   // Battle of Wits: "if you have 200 or more cards in your library".
   if ((m = /^you have (\d+) or more cards in your library$/.exec(text))) return { kind: "amount", amount: { count: { kind: "cardsInLibrary", who: { ref: "you" } } }, min: Number(m[1]) };
   // Bloodghast: "as long as an opponent has 10 or less life" (one still in the game).

@@ -4973,6 +4973,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const min = /^[\d,]+$/.test(many[1]!) ? Number(many[1]!.replace(/,/g, "")) : num(many[1]!);
     return body && Number.isInteger(min) && min > 0 ? { event: "state", state: { kind: "selfCounters", counter: many[2]!, min }, body } : "fail";
   }
+  // Bomb Squad: "Whenever a creature has four or more fuse counters on it, remove all fuse counters from it and destroy it.
+  // That creature deals 4 damage to its controller." A state trigger (CR 603.8) of each creature in that state, "it" being
+  // that creature; it triggers again for that one only after it has resolved (rulings: two Bomb Squads each trigger).
+  const eachMany = new RegExp(`^Whenever an? ([a-z]+) has ${NUM} or more ([a-z]+) counters on it, (.+)$`).exec(line);
+  if (eachMany) {
+    const min = num(eachMany[2]!);
+    const filter = parseTargetPhrase(eachMany[1]!);
+    const body = Number.isInteger(min) && min > 0 && filter?.kind === "object" && !filter.counter ? parseBody(eachMany[4]!, { subjectIt: true }) : null;
+    return body && filter?.kind === "object" ? { event: "state", stateEach: { ...filter, counter: eachMany[3]!, counterMin: min, text: `${eachMany[1]} with ${eachMany[2]} or more ${eachMany[3]} counters on it` }, body } : "fail";
+  }
   // Afiya Grove: "When ~ has no +1/+1 counters on it, sacrifice it." (CR 603.8).
   const none = /^When ~ has no ([+-]1\/[+-]1|[a-z]+) counters on it, (.+)$/.exec(line);
   if (none) {

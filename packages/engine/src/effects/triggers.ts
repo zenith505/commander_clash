@@ -2951,6 +2951,22 @@ export function checkStateConditions(s: GameState) {
     const triggers = abilitiesOf(s, o).triggers;
     let printed: TriggeredAbility[] | undefined;
     triggers.forEach((t, index) => {
+      // Bomb Squad: once for each permanent in that state (CR 603.8), not again for that one until it has resolved or left
+      // the stack.
+      if (t.event === "state" && t.stateEach) {
+        const me = controllerOf(s, o);
+        for (const pid of s.battlefield) {
+          const p = s.objects[pid]!;
+          if (!objectMatches(s, t.stateEach, p, me, false)) continue;
+          const pzc = p.zoneChanges ?? 0;
+          const about = (x: { subject?: { id: ObjectId; zc: number } }) => x.subject?.id === pid && x.subject.zc === pzc;
+          const mine = (x: StackItem) => x.sourceId === id && x.stateIndex === index && x.sourceZc === (o.zoneChanges ?? 0) && about(x);
+          if (s.triggerQueue.some((q) => q.sourceId === id && q.index === index && about(q)) || s.stack.some(mine) || (!!s.resolving && mine(s.resolving.item))) continue;
+          printed ??= compileCard(defOf(s, o)).triggers;
+          s.triggerQueue.push({ sourceId: id, sourceCardId: cardIdOf(o), controller: me, index, sourceZc: o.zoneChanges ?? 0, subject: { id: pid, zc: pzc }, ...(printed[index] !== t ? { body: t.body, stateTrigger: true as const } : {}) });
+        }
+        return;
+      }
       if (t.event !== "state" || !t.state || (t.activeIf && !staticConditionNow(s, t.activeIf, id, controllerOf(s, o)))) return;
       // Not again until it has resolved (CR 603.8): one waiting, on the stack, or resolving now.
       const mine = (x: StackItem) => x.sourceId === id && x.stateIndex === index && x.sourceZc === (o.zoneChanges ?? 0);

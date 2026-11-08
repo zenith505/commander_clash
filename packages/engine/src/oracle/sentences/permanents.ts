@@ -1260,9 +1260,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = Number.isInteger(n) && n > 0 ? parseObject(m[2]!, ctx) : null;
     return what && !isGroup(what) ? [{ type: "battleDefense", what, n }] : null;
   }
-  // Oblivion Stone: "remove all fate counters from all permanents".
-  if ((m = new RegExp(`^Remove all ${COUNTER} counters from all permanents$`, "i").exec(s))) {
-    const what = parseObject("all permanents", ctx);
+  // Oblivion Stone: "remove all fate counters from all permanents". Mine Layer: "... from all lands"; Sporogenesis: "...
+  // from all creatures": every one of that kind, from each permanent of that type (rulings on Sporogenesis: also when
+  // another Sporogenesis is still on the battlefield).
+  if ((m = new RegExp(`^Remove all ${COUNTER} counters from all (permanents|lands|creatures)$`, "i").exec(s))) {
+    const what = parseObject(`all ${m[2]!.toLowerCase()}`, ctx);
     return what?.ref === "each" ? [{ type: "removeCounters", what, counter: counterKind(m[1]!), n: "all" }] : null;
   }
   // Temporal Distortion: "At the beginning of each player's upkeep, remove all hourglass counters from permanents that

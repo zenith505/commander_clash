@@ -1488,6 +1488,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "ownersGainControl":
     case "scrambleControl":
     case "successionControl":
+    case "rotateControl":
     case "counterOfKindEach":
     case "counterKindToOthers":
     case "swapCreatures":

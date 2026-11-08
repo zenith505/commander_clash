@@ -3,7 +3,7 @@ import { ANY_COUNTER, NON_AURA_ENCHANTMENT, allEffects, refCovers, type SearchDe
 import { substituteX } from "../amounts";
 import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS, plainMana, BASIC_TYPES } from "./words";
 import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_LANDWALK, CHOSEN_PROTECTION, CREATURE_TYPES, SUPPORTED_KEYWORDS, TARGET_PLAYER_PROTECTION, THAT_PLAYER_PROTECTION } from "../keywords";
-import { parsePreventAll, parseStaticCondition } from "./statics";
+import { parseIsA, parsePreventAll, parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
 import { parseBecomes, parseChanges, parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
@@ -1472,6 +1472,30 @@ function wandPunisher(who: PlayerRef, landLife: number): Effect {
 }
 
 function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell: boolean, before: Effect[]): { effects: Effect[]; skip: number } | null {
+  // Vraska, the Silencer: "you may pay {1}. If you do, return that card to the battlefield tapped under your control. It's
+  // a Treasure artifact with "...," and it loses all other card types": the permanent it becomes, from then on (CR
+  // 611.2c), as it enters; it keeps its supertypes and abilities but no other card type or subtype (rulings, CR 205.1a).
+  const treasureIt = /^It's (an? [A-Z][a-z]+ artifact) with "([^"]+?),?" and it loses all other card types$/.exec(s);
+  if (treasureIt && !spell) {
+    const prev = before.at(-1);
+    const put = prev?.type === "may" && prev.effects.length === 1 ? prev.effects[0] : prev;
+    const mods = parseIsA(`${treasureIt[1]} with "${treasureIt[2]}"`, true);
+    if (put?.type !== "putOntoBattlefield" || put.what.ref !== "subjectCard" || put.alsoMods || !mods) return null;
+    put.alsoMods = mods;
+    return { effects: [], skip: 0 };
+  }
+  // Goldberry, River-Daughter: "Move one or more counters from ~ onto another target permanent you control. If you do,
+  // draw a card.": any kinds, chosen one at a time as it resolves, at least one (CR 122.5); the draw only if one moved.
+  const oneOrMore = /^Move one or more counters from ~ onto (another target [^,]+)$/.exec(s);
+  if (oneOrMore && !spell && !before.length) {
+    const to = parseObject(oneOrMore[1]!, ctx);
+    const then = /^If you do, (draw a card)\.?$/.exec(sentences[si + 1] ?? "");
+    const draw = then ? parseOne(capital(then[1]!), ctx) : null;
+    if (to?.ref !== "target" || to.n || !draw) return null;
+    return { effects: [{ type: "removeAnyCounters", what: { ref: "self" }, n: 0, upTo: true, moveTo: to, atLeastOne: true }, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "countersRemovedThisWay" } }, min: 1 }, effects: draw }], skip: 1 };
+  }
+  // Aminatou, the Fateshifter (Effect rotateControl).
+  if (s === "Choose left or right" && /^Each player gains control of all nonland permanents other than ~ controlled by the next player in the chosen direction\.?$/.test(sentences[si + 1] ?? "")) return { effects: [{ type: "rotateControl" }], skip: 1 };
   // Power Sink: "Counter target spell unless its controller pays {X}. If that player doesn't, they tap all lands with mana
   // abilities they control and lose all unspent mana.": only if they didn't pay (CR 608.2c), even when the spell can't be
   // countered; lands with a mana ability of any kind, granted ones too, tapped but not for mana (rulings).
@@ -3753,6 +3777,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Promise of Tomorrow: "sacrifice ~ and return all cards exiled with it to the battlefield under your control": two
   // instructions, the cards its other ability exiled (CR 607.2a) returned even though ~ has just left.
   text = text.replace(/^sacrifice ~ and return all cards exiled with it to the battlefield under your control\.$/, "sacrifice ~. Return all cards exiled with ~ to the battlefield under your control.");
+  // Sothera, the Supervoid: "each opponent chooses a creature they control and exiles it" is each exiling one of their
+  // choice; "sacrifice ~, then put a creature card exiled with it onto the battlefield ..." the two in turn, whether or not
+  // ~ could be sacrificed ("then", not "if you do").
+  text = text.replace(/^each opponent chooses a creature they control and exiles it\.$/, "each opponent exiles a creature they control.");
+  text = text.replace(/^sacrifice ~, then (put a creature card exiled with) it (onto the battlefield under your control with two additional \+1\/\+1 counters on it\.)$/, "sacrifice ~. Put a creature card exiled with ~ $2");
   // Umbilicus: "that player may pay 2 life. If they don't, they return a permanent they control to its owner's hand": a
   // punisher (sentences/basics.ts).
   text = text.replace(/^that player may (pay \d+ life)\. If they don't, they return (an? [a-z]+ they control to its owner's hand)\.$/, "that player returns $2 unless they $1.");

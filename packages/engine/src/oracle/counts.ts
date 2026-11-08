@@ -67,6 +67,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Crackling Drake: "the total number of instant and sorcery cards you own in exile and in your graveyard".
   if (!each && /^the total number of instant and sorcery cards you own in exile and in your graveyard$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" }, graveyardToo: true } };
+  // Ravenloft Adventurer: "defending player loses 1 life for each card they own in exile with a hit counter on it": the
+  // cards that player owns in exile with one, however they got it.
+  if (each && (m = /^card they own in exile with an? ([a-z]+) counter on it$/.exec(p))) {
+    const who = whosePlayer("their", ctx);
+    return who?.ref === "eventPlayer" ? { count: { kind: "cardsInExile", who, counter: counterKind(m[1]!) } } : null;
+  }
   // Umbris, Fear Manifest: "for each card your opponents own in exile": face down or not (like Cosmogoyf), however they
   // got there (rulings).
   if (each && /^card your opponents own in exile$/.test(p)) return { count: { kind: "cardsInExile", who: { ref: "eachOpponent" } } };

@@ -2909,22 +2909,24 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
     const body = parseBody(truce[1]!);
     return body ? { event: "attackBetweenYouAndEnchanted", body } : "fail";
   }
-  const attacked = /^Whenever enchanted player is attacked, (.+)$/.exec(line);
+  // Curse of Bounty: "untap all nonland permanents you control. Each opponent attacking that player untaps all nonland
+  // permanents they control": the same for each of them.
+  const attacked = /^Whenever enchanted player is attacked, (.+)$/.exec(line.replace(/^(Whenever enchanted player is attacked, untap all nonland permanents you control\.) Each opponent attacking that player untaps all nonland permanents they control\.$/, "$1 Each opponent attacking that player does the same."));
   if (attacked) {
     const same = / Each opponent attacking that player does the same\.$/;
     const body = parseBody(attacked[1]!.replace(same, ""), { eventPlayer: true });
     if (!body) return "fail";
     if (!same.test(attacked[1]!)) return { event: "enchantedPlayerAttacked", body };
     // "Does the same": what "you" did, for each of them.
-    const again = body.effects.map((e) => ((e.type === "draw" || e.type === "gainLife" || e.type === "createToken") && e.who.ref === "you" ? { ...e, who: { ref: "opponentsAttackingEventPlayer" as const } } : null));
+    const again = body.effects.map((e) => ((e.type === "draw" || e.type === "gainLife" || e.type === "createToken") && e.who.ref === "you" ? { ...e, who: { ref: "opponentsAttackingEventPlayer" as const } } : e.type === "untap" && e.what.ref === "each" && e.what.filter.controller === "you" && !e.what.of && Object.keys(e.what).length === 2 ? { ...e, what: { ref: "each" as const, filter: ((({ controller: _, ...f }) => ({ ...f, text: "nonland permanents they control" }))(e.what.filter)), of: { ref: "opponentsAttackingEventPlayer" as const } } } : null));
     if (body.targets.length || again.some((e) => !e)) return "fail";
-    return { event: "enchantedPlayerAttacked", body: { ...body, effects: [...body.effects, ...(again as Effect[])], text: attacked[1]! } };
+    return { event: "enchantedPlayerAttacked", body: { ...body, effects: [...body.effects, ...(again as Effect[])], text: line.replace(/^Whenever enchanted player is attacked, /, "") } };
   }
   return null;
 }
 
 /** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
-const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", /** Old One Eye: "At the beginning of your first main phase" (CR 505.1a). */ "yourFirstMain", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut", "youSacrifice", "opponentGainsLife", /** Deathless Knight. */ "youGainLife"];
+const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", /** Old One Eye: "At the beginning of your first main phase" (CR 505.1a). */ "yourFirstMain", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut", "youSacrifice", "opponentGainsLife", /** Deathless Knight. */ "youGainLife", /** Deathmist Raptor. */ "permanentTurnedFaceUp"];
 
 /** The Oaths (see parseTrigger): `what` the target has more (or fewer) of, `may` what the first player may do. */
 function oathTrigger(what: string, may: string, whole: string): TriggeredAbility | "fail" {
@@ -3899,7 +3901,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Old One Eye: "you may discard two cards. If you do, ...": only with two cards in hand (see canDoNow).
   // Akuta, Born of Ash: "you may sacrifice a Swamp. If you do, return ~ from your graveyard to the battlefield".
   // Wolfbat: "... to the battlefield with a finality counter on it": it enters with it (CR 122.6).
-  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:(?:pay [^.]+|discard (?:a card|two cards)|sacrifice an? [A-Z][a-z]+)\. If you do, )?(?:return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature|, then attach it to that creature| with a finality counter on it)?(?:\. It gains haste until end of turn)?)|put ~ from your graveyard on top of your library))\.$/.exec(line);
+  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:(?:pay [^.]+|discard (?:a card|two cards)|sacrifice an? [A-Z][a-z]+)\. If you do, )?(?:return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature|, then attach it to that creature| with a finality counter on it| face up or face down)?(?:\. It gains haste until end of turn)?)|put ~ from your graveyard on top of your library))\.$/.exec(line);
   // An Aura's "when enchanted creature dies, return ~ from your graveyard" (Screams from Within) is its battlefield trigger;
   // so is "When enchanted land is put into a graveyard" (Genju of the Realm).
   if (yard && !/^(When|Whenever) ~ /.test(yard[1]!) && !/^When enchanted (?:creature|land|artifact|permanent) (?:dies|is put into a graveyard)$/.test(yard[1]!)) {
@@ -3918,7 +3920,20 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // "When a Ninja you control enters" (Smoke Shroud): a creature type means a creature.
     const creature = (f: TargetSpec | undefined) => !!f && (!!f.types?.includes("Creature") || (!f.types?.length && !!f.subtypes?.length && f.subtypes.every((x) => CREATURE_TYPES.has(x))));
     if (attach && !(t.event === "permanentEnters" && creature(t.enters?.filter)) && t.event !== "anotherCreatureYouControlEnters") return "fail";
-    const body = parseBody(`${yard[2]![0]!.toUpperCase()}${yard[2]!.slice(1)}.`, { selfCard: true, ...(attach ? { subject: true } : {}) });
+    // Deathmist Raptor: "you may return ~ from your graveyard to the battlefield face up or face down": the choice made as
+    // it resolves (rulings); face down it's a 2/2 that can be turned face up for its own megamorph cost (CR 708.2a,
+    // 702.37e).
+    const upOrDown = / face up or face down$/.test(yard[2]!);
+    if (upOrDown && !/^you may return ~ from your graveyard to the battlefield face up or face down$/.test(yard[2]!)) return "fail";
+    const body = parseBody(`${yard[2]![0]!.toUpperCase()}${yard[2]!.slice(1).replace(/ face up or face down$/, "")}.`, { selfCard: true, ...(attach ? { subject: true } : {}) });
+    if (body && upOrDown) {
+      const may = body.effects[0];
+      const put = may?.type === "may" && may.effects.length === 1 ? may.effects[0] : undefined;
+      if (body.effects.length !== 1 || may?.type !== "may" || put?.type !== "putOntoBattlefield" || put.what.ref !== "selfCard" || put.faceDown || put.tapped) return "fail";
+      may.effects = [{ type: "either", options: [[put], [{ ...put, faceDown: "plain" }]], labels: ["Face up", "Face down"] }];
+      may.text = "return ~ from your graveyard to the battlefield face up or face down";
+      body.text = "You may return ~ from your graveyard to the battlefield face up or face down.";
+    }
     return body ? { ...t, body, zone: "graveyard" } : "fail";
   }
   // Kozilek's Return, Ugin's Binding: "Whenever you cast a colorless spell with mana value 7 or greater, you may exile

@@ -1168,6 +1168,8 @@ export function moveObject(
   o.counterTimestamps = lastCounterTimes;
   // "Instead exile it with a void counter on it" (Dauthi Voidwalker).
   if (yardExile?.counter && to === "exile") o.counters[yardExile.counter] = 1;
+  // Ravenloft Adventurer: "instead exile it and put a hit counter on it".
+  if (insteadOfDying?.x.counter && to === "exile") o.counters[insteadOfDying.x.counter] = (o.counters[insteadOfDying.x.counter] ?? 0) + 1;
   o.controller = opts.controller ?? o.owner;
   o.seenController = undefined;
   o.attacking = undefined;
@@ -8196,7 +8198,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           : c.kind === "discard" || c.kind === "reveal" || c.kind === "exileFromHand"
           ? p.hand.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))) // it's on the stack by the time costs are paid (CR 601.2a)
           : c.kind === "exileFromGraveyard" && c.linked
-          ? linkedExileCards(s, o)
+          ? linkedCostCards(s, o, c.filter)
           : c.kind === "exileFromGraveyard" && c.process
           ? processCandidates(s, pid)
           : p.graveyard.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))); // "other cards" for escape
@@ -8212,7 +8214,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
             ? `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`
             : `${c.n === 1 ? "a card" : `${c.n} cards`}`
           : c.kind === "exileFromGraveyard" && c.linked
-          ? `a card exiled with ${d.name}`
+          ? `${c.filter ? (/^[aeiou]/i.test(c.filter.text) ? "an " : "a ") + c.filter.text : "a card"} exiled with ${d.name}`
           : c.kind === "exileFromGraveyard" && c.process
           ? "a card an opponent owns from exile"
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
@@ -8396,6 +8398,11 @@ export function sharesTypeWithLinked(s: GameState, key: string, types: readonly 
 
 export function linkedExileCards(s: GameState, o: GameObject): ObjectId[] {
   return (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).map((l) => l.id);
+}
+
+/** The cards exiled with `o` a "Put a [creature] card exiled with ~ into its owner's graveyard" cost can take (Shelob, Dread Weaver's filter). */
+export function linkedCostCards(s: GameState, o: GameObject, filter?: TargetSpec): ObjectId[] {
+  return linkedExileCards(s, o).filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
 }
 
 /**

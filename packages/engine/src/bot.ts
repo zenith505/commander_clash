@@ -266,6 +266,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Lim-Dûl's Vault: keep five cards with at least two we'd like to draw; otherwise dig on while life allows, a few times.
     // Blocks an opponent chose for us with Odric: we don't pay for their plan; they choose again.
     if (pend.kind === "chooseMay" && pend.blockTax) return [{ type: "chooseMay", player: pid, yes: false }];
+    // Pardic Dragon: "that player may put a time counter on ~": an opponent's suspended card, kept from being cast longer.
+    const theirMay = pend.kind === "chooseMay" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && s.resolving!.item.controller !== pid)
+      return [{ type: "chooseMay", player: pid, yes: theirMay.effects.every((x) => x.type === "counters" && x.counter === "time" && x.what.ref === "selfCard") }];
     // Fasting: skip the draw step for the life while the hand still holds three or more cards (drawing destroys it).
     if (pend.kind === "chooseMay" && pend.skipDraw) return [{ type: "chooseMay", player: pid, yes: player(s, pid).hand.length >= 3 }];
     // Dance with Calamity: another card while there's room for one of about average mana value under the limit.
@@ -645,6 +649,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const theirs = pend.cards.filter((id) => obj(s, id).owner !== pid);
       return [{ type: "searchLibrary", player: pid, found: player(s, pid).life - pend.dig.payLife >= 10 ? theirs.slice(0, pend.max) : [] }];
     }
+    // Dubious Challenge: the exiled cards come back onto the battlefield (one maybe for the opponent): our two best.
+    if (pend.kind === "searchLibrary" && pend.dig?.to === "into exile" && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "takeOneExiled"))
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     // Puresight Merrow: "Look at the top card of your library. You may exile that card.": exile it only to skip a land it
     // doesn't need (five or more lands already).
     if (pend.kind === "searchLibrary" && pend.dig?.to === "into exile" && pend.min === 0 && pend.cards.every((id) => obj(s, id).owner === pid)) {
@@ -1203,6 +1210,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && (pend.what === "textFrom" || pend.what === "textTo")) return [{ type: "chooseOption", player: pid, choice: textWordPick(s, pid, pend) }];
     // Truth or Tale: the best card of the chosen pile.
     if (pend.kind === "chooseOption" && pend.what === "pileCard") return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => handWorth(s, b) - handWorth(s, a))[0]! }];
+    // Dubious Challenge: the exiled creature card worth the most to us, if any is worth having.
+    if (pend.kind === "chooseOption" && pend.what === "takeExiled") {
+      const best = pend.options.filter((o) => o !== "none").sort((a, b) => mv(s, b) - mv(s, a))[0];
+      return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "impulseChoice") {
       const p = player(s, pid);
       const land = pend.options.find((o) => isType(defOf(s, obj(s, o)), "Land"));
@@ -4197,7 +4209,9 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
     const given = new Set((s.resolving.countersPutThisWay ?? []).map((c) => c.id));
     return [...options].sort((a, b) => Number(given.has(a)) - Number(given.has(b)) || worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   }
-  const after = action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next + 1] : undefined;
+  // Grenzo's Rebuttal: past the picks that add to this one's ("each permanent chosen this way"), to what's done with them.
+  const rest = action === "choose" && s.resolving ? s.resolving.body.effects.slice(s.resolving.next + 1) : [];
+  const after = rest.find((x) => !(x.type === "pick" && x.addChosen));
   // Azra Oddsmaker: the creature whose combat damage to a player draws us cards this turn: ours that can attack an
   // opponent now, the strongest first; else our best one.
   // The pick is nested in "if you do" there, so look for a choose-pick followed by that trigger anywhere in the body.
@@ -5486,6 +5500,17 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const handRoom = maxHandSize(s, pid) - hand;
       if (!necro && ab.body.effects.some((e) => e.type === "exileFaceDown" && (e.from !== "handCard" || handRoom >= 0))) continue;
       if (ab.body.effects.some((e) => e.type === "moveLinked" && (!linkedOwned(s, id, pid) || (e.dest === "hand" && handRoom <= 0)))) continue;
+      // Muse Vessel: in our main phase with the stack empty, for an exiled card we could play now (a land with a land drop
+      // left, or a spell we have the mana for after paying for this).
+      if (ab.body.effects.some((e) => e.type === "mayPlayLinked")) {
+        const now = s.activePlayer === pid && (s.step === "main1" || s.step === "main2") && !s.stack.length;
+        const room = availableMana(s, pid) - manaValue(parseManaCost(ab.manaCost)) - (ab.tap ? 1 : 0);
+        const playable = linkedCards(s, id).some((l) => {
+          const d = defOf(s, obj(s, l.id));
+          return isType(d, "Land") ? player(s, pid).landsPlayedThisTurn < landsAllowed(s, pid) : mv(s, l.id) <= room;
+        });
+        if (!now || !playable) continue;
+      }
       // An Incubator becomes a 0/0 Phyrexian: only worth it with +1/+1 counters on it (CR 701.53b).
       // "Discard your hand" (Tarrian's Journal): only with at most one card in it, which then becomes a land worth tapping.
       if (ab.discardHand && hand > 1) continue;

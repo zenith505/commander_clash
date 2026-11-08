@@ -2701,6 +2701,12 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(exhaust[1]!, {});
     return body ? { event: "abilityActivated", activates: { by: "you", exhaust: true, mana: true }, body } : "fail";
   }
+  // Marvel Boy, Noh-Varr: "Whenever you activate a power-up ability" (CR 702.193a): any permanent's or card's of yours.
+  const powerUp = /^Whenever you activate a power-up ability, (.+)$/.exec(line);
+  if (powerUp) {
+    const body = parseBody(powerUp[1]!, {});
+    return body ? { event: "abilityActivated", activates: { by: "you", powerUp: true }, body } : "fail";
+  }
   // Herald of Anafenza: "Whenever you activate ~'s outlast ability" (CR 702.107a).
   const outlast = /^Whenever you activate ~'s outlast ability, (.+)$/.exec(line);
   if (outlast) {
@@ -3811,6 +3817,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // a time counter put on it or removed.
   const suspendedIf = /^(Whenever (?:a player|an opponent|you) casts? a spell), if ~ is suspended, (.+)$/.exec(line);
   if (suspendedIf) {
+    // Pardic Dragon: "that player may put a time counter on ~": the opponent who cast the spell decides (CR 603.5).
+    const theyMay = /^that player may put a time counter on ~\.$/.test(suspendedIf[2]!) && /^Whenever an opponent casts a spell$/.test(suspendedIf[1]!);
+    if (theyMay) {
+      const t = parseTrigger(`${suspendedIf[1]}, draw a card.`);
+      if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.zone || t.ifCond || t.cast.orCopy) return "fail";
+      const put: Effect = { type: "counters", what: { ref: "selfCard" }, counter: "time", n: 1 };
+      return { ...t, zone: "exile", ifCond: { kind: "selfSuspended" }, body: { targets: [], effects: [{ type: "may", effects: [put], decider: { ref: "eventPlayer" }, text: "put a time counter on ~" }], text: "That player may put a time counter on ~." } };
+    }
     const t = parseTrigger(`${suspendedIf[1]}, ${suspendedIf[2]!.replace(/ time counter from it\.$/, " time counter from ~.")}`);
     if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.zone || t.ifCond || t.cast.orCopy) return "fail";
     // The card in exile ("selfCard"), not a permanent: only removing a time counter from it is modeled.

@@ -630,6 +630,9 @@ export function compile(d: CardDef): CompiledCard {
       // ability with two trigger events (CR 603.1), the same as an ability for each. "Whenever you cast a green spell and
       // whenever a Forest you control enters, ..." (Necklace of Girion) too.
       .replace(/^Whenever you cast (an? [a-z]+ spell)(?: or| and whenever) (an? [A-Z][a-z]+ you control) enters, ([^\n]+)$/m, "Whenever you cast $1, $3\nWhenever $2 enters, $3")
+      // Marvel Boy, Noh-Varr: "Whenever another creature you control enters and whenever you activate a power-up ability,
+      // put a +1/+1 counter on ~": one ability with two trigger events (CR 603.1), the same as an ability for each.
+      .replace(/^Whenever (another creature you control) enters and whenever you activate a power-up ability, ([^\n]+)$/m, "Whenever $1 enters, $2\nWhenever you activate a power-up ability, $2")
       // Orcish Mine: "At the beginning of your upkeep and whenever enchanted land becomes tapped, remove an ore counter from
       // ~": the same, an ability for each event (CR 603.1).
       .replace(/^At the beginning of your upkeep and whenever enchanted land becomes tapped, ([^\n]+)$/m, "At the beginning of your upkeep, $1\nWhenever enchanted land becomes tapped, $1")
@@ -3908,9 +3911,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Urborg Scavengers: "~ has flying as long as a card exiled with it has flying. The same is true for first strike, ...":
     // each keyword while a card exiled with it has that one (linked to its one exile ability below, CR 607.2a), layer 6.
-    const linkedKw = /^~ has ([a-z ]+) as long as a card exiled with it has \1\. The same is true for ((?:[a-z ]+, )+)and ([a-z ]+)\.$/.exec(line);
+    // Death-Mask Duplicant: "As long as a card exiled with ~ has flying, ~ has flying. The same is true for fear, ...,
+    // landwalk, protection, and trample.": the same, landwalk and protection being every one of those it has (rulings).
+    const linkedKw = /^~ has ([a-z ]+) as long as a card exiled with it has \1\. The same is true for ((?:[a-z ]+, )+)and ([a-z ]+)\.$/.exec(line) ?? /^As long as a card exiled with ~ has ([a-z ]+), ~ has \1\. The same is true for ((?:[a-z ]+, )+)and ([a-z ]+)\.$/.exec(line);
     if (linkedKw) {
-      const kws = [linkedKw[1]!, ...linkedKw[2]!.split(", ").filter(Boolean), linkedKw[3]!].map((k) => canonicalKeyword(k));
+      const kws = [linkedKw[1]!, ...linkedKw[2]!.split(", ").filter(Boolean), linkedKw[3]!].map((k) => (k === "landwalk" ? "Landwalk" : k === "protection" ? "Protection" : canonicalKeyword(k)));
       if (kws.some((k) => !k || !/^[A-Z][a-z]+(?: [a-z]+)?$/.test(k))) out.unsupported.push(raw);
       else out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "addKeywords", keywords: kws.map((k) => `${LINKED_CARD_KEYWORD}${k}`) }], text: line });
       continue;
@@ -6874,6 +6879,15 @@ function linkExile(out: CompiledCard) {
     if (spells.length !== 1 || others.length !== 1 || out.spell) out.unsupported.push("(casts an exiled card it can't link to one exile ability)");
     else spells[0]!.linked = true;
   }
+  // Muse Vessel: "a card exiled with ~" is one its "target player exiles a card from their hand" ability exiled (CR
+  // 607.2a, rulings), its only exile instruction.
+  if ([...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].some((b) => allEffects(b.effects).some((e) => e.type === "mayPlayLinked"))) {
+    const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects));
+    const fromHand = all.filter((e): e is Extract<Effect, { type: "discard" }> => e.type === "discard" && !!e.exile);
+    const others = all.filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong", "search", "chooseFromGraveyard", "pick"].includes(e.type) && !(e.type === "pick" && e.action !== "exile"));
+    if (out.spell || fromHand.length !== 1 || others.length) out.unsupported.push("(plays an exiled card it can't link to one exile ability)");
+    else fromHand[0]!.linked = true;
+  }
   // Ugin's Labyrinth: "If a card is exiled with ~" and "Return the exiled card to its owner's hand" are about the card its
   // imprint ability exiled (CR 607.2a), its only exile.
   if (out.activated.some((a) => allEffects(a.body.effects).some((e) => e.type === "bounce" && e.what.ref === "linkedCard"))) {
@@ -6912,8 +6926,9 @@ function linkExile(out: CompiledCard) {
     const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects));
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");
     const others = all.some((e) => e.type === "exileGraveyard" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileTop" || e.type === "chooseFromGraveyard" || (e.type === "discard" && !!e.exile));
-    const holders = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => exiles.includes(e as Extract<Effect, { type: "exile" }>)));
-    const oneAbility = exiles.length >= 1 && new Set(holders.map((t) => JSON.stringify(t.body))).size === 1 && holders.length === exiles.length;
+    // Death-Mask Duplicant's imprint is an activated ability.
+    const holders = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].filter((b) => allEffects(b.effects).some((e) => exiles.includes(e as Extract<Effect, { type: "exile" }>)));
+    const oneAbility = exiles.length >= 1 && new Set(holders.map((b) => JSON.stringify(b))).size === 1 && holders.length === exiles.length;
     if (others || out.spell || !oneAbility || exiles.some((e) => e.until)) out.unsupported.push("(has keywords of exiled cards it can't link to one exile ability)");
     else for (const e of exiles) e.linked = true;
   }

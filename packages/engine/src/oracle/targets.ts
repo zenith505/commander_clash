@@ -1017,7 +1017,8 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const first = ctx.targets.length;
   if (many) {
     // Rats' Feast: "X target cards from a single graveyard": each in the graveyard of the others (TargetSpec.singleGraveyard).
-    if ((single && many !== "exactX") || share || ctx.targets.some((t) => t.many)) return null;
+    // Martyr of Bones: "up to X target cards from a single graveyard", the same for the ones chosen (as Kaya's "up to two").
+    if ((single && many !== "exactX" && many !== "x") || share || ctx.targets.some((t) => t.many)) return null;
     addTarget(ctx, { ...spec, ...(single ? { singleGraveyard: true as const, text: spec.text.replace(/ from a graveyard$/, " from a single graveyard") } : {}), ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), ...(manyMax ? { manyMax } : {}), ...(range === "one or more" ? { manyMin: 1 as const } : {}), ...(whereMany ? { manyWhere: true as const } : {}), ...(twice ? { manyTimes: 2 as const } : {}), ...(differMv ? { differentManaValues: true as const, text: spec.text.replace(" with mana value ", " with a different mana value ") } : {}), many });
     // "It" can't mean one of them; "they", "those creatures" means all of them, however many.
     ctx.lastObjectTarget = undefined;

@@ -1569,7 +1569,13 @@ function linkedCardKeyword(s: GameState, sourceId: ObjectId | undefined, keyword
   const src = sourceId ? s.objects[sourceId] : undefined;
   if (!src) return [];
   const linked = s.linkedExile?.[`${src.id}@${src.zoneChanges ?? 0}`] ?? [];
-  const has = linked.some((l) => { const o = s.objects[l.id]; return o?.zone === "exile" && (o.zoneChanges ?? 0) === l.zc && !o.faceDown && printedKeywords(defOf(s, o)).some((k) => k.toLowerCase() === keyword.toLowerCase()); });
+  const cards = linked.flatMap((l) => { const o = s.objects[l.id]; return o?.zone === "exile" && (o.zoneChanges ?? 0) === l.zc && !o.faceDown ? [o] : []; });
+  // Death-Mask Duplicant: "landwalk" and "protection" are each of those abilities the cards have, all of them (rulings).
+  if (keyword === "Landwalk" || keyword === "Protection") {
+    const fits = (k: string) => (keyword === "Landwalk" ? isLandwalk(k) : /^Protection from /i.test(k));
+    return [...new Set(cards.flatMap((o) => printedKeywords(defOf(s, o)).filter(fits)))];
+  }
+  const has = cards.some((o) => printedKeywords(defOf(s, o)).some((k) => k.toLowerCase() === keyword.toLowerCase()));
   return has ? [keyword] : [];
 }
 

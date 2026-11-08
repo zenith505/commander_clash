@@ -2,7 +2,7 @@ import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption
 import { coloredManaSymbols, manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool, mayPayUse, type ManaUse } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, livingPlayers, gainLife, inCombatPhase, loseEnergy, processCandidates, adventureExileCards, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
+import { autoEvidence, evidenceCandidates, evidenceValue, livingPlayers, gainLife, inCombatPhase, loseEnergy, processCandidates, adventureExileCards, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
 import { abilitiesOf, realDefOf, canBeSacrificed, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import type { Color, GameObject, GameState, ObjectId, PlayerId } from "../types";
@@ -92,6 +92,24 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           log(s, `${p.name} pays ${n} energy for ${src}.`);
         }
         sc.may = n > 0 || !e.payX.atLeastOne;
+      }
+      // "You may collect evidence X" (Incinerator of the Guilty): X first, at most the total mana value of the cards in the
+      // graveyard (more can't be collected, CR 701.59a-b), then the cards. Collecting evidence 0 is collecting evidence
+      // (rulings), with no cards needed, so none are exiled for it.
+      if (e.payX?.evidence && sc.may === undefined) {
+        if (sc.payX === undefined) {
+          const most = evidenceValue(s, evidenceCandidates(s, ctx.controller));
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "evidenceX", options: ["none"], numberRange: { min: 0, max: most }, prompt: "you may collect evidence X: choose X" };
+          return "paused";
+        }
+        if (sc.payX === "none") sc.may = false;
+        else if (Number(sc.payX) === 0) {
+          sc.evidence = [];
+          sc.may = true;
+        } else {
+          s.pending = { kind: "collectEvidence", player: ctx.controller, n: Number(sc.payX), source: src };
+          return "paused";
+        }
       }
       // "You may pay {1}{W} any number of times" (Intrepid Adversary): how many times first, at most as many as the player
       // could pay, then the whole payment at once.
@@ -518,9 +536,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // The cards picked as it asked (see "may"); anyone else's choice is made for them, the fewest that do.
       const sc = s.resolving!.scratch ?? {};
       const p = player(s, ctx.controller);
-      const ids = sc.evidence?.filter((id) => p.graveyard.includes(id)) ?? autoEvidence(s, p.id, e.n);
-      if (evidenceProblem(s, p.id, e.n, ids)) return;
-      collectEvidence(s, p, ids, e.n);
+      const n = e.nX ? (ctx.x ?? 0) : e.n;
+      const ids = sc.evidence?.filter((id) => p.graveyard.includes(id)) ?? autoEvidence(s, p.id, n);
+      if (evidenceProblem(s, p.id, n, ids)) return;
+      collectEvidence(s, p, ids, n);
       return;
     }
     case "reflexive": {

@@ -1,6 +1,6 @@
 import type { Effect, PlayerRef, SearchDest } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType, objIsType } from "../cards";
-import { controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
+import { controllerOf, ignoredBy, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { attackingPermanentOf, auraHostOptions, castProblem, creatureTypesOf, freeCastable, draw, shareCreatureType, grantedMadness, gainLife, log, loseLife, payLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
@@ -2381,7 +2381,8 @@ export function cantSearch(s: GameState, pid: PlayerId): boolean {
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     const a = abilitiesOf(s, o);
-    return !!a.playersCantSearch || (controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost && !!a.opponentsCantSearch);
+    // Leonin Arbiter: unless this player paid to ignore this one this turn (CR 116.2d).
+    return (!!a.playersCantSearch && !(a.ignorable && ignoredBy(s, o, pid))) || (controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost && !!a.opponentsCantSearch);
   });
 }
 

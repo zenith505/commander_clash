@@ -3,7 +3,8 @@ import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type Abili
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { mayPayUse } from "./spend";
-import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
+import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planIgnoreEffect, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
+import { cantSearch } from "./effects/run-library";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
 import { reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
@@ -133,6 +134,7 @@ import {
   auraHostOptions,
   lastDrawnInHand,
   deferredChoice,
+  ignorableBy,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -867,6 +869,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const phasing = pend.kind === "pickPermanents" && pend.action === "choose" && pend.min === 0 ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
     if (pend.kind === "pickPermanents" && phasing?.type === "phaseOut" && phasing.what.ref === "created")
       return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, pend.count) }];
+    // Armed and Armored: the Equipment to put on the Dwarf just chosen.
+    const toChosen = pend.kind === "pickPermanents" && pend.action === "attach" ? s.resolving?.body.effects[s.resolving.next] : undefined;
+    if (pend.kind === "pickPermanents" && toChosen?.type === "attachAny" && toChosen.toChosen) return [{ type: "pickPermanents", player: pid, ids: attachPicks(s, pid, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.min !== undefined && pend.action !== "keep") return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     // Stick Together: for this slot of the party, the creature the most valuable whole party (this slot and the ones still
     // to come, each creature once) uses, or none.
@@ -1497,6 +1502,21 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const spells = pend.options.filter((id) => !isType(defOf(s, obj(s, id)), "Land")).sort((a, b) => mv(s, b) - mv(s, a));
       return [{ type: "chooseOption", player: pid, choice: spells[0] ?? pend.options[0]! }];
     }
+    if (pend.kind === "chooseOption" && pend.what === "evidenceX") {
+      // Incinerator of the Guilty: the X that destroys the most of the damaged player's creatures and planeswalkers, the
+      // smallest such X, collected from cards it doesn't need in its graveyard; none if it destroys nothing.
+      const victim = s.resolving?.item.event?.player;
+      const most = pend.numberRange?.max ?? 0;
+      const dies = (o: GameObject) => (objIsType(s, o, "Creature") && !objHasKeyword(s, o, "Indestructible") ? Math.max(1, toughness(s, o) - (o.damage ?? 0)) : objIsType(s, o, "Planeswalker") ? Math.max(1, o.counters.loyalty ?? 0) : Infinity);
+      const needs = victim === undefined ? [] : s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === victim).map(dies).filter((n) => n <= most);
+      let best = 0;
+      let kills = 0;
+      for (const x of [...new Set(needs)].sort((a, b) => a - b)) {
+        const k = needs.filter((n) => n <= x).length;
+        if (k > kills && spareEvidence(s, pid, x)) [best, kills] = [x, k];
+      }
+      return [{ type: "chooseOption", player: pid, choice: best ? String(best) : "none" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "payEnergy") {
       const most = pend.numberRange?.max ?? 0;
       // Aether Spike: "Counter that spell unless its controller pays {1} for each {E} paid this way": more than its
@@ -1536,6 +1556,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
           if (score > bestScore) [best, bestScore] = [n, score];
         }
         return [{ type: "chooseOption", player: pid, choice: String(best) }];
+      }
+      // Suppression Ray: a stun counter on each of up to that many of the creatures it tapped: one for each of those an
+      // opponent controls.
+      const stun = may?.effects.length === 1 && may.effects[0]!.type === "pick" && may.effects[0]!.fromTapped;
+      if (stun) {
+        const theirs = (s.resolving?.tappedIds ?? []).filter((c) => s.objects[c.id]?.zone === "battlefield" && controllerOf(s, obj(s, c.id)) !== pid).length;
+        return [{ type: "chooseOption", player: pid, choice: String(Math.min(most, theirs)) }];
       }
       // Wheel of Potential: the {E} paid is how many each player who wheels draws; all we have, short of decking ourselves.
       const wheelPaid = s.resolving?.body.effects.some((x) => x.type === "eachMay" && typeof x.wheel === "object" && "count" in x.wheel && x.wheel.count.kind === "notedAmount");
@@ -1689,6 +1716,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
     if (land) return [land];
+    const ignore = chooseIgnore(s, pid);
+    if (ignore) return ignore;
     const fetch = chooseFetch(s, pid);
     if (fetch) return fetch;
     // Turn face-down creatures face up when we can pay for it (CR 702.37e).
@@ -2120,8 +2149,80 @@ function chooseUnblocked(s: GameState, pid: PlayerId, ids: ObjectId[]): ObjectId
  * our first main phase, one with a mana cost in the second, with mana left over. Command Beacon once our commander costs
  * four or more extra to cast from the command zone.
  */
+/**
+ * CR 116.2d, a special action: pay {2} to ignore a Leonin Arbiter when we'd search this turn (a spell in hand that
+ * searches, or a fetch land) and have the mana for it as well; exile three cards from our graveyard (Lost in Thought) or
+ * sacrifice a token (Volrath's Curse) to attack with a creature of power 3 or more in our first main phase.
+ */
+function chooseIgnore(s: GameState, pid: PlayerId): Action[] | null {
+  const ignorable = s.battlefield.filter((id) => ignorableBy(s, pid, id));
+  if (!ignorable.length) return null;
+  // Leonin Arbiter: only when paying for each of them lets us search, with mana left for the spell.
+  const arbiters = ignorable.filter((id) => abilitiesOf(s, obj(s, id)).playersCantSearch && ignorableBy(s, pid, id)!.mana);
+  if (arbiters.length && cantSearch(s, pid)) {
+    const without = cloneState(s);
+    for (const id of arbiters) without.objects[id]!.ignoredBy = { turn: s.turn, zc: obj(s, id).zoneChanges ?? 0, players: [pid] };
+    const toPay = arbiters.reduce((n, id) => n + manaValue(parseManaCost(ignorableBy(s, pid, id)!.mana!)), 0);
+    const p = player(s, pid);
+    const searches = (b: AbilityBody | undefined) => !!b && allEffects(b.effects).some((e) => e.type === "search" && !e.library && !e.who);
+    const want = p.hand.some((id) => !isType(defOf(s, obj(s, id)), "Land") && searches(compileCard(defOf(s, obj(s, id))).spell) && availableMana(s, pid) >= toPay + mv(s, id)) || (s.step === "main1" && availableMana(s, pid) >= toPay && chooseFetchIgnoring(s, pid));
+    if (!cantSearch(without, pid) && want) {
+      const plan = planIgnoreEffect(s, pid, arbiters[0]!);
+      if (plan) return plan;
+    }
+  }
+  if (s.step !== "main1" || s.activePlayer !== pid) return null;
+  for (const id of ignorable) {
+    const o = obj(s, id);
+    const ig = ignorableBy(s, pid, id)!;
+    // Damping Engine: a token, or a tapped land when we have lands to spare, to cast the dearest artifact, creature or
+    // enchantment we hold that it stops (or play a land).
+    if (ig.who === "mostPermanents") {
+      const p = player(s, pid);
+      const filter = abilitiesOf(s, o).mostPermanentsCant!;
+      const blocked = p.hand.filter((h) => printedMatches(filter, defOf(s, obj(s, h))) && mv(s, h) <= availableMana(s, pid) - 1).sort((a, b) => mv(s, b) - mv(s, a))[0];
+      const landToPlay = p.hand.some((h) => isType(defOf(s, obj(s, h)), "Land")) && p.landsPlayedThisTurn === 0;
+      if (!blocked && !landToPlay) continue;
+      const mine = s.battlefield.filter((x) => x !== id && controllerOf(s, obj(s, x)) === pid && canSacrificeForCost(s, obj(s, x)));
+      const token = mine.filter((x) => obj(s, x).isToken).sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0];
+      const lands = mine.filter((x) => objIsType(s, obj(s, x), "Land"));
+      const spareLand = lands.length > 5 ? lands.find((x) => obj(s, x).tapped) : undefined;
+      const fodder = token ?? spareLand;
+      const plan = fodder && planIgnoreEffect(s, pid, id, { sacrifice: [fodder] });
+      if (plan) return plan;
+      continue;
+    }
+    const host = o.attachedTo !== undefined ? s.objects[o.attachedTo] : undefined;
+    if (ig.who !== "attachedController" || !host || power(s, host) < 3 || isSummoningSick(s, host)) continue;
+    const c = ig.costs?.[0];
+    if (c?.kind === "exileFromGraveyard") {
+      const yard = player(s, pid).graveyard;
+      if (yard.length < c.n) continue;
+      // The least useful: lands first, then the cheapest.
+      const picks = [...yard].sort((a, b) => Number(isType(defOf(s, obj(s, b)), "Land")) - Number(isType(defOf(s, obj(s, a)), "Land")) || mv(s, a) - mv(s, b)).slice(0, c.n);
+      const plan = planIgnoreEffect(s, pid, id, { exileCards: picks });
+      if (plan) return plan;
+    }
+    if (c?.kind === "sacrifice") {
+      const token = s.battlefield.filter((x) => x !== host.id && x !== id && obj(s, x).isToken && controllerOf(s, obj(s, x)) === pid && canSacrificeForCost(s, obj(s, x))).sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0];
+      const plan = token && planIgnoreEffect(s, pid, id, { sacrifice: [token] });
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/** A fetch land we'd sacrifice to search with, were we free to search (chooseFetch). */
+function chooseFetchIgnoring(s: GameState, pid: PlayerId): boolean {
+  const t = cloneState(s);
+  for (const id of t.battlefield) if (abilitiesOf(t, obj(t, id)).ignorable) t.objects[id]!.ignoredBy = { turn: t.turn, zc: obj(t, id).zoneChanges ?? 0, players: [pid] };
+  return !!chooseFetch(t, pid);
+}
+
 function chooseFetch(s: GameState, pid: PlayerId): Action[] | null {
   const p = player(s, pid);
+  // Leonin Arbiter, Mindlock Orb: no search, so nothing to find (chooseIgnore pays for the Arbiter first when it's worth it).
+  if (cantSearch(s, pid)) return null;
   for (const id of s.battlefield) {
     const o = obj(s, id);
     if (controllerOf(s, o) !== pid || !objIsType(s, o, "Land")) continue;
@@ -6015,7 +6116,9 @@ function flipBranchWorth(s: GameState, pid: PlayerId, o: GameObject, effects: Ef
 function attachPicks(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId[] {
   const item = s.resolving?.item;
   const e = item?.body?.effects.find((x) => x.type === "attachAny");
-  const t = e?.type === "attachAny" ? (e.self && item?.sourceId ? ({ kind: "object", id: item.sourceId } as const) : item!.targets?.[e.host]) : undefined;
+  // Armed and Armored: the Dwarf just chosen.
+  const chosen = e?.type === "attachAny" && e.toChosen ? s.resolving?.created?.find((id) => s.objects[id]?.zone === "battlefield") : undefined;
+  const t = e?.type === "attachAny" ? (chosen ? ({ kind: "object", id: chosen } as const) : e.self && item?.sourceId ? ({ kind: "object", id: item.sourceId } as const) : item!.targets?.[e.host]) : undefined;
   if (!t || (t.kind !== "object" && t.kind !== "player")) return [];
   const host = t.kind === "object" ? s.objects[t.id] : undefined;
   const ourHost = host ? controllerOf(s, host) === pid : t.id === pid;

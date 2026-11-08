@@ -357,14 +357,22 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         log(s, `${wasTapped.length} tapped creature${wasTapped.length === 1 ? "" : "s"} untap and ${wasUntapped.length} untapped creature${wasUntapped.length === 1 ? "" : "s"} tap.`);
         return;
       }
+      const tappedIds: { id: ObjectId; zc: number }[] = [];
       for (const o of objects(s, e.what, ctx)) {
         if (e.type === "untap") untapPermanent(s, o);
         else if (!o.tapped) {
           tapPermanent(s, o, undefined, ctx.controller);
-          if (o.tapped) tapped++;
+          if (o.tapped) {
+            tapped++;
+            tappedIds.push({ id: o.id, zc: o.zoneChanges ?? 0 });
+          }
         }
       }
-      if (e.type === "tap" && e.noteTapped) s.resolving!.tappedThisWay = tapped;
+      // Those that became tapped (Monsoon counts them; Suppression Ray chooses among them).
+      if (e.type === "tap" && e.noteTapped) {
+        s.resolving!.tappedThisWay = tapped;
+        s.resolving!.tappedIds = tappedIds;
+      }
       return;
     }
     case "harness": {
@@ -2246,8 +2254,11 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const me = e.self && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const returned = !!me && (s.resolving?.created ?? []).includes(me.id);
       if (e.self && (!me || me.zone !== "battlefield" || (!returned && ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc))) return;
-      const t = me ? ({ kind: "object", id: me.id } as const) : ctx.targets[e.host];
-      if (!t || (!me && !ctx.legal[e.host])) return;
+      // Armed and Armored: the permanent just chosen, if it's still there.
+      const chosenHost = e.toChosen ? (s.resolving?.created ?? []).map((id) => s.objects[id]).find((o) => o?.zone === "battlefield") : undefined;
+      if (e.toChosen && !chosenHost) return;
+      const t = me ? ({ kind: "object", id: me.id } as const) : chosenHost ? ({ kind: "object", id: chosenHost.id } as const) : ctx.targets[e.host];
+      if (!t || (!me && !chosenHost && !ctx.legal[e.host])) return;
       const host = t.kind === "object" ? s.objects[t.id] : undefined;
       if (t.kind === "object" && host?.zone !== "battlefield") return;
       const sc = (s.resolving!.scratch ??= {});

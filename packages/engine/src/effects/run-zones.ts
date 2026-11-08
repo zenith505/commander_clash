@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, toughness } from "../cards";
 import { nameLandBan } from "../names";
-import { faceDownExileGroup, hiddenInExile, adventureExileCards, graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, payLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
+import { nearestOpponent, faceDownExileGroup, hiddenInExile, adventureExileCards, graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, payLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { countersRemoved, putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -173,7 +173,10 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     who = who.filter((pid) => !sc.paidBy?.includes(pid));
   }
   if (!sc.queue) {
-    sc.queue = apnap(s, who);
+    // "Starting with you, each player chooses" (Grenzo's Rebuttal): in turn order from you (CR 101.4).
+    const order = apnap(s, who);
+    const at = e.fromYou ? order.indexOf(ctx.controller) : -1;
+    sc.queue = at > 0 ? [...order.slice(at), ...order.slice(0, at)] : order;
     sc.chosen = {};
     r.couldntPick = [];
   }
@@ -204,7 +207,9 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const group = e.fromGroup ? (ctx.event?.group ?? []).filter((g) => s.objects[g.id]?.zone === "battlefield" && (obj(s, g.id).zoneChanges ?? 0) === g.zc).map((g) => g.id) : undefined;
     // "On either of them" (Call of the Death-Dweller): the permanents the targets became, still on the battlefield.
     const ofTargets = e.fromTargets ? objects(s, { ref: "target", index: e.fromTargets.index, n: e.fromTargets.n }, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id) : undefined;
-    const options0 = ofTargets ?? group ?? (e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId, ctx.sourceZc)) : pickOptions(s, e, pid, ctx.sourceId, ctx.sourceZc));
+    // Grenzo's Rebuttal: among the permanents of the player to this one's left (the next in turn order, CR 101.4).
+    const left = e.amongLeft ? nearestOpponent(s, pid, "left") : undefined;
+    const options0 = e.amongLeft ? (left === undefined ? [] : pickOptions(s, e, left, ctx.sourceId, ctx.sourceZc)) : ofTargets ?? group ?? (e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId, ctx.sourceZc)) : pickOptions(s, e, pid, ctx.sourceId, ctx.sourceZc));
     // Labyrinth Raptor: only creatures blocking the trigger's subject now, the same attacking object (CR 400.7, 509.1h).
     const attacker = e.filter.blockingSubject && ctx.subject ? s.objects[ctx.subject.id] : undefined;
     const options1 = !e.filter.blockingSubject ? options0 : attacker && attacker.zone === "battlefield" && (attacker.zoneChanges ?? 0) === ctx.subject!.zc && attacker.attacking !== undefined ? options0.filter((id) => !!attacker.blockedBy?.includes(id) && obj(s, id).blocking?.includes(attacker.id)) : [];
@@ -252,11 +257,11 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       const tied = e.anyController && e.least ? `click a creature tied for the least ${e.least} (anyone's). ${src} ${after?.type === "destroy" ? "destroys it" : after?.type === "damage" ? `deals ${describeAmount(after.amount)} damage to it` : "chooses it"}.` : undefined;
       const lose = after?.type === "continuous" && after.what.ref === "created" && after.mods.some((m) => m.kind === "control") && after.duration === "game";
       // The Horus Heresy: anyone's creature, in the ability's own words.
-      const fate = tied ?? (e.anyController && e.prompt ? undefined : (after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created" ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${src} ${after.type === "destroy" ? "destroys" : "exiles"} it.` : lose ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${player(s, ctx.controller).name} gains control of it.` : undefined);
+      const fate = tied ?? ((e.anyController || e.amongLeft) && e.prompt ? undefined : (after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created" ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${src} ${after.type === "destroy" ? "destroys" : "exiles"} it.` : lose ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${player(s, ctx.controller).name} gains control of it.` : undefined);
       // Chaos Defiler: you pick among each opponent's permanents in turn ("{player}": whose these are).
       const picker = e.youChoose ? ctx.controller : pid;
       // The ability's own words otherwise (Sunder the Gateway: "click an Incubator token you control to transform it").
-      const own = e.prompt?.replace(/~/g, src).replace("{player}", picker === pid ? "yours" : `${player(s, pid).name}'s`);
+      const own = e.prompt?.replace(/~/g, src).replace("{player}", picker === pid ? "yours" : `${player(s, pid).name}'s`).replace("{left}", left === undefined ? "" : player(s, left).name);
       s.pending = { kind: "pickPermanents", player: picker, source: src, action: e.action, ...(fate && picker === pid ? { prompt: fate } : own ? { prompt: own } : {}), what: e.least ? `${e.filter.text} with the least ${e.least}` : e.greatest ? `${e.filter.text} with the greatest ${e.greatest === "power" ? "power" : "mana value"}` : e.filter.text, options, count: n, ...(e.counter ? { counter: e.counter.kind } : {}), ...(among !== undefined && among !== pid ? { of: among } : {}), ...(picker !== pid ? { of: pid, pickFor: pid } : {}), ...(e.differentPowers ? { differentPowers: true as const } : {}) };
       return "paused";
     }
@@ -265,7 +270,12 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
   }
   if (payForPick() === "paused") return "paused";
   // "Put a +1/+1 counter on a creature you control. It gains ...": "it" is the one picked, while it's that object (CR 400.7).
-  if ((e.action === "counters" || e.action === "choose" || e.action === "flicker") && s.resolving) s.resolving.created = apnap(s, who).flatMap((pid) => sc.chosen?.[pid] ?? []).filter((id) => s.objects[id]?.zone === "battlefield");
+  if ((e.action === "counters" || e.action === "choose" || e.action === "flicker") && s.resolving) {
+    const picked = apnap(s, who).flatMap((pid) => sc.chosen?.[pid] ?? []).filter((id) => s.objects[id]?.zone === "battlefield");
+    // Grenzo's Rebuttal: "each permanent chosen this way" by its three picks, each once (an artifact creature can be
+    // chosen as both, rulings).
+    s.resolving.created = e.addChosen && e.action === "choose" ? [...new Set([...(s.resolving.created ?? []), ...picked])] : picked;
+  }
   // "Unattach an Equipment from a creature you control. If you do, tap that creature" (Akiri, Fearless Voyager): it stays
   // on the battlefield, attached to nothing (CR 701.3d); "that creature" is the one it was attached to.
   if (e.action === "unattach") {
@@ -2030,6 +2040,52 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         for (const id of gone) moveObject(s, id, "exile");
       });
       invalidateCharacteristics(s);
+      return;
+    }
+    case "takeOneExiled": {
+      // Dubious Challenge: the cards still exiled as the objects the dig made them (CR 400.7); the opponent may take one
+      // (rulings: with one exiled card, they choose who gets it), then the rest are yours. Face up, so they see them.
+      const sc = (s.resolving!.scratch ??= {});
+      const live = (s.resolving?.dugExiled ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).map((l) => l.id);
+      const who = players(s, e.who, ctx)[0];
+      if (!live.length) return;
+      if (who !== undefined && sc.takeExiled === undefined) {
+        s.pending = { kind: "chooseOption", player: who, source: src, what: "takeExiled", options: [...live, "none"], labels: [...live.map((id) => defOf(s, obj(s, id)).name), "None"], prompt: `you may choose one of the exiled cards and put it onto the battlefield under your control; ${player(s, ctx.controller).name} gets the rest` };
+        return "paused";
+      }
+      const pick = sc.takeExiled !== undefined && live.includes(sc.takeExiled) ? sc.takeExiled : undefined;
+      sc.takeExiled = undefined;
+      if (pick && who !== undefined) {
+        log(s, `${player(s, who).name} puts ${defOf(s, obj(s, pick)).name} onto the battlefield under their control.`);
+        moveObject(s, pick, "battlefield", { controller: who });
+      } else if (who !== undefined) log(s, `${player(s, who).name} takes none of the exiled cards.`);
+      const rest = live.filter((id) => id !== pick && s.objects[id]?.zone === "exile");
+      if (rest.length) {
+        log(s, `${player(s, ctx.controller).name} puts ${rest.map((id) => defOf(s, obj(s, id)).name).join(", ")} onto the battlefield under their control.`);
+        enterTogether(s, () => rest.forEach((id) => moveObject(s, id, "battlefield", { controller: ctx.controller })));
+      }
+      return;
+    }
+    case "mayPlayLinked": {
+      // Muse Vessel: one of the cards exiled with this object (as it is or last was, CR 400.7, 607.2a), chosen as this
+      // resolves (CR 608.2d); its controller may play that one this turn, paying for it as usual.
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.impulseChoice) {
+        const ids = linkedCards(s, ctx.sourceId, ctx.sourceZc).map((l) => l.id);
+        sc.impulseChoice = { ids };
+        if (!ids.length) return void log(s, `There's no card exiled with ${src}.`);
+        if (ids.length > 1) {
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "impulseChoice", options: ids, labels: ids.map((id) => defOf(s, obj(s, id)).name), prompt: "choose a card exiled with it; you may play it this turn" };
+          return "paused";
+        }
+      }
+      const st = sc.impulseChoice;
+      sc.impulseChoice = undefined;
+      const id = st.pick ?? st.ids[0];
+      const o = id ? s.objects[id] : undefined;
+      if (!o || o.zone !== "exile") return;
+      o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn };
+      log(s, `${player(s, ctx.controller).name} chooses ${defOf(s, o).name} and may play it this turn.`);
       return;
     }
     case "playLinked": {

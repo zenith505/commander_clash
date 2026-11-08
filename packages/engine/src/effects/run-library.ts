@@ -2161,6 +2161,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
             // Face up (CR 406.3); "you may play the exiled card this turn" is that object's only (CR 400.7).
             moveObject(s, id, "exile");
             const o = obj(s, id);
+            if (o.zone === "exile") (r.dugExiled ??= []).push({ id, zc: o.zoneChanges ?? 0 });
             if (e.play) o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.playFree ? { castOnly: true as const, free: true as const } : {}) };
             // "If you do, it becomes plotted" (CR 702.170c): its owner may cast it without paying its mana cost on a later
             // turn (702.170d).

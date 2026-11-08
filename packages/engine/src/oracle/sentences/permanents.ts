@@ -2211,6 +2211,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const b = addTarget(ctx, { kind: "object", types: [], distinctFrom: [a], sharesCardTypeWith: [a], sharesCardTypeAmong: ["Artifact", "Creature"], text: "another target permanent that shares one of those types with it" });
     return [{ type: "exchangeControl", a: { ref: "target", index: a }, b: { ref: "target", index: b } }];
   }
+  // Gauntlets of Chaos: "Exchange control of target artifact, creature, or land you control and target permanent an opponent
+  // controls that shares one of those types with it": two artifacts, two creatures or two lands, as they're chosen and
+  // again as it resolves (rulings, CR 608.2b, 701.12b).
+  if (/^[Ee]xchange control of target artifact, creature, or land you control and target permanent an opponent controls that shares one of those types with it$/.test(s)) {
+    const among = ["Artifact", "Creature", "Land"];
+    const a = addTarget(ctx, { kind: "object", types: among, controller: "you", text: "target artifact, creature, or land you control" });
+    const b = addTarget(ctx, { kind: "object", types: [], controller: "opponent", sharesCardTypeWith: [a], sharesCardTypeAmong: among, text: "target permanent an opponent controls that shares one of those types with it" });
+    return [{ type: "exchangeControl", a: { ref: "target", index: a }, b: { ref: "target", index: b } }];
+  }
   // Role Reversal: "Exchange control of two target permanents that share a permanent type": a permanent type in common
   // (CR 110.4: artifact, battle, creature, enchantment, land, planeswalker; supertypes don't count, rulings), as they're
   // chosen and again as it resolves (CR 608.2b); either illegal, or both under one player's control, and nothing happens.

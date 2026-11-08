@@ -1,7 +1,7 @@
 # Roadmap
 
-30,577 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,728 of
+30,587 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,732 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -208,7 +208,7 @@ line blocks.
    Phoenix (bestow with collect evidence, cast from the graveyard), Visions of Ruin (flashback cheaper by a
    commander's mana value), Strata Scythe (done in round 275), Printlifter Ooze (turned face up), Adrestia ("if an Assassin crewed it"),
    Sorcerous Squall (casting from an opponent's graveyard), Narset, Enlightened Master (free noncreature casts from
-   among exiled cards), Azra Oddsmaker ("choose a creature" with a this-turn trigger), Capricopian (reselecting the
+   among exiled cards), Azra Oddsmaker (done in round 311) ("choose a creature" with a this-turn trigger), Capricopian (reselecting the
    attacked player, activated by that player), Aggressive Mining ("you can't play
    lands"), Hunting Wilds and Overwhelming Splendor (done in round 275), Gandalf, Goblins' Bane
    (Flameshape's face-down exile with play permission), Mastermind's Acquisition (a card from outside the game), Qal
@@ -220,7 +220,7 @@ line blocks.
    Fervent, Lupine Prototype, Technodrome, Training Drone and others), "whenever you cast a spell with {X} in its mana
    cost" (Zaxara, Nev, Owlin Spiralmancer, Lattice Library, Geometer's Arthropod), "enchanted creature or enchantment
    creature" (Feast of Dreams, Nyx Herald, Kestia, Temple Thief).
-   Out after round 176: Extract Brain (an opponent chooses X cards from their hand for you to look at), Divergent Transformations and Chaos Mutation (each player's replacement
+   Out after round 176: Extract Brain (an opponent chooses X cards from their hand for you to look at), Divergent Transformations and Chaos Mutation (both done in round 311) (each player's replacement
    in APNAP order), Black Panther, Wakandan King (done in round 275), Grell Philosopher (Horrors gain an opponent's artifact's activated abilities), Pulmonic Sliver (a granted
    replacement), Etrata, Deadly Fugitive (a granted turn-face-up ability and cloak), The Creation of Avacyn (turning
    the exiled card face up), Pawpatch Recruit ("target creature other than that
@@ -273,8 +273,8 @@ line blocks.
    Friendly Rivalry (two differently targeted creatures each dealing damage), Invoke Justice (done in round 304) (counters distributed
    among a target player's creatures), The Eagles Are Coming!, Thief of Blood (done in round 300), Eldrazi Mimic ("base power and
    toughness become" another's), Arcbound Javelineer ("Remove X counters" as a cost), Wonderscape Sage (done in round 299) ("unless that
-   land had a nonbasic land type"), Tajuru Preserver and Sigarda (sacrifice prevention), Pandemonium (another player
-   chooses targets), Curse of Shallow Graves ("that attacking player may"), Namor (blue mana symbols in a cost), Tune
+   land had a nonbasic land type"), Tajuru Preserver and Sigarda (sacrifice prevention), Pandemonium (done in round 311) (another player
+   chooses targets), Curse of Shallow Graves (done in round 311) ("that attacking player may"), Namor (blue mana symbols in a cost), Tune
    Up (a Vehicle becoming an artifact creature with no duration), Bounding Felidar (done in round 299) ("for each of those creatures" after
    counters), Gleam of Authority ("other creatures" there means other than the enchanted creature), Azog, Sengir,
    Mysterio, Gate to the Aether. Round 179 went down from rank 10,640 to about rank 11,250 (Caller of the Claw,
@@ -823,7 +823,7 @@ line blocks.
    creature's power" and "put all instant and sorcery cards from among them into your hand" (Glamdring, Foe-hammer //
    Gleam of Death, Cantankerous Keepers); "if no life is lost this way, convert ~" and "choose flying or indestructible
    at random" (Blitzwing). +23 (27,642 of 31,936 with round 207 and Lane B round B38).
-   Out after round 208 (looked at, not done): Michelangelo, Improviser ("a creature card and/or a land card from your
+   Out after round 208 (looked at, not done): Michelangelo, Improviser (done in round 311) ("a creature card and/or a land card from your
    hand" onto the battlefield at once needs a picker for one of each); Silverquill, the Disputant (done in round 299) and Lorehold, the
    Historian (casualty and miracle granted to other spells and cards: both are read from the card's own text only);
    Dyadrine, Synthesis Amalgam ("remove a +1/+1 counter from each of two creatures you control. If you do").
@@ -1125,7 +1125,7 @@ line blocks.
    control": each opponent's choice in turn); Marshland Bloodcaster (paying life equal to the next spell's mana value
    instead of its mana cost); Watcher of Hours (a trigger of a card in exile, "whenever you remove a time counter from
    this card while it's exiled"); Tarmogoyf Nest and Disa the Restless (done in round 275);
-   Kethek, Crucible Goliath (reveal until a nonlegendary creature card with lesser mana value than the sacrificed
+   Kethek, Crucible Goliath (done in round 311) (reveal until a nonlegendary creature card with lesser mana value than the sacrificed
    creature); Yidris, Maelstrom Wielder (done in round 303) (cascade on spells cast from hand for the turn); Animal Friend (a quoted
    ability that refers to its source); Hive Mind.
    Round 221: "put a +1/+1 counter on target creature and goad it" (Bhaal, Lord of Murder); "the number of cards you
@@ -2363,6 +2363,34 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 311 took cards back off the "Out after round N" lists, most played first: "Exile two target creatures controlled
+   by different players. Each of those creatures' controllers reveals cards from the top of their library until they
+   reveal a creature card, puts that card onto the battlefield, then shuffles the rest into their library" (Divergent
+   Transformations: the many-target spec's "controlled by different players", CR 115.3; each reveal in APNAP order,
+   CR 101.4) and "For each creature exiled this way, its controller reveals ... then puts the rest on the bottom of
+   their library in a random order" (Chaos Mutation: revealUntilPerExiled with a filter); "you may put a creature card
+   and/or a land card from your hand onto the battlefield" in a trigger (Michelangelo, Improviser, Yuna's template);
+   "you may discard a card. If you do, choose a creature. Whenever that creature deals combat damage to a player this
+   turn, you draw two cards" (Azra Oddsmaker: a choice, not a target, anyone's creature, then a delayed trigger about it,
+   CR 603.7; a bot chooses its own creature that can attack; a browser test); "All damage that would be dealt this turn
+   to you and permanents you control is dealt to enchanted creature instead" (Saving Grace: a redirection, CR 614.9);
+   "search your library for an Aura card that could enchant that creature, put it onto the battlefield attached to that
+   creature" (Sovereigns of Lost Alara: CR 303.4f); "Whenever a creature enters, that creature's controller may have it
+   deal damage equal to its power to any target of their choice" (Pandemonium: the target chosen by the creature's
+   controller, CR 603.3d; bots aim at an opponent); "destroy target nonland permanent with mana value less than or equal
+   to the mana value of the discarded card" (Argentum Masticore: X from the discarded card, CR 608.2h); "you may
+   sacrifice another creature. If you do, reveal cards ... until you reveal a nonlegendary creature card with lesser mana
+   value, put it onto the battlefield, then put the rest on the bottom of your library in a random order" (Kethek,
+   Crucible Goliath: the sacrificed creature's mana value as it last existed, CR 608.2h); "Whenever a player attacks
+   enchanted player with one or more creatures, that attacking player may create a tapped 2/2 black Zombie creature
+   token" (Curse of Shallow Graves: the token is the attacking player's). +10, 30,587 of 31,936 with round 310 and B149.
+   Out after round 311 (looked at, not done): Auratouched Mage ("an Aura card that could enchant it", then "if this
+   creature is still on the battlefield ... otherwise reveal the Aura card and put it into your hand": a search whose
+   destination depends on the creature after the search); Retraced Image and Mitotic Manipulation ("if it has the same
+   name as a permanent": a condition on the card chosen, checked as it's put onto the battlefield); Unstable Glyphbridge
+   (the back face's craft return and "for each player, choose a creature with power 2 or less that player controls"
+   needs a per-player pick); Reap ("up to X targets" where X counts black permanents of another target as you cast it,
+   CR 601.2c).
    Round 310 took cards back off the "Out after round N" lists, most played first: "create a 0/0 green Ooze creature token
    with trample. The token enters with X +1/+1 counters on it, where X is the number of other creatures you control"
    (Printlifter Ooze: it enters with them, CR 614.1c, X counted as it's created, so every creature you control then);
@@ -2623,7 +2651,7 @@ line blocks.
    Summoning ("The next creature spell you cast this turn can be cast as though it had flash. That spell can't be
    countered. That creature enters with an additional +1/+1 counter on it": all three for that one spell); Last Night
    Together ("Only the chosen creatures can attack during that combat phase": whether a target that became illegal still
-   counts as chosen isn't settled by its rulings); Azra Oddsmaker ("choose a creature", not a target, then a this-turn
+   counts as chosen isn't settled by its rulings); Azra Oddsmaker (done in round 311) ("choose a creature", not a target, then a this-turn
    trigger for it); Avacyn's Judgment and Welcome to the Fold (their madness {X} is understood now, but not "X damage
    divided as you choose among those permanents and/or players instead" or "instead gain control of that creature if
    its toughness is X or less"); Tameshi, Reality Architect ("Whenever one or more noncreature permanents are returned
@@ -3046,7 +3074,7 @@ line blocks.
    Out after round 242 (looked at, not done): Frontline Heroism (the copy must target the token it created; with a
    token doubler its controller picks which, CR 707.10e); Optimus Prime, Autobot Leader ("the chosen creature" after
    bolster, and a floating "when that creature deals combat damage this turn"); The War Doctor (phasing out and exile
-   batch triggers); Saving Grace (redirecting damage to itself); Volcanic Offering (done in round B141) (a target an opponent chooses);
+   batch triggers); Saving Grace (done in round 311) (redirecting damage to itself); Volcanic Offering (done in round B141) (a target an opponent chooses);
    Riftmarked Knight (the token its suspend makes, with flanking and protection from white); Roiling Horror (done in round B111) (its
    characteristic-defining P/T counts a life difference); Watcher of Hours ("you remove a time counter", a choice of
    which); Jaya's Phoenix and Repeated Reverberation (copy the next loyalty ability); Coveted Falcon, Shadow Kin, Arna
@@ -3089,7 +3117,7 @@ line blocks.
    activated abilities); Brutal Hordechief (you choose how opponents' creatures block); Sudden Substitution (exchange
    control of a spell and a creature); Lobelia, Defender of Bag End (exile the top card of each opponent's library face
    down, play them free); Spinerock Tyrant (copies that gain wither); Curse of Echoes (each other player may copy the
-   spell); Sovereigns of Lost Alara (an Aura that could enchant that creature); Durnan of the Yawning Portal (cast it
+   spell); Sovereigns of Lost Alara (done in round 311) (an Aura that could enchant that creature); Durnan of the Yawning Portal (cast it
    with undaunted).
    Out after round 233 (looked at, not done): Invisible Woman, Sue Storm (counters put on several creatures at once as one
    trigger); Sorceress's Schemes (done in round 272); Cursecloth Wrappings (done in round 303) (embalm granted to a
@@ -4582,7 +4610,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   and 189).
 - Skipped there, with reasons: Martyr of Bones ("up to X target cards" with an X that isn't the spell's own); Kaboom!
   (any number of target players); Calibrated Blast (a reflexive trigger after the cards go to the bottom); Mount Velus
-  Manticore and Argentum Masticore (a reflexive "when you discard a card this way" about the discarded card's types or
+  Manticore and Argentum Masticore (done in round 311) (a reflexive "when you discard a card this way" about the discarded card's types or
   colors); Wolf of Devil's Breach (pay and discard in an attack trigger); Dralnu's Pet (a kicker that discards a
   creature card, counters by its mana value); Bribe Taker (a counter for each kind of counter). Known bot gap: bots
   don't activate the Martyrs.

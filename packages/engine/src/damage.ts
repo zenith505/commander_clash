@@ -104,6 +104,19 @@ export function lethalAmounts(s: GameState, src: DamageSource, o: GameObject): n
 export const excessOver = (lethal: number[], n: number) => Math.max(0, ...lethal.map((l) => n - l));
 
 /**
+ * The Red Terror: "Whenever a red source you control deals damage to one or more permanents and/or players": once for each
+ * source in each damage event (CR 120.3, 603.2c), damage dealt at the same time being one (see dealPlanned); its colors
+ * and controller as it dealt it.
+ */
+let sourceBatch: Map<string, DamageSource> | null = null;
+function sourceDealtOnce(s: GameState, src: DamageSource) {
+  const key = src.ref ? `${src.ref.object}@${src.ref.zc}` : src.id ? `id:${src.id}` : `name:${src.name}:${src.controller}`;
+  if (sourceBatch) {
+    if (!sourceBatch.has(key)) sourceBatch.set(key, src);
+  } else fireEvent(s, { type: "sourceDealtDamageEvent", by: src.controller, colors: [...src.colors] });
+}
+
+/**
  * Deal `n` damage from `src` to a permanent or player. Returns how much was dealt (0 if it
  * was all prevented). Combat damage also counts for commander damage and toxic.
  *
@@ -116,6 +129,7 @@ export const excessOver = (lethal: number[], n: number) => Math.max(0, ...lethal
  */
 /** The permanent dealing damage, if it's still the object it was, has now dealt damage (Karakyk Guardian). */
 function noteDealt(s: GameState, src: DamageSource, combat: boolean | undefined, to: { player: PlayerId } | { object: GameObject }) {
+  sourceDealtOnce(s, src);
   const o = src.id ? s.objects[src.id] : undefined;
   if (!o || o.zone !== "battlefield" || (src.ref?.object === o.id && src.ref.zc !== (o.zoneChanges ?? 0))) return;
   // Diseased Vermin and The Fallen: the players and planeswalkers it has dealt damage to as this object (phasing keeps
@@ -1574,6 +1588,8 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   infectAtZero = new Set(s.players.filter((p) => !p.lost && damageAsInfect(s, p.id)).map((p) => p.id));
   const outerCreatures = creatureBatch;
   creatureBatch = [];
+  const outerSources = sourceBatch;
+  sourceBatch = new Map();
   // Poison counters from several sources at once are put as one event (rulings on All Will Be One).
   // Counters removed by damage dealt at the same time are removed at once (Chandra, Fire Artisan's rulings).
   const out = batchCountersRemoved(s, () => batchPlayerCounters(s, () =>
@@ -1614,6 +1630,8 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   if (hits.length) fireEvent(s, { type: "excessDamage", hits, combat });
   const toCreatures = creatureBatch;
   creatureBatch = outerCreatures;
+  const dealers = sourceBatch;
+  sourceBatch = outerSources;
   for (const ev of toCreatures) fireEvent(s, { ...ev, excess: excessThisTurn(s, ev.id, s.objects[ev.id]?.zoneChanges ?? 0) });
   for (const [id, amount] of dealtTo) {
     // Each permanent's damage events this turn: damage dealt at the same time is one event (CR 120.3).
@@ -1636,6 +1654,7 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   infectAtZero = outerInfect;
   for (const [pid, amount] of toPlayers) fireEvent(s, { type: "playerDealtDamage", player: pid, amount, combat });
   firePlayersDealt(s, out);
+  for (const src of dealers.values()) fireEvent(s, { type: "sourceDealtDamageEvent", by: src.controller, colors: [...src.colors] });
   // "If damage is prevented this way, ~ deals that much damage to that source's controller" (Deflecting Palm), after it.
   for (const b of back) {
     const d = s.cards[b.cardId];

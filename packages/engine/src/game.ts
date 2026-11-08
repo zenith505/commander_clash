@@ -5875,7 +5875,10 @@ export function castProblem(
   // (its targets chosen, the cast is all announced: compile requires a target).
   const beholdFlashCost = compileCard(d).flashIfKicked ? compileCard(d).kicker?.extraCosts?.[0] : undefined;
   const beholdFlash = beholdFlashCost?.kind === "reveal" && (!!choices?.kicks?.includes(0) || (!targets && !!s.objects[id] && beholdCandidates(s, pid, s.objects[id]!, beholdFlashCost).length > 0));
-  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || beholdFlash || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid));
+  // Tegwyll's Scouring: begun as though it had flash when there are enough creatures to tap (CR 601.3c), then only with them
+  // tapped (castSpell treats kicks left out as none).
+  const tapFlash = beholdFlashCost?.kind === "tap" && (!!choices?.kicks?.includes(0) || (choices?.kicks === undefined && !!s.objects[id] && tapCostCandidates(s, pid, s.objects[id]!, beholdFlashCost).length >= beholdFlashCost.n));
+  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || beholdFlash || tapFlash || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid));
   // Offering (CR 702.48a): with a permanent sacrificed for it; before its costs are chosen, when there's one to sacrifice.
   const offered = !!compileCard(d).offering && (choices ? choices.offering !== undefined : offeringCandidates(s, pid, id).length > 0);
   if (!free && !instantSpeed && !offered && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
@@ -6937,7 +6940,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const or = compileCard(d).costOr;
   if (or && choices.costOr === undefined) throw new RulesError(`choose how to pay ${d.name}'s additional cost: ${or.map((x) => x.text).join(" or ")}`);
   const specs = withSplices({ targets: spellTargets(s, id, modes, undefined, castHow(choices)), effects: [], text: "" }, splicedBodies(s, choices.splice)).targets;
-  const problem = castProblem(s, p.id, id, specs.length ? (targets ?? []) : undefined, spell?.modal ? modes : undefined, convoke, improvise, x, choices);
+  // Tegwyll's Scouring: cast as though it had flash only with its tapping paid (kicks left out are none).
+  const problem = castProblem(s, p.id, id, specs.length ? (targets ?? []) : undefined, spell?.modal ? modes : undefined, convoke, improvise, x, compileCard(d).flashIfKicked && choices.kicks === undefined ? { ...choices, kicks: [] } : choices);
   if (problem) throw new RulesError(problem);
   // What pays a cost beyond mana (which creatures are sacrificed, which cards discarded) is chosen as it's cast (CR
   // 601.2h): a cast that doesn't say can't skip the cost. As for abilities (activateAbility).
@@ -9880,6 +9884,7 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   if (pend.totalMv !== undefined && found.reduce((n, id) => n + defMv(defOf(s, obj(s, id))), 0) > pend.totalMv) throw new RulesError(`choose cards with total mana value ${pend.totalMv} or less`);
   if (pend.shareLandType && !shareLandType(found.map((id) => defOf(s, obj(s, id)))))
     throw new RulesError("choose cards that share a land type");
+  if (pend.oneName && found.some((id) => !sameName(defOf(s, obj(s, id)).name, defOf(s, obj(s, found[0]!)).name))) throw new RulesError("choose cards with the same name");
   if (pend.oneOfEach && !oneOfEachFits(pend.oneOfEach, found.map((id) => defOf(s, obj(s, id)))))
     throw new RulesError(`find one card for each: ${pend.oneOfEach.map((f) => f.text).join(", ")}`);
   r.scratch = { ...r.scratch, found };

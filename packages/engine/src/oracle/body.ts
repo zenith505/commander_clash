@@ -12616,13 +12616,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // graveyard (CR 400.7); someone who can't exile it isn't asked to pay.
     // Ultimecia, Time Sorceress: "you may pay {4}{U}{U}{B}{B} and exile eight cards from your graveyard. If you do, ...":
     // only with that many cards there (canDoNow).
-    const payAnd = /^[Yy]ou may pay ((?:\{[^}]+\})+|\d+ life) and ((?:sacrifice|discard) an? [a-z ]+|exile it|exile (?:two|three|four|five|six|seven|eight|nine|ten) cards from your graveyard)$/.exec(s);
+    // Canoptek Wraith: "When this creature deals combat damage to a player, you may pay {3} and sacrifice it. If you do,
+    // ...": itself, both or neither (not asked once it has left the battlefield).
+    const payAnd = /^[Yy]ou may pay ((?:\{[^}]+\})+|\d+ life) and ((?:sacrifice|discard) an? [a-z ]+|sacrifice it|exile it|exile (?:two|three|four|five|six|seven|eight|nine|ten) cards from your graveyard)$/.exec(s);
     const payLifeAnd = payAnd && /^(\d+) life$/.exec(payAnd[1]!);
     if (payAnd && (payLifeAnd || plainMana(payAnd[1]!)) && /^If you do, /.test(sentences[si + 1] ?? "")) {
       const inner = parseOne(capital(payAnd[2]!), ctx);
-      const kind = /^sacrifice/.test(payAnd[2]!) ? "pick" : /^discard/.test(payAnd[2]!) ? "discard" : /graveyard$/.test(payAnd[2]!) ? "chooseFromGraveyard" : "exile";
+      const kind = payAnd[2] === "sacrifice it" ? "sacrifice" : /^sacrifice/.test(payAnd[2]!) ? "pick" : /^discard/.test(payAnd[2]!) ? "discard" : /graveyard$/.test(payAnd[2]!) ? "chooseFromGraveyard" : "exile";
       if (!inner || inner.length !== 1 || inner[0]!.type !== kind) return null;
       if (inner[0]!.type === "exile" && inner[0]!.what.ref !== "subjectCard") return null;
+      if (inner[0]!.type === "sacrifice" && (inner[0]!.what.ref !== "self" || ctx.spell)) return null;
       const then = parseOne(capital(sentences[si + 1]!.replace(/^If you do, /, "").replace(/\.$/, "")), ctx);
       if (!then) return null;
       effects.push({ type: "may", effects: inner, pay: payLifeAnd ? { life: Number(payLifeAnd[1]) } : { mana: payAnd[1]! }, text: `pay ${payAnd[1]} and ${payAnd[2]}` }, { type: "if", cond: { kind: "youDid" }, effects: then });

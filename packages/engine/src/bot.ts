@@ -593,6 +593,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = groups.reduce<string[]>((a, g) => (g.length > a.length ? g : a), []);
       return [{ type: "searchLibrary", player: pid, found: best }];
     }
+    // Canoptek Wraith: "basic land cards which have the same name": as many as we can of one name, the best-ranked first.
+    if (pend.kind === "searchLibrary" && pend.oneName) {
+      const ranked = chooseSearch(s, pid, pend.cards, pend.cards.length);
+      const groups = ranked.map((first) => ranked.filter((id) => sameName(defOf(s, obj(s, id)).name, defOf(s, obj(s, first)).name)).slice(0, pend.max));
+      const best = groups.reduce<string[]>((a, g) => (g.length > a.length ? g : a), []);
+      return [{ type: "searchLibrary", player: pid, found: best }];
+    }
     // "A Forest card and a Plains card" (Krosan Verge): the best-ranked cards that still fit one each.
     if (pend.kind === "searchLibrary" && pend.oneOfEach) {
       const found: string[] = [];
@@ -3757,6 +3764,8 @@ function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean, x?:
   if (!k) return [[]];
   // "As an additional cost to cast this spell, waterbend {5}": always paid, nothing to choose.
   if (k.required) return [[]];
+  // Molten Exhale, Tegwyll's Scouring: the price of casting it as though it had flash, not paid when it needn't be.
+  if (compileCard(defOf(s, obj(s, id))).flashIfKicked) return canActAtSorcerySpeed(s, pid) ? [[]] : [[0]];
   // "Kicker {X}": kicked only with an X chosen for it, else not.
   if (parseManaCost(k.costs[0]!).hasX && !parseManaCost(defOf(s, obj(s, id)).manaCost).hasX) return x ? [[0]] : [[]];
   if (k.multi) {

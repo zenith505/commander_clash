@@ -335,8 +335,9 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     // (rulings), the subject either way.
     // Tanuki Transplanter: "Whenever ~ or equipped creature attacks, add an amount of {G} equal to its power": the power of
     // whichever attacked, as the ability resolves or as it last existed (rulings). Chainflail Centipede: "it gets +2/+0
-    // until end of turn": whichever attacked.
-    const whichever = !!m[1] && ((event === "selfBecomesBlocked" && /^it deals \d+ damage to defending player\.?$/.test(text)) || (event === "selfAttacks" && /^add an amount of \{[WUBRGC]\} equal to its power\. Until end of turn, you don't lose this mana as steps and phases end\.?$/.test(text)) || (event === "selfAttacks" && /^it gets \+\d+\/\+\d+ until end of turn\.?$/.test(text)) || (event === "selfDealsCombatDamageToPlayer" && /^you may sacrifice it\. If you do, (?:(?!\b(?:it|its|that creature)\b)[^.])+\.?$/.test(text)));
+    // until end of turn": whichever attacked. Razorfield Ripper: "you get {E}, then it gets +X/+X until end of turn, where X
+    // is the amount of {E} you have": the same, X counted as it resolves, the new {E} included (rulings).
+    const whichever = !!m[1] && ((event === "selfBecomesBlocked" && /^it deals \d+ damage to defending player\.?$/.test(text)) || (event === "selfAttacks" && /^add an amount of \{[WUBRGC]\} equal to its power\. Until end of turn, you don't lose this mana as steps and phases end\.?$/.test(text)) || (event === "selfAttacks" && /^it gets \+\d+\/\+\d+ until end of turn\.?$/.test(text)) || (event === "selfAttacks" && /^you get (?:\{E\})+, then it gets \+X\/\+X until end of turn, where X is the amount of \{E\} you have\.?$/.test(text)) || (event === "selfDealsCombatDamageToPlayer" && /^you may sacrifice it\. If you do, (?:(?!\b(?:it|its|that creature)\b)[^.])+\.?$/.test(text)));
     if (m[1] && /\b(it|its|that creature)\b/i.test(text) && !whichever) return "fail";
     if (o.creature) {
       // Neko-Te: "That creature doesn't untap during its controller's untap step": "its" is that creature's there.
@@ -527,6 +528,17 @@ function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | n
   // "Whenever another source you control deals exactly 1 damage to a permanent or player, ~ deals 2 damage to that
   // permanent or player" (Ghyrson Starn): each source's damage to each permanent or player, that amount after prevention
   // and replacement (it's the damage dealt, CR 120.4); once for each of them dealt at the same time (rulings).
+  // The Red Terror: "Whenever a red source you control deals damage to one or more permanents and/or players, put a +1/+1
+  // counter on ~": once for each such source each time it deals damage, all it deals at the same time being one event
+  // (CR 120.3, 603.2c); combat damage and noncombat both, its color as it deals it.
+  const anyDamage = /^Whenever an? (white |blue |black |red |green )?source you control deals damage to one or more permanents and\/or players, (.+)$/.exec(line);
+  if (anyDamage) {
+    if (/\b(it|its|that source|that much|that many|that player|that permanent)\b/.test(anyDamage[2]!)) return "fail";
+    const body = parseBody(anyDamage[2]!);
+    if (!body) return "fail";
+    const color = anyDamage[1] ? ({ white: "W", blue: "U", black: "B", red: "R", green: "G" } as const)[anyDamage[1].trim() as "white"] : undefined;
+    return { event: "yourSourceDealsDamage", body, ...(color ? { sourceColor: color } : {}) };
+  }
   const exact = /^Whenever (another|a) source you control deals exactly (one|two|three|\d+) damage to a permanent or player, (.+)$/.exec(line);
   if (exact) {
     if (/\b(it|its|that source|that creature|that player|that permanent)\b(?! or player)/.test(exact[3]!)) return "fail";
@@ -2569,6 +2581,17 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   // exile (CR 122.1).
   const exileCounter = batch.each && batch.what === "toGraveyard" && batch.whose === "you" && batch.from === "library" && batch.filter && !batch.other && !yourTurn ? /^exile it with an? ([a-z]+) counter on it\.?$/.exec(rest) : null;
   if (exileCounter) return { event: "batch", batch, body: { targets: [], effects: [{ type: "exile", what: { ref: "eventGroup" }, counters: { [exileCounter[1]!]: 1 } }], text: rest.replace(/\.$/, "") } };
+  // Amzu, Swarm's Hunger: "you may create a 1/1 black and green Insect creature token, then put a number of +1/+1 counters
+  // on it equal to the greatest mana value among those cards": the cards that event moved out of your graveyard, each
+  // card's mana value as it was there (wherever it went, CR 608.2h), one trigger for all of them (rulings).
+  const amzu = batch.what === "leavesGraveyard" && batch.whose === "you" && !batch.each && !batch.filter && !batch.to && !yourTurn ? /^you may (create an? [^.,]+ creature token), then put a number of \+1\/\+1 counters on it equal to the greatest mana value among those cards\.?$/.exec(rest) : null;
+  if (amzu) {
+    const made = parseBody(`${capital(amzu[1]!)}, then put a +1/+1 counter on it.`);
+    const put = made?.effects[1];
+    if (!made || made.targets.length || made.effects.length !== 2 || made.effects[0]!.type !== "createToken" || put?.type !== "counters" || put.what.ref !== "created") return "fail";
+    const inner = [made.effects[0]!, { ...put, n: { count: { kind: "eventGroupGreatestMv" as const } } }];
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "may", effects: inner, text: rest.replace(/^you may /, "").replace(/\.$/, "") }], text: rest.replace(/\.$/, "") } };
+  }
   // The objects as a group: not modeled. "Exile the top card of your library. You may play that card ..." (Inti) is about
   // the exiled card, not them.
   const aboutThem = rest.replace(/exile the top card of your library\. (?:Until (?:the end of your next turn|end of turn|your next end step), you may play that card|You may play that card (?:this turn|until the end of your next turn|until your next end step))\.?$/i, "");
@@ -3012,10 +3035,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    // Canoptek Wraith: "If you do, choose a land you control. Then search your library for up to two basic land cards which
+    // have the same name as the chosen land": a land chosen as it resolves, not targeted, and nothing else about it, so
+    // the two found share the name of a land you control (rulings: the same name as each other).
+    .replace(/\. If you do, choose a land you control\. Then search your library for up to two basic land cards which have the same name as the chosen land, /, ". If you do, search your library for up to two basic land cards which have the same name as a land you control, ")
     // Furious Forebear: "Whenever a creature you control dies while ~ is in your graveyard, you may pay {1}{W}. If you do,
     // return ~ from your graveyard to your hand.": an ability that works only in the graveyard (CR 113.6m), as the other
     // "return ~ from your graveyard" triggers are read below; not if it dies at the same time (rulings).
-    .replace(/^(Whenever a creature you control dies) while ~ is in your graveyard, (?=you may pay [^.]+\. If you do, return ~ from your graveyard to your hand\.$)/, "$1, ")
+    // Boneyard Scourge: "Whenever a Dragon you control dies while ~ is in your graveyard, you may pay {1}{B}. If you do,
+    // return ~ from your graveyard to the battlefield": the same, and not if it dies with that Dragon (rulings).
+    .replace(/^(Whenever a (?:creature|Dragon) you control dies) while ~ is in your graveyard, (?=you may pay [^.]+\. If you do, return ~ from your graveyard to (?:your hand|the battlefield)\.$)/, "$1, ")
     // Lifeline: "Whenever a creature dies, if another creature is on the battlefield, return the first card to the
     // battlefield under its owner's control at the beginning of the next end step": another than the one that died, which
     // is gone, so any creature (rulings: none left, none returns, checked again as it resolves, CR 603.4); the card, if

@@ -277,6 +277,8 @@ export type TriggerSourceEvent =
   | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean; /** The source's colors as it dealt the damage (Circle of Affliction). */ colors?: Color[] }
   /** A source (`source`: its object, "" if none) controlled by `by` dealt damage to a permanent (`id`) or a player. */
   | { type: "sourceDealtDamage"; source: ObjectId; by: PlayerId; id?: ObjectId; player?: PlayerId; amount: number; combat?: true }
+  /** One source's damage in one damage event, to any number of permanents and players (The Red Terror). */
+  | { type: "sourceDealtDamageEvent"; by: PlayerId; colors: Color[] }
   /** A permanent dealt damage to a creature (`id`). */
   | { type: "damagedCreature"; source: ObjectId; id: ObjectId; amount: number; combat: boolean; /** The excess damage that creature has been dealt this turn (CR 120.10). */ excess?: number }
   /** A spell (`card`, controlled by `by`) dealt damage to a player or a battle. */
@@ -1930,6 +1932,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (controllerOf(s, w) !== ev.by) continue;
       add(w, ev.by, (e, t) => e === "sourceYouControlDealsDamage" && !!t.sourceDamage && ev.amount === t.sourceDamage.exactly && !(t.sourceDamage.other && ev.source === w.id), undefined, undefined, hit, undefined, undefined, undefined, { amount: ev.amount, ...(ev.player !== undefined ? { player: ev.player } : {}) });
     }
+  } else if (ev.type === "sourceDealtDamageEvent") {
+    // The Red Terror: "Whenever a red source you control deals damage to one or more permanents and/or players": its
+    // controller's permanents, once for each source and damage event; the source's colors as it dealt the damage.
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "yourSourceDealsDamage" && (!t.sourceColor || ev.colors.includes(t.sourceColor)));
+    }
   } else if (ev.type === "damagedCreature") {
     const o = s.objects[ev.source];
     const hit = s.objects[ev.id];
@@ -2569,7 +2578,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "Whenever a creature card leaves your graveyard": once for each of them (CR 603.2c).
         // Tamiyo, the Moon Sage's emblem: "a card is put into your graveyard from anywhere, you may return it": that card is
         // the group, alone.
-        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard" || b.what === "discards") && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : b.each && b.what === "toGraveyard" ? { group: [{ id: matched[k]!.id, zc: matched[k]!.zc }] } : {}), ...(b.dies && !b.each ? { groupPower: died.reduce((a, m) => a + (m.chars?.power ?? 0), 0) } : {}) });
+        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard" || b.what === "discards" || b.what === "leavesGraveyard") && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : b.each && b.what === "toGraveyard" ? { group: [{ id: matched[k]!.id, zc: matched[k]!.zc }] } : {}), ...(b.dies && !b.each ? { groupPower: died.reduce((a, m) => a + (m.chars?.power ?? 0), 0) } : {}) });
         causedBy = null;
       }
     };

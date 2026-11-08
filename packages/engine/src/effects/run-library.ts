@@ -1437,6 +1437,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ...(agent?.exileFor !== undefined ? { foundExiled: true as const } : {}),
           ...(e.others && agent?.exileFor === undefined ? { firstTo: describeDest(e.dest), othersTo: describeDest(e.others), ...(e.firstN ? { firstN: e.firstN } : {}) } : {}),
           ...(e.shareLandType ? { shareLandType: true as const } : {}),
+          ...(e.oneName ? { oneName: true as const } : {}),
           ...(e.exactly ? { exactly: true as const } : {}),
           ...(e.differentPowers ? { distinctPowers: true as const } : {}),
           ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}),

@@ -3212,7 +3212,7 @@ export type Effect =
   /** "It can't be regenerated this turn" (CR 701.19c): its regeneration shields don't apply this turn. */
   | { type: "noRegen"; what: ObjRef; ifCreature?: true }
   /** "Look at target opponent's hand" (only you see it, CR 402.3); `reveal`: "target player reveals their hand" (everyone sees it). */
-  | { type: "lookAtHand"; who: PlayerRef; reveal?: true; /** "Target player reveals their library" (Mindblaze): the whole library, its order unchanged. */ library?: true; /** "Look at a card at random in target player's hand" (Urza's Bauble). */ atRandom?: true }
+  | { type: "lookAtHand"; who: PlayerRef; reveal?: true; /** "Target player reveals their library" (Mindblaze): the whole library, its order unchanged. */ library?: true; /** "Look at a card at random in target player's hand" (Urza's Bauble). */ atRandom?: true; /** "Look at the top card of each player's library" (Case the Joint): the top card of each one's library, seen only by the player looking. */ topCard?: true }
   /** "Look at target face-down creature" (Smoke Teller): the card it is, shown to this ability's controller only (CR 708.5). */
   | { type: "lookAtFaceDown"; what: ObjRef }
   /** "~ assigns no combat damage this turn" (CR 510.1). */
@@ -3447,7 +3447,7 @@ export type Effect =
    * `moveTo`: "Move any number of counters from target permanent you control onto a second target permanent you control"
    * (Resourceful Defense): `n` is ignored, up to all of them, each removed and put on that one (CR 122.5).
    */
-  | { type: "removeAnyCounters"; what: ObjRef; n: Amount; upTo?: true; moveTo?: ObjRef; /** "Any number of +1/+1 counters" (Scrounging Bandar): only these kinds. */ kinds?: CounterKind[]; /** With `upTo` and `moveTo`: "Move one or more counters" (Goldberry, River-Daughter): at least one while there's one to move. */ atLeastOne?: true }
+  | { type: "removeAnyCounters"; what: ObjRef; n: Amount; upTo?: true; moveTo?: ObjRef; /** "Any number of +1/+1 counters" (Scrounging Bandar): only these kinds. */ kinds?: CounterKind[]; /** With `moveTo`: "move X +1/+1 counters from ~ onto another target creature" (Tester of the Tangential): `n` of them, all if fewer. */ moveN?: true; /** With `upTo` and `moveTo`: "Move one or more counters" (Goldberry, River-Daughter): at least one while there's one to move. */ atLeastOne?: true }
   /**
    * Slippery Bogbonder: "Then move any number of counters from among creatures you control onto that creature." Chosen
    * one at a time as it resolves, any kinds, from any of them but `onto` itself (rulings), then moved together (CR 122.5).
@@ -7193,6 +7193,8 @@ export interface CompiledCard {
    * (CR 208.2b, 707.2), so a copy effect over what it is; `text` is the choice as offered.
    */
   entersForms?: { except: CopyExcept; text: string }[];
+  /** Molten Sentry: "As ~ enters, flip a coin. If the coin comes up heads, ~ enters as ...": `entersForms` [heads, tails], picked by a coin flip (CR 705.2), not chosen. */
+  entersFormsFlip?: true;
   /** Aquamorph Entity: "As ~ enters or is turned face up, it becomes your choice of ...": `entersForms` chosen as it's turned face up too (CR 614.1e), part of that special action or of the effect that turns it face up. */
   faceUpForms?: true;
   /** Gaea's Liege: its "*" power and toughness are 0 off the battlefield (CR 208.2) and set by its own conditional static abilities on it, one of which always applies there. */

@@ -161,6 +161,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   if (pend?.player === pid) {
     if (pend.kind === "declareAttackers") return chooseAttacks(s, pid);
     if (pend.kind === "declareBlockers") return pend.defender !== undefined ? [blocksForOpponent(s, pid, pend.defender)] : payForBlocks(s, pid, chooseBlocks(s, pid));
+    // "An opponent chooses one —" (Misfortune): the mode of another player's spell, as it's cast.
+    if (pend.kind === "chooseModes" && pend.deferred) return [{ type: "chooseModes", player: pid, modes: [modeForOther(s, pid, pend.deferred, pend.legal)] }];
     if (pend.kind === "chooseModes") {
       const t = s.triggerQueue[0]!;
       const printed = triggerBody(s, t);
@@ -169,6 +171,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const range = t.both ? modeRange(printed, true) : printed.modal?.distinctTargets ? [pend.min, pend.max] : undefined;
       const body = range ? { ...printed, modal: { ...printed.modal!, min: range[0]!, max: range[1]! } } : printed;
       return [{ type: "chooseModes", player: pid, modes: chooseModes(s, pid, body, true, t.sourceId)!.modes }];
+    }
+    if (pend.kind === "chooseTargets" && pend.deferred?.own) {
+      // Our own spell's targets, once an opponent has chosen its mode (askModeChooser): as we'd choose them for that mode.
+      const act = pend.deferred.act;
+      const printed = act.type === "castSpell" ? castingBody(castDef(s, act.objectId, act.alt)) : undefined;
+      const body = printed ? { ...withModes(printed, act.modes), targets: pend.specs } : undefined;
+      return [{ type: "chooseTargets", player: pid, targets: (body && chooseTargets(s, pid, body, true, act.objectId)) ?? pend.specs.map((): TargetChoice => ({ kind: "none" })) }];
     }
     if (pend.kind === "chooseTargets" && pend.deferred) {
       // A target of another player's spell or ability "of an opponent's choice", as it's cast or activated (askChoosers).
@@ -290,6 +299,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const taps = mana ? planMana(s, pid, parseManaCost(mana), 0, undefined, [], mayPayUse(s, pend)) : [];
       const ok = !!taps && (!mana || manaValue(parseManaCost(mana)) <= Math.max(4, lands(s, pid) - 2)) && player(s, pid).life > life + 5 && (player(s, pid).energy ?? 0) >= energy;
       return ok ? [...taps!, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
+    }
+    // Shrouded Lore: the opponent chooses the card that helps us least, so each payment can only get us a better one.
+    if (pend.kind === "chooseMay" && pend.pay?.mana && s.resolving?.body.effects[s.resolving.next]?.type === "loreChoices") {
+      const taps = planMana(s, pid, parseManaCost(pend.pay.mana));
+      return taps ? [...taps, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
     }
     if (pend.kind === "chooseMay" && pend.pay) {
       // "You may pay {1}. If you do, ...": worth it when the rest is, and it leaves us some life.
@@ -972,6 +986,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Wall of Shards: the life to the opponent who has the most already, where it matters least.
     // "Target ... of an opponent's choice" (Mausoleum Turnkey): any one of them will choose against us; the next in turn order.
+    // "An opponent chooses one —" (Misfortune): the opponent whose likely mode is the best for us.
+    if (pend.kind === "chooseOption" && pend.what === "modeChooser" && pend.deferred) return [{ type: "chooseOption", player: pid, choice: bestModeChooser(s, pid, pend.options, pend.deferred) }];
     if (pend.kind === "chooseOption" && pend.what === "targetChooser" && pend.deferred) return [{ type: "chooseOption", player: pid, choice: bestChooser(s, pid, pend.options, pend.deferred) }];
     if (pend.kind === "chooseOption" && pend.what === "targetChooser") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Plague of Vermin: Rats for life we can spare (keeping 20) in the first round only, so the rounds end.
@@ -2184,6 +2200,45 @@ function harmsChosenTarget(body: AbilityBody, i = 0): boolean {
         (e.type === "damageRule" && e.rule.redirect?.ref === "target" && e.rule.redirect.index === i),
     )
   );
+}
+
+/**
+ * The mode we choose for another player's spell "An opponent chooses one —" (askModeChooser, CR 700.2e). A mode about us
+ * ("that player", PlayerRef modeChooser: Misfortune's counters and damage, Fatal Lore's destruction and draw) when it costs
+ * us no creature and no more than a little life (damage keeping us above 10); otherwise, and when no mode is about us
+ * (Library of Lat-Nam), the first one that can be chosen.
+ */
+function modeForOther(s: GameState, pid: PlayerId, d: DeferredAct, legal: boolean[]): number {
+  const act = d.act;
+  const modal = act.type === "castSpell" ? castingBody(castDef(s, act.objectId, act.alt))?.modal : undefined;
+  const first = legal.findIndex(Boolean);
+  if (!modal) return Math.max(0, first);
+  const aboutUs = modal.modes.map((m) => JSON.stringify(m).includes('"modeChooser"'));
+  const ours = modal.modes.findIndex((m, i) => aboutUs[i] && legal[i] && modeSparesUs(s, pid, m));
+  return ours >= 0 ? ours : Math.max(0, legal.findIndex((ok, i) => ok && !aboutUs[i]), first);
+}
+
+/** A mode about us that costs us no creature, and damage that leaves us above 10 life; anything else in it, no. */
+function modeSparesUs(s: GameState, pid: PlayerId, m: AbilityBody): boolean {
+  const mine = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid && objIsType(s, o, "Creature"));
+  let life = player(s, pid).life;
+  for (const e of m.effects) {
+    if (e.type === "counters" && e.counter === "-1/-1" && e.what.ref === "each" && typeof e.n === "number") {
+      if (mine.some((o) => toughness(s, o) <= (e.n as number))) return false;
+    } else if (e.type === "damage" && e.to.ref === "modeChooser" && typeof e.amount === "number") life -= e.amount;
+    else if (e.type === "destroy") {
+      if (mine.length) return false;
+    } else if (!(e.type === "drawUpTo" && e.who.ref === "modeChooser")) return false;
+  }
+  return life > 10;
+}
+
+/** The opponent we ask to choose our spell's mode (askModeChooser): one whose likely choice is a mode about them, else the first. */
+function bestModeChooser(s: GameState, pid: PlayerId, options: string[], d: DeferredAct): string {
+  const act = d.act;
+  const modal = act.type === "castSpell" ? castingBody(castDef(s, act.objectId, act.alt))?.modal : undefined;
+  if (!modal) return options[0]!;
+  return options.find((q) => modeSparesUs(s, Number(q), modal.modes.find((m) => JSON.stringify(m).includes('"modeChooser"')) ?? modal.modes[0]!)) ?? options[0]!;
 }
 
 /**
@@ -3422,6 +3477,9 @@ function totalWithoutX(s: GameState, pid: PlayerId, id: string, via?: CastFromGr
 
 function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x: number | undefined, via?: CastFromGraveyardKind, alt?: AltCostKind): Action[] | null {
   const printed = castingBody(castDef(s, id, alt));
+  // "An opponent chooses one —" (Misfortune, Fatal Lore, Library of Lat-Nam): cast without a mode, which that opponent
+  // chooses (askModeChooser); each mode is good for us.
+  if (printed?.modal?.chooser) return castPlanWithModes(s, pid, id, free, x, via, alt, undefined);
   const choice = printed?.modal ? chooseModes(s, pid, printed, false, id) : null;
   if (printed?.modal && !choice) return null;
   // Entwine (CR 702.42a): every mode, when we can pay for it and they all have targets.

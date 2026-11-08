@@ -937,6 +937,12 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const p = gifteeOf(s, ctx);
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
+    case "modeChooser": {
+      // "That player" in a mode an opponent chose (Misfortune, CR 700.2e): them, as they were chosen as it was cast.
+      const item = s.resolving?.item;
+      const p = item?.kind === "spell" ? item.modeChooser : undefined;
+      return p !== undefined && !player(s, p).lost ? [p] : [];
+    }
     case "opponentsAttackingEventPlayer": {
       // "A player is attacking another player if they control a creature that's attacking that player" (rulings).
       const p = ctx.event?.player;
@@ -1327,6 +1333,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "randomTargetsToBottom":
     case "destroyRandomTarget":
     case "chooseFromGraveyard":
+    case "loreChoices":
     case "reorderGraveyard":
     case "returnAllFromGraveyard":
     case "commandersOntoBattlefield":

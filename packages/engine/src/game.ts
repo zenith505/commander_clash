@@ -452,7 +452,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "turnFaceUp":
       requireNoPending(s);
-      turnFaceUp(s, p, action.objectId, action.way, action.x, action.costs);
+      turnFaceUp(s, p, action.objectId, action.way, action.x, action.costs, action.form);
       break;
     case "suspend":
       requireNoPending(s);
@@ -3117,6 +3117,29 @@ function dredgeInstead(s: GameState, p: Player, id: ObjectId) {
 }
 
 /**
+ * Sages of the Anima instead of a draw (CompiledCard.drawRevealCreatures, CR 614.1a): reveal the top cards of the library
+ * (all of them with fewer, rulings), put the creature cards among them into the hand (not drawn, rulings), and the rest on
+ * the bottom in the order the player chooses, which other players don't see (rulings). An empty library reveals nothing
+ * and loses nothing (the draw was replaced, CR 704.5b). Returns the cards for the bottom.
+ */
+function revealCreaturesInstead(s: GameState, p: Player, src: ObjectId): ObjectId[] {
+  if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+  const name = nameOf(s, src);
+  const seen = p.library.slice(0, abilitiesOf(s, obj(s, src)).drawRevealCreatures ?? 3);
+  if (!seen.length) {
+    log(s, `${p.name} would draw from an empty library; ${name} replaces it, so nothing happens.`);
+    return [];
+  }
+  log(s, `${p.name} reveals ${seen.map((id) => nameOf(s, id)).join(", ")} instead of drawing (${name}).`);
+  const creatures = seen.filter((id) => isType(defOf(s, obj(s, id)), "Creature"));
+  for (const id of creatures) moveObject(s, id, "hand");
+  const rest = seen.filter((id) => !creatures.includes(id));
+  for (const id of rest) p.library.push(...p.library.splice(p.library.indexOf(id), 1));
+  log(s, `${p.name} puts ${creatures.length ? creatures.map((id) => nameOf(s, id)).join(", ") : "no creature card"} into their hand${rest.length ? ` and ${rest.length === 1 ? "the other card" : `the other ${rest.length}`} on the bottom of their library` : ""}.`);
+  return rest;
+}
+
+/**
  * Abundance instead of a draw: reveal from the top until a land (or nonland) card, put it into the hand (not drawn,
  * rulings), and the other revealed cards on the bottom in the order the player chooses (none found: all of them). Returns
  * those other cards.
@@ -3200,8 +3223,15 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   // Archmage Ascension (while it has six quest counters): one of each name, optional.
   const tutors: ObjectId[] = [];
   for (const id of mine((a) => a.drawTutor)) if (staticConditionNow(s, abilitiesOf(s, obj(s, id)).drawTutor!, id, pid) && !tutors.some((d) => nameOf(s, d) === nameOf(s, id))) tutors.push(id);
-  if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length) return undefined;
+  // Sages of the Anima: one of each name, mandatory (rulings: once one replaces the draw, the others no longer apply).
+  const sages: ObjectId[] = [];
+  for (const id of mine((a) => a.drawRevealCreatures)) if (!sages.some((d) => nameOf(s, d) === nameOf(s, id))) sages.push(id);
+  // Obstinate Familiar, Pursuit of Knowledge: optional, one of each name.
+  const skippers: ObjectId[] = [];
+  for (const id of mine((a) => a.drawMaySkip || a.drawMayCounter)) if (!skippers.some((d) => nameOf(s, d) === nameOf(s, id))) skippers.push(id);
+  if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length) return undefined;
   const out = [...shields];
+  for (const id of sages) out.push({ key: `sages:${id}`, label: `Reveal the top ${abilitiesOf(s, obj(s, id)).drawRevealCreatures} cards instead, the creature cards into your hand, the rest on the bottom of your library (${nameOf(s, id)})` });
   for (const id of exilers) {
     const a = abilitiesOf(s, obj(s, id)).drawExile!;
     out.push({ key: `exiles:${id}`, label: `Exile the top ${a.n === 1 ? "card" : `${a.n} cards`} of your library${a.faceDown ? " face down" : ""} instead${a.play ? `; you may play ${a.n === 1 ? "it" : "them"} this turn` : ""} (${nameOf(s, id)})` });
@@ -3220,10 +3250,15 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   if (thief) out.push({ key: "thief", label: `${player(s, thief.controller).name} draws a card instead (${thief.name})` });
   if (portal) out.push({ key: "skip", label: `Skip this draw (${nameOf(s, portal)})` });
   for (const id of tutors) out.push({ key: `tutor:${id}`, label: `Search your library for a card and put it into your hand instead, then shuffle (${nameOf(s, id)})` });
+  for (const id of skippers) {
+    const kind = abilitiesOf(s, obj(s, id)).drawMayCounter;
+    out.push({ key: `${kind ? "counter" : "mayskip"}:${id}`, label: kind ? `Put a ${kind} counter on ${nameOf(s, id)} instead` : `Skip this draw (${nameOf(s, id)})` });
+  }
   // A Notion Thief with nothing else to choose from goes on as before.
-  if (!shields.length && !exilers.length && !tutors.length && digs.length < 2 && out.length < 2) return undefined;
-  // Only replacements its player may decline (dredge, Abundance, Archmage Ascension): or none of them, the draw itself.
-  if (out.every((x) => /^(?:dredge|abundance|tutor):/.test(x.key))) out.push({ key: "draw", label: "Draw the card" });
+  if (!shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && digs.length < 2 && out.length < 2) return undefined;
+  // Only replacements its player may decline (dredge, Abundance, Archmage Ascension, Obstinate Familiar, Pursuit of
+  // Knowledge): or none of them, the draw itself.
+  if (out.every((x) => /^(?:dredge|abundance|tutor|mayskip|counter):/.test(x.key))) out.push({ key: "draw", label: "Draw the card" });
   return out;
 }
 
@@ -3296,6 +3331,26 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
   if (key === "thief") return stealDraw(s, pid, notionThief(s, pid)!);
   if (key === "skip") return skipDraw(s, pid, drawSkipper(s)!);
   if (key.startsWith("exiles:")) return exileInstead(s, pid, key.slice("exiles:".length));
+  if (key.startsWith("mayskip:") || key.startsWith("counter:")) {
+    // Obstinate Familiar: the draw doesn't happen; Pursuit of Knowledge: a counter on it instead (CR 614.1a).
+    const src = key.slice(key.indexOf(":") + 1);
+    const kind = abilitiesOf(s, obj(s, src)).drawMayCounter;
+    if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+    if (kind) {
+      const put = putCounters(s, obj(s, src), kind, 1);
+      log(s, `${p.name} puts ${put ? `a ${kind} counter` : `no ${kind} counter`} on ${nameOf(s, src)} instead of drawing.`);
+    } else log(s, `${p.name} skips that draw (${nameOf(s, src)}).`);
+    return;
+  }
+  if (key.startsWith("sages:")) {
+    const src = key.slice("sages:".length);
+    const rest = revealCreaturesInstead(s, p, src);
+    if (rest.length > 1) {
+      s.pending = { kind: "orderLibrary", player: pid, cards: rest, bottom: true, source: nameOf(s, src), thenDraw: { left, made: [...made], ...(after ? { after } : {}) } };
+      return "paused";
+    }
+    return;
+  }
   if (key.startsWith("tutor:")) return tutorInstead(s, pid, key.slice("tutor:".length), left, after, made);
   if (key === "draw") {
     // None of the optional replacements: the card is drawn (an empty library's own replacements still apply).
@@ -3388,6 +3443,7 @@ function chooseDrawInstead(s: GameState, p: Player, choice: string) {
   if (choice === "thief" && !notionThief(s, p.id)) throw new RulesError("no Notion Thief replaces that draw");
   if (choice.startsWith("tutor:") && !s.battlefield.includes(choice.slice("tutor:".length))) throw new RulesError("that permanent no longer replaces the draw");
   if (choice.startsWith("exiles:") && !drawExilers(s, p.id).includes(choice.slice("exiles:".length))) throw new RulesError("that permanent no longer replaces the draw");
+  if (/^(?:sages|mayskip|counter):/.test(choice) && !s.battlefield.includes(choice.slice(choice.indexOf(":") + 1))) throw new RulesError("that permanent no longer replaces the draw");
   s.pending = null;
   const made = [...(pend.made ?? [])];
   const done = applyDrawReplacement(s, p.id, choice, pend.left, pend.after, made, pend.archives);
@@ -8456,8 +8512,10 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     // Cycling works only while the card is in your hand (CR 702.29a); commander ninjutsu from the command zone too (CR 702.49d).
     if (!(o.zone === "hand" || (o.zone === "command" && ab.orCommand)) || o.owner !== pid) return `${ab.text} works only from your hand${ab.orCommand ? " or the command zone" : ""}`;
   } else if (ab.zone === "graveyard") {
-    // Unearth works only while the card is in your graveyard (CR 702.84a).
-    if (o.zone !== "graveyard" || o.owner !== pid) return `${ab.text} works only from your graveyard`;
+    // Unearth works only while the card is in your graveyard (CR 702.84a). Mister Immortal's from exile too, face up there
+    // (a face-down card in exile has no abilities, CR 406.3, 708.2).
+    const exiled = !!ab.orExile && o.zone === "exile" && !o.faceDown && !o.hiddenExile;
+    if ((o.zone !== "graveyard" && !exiled) || o.owner !== pid) return `${ab.text} works only from your graveyard${ab.orExile ? " or from exile" : ""}`;
     // Ashes of the Abhorrent: no activated abilities of cards in graveyards (embalm, unearth, scavenge, ...; rulings).
     const ashes = s.battlefield.find((b) => abilitiesOf(s, obj(s, b)).noGraveyardActivations);
     if (ashes) return `${characteristics(s, obj(s, ashes)).name}: players can't activate abilities of cards in graveyards`;
@@ -9967,6 +10025,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     if (!st || !pend.counterKind || !pend.options.includes(choice)) throw new RulesError("put another counter of that kind on it or remove one");
     st.picks[pend.counterKind] = choice;
     log(s, choice === "none" ? `${p.name} chooses to leave the ${pend.counterKind} counters as they are (${pend.source}).` : `${p.name} chooses to ${choice === "add" ? "put another" : "remove a"} ${pend.counterKind} counter (${pend.source}).`);
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "faceUpForm") {
+    // Aquamorph Entity turned face up by an effect: the form it's turned face up as, then the effect goes on.
+    if (!pend.about || !r) throw new RulesError("nothing to choose");
+    ((r.scratch ??= {}).faceUpForms ??= {})[pend.about] = Number(choice);
+    log(s, `${p.name} chooses ${pend.labels?.[pend.options.indexOf(choice)] ?? choice} for ${pend.source}.`);
     continueResolution(s);
     return;
   }
@@ -13234,10 +13300,13 @@ export const faceUpCost = (s: GameState, o: GameObject, way = 0) => faceUpWays(s
 /** A morph or disguise cost with its {X} as the X chosen (CR 107.3d): "{X}{3}{W}" with X 2 is "{2}{3}{W}". */
 export const faceUpManaCost = (cost: string, x = 0) => cost.replace(/\{X\}/g, x ? `{${x}}` : "") || "{0}";
 
-function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs?: CostChoices) {
+function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs?: CostChoices, form?: number) {
   const problem = turnFaceUpProblem(s, p.id, id, way, x, costs);
   if (problem) throw new RulesError(problem);
   const o = obj(s, id);
+  // Aquamorph Entity: what it becomes is chosen as it's turned face up (CR 614.1e), so with the special action.
+  const forms = faceUpFormsOf(s, o);
+  if (forms && (form === undefined || !forms[form])) throw new RulesError(`choose what ${defOf(s, { ...o, faceDown: undefined }).name} becomes as it's turned face up`);
   const fd = faceUpWays(s, o)[way]!;
   // What pays it is chosen as it's paid (as for abilities, activateAbility): no skipping a cost by not saying.
   if (fd.costs?.some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError("choose what to pay its morph cost with");
@@ -13246,21 +13315,37 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs
   if (fd.costs) payExtraCosts(s, p, fd.costs, { ...costs });
   // Mana with it too: "Morph—Pay 5 life" with Exiled Doomsayer's {2}.
   if (!fd.costs || fd.cost) spendFromPool(s, p.id, parseManaCost(faceUpManaCost(fd.cost, x)), { ability: o, faceUp: fd.kind });
-  turnedFaceUp(s, o, `${p.name} turns a face-down creature face up: it's ${name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.text ?? fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`, fd.kind === "megamorph", x, p.id);
+  turnedFaceUp(s, o, `${p.name} turns a face-down creature face up: it's ${name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.text ?? fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`, fd.kind === "megamorph", x, p.id, forms ? form : undefined);
   s.passedInSuccession = [];
+}
+
+/**
+ * Aquamorph Entity: "As ~ enters or is turned face up, it becomes your choice of 5/1 or 1/5" (CompiledCard.faceUpForms): the
+ * forms a face-down permanent chooses among as it's turned face up, the face-up card's (CR 614.1e, 708.8); otherwise undefined.
+ */
+export function faceUpFormsOf(s: GameState, o: GameObject): CompiledCard["entersForms"] {
+  if (!o.faceDown) return undefined;
+  const up = compileCard(defOf(s, { ...o, faceDown: undefined }));
+  return up.faceUpForms ? up.entersForms : undefined;
 }
 
 /**
  * Turns a face-down permanent face up. Its copiable values go back to the card's, or what a copy effect made it (CR
  * 708.8, 707.3); it's the same permanent, so nothing "enters". `megamorph`: its megamorph cost was paid (CR 702.37b).
  */
-function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = false, x = 0, by?: PlayerId) {
+function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = false, x = 0, by?: PlayerId, form?: number) {
+  const forms = faceUpFormsOf(s, o);
   o.faceDown = undefined;
   o.turnedFaceUpTurn = s.turn;
   lockIfRoom(s, o);
+  // Aquamorph Entity: it's turned face up as the form chosen, part of its copiable values (CR 614.1e, 707.2), never the
+  // printed 1/1 in between (rulings).
+  const chosenForm = forms && form !== undefined ? forms[form] : undefined;
+  if (forms && !chosenForm) throw new RulesError("choose what it becomes as it's turned face up");
+  if (chosenForm) addCopyEffect(s, o, copyKey(s, copiableDef(s, o), chosenForm.except));
   invalidateCharacteristics(s);
   const d = defOf(s, o);
-  log(s, text);
+  log(s, chosenForm ? `${text} It becomes ${chosenForm.text}.` : text);
   // Megamorph: a +1/+1 counter as it's turned face up, if its megamorph cost was paid (CR 702.37b).
   if (megamorph) putCounters(s, o, "+1/+1", 1);
   // Hooded Hydra: its counters as it's turned face up, not a trigger (CR 614.1e, rulings).
@@ -13275,7 +13360,7 @@ function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = fal
  * (Unable to Scream); a manifested or cloaked instant or sorcery card is revealed and stays face down, and nothing
  * triggers (CR 701.40g, 701.58g). Whether it turned face up.
  */
-export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string, by?: PlayerId): boolean {
+export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string, by?: PlayerId, form?: number): boolean {
   if (o.zone !== "battlefield" || !o.faceDown) return false;
   if (characteristics(s, o).cantTurnFaceUp) {
     log(s, `${src}: that face-down permanent can't be turned face up.`);
@@ -13286,7 +13371,7 @@ export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string, by?
     log(s, `${src}: ${player(s, controllerOf(s, o)).name} reveals the face-down permanent, ${card.name}, an ${isType(card, "Instant") ? "instant" : "sorcery"} card; it stays face down.`);
     return false;
   }
-  turnedFaceUp(s, o, `${src} turns a face-down permanent of ${player(s, controllerOf(s, o)).name}'s face up: it's ${defOf(s, { ...o, faceDown: undefined }).name}.`, false, 0, by);
+  turnedFaceUp(s, o, `${src} turns a face-down permanent of ${player(s, controllerOf(s, o)).name}'s face up: it's ${defOf(s, { ...o, faceDown: undefined }).name}.`, false, 0, by, form);
   return true;
 }
 

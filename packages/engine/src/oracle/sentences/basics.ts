@@ -2019,6 +2019,9 @@ export function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] |
       if (!filter) return null;
       out.push({ sacrifice: filter, n: num(m[1]!) });
     }
+    // Archfiend of Spite: "sacrifice that many permanents of their choice" (that many read as X): the trigger's amount; one
+    // or the other, not some of each, and with too few permanents they lose the life (rulings, punisherOptions).
+    else if (/^sacrifices? X permanents of their choice$/.test(part)) out.push({ sacrifice: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanent" }, n: 1, nAmount: X });
     // "Have it deal 4 damage to them" (Vexing Devil), "have Browbeat deal 5 damage to them": the source deals it.
     else if ((m = /^ha(?:ve|s) (?:it|~) deal (\d+) damage to (?:them|that player)$/.exec(part))) out.push({ damage: Number(m[1]) });
     // Temporal Extortion: "any player may pay half their life, rounded up": half their own life (CR 107.1a).

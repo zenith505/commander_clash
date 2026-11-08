@@ -860,7 +860,7 @@ export interface Player {
   /** Screaming Nemesis: "they can't gain life for the rest of the game", whatever happens to the Nemesis (rulings). */
   cantGainLifeForGame?: true;
   /** "Until your next turn, creatures can't attack you unless their controller pays {2} for each" (Summon: Yojimbo), one entry per effect. */
-  attackTaxUntil?: { n: number; planeswalkers?: true }[];
+  attackTaxUntil?: { n: number; planeswalkers?: true; /** Sivitri, Dragon Master: life for each creature, paid as attackers are declared (CR 508.1g-h, 119.4). */ life?: number }[];
   /** "Until your next turn, creatures can't attack you" (Chronomantic Escape): this player, not their planeswalkers. */
   unattackableUntil?: true;
   /**
@@ -1042,6 +1042,10 @@ export interface StackItem {
   lki?: LastKnown;
   /** A station ability: the creature tapped to pay for it, and its power as it last existed if it has left (CR 702.184a). */
   stationed?: { id: ObjectId; zc: number; power: number };
+  /** Cryptic Gateway: the creatures tapped to pay its "Tap two untapped creatures you control" cost, and their creature types, as they last existed once they leave (CR 608.2h). */
+  costTapped?: { id: ObjectId; zc: number; types: string[] | "all" }[];
+  /** "Target creature that's blocking equipped creature" (Plasma Caster): the creature the source was attached to as it was activated (rulings). */
+  hostThen?: { id: ObjectId; zc: number };
   /** A crew ability: how many creatures were tapped to pay its crew cost (Mighty Servant of Leuk-o, CR 702.122a). */
   crewers?: number;
   /** Its source's transform count as it was put on the stack: an ability of it transforms it only if unchanged (CR 701.27f). */
@@ -1596,7 +1600,7 @@ export type PendingDecision =
    * (exploit's "you may sacrifice a creature"). With `objectId`, it's devour's choice as that permanent enters
    * (CR 702.82a): any number of them.
    */
-  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** The whole question, when `what` and `action` don't say it (Orzhov Advokist). */ prompt?: string; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ /** Krenko's Buzzcrusher (pick `youChoose`): the player this pick is for, whose permanents these are. */ pickFor?: PlayerId; /** Malik, Grim Manipulator: a secret choice (secretChoose), "theirs" among another player's permanents (to be sacrificed), "own" among this player's own. */ secret?: "own" | "theirs"; of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "keep" (Winnowing): those sharing a creature type with the one kept stay too. */ sparesKin?: true; /** "keep": the rest are returned to their owners' hands (Consuming Tide). */ bounce?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the life paid for each one kept (Killing Wave). */ payLife?: number; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[]; /** Birthing Ritual: the cards looked at, shown with the question. */ looked?: ObjectId[]; /** Paying `objectId`'s cost to attack (Exalted Dragon, CR 508.1i). */ attackCost?: true; /** Battle for Bretagard: no two of those chosen may share a name (pick `differentNames`). */ differentNames?: true }
+  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** The whole question, when `what` and `action` don't say it (Orzhov Advokist). */ prompt?: string; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ /** Krenko's Buzzcrusher (pick `youChoose`): the player this pick is for, whose permanents these are. */ pickFor?: PlayerId; /** Malik, Grim Manipulator: a secret choice (secretChoose), "theirs" among another player's permanents (to be sacrificed), "own" among this player's own. */ secret?: "own" | "theirs"; of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "keep" (Winnowing): those sharing a creature type with the one kept stay too. */ sparesKin?: true; /** "keep": the rest are returned to their owners' hands (Consuming Tide). */ bounce?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the life paid for each one kept (Killing Wave). */ payLife?: number; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[]; /** Birthing Ritual: the cards looked at, shown with the question. */ looked?: ObjectId[]; /** Paying `objectId`'s cost to attack (Exalted Dragon, CR 508.1i). */ attackCost?: true; /** Battle for Bretagard: no two of those chosen may share a name (pick `differentNames`). */ differentNames?: true; /** Sigarda's Vanguard: no two of those chosen may have the same power (pick `differentPowers`). */ differentPowers?: true }
   /** "Distribute X +1/+1 counters among any number of creatures you control": how many each of `options` gets, adding up to `total`. */
   /** `move`: moving the counters on the source, any number of them (Forgotten Ancient); otherwise all `total` are distributed. */
   | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string; move?: true; /** Remove up to `total` of them, no more from each than `has` (Sensational Spider-Man). */ remove?: true; has?: Record<ObjectId, number> }
@@ -2335,6 +2339,8 @@ export interface AttackCostDue {
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
 export interface TriggerEventInfo {
   amount?: number;
+  /** Archfiend of Spite: the source that dealt the damage, for "that source's controller" as the ability resolves (rulings); while it's still that object on the battlefield or the stack, its controller then, otherwise `player`, its controller as it last existed (CR 608.2h). */
+  sourceOf?: { id: ObjectId; zc: number };
   /** A counters-put trigger: the kind of counter put (Bold Plagiarist's "the same number and kind of counters"). */
   counter?: string;
   /** "Whenever players finish voting" (Erestor of the Council): the votes cast (CR 701.38). */
@@ -2699,7 +2705,7 @@ export interface Resolving {
     /** "revealHandOrTop" (Eladamri): the card picked, or "top" for the top card of the library. */
     revealPick?: string;
     /** "exileHandOrPermanent" (Nicol Bolas, Dragon-God): the players still to choose, and the cards and permanents chosen. */
-    handOrPermanent?: { queue: PlayerId[]; picks: ObjectId[] };
+    handOrPermanent?: { queue: PlayerId[]; picks: ObjectId[]; /** Lich's Mastery: how many each player still exiles (Effect exileHandOrPermanent `n`). */ left?: number };
     /** A tempting offer's runs (see eachAccepted): the one going on, and the scratch kept between them. */
     offer?: { i: number; keep: string[] };
     /** The "if"s running, outermost first: whether each one's condition held as it was reached, and its instructions done. */

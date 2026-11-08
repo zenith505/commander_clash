@@ -64,6 +64,7 @@ export interface ResolveCtx {
   sacrificed?: LastKnown[];
   /** A station ability's tapped creature (CR 702.184a). */
   stationed?: StackItem["stationed"];
+  costTapped?: StackItem["costTapped"];
   sourceUntaps?: number;
   sourceTransforms?: number;
   /** The creature type or color chosen as it resolves, or else as its source entered. */
@@ -103,7 +104,7 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
   // An amount bound ("with power less than or equal to ~'s power") is worked out again now (CR 608.2b), with the source as
   // it last existed if it has left (608.2h).
   const now: AmountCtx = { ...targetingCtx(s, item.controller, item.sourceId), ...(item.sourceZc !== undefined ? { sourceZc: item.sourceZc } : {}), ...(item.lki ? { lki: item.lki } : {}), x: item.x ?? 0 };
-  const legal = body.targets.map((spec, i) => !!targets[i] && isLegalTarget(s, bindBound(s, spec, now), targets[i]!, item.controller, src) && lesserPowerOk(s, spec, targets[i]!, item.sourceId, item.sourceZc));
+  const legal = body.targets.map((spec, i) => !!targets[i] && isLegalTarget(s, bindBound(s, spec, now), targets[i]!, item.controller, src) && lesserPowerOk(s, spec, targets[i]!, item.sourceId, item.sourceZc, item.hostThen));
   checkTotals(s, body.targets, targets, legal);
   // Requirements about the other targets, checked again too (CR 608.2b): "controlled by different players" (Run Away
   // Together), "with the same controller" (Simic Guildmage), "in that player's graveyard" (Goblin Welder).
@@ -175,6 +176,7 @@ export function continueResolution(s: GameState): Resolution {
     manaSpent: item.kind === "spell" ? (item.copy ? 0 : (s.objects[item.objectId!]?.manaSpent ?? 0)) : (item.event?.manaSpent ?? 0),
     sacrificed: item.sacrificed,
     stationed: item.stationed,
+    costTapped: item.costTapped,
     sourceUntaps: item.sourceUntaps,
     sourceTransforms: item.sourceTransforms,
   };
@@ -742,14 +744,29 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       }
       return out;
     }
-    case "eventPlayer":
-      return ctx.event?.player !== undefined && !player(s, ctx.event.player).lost ? [ctx.event.player] : [];
+    case "eventPlayer": {
+      // Archfiend of Spite: "that source's controller" as it resolves, if the source is still that object.
+      const src = ctx.event?.sourceOf ? s.objects[ctx.event.sourceOf.id] : undefined;
+      const now = src && (src.zoneChanges ?? 0) === ctx.event!.sourceOf!.zc ? (src.zone === "battlefield" ? controllerOf(s, src) : src.zone === "stack" ? s.stack.find((i) => i.objectId === src.id)?.controller : undefined) : undefined;
+      const who = now ?? ctx.event?.player;
+      return who !== undefined && !player(s, who).lost ? [who] : [];
+    }
     case "eventPlayers":
       return s.turnOrder.filter((p) => ctx.event?.players?.includes(p) && !player(s, p).lost);
     case "votedWithYou": {
       const votes = ctx.event?.votes ?? [];
       const mine = new Set(votes.filter((v) => v.voter === ctx.controller).map((v) => v.choice));
       return opponents(s, ctx.controller).filter((p) => votes.some((v) => v.voter === p && mine.has(v.choice)));
+    }
+    case "votedNoneOfYours": {
+      const votes = ctx.event?.votes ?? [];
+      const mine = new Set(votes.filter((v) => v.voter === ctx.controller).map((v) => v.choice));
+      return opponents(s, ctx.controller).filter((p) => votes.some((v) => v.voter === p) && !votes.some((v) => v.voter === p && mine.has(v.choice)));
+    }
+    case "youAndVotedWithYou": {
+      const votes = ctx.event?.votes ?? [];
+      const mine = new Set(votes.filter((v) => v.voter === ctx.controller).map((v) => v.choice));
+      return apnap(s, livingPlayers(s).filter((p) => p === ctx.controller || (opponents(s, ctx.controller).includes(p) && votes.some((v) => v.voter === p && mine.has(v.choice)))));
     }
     case "youAndEventPlayer":
       return s.turnOrder.filter((p) => (p === ctx.controller || p === ctx.event?.player) && !player(s, p).lost);

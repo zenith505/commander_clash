@@ -266,13 +266,15 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, us
   // Boseiju's mana goes to an instant or sorcery spell first, which it makes uncounterable.
   const instantOrSorcery = !!spellDef && (isType(spellDef, "Instant") || isType(spellDef, "Sorcery"));
   const rank = (l: ManaLot, plain: boolean) => (l.keep ? 10 : 0) + (l.haste ? (hasteFits(l) ? -1 : 3) : 0) + (l.uncounterableInstantSorcery ? (instantOrSorcery ? -1 : 3) : 0) + (l.commanderCounters ? (ownCommander ? -1 : 3) : 0) + (l.creatureCounter ? (creatureSpell ? -1 : 3) : 0) + (l.only ? 0 : plain === (use === "other") ? 1 : 2);
+  // Mana a basic land made and nothing else marks (Imperiosaur's "basicLand" origin) is spent as plain mana is.
+  const plainLike = (l: ManaLot) => l.from?.length === 1 && l.from[0] === "basicLand" && !l.only && !l.keep && !l.spentTrigger && !l.haste && !l.commanderCounters && !l.creatureCounter && !l.uncounterableInstantSorcery && !l.source;
   for (const m of Object.keys(spent) as ManaType[]) {
     spent[m] = pool[m] - paid.pool[m];
     if (!spent[m]) continue;
     p.manaPool[m] -= spent[m];
     const plainLot: ManaLot = { mana: m, n: plain[m] };
     const take = (candidates: ManaLot[], n: number) => {
-      for (const l of candidates.sort((a, b) => rank(a, a === plainLot) - rank(b, b === plainLot))) {
+      for (const l of candidates.sort((a, b) => rank(a, a === plainLot || plainLike(a)) - rank(b, b === plainLot || plainLike(b)))) {
         const k = Math.min(n, l.n);
         l.n -= k;
         n -= k;

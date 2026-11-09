@@ -61,7 +61,8 @@ describe("restricted mana (CR 106.6)", () => {
     s = act(s, { type: "activateMana", player: ap, objectId: f2, mana: "G" });
     s = act(s, { type: "castSpell", player: ap, objectId: ids[0]! });
     expect(s.players[ap]!.manaPool).toMatchObject({ W: 0, G: 1 });
-    expect(s.players[ap]!.manaLots).toBeUndefined();
+    // No restricted mana is left; the {G} left only records that a basic land made it (Imperiosaur, round B165).
+    expect(s.players[ap]!.manaLots ?? []).toEqual([{ mana: "G", n: 1, from: ["basicLand"] }]);
     // The {G} left is free mana: it pays for the instant.
     s = act(s, { type: "castSpell", player: ap, objectId: ids[1]!, targets: [target(putOnBattlefield(s, ap, bear()))] });
     expect(s.stack.at(-1)?.objectId).toBe(ids[1]);

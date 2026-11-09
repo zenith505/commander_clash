@@ -28633,6 +28633,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cecd2f49-8ccb-472d-9cf1-fd0f4d93546d",
+  "name": "Summon: Esper Valigarmanda",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Enchantment Creature — Saga Drake",
+  "supertypes": [],
+  "types": [
+   "Enchantment",
+   "Creature"
+  ],
+  "subtypes": [
+   "Saga",
+   "Drake"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after IV.)\nI — Exile an instant or sorcery card from each graveyard.\nII, III, IV — Add {R} for each lore counter on this Saga. You may cast an instant or sorcery card exiled with this Saga, and mana of any type can be spent to cast that spell.\nFlying, haste",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Haste"
+  ],
+  "producedMana": [
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "saga",
+  "gameChanger": false
+ },
+ {
   "oracleId": "67d29e56-9ca8-46bc-9ee0-20184e867ce4",
   "name": "Summon: Valefor",
   "manaCost": "{4}{U}",
@@ -29317,6 +29355,39 @@
   "set": "fut",
   "releasedAt": "2007-05-04",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "863a148c-596a-492b-b68e-3e1cbfcb140f",
+  "name": "Tasha, the Witch Queen",
+  "manaCost": "{3}{U}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Planeswalker — Tasha",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Tasha"
+  ],
+  "oracleText": "Whenever you cast a spell you don't own, create a 3/3 black Demon creature token.\n+1: Draw a card. For each opponent, exile up to one target instant or sorcery card from that player's graveyard and put a page counter on it.\n−3: You may cast a spell from among cards in exile with page counters on them without paying its mana cost.\nTasha, the Witch Queen can be your commander.",
+  "loyalty": "4",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -30014,6 +30085,78 @@
     ],
     "imageUrl": "https://cards.scryfall.io/normal/back/3/6/36052532-5028-43a8-9fc4-56221ec867fd.jpg?1783923839",
     "artUrl": "https://cards.scryfall.io/art_crop/back/3/6/36052532-5028-43a8-9fc4-56221ec867fd.jpg?1783923839"
+   }
+  ]
+ },
+ {
+  "oracleId": "521a63cf-5e83-4649-9800-c62b2fc474d6",
+  "name": "The Legend of Yangchen // Avatar Yangchen",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Enchantment — Saga // Legendary Creature — Avatar",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter.)\nI — Starting with you, each player chooses up to one permanent with mana value 3 or greater from among permanents your opponents control. Exile those permanents.\nII — You may have target opponent draw three cards. If you do, draw three cards.\nIII — Exile this Saga, then return it to the battlefield transformed under your control.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Airbend",
+   "Transform"
+  ],
+  "commanderLegal": "legal",
+  "set": "tla",
+  "releasedAt": "2025-11-21",
+  "rarity": "mythic",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "The Legend of Yangchen",
+    "manaCost": "{3}{W}{W}",
+    "typeLine": "Enchantment — Saga",
+    "supertypes": [],
+    "types": [
+     "Enchantment"
+    ],
+    "subtypes": [
+     "Saga"
+    ],
+    "oracleText": "(As this Saga enters and after your draw step, add a lore counter.)\nI — Starting with you, each player chooses up to one permanent with mana value 3 or greater from among permanents your opponents control. Exile those permanents.\nII — You may have target opponent draw three cards. If you do, draw three cards.\nIII — Exile this Saga, then return it to the battlefield transformed under your control.",
+    "colors": [
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/a/6/a60e8f23-90b2-4bc6-bd54-a95055556389.jpg?1783905002",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/a/6/a60e8f23-90b2-4bc6-bd54-a95055556389.jpg?1783905002"
+   },
+   {
+    "name": "Avatar Yangchen",
+    "manaCost": "",
+    "typeLine": "Legendary Creature — Avatar",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Avatar"
+    ],
+    "oracleText": "Flying\nWhenever you cast your second spell each turn, airbend up to one other target nonland permanent. (Exile it. While it's exiled, its owner may cast it for {2} rather than its mana cost.)",
+    "power": "4",
+    "toughness": "5",
+    "colors": [],
+    "imageUrl": "https://cards.scryfall.io/normal/back/a/6/a60e8f23-90b2-4bc6-bd54-a95055556389.jpg?1783905002",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/a/6/a60e8f23-90b2-4bc6-bd54-a95055556389.jpg?1783905002"
    }
   ]
  },
@@ -31320,6 +31463,32 @@
   "set": "blb",
   "releasedAt": "2024-08-02",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9567d963-4815-466b-a319-6d138b6a0cd2",
+  "name": "Triple Triad",
+  "manaCost": "{3}{R}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, each player exiles the top card of their library. Until end of turn, you may play the card you own exiled this way and each other card exiled this way with lesser mana value than it without paying their mana costs.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -34424,5 +34593,95 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "8f52fc65-a914-421a-9426-21eb520d55d5",
+  "name": "Zenos yae Galvus // Shinryu, Transcendent Rival",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Noble Warrior // Legendary Creature — Dragon",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Noble",
+   "Warrior"
+  ],
+  "oracleText": "My First Friend — When Zenos yae Galvus enters, choose a creature an opponent controls. Until end of turn, creatures other than Zenos yae Galvus and the chosen creature get -2/-2.\nWhen the chosen creature leaves the battlefield, transform Zenos yae Galvus.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying",
+   "Transform",
+   "My First Friend",
+   "Burning Chains"
+  ],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Zenos yae Galvus",
+    "manaCost": "{3}{B}{B}",
+    "typeLine": "Legendary Creature — Human Noble Warrior",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Human",
+     "Noble",
+     "Warrior"
+    ],
+    "oracleText": "My First Friend — When Zenos yae Galvus enters, choose a creature an opponent controls. Until end of turn, creatures other than Zenos yae Galvus and the chosen creature get -2/-2.\nWhen the chosen creature leaves the battlefield, transform Zenos yae Galvus.",
+    "power": "4",
+    "toughness": "4",
+    "colors": [
+     "B"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/b/6/b65ffce4-bb58-418a-9bad-81533a5f2ba2.jpg?1783906617",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/b/6/b65ffce4-bb58-418a-9bad-81533a5f2ba2.jpg?1783906617"
+   },
+   {
+    "name": "Shinryu, Transcendent Rival",
+    "manaCost": "",
+    "typeLine": "Legendary Creature — Dragon",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Dragon"
+    ],
+    "oracleText": "Flying\nAs this creature transforms into Shinryu, choose an opponent.\nBurning Chains — When the chosen player loses the game, you win the game.",
+    "power": "8",
+    "toughness": "8",
+    "colors": [
+     "B"
+    ],
+    "colorIndicator": [
+     "B"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/b/6/b65ffce4-bb58-418a-9bad-81533a5f2ba2.jpg?1783906617",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/b/6/b65ffce4-bb58-418a-9bad-81533a5f2ba2.jpg?1783906617"
+   }
+  ]
  }
 ]

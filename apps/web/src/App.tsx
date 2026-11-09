@@ -1066,11 +1066,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : card.manaCost), max, value: range ? range.min : optional ? 0 : Math.max(max, compiled.xMin ?? 0), ...(range?.min ? { min: range.min } : !costX && compiled.xMin ? { min: compiled.xMin } : {}), ...(extra ? { extra } : {}) });
     }
     // "Kicker {X}": X is announced once it's kicked (CR 601.2b), "X can't be 0" (Thieving Skydiver).
-    const kickX = d.kicks?.map((i) => compiled.kicker?.costs[i] ?? "").find((c) => parseManaCost(c).hasX);
+    // Waterbender's Restoration: a required "waterbend {X}", always paid, so X is always announced.
+    const requiredX = compiled.kicker?.required && parseManaCost(compiled.kicker.costs[0]!).hasX ? compiled.kicker.costs[0]! : undefined;
+    const kickX = requiredX ?? d.kicks?.map((i) => compiled.kicker?.costs[i] ?? "").find((c) => parseManaCost(c).hasX);
     if (d.x === undefined && kickX) {
       const min = compiled.kicker?.xMin ?? 0;
       const max = maxX((n) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", Math.max(n, min), kicks));
-      return setXPick({ mode: "cast", draft: d, label: `${card.name} (kicked)`, cost: kickX, max: Math.max(max, min), value: Math.max(max, min), ...(min ? { min } : {}) });
+      return setXPick({ mode: "cast", draft: d, label: requiredX ? `${card.name} (waterbend {X})` : `${card.name} (kicked)`, cost: kickX, max: Math.max(max, min), value: Math.max(max, min), ...(min ? { min } : {}) });
     }
     // The optional costs announced so far decide which targets it has (CR 702.33g, 702.166d, 702.174m); bargain is
     // asked before them when a target depends on it.

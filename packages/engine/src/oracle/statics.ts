@@ -1151,6 +1151,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^(?:there are cards|a card is) exiled with (?:~|it)$/.test(text)) return { kind: "amount", amount: { count: { kind: "linkedExiled" } }, min: 1 };
   // Veteran Survivor: "As long as there are three or more cards exiled with ~": the same, at least that many.
   if ((m = new RegExp(`^there are ${NUM} or more cards exiled with ~$`).exec(text))) return { kind: "amount", amount: { count: { kind: "linkedExiled" } }, min: num(m[1]!) };
+  // Keen-Eyed Curator: "As long as there are four or more card types among cards exiled with ~" (CR 205.2a).
+  if ((m = new RegExp(`^there are ${NUM} or more card types among cards exiled with ~$`).exec(text))) return { kind: "amount", amount: { count: { kind: "linkedExiled", cardTypes: true } }, min: num(m[1]!) };
   // Negative Zone Portal: "if there are four or more creature cards exiled with ~": only those cards.
   if ((m = new RegExp(`^there are ${NUM} or more (creature|artifact|land) cards exiled with ~$`).exec(text))) {
     const filter = parseSearchFilter(`${m[2]} card`);

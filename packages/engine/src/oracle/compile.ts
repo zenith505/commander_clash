@@ -637,6 +637,10 @@ export function compile(d: CardDef): CompiledCard {
       // Marvel Boy, Noh-Varr: "Whenever another creature you control enters and whenever you activate a power-up ability,
       // put a +1/+1 counter on ~": one ability with two trigger events (CR 603.1), the same as an ability for each.
       .replace(/^Whenever (another creature you control) enters and whenever you activate a power-up ability, ([^\n]+)$/m, "Whenever $1 enters, $2\nWhenever you activate a power-up ability, $2")
+      // Astral Drift: "Whenever you cycle ~ or cycle another card while ~ is on the battlefield": one ability with two
+      // trigger events, the card's own cycling from the hand (CR 702.29c-d) and another card cycled while it's on the
+      // battlefield; one cycle can't be both, so two abilities with the same effect act the same.
+      .replace(/^Whenever you cycle ~ or cycle another card while ~ is on the battlefield, ([^\n]+)$/m, "When you cycle ~, $1\nWhenever you cycle another card, $1")
       // Orcish Mine: "At the beginning of your upkeep and whenever enchanted land becomes tapped, remove an ore counter from
       // ~": the same, an ability for each event (CR 603.1).
       .replace(/^At the beginning of your upkeep and whenever enchanted land becomes tapped, ([^\n]+)$/m, "At the beginning of your upkeep, $1\nWhenever enchanted land becomes tapped, $1")
@@ -2083,10 +2087,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "As an additional cost to cast this spell, (you may) waterbend {5}" (CR 701.67a): a cost paid like kicker, part of
     // which tapped artifacts and creatures can pay. "If this spell's additional cost was paid" reads as kicked.
-    const waterbendCost = /^As an additional cost to cast ~, (you may )?waterbend \{(\d+)\}\.$/.exec(line);
+    // Waterbender's Restoration: "waterbend {X}": X announced as it's cast (CR 107.3a, 601.2b), and up to X of it paid by
+    // tapping.
+    const waterbendCost = /^As an additional cost to cast ~, (you may )?waterbend \{(\d+|X)\}\.$/.exec(line);
     if (waterbendCost) {
-      if (out.kicker) out.unsupported.push(raw);
-      else out.kicker = { costs: [`{${waterbendCost[2]}}`], waterbend: Number(waterbendCost[2]), ...(waterbendCost[1] ? {} : { required: true as const }) };
+      if (out.kicker || (waterbendCost[2] === "X" && (waterbendCost[1] || parseManaCost(d.manaCost).hasX))) out.unsupported.push(raw);
+      else out.kicker = { costs: [`{${waterbendCost[2]}}`], waterbend: waterbendCost[2] === "X" ? "X" : Number(waterbendCost[2]), ...(waterbendCost[1] ? {} : { required: true as const }) };
       continue;
     }
     // "Squad—Exile four cards from your graveyard." (Ruthless Radrat): a squad cost that isn't mana (CR 702.157a, 118.8),

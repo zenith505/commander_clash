@@ -3681,6 +3681,12 @@ function advanceStep(s: GameState): void {
       s.effects = s.effects.filter((e) => !nextCombatOver(e));
       invalidateCharacteristics(s);
     }
+    // "Until end of combat on your next turn, you may play that card" (Brazen Cannonade): over as that end of combat ends.
+    for (const q of s.players)
+      for (const id of q.exile) {
+        const m = obj(s, id).mayPlay;
+        if (m?.until === "yourNextCombat" && m.player === s.activePlayer && s.turn > m.turn) obj(s, id).mayPlay = undefined;
+      }
     for (const o of attackersAndBlockers(s)) clearCombat(o);
     for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
     for (const id of s.battlefield) obj(s, id).provokedAlso = undefined;
@@ -4501,7 +4507,9 @@ function finishCleanup(s: GameState) {
   for (const q of s.players)
     for (const id of q.exile) {
       const m = obj(s, id).mayPlay;
-      if (m && (m.until === "thisTurn" || ((m.until === "nextTurn" || m.until === "duringNextTurn") && s.activePlayer === m.player && s.turn > m.turn))) obj(s, id).mayPlay = undefined;
+      // Brazen Cannonade's "until end of combat on your next turn" in a next turn with no end of combat step (its combat
+      // phase skipped): over with that turn.
+      if (m && (m.until === "thisTurn" || ((m.until === "nextTurn" || m.until === "duringNextTurn" || m.until === "yourNextCombat") && s.activePlayer === m.player && s.turn > m.turn))) obj(s, id).mayPlay = undefined;
     }
   // Mosswood Dreadknight's "until the end of your next turn" from a graveyard.
   for (const q of s.players)
@@ -6005,7 +6013,8 @@ export function castProblem(
   const costX = costsHaveX(d, choices);
   // "Kicker {X}": X only when it's kicked (CR 107.3a, 601.2b); "X can't be 0" then.
   const kicker = compileCard(d).kicker;
-  const kickX = !!choices?.kicks?.some((i) => parseManaCost(kicker?.costs[i] ?? "").hasX);
+  // Waterbender's Restoration: a required "waterbend {X}" is always paid, so X is always announced.
+  const kickX = !!choices?.kicks?.some((i) => parseManaCost(kicker?.costs[i] ?? "").hasX) || (!!kicker?.required && parseManaCost(kicker.costs[0]!).hasX);
   // An {X} in the alternative cost paid, though the mana cost has none: "Foretell {X}{X}{W}" (Starnheim Unleashed),
   // "Madness {X}{B}{B}" (From Under the Floorboards). X is announced as it's cast (CR 107.3a, rulings).
   const altX = parseManaCost((free ? madness : undefined) ?? (choices?.alt && !choices.faceDown ? (altCost(d, choices.alt, s, pid, o)?.mana ?? "") : "")).hasX;
@@ -6516,7 +6525,7 @@ function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectI
   if (how.waterbend?.length) {
     // Waterbend as an additional cost (CR 701.67a): up to the waterbend cost's own generic mana, if it's being paid.
     const k = compileCard(d).kicker;
-    const cap = k?.waterbend !== undefined && (k.required || kicks?.includes(0)) ? k.waterbend : 0;
+    const cap = k?.waterbend !== undefined && (k.required || kicks?.includes(0)) ? (k.waterbend === "X" ? (x ?? 0) : k.waterbend) : 0;
     if (!cap) return `${d.name} has no waterbend cost being paid`;
     const problem = castWaterbendProblem(s, pid, how.waterbend, cap, [...(convoke ?? []), ...(improvise ?? []), ...(how.tap ?? []), ...(how.teamwork ?? []), ...(how.conspire ?? []), ...(how.harmonize !== undefined ? [how.harmonize] : []), ...(how.sacrifice ?? [])]);
     if (problem) return problem;
@@ -7174,7 +7183,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const free = freeCastOf(s, p.id) === id && !madness;
   // X is announced as it's cast (CR 601.2b) and is part of the spell while it's on the stack (CR 107.3a).
   // Or in the alternative cost paid: "Foretell {X}{X}{W}", "Madness {X}{B}{B}" (CR 107.3a).
-  const hasX = parseManaCost(d.manaCost).hasX || costsHaveX(d, choices) || !!choices?.kicks?.some((i) => parseManaCost(compileCard(d).kicker?.costs[i] ?? "").hasX) || parseManaCost(madness ?? (choices.alt ? (altCost(d, choices.alt, s, p.id)?.mana ?? "") : "")).hasX;
+  const hasX = parseManaCost(d.manaCost).hasX || costsHaveX(d, choices) || !!choices?.kicks?.some((i) => parseManaCost(compileCard(d).kicker?.costs[i] ?? "").hasX) || (!!compileCard(d).kicker?.required && parseManaCost(compileCard(d).kicker!.costs[0]!).hasX) || parseManaCost(madness ?? (choices.alt ? (altCost(d, choices.alt, s, p.id)?.mana ?? "") : "")).hasX;
   const beholdCost = compileCard(d).kicker?.extraCosts?.[0];
   const beheld = kicks?.includes(0) && beholdCost?.kind === "reveal" && beholdCost.orControl && choices.reveal?.length === 1 ? s.objects[choices.reveal[0]!] : undefined;
   s.stack.push({
@@ -8947,7 +8956,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     }
   } else if (ab.waterbend !== undefined) {
     if (tapCreatures?.length) {
-      const wp = waterbendProblem(s, pid, o, ab, tapCreatures, x ?? 0, costs);
+      const wp = waterbendProblem(s, pid, o, ab, tapCreatures, x ?? 0, costs, targets);
       if (wp) return wp;
     }
   } else if (tapCreatures?.length) return "this ability doesn't tap creatures";
@@ -9012,17 +9021,33 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
  * you control rather than pay that mana." The ones tapped are the activation's `tapCreatures`: no more than the generic
  * mana in the waterbend cost itself, even if the total cost went up or down (rulings), each one once.
  */
-function waterbendProblem(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, ids: ObjectId[], x: number, costs?: CostChoices): string | null {
-  const cap = ab.waterbend === "X" ? x : (ab.waterbend ?? 0);
+function waterbendProblem(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, ids: ObjectId[], x: number, costs?: CostChoices, targets?: TargetChoice[]): string | null {
+  const cap = waterbendCap(s, pid, o, ab, x, targets);
+  if (ab.bendCreaturesOnly) {
+    // Heirloom Epic: no more creatures than the mana in the cost, each one once (rulings).
+    if (ids.length > cap) return `no more than ${cap} creature${cap === 1 ? "" : "s"} can be tapped to pay for this ability`;
+    if (new Set(ids).size !== ids.length) return "each creature can only be tapped once to pay for this ability";
+  }
   if (ids.length > cap) return `waterbend {${cap}} can be paid by tapping no more than ${cap} artifact${cap === 1 ? "" : "s"} or creature${cap === 1 ? "" : "s"}`;
   if (new Set(ids).size !== ids.length) return "each artifact or creature can only be tapped once to waterbend";
   for (const id of ids) {
     const c = s.objects[id];
+    if (ab.bendCreaturesOnly && (!c || c.zone !== "battlefield" || controllerOf(s, c) !== pid || !objIsType(s, c, "Creature"))) return "only creatures you control can be tapped to pay for this ability";
     if (!c || c.zone !== "battlefield" || controllerOf(s, c) !== pid || !(objIsType(s, c, "Artifact") || objIsType(s, c, "Creature"))) return "only artifacts and creatures you control can be tapped to waterbend";
     // The source tapped by its own {T} cost, or tapped or sacrificed for another cost, can't be tapped again (rulings).
     if (c.tapped || (ab.tap && id === o.id) || costs?.tap?.includes(id) || costs?.sacrifice?.includes(id)) return `${nameOf(s, id)} is already tapped`;
   }
   return null;
+}
+
+/**
+ * How many artifacts and creatures may be tapped for an ability's waterbend cost: N for "Waterbend {N}", X for {X}, and for
+ * Heirloom Epic's "for each mana in this ability's activation cost" the generic mana in its cost as it's activated, after
+ * increases and reductions (rulings; its cost is all generic, so nothing colored could be paid this way).
+ */
+export function waterbendCap(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, x: number, targets?: TargetChoice[]): number {
+  if (ab.waterbend === "cost") return activationCost(s, pid, o, ab, targets, x).symbols.reduce((n, y) => n + (y.kind === "generic" ? y.amount : 0), 0);
+  return ab.waterbend === "X" ? x : (ab.waterbend ?? 0);
 }
 
 /** An activation's mana cost after the artifacts and creatures tapped to waterbend each pay {1} of its generic mana (CR 701.67a). */
@@ -9438,7 +9463,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     }
     for (const c of tapCreatures ?? []) tapPermanent(s, obj(s, c));
   });
-  if (ab.waterbend !== undefined && tapCreatures?.length) log(s, `${p.name} taps ${tapCreatures.map((c) => nameOf(s, c)).join(", ")} to waterbend.`);
+  if (ab.waterbend !== undefined && tapCreatures?.length) log(s, `${p.name} taps ${tapCreatures.map((c) => nameOf(s, c)).join(", ")} ${ab.bendCreaturesOnly ? "to pay for it" : "to waterbend"}.`);
   // Its last known information takes in the counters its cost put on or removed (CR 608.2h): Nissa, Ascended Animist's
   // +1 gone before it resolves makes a Horror as big as her loyalty after the +1.
   if (lki?.counters && o.zone === "battlefield" && (ab.loyalty !== undefined || ab.loyaltyX || ab.putCounters || ab.removeCounters)) Object.assign(lki, { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters } });

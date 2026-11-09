@@ -13335,6 +13335,30 @@
   "gameChanger": false
  },
  {
+  "oracleId": "43037ef5-09e8-4881-beff-ed38cf7574c6",
+  "name": "Heirloom Epic",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact — Book",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Book"
+  ],
+  "oracleText": "{4}, {T}: Draw a card. For each mana in this ability's activation cost, you may tap an untapped creature you control rather than pay that mana. Activate only as a sorcery.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "blb",
+  "releasedAt": "2024-08-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8bcdb107-3827-4280-9e5e-7f1e771ef0c5",
   "name": "Helica Glider",
   "manaCost": "{2}{W}",
@@ -32641,6 +32665,36 @@
   "set": "akh",
   "releasedAt": "2017-04-28",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "285046f6-b3c4-4eb7-8712-9dffebabc762",
+  "name": "Waterbender's Restoration",
+  "manaCost": "{U}{U}",
+  "cmc": 2,
+  "typeLine": "Instant — Lesson",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [
+   "Lesson"
+  ],
+  "oracleText": "As an additional cost to cast this spell, waterbend {X}. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)\nExile X target creatures you control. Return those cards to the battlefield under their owner's control at the beginning of the next end step.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Waterbend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tle",
+  "releasedAt": "2025-11-21",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

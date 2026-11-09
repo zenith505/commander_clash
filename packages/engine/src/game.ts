@@ -3065,6 +3065,9 @@ function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number
   // Rowen, Primitive Etchings: "Reveal the first card you draw each turn", on any player's turn.
   if (p.draws.n === 1 && drawnCard.zone === "hand" && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).triggers.some((t) => t.draws?.revealed && (!t.draws.ownTurn || s.activePlayer === pid))))
     log(s, `${p.name} reveals ${defOf(s, drawnCard).name}, the first card they drew this turn.`);
+  // Booby Trap: "The chosen player reveals each card they draw."
+  const trap = drawnCard.zone === "hand" ? s.battlefield.map((id) => obj(s, id)).find((o) => o.chosen?.player === pid && abilitiesOf(s, o).revealsChosenPlayersDraws) : undefined;
+  if (trap) log(s, `${p.name} reveals ${defOf(s, drawnCard).name} as they draw it (${characteristics(s, trap).name}).`);
   fireEvent(s, { type: "draw", player: pid, nth: p.draws.n, ...(firstInDrawStep ? { firstInDrawStep: true as const } : {}), card: top });
   // Miracle (CR 702.94a-b): the first card drawn this turn is revealed as it's drawn, and its trigger lets its owner cast
   // it for its miracle cost. It's always revealed here; whether to cast it is asked as the trigger resolves.

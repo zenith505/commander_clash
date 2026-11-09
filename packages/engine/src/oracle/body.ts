@@ -1504,6 +1504,64 @@ function wandPunisher(who: PlayerRef, landLife: number): Effect {
  * reads parseFaceDownPlay's: the last effect and the next sentence's index in parseFaceDownPlay's shape (the effects
  * before the last one already pushed), "fail" for one that can't be read, or null when it isn't one of them.
  */
+/** Lane B round B160's sentences, chained first (parseBodyText is at TS2563's limit). */
+function roundB160Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  const next = (k = 1) => (sentences[si + k] ?? "").replace(/\.$/, "");
+  // Magus of the Mind: "Shuffle your library, then exile the top X cards, where X is one plus the number of spells cast this
+  // turn. Until end of turn, you may play lands and cast spells from among cards exiled this way without paying their mana
+  // costs.": every player's spells this turn, counted as it resolves (X is one with none, rulings); the cards are played
+  // with their normal timing, a land only with a land play left (rulings), and the rest stay exiled.
+  if (s === "Exile the top X cards, where X is one plus the number of spells cast this turn" && effects[effects.length - 1]?.type === "shuffle" && next() === "Until end of turn, you may play lands and cast spells from among cards exiled this way without paying their mana costs") {
+    return { effect: { type: "impulse", n: { count: { kind: "spellsCastThisTurn", anyone: true }, plus: 1 }, until: "thisTurn", free: true }, next: si + 2 };
+  }
+  // Nebuchadnezzar: "Choose a card name. Target opponent reveals X cards at random from their hand. Then that player discards
+  // all cards with that name revealed this way.": the name chosen as it resolves, before the reveal (rulings).
+  const prev = effects[effects.length - 1];
+  if (s === "Target opponent reveals X cards at random from their hand" && next() === "Then that player discards all cards with that name revealed this way" && prev?.type === "choose" && prev.choice === "cardName" && effects.length === 1) {
+    const who = parsePlayer("target opponent", ctx);
+    if (!who) return "fail";
+    prev.purpose = "theirs";
+    return { effect: { type: "revealRandomDiscardNamed", who, n: X }, next: si + 2 };
+  }
+  // Bazaar of Wonders: "counter it if a card with the same name is in a graveyard or a nontoken permanent with the same name is
+  // on the battlefield": not an intervening "if" (CR 603.4), checked only as it resolves.
+  if (/^[Cc]ounter it if a card with the same name is in a graveyard or a nontoken permanent with the same name is on the battlefield$/.test(s) && ctx.castSpell && !effects.length && si === 0 && sentences.length === 1)
+    return { effect: { type: "counterCauseIfNamed" }, next: si + 1 };
+  // Guard Dogs: "Choose a permanent you control. Prevent all combat damage target creature would deal this turn if it shares a
+  // color with that permanent.": the target chosen as it's activated, the permanent as it resolves, and the colors compared
+  // only then (rulings); a shield for the rest of the turn if they share one.
+  const guard = /^Prevent all combat damage (target creature) would deal this turn if it shares a color with that permanent$/.exec(s);
+  if (guard && prev?.type === "pick" && prev.action === "choose" && prev.n === 1 && prev.who.ref === "you" && effects.length === 1 && si + 1 === sentences.length) {
+    const shield = parseOne(`Prevent all combat damage ${guard[1]} would deal this turn`, ctx);
+    if (shield?.length !== 1 || shield[0]!.type !== "continuous" || shield[0]!.what.ref !== "target") return "fail";
+    return { effect: { type: "if", cond: { kind: "sharesColor", a: shield[0]!.what, b: { ref: "created" } }, effects: shield }, next: si + 1 };
+  }
+  // Mourner's Shield: "Prevent all damage that would be dealt this turn by a source of your choice that shares a color with the
+  // exiled card.": the card its imprint ability exiled (linked by linkExile, CR 607.2a), its colors as the source is chosen.
+  if (s === "Prevent all damage that would be dealt this turn by a source of your choice that shares a color with the exiled card" && ctx.activated && !effects.length && si + 1 === sentences.length) {
+    const rule = parseOne("Prevent all damage that would be dealt this turn by a source of your choice", ctx);
+    const e = rule?.[0];
+    if (rule?.length !== 1 || e?.type !== "damageRule" || !e.rule.by?.choose || e.rule.by.choose.colors?.length) return "fail";
+    e.rule.by.choose = { ...e.rule.by.choose, sharesColorWithLinked: true };
+    return { effect: e, next: si + 1 };
+  }
+  // Clarion Ultimatum: "Choose five permanents you control. For each of those permanents, you may search your library for a
+  // card with the same name as that permanent. Put those cards onto the battlefield tapped, then shuffle.": the permanents
+  // chosen as it resolves (each one if you control fewer, rulings), then one search for up to one permanent card with each
+  // one's name, all entering tapped at once; a card that isn't a permanent card stays in the library (rulings).
+  const clarion = /^Choose (two|three|four|five) permanents you control$/.exec(s);
+  if (clarion && next() === "For each of those permanents, you may search your library for a card with the same name as that permanent" && next(2) === "Put those cards onto the battlefield tapped, then shuffle" && !effects.length && si + 3 === sentences.length) {
+    const filter = parseSearchFilter("permanent card");
+    if (!filter) return "fail";
+    effects.push({ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanent" }, n: num(clarion[1]!), action: "choose" });
+    return { effect: { type: "search", filter, n: 99, upTo: true, reveal: false, dest: { zone: "battlefield", tapped: true }, sameName: { chosenThisWay: true, each: true } }, next: si + 3 };
+  }
+  // Stronghold Gambit (see the effect "eachChoosesFromHand").
+  if (s === "Each player chooses a card in their hand" && next() === "Then each player reveals their chosen card" && next(2) === "The owner of each creature card revealed this way with the lowest mana value puts it onto the battlefield" && !effects.length && si === 0 && sentences.length === 3 && ctx.spell)
+    return { effect: { type: "eachChoosesFromHand" }, next: si + 3 };
+  return null;
+}
+
 /** Lane B round B159's sentences, chained first (parseBodyText is at TS2563's limit). */
 function roundB159Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
   const next = (k = 1) => (sentences[si + k] ?? "").replace(/\.$/, "");
@@ -6975,7 +7033,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
     // rounds B158, B157, B156, B155, B154, B153, B152, B151, B148 and 311 to 317's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB159Sentence(s, sentences, si, ctx, effects) ?? roundB158Sentence(s, sentences, si, ctx, effects) ?? roundB157Sentence(s, sentences, si, ctx, effects) ?? roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    const faceDown = roundB160Sentence(s, sentences, si, ctx, effects) ?? roundB159Sentence(s, sentences, si, ctx, effects) ?? roundB158Sentence(s, sentences, si, ctx, effects) ?? roundB157Sentence(s, sentences, si, ctx, effects) ?? roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);

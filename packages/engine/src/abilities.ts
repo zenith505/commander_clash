@@ -1068,6 +1068,12 @@ export interface TargetSpec {
   sharesTypeWithSacrificed?: true;
   /** Mind Extraction: "all cards of each of the sacrificed creature's colors": a card sharing a color with what the spell's cost sacrificed, as it last existed (rulings: none if it was colorless); bound as it resolves. */
   sharesColorWithSacrificed?: true;
+  /**
+   * Mourner's Shield: "a source of your choice that shares a color with the exiled card": one of the colors of the card its
+   * imprint ability exiled (CR 607.2a), still exiled, as the source is chosen; with no such card, or a colorless one, there
+   * is no source to choose. Bound as the choice is made (only damage sources use it).
+   */
+  sharesColorWithLinked?: true;
   /** "A permanent ... that shares a card type with it" (Martyr's Bond): with the trigger's subject, as it last existed; bound as the pick resolves. */
   sharesTypeWithSubject?: true;
   /** "A creature of their choice that's blocking it" (Labyrinth Raptor): blocking the trigger's subject as the pick resolves (CR 509.1h); none once the subject has left combat or the battlefield (CR 506.4). Only a "pick" checks it. */
@@ -1307,7 +1313,7 @@ export interface TargetSpec {
  * like this you control (Pattern Matcher's "another creature you control"; Doubling Chant's one card for each), each card in your graveyard (Frostpyre
  * Arcanist), each card this effect exiled (Haunting Echoes, Pick the Brain), or the card revealed from your hand (Assembly Hall). A face-down object has no name (CR 708.2).
  */
-export type SameNameRef = { target: number; card?: true } | { subject: true } | { spell: true } | { permanents: TargetSpec; /** Whose permanents: yours if left out (Dichotomancy: target opponent's). */ whose?: PlayerRef; other?: true; /** Doubling Chant: "for each creature you control, ... a creature card with the same name as that creature": one card for each of them (a search's `oneOfEach`). */ each?: true } | { yourGraveyard: true } | { exiledThisWay: true } | { revealed: true };
+export type SameNameRef = { target: number; card?: true } | { subject: true } | { spell: true } | { permanents: TargetSpec; /** Whose permanents: yours if left out (Dichotomancy: target opponent's). */ whose?: PlayerRef; other?: true; /** Doubling Chant: "for each creature you control, ... a creature card with the same name as that creature": one card for each of them (a search's `oneOfEach`). */ each?: true } | { yourGraveyard: true } | { exiledThisWay: true } | { revealed: true } | /** Clarion Ultimatum: "for each of those permanents, ... a card with the same name as that permanent": the permanents the "choose" pick before it chose, each one's name now (none face down, CR 708.2a), one card for each. */ { chosenThisWay: true; each: true };
 
 /** Where a card found by a search goes. */
 export interface SearchDest {
@@ -3482,6 +3488,25 @@ export type Effect =
   /** "Until end of turn, you may play a card exiled with ~" (Raphael): a GameState.linkedPlays grant (see there). */
   | { type: "playLinkedThisTurn"; filter?: TargetSpec; castOnly?: true; all?: true; owned?: true }
   | { type: "castLinkedFree"; /** "A creature spell" (Idol of Endurance): only one of these. */ filter?: TargetSpec }
+  /**
+   * Nebuchadnezzar: "Target opponent reveals X cards at random from their hand. Then that player discards all cards with that
+   * name revealed this way.": `n` cards of the `who` player's hand chosen at random (all of them if there are fewer), the
+   * ones with the name chosen before (a split card has both its names, CR 709.4) discarded together.
+   */
+  | { type: "revealRandomDiscardNamed"; who: PlayerRef; n: Amount }
+  /**
+   * Bazaar of Wonders: "counter it if a card with the same name is in a graveyard or a nontoken permanent with the same name
+   * is on the battlefield": the spell whose cast triggered this, checked as it resolves; a face-down spell has no name
+   * (CR 708.2a), and a split card has both of its names in a graveyard (CR 709.4a).
+   */
+  | { type: "counterCauseIfNamed" }
+  /**
+   * Stronghold Gambit: "Each player chooses a card in their hand. Then each player reveals their chosen card. The owner of
+   * each creature card revealed this way with the lowest mana value puts it onto the battlefield.": chosen in turn order from
+   * the active player (CR 101.4), none seeing the others' until all are revealed; every creature card tied for the lowest
+   * mana value (a split card's combined, CR 709.4b) enters at once under its owner's control, the rest stay in hand (rulings).
+   */
+  | { type: "eachChoosesFromHand" }
   | { type: "impulse"; n: Amount; /** With `who` eachPlayer, Rocco, Street Chef: "each player may play the card they exiled this way": each card's own owner's permission, ending as this ability's controller's next end step begins with until "yourNextEndStep". */ ownersPlay?: true; /** With `who` eachPlayer, Triple Triad: "you may play the card you own exiled this way and each other card exiled this way with lesser mana value than it": only those, none if you exiled none (CR 202.3e: X is 0). */ ownAndLesser?: true; until: "thisTurn" | "nextTurn" | /** "Until your next turn" (Nivix, Aerie of the Firemind): over as that turn begins. */ "yourNextTurn" | "exiled" | "yourNextEndStep" | /** "Until the beginning of your next upkeep" (Elkin Bottle). */ "yourNextUpkeep" | /** "During your next turn" (Galvanic Relay). */ "duringNextTurn" | /** "For as long as you control ~" (Lightning, Security Sergeant). */ "whileControlled" | /** "Until end of combat on your next turn" (Brazen Cannonade). */ "yourNextCombat"; who?: PlayerRef; /** Elder Brain: "exile all cards from that player's hand, then they draw that many cards" (`n` unused). */ hand?: true; /** Elkin Lair: "that player exiles a card at random from their hand. The player may play that card this turn." (`n` unused): the `who` player's own card, their permission. */ randomFromHand?: true; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** With `free`: "You may cast Equipment spells this way without paying their mana costs" (Nahiri, Forged in Fury): only cards like this are free. */ freeFor?: TargetSpec; /** "During any turn you attacked with a token" (Neyali): only then. */ attackedWithToken?: true; /** "During any turn you attacked with a commander" (Neriv, Crackling Vanguard): only then. */ attackedWithCommander?: true; /** "During any turn you attacked with a Rogue" (Robber of the Rich): only in a turn its player declared a creature of this type as an attacker. */ attackedWithType?: string; /** "During any turn you attacked with ~" (Goblin Researcher): only in a turn its player declared this ability's source, as the object it is, as an attacker (GameObject.mayPlay.attackedWithSource). */ attackedWithSource?: true; /** "During any turn you attacked with three or more creatures" (Boros Strike-Captain): only in a turn its player declared at least this many creatures as attackers. */ attackedWithAtLeast?: number; /** With `graveyards` and `choose` (Author of Shadows): "Choose a nonland card exiled this way": one card like this among all those exiled, chosen as it resolves; only it gets the permission. */ chooseAmong?: TargetSpec; /** "During any turn you put a lore counter on ~" (Summon: Brynhildr): only in a turn its player put a lore counter on the source, as the object it is (GameObject.mayPlay.loreOn). */ loreOnSource?: true; /** "You may play it if you control a Kavu" (Possibility Technician): only while that player controls a permanent like this (GameObject.mayPlay.ifControl). */ ifControl?: TargetSpec; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** With `oneOf`: "You may play up to two of those cards" (March of Reckless Joy): this many of them. */ oneOfMax?: number; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true; /** With `graveyards`: "all creature cards from target player's graveyard" (Shadow of the Enemy): only these. */ graveyardFilter?: TargetSpec; /** "You may cast instant and sorcery spells from among them" (Ral, Leyline Prodigy): only cards like this get the permission. */ castFilter?: TargetSpec; /** "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): only spells like this, the face cast counting (GameObject.mayPlay.castFilter); with `oneOf`, one of them. */ spellFilter?: TargetSpec; /** "You may play it until you exile another card with ~" (Unstable Amulet, Furious Rise): until the source's next such exile (GameObject.mayPlay.untilAnother). */ untilAnother?: true; /** Casey & Raph: "Target player exiles the top card of their library. Until that player's next end step, they may play that card": the `who` player has the permission, not you. */ theyPlay?: true; /** Curse of Hospitality: "that creature's controller may play that card": this player has the permission, not you. */ player?: PlayerRef; /** Dream Harvest: "Each opponent exiles cards from the top of their library until they have exiled cards with total mana value 5 or greater this way": with an each-player `who`, down to the card that brings that library's total there (X as 0, CR 202.3e), all of it if it never does; `n` unused. */ untilTotalMv?: number }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
@@ -5102,6 +5127,8 @@ export type SpellCondition =
   | { kind: "kicked"; which?: number; /** As written, before compile() turns it into `which`. */ cost?: string; /** "If it was kicked twice" (Archangel of Wrath): at least this many kicker costs paid. */ times?: number }
   /** "You may discard a card. If you do, draw a card.": whether the last "you may" was done (CR 608.2c). */
   | { kind: "youDid" }
+  /** Guard Dogs: "if it shares a color with that permanent": both objects as they are now, on the battlefield, with a color in common (CR 105.2). */
+  | { kind: "sharesColor"; a: ObjRef; b: ObjRef }
   /** Cait, Cage Brawler: "if you discarded the card with the greatest mana value among those cards or tied for greatest": among the cards discarded while this resolves. */
   | { kind: "youDiscardedGreatestMv" }
   /** "If this ability has been activated four or more times this turn" (Dragon Whelp): this activated ability, counted as it resolves (rulings). */
@@ -6014,7 +6041,7 @@ export interface TriggeredAbility {
   rolls?: { min?: number; natural?: number | "max" };
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
   /** `notFirstInDrawStep`: "except the first one they draw in each of their draw steps" (Orcish Bowmasters). */
-  draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number; notFirstInDrawStep?: true; /** "During their turn": only while the player who draws is the active player. */ ownTurn?: true; /** Keranos, God of Storms: "Reveal the first card you draw on each of your turns. Whenever you reveal a land card this way, ...": only when the card drawn is (not) a land, revealed as it's drawn. Rowen, Primitive Etchings: "Reveal the first card you draw each turn. Whenever you reveal a basic land (creature) card this way" on any turn. */ revealed?: "land" | "nonland" | "basicLand" | "creature" | /** Inquisitor Eisenhorn. */ "instantOrSorcery" };
+  draws?: { by: "you" | "opponent" | "any" | "enchanted" | /** Booby Trap: "the chosen player", the one chosen as its source entered (Chosen.player). */ "chosenPlayer"; /** Booby Trap: "draws a card with the chosen name": the card drawn, as it is in the hand, has the name chosen as its source entered (Chosen.name). */ chosenName?: true; nth?: number; notFirstInDrawStep?: true; /** "During their turn": only while the player who draws is the active player. */ ownTurn?: true; /** Keranos, God of Storms: "Reveal the first card you draw on each of your turns. Whenever you reveal a land card this way, ...": only when the card drawn is (not) a land, revealed as it's drawn. Rowen, Primitive Etchings: "Reveal the first card you draw each turn. Whenever you reveal a basic land (creature) card this way" on any turn. */ revealed?: "land" | "nonland" | "basicLand" | "creature" | /** Inquisitor Eisenhorn. */ "instantOrSorcery" };
   /** Wedding Ring: "an opponent who controls an artifact named ~ ... during their turn": what the event's player must be. */
   eventPlayerIf?: { controlsArtifactNamedSelf?: true; theirTurn?: true };
   /**
@@ -7694,6 +7721,8 @@ export interface CompiledCard {
    * or spell having none (CR 708.2a), one name in common being the same name (CR 201.2b). Only casting and playing (rulings).
    */
   permanentNameBan?: { cast?: true; lands?: true };
+  /** Booby Trap: "The chosen player reveals each card they draw.": the player chosen as it entered (Chosen.player) shows each card as it's drawn (CR 701.20a). */
+  revealsChosenPlayersDraws?: true;
   /** Circu, Dimir Lobotomist: "Your opponents can't cast spells with the same name as a card exiled with ~" (its linked exiled cards, face up). */
   linkedNameCastBan?: true | /** Exclusion Ritual: "Players can't cast spells with the same name as the exiled card": you too. */ "players";
   /** "You have protection from the chosen card name" (Runed Halo, CR 702.16a): see playerProtectedFrom. */

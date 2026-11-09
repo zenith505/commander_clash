@@ -1,5 +1,5 @@
 import { exiledWithNamed } from "../names";
-import { defMv, restingDef, sameName } from "../faces";
+import { defMv, hasName, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import { isRealKicker, type AbilityBody, type BatchTrigger, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, pairedWith, power, toughness } from "../cards";
@@ -2579,6 +2579,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (e !== "playerDraws" || !t.draws) return false;
         const by = t.draws.by;
         if ((by === "you" && ev.player !== you) || (by === "opponent" && ev.player === you) || (by === "enchanted" && o.attachedToPlayer !== ev.player)) return false;
+        // Booby Trap: the player chosen as it entered, drawing a card with the name chosen then (a split card has both of its
+        // names, CR 709.4a), as it is in the hand.
+        if (by === "chosenPlayer" && (o.chosen?.player === undefined || o.chosen.player !== ev.player)) return false;
+        if (t.draws.chosenName) {
+          const c = ev.card !== undefined ? s.objects[ev.card] : undefined;
+          if (!c || c.zone !== "hand" || o.chosen?.name === undefined || !hasName(defOf(s, c).name, o.chosen.name)) return false;
+        }
         if (t.draws.notFirstInDrawStep && ev.firstInDrawStep) return false;
         if (t.draws.ownTurn && ev.player !== s.activePlayer) return false;
         // Keranos: the card revealed as it was drawn, a land or not (as it is in the hand).

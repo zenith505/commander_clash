@@ -1667,8 +1667,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const hit = fits(t).filter(([x]) => !t.attacksPlayers || (obj(s, x).attacking !== undefined && !obj(s, x).attackingPermanent));
         if (hit.length < (t.minAttackers ?? 1) || (t.exactAttackers && hit.length !== t.minAttackers)) continue;
         if (t.minTotalPower && hit.reduce((n, [x]) => n + power(s, obj(s, x)), 0) < t.minTotalPower) continue;
+        // Desert Were-Worm: the first attack this turn with that much power (TurnLog.attackPower is from earlier ones).
+        if (t.totalPowerFirst && (s.turnLog?.attackPower?.[ev.controller] ?? 0) >= (t.minTotalPower ?? 0)) continue;
         const amount = ev.type === "groupCombatDamage" ? hit.reduce((n, [, i]) => n + ev.amounts[i]!, 0) : undefined;
-        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.exactAttackers === !!t.exactAttackers && tt.minTotalPower === t.minTotalPower && !!tt.anyoneAttacks === anyone && !!tt.perPlayer === !!t.perPlayer && !!tt.selfOrCommander === !!t.selfOrCommander && !!tt.attacksPlayers === !!t.attacksPlayers;
+        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.exactAttackers === !!t.exactAttackers && tt.minTotalPower === t.minTotalPower && !!tt.totalPowerFirst === !!t.totalPowerFirst && !!tt.anyoneAttacks === anyone && !!tt.perPlayer === !!t.perPlayer && !!tt.selfOrCommander === !!t.selfOrCommander && !!tt.attacksPlayers === !!t.attacksPlayers;
         const group = hit.map(([x]) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
         if (t.attacksPlayers) {
           const attackedPlayers = s.turnOrder.filter((p) => hit.some(([x]) => obj(s, x).attacking === p));

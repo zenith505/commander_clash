@@ -168,6 +168,15 @@ export function parseCountMod(line: string): CountMod | undefined {
     const token = tokenPhrase(m[2]!, m[3]);
     return token ? { what: "tokens", who: "you", op: "instead", type: capital(m[1]!), token } : undefined;
   }
+  // Fisher's Talent: "If you would create a Fish token, create a 3/3 blue Shark creature token instead.": each token you'd
+  // create with that subtype is that token instead, with nothing else of the one it replaces (rulings); what the effect
+  // says about the tokens (tapped, attacking) still applies. Its level 3 replaces a Shark the same way, the Shark its
+  // level 2 made too (CR 616.1e).
+  m = /^If you would create an? ([A-Z][a-z]+) token, create (an? \d+\/\d+ [a-z]+ [A-Z][a-z]+ creature) token instead\.$/.exec(line);
+  if (m) {
+    const token = tokenPhrase(m[2]!.replace(/^an? /, ""));
+    return token && token.subtypes.length === 1 && token.subtypes[0] !== m[1] ? { what: "tokens", who: "you", op: "instead", subtype: m[1]!, token } : undefined;
+  }
   // Bilbo: "If you would create a Food token, instead create a Food token and a Treasure token."
   m = /^If you would create an? ([A-Z][a-z]+) token, instead create an? \1 token and an? ([A-Z][a-z]+) token\.$/.exec(line);
   if (m && PREDEFINED_TOKENS[m[1]!] && PREDEFINED_TOKENS[m[2]!]) return { what: "tokens", who: "you", op: "andEach", subtype: m[1]!, token: PREDEFINED_TOKENS[m[2]!]! };

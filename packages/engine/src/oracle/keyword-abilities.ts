@@ -360,6 +360,15 @@ export function parseCostKeyword(
         },
       };
     }
+    // Karplusan Minotaur: "Cumulative upkeep—Flip a coin": a coin flipped for each age counter, all of them once begun (rulings),
+    // each called, so won or lost (CR 705.2), which can always be done.
+    if (/^Cumulative upkeep—Flip a coin\.?$/.test(line))
+      return {
+        trigger: {
+          event: "yourUpkeep",
+          body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, flipCost: true }], text: "Cumulative upkeep—flip a coin: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you flip a coin for each age counter on it." },
+        },
+      };
     // Psychic Vortex: "Cumulative upkeep—Draw a card": a card drawn for each age counter, which can always be done (an
     // empty library is a loss at the next state check, rulings), the draws replaced or not (rulings).
     if (/^Cumulative upkeep—Draw a card\.?$/.test(line))

@@ -17,6 +17,7 @@ import { parsePunisherOptions } from "./sentences/basics";
 import { X_MODES_MAX } from "../modes";
 import { round318Sentence } from "./round318";
 import { round319WholeText } from "./round319";
+import { round320WholeText } from "./round320";
 
 export interface Ctx {
   targets: TargetSpec[];
@@ -420,7 +421,9 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boo
   // monarch" (Forth Eorlingas!): the same, once for each combat damage step (CR 510.2, 603.2c).
   // The Girl in the Fireplace: "Whenever a creature you control deals combat damage to a player this turn, time travel":
   // once for each creature (CR 603.7b).
-  const dealt = /^Whenever (one or more creatures you control deal combat damage to one or more players|a creature you control deals combat damage to a player(?: or planeswalker)?) this turn, (.+)$/.exec(s);
+  // Jace, Cunning Castaway: "Whenever one or more creatures you control deal combat damage to a player this turn": once for
+  // each player dealt it, and again in another combat damage step (rulings).
+  const dealt = /^Whenever (one or more creatures you control deal combat damage to (?:one or more players|a player)|a creature you control deals combat damage to a player(?: or planeswalker)?) this turn, (.+)$/.exec(s);
   if (dealt) return floatingTrigger(`This turn, whenever ${dealt[1]!}, ${dealt[2]!}`, after, ctx);
   // Duskmantle Guildmage: "Whenever a card is put into an opponent's graveyard from anywhere this turn, that player loses 1
   // life": once for each card (CR 603.7b), not a token (rulings), each opponent's.
@@ -19963,7 +19966,8 @@ function parseModal(count: string, bullets: string, text: string, opts: Paramete
     // "Street Justice — Exile target creature ...": a mode's name is a flavor word, with no rules meaning (CR 207.2d).
     // A trigger's modes can say what its event was about: "Create a Royal Role token attached to that creature".
     // Typhoid Mary, Fractured: "Typhoid Mary — Draw a card", the card's own name (so "~") as the flavor word.
-    const body = parseBody(b.replace(/^(?:[A-Z][A-Za-z' ,!-]*|~) — /, ""), opts);
+    // Aerith Rescue Mission: "Take 59 Flights of Stairs —", a flavor word with a number in it.
+    const body = parseBody(b.replace(/^(?:[A-Z][A-Za-z0-9' ,!-]*|~) — /, ""), opts);
     if (!body) return null; // every mode has to work, or the card isn't supported
     modes.push(body);
   }
@@ -20240,6 +20244,9 @@ function wholeTextForms(text: string, selfEntered: boolean, opts: Parameters<typ
   if (b155) return b155;
   const r319 = round319WholeText(text, (t) => parseBody(t, opts));
   if (r319) return r319;
+  const r320 = round320WholeText(text, (t) => parseBody(t, opts));
+  if (typeof r320 === "string") text = r320;
+  else if (r320) return r320;
   // Fblthp, the Lost: "When ~ enters, draw a card. If it entered from your library or was cast from your library, draw two
   // cards instead." How it entered (rulings: not cast from exile after an effect exiled it from the library).
   if (selfEntered && /^draw a card\. If it entered from your library or was cast from your library, draw two cards instead\.$/.test(text.trim()))

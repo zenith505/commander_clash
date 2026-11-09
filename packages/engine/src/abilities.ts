@@ -116,6 +116,8 @@ export interface AmountExpr {
   max?: number;
   /** "X damage divided evenly, rounded down, among all creatures target opponent controls" (Dwarven Catapult): divided by this count as it's worked out, rounded down; none when it's 0. */
   divBy?: Count;
+  /** Myriad Construct: "If ~ was kicked, it enters with a +1/+1 counter on it for each nonbasic land your opponents control": times this count as well (a "wasKicked" 0 or 1). */
+  mulBy?: Count;
 }
 
 /** What an amount counts. */
@@ -600,6 +602,8 @@ export type Count =
   | { kind: "constant"; n: number }
   /** "Equal to the difference" after "if that creature has greater power than ~" (Conformer Shuriken): the first less the second. */
   | { kind: "difference"; of: [Count, Count] }
+  /** Power Surge: "the number of untapped lands they controlled at the beginning of this turn", they being the active player: counted as the turn began, before its untap step (TurnLog.untappedLands). */
+  | { kind: "untappedLandsAtTurnStart" }
   /** "Fewer lands than the player who controls the most lands ... the difference" (Scholarship Sponsor): the most permanents like this any player in the game controls, less the number `who` controls. */
   | { kind: "behindMost"; filter: TargetSpec; who: PlayerRef; /** Tales of the Ancestors: cards in hand instead of permanents (`filter` unused). */ hand?: true }
   /** "The difference between that creature's power and its toughness" (Jaws of Defeat): the larger less the smaller. */
@@ -4011,6 +4015,8 @@ export type Effect =
   /** Sphinx's Tutelage: "If two nonland cards that share a color were milled this way, repeat this process" (cond "milledShareColor"). */
   /** "Then repeat this process X more times" (Another Round): `effects` `n` times in all, each pass its own choices. */
   | { type: "repeat"; effects: Effect[]; n: Amount; /** "Repeat the following process for each opponent in turn order" (Protection Racket): one pass for each of these players, in turn order starting after this ability's controller, that player being PlayerRef "eachOne"; `n` is unused. */ forEach?: PlayerRef; /** "Manifest dread X times, then put X +1/+1 counters on each of those creatures" (Valgavoth's Onslaught): what every pass put onto the battlefield is remembered together (ObjRef "created"). */ gather?: true }
+  /** Insatiable Frugivore: "create a Food token, then you may exile three cards from your graveyard. If you do, repeat this process.": `effects` in order, then again while the last "you may" in them was done (CR 608.2c), each pass's choices made anew. */
+  | { type: "repeatIfDid"; effects: Effect[]; text: string }
   | { type: "repeatIf"; effects: Effect[]; cond: { kind: "milledIs"; filter: TargetSpec } | { kind: "milledShareColor" } | /** Hoarder's Greed: "If you win, repeat this process." */ { kind: "wonClash" }; then: Effect[] }
   /** "You may roll again" in a results table's row (Delina, Wild Mage): if its controller wants, the ability's roll and the rows after it happen again (CR 706.3c). */
   | { type: "rollAgain" }
@@ -5379,7 +5385,7 @@ export type SpellCondition =
 
 /** Every effect, including the ones inside "you may" and "if", in order. */
 export const allEffects = (effects: Effect[]): Effect[] =>
-  effects.flatMap((e) => (e.type === "may" || e.type === "if" ? [e, ...allEffects(e.effects), ...allEffects(e.otherwise ?? [])] : e.type === "either" || e.type === "villainous" || e.type === "splitTargets" ? [e, ...e.options.flatMap(allEffects)] : e.type === "together" || e.type === "repeatMay" ? [e, ...allEffects(e.effects)] : [e]));
+  effects.flatMap((e) => (e.type === "may" || e.type === "if" ? [e, ...allEffects(e.effects), ...allEffects(e.otherwise ?? [])] : e.type === "either" || e.type === "villainous" || e.type === "splitTargets" ? [e, ...e.options.flatMap(allEffects)] : e.type === "together" || e.type === "repeatMay" || e.type === "repeatIfDid" ? [e, ...allEffects(e.effects)] : [e]));
 
 /** A sequence of effects with the targets they need, like a spell's text or one ability. */
 export interface AbilityBody {

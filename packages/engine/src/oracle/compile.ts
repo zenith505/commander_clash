@@ -2170,6 +2170,15 @@ export function compile(d: CardDef): CompiledCard {
         };
       continue;
     }
+    // Myriad Construct: "If ~ was kicked, it enters with a +1/+1 counter on it for each nonbasic land your opponents
+    // control.": counted as it enters (CR 614.1c), none if it wasn't kicked.
+    const kickedEach = new RegExp(`^If ~ was kicked, it enters with an? (\\+1/\\+1) counter on it for each (.+?)\\.$`).exec(line);
+    if (kickedEach) {
+      const a = parseCount(kickedEach[2]!, null, true);
+      if (!a || typeof a !== "object" || a.times || a.plus || a.half || a.negate || a.per || a.mulBy || out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: "+1/+1", n: { count: a.count, mulBy: { kind: "wasKicked" } } };
+      continue;
+    }
     // Ravaging Riftwurm: "If ~ was kicked, it enters with three additional time counters on it": on top of the ones a
     // keyword (vanishing) already puts on it as it enters, one replacement for the lot (CR 614.1c, 702.63a).
     const kickedMore = new RegExp(`^If ~ was kicked, it enters with ${NUM} additional (\\S+) counters? on it\\.$`).exec(line);

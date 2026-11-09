@@ -683,11 +683,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // Gryff's Boon: "Return ~ from your graveyard to the battlefield attached to target creature."
   // Sandman, Shifting Scoundrel: "Return ~ and target land card from your graveyard to the battlefield tapped."
   // Slimefoot and Squee: "Return this card and up to one other target creature card from your graveyard ...".
+  // Garland, Knight of Cornelia: "Return this card from your graveyard to the battlefield transformed." (as "Put ~ from your
+  // graveyard onto the battlefield transformed", CR 712.14).
   // Mister Immortal: "Return this card from your graveyard or from exile to the battlefield tapped": it works from either
   // zone (CR 113.6k), where "~" is the card; a face-down card in exile has no abilities (CR 406.3, 708.2).
   const orExile = /^Return ~ from your graveyard or from exile to the battlefield(?: tapped)?\.$/.test(effectText);
   if (orExile) effectText = effectText.replace(" or from exile", "");
-  const returnsSelf = /^(?:Return ~ and (?:up to one other )?target [a-z]+ card from your graveyard to the battlefield(?: tapped)?|Return ~ from your graveyard to (?:your hand|the battlefield(?:(?: tapped(?: and attacking)?)?(?: with (?:a|two|three) (?:\+1\/\+1|finality) counters? on (?:it|~))?| attached to target creature(?: you control(?: with power \d+ or less)?)?)?)|Put ~ from your graveyard into your library (?:second|third) from the top|Put ~ from your graveyard on top of your library|Put ~ from your graveyard onto the battlefield transformed)\./.test(effectText) ||
+  const returnsSelf = /^(?:Return ~ and (?:up to one other )?target [a-z]+ card from your graveyard to the battlefield(?: tapped)?|Return ~ from your graveyard to (?:your hand|the battlefield(?:(?: tapped(?: and attacking)?)?(?: with (?:a|two|three) (?:\+1\/\+1|finality) counters? on (?:it|~))?| attached to target creature(?: you control(?: with power \d+ or less)?)?)?)|Put ~ from your graveyard into your library (?:second|third) from the top|Put ~ from your graveyard on top of your library|Put ~ from your graveyard onto the battlefield transformed|Return ~ from your graveyard to the battlefield transformed)\./.test(effectText) ||
     // Nim Devourer: "Return this card from your graveyard to the battlefield, then sacrifice a creature." (it may be the one).
     effectText === "Return ~ from your graveyard to the battlefield, then sacrifice a creature.";
   const fromYard = /Exile ~ from your graveyard/.test(costs) || returnsSelf || inYard;

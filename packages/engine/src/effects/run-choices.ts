@@ -400,14 +400,15 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // rulings: with one left, it's that one), by their controller or by the spell's controller (Cannibalize).
       const sc = (s.resolving!.scratch ??= {});
       if (sc.either === undefined) {
-        const ids = [0, 1].map((i) => (s.resolving!.legal[i] ? objects(s, { ref: "target", index: i }, ctx)[0] : undefined));
-        const can = [0, 1].filter((i) => ids[i]?.zone === "battlefield");
+        // Aerith Rescue Mission: "one of them", among up to three.
+        const ids = e.options.map((_, i) => (s.resolving!.legal[i] ? objects(s, { ref: "target", index: i }, ctx)[0] : undefined));
+        const can = e.options.map((_, i) => i).filter((i) => ids[i]?.zone === "battlefield");
         if (!can.length) return;
         if (can.length === 1) sc.either = can[0]!;
         else {
           const chooser = e.chooser === "you" ? ctx.controller : controllerOf(s, ids[0]!);
           const name = (o: GameObject) => defOf(s, o).name;
-          s.pending = { kind: "chooseOption", player: chooser, source: src, what: "splitTargets", options: can.map(String), labels: can.map((i) => e.label.replace("{0}", name(ids[i]!)).replace("{1}", name(ids[1 - i]!))), prompt: "choose one of the two creatures" };
+          s.pending = { kind: "chooseOption", player: chooser, source: src, what: "splitTargets", options: can.map(String), labels: can.map((i) => e.label.replace("{0}", name(ids[i]!)).replace("{1}", e.options.length === 2 ? name(ids[1 - i]!) : "")), prompt: e.options.length === 2 ? "choose one of the two creatures" : "choose one of the creatures" };
           return "paused";
         }
       }

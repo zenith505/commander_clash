@@ -95,7 +95,7 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     // Vaevictis Asmadi, the Dire: each player's target is sacrificed (our own one the least useful).
     if (e.type === "sacrificeTargetsReveal" && e.what.ref === "target") mark(e.what.index, e.what.n);
     // Retribution, Cannibalize: one of the two is sacrificed, exiled or dealt damage: an opponent's creatures.
-    if (e.type === "splitTargets") mark(0, 2);
+    if (e.type === "splitTargets") mark(0, e.options.length);
     // Exchanging control (Oko): the opponent's permanent taken, our least useful one given.
     if (e.type === "exchangeControl") for (const r of [e.a, e.b]) if (r.ref === "target") mark(r.index);
     // Taking a spell over: an opponent's.

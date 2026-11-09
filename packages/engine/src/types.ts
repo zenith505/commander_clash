@@ -1712,6 +1712,8 @@ export interface GameEvent {
 
 /** What happened this turn, for the Traps' alternative cost conditions (CR 601.2b). */
 export interface TurnLog {
+  /** Power Surge: the untapped lands the active player controlled as this turn began, before its untap step (CR 502.3); left out when none. */
+  untappedLands?: number;
   /** The most total power each player attacked with in one declaration of attackers this turn (Desert Were-Worm). */
   attackPower?: Record<number, number>;
   /** Rasputin Dreamweaver's "started the turn untapped": the permanents with such an ability untapped as this turn began, as `id@zoneChanges`. */
@@ -2978,6 +2980,8 @@ export interface Resolving {
     /** Join forces: the players still to decide, from the controller on in turn order, and what they've paid so far. */
     join?: { queue: PlayerId[]; paid: number; asked?: number; by: Record<PlayerId, number> };
     /** "Then repeat this process X more times": the passes left (this one too), the next instruction, and the scratch from before it started. */
+    /** Insatiable Frugivore's repeatIfDid: the step it's at, and the scratch keys from before it began. */
+    repeatDid?: { step: number; keep: string[] };
     repeat?: { left: number; step?: number; keep: string[]; gathered?: ObjectId[]; order?: PlayerId[] };
     /** The commander chosen to put into the hand (Command Beacon with two commanders). */
     commander?: ObjectId;

@@ -6,6 +6,7 @@ import type { Ctx } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseSentence } from "./sentence";
 import { round319Sentence } from "./round319";
+import { round320Trigger } from "./round320";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -69,6 +70,9 @@ export function round318Sentence(s: string, sentences: string[], si: number, ctx
 }
 
 export function round318Trigger(raw: string): TriggeredAbility | "fail" | null {
+  // Round 320's triggers first (oracle/round320.ts).
+  const r320 = round320Trigger(raw);
+  if (r320 !== null) return r320;
   // Karplusan Minotaur: "Whenever you lose a coin flip, ~ deals 1 damage to any target of an opponent's choice.": as it's
   // put on the stack its controller chooses an opponent, who chooses the target (CR 603.3d; rulings on Cuombajj Witches);
   // only flips its controller lost (CR 705.2, rulings).

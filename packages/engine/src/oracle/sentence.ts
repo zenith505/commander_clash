@@ -601,6 +601,9 @@ export function parseChanges(text: string): Modification[] | null {
     } else if (/^loses? all abilities$/i.test(p)) out.push({ kind: "loseAllAbilities" });
     // Hammerheim: "loses all landwalk abilities": every kind of landwalk (CR 702.14), whatever land it names (layer 6).
     else if (/^loses? all landwalk abilities$/i.test(p)) out.push({ kind: "removeKeywords", keywords: ["Landwalk"] });
+    // Shelkin Brownie: "loses all "bands with other" abilities", not banding itself (rulings); Tolaria: "loses banding and
+    // all "bands with other" abilities" (losing banding loses them all anyway, CR 702.22b). Layer 6.
+    else if ((m = /^loses? (banding and )?all "bands with other" abilities$/i.exec(p))) out.push({ kind: "removeKeywords", keywords: [m[1] ? "Banding" : "Bands with other"] });
     // Barbed Foliage: "loses flanking": the keyword and its triggered ability, every instance (CR 702.25a-b; layers.ts).
     else if (/^loses? flanking$/i.test(p)) out.push({ kind: "removeKeywords", keywords: ["Flanking"] });
     // Amoeboid Changeling: "loses all creature types" (layer 4).

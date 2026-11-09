@@ -4860,6 +4860,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4b9922b9-c5b5-467e-8a5b-1e45e862194d",
+  "name": "Cathedral of Serra",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "White legendary creatures you control have \"bands with other legendary creatures.\" (Any legendary creatures can attack in a band as long as at least one has \"bands with other legendary creatures.\" Bands are blocked as a group. If at least two legendary creatures you control, one of which has \"bands with other legendary creatures,\" are blocking or being blocked by the same creature, you divide that creature's combat damage, not its controller, among any of the creatures it's being blocked by or is blocking.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "27c2b8ce-17b9-4f6c-8444-3bdc636dd413",
   "name": "Cavalier of Night",
   "manaCost": "{2}{B}{B}{B}",
@@ -27232,6 +27254,41 @@
   "set": "dbl",
   "releasedAt": "2022-01-28",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7a9942cd-32ac-4cc9-8840-3fe6b092d0b8",
+  "name": "Sir Shandlar of Eberyn",
+  "manaCost": "{4}{G}{W}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Human Knight",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "",
+  "power": "4",
+  "toughness": "7",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -2619,6 +2619,13 @@ export function parseStaticMods(rest: string): Modification[] | null {
 }
 
 export function parseStatic(line: string): StaticAbility | null {
+  // Seafarer's Quay: "Blue legendary creatures you control have "bands with other legendary creatures."": the keyword
+  // ability "bands with other [quality]" (CR 702.22b-c) granted in quotes, the same as unquoted.
+  const bwo = /^(.+) have "(bands with other [^"]+)\."$/.exec(line);
+  if (bwo) {
+    const st = parseStatic(`${bwo[1]} have ${bwo[2]}.`);
+    return st && { ...st, text: line };
+  }
   // Lymph Sliver: "All Sliver creatures have absorb 1.": absorb N is "If a source would deal damage to this creature,
   // prevent N of that damage" (CR 702.64a), N from each source (rulings), several instances each applying (CR 702.64b).
   // (Any creature type: a text-changing effect can change "Sliver", CR 612.2.)

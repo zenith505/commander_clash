@@ -74,7 +74,7 @@ export const SUPPORTED_KEYWORDS = [
   // don't have an enduring story, you have an enduring story for the rest of the game." See checkAscend.
   "Storied",
   // CR 702.22: attacking bands are declared with attackers (see finishAttacks), a block spreads to the whole band, and
-  // the other player divides combat damage (see bandSplit). "Bands with other" isn't modeled.
+  // the other player divides combat damage (see bandSplit). "Bands with other [quality]" is a keyword too (see canonicalKeyword, bandsWithOther).
   "Banding",
   // CR 702.147a: "This creature can't block" (see cantBlockNow) and "When this creature attacks, sacrifice it at end of
   // combat" (see abilitiesOf). It can be a keyword counter (CR 122.1b).
@@ -135,6 +135,12 @@ export function canonicalKeyword(text: string): string | undefined {
   const k = SUPPORTED_LOWER.get(p);
   if (k) return k;
   if (p === CHOSEN_KEYWORD) return CHOSEN_KEYWORD;
+  // "Bands with other [quality]" (CR 702.22b-c, j-k): a special form of banding, the quality legendary creatures or
+  // creatures with one name (Master of the Hunt's Wolves of the Hunt). See bandsWithOther.
+  // A token's own text has its name as "~" (see printedKeywords) and may end in a period.
+  if (p.replace(/\.$/, "") === "bands with other legendary creatures") return "Bands with other legendary creatures";
+  const bwoName = /^bands with other creatures named (.+?)\.?$/i.exec(text.trim());
+  if (bwoName) return `Bands with other creatures named ${bwoName[1]}`;
   // Traveler's Cloak, Illusionary Presence: "landwalk of the chosen type"; Barbarian Guides: "snow landwalk of the chosen
   // type" (CR 702.14a, c): bound to the land type chosen as it entered or resolved.
   if (p === "landwalk of the chosen type") return CHOSEN_LANDWALK;

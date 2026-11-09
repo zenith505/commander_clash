@@ -1560,6 +1560,8 @@ export type ObjRef =
    * trigger's source as it last existed on the battlefield (CR 603.10a).
    */
   | { ref: "damagedSelfThisTurn" }
+  /** "All creatures banded with it" (Icatian Skirmishers): the other creatures in the source's attacking band now, none once it's left combat (CR 702.22c, f). */
+  | { ref: "bandedWithSelf" }
   /** "All creatures blocking or blocked by ~" (Kjeldoran Frostbeast): the creatures in combat with the source now, none if it left (CR 506.4). */
   | { ref: "inCombatWithSelf"; /** "Each creature it's blocking" (Gomazoa): only the attackers it blocks. */ blocked?: true; /** "~ and each creature it's blocking": the source too, while it's on the battlefield. */ andSelf?: true; /** Trial: "all creatures blocking or blocked by target creature": in combat with that target instead of the source. */ ofTarget?: number; /** Abu Ja'far: "When ~ dies, destroy all creatures blocking or blocked by it": in combat with the source as it last existed on the battlefield (CR 603.10a, 608.2h), and still blocking or attacking. */ lastKnown?: true }
   /** "Each creature blocking it" (Plague Wight; `subject`: the trigger's attacker, Trailblazer's Torch): the creatures blocking the source now, none if it left combat (CR 506.4). */
@@ -1873,7 +1875,7 @@ export interface DamageMod {
    * its chosen player), `objects` (a permanent matching it, "you" being the ability's controller), `self` (the permanent
    * with the ability), `chosenPermanents` (a permanent the chosen player controls). Missing: any permanent or player.
    */
-  to?: { players?: "all" | "you" | "opponents" | "enchanted" | "chosen"; objects?: TargetSpec; self?: true; chosenPermanents?: true; /** "another permanent you control": not the permanent with the ability. */ other?: true; /** A resolved effect's "that player" and the permanents they control. */ player?: PlayerId; permanentsOf?: PlayerId; /** A resolved effect's target creature, as the object it was (Kill-Suit Cultist, CR 400.7). */ chosen?: { id: ObjectId; zc: number } };
+  to?: { players?: "all" | "you" | "opponents" | "enchanted" | "chosen"; objects?: TargetSpec; self?: true; /** Camel: "to creatures banded with ~": the other creatures in the holder's attacking band (CR 702.22c). */ bandedWithHolder?: true; chosenPermanents?: true; /** "another permanent you control": not the permanent with the ability. */ other?: true; /** A resolved effect's "that player" and the permanents they control. */ player?: PlayerId; permanentsOf?: PlayerId; /** A resolved effect's target creature, as the object it was (Kill-Suit Cultist, CR 400.7). */ chosen?: { id: ObjectId; zc: number } };
   combat?: "only" | "non";
   /** The Rollercrusher Ride: "while there are four or more card types among cards in your graveyard". */
   while?: StaticCondition;
@@ -2310,6 +2312,8 @@ export type StaticCondition =
   | { kind: "subjectPT"; stat: "power" | "toughness"; min?: number; max?: number; greatest?: true; /** "If that creature's power is greater than ~'s" (Pelt Collector): than this permanent's, as it last existed if it's gone. */ greaterThanSource?: true }
   /** "If you're the defending player" (Kazuul, Tyrant of the Cliffs): the trigger's subject is still attacking you, a planeswalker you control or a battle you protect (CR 506.2). */
   | { kind: "subjectAttackingYou" }
+  /** Wall of Caltrops: "if at least one other Wall creature is blocking that creature and no non-Wall creatures are blocking that creature": the trigger's subject, still attacking, blocked only by creatures of this subtype, one of them not the source. */
+  | { kind: "subjectBlockedOnlyBy"; subtype: string }
   /** "Activate only if ~ entered this turn or if you control a basic land": either one. */
   | { kind: "anyOf"; conds: StaticCondition[] }
   /** "~ can't attack or block unless a player has no cards in hand" (Lupine Prototype): while `cond` is false. */

@@ -60,6 +60,7 @@ import {
   untapViaMana,
   counterCostCandidates,
   counterOnCandidates,
+  exileSpellCandidates,
   maxBlocks,
   blockersNeeded,
   canEnterUntapped,
@@ -145,7 +146,7 @@ import { prepareSpellOf } from "./prepare";
 import { castingBody, castTimeTargets, compileCard } from "./oracle";
 import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PendingDecision, type PlayerId, type StackItem, type DeferredAct } from "./types";
 import { evalAmount } from "./amounts";
-import { CHOSEN_HEXPROOF, CHOSEN_PARITY_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION } from "./keywords";
+import { CHOSEN_HEXPROOF, CREATURE_TYPES, CHOSEN_PARITY_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
 import { damageEstimate } from "./damage";
 import { blightOptions, removableCounters } from "./counters";
@@ -3978,6 +3979,27 @@ function castNumberFor(s: GameState, id: ObjectId, targets: TargetChoice[] | und
 }
 
 /**
+ * The creature type to choose for "target creatures of the creature type of your choice" (Selective Snare): the one with
+ * the most of what it would aim at, an opponent's creatures or cards of our own, a changeling counting for every type.
+ */
+function botCastType(s: GameState, pid: PlayerId, id: ObjectId, body: AbilityBody): string | undefined {
+  const spec = gateBody(body).targets[0];
+  if (!spec) return undefined;
+  const counts = new Map<string, number>();
+  const all: ObjectId[] = [];
+  for (const t of legalTargets(s, spec, pid, undefined, botSource(s, id), id)) {
+    if (t.kind !== "object") continue;
+    const o = obj(s, t.id);
+    if (o.zone === "battlefield" ? controllerOf(s, o) === pid : o.owner !== pid) continue;
+    const c = o.zone === "battlefield" ? characteristics(s, o) : undefined;
+    if (c?.allCreatureTypes || (!c && defOf(s, o).keywords.includes("Changeling"))) all.push(o.id);
+    else for (const ty of (c ? c.subtypes : defOf(s, o).subtypes).filter((x) => CREATURE_TYPES.has(x))) counts.set(ty, (counts.get(ty) ?? 0) + 1);
+  }
+  const best = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+  return best ? best[0] : all.length ? [...CREATURE_TYPES].sort()[0] : undefined;
+}
+
+/**
  * Casting it with these modes. `gate`: the optional costs some of its targets depend on, all of them paid or none (an
  * undefined gate leaves them to the usual choices below).
  */
@@ -3986,7 +4008,11 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   // Whether a cost of this kind must be paid (true), must not be (false), or is up to the usual choice (undefined).
   const must = (kind: SpellCondition["kind"]) => (gate && gate.conds.some((c) => c.kind === kind) ? gate.paid : undefined);
   const kickOk = (kicks: number[]) => !gate || !gate.conds.some((c) => c.kind === "kicked") || gate.conds.filter((c) => c.kind === "kicked").every((c) => castConditionMet(c, { kicks }) === gate.paid);
-  const how: CastHow = { ...(gate?.paid ? { kicks: [0, 1], bargained: true, teamwork: true, gift: true, evidence: true } : {}), ...(alt ? { alt } : {}) };
+  // Selective Snare, Aphetto Dredging: the creature type with the most creatures to aim at (an opponent's to bounce, our
+  // own cards to return), chosen before the targets.
+  const castType = compileCard(castDef(s, id, alt)).castChooseType && printed ? botCastType(s, pid, id, printed) : undefined;
+  if (compileCard(castDef(s, id, alt)).castChooseType && !castType) return null;
+  const how: CastHow = { ...(gate?.paid ? { kicks: [0, 1], bargained: true, teamwork: true, gift: true, evidence: true } : {}), ...(alt ? { alt } : {}), ...(castType ? { castType } : {}) };
   const gated = printed && gateBody(withModes(printed, modes), how);
   // Rules about choosing its targets as it's cast (Dream Leash: a tapped permanent only).
   const body = gated && { ...gated, targets: castTimeTargets(castDef(s, id, alt), gated.targets) };
@@ -4018,6 +4044,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
     if (costOr !== undefined) e.costOr = costOr;
     const num = castNumberFor(s, id, targets ?? undefined);
     if (num !== undefined) e.number = num;
+    if (castType) e.creatureType = castType;
     if (costOr === undefined || planCast(s, pid, id, targets ?? undefined, modes, "auto", x, { ...e, ...(via ? { via } : {}), ...(alt ? { alt } : {}) })) {
       extra = e;
       break;
@@ -5874,7 +5901,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // An X ability: the biggest X we can pay for (never 0).
       const cost = parseManaCost(ab.manaCost);
       // Prototype Portal: X set by the ability (CR 107.3c).
-      const fixedX = definedX(s, o, ab);
+      // Bargaining Table: the opponent with the fewest cards in hand, X the least (an opponent chosen, not targeted).
+      const xOpponent = ab.xIs && typeof ab.xIs === "object" && "opponentHand" in ab.xIs ? opponents(s, pid).sort((a, b) => player(s, a).hand.length - player(s, b).hand.length)[0] : undefined;
+      const fixedX = definedX(s, o, ab, xOpponent !== undefined ? { xOpponent } : undefined);
       // Kaho, Minamo Historian: "cast a spell with mana value X from among cards exiled with ~": X matching one of them.
       const linkedMvX = cost.hasX && body.effects.some((e) => e.type === "castFromAmong" && e.fromLinked && e.exactMv !== undefined) ? [...new Set(linkedCards(s, id).map((l) => defMv(defOf(s, obj(s, l.id)))))].filter((v) => v <= availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost)).sort((a, b) => b - a) : undefined;
       if (linkedMvX && !linkedMvX.length) continue;
@@ -5888,8 +5917,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         // O-Naginata: not to a creature it can't be attached to (it would stay where it is, rulings).
         const only = ab.equip ? abilitiesOf(s, o).attachOnly : undefined;
         if (only && targets.some((t) => t.kind === "object" && !objectMatches(s, only, obj(s, t.id), pid, false))) continue;
-        const costs = discardX !== undefined ? (graveXPool(s, pid, id, ab) ? graveXCosts(s, pid, o, ab, targets, discardX) : discardXCosts(s, pid, o, ab, targets, discardX)) : abilityCosts(s, pid, o, ab, targets);
-        if (costs === null) continue;
+        const costs0 = discardX !== undefined ? (graveXPool(s, pid, id, ab) ? graveXCosts(s, pid, o, ab, targets, discardX) : discardXCosts(s, pid, o, ab, targets, discardX)) : abilityCosts(s, pid, o, ab, targets);
+        if (costs0 === null) continue;
+        const costs = xOpponent !== undefined ? { ...costs0, xOpponent } : costs0;
         if (titan && (costs?.sacrifice ?? []).reduce((a, c) => a + Math.max(0, power(s, obj(s, c))), 0) >= 10) continue;
         if (flips && flipWorth(s, pid, o, ab, flips, targets) <= 0) continue;
         // Tree of Perdition, Tree of Redemption: only to lower an opponent's life total, or raise ours.
@@ -6629,6 +6659,13 @@ export function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: Act
       const picks = spareCounters(s, pid, o, c);
       if (!picks) return null;
       out.counters = picks;
+    } else if (c.kind === "exileSpell") {
+      // Nivmagus Elemental: only a spell of ours that an opponent's spell or ability on the stack is countering (lost
+      // anyway); never the spell this ability would be for.
+      const target = (x: StackItem) => (x.targets ?? []).flatMap((t) => (t.kind === "stack" ? [s.stack.find((y) => y.id === t.id)?.objectId] : []));
+      const doomed = exileSpellCandidates(s, pid, c).find((id) => s.stack.some((x) => x.controller !== pid && target(x).includes(id) && JSON.stringify(x.body?.effects ?? []).includes('"type":"counterSpell"')));
+      if (!doomed) return null;
+      out.exileSpell = [doomed];
     } else if (c.kind === "putCounter") {
       const pick = spareCounterHost(s, pid, c, targeted);
       if (!pick) return null;

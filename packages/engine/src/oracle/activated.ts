@@ -337,6 +337,11 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     } else if ((c = /^Collect evidence (\d+)$/.exec(part))) {
       // CR 701.59a: exile cards from your graveyard with total mana value N or more.
       extra.push({ kind: "collectEvidence", n: Number(c[1]) });
+    } else if ((c = /^Exile (an instant or sorcery spell|a spell) you control$/.exec(part))) {
+      // Nivmagus Elemental, Synthesis Pod: a spell of yours on the stack, a copy too, exiled as the cost is paid (rulings,
+      // CR 602.2b, 601.2h); it isn't countered (CR 701.6a), so even one that can't be countered.
+      const types = c[1] === "a spell" ? [] : ["Instant", "Sorcery"];
+      extra.push({ kind: "exileSpell", n: 1, filter: { kind: "spell", types, notTypes: [], notColors: [], text: c[1] === "a spell" ? "spell you control" : "instant or sorcery spell you control" } });
     } else if ((c = /^Exile (an?|another) ([^,:]+?) you control( face up)?$/.exec(part))) {
       // "Exile a creature you control" (The Soul Stone): a permanent you choose as it's activated (CR 602.2b, 601.2h),
       // exiled rather than sacrificed.
@@ -588,6 +593,15 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     if (xCounters) {
       xIs = { counters: counterKind(xCounters[1]!) };
       effectText = effectText.slice(0, xCounters.index) + "";
+      if (!/\.$/.test(effectText)) effectText += ".";
+      found = true;
+    }
+    // Bargaining Table: "X is the number of cards in an opponent's hand.": defined by the ability (CR 107.3c), the opponent
+    // chosen as it's announced, before X is (rulings; CostChoices.xOpponent).
+    const xOppHand = !xIs && /\{X\}/.test(costs) ? / X is the number of cards in an opponent's hand\.$/.exec(effectText) : null;
+    if (xOppHand) {
+      xIs = { opponentHand: true };
+      effectText = effectText.slice(0, xOppHand.index);
       if (!/\.$/.test(effectText)) effectText += ".";
       found = true;
     }

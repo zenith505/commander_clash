@@ -127,6 +127,11 @@ export interface CastHow {
   alt?: AltCostKind;
   /** The face of a card with several it's cast as (CR 709.3, 712.11b, 715.3): spellTargets looks at that face. */
   face?: number;
+  /**
+   * Selective Snare: the creature type chosen as it's cast (CompiledCard.castChooseType), its targets' type. Unset, any type
+   * could still be chosen: they're any creatures (only for asking whether it could be cast).
+   */
+  castType?: string;
 }
 
 /** Whether a spell cast this way meets a condition on how it was cast ("if ~ was kicked", "if the gift was promised"). */
@@ -162,7 +167,9 @@ export function gateTargets(specs: TargetSpec[], how: CastHow = {}): TargetSpec[
  * The body as cast this way (see gateTargets); "another target for each time it was kicked" (Comet Storm) becomes that
  * many targets (CR 601.2c, 702.33d), the effects' references to it covering them all.
  */
-export function gateBody(b: AbilityBody, how: CastHow = {}): AbilityBody {
+export function gateBody(b0: AbilityBody, how: CastHow = {}): AbilityBody {
+  // "Target creatures of the creature type of your choice": of the type chosen (CR 601.2b-c), bound for good.
+  const b = b0.targets.some((t) => t.chosen === "type") ? { ...b0, targets: b0.targets.map((t) => (t.chosen !== "type" ? t : (({ chosen: _, ...rest }) => (how.castType ? { ...rest, subtypes: [...(rest.subtypes ?? []), how.castType] } : rest))(t))) } : b0;
   if (!hasGatedTargets(b.targets)) return b;
   const gated = b.targets.some((t) => t.onlyIf) ? { ...b, targets: b.targets.map((t) => (t.onlyIf && castConditionMet(t.onlyIf.cond, how) === !!t.onlyIf.not ? { ...t, skip: true as const } : t)) } : b;
   return gated.targets.some((t) => t.many === "kicked") ? expandMany(gated, how.kicks?.length ?? 0) : gated;

@@ -2606,6 +2606,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "151d9035-c8e8-4794-8405-dc7744eb99a2",
+  "name": "Bargaining Table",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{X}, {T}: Draw a card. X is the number of cards in an opponent's hand.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mmq",
+  "releasedAt": "1999-10-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8294539d-7982-4ec9-8392-99eed78542f5",
   "name": "Battle for Bretagard",
   "manaCost": "{1}{G}{W}",
@@ -21243,6 +21265,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d2f9a8a0-509b-4c24-a8cc-f27f77c9eefd",
+  "name": "Nivmagus Elemental",
+  "manaCost": "{U/R}",
+  "cmc": 1,
+  "typeLine": "Creature — Elemental",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "Exile an instant or sorcery spell you control: Put two +1/+1 counters on this creature. (That spell won't resolve.)",
+  "power": "1",
+  "toughness": "2",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rtr",
+  "releasedAt": "2012-10-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c637fedc-b7b9-4da8-bab4-0488e7c1fac1",
   "name": "Noggin Whack",
   "manaCost": "{2}{B}{B}",
@@ -26607,6 +26661,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "85442273-9596-47bf-9b40-6d48fd7183a6",
+  "name": "Selective Snare",
+  "manaCost": "{X}{U}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Return X target creatures of the creature type of your choice to their owner's hand.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "grn",
+  "releasedAt": "2018-10-05",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "75b235d3-595a-4859-be45-9559d8445db5",
   "name": "Selesnya Guildgate",
   "manaCost": "",
@@ -28258,6 +28338,28 @@
   "commanderLegal": "legal",
   "set": "fin",
   "releasedAt": "2025-06-13",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b2187f45-80ae-4ac4-9f83-5eb7a00978e2",
+  "name": "Sorcerous Spyglass",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "As this artifact enters, look at an opponent's hand, then choose any card name.\nActivated abilities of sources with the chosen name can't be activated unless they're mana abilities.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lci",
+  "releasedAt": "2023-11-17",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

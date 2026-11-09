@@ -1036,6 +1036,8 @@ export type Step =
 
 export interface StackItem {
   id: string;
+  /** Selective Snare: the creature type chosen as it was cast (CostChoices.creatureType), copied with it (CR 707.10). */
+  chosenType?: string;
   /** Liquid Fire: the number chosen as it was cast (CostChoices.number), "the chosen number" as it resolves; copied with it (CR 707.10). */
   chosenNumber?: number;
   /** "An opponent chooses one —" (Misfortune): the opponent who chose its mode as it was cast (CostChoices.modeChooser), "that player" as it resolves; copied with it (CR 707.10). */
@@ -1384,6 +1386,15 @@ export interface CostChoices {
   sacrifice?: ObjectId[];
   discard?: ObjectId[];
   exileCards?: ObjectId[];
+  /**
+   * "X is the number of cards in an opponent's hand" (Bargaining Table), "X is the number of artifact and/or creature cards in
+   * an opponent's graveyard as you cast ~" (Spoils of War): the opponent chosen as it's announced, before X (rulings).
+   */
+  xOpponent?: PlayerId;
+  /** Selective Snare: the creature type chosen as it's cast, before its targets (CompiledCard.castChooseType, rulings). */
+  creatureType?: string;
+  /** The spell on the stack (its object) exiled for "Exile an instant or sorcery spell you control" (Nivmagus Elemental). */
+  exileSpell?: ObjectId[];
   /** Untapped permanents to tap for "Tap an untapped creature you control" (CR 602.2b). */
   tap?: ObjectId[];
   /** The permanent that gets the counter for "Put a -1/-1 counter on a creature you control" (Hatchet Bully, CR 602.2b). */

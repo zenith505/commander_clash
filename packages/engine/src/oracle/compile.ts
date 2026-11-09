@@ -1727,6 +1727,19 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "As Arachne enters, look at an opponent's hand, then choose a card type other than creature." (CR 614.12): an
     // opponent, then their hand is seen, then a card type. Kindred is a card type too, but no kindred card plays here.
+    // Myr Superion (CompiledCard.creatureManaOnly): a permanent spell's restriction on the mana that casts it (CR 106.6).
+    if (line === "Spend only mana produced by creatures to cast ~." && !isSpell && !out.creatureManaOnly) {
+      out.creatureManaOnly = true;
+      continue;
+    }
+    // Sorcerous Spyglass, Anointed Peacekeeper: "look at an opponent's hand, then choose any card name": the same, then any
+    // card name (CR 201.4), not only one seen in that hand (rulings).
+    if (line === "As ~ enters, look at an opponent's hand, then choose any card name." && !out.entersChoosePlayer && !out.entersChoose?.some((c) => c.what === "cardName")) {
+      out.entersChoosePlayer = "opponent";
+      out.entersLookHand = true;
+      (out.entersChoose ??= []).push({ what: "cardName" });
+      continue;
+    }
     const lookThenType = /^As ~ enters, look at an opponent's hand, then choose a card type other than (\w+)\.$/.exec(line);
     if (lookThenType && !out.entersChoosePlayer && !out.entersChoose?.some((c) => c.what === "cardType")) {
       out.entersChoosePlayer = "opponent";
@@ -6659,7 +6672,16 @@ export function compile(d: CardDef): CompiledCard {
     // Spiritualize: "Until end of turn, whenever target creature deals damage, ..." then "Draw a card.": the first
     // paragraph's targets are the spell's, as long as the rest has none of its own (its indexes stay the same).
     const joined: AbilityBody | null = parts.length && parts.every((b, i) => b && (i === 0 || !b.targets.length) && !b.modal && Object.keys(b).every((k) => k === "targets" || k === "effects" || k === "text")) ? { targets: parts[0]!.targets, effects: parts.flatMap((b) => b!.effects), text: spellLines.join(" ") } : null;
-    const body = floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}), ...(costTappedX ? { costTappedX } : {}) }) : null;
+    // Selective Snare, Aphetto Dredging: "target creatures of the creature type of your choice": the type is chosen as it's
+    // cast, before the targets (rulings, CR 601.2b-c), one existing creature type (CR 205.3m); the spell's one target spec
+    // is of that type (CostChoices.creatureType, CastHow.castType).
+    const ofYourChoice = " of the creature type of your choice";
+    const typeChoice = !floatingFirst && tail === undefined && spellLines.length === 1 && spellLines[0]!.split(ofYourChoice).length === 2 && /\btarget creatures?(?: cards?)?$/.test(spellLines[0]!.split(ofYourChoice)[0]!) && !spellLines[0]!.includes("•");
+    const body0 = floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(typeChoice ? spellLines[0]!.replace(ofYourChoice, "") : spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}), ...(costTappedX ? { costTappedX } : {}) }) : null;
+    // "Up to three target creature cards" is three target specs alike: each one of that type.
+    const typed = typeChoice && body0 && !body0.modal && body0.targets.length > 0 && body0.targets.every((t) => (t.kind === "object" || t.kind === "card") && !t.chosen && t.types?.length === 1 && t.types[0] === "Creature" && !t.subtypes?.length && t.text === body0.targets[0]!.text);
+    const body = typeChoice ? (typed ? { ...body0, targets: body0.targets.map((t) => ({ ...t, chosen: "type" as const, text: `${t.text} of the chosen type` })) } : null) : body0;
+    if (typed) out.castChooseType = true;
     if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
     // Into the Time Vortex, Throes of Chaos: cascade and nothing else to do; the spell resolves doing nothing more (CR 608.2).
@@ -6855,7 +6877,7 @@ export function compile(d: CardDef): CompiledCard {
   const chosenTarget = (b: AbilityBody) => [...b.targets, ...(b.modal?.modes.flatMap((m) => m.targets) ?? [])].some((t) => t.chosen === "type");
   const choosesType = out.entersChoose?.some((c) => c.what === "creatureType");
   for (const b of [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])])
-    if (chosenTarget(b) && (b === out.spell || !choosesType || allEffects(b.effects).some((e) => e.type === "choose"))) out.unsupported.push(`${b.text} (a target of the chosen type, with no type chosen as it entered)`);
+    if (chosenTarget(b) && !(b === out.spell && out.castChooseType && !allEffects(b.effects).some((e) => e.type === "choose")) && (b === out.spell || !choosesType || allEffects(b.effects).some((e) => e.type === "choose"))) out.unsupported.push(`${b.text} (a target of the chosen type, with no type chosen as it entered)`);
     else if (chosenTarget(b) && allEffects(b.effects).some((e) => e.type === "becomeCopy")) out.unsupported.push(`${b.text} (a copy keeping the type chosen for its source)`);
   // "Attached to enchanted creature" (Mantle of the Ancients): only an Aura that enchants a creature has one.
   const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
@@ -7457,6 +7479,8 @@ function checkCastingLinks(out: CompiledCard) {
   };
   const needs = new Set<ChoiceKind>();
   const choices = new Set<ChoiceKind>((out.entersChoose ?? []).map((c) => c.what));
+  // Selective Snare: the creature type chosen as it's cast (CompiledCard.castChooseType) is its targets' type.
+  if (out.castChooseType) choices.add("creatureType");
   // "The sacrificed creature" refers to a sacrifice cost: the spell's, or the activated ability's own.
   // "The exiled card's power" (Corpse Lunge): the one card an "exile a creature card from your graveyard" cost exiled,
   // with nothing sacrificed to share the record.

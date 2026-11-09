@@ -1,6 +1,6 @@
 # Roadmap
 
-30,797 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,805 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,785 of
 9,979 (98%).
 
@@ -1207,7 +1207,7 @@ line blocks.
    a creature deals combat damage to you); Chandra, the Firebrand ("each of up to six targets"); Ooze Flux (done in round 315) (remove one
    or more +1/+1 counters as a variable cost); Chancellor of the Annex (the first spell each opponent casts); Kaima,
    the Fractured Calm (a count of creatures goaded this way); Namor the Sub-Mariner; Words of Worship and Words of Wind
-   (replacing the next draw this turn); Become the Pilot (can't be blocked unless attacking its owner); Nemesis Phoenix
+   (replacing the next draw this turn); Become the Pilot (done in round B164) (can't be blocked unless attacking its owner); Nemesis Phoenix
    (returned tapped and attacking from the graveyard); Battletide Alchemist ("you may prevent X of that damage" for any
    player).
    Round 224 (fresh cards from the top): a floating "whenever one or more Gorgons and/or Snakes you control deal combat
@@ -3724,7 +3724,7 @@ line blocks.
    nontoken permanent or discards a permanent card"), Zenith Chronicler ("each other player" meaning other than the
    player who cast the spell). From round 92: "hexproof from" only works for colors, monocolored and multicolored
    (not artifacts, instants, planeswalkers, activated abilities, "each of its colors" or "that color": Jaheira,
-   Elenda, Volatile Stormdrake, Tam, Mondo Gecko, Skrelv, Sungold Sentinel stay out); "Tribal" cards still out (the
+   Elenda, Volatile Stormdrake, Tam, Mondo Gecko, Skrelv, Sungold Sentinel (done in round B164) stay out); "Tribal" cards still out (the
    data calls them all Kindred now). Bots never cast Donate, Harmless Offering or Bazaar Trader's ability (they would
    only give away their own permanents), never use Lion's Eye Diamond (automatic payment doesn't either), and cast from
    Bolas's Citadel only while their life stays 15 or more. Round 88 leftovers still out: Ob Nixilis of the Black Oath
@@ -4114,7 +4114,7 @@ line blocks.
      time", each player's own half work; still out: Temporal Extortion ("any player may pay"), Heartless Hidetsugu
      (per-recipient damage), Aspect of Wolf (done in round B111), The Goose Mother, Banshee, Chainer's Torment (done in round B121), Doomsday, Death
      Wish, Contaminated Drink (rad
-     counters), Contested Game Ball and War Elemental ("dealt combat damage", "its owner"). Split the Party works.
+     counters), Contested Game Ball (done in round B164) and War Elemental ("dealt combat damage", "its owner"). Split the Party works.
    - Damage amount replacements and per-source prevention work (double, triple, +N, half, "prevent N of that damage",
      "all but N", "can't be prevented"; the affected player orders them with shields, CR 616.1); still out: Neriv
      (mana value of the source), Bitter Feud, Desperate Gambit and Forcefield (next-time doubling on a chosen or
@@ -5247,7 +5247,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   colorless" (Ghostfire), "exile it, then shuffle all creature cards" (Barishi). +29 (27,671 of 31,936 with B35 to B38
   and rounds 202 to 208).
 - Out after round B39: Ulamog's Despoiler ("As ~ enters, you may put two cards ... If you do, it enters with four
-  +1/+1 counters": an enters-option picker for exile), Arni Brokenbrow ("base power becomes 1 plus the greatest power
+  +1/+1 counters": an enters-option picker for exile), Arni Brokenbrow (done in round B164) ("base power becomes 1 plus the greatest power
   among other creatures you control"), Inquisitor's Snare still (the prevention must follow the creature after it
   leaves the battlefield, rulings), Skulking Killer (done in round B106) ("if that opponent controls no other creatures" as it resolves),
   Wicked Guardian ("have it deal 2 damage to another creature you control", chosen as it resolves), Graveyard Shovel,
@@ -5633,7 +5633,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B55 (looked at, not done): Runic Repetition (done in round 272), Lymph Sliver (done in round B130) (absorb), Mesmeric
   Sliver (fateseal), Namor ("attacks a player who has more life than you"), Asgardian Inspiration (a trigger from the
   graveyard on an event that isn't one yet), Old Fat Spider Can't See Me (a damage rule for as long as ~ remains on the
-  battlefield), Isu the Abominable (a choice of payment), Etched Slith (done in round B156) ("target permanent or opponent"), Reiterating
+  battlefield), Isu the Abominable (done in round B164) (a choice of payment), Etched Slith (done in round B156) ("target permanent or opponent"), Reiterating
   Bolt (an energy additional cost), Dodgy Jalopy (scavenge with a variable power), Chancellor of the Dross (opening-hand
   reveals), Words of Worship, Garruk, Curse Breaker (its −4), Kaima, Infernal Kirin (done in round B159), Celestial Judgment (done in round B148) and Ancestral
   Knowledge (new mechanics), Fatal Fissure (a delayed trigger with a target of its own), Mudslide (done in round B145) and Dream Tides (done in round B145) (pay
@@ -5690,7 +5690,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   land type, nonbasic too), Corrosive Ooze (destroying Equipment at end of combat), Trove of Temptation (an attack
   requirement toward you or your planeswalkers), Viral Spawning (done in round B154) (a conditional flashback), Silver Surfer, Galactus's Herald
   ("attacks that player each combat"), Blue Dragon (done in round B154) (three targets until your next turn), Satyr Firedancer (a spell's damage
-  to an opponent), Thrill-Kill Disciple (squad with a discard), Magnigoth Treefolk and Diligent Zookeeper (counted
+  to an opponent), Thrill-Kill Disciple (squad with a discard), Magnigoth Treefolk and Diligent Zookeeper (both done in round B164) (counted
   landwalk and creature types), Exotic Pets and Storm of Forms (each kind of counter), Sanctifier en-Vec (a color filter on
   permanents, spells and cards going to graveyards), Greatbow Doyen, Ancestral Communion, The Book of Vile Darkness.
 - Round B58 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 15,000): "If that player
@@ -7397,6 +7397,22 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   control enters transformed": either direction, an Incubator too, or a transforming double-faced card entering back face
   up, CR 712.14a, not a modal double-faced one, rulings; "Do this only once each turn" counts only a yes, CR 603.2h). +6, 30,797 of 31,936
   with B162 and rounds 321 and 322.
+- Round B164 (least played first, mechanics that could be built from the skip lists): Diligent Zookeeper ("gets +1/+1 for
+  each of its creature types, to a maximum of 10": each non-Human creature you control counts its own creature types as
+  layer 4 has them, a changeling all of them, so a changeling is a Human and isn't affected, CR 702.73a; land types aren't
+  creature types, CR 205.3m). Magnigoth Treefolk ("For each basic land type among lands you control, ~ has landwalk of
+  that type": the basic land types among your lands as layer 4 has them, CR 702.14c). Isu the Abominable ("you may pay
+  {G}, {W}, or {U}. If you do, ...": which one chosen as it resolves, only those you could pay offered, then paid, CR
+  608.2d; a picker, browser tests; the bot pays the first it can). Arni Brokenbrow ("base power become 1 plus the greatest
+  power among other creatures you control": counted as it resolves, a negative power kept and 1 with no other creature,
+  rulings; set in layer 7b, CR 613.4b; the bot says yes only for more power). Sungold Sentinel (coven: a color chosen as
+  it resolves for hexproof from it and "can't be blocked by creatures of that color"). Contested Game Ball ("the attacking
+  player gains control of ~ and untaps it", once for a combat damage step, CR 506.2; its counters counted as the ability
+  resolves, rulings). Become the Pilot ("can't be blocked unless it's attacking its owner or a permanent its owner
+  controls", CR 509.1b). Spoils of War ("X is the number of artifact and/or creature cards in an opponent's graveyard as
+  you cast this spell": the opponent chosen as it's cast, X defined by that graveyard and paid, CR 107.3c, 601.2b; a picker
+  showing each opponent's X, a browser test; the bot chooses the opponent with the most such cards). +8, 30,805 of 31,936
+  with B163 and round 322.
 - Out after round B163 (looked at, not done): Words of Waste and Words of Wind (an opponent's discard or each player's
   bounce chosen in the middle of a draw: a pause the draw sequence resumes from only for some replacements), Strax,
   Sontaran Nurse ("Choose a player at random. When you do, ~ fights another target creature that player controls": a
@@ -7423,7 +7439,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B159 (looked at, not done): Kaboom! (a card revealed per target, each target's own
   loop, the order among them a choice), Ulamog's Despoiler, Sutured Ghoul, Frankenstein's Monster and Living Lore (a choice
   made as they enter, new), Charmed Pendant (mana of the milled card's colors), Nafs Asp, Glass Asp and Sabertooth Cobra
-  ("unless that player pays {1} before their next draw step": a payment window), Spoils of War.
+  ("unless that player pays {1} before their next draw step": a payment window), Spoils of War (done in round B164).
 - Out after round B157 (looked at, not done): Musician (a granted upkeep ability it checks for by its text),
   Makeshift Mannequin (a granted trigger "for as long as it has a mannequin counter"), Flameskull (rejuvenation's "play one
   of those cards", a permission shared by two cards) and Cleansing (each land's destruction paid off by any player) were
@@ -7455,7 +7471,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Mastery does with a trigger instead; "sacrifice that many nontoken permanents. If you can't, you lose the game").
 - Out after round B148 (looked at, not done): Liberated Livestock (for each token created, an Aura from your hand and/or
   graveyard put onto the battlefield attached to it), Rogues' Gallery (a target slot per color, a multicolored card
-  filling only one), Sungold Sentinel (a color chosen as the ability resolves for hexproof from it and "can't be blocked
+  filling only one), Sungold Sentinel (done in round B164) (a color chosen as the ability resolves for hexproof from it and "can't be blocked
   by creatures of that color"), Blood Spatter Analysis (a reflexive "when you do" after "sacrifice it if it has five or
   more bloodstain counters"), Triton Tactics (tapping each creature that was blocked by those creatures this turn: block
   history).
@@ -7466,7 +7482,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B146 (looked at, not done): Tamanoa (done in round B147) and Blaze Commando (done in round B147) ("whenever a noncreature source / an instant or
   sorcery spell you control deals damage": once per source and damage event, which Lane A's round 305, PR #452, adds for
   The Red Terror; merged now, so they're next), Bargaining Table (still: the opponent chosen as it's activated sets X), Foraging
-  Wickermaw (a mana ability that also makes ~ the color of the mana it made), Isu the Abominable ("you may pay {G}, {W},
+  Wickermaw (a mana ability that also makes ~ the color of the mana it made), Isu the Abominable (done in round B164) ("you may pay {G}, {W},
   or {U}": one of three payments), Cheering Fanatic (done in round B158) ("spells with the chosen name cost {1} less to cast this turn").
 - Out after round B144 (looked at, not done): Merseine ("pay enchanted creature's mana cost" as a cost, activated only
   by that creature's controller), Yare (done in round B145) and Blaze of Glory (done in round B145) ("target creature defending player controls" on a spell, with
@@ -7509,7 +7525,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   or is turned face up, that a creature becoming a copy of it later takes too, rulings: the engine's "enters as" effect
   isn't copied), Glass Asp, Nafs Asp and Sabertooth Cobra ("unless they pay {2} before that step": a payment any time
   before a step begins).
-- Out after round B129 (looked at, not done): Spoils of War, Grenzo's Rebuttal (done in round B152), Peace Talks and Martyr of Bones (done in round B152), still
+- Out after round B129 (looked at, not done): Spoils of War (done in round B164), Grenzo's Rebuttal (done in round B152), Peace Talks and Martyr of Bones (done in round B152), still
   out for the reasons in the earlier lists.
 - Out after round B128 (looked at, not done): Bullseye, Death Dealer (done in round B146) and Ion Storm (an activation cost with "or" between
   two costs; Ion Storm done in round B132), Price of Betrayal (counters removed from an opponent, a player, as well as permanents), Bargaining Table
@@ -7588,7 +7604,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   announced in turn order before any sacrifice, rulings), Crypsis ("protection from creatures your opponents control":
   relative to the protected creature's controller, creature cards owned by an opponent too, rulings), Mister Immortal (done in round B139)
   (an ability activated from exile: no activation from exile yet).
-- Out after round B107 (looked at, not done): Isu the Abominable ("you may pay {G}, {W}, or {U}": a choice of payment), Time
+- Out after round B107 (looked at, not done): Isu the Abominable (done in round B164) ("you may pay {G}, {W}, or {U}": a choice of payment), Time
   to Reflect and You Cannot Pass! (done in round B110) (a creature that blocked or was blocked by a Zombie / legendary creature: what the other
   creature was when the block happened, rulings, which the turn's block log doesn't keep), Heroic Feast (as many targets as
   the life gained), Bioshift (done in round 304) (moving any number of counters), Erithizon (done in round B110), Mausoleum Turnkey (done in round B110) and Evangelize (done in round B141) (a target chosen by
@@ -7688,7 +7704,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B92 (looked at, not done): Reality Twist ("Plains produce {R}, Swamps produce {G}...": a land with two
   basic land types lets its controller pick the color, rulings), Harvest Mage and Pulse of Llanowar (mana of a color of
   your choice instead: a choice as the land is tapped), Escaped Shapeshifter (keywords and protection read from opponents'
-  creatures, a layer 6 dependency), Spoils of War (X set by an opponent's graveyard as you cast it), Drain Life, Soul Burn
+  creatures, a layer 6 dependency), Spoils of War (done in round B164) (X set by an opponent's graveyard as you cast it), Drain Life, Soul Burn
   and Consume Spirit ("Spend only black mana on X" on a spell, with cost reductions), Emblazoned Golem (one mana of each
   color on X), Fatal Lore (done in round B142) (an opponent chooses the mode), Echo Chamber (done in round B141) (an opponent chooses the target), Butcher Orgg and
   Cunning Giant (done in round B144) (combat damage assigned to other creatures).

@@ -1,8 +1,8 @@
 # Roadmap
 
-30,789 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,777 of
-9,979 (97%).
+30,797 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,785 of
+9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -2363,6 +2363,31 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 322 took cards back off the "Out after round N" lists, most played first: "Whenever a player attacks you, if
+   that player has another opponent who isn't being attacked, prevent all combat damage that would be dealt to you this
+   combat." (Suppressor Skyguard: an intervening "if", CR 603.4, checked as attackers are declared and as it resolves; the
+   shield ends with combat, CR 511.2); "If a creature card with mana value 6 or greater is revealed this way, transform
+   Runo." and "If that creature is a Kraken, Leviathan, Octopus, or Serpent, create two of those tokens instead." (Runo
+   Stromkirk // Krothuss: the copied creature's types as the ability resolves); "choose up to one target card in a
+   graveyard that was discarded or put there from a library this turn. Put that card into its owner's hand." (Ghost of
+   Ramirez DePietro);
+   "If a creature you control would connive, instead you draw a card, then that creature connives." (Leader,
+   Super-Genius: one extra card for each copy, CR 614.6, the conniving creature's controller drawing it, CR 701.50a);
+   "you may search your library for a Curse card that doesn't have the same name as a Curse attached to enchanted player,
+   put it onto the battlefield attached to that player" (Curse of Misfortunes: the names as it resolves, face-down ones
+   nameless, CR 708.2; a browser test); "When this creature is turned face up, target opponent gains control of any
+   number of target permanents you control. Draw a card for each one they gained control of this way." (Coveted Falcon:
+   the count as it resolves, those still controlled by that player; and its attack trigger, "target permanent you own but
+   don't control"; a browser test); "you may exchange control of
+   target nonland permanent you control and target nonland permanent an opponent controls with equal or lesser mana
+   value" (Puca's Mischief: the mana values compared when targets are chosen and again as it resolves, CR 608.2b,
+   rulings; a browser test); "Protection from permanents with corruption counters on them" (Geyadrone Dihada: a quality
+   of the source, so spells aren't covered, CR 702.16a). +8, 30,791 of 31,936 with round 321 and B162.
+   Out after round 322 (looked at, not done): Tamiyo, Collector of Tales and Nephalia Academy (not every discard path
+   carries what caused it), Archelos, Lagoon Mystic (the order of replacement effects as permanents enter), Stalking
+   Leonin (a secret choice of opponent, revealed as a cost), Breathkeeper Seraph (a return at "your next upkeep" granted by
+   soulbond), Rebbec, Architect of Ascension. Bots: Coveted Falcon gives nothing away; Puca's Mischief only trades for a
+   clearly better permanent and never their commander.
    Round 321 took cards back off the "Out after round N" lists, most played first: "You may put a creature card exiled
    this way onto the battlefield. It gains haste. Return it to your hand at the beginning of the next end step." (Anzrag's
    Rampage: up to one of the exiled cards, CR 110.4b, the delayed trigger about the permanent it became, CR 603.7c; a
@@ -7370,8 +7395,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   this object). Depth Defiler ("When you cast this spell, choose one. If it was kicked, choose both instead.": the spell
   as cast, CR 603.3c, 702.33d). Corruption of Towashi ("Whenever a permanent you control transforms or a permanent you
   control enters transformed": either direction, an Incubator too, or a transforming double-faced card entering back face
-  up, CR 712.14a, not a modal double-faced one, rulings; "Do this only once each turn" counts only a yes, CR 603.2h). +6, 30,789 of 31,936
-  with B162 and round 321.
+  up, CR 712.14a, not a modal double-faced one, rulings; "Do this only once each turn" counts only a yes, CR 603.2h). +6, 30,797 of 31,936
+  with B162 and rounds 321 and 322.
 - Out after round B163 (looked at, not done): Words of Waste and Words of Wind (an opponent's discard or each player's
   bounce chosen in the middle of a draw: a pause the draw sequence resumes from only for some replacements), Strax,
   Sontaran Nurse ("Choose a player at random. When you do, ~ fights another target creature that player controls": a

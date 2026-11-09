@@ -3265,6 +3265,10 @@ export function compile(d: CardDef): CompiledCard {
       out.notesLifeOnEnter = true;
       continue;
     }
+    if (line === "If a creature you control would connive, instead you draw a card, then that creature connives.") {
+      out.conniveDrawsFirst = true;
+      continue;
+    }
     if (line === "Spells and abilities your opponents control can't cause you to sacrifice permanents.") {
       out.opponentsCantMakeYouSacrifice = true;
       continue;

@@ -6549,6 +6549,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4c495e94-3194-47c7-8129-dd0a0f915daa",
+  "name": "Coveted Falcon",
+  "manaCost": "{1}{U}{U}",
+  "cmc": 3,
+  "typeLine": "Artifact Creature — Bird",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Bird"
+  ],
+  "oracleText": "Flying\nWhenever this creature attacks, gain control of target permanent you own but don't control.\nDisguise {1}{U}\nWhen this creature is turned face up, target opponent gains control of any number of target permanents you control. Draw a card for each one they gained control of this way.",
+  "power": "1",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Disguise"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "dd69ef80-d30c-4b15-aec8-4154dc20cb25",
   "name": "Covetous Elegy",
   "manaCost": "{4}{W}{B}",
@@ -6942,6 +6976,68 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7194cf15-69fc-46f0-987a-2cea8b498f50",
+  "name": "Curse of Death's Hold",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Enchantment — Aura Curse",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura",
+   "Curse"
+  ],
+  "oracleText": "Enchant player\nCreatures enchanted player controls get -1/-1.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b03c7c8d-8206-45cd-8ead-8f7b35c03a7a",
+  "name": "Curse of Misfortunes",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Enchantment — Aura Curse",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura",
+   "Curse"
+  ],
+  "oracleText": "Enchant player\nAt the beginning of your upkeep, you may search your library for a Curse card that doesn't have the same name as a Curse attached to enchanted player, put it onto the battlefield attached to that player, then shuffle.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "dka",
+  "releasedAt": "2012-02-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5480f855-80b7-45c7-94a9-071c7b5d5ccf",
   "name": "Curse of the Bloody Tome",
   "manaCost": "{2}{U}",
@@ -6965,6 +7061,37 @@
   "keywords": [
    "Enchant",
    "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f22c3624-6bd5-4761-b8ad-ac301ad9351c",
+  "name": "Curse of the Pierced Heart",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura Curse",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura",
+   "Curse"
+  ],
+  "oracleText": "Enchant player\nAt the beginning of enchanted player's upkeep, this Aura deals 1 damage to that player or a planeswalker that player controls.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Enchant"
   ],
   "commanderLegal": "legal",
   "set": "isd",
@@ -12109,6 +12236,35 @@
   "set": "e01",
   "releasedAt": "2017-06-16",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9a02a9a7-39d9-4763-85d3-747a0540b60b",
+  "name": "Gilded Lotus",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add three mana of any one color.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -23787,6 +23943,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a8e6655c-e63f-4a60-98f6-9d5bf8631488",
+  "name": "Puca's Mischief",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, you may exchange control of target nonland permanent you control and target nonland permanent an opponent controls with equal or lesser mana value.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2903bd66-6948-445b-a18a-12e2ce1a86c3",
   "name": "Pull from Eternity",
   "manaCost": "{W}",
@@ -31730,6 +31912,31 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9965d9c5-2ebf-4a6c-930e-55c5890979be",
+  "name": "Thought Vessel",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "You have no maximum hand size.\n{T}: Add {C}.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "edd8d1e8-be43-4c38-bb3a-83081fbaf0b5",
   "name": "Thoughtseize",
   "manaCost": "{B}",
@@ -35360,6 +35567,31 @@
   "set": "jud",
   "releasedAt": "2002-05-27",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b166b670-febc-4821-855e-f8d465644c03",
+  "name": "Worn Powerstone",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "This artifact enters tapped.\n{T}: Add {C}{C}.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -2735,6 +2735,15 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     if (body.targets.length !== printed.targets.length + slots - 1 || printed.targets.length !== 1) return null;
     return Array.from({ length: slots }, (_, k): TargetChoice => (picked[k] ? { kind: "object", id: picked[k]! } : { kind: "none" }));
   }
+  // Coveted Falcon: "target opponent gains control of any number of target permanents you control. Draw a card for each
+  // one ...": a bot gives away none of its permanents (a card isn't worth a permanent to it); the opponent with the least
+  // life gets nothing.
+  const giveAway = printed.effects[0]?.type === "continuous" && printed.effects[0].giveTo?.ref === "target" && printed.effects[0].giveTo.index === 0 && printed.effects[0].mods.some((m) => m.kind === "control") && printed.targets[0]?.kind === "player" ? printed.effects[0] : undefined;
+  if (giveAway && many === 1 && printed.targets.length === 2) {
+    const opp = s.players.filter((p) => !p.lost && p.id !== pid).sort((a, b) => a.life - b.life)[0];
+    if (!opp) return null;
+    return [{ kind: "player", id: opp.id }, ...Array.from({ length: body.targets.length - 1 }, (): TargetChoice => ({ kind: "none" }))];
+  }
   // Portal Manipulator: the creatures attacking us (or our planeswalkers and battles) sent at the player with the most
   // life among those who don't control them, never ourselves.
   const turnAt = printed.effects.length === 1 && printed.effects[0]!.type === "reselectAttack" ? printed.effects[0]! : undefined;
@@ -2843,7 +2852,27 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
   }
   // Exchanging control (Switcheroo, Avarice Totem): our least useful permanent for an opponent's most useful one, worth it
   // only when theirs is worth clearly more; an exchange between two of their permanents does us no good.
-  const swap = body.effects.find((e): e is Extract<Effect, { type: "exchangeControl" }> => e.type === "exchangeControl");
+  const swap = body.effects.flatMap((e) => (e.type === "may" ? e.effects : [e])).find((e): e is Extract<Effect, { type: "exchangeControl" }> => e.type === "exchangeControl");
+  // Puca's Mischief: theirs with a mana value at most ours (chosen as a set, rulings): every pair that fits, the best trade
+  // first; a trigger that must target takes any pair, and its "you may" then declines (wantsMay).
+  const paired = swap?.a.ref === "target" && swap.b.ref === "target" && body.targets.length === 2 && body.targets[swap.b.index]?.mvAtMostOf?.includes(swap.a.index) ? swap : undefined;
+  if (paired?.a.ref === "target" && paired.b.ref === "target") {
+    const [ia, ib] = [paired.a.index, paired.b.index];
+    const src = sourceId ? botSource(s, sourceId) : undefined;
+    const as = legalTargets(s, body.targets[ia]!, pid, undefined, src, sourceId).filter((t) => t.kind === "object");
+    const pairs = as.flatMap((a) => {
+      const chosen: TargetChoice[] = [];
+      chosen[ia] = a;
+      return legalTargets(s, body.targets[ib]!, pid, undefined, src, sourceId).filter((b) => b.kind === "object" && canChooseTarget(s, body.targets, chosen, ib, b, pid, src, sourceId)).map((b) => [a, b] as const);
+    });
+    const gain = ([a, b]: readonly [TargetChoice, TargetChoice]) => (a.kind === "object" && b.kind === "object" && !obj(s, a.id).isCommander ? worth(s, pid, obj(s, b.id)) - worth(s, pid, obj(s, a.id)) : -Infinity);
+    const best = [...pairs].sort((x, y) => gain(y) - gain(x))[0];
+    if (!best || (!forced && gain(best) < 2)) return null;
+    const t: TargetChoice[] = [];
+    t[ia] = best[0];
+    t[ib] = best[1];
+    return t;
+  }
   if (swap && body.targets.length <= 2 && (swap.a.ref === "target" || swap.a.ref === "self") && swap.b.ref === "target" && body.targets.every((t) => t.kind === "object")) {
     const me = sourceId ? s.objects[sourceId] : undefined;
     const options = (i: number) => legalTargets(s, body.targets[i]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).flatMap((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" ? [obj(s, t.id)] : []));
@@ -4724,6 +4753,19 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     const spell = s.stack.find((x) => x.id === r.item.cause && x.kind === "spell");
     const o = spell?.objectId ? s.objects[spell.objectId] : undefined;
     return !!o && !o.spellCopy && !o.isCommander && defMv(defOf(s, o)) <= 2 && player(s, pid).library.some((id) => !isType(defOf(s, obj(s, id)), "Land"));
+  }
+  // Puca's Mischief: "you may exchange control of ...": only for one of theirs clearly worth more than ours.
+  const exch = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "exchangeControl" ? e.effects[0]! : undefined;
+  if (r && exch?.type === "exchangeControl" && exch.a.ref === "target" && exch.b.ref === "target") {
+    const at = (i: number) => {
+      const t = r.item.targets?.[i];
+      const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+      return o?.zone === "battlefield" ? o : undefined;
+    };
+    const [a, b] = [at(exch.a.index), at(exch.b.index)];
+    if (!a || !b) return false;
+    const [mine, theirs] = controllerOf(s, a) === pid ? [a, b] : [b, a];
+    return controllerOf(s, mine) === pid && controllerOf(s, theirs) !== pid && !mine.isCommander && worth(s, pid, theirs) >= worth(s, pid, mine) + 2;
   }
   // Iroh, Tea Master: "you may have target opponent gain control of target permanent you control": only a noncreature
   // token (a Food, a Treasure), for the Ally token it makes.

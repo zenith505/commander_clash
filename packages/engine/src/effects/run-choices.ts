@@ -623,6 +623,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Hibernation's End: "Whenever you pay ~'s cumulative upkeep" triggers once it's paid.
       const paid: Effect = { type: "cumulativeUpkeepPaid" };
       if (e.selfCounter) return runEffect(s, { type: "may", effects: [...(sc.n ? [{ type: "counters", what: { ref: "self" }, counter: e.selfCounter, n: sc.n } as Effect] : []), paid], otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Put ${sc.n} ${e.selfCounter} counter${sc.n === 1 ? "" : "s"} on ~ to keep it (cumulative upkeep)`, keep: true }, ctx);
+      // Karplusan Minotaur: that many flips, one after another, each one won or lost (rulings); none for no age counters.
+      if (e.flipCost) return runEffect(s, { type: "may", effects: [...(sc.n ? [{ type: "flipCoin", n: sc.n } as Effect] : []), paid], otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Flip ${sc.n === 1 ? "a coin" : `${sc.n} coins`} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
       if (e.drawCost) return runEffect(s, { type: "may", effects: [...(sc.n ? [{ type: "draw", who: { ref: "you" }, n: sc.n } as Effect] : []), paid], otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Draw ${sc.n === 1 ? "a card" : `${sc.n} cards`} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
       if (e.addMana) return runEffect(s, { type: "may", effects: [...(sc.n ? [{ type: "addMana", mana: e.addMana.repeat(sc.n) } as Effect] : []), paid], otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Add ${e.addMana.repeat(sc.n)} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
       // Phyrexian Soulgorger: that many different creatures, chosen and sacrificed as it resolves, or ~ is sacrificed; none

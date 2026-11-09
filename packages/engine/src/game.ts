@@ -10735,7 +10735,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   // "Each player chooses a creature type": one more for "a type chosen this way".
-  if (pend.what === "creatureType" && r.scratch?.eachAsked && r.chosen?.types) r.chosen = { ...r.chosen, types: [...r.chosen.types, choice] };
+  if (pend.what === "creatureType" && r.scratch?.eachAsked && r.chosen?.types) r.chosen = { ...r.chosen, types: [...r.chosen.types, choice], typesBy: { ...r.chosen.typesBy, [p.id]: choice } };
   else if (pend.what === "color" && r.scratch?.eachAsked && r.chosen?.colorsBy) r.chosen = { ...r.chosen, colorsBy: { ...r.chosen.colorsBy, [p.id]: withChoice({}, "color", choice).color! } };
   else r.chosen = withChoice(r.chosen, pend.what, choice);
   log(s, `${p.name} chooses ${pend.what === "opponent" ? player(s, Number(choice)).name : choice}${pend.what === "opponent" ? ` for ${pend.source}` : ""}.`);
@@ -12272,6 +12272,13 @@ function finishAttacks(s: GameState) {
   const attacks = d.ids.filter((id) => s.objects[id]?.attacking !== undefined);
   for (const id of attacks) fireEvent(s, { type: "attacks", id }); // CR 508.3a
   if (attacks.length) fireEvent(s, { type: "groupAttack", controller: s.activePlayer, ids: attacks });
+  // Desert Were-Worm's "for the first time each turn": the most total power attacked with in one declaration this turn, as
+  // they were declared, noted after this attack's triggers saw the earlier ones.
+  if (attacks.length) {
+    const total = attacks.reduce((n, id) => n + power(s, obj(s, id)), 0);
+    const log = (s.turnLog ??= {});
+    if (total > (log.attackPower?.[s.activePlayer] ?? 0)) (log.attackPower ??= {})[s.activePlayer] = total;
+  }
   if (attacks.length === 1) fireEvent(s, { type: "attacksAlone", id: attacks[0]! }); // CR 506.5
   // "Attacks a player alone": the only creature declared as an attacker attacking that player, not one of their
   // planeswalkers or battles (Yuriko, Blade of the Mighty rulings).

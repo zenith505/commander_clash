@@ -452,7 +452,10 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
     const taken = new Set(Object.values(yp.picked).flat());
     // Ill-Gotten Gains: into their hands, any cards; onto the battlefield, only permanent cards (CR 110.4b).
     const toHand = e.dest === undefined || e.dest === "exile" || e.dest === "keep";
-    const cards = p.lost ? [] : yardOf(pid).graveyard.filter((id) => !taken.has(id) && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (toHand || isPermanentCard(defOf(s, obj(s, id)))));
+    // Grave Sifter: "of that type", the type this player chose (none chosen: none fit).
+    const own = e.filter?.chosen === "pickerType" ? s.resolving!.chosen?.typesBy?.[pid] : undefined;
+    const filter = e.filter?.chosen === "pickerType" ? (own ? (({ chosen: _, ...f }) => ({ ...f, subtypes: [...(f.subtypes ?? []), own] }))(e.filter) : undefined) : e.filter;
+    const cards = p.lost || (e.filter?.chosen === "pickerType" && !filter) ? [] : yardOf(pid).graveyard.filter((id) => !taken.has(id) && (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (toHand || isPermanentCard(defOf(s, obj(s, id)))));
     const max = Math.min(e.n, cards.length);
     // Nothing to choose between: those are the ones (none at all, for a "may" with nothing there).
     if ((!e.upTo && cards.length <= e.n) || !cards.length) {
@@ -460,7 +463,7 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
       yp.queue.shift();
       continue;
     }
-    const kind = e.filter?.text ?? "card";
+    const kind = own ? `${own} card` : e.filter?.text ?? "card";
     const whose = e.youChoose ? ` in ${pid === ctx.controller ? "your" : `${p.name}'s`} graveyard` : e.fromYours ? ` in ${player(s, ctx.controller).name}'s graveyard` : "";
     // Dredge the Mire: they choose for you, so the card that helps you least (bots), as Visions of Dread.
     const forYou = e.underYours && pid !== ctx.controller ? { forPlayer: ctx.controller, helps: true as const, under: ctx.controller } : {};

@@ -278,7 +278,7 @@ export type TriggerSourceEvent =
   /** `source` is the permanent dealing it, or "" for a spell or a gone permanent's ability (CR 120.3); `by` controls it. */
   | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean; /** The source's colors as it dealt the damage (Circle of Affliction). */ colors?: Color[] }
   /** A source (`source`: its object, "" if none) controlled by `by` dealt damage to a permanent (`id`) or a player. */
-  | { type: "sourceDealtDamage"; source: ObjectId; by: PlayerId; id?: ObjectId; player?: PlayerId; amount: number; combat?: true }
+  | { type: "sourceDealtDamage"; source: ObjectId; by: PlayerId; id?: ObjectId; player?: PlayerId; amount: number; combat?: true; /** Damage to a creature: its toughness as the damage was dealt (Taii Wakeen). */ toughness?: number }
   /**
    * One source's damage in one damage event, to any number of permanents and players (The Red Terror, Tamanoa, Justice):
    * `amount` all it dealt then; `creature` it was a creature permanent, `stackSpell` a spell on the stack; `ref` the
@@ -1963,7 +1963,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const w = obj(s, id);
       if (controllerOf(s, w) !== ev.by) continue;
-      add(w, ev.by, (e, t) => e === "sourceYouControlDealsDamage" && !!t.sourceDamage && ev.amount === t.sourceDamage.exactly && !(t.sourceDamage.other && ev.source === w.id), undefined, undefined, hit, undefined, undefined, undefined, { amount: ev.amount, ...(ev.player !== undefined ? { player: ev.player } : {}) });
+      add(w, ev.by, (e, t) => e === "sourceYouControlDealsDamage" && !!t.sourceDamage && (t.sourceDamage.toughness ? !ev.combat && ev.toughness !== undefined && ev.amount === ev.toughness : ev.amount === t.sourceDamage.exactly) && !(t.sourceDamage.other && ev.source === w.id), undefined, undefined, hit, undefined, undefined, undefined, { amount: ev.amount, ...(ev.player !== undefined ? { player: ev.player } : {}) });
     }
   } else if (ev.type === "sourceDealtDamageEvent") {
     // The Red Terror: "Whenever a red source you control deals damage to one or more permanents and/or players": its

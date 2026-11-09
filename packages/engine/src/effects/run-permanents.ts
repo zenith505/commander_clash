@@ -1121,7 +1121,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (n <= 0 || !removable.length) return;
         const parts = sc.distributed;
         if (!parts) {
-          s.pending = { kind: "distribute", player: ctx.controller, source: src, counter: e.counter, total: n, options: removable, what: e.filter.text, remove: true, has };
+          // Overseer of Vault 76: exactly that many, so none with fewer to remove (CR 608.2d, rulings).
+          if (e.exact && Object.values(has).reduce((a, k) => a + k, 0) < n) return;
+          s.pending = { kind: "distribute", player: ctx.controller, source: src, counter: e.counter, total: n, options: removable, what: e.filter.text, remove: true, has, ...(e.exact ? { exact: true as const } : {}) };
           return "paused";
         }
         let removed = 0;

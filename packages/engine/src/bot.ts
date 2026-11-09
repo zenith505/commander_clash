@@ -6637,6 +6637,18 @@ export function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: Act
       out.exileCards = [card];
     } else if (c.kind === "exileFromGraveyard" && c.top) {
       if (topGraveyardCards(s, pid, c.n, c.filter).length < c.n) return null;
+    } else if (c.kind === "exileFromGraveyard" && c.singleGraveyard) {
+      // Night Soil: "from a single graveyard": an opponent's first (their creature cards are what they'd bring back), the
+      // one with the dearest; else ours, cards we have no use for there.
+      const fit = (x: ObjectId) => x !== o.id && s.objects[x]?.zone === "graveyard" && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x))));
+      const theirs = opponents(s, pid)
+        .map((q) => player(s, q).graveyard.filter(fit).sort((a, b) => mv(s, b) - mv(s, a)))
+        .filter((g) => g.length >= c.n)
+        .sort((a, b) => mv(s, b[0]!) - mv(s, a[0]!))[0];
+      const ours = player(s, pid).graveyard.filter((x) => fit(x) && !usefulInGraveyard(s, x)).sort((a, b) => mv(s, a) - mv(s, b));
+      const pick = theirs ?? (ours.length >= c.n ? ours : undefined);
+      if (!pick) return null;
+      out.exileCards = [...(out.exileCards ?? []), ...pick.slice(0, c.n)];
     } else if (c.kind === "exileFromGraveyard" && !c.x) {
       // "Exile a card from your graveyard": cards we have no use for there, the cheapest first.
       const pool = player(s, pid)

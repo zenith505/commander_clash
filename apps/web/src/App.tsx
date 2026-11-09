@@ -498,7 +498,7 @@ type XPick =
   /** `extra`: an additional cost with X in it, "pay X life" (CR 107.3a). */
   /** `min`: "X can't be 0" (Thieving Skydiver's kicker). */
   | { mode: "cast"; draft: CastDraft; label: string; cost: string; max: number; value: number; extra?: string; min?: number }
-  | { mode: "activate"; objectId: string; index: number; label: string; cost: string; max: number; value: number; modes?: number[]; extra?: string }
+  | { mode: "activate"; objectId: string; index: number; label: string; cost: string; max: number; value: number; modes?: number[]; extra?: string; /** "One or more" (Radiant Lotus): X can't be 0. */ min?: number }
   /** Turning a face-down permanent face up for "Disguise {X}{3}{W}" (CR 107.3d). */
   | { mode: "faceUp"; objectId: string; way: number; label: string; cost: string; max: number; value: number; extra?: string }
   /** "Suspend X—{X}{3}{U}. X can't be 0." (Aeon Chronicler): X time counters, `min` 1 (CR 702.62a). */
@@ -798,7 +798,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, Math.max(n, ab.xMin ?? 0)));
       // "Tap X untapped Knights you control" (Aryel): the noun before "you control" in the plural.
       const extra = [...(ab.energyX ? ["pay X energy"] : []), ...(ab.removeCounters?.x ? [`remove X ${ab.removeCounters.counter} counters`] : []), ...(ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [c.kind === "removeCounters" ? `remove X ${c.counter ?? ""} counters from among ${c.filter.text}`.replace(/  +/g, " ") : `${c.kind === "sacrifice" ? "sacrifice" : c.kind === "exileFromGraveyard" ? "exile" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : c.kind === "tap" ? c.filter.text.replace(/(\w)( you control)$/, "$1s$2") : c.kind === "reveal" ? `${plural(c.filter.text)} from your hand` : c.kind === "exileFromGraveyard" ? `${plural(c.filter?.text ?? "card")} from your graveyard` : ""}`.trim()] : []))].join(" and ");
-      return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: Math.min(max, Math.max(ab.xMin ?? 0, 1)), modes, extra });
+      return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: Math.min(max, Math.max(ab.xMin ?? 0, 1)), modes, extra, ...(ab.xMin ? { min: ab.xMin } : {}) });
     }
     // −X loyalty abilities: X loyalty counters, up to how many it has (CR 606.6).
     if (x === undefined && ab.loyaltyX) {
@@ -2428,7 +2428,7 @@ function tapCandidates(s: GameState, pick: TapPick): GameObject[] {
 
 /** The bar shown while announcing X. */
 function XPickBar({ pick, onChange, onDone, onCancel }: { pick: XPick; onChange: (x: number) => void; onDone: () => void; onCancel: () => void }) {
-  const min = pick.mode === "cast" || pick.mode === "suspend" ? (pick.min ?? 0) : 0;
+  const min = pick.mode === "faceUp" ? 0 : (pick.min ?? 0);
   const set = (n: number) => onChange(Math.max(min, Math.min(pick.max, Math.floor(n) || 0)));
   return (
     <div className="targeting x-pick">
@@ -4235,7 +4235,7 @@ function LibrarySearch({
               : dig
               ? `The rest go ${dig.rest}.${pending.distinctPowers ? " Each must have a different power." : ""}${pending.totalMv !== undefined ? ` Total mana value ${found.reduce((n, x) => n + mvOf(x), 0)} of at most ${pending.totalMv}.` : ""}${dig.lifeEach ? ` You'll lose ${found.length * dig.lifeEach} life.` : ""}`
               : pending.firstTo
-                ? pending.firstN ? `The first ${pending.firstN} you find go ${pending.firstTo}, the other ${pending.othersTo}.` : `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.`
+                ? pending.firstN && pending.firstN > 1 ? `The first ${pending.firstN} you find go ${pending.firstTo}, the other ${pending.othersTo}.` : `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.`
                 : pending.reveal
                 ? `Revealing ${found.length}.`
                 : pending.bottom

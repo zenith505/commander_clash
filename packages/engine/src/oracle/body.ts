@@ -20137,7 +20137,7 @@ function round316Sentence(s: string, sentences: string[], si: number, ctx: Ctx, 
     const [ex, mana] = effects.slice(-2);
     const spec = ex?.type === "exile" && ex.what.ref === "target" ? ctx.targets[ex.what.index] : undefined;
     if (ex?.type !== "exile" || ex.what.ref !== "target" || spec?.kind !== "card" || spec.many !== "any" || spec.owner !== "you" || ex.until || ex.linked || ex.ownerMay || ex.youMay || ex.counters || ex.suspend) return null;
-    if (mana?.type !== "addMana" || (mana.times as Amount | undefined)?.count?.kind !== "cardsExiledThisWay" || effects.length !== 2) return null;
+    if (mana?.type !== "addMana" || typeof mana.times !== "object" || !("count" in mana.times) || mana.times.count.kind !== "cardsExiledThisWay" || effects.length !== 2) return null;
     ex.youMay = { thisTurn: true, play: true };
     effects.pop();
     return { effect: mana, next: si + 1 };

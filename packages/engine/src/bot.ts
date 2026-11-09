@@ -272,6 +272,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const theirMay = pend.kind === "chooseMay" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
     if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && s.resolving!.item.controller !== pid)
       return [{ type: "chooseMay", player: pid, yes: theirMay.effects.every((x) => x.type === "counters" && x.counter === "time" && x.what.ref === "selfCard") }];
+    // Trench Gorger: searching makes its base P/T the number of lands exiled (0/0 with none); the bot keeps its lands and
+    // the 6/6 trampler.
+    const afterMay = theirMay?.type === "may" ? s.resolving!.body.effects[s.resolving!.next + 1] : undefined;
+    if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.effects[0]?.type === "search" && afterMay?.type === "if" && afterMay.cond.kind === "youDid" && afterMay.effects.some((x) => x.type === "continuous" && x.what.ref === "self" && x.mods.some((m) => m.kind === "setPT")))
+      return [{ type: "chooseMay", player: pid, yes: false }];
     // Fasting: skip the draw step for the life while the hand still holds three or more cards (drawing destroys it).
     if (pend.kind === "chooseMay" && pend.skipDraw) return [{ type: "chooseMay", player: pid, yes: player(s, pid).hand.length >= 3 }];
     // Dance with Calamity: another card while there's room for one of about average mana value under the limit.
@@ -1348,6 +1353,20 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "either" && pend.labels?.[0] === TURNABOUT_TAP) {
       const t = s.resolving?.item.targets?.[0];
       return [{ type: "chooseOption", player: pid, choice: t?.kind === "player" && t.id === pid ? "1" : "0" }];
+    }
+    // Faces of the Past: tap when that stops more of the opponents' untapped creatures than ours, else untap when that
+    // readies more of ours than theirs; tapping on a tie (before our turn's combat it costs us nothing to wait).
+    if (pend.kind === "chooseOption" && pend.what === "either" && pend.labels?.[0] === FACES_TAP && s.resolving) {
+      // The dying creature's creature types as it last existed (what the effect compares with).
+      const sub = s.resolving.item.subject;
+      const lk = sub ? s.lastKnown?.[sub.id]?.creatureTypes : undefined;
+      const types = lk === "all" ? ("all" as const) : new Set(lk ?? []);
+      const kin = s.battlefield.map((id) => obj(s, id)).filter((o) => objIsType(s, o, "Creature") && shareCreatureType(types, creatureTypesOf(s, o)));
+      const net = (i: number) => {
+        const objs = kin.filter((o) => o.tapped === (i === 1));
+        return objs.filter((o) => controllerOf(s, o) !== pid).length * (i === 0 ? 1 : -1) + objs.filter((o) => controllerOf(s, o) === pid).length * (i === 0 ? -1 : 1);
+      };
+      return [{ type: "chooseOption", player: pid, choice: net(1) > net(0) ? "1" : "0" }];
     }
     // Reign of Terror, Lava Storm: what costs the opponents most, net of what we'd lose.
     const either = pend.kind === "chooseOption" && pend.what === "either" && s.resolving ? allEffects(s.resolving.body.effects).find((e) => e.type === "either" && pend.options.every((o, i) => e.labels[Number(o)] === pend.labels?.[i])) : undefined;
@@ -5066,6 +5085,7 @@ function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, 
 
 /** Turnabout's first option (oracle/body.ts). */
 const TURNABOUT_TAP = "Tap all its untapped permanents of the chosen type";
+const FACES_TAP = "Tap all untapped creatures that share a creature type with it";
 
 /**
  * "Choose odd or even": while a spell or ability resolves (Extinction Event, Twins of Discord, Zimone's Hypothesis), the

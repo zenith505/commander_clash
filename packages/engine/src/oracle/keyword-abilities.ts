@@ -31,6 +31,17 @@ export function parseGraveyardKeyword(
     if (way?.kind !== "flashback" || !less || !("count" in less)) return "fail";
     return { fromGraveyard: { ...way, less } };
   }
+  // Viral Spawning: "Corrupted — As long as an opponent has three or more poison counters and ~ is in your graveyard, it
+  // has flashback {2}{G}.": flashback (CR 702.34a) it has only while the condition holds, so it can be cast that way only
+  // then (checked as it's cast, CR 601.2), and exiled as a flashback spell however the condition changes after.
+  if ((m = /^As long as (.+?) and ~ is in your graveyard, it has flashback (.+?)\.?$/.exec(line))) {
+    const self: StaticAbility = { affects: { kind: "self" }, mods: [], text: line };
+    const cond = parseStaticCondition(m[1]!, self);
+    const r = parseGraveyardKeyword(`Flashback ${m[2]}`, d);
+    const way = r && r !== "fail" && "fromGraveyard" in r && !("fromExile" in r) ? r.fromGraveyard : undefined;
+    if (!cond || way?.kind !== "flashback" || way.if) return "fail";
+    return { fromGraveyard: { ...way, if: cond } };
+  }
   // Not "Flashback costs you pay cost {2} less" (Catalyst Stone), a static ability about flashback.
   if ((m = /^(Flashback|Escape)(?: (?!costs )|—)(.+?)\.?$/.exec(line))) {
     const kind = m[1] === "Flashback" ? "flashback" : "escape";

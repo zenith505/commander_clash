@@ -527,6 +527,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const o = s.resolving?.discardedCards?.length === 1 ? s.objects[s.resolving.discardedCards[0]!.id] : undefined;
     return o && o.zone === "graveyard" && (o.zoneChanges ?? 0) === s.resolving!.discardedCards![0]!.zc ? [o] : [];
   }
+  if (ref.ref === "exiledThisWay" && ref.cards) return (s.resolving?.exiledCards ?? []).map((id) => s.objects[id]).filter((o): o is GameObject => o?.zone === "exile");
   if (ref.ref === "exiledThisWay")
     return (s.resolving?.exiled ?? []).map((x) => s.objects[x.o.id]).filter((o, i): o is GameObject => o?.zone === "exile" && (o.zoneChanges ?? 0) === (s.resolving!.exiled![i]!.o.zoneChanges ?? 0) + 1);
   if (ref.ref === "exiledFromHand") {
@@ -700,7 +701,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const t = ref.otherThan !== undefined ? ctx.targets[ref.otherThan] : undefined;
     const except = t?.kind === "object" ? t.id : ref.other ? ctx.sourceId : ref.otherThanSubject ? ctx.subject?.id : undefined;
     const whose = ref.of && players(s, ref.of, ctx);
-    const mine = ref.sharesTypeWithSelf ? sourceCreatureTypes(s, ctx) : undefined;
+    const mine = ref.sharesTypeWithSelf ? sourceCreatureTypes(s, ctx) : ref.sharesTypeWithSubject ? subjectCreatureTypes(s, ctx) : undefined;
+    if (ref.sharesTypeWithSubject && !mine) return [];
     const made = ref.notCreated ? (s.resolving?.created ?? []) : [];
     const spared = ref.spareConvokerTypes ? convokerTypes(s, ctx) : [];
     const spare = (o: GameObject) => spared.length > 0 && objIsType(s, o, "Creature") && !objIsType(s, o, "Artifact") && !objIsType(s, o, "Enchantment") && spared.some((t) => shareCreatureType(t, creatureTypesOf(s, o)));

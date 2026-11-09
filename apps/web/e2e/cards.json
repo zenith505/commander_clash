@@ -10088,6 +10088,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c8cd2b52-6d32-413f-9b26-2f9d436dbeae",
+  "name": "Faces of the Past",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever a creature dies, tap all untapped creatures that share a creature type with it or untap all tapped creatures that share a creature type with it.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "scg",
+  "releasedAt": "2003-05-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "437b2dab-15e0-4b9a-a204-58622d37a3b3",
   "name": "Fact or Fiction",
   "manaCost": "{3}{U}",

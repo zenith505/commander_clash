@@ -3414,10 +3414,16 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Serra the Benevolent's emblem: "If you control a creature, damage that would reduce ...": only while you do.
-    const floor = /^(If (you control an? [^,]+), )?[Dd]amage that would reduce your life total to less than (\d+) reduces it to \3 instead\.$/.exec(line);
-    const floorIf = floor?.[2] ? parseStaticCondition(floor[2], { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
+    // Elderscale Wurm: "As long as you have 7 or more life, damage ...": the same as the floor's own "not if they're below it
+    // already" (rulings: with less than 7 life, damage reduces it as normal).
+    const floor = /^(?:(If (you control an? [^,]+), )|(As long as (you have (\d+) or more life), ))?[Dd]amage that would reduce your life total to less than (\d+) reduces it to \6 instead\.$/.exec(line);
+    if (floor?.[3] && floor[5] !== floor[6]) {
+      out.unsupported.push(raw);
+      continue;
+    }
+    const floorIf = floor?.[2] || floor?.[4] ? parseStaticCondition((floor[2] ?? floor[4])!, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
     if (floor && floorIf !== null) {
-      out.lifeFloor = Number(floor[3]);
+      out.lifeFloor = Number(floor[6]);
       if (floorIf) out.lifeFloorIf = floorIf;
       continue;
     }
@@ -4307,6 +4313,16 @@ export function compile(d: CardDef): CompiledCard {
     // Shadow the Hedgehog (after its flavor word, CR 207.2d): spells its controller casts get split second (CR 702.61a).
     if (/^(?:[A-Z][A-Za-z' ]* — )?Each spell you cast has split second if mana from an artifact was spent to cast it\.$/.test(line)) {
       out.splitSecondIfArtifactMana = true;
+      continue;
+    }
+    if (line === "Tapped creatures you control can block as though they were untapped.") {
+      out.tappedCreaturesCanBlock = true;
+      continue;
+    }
+    // Molten Disaster: "If ~ was kicked, it has split second" (CR 702.61a): only while it's a kicked spell on the stack
+    // (rulings); a spell's own line, so only on an instant or sorcery with a kicker.
+    if (/^If ~ was kicked, it has split second\.(?: \(.*\))?$/.test(line) && isSpell && /\bKicker\b/.test(d.oracleText ?? "")) {
+      out.splitSecondIfKicked = true;
       continue;
     }
     if (/^You may activate abilities of creatures you control as though those creatures had haste\.$/.test(line)) {
@@ -6879,6 +6895,10 @@ export function compile(d: CardDef): CompiledCard {
   for (const b of [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])])
     if (chosenTarget(b) && !(b === out.spell && out.castChooseType && !allEffects(b.effects).some((e) => e.type === "choose")) && (b === out.spell || !choosesType || allEffects(b.effects).some((e) => e.type === "choose"))) out.unsupported.push(`${b.text} (a target of the chosen type, with no type chosen as it entered)`);
     else if (chosenTarget(b) && allEffects(b.effects).some((e) => e.type === "becomeCopy")) out.unsupported.push(`${b.text} (a copy keeping the type chosen for its source)`);
+  // Belbe's Portal: "put a creature card of the chosen type from your hand": the type chosen as this permanent entered,
+  // so only with that choice, and not on a spell.
+  for (const b of [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])])
+    if (allEffects(b.effects).some((e) => e.type === "putFromHand" && e.filter?.chosen === "type") && (b === out.spell || !choosesType || allEffects(b.effects).some((e) => e.type === "choose"))) out.unsupported.push(`${b.text} (a card of the chosen type, with no type chosen as it entered)`);
   // "Attached to enchanted creature" (Mantle of the Ancients): only an Aura that enchants a creature has one.
   const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
   if (bodies.some((b) => allEffects(b.effects).some((e) => e.type === "putOntoBattlefield" && e.attachToEnchanted)) && !(d.subtypes.includes("Aura") && out.enchant?.kind === "object" && out.enchant.types?.includes("Creature")))

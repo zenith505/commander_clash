@@ -4815,6 +4815,8 @@ export function splitSecondOnStack(s: GameState): boolean {
  */
 function hasSplitSecond(s: GameState, o: GameObject, controller: PlayerId, item: StackItem): boolean {
   if (objHasKeyword(s, o, "Split second")) return true;
+  // Molten Disaster: its own split second while it was kicked (CR 702.33d), a copy of a kicked spell kicked too (rulings).
+  if (abilitiesOf(s, o).splitSecondIfKicked && ((item.kind === "spell" && item.kicked?.length) || o.kicked?.length)) return true;
   if (s.battlefield.some((id) => controllerOf(s, obj(s, id)) === controller && abilitiesOf(s, obj(s, id)).spellsHaveSplitSecond?.some((f) => spellMatches(s, f, item)))) return true;
   if (!o.spent?.from?.artifact) return false;
   return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === controller && !!abilitiesOf(s, obj(s, id)).splitSecondIfArtifactMana);
@@ -5472,7 +5474,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // "Whenever you cast a permanent spell using mana produced by Tecutlan": its mana is kept apart, to tell.
   const source = abilitiesOf(s, o).triggers.some((t) => t.cast?.manaFromSelf) ? `${o.id}#${o.zoneChanges ?? 0}` : undefined;
   if (getter !== p.id) log(s, `${p.name} taps ${name}: ${player(s, getter).name} adds ${adds.map((m) => `{${m}}`).join("")}.`);
-  addMana(s, getter, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: true as const } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
+  addMana(s, getter, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: ab.spentCreatureCounter } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
   // Winter's Night: the land tapped for mana doesn't untap during its controller's next untap step.
@@ -12552,7 +12554,7 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
     const at = obj(s, b.attacker);
     const bd = defOf(s, bl);
     const ad = defOf(s, at);
-    if (controllerOf(s, bl) !== p.id || bl.zone !== "battlefield" || !objIsType(s, bl, "Creature") || bl.tapped)
+    if (controllerOf(s, bl) !== p.id || bl.zone !== "battlefield" || !objIsType(s, bl, "Creature") || !untappedForBlocking(s, bl))
       throw new RulesError(`${bd.name} can't block`);
     const already = seen.get(bl.id) ?? [];
     if (already.includes(at.id)) throw new RulesError(`${bd.name} already blocks ${ad.name}`);
@@ -12687,7 +12689,7 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
   // Hipparion: nor is one that has to pay to block that attacker (CR 509.1c).
   const cannot = (b: GameObject, at: GameObject) => !!blockProblem(s, b, at) || blockTaxVs(s, b.id, at.id) > 0;
   // One that has to pay to block (Qal Sisma Behemoth) is never obliged to (CR 509.1c).
-  const mine = creaturesOf(s, pid).filter((o) => !o.tapped && !cantBlockNow(s, o) && !characteristics(s, o).ownBlockTax && !(characteristics(s, o).cantBlockAlone && !earlier && blocking.size <= 1 && !blocking.has(o.id)));
+  const mine = creaturesOf(s, pid).filter((o) => untappedForBlocking(s, o) && !cantBlockNow(s, o) && !characteristics(s, o).ownBlockTax && !(characteristics(s, o).cantBlockAlone && !earlier && blocking.size <= 1 && !blocking.has(o.id)));
   // A creature already blocking as many demanding attackers as it can block obeys all the requirements it can.
   const full = (b: GameObject) => {
     const at = blocking.get(b.id) ?? [];
@@ -12800,12 +12802,22 @@ export function cantBlockNow(s: GameState, o: GameObject): boolean {
   return defMv(defOf(s, o)) % 2 === 0 && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) !== you && abilitiesOf(s, s.objects[id]!).opponentsCantBlockEven);
 }
 
+/**
+ * A creature that may be declared as a blocker as far as being tapped goes (CR 509.1a): untapped, or tapped while its
+ * controller controls Masako the Humorless ("Tapped creatures you control can block as though they were untapped").
+ */
+export function untappedForBlocking(s: GameState, o: GameObject): boolean {
+  if (!o.tapped) return true;
+  const you = controllerOf(s, o);
+  return s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === you && !!abilitiesOf(s, s.objects[id]!).tappedCreaturesCanBlock);
+}
+
 export function blockProblem(s: GameState, blocker: GameObject, attacker: GameObject, defender = attacker.attacking): string | null {
   const b = characteristics(s, blocker);
   const a = characteristics(s, attacker);
   const has = (c: typeof a, k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   // A battle can't block, even one that's also a creature (CR 509.1a; rulings).
-  if (!b.types.includes("Creature") || b.types.includes("Battle") || blocker.tapped) return `${b.name} can't block`;
+  if (!b.types.includes("Creature") || b.types.includes("Battle") || !untappedForBlocking(s, blocker)) return `${b.name} can't block`;
   if (cantBlockNow(s, blocker)) return `${b.name} can't block`;
   if (cantBeBlockedNow(s, attacker)) return `${a.name} can't be blocked`;
   if (has(a, "Flying") && !has(b, "Flying") && !has(b, "Reach") && !b.reachVs?.some((t) => a.allCreatureTypes || a.subtypes.includes(t))) return `${b.name} can't block a creature with flying`; // CR 702.9b

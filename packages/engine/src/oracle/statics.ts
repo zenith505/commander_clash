@@ -409,6 +409,9 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
   else if ((m = /^(~ .+?) if (you've committed a crime this turn)$/.exec(text))) [statement, cond] = [m[1], m[2]];
   // Fugitive Droid: "~ can't be blocked if an artifact entered the battlefield under your control this turn": the same.
   else if ((m = /^(~ can't be blocked) if (an? [a-z]+ entered the battlefield under your control this turn)$/.exec(text))) [statement, cond] = [m[1], m[2]];
+  // Nimble Trapfinder: "~ can't be blocked if you had another Cleric, Rogue, Warrior, or Wizard enter the battlefield under
+  // your control this turn": the same.
+  else if ((m = /^(~ can't be blocked) if (you had another (?:[A-Z][a-z]+, )+or [A-Z][a-z]+ enter the battlefield under your control this turn)$/.exec(text))) [statement, cond] = [m[1], m[2]];
   if (!statement || !cond) return null;
   // Theros gods: "As long as your devotion to black is less than five, ~ isn't a creature": it loses the card type
   // creature and its creature types (layer 4, CR 205.3d; rulings). It works even if the God lost all abilities, as layer 4
@@ -1106,6 +1109,13 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const b = parseStaticCondition("there is a Desert card in your graveyard", st);
     return a && b ? { kind: "anyOf", conds: [a, b] } : null;
   }
+  // Avengers Assemble!: "if you attacked with a Hero this turn or a Hero entered the battlefield under your control this
+  // turn": either one.
+  if ((m = /^(you attacked with an? [A-Z][a-z]+ this turn) or (an? [A-Z][a-z]+ entered the battlefield under your control this turn)$/.exec(text))) {
+    const a = parseStaticCondition(m[1]!, st);
+    const b = parseStaticCondition(m[2]!, st);
+    return a && b ? { kind: "anyOf", conds: [a, b] } : null;
+  }
   // Earth Rumble Wrestlers: "as long as you control a land creature or a land entered the battlefield under your control
   // this turn": either one.
   if (/^you control a land creature or a land entered the battlefield under your control this turn$/.test(text)) {
@@ -1529,6 +1539,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // time this turn, whether or not you still control it (rulings).
   if ((m = /^you had an? ([A-Z][a-z]+) or ([A-Z][a-z]+) enter the battlefield under your control this turn$/.exec(text)) && subtypeSet(m[1]!) === "Creature" && subtypeSet(m[2]!) === "Creature")
     return { kind: "youEntered", types: [], subtype: m[1]!, orSubtype: m[2]!, n: 1 };
+  // Nimble Trapfinder: "if you had another Cleric, Rogue, Warrior, or Wizard enter the battlefield under your control this
+  // turn": one with any of those types as it entered, not ~ itself, whether or not you still control it (rulings).
+  if ((m = /^you had another ((?:[A-Z][a-z]+, )+)or ([A-Z][a-z]+) enter the battlefield under your control this turn$/.exec(text))) {
+    const types = [...m[1]!.split(", ").filter(Boolean), m[2]!];
+    if (types.every((t) => CREATURE_TYPES.has(t))) return { kind: "youEntered", types: [], anySubtype: types, n: 1, other: true };
+  }
   // Zimone, All-Questioning: "if a land entered the battlefield under your control this turn and you control a prime number
   // of lands": both, the second counted as it triggers and again as it resolves (rulings: it won't resolve otherwise).
   if ((m = /^(an? land entered the battlefield under your control this turn) and (you control a prime number of lands)$/.exec(text))) {
@@ -1557,6 +1573,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^you attacked with ${NUM} or more creatures this turn$`).exec(text))) return { kind: "attackedWith", n: num(m[1]!) };
   // Deepway Navigator: "you attacked with three or more Merfolk this turn": of that type as they were declared.
   if ((m = new RegExp(`^you attacked with ${NUM} or more ([A-Z][a-z]+) this turn$`).exec(text)) && CREATURE_TYPES.has(singularWord(m[2]!))) return { kind: "attackedWith", n: num(m[1]!), subtype: singularWord(m[2]!) };
+  // Avengers Assemble!: "you attacked with a Hero this turn": a creature of that type as it was declared.
+  if ((m = /^you attacked with an? ([A-Z][a-z]+) this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "attackedWith", n: 1, subtype: m[1]! };
   // Thaumaton Torpedo: "you attacked with a Spacecraft this turn": an artifact type, as it was declared (CR 205.3g).
   if (/^you attacked with a Spacecraft this turn$/.test(text)) return { kind: "attackedWith", n: 1, subtype: "Spacecraft" };
   if ((m = new RegExp(`^you attacked with creatures with total power ${NUM} or greater this combat$`).exec(text))) return { kind: "attackPower", n: num(m[1]!) };
@@ -1576,6 +1594,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Your life total (CR 119), against a number or your starting life total (CR 903.7).
   if ((m = /^you have (\d+) or (more|less) life$/.exec(text))) return { kind: "life", ...(m[2] === "more" ? { min: Number(m[1]) } : { max: Number(m[1]) }) };
   // The End: "if your life total is 5 or less" (CR 119).
+  // Elderscale Wurm: "if your life total is less than 7".
+  if ((m = /^your life total is less than (\d+)$/.exec(text))) return { kind: "life", max: Number(m[1]) - 1 };
   if ((m = /^your life total is (\d+) or less$/.exec(text))) return { kind: "life", max: Number(m[1]) };
   // Near-Death Experience: "if you have exactly 1 life".
   if ((m = /^you have exactly (\d+) life$/.exec(text))) return { kind: "life", min: Number(m[1]), max: Number(m[1]) };

@@ -3,19 +3,19 @@ import type { Effect, TriggeredAbility } from "../abilities";
 import type { Ctx } from "./body";
 import { counterKind, num } from "./words";
 import { parseTrigger } from "./triggers";
+import { round324Sentence, round324Trigger } from "./round324";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 export function round323Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void s;
-  void sentences;
-  void si;
-  void ctx;
-  void effects;
-  return null;
+  // Round 324's sentences first (oracle/round324.ts).
+  return round324Sentence(s, sentences, si, ctx, effects);
 }
 
 export function round323Trigger(raw: string): TriggeredAbility | "fail" | null {
+  // Round 324's triggers first (oracle/round324.ts).
+  const r324 = round324Trigger(raw);
+  if (r324 !== null) return r324;
   // Overseer of Vault 76: "At the beginning of combat on your turn, you may remove three quest counters from among permanents
   // you control. When you do, put a +1/+1 counter on each creature you control and they gain vigilance until end of turn.":
   // exactly three, chosen as it resolves from any permanents you control, never more (rulings); not an option with fewer

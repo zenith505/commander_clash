@@ -2820,7 +2820,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return;
       }
       if (!sc.found) {
-        const filter = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
+        // Belbe's Portal: "a creature card of the chosen type", the type chosen as its source entered.
+        const filter = e.filter && bindBound(s, e.filter.chosen === "type" ? bindChosen(e.filter, ctx.chosen) : e.filter, amountCtx(s, ctx));
         // "With lesser power" (Shadowfax): its power in your hand, less than the source's, or the source's as it last
         // existed on the battlefield (rulings).
         const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;

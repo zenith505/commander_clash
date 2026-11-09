@@ -281,7 +281,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
 
   // "That creature enters with an additional +1/+1 counter on it" about a creature spell a cast trigger is about (Boreal
   // Outrider): the spell, as it resolves (CR 614.1c).
-  if ((m = new RegExp(`^[Tt]hat creature enters with (an|${NUMX}) additional ${COUNTER} counters? on it$`).exec(s)))
+  // Chocobo Camp: "When you next cast a Bird creature spell this turn, it enters with an additional +1/+1 counter on it":
+  // "it" is that spell (Ctx.spellIt), the same.
+  if ((m = new RegExp(`^(?:[Tt]hat creature|${ctx.spellIt ? "[Ii]t" : "[Tt]hat creature"}) enters with (an|${NUMX}) additional ${COUNTER} counters? on it$`).exec(s)))
     // "That creature enters with X additional +1/+1 counters on it, where X is the number of ingredient counters on ~"
     // (Communal Brewing): X counted as the trigger resolves (rulings), with ~'s last known counters if it has left.
     return ctx.castSpell && (m[1] !== "X" || ctx.whereX) ? [{ type: "spellEntersWith", counter: counterKind(m[m.length - 1]!), n: m[1] === "an" ? 1 : amt(m[1]!) }] : null;

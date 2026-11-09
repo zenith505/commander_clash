@@ -2118,12 +2118,15 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       // Green Sun's Twilight: "put the chosen cards onto the battlefield or into your hand": all of them the same way,
       // chosen once they're chosen (rulings).
       if (e.orHand && !sc.moved) {
+        // Break Out: "If that card has mana value 2 or less, you may put it onto the battlefield ...": with a greater mana
+        // value there's no choice, it goes into the hand.
+        if (e.orHandMvMax !== undefined && found.length && found.every((id) => defMv(defOf(s, obj(s, id))) > e.orHandMvMax!)) return dig(s, { ...e, into: "hand", orHand: undefined, orHandMvMax: undefined, tapped: undefined, hasteOnto: undefined }, ctx, src, pid);
         if (found.length && sc.either === undefined) {
           const them = found.length === 1 ? names(found) : "them";
           s.pending = { kind: "chooseOption", player: p.id, source: src, what: "either", options: ["0", "1"], labels: [`Put ${names(found)} onto the battlefield`, `Put ${them} into your hand`], prompt: "choose one" };
           return "paused";
         }
-        if (sc.either === 1) return dig(s, { ...e, into: "hand", orHand: undefined, tapped: undefined }, ctx, src, pid);
+        if (sc.either === 1) return dig(s, { ...e, into: "hand", orHand: undefined, orHandMvMax: undefined, tapped: undefined, hasteOnto: undefined }, ctx, src, pid);
       }
       // Resuming after the owner ordered the rest for the bottom: the cards taken have already moved.
       if (sc.moved) return toBottom(s, from, looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library"), src, false) ?? castExiled();
@@ -2213,6 +2216,11 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           } else player(s, from).library = [id, ...player(s, from).library.filter((x) => x !== id)];
         }
       });
+      // Break Out: "... and it gains haste until end of turn": the permanent it became (CR 400.7).
+      if (e.hasteOnto && r.created?.length) {
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: "endOfTurn", affected: [...r.created], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+        invalidateCharacteristics(s);
+      }
       // Nine-Fingers Keene: where the rest go, decided now, the card taken already where it went (rulings).
       const restTo = e.restToHandIf && !sc.moved && staticConditionNow(s, e.restToHandIf, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller) ? "hand" : e.rest;
       if (restTo === "shuffle") {

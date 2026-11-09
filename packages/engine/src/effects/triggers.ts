@@ -875,6 +875,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       undefined,
       { counters: ev.counters, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) },
     );
+    // Zenos yae Galvus: "When the chosen creature leaves the battlefield": the permanent noted as it, that object (CR 400.7),
+    // gone to any zone; Zenos's own ability, so only while Zenos is on the battlefield.
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const ch = w.chosen?.object;
+      if (id !== ev.id && ch?.id === ev.id && ch.zc === was) add(w, controllerOf(s, w), (e) => e === "chosenObjectLeaves", undefined, undefined, o);
+    }
     // "Whenever ~ becomes unattached from a permanent": an Aura's or Equipment's own event, not the creature's dying (as
     // "whenever you sacrifice" isn't, rulings), so Hushbringer doesn't stop it.
     locked = null;
@@ -1538,7 +1545,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
       // Curse of Vengeance: "When enchanted player loses the game": the Aura is still attached to them as they leave.
-      if (you !== ev.player) add(o, you, (e) => e === "anotherPlayerLosesGame" || (e === "enchantedPlayerLosesGame" && o.attachedToPlayer === ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+      // Shinryu, Transcendent Rival: "When the chosen player loses the game".
+      if (you !== ev.player) add(o, you, (e) => e === "anotherPlayerLosesGame" || (e === "enchantedPlayerLosesGame" && o.attachedToPlayer === ev.player) || (e === "chosenPlayerLosesGame" && o.chosen?.player === ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "connived") {
     // "Whenever a creature you control connives" (Iron Monger, Ultron): even one that has left the battlefield (Toluz

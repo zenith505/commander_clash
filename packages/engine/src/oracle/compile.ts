@@ -1613,6 +1613,12 @@ export function compile(d: CardDef): CompiledCard {
     // "As this creature transforms into Sephiroth, One-Winged Angel, you get an emblem with ..." (CR 712.20): instructions
     // with no targets, done as it transforms.
     const asTransforms = /^As ~ transforms into ~, (.+)$/.exec(line);
+    // Shinryu, Transcendent Rival: "As this creature transforms into Shinryu, choose an opponent.": chosen as it transforms
+    // (CR 712.20), only by transforming (rulings: not if it enters with this face up); "the chosen player" its own.
+    if (asTransforms?.[1] === "choose an opponent." && !out.asTransformsChoose) {
+      out.asTransformsChoose = "opponent";
+      continue;
+    }
     if (asTransforms) {
       const body = parseBody(capital(asTransforms[1]!), {});
       if (!body || body.targets.length || out.asTransforms || allEffects(body.effects).some((e) => e.type !== "emblem")) out.unsupported.push(raw);

@@ -211,7 +211,8 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const tappedHere = e.fromTapped ? (r.tappedIds ?? []).filter((c) => s.objects[c.id]?.zone === "battlefield" && (obj(s, c.id).zoneChanges ?? 0) === c.zc && objectMatches(s, e.filter, obj(s, c.id), pid, false)).map((c) => c.id) : undefined;
     // Grenzo's Rebuttal: among the permanents of the player to this one's left (the next in turn order, CR 101.4).
     const left = e.amongLeft ? nearestOpponent(s, pid, "left") : undefined;
-    const options0 = e.amongLeft ? (left === undefined ? [] : pickOptions(s, e, left, ctx.sourceId, ctx.sourceZc)) : tappedHere ?? ofTargets ?? group ?? (e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId, ctx.sourceZc)) : pickOptions(s, e, pid, ctx.sourceId, ctx.sourceZc));
+    // The Legend of Yangchen: among the permanents this ability's controller's opponents control, whoever picks.
+    const options0 = e.amongYourOpponents ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) !== ctx.controller && objectMatches(s, e.filter, obj(s, id), ctx.controller, false)) : e.amongLeft ? (left === undefined ? [] : pickOptions(s, e, left, ctx.sourceId, ctx.sourceZc)) : tappedHere ?? ofTargets ?? group ?? (e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId, ctx.sourceZc)) : pickOptions(s, e, pid, ctx.sourceId, ctx.sourceZc));
     // Labyrinth Raptor: only creatures blocking the trigger's subject now, the same attacking object (CR 400.7, 509.1h).
     const attacker = e.filter.blockingSubject && ctx.subject ? s.objects[ctx.subject.id] : undefined;
     const options1 = !e.filter.blockingSubject ? options0 : attacker && attacker.zone === "battlefield" && (attacker.zoneChanges ?? 0) === ctx.subject!.zc && attacker.attacking !== undefined ? options0.filter((id) => !!attacker.blockedBy?.includes(id) && obj(s, id).blocking?.includes(attacker.id)) : [];
@@ -1437,10 +1438,17 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Rod of Absorption: "with total mana value X or less", what's left of X as each is cast.
         sc.castAmong = { ids, declined: [], ...(e.exactMv !== undefined ? { exactMv: amountNow(s, e.exactMv, ctx) } : {}), ...(e.totalMv !== undefined ? { budget: amountNow(s, e.totalMv, ctx) } : {}) };
       }
+      if (!sc.castAmong && e.opponentsExile) {
+        // Ashiok, Nightmare Muse: every face-up card your opponents own in exile (each player's own exile here, CR 406.3).
+        const pool = s.turnOrder.filter((pid) => pid !== you.id).flatMap((pid) => s.players[pid]!.exile);
+        sc.castAmong = { ids: pool.filter((id) => obj(s, id).owner !== you.id && !obj(s, id).faceDown).map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
+      }
       if (!sc.castAmong && e.ownExileCounter) {
         // Goliath Daydreamer: every card you own in exile with that kind of counter on it, whatever put it there (rulings).
         const k = e.ownExileCounter;
-        sc.castAmong = { ids: you.exile.filter((id) => (obj(s, id).counters[k] ?? 0) > 0 && obj(s, id).owner === you.id && !obj(s, id).faceDown).map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
+        // Tasha: every player's cards in exile (each player has their own exile here).
+        const pool = e.anyOwnerExile ? s.turnOrder.flatMap((pid) => s.players[pid]!.exile) : you.exile;
+        sc.castAmong = { ids: pool.filter((id) => (obj(s, id).counters[k] ?? 0) > 0 && (e.anyOwnerExile || obj(s, id).owner === you.id) && !obj(s, id).faceDown).map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
       }
       if (!sc.castAmong && e.fromYard?.randomLinked) {
         // Arcane Bombardment: one card at random, linked to the source; then every card still exiled with it.
@@ -4371,7 +4379,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           for (const pid of apnap(s, players(s, e.who, ctx))) {
             const ids = [...player(s, pid).graveyard];
             for (const id of ids) moveObject(s, id, "exile");
-            all.push(...ids.filter((id) => obj(s, id).zone === "exile"));
+            all.push(...(e.ownersPlay || e.ownAndLesser ? ids.filter((id) => obj(s, id).zone === "exile") : ids));
           }
           if (all.length) log(s, `${p.name} exiles ${all.map((id) => defOf(s, obj(s, id)).name).join(", ")} from ${e.who.ref === "eachOpponent" ? "each opponent's graveyard" : "graveyards"}.`);
           const ids = all.filter((id) => !e.chooseAmong || printedMatches(e.chooseAmong, defOf(s, obj(s, id))));
@@ -4395,11 +4403,26 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           for (const id of ids) {
             moveObject(s, id, "exile");
             const o = obj(s, id);
-            o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(e.life ? { life: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.free ? { free: true as const } : {}) };
+            if (o.zone !== "exile" && (e.ownersPlay || e.ownAndLesser)) continue;
+            // Rocco: each player plays the card they exiled, until this ability's controller's next end step.
+            const holder = e.ownersPlay ? pid : p.id;
+            o.mayPlay = { player: holder, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.ownersPlay && holder !== ctx.controller ? { untilOf: ctx.controller } : {}), ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(e.life ? { life: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.free ? { free: true as const } : {}) };
           }
-          all.push(...ids);
+          all.push(...(e.ownersPlay || e.ownAndLesser ? ids.filter((id) => obj(s, id).zone === "exile") : ids));
+        }
+        // Triple Triad: only the card you own exiled this way and those with lesser mana value than it (X as 0, CR 202.3e,
+        // rulings); none at all if you exiled none.
+        if (e.ownAndLesser) {
+          const mine = all.find((id) => obj(s, id).owner === ctx.controller);
+          const mv = mine !== undefined ? defMv(defOf(s, obj(s, mine))) : -1;
+          for (const id of all) if (id !== mine && !(defMv(defOf(s, obj(s, id))) < mv)) obj(s, id).mayPlay = undefined;
         }
         if (s.resolving) (s.resolving.impulsed ??= []).push(...all);
+        if (all.length && (e.ownersPlay || e.ownAndLesser)) {
+          const playable = all.filter((id) => obj(s, id).mayPlay);
+          log(s, `Each player exiles the top card of their library: ${all.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, obj(s, id).owner).name})`).join(", ")}. ${e.ownersPlay ? `Until ${p.name}'s next end step, each player may play the card they exiled` : playable.length ? `${p.name} may play ${playable.map((id) => defOf(s, obj(s, id)).name).join(", ")} without paying their mana costs this turn` : `${p.name} may play none of them`}.`);
+          return;
+        }
         if (all.length) log(s, `${p.name} exiles ${all.map((id) => defOf(s, obj(s, id)).name).join(", ")} from ${e.graveyards ? (e.who.ref === "target" ? `${players(s, e.who, ctx).map((pid) => player(s, pid).name).join("")}'s graveyard` : "each opponent's graveyard") : `the top of each ${e.who.ref === "eachOpponent" ? "opponent's " : ""}library`} and may ${e.oneOf ? "play one of them" : e.castOnly ? "cast them" : "play them"}${e.free ? " without paying their mana costs" : ""}${e.life ? ", paying life rather than mana for a spell" : ""}${e.anyType ? ", spending mana as though it were mana of any color" : ""}${e.until === "thisTurn" ? " this turn" : e.until === "exiled" ? " for as long as they remain exiled" : ""}.`);
         return;
       }

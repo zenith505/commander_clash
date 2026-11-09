@@ -616,7 +616,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const twice = (id: ObjectId) => !e.nameTwice || all.some((x) => x !== id && sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name));
         // Soldevi Sage: only the cards just drawn, those still in that hand.
         const drawn = e.drawn ? (s.resolving!.drawnThisWay ?? []) : undefined;
-        const hand = all.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && twice(id) && (!drawn || drawn.includes(id)));
+        // Ashiok, Nightmare Muse: a token returned to a hand isn't a card, so it can't be the card exiled from it (rulings).
+        const tokenHere = !!e.exile && all.some((id) => obj(s, id).isToken);
+        const hand = all.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && twice(id) && (!drawn || drawn.includes(id)) && !(tokenHere && obj(s, id).isToken));
         if (e.downToFewest) {
           if (hand.length > fewest && fewest > 0) {
             s.pending = { kind: "discard", player: pid, count: hand.length - fewest, source: src };
@@ -643,7 +645,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           continue;
         }
         if (!e.hand && hand.length > n) {
-          s.pending = { kind: "discard", player: pid, count: n, source: src, ...(filter ? { filter } : {}), ...(e.exile ? { exile: true as const } : {}), ...(drawn ? { among: hand } : {}) };
+          s.pending = { kind: "discard", player: pid, count: n, source: src, ...(filter ? { filter } : {}), ...(e.exile ? { exile: true as const } : {}), ...(drawn || tokenHere ? { among: hand } : {}) };
           return "paused";
         }
         sc.chosen![pid] = [...hand]; // no choice to make: the whole hand (all the cards that match)

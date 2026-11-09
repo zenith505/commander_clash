@@ -1298,6 +1298,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "addEndStep":
     case "loseGame":
     case "winGame":
+    case "rememberChosenObject":
     case "highestLifeWins":
       return runBasicsEffect(s, e, ctx, src);
     case "damageRule":

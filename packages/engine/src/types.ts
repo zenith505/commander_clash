@@ -444,6 +444,8 @@ export interface GameObject {
     source?: { id: ObjectId; zc: number };
     /** "Without paying its mana cost" (CR 118.9). */
     free?: true;
+    /** With until "yourNextEndStep": whose end step ends it, if not `player`'s (Rocco, Street Chef: "Until your next end step, each player may play the card they exiled this way"). */
+    untilOf?: PlayerId;
     /** With until "thisTurn": only while `source` is still on the battlefield as that object too (Uba Mask's "cards they exiled with ~ this turn"). */
     whileSource?: true;
     /** Foretold with the foretell a permanent gave it in hand (Dream Devourer): its foretell cost is its mana cost (the face cast's, rulings) less this much generic mana, though it doesn't have foretell any more (rulings). */

@@ -6659,6 +6659,12 @@ export function compile(d: CardDef): CompiledCard {
     if (spellLines.length || spree.costs.length < 2 || ascendSpell || modes.some((m) => !m)) out.unsupported.push(...spree.lines, ...spellLines);
     else out.spell = { targets: [], effects: [], text: spree.lines.join(" "), modal: { min: 1, max: spree.tiered ? 1 : modes.length, modes: modes as AbilityBody[], costs: spree.costs } };
   } else if (isSpell) {
+    // Spoils of War: "X is the number of artifact and/or creature cards in an opponent's graveyard as you cast ~": X in its
+    // mana cost set by its text as it's cast (CR 107.3c; the player can't choose it, rulings), the opponent chosen then.
+    if (spellLines.length >= 2 && /^X is the number of artifact and\/or creature cards in an opponent's graveyard as you cast ~\.$/.test(spellLines[0]!) && parseManaCost(d.manaCost).hasX) {
+      spellLines.shift();
+      out.castXIs = { opponentGraveyard: { kind: "card", types: ["Artifact", "Creature"], notTypes: [], notColors: [], text: "artifact and/or creature card" } };
+    }
     // "Choose one — • Destroy all creatures. • Destroy all planeswalkers." then "Then return a creature ... card from your
     // graveyard to the battlefield ..." (Blood on the Snow): the paragraph after the modes is done whichever mode was
     // chosen, after it (CR 700.2, 608.2c). With one mode chosen, that's the same as the end of each mode.
@@ -6817,7 +6823,7 @@ export function compile(d: CardDef): CompiledCard {
     if (Array.isArray(v)) return v.some(affectedPoison);
     if (!v || typeof v !== "object") return false;
     if ((v as { type?: string }).type === "continuous" && (v as { what?: { ref?: string } }).what?.ref === "each") return false;
-    return (v as { kind?: string }).kind === "affectedControllerPoison" || (v as { kind?: string }).kind === "affectedControllerHand" || (v as { kind?: string }).kind === "affectedColors" || Object.values(v).some(affectedPoison);
+    return (v as { kind?: string }).kind === "affectedControllerPoison" || (v as { kind?: string }).kind === "affectedControllerHand" || (v as { kind?: string }).kind === "affectedColors" || (v as { kind?: string }).kind === "affectedCreatureTypes" || Object.values(v).some(affectedPoison);
   };
   if (affectedPoison([out.spell, out.triggers, out.activated])) out.unsupported.push("(poison counters of an affected permanent's controller, with no affected permanent)");
   // Both pay with the same chosen cards: a discard for jump-start on top of a discard the spell asks for isn't modeled.

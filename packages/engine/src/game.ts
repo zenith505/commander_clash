@@ -5831,6 +5831,17 @@ export function castProblem(
   const typeChoice = compileCard(defOf(s, o)).castChooseType;
   if (choices?.creatureType !== undefined && (!typeChoice || !CREATURE_TYPES.has(choices.creatureType))) return typeChoice ? `${choices.creatureType} isn't a creature type` : `${defOf(s, o).name} doesn't ask you to choose a creature type`;
   if (typeChoice && targets !== undefined && choices?.creatureType === undefined) return `choose a creature type for ${defOf(s, o).name} before its targets`;
+  // Spoils of War: X is what its text says as it's cast (CR 107.3c), counted in the graveyard of the opponent chosen then,
+  // before X (rulings); with none chosen yet, it can still be cast once one is.
+  const castXIs = compileCard(defOf(s, o)).castXIs;
+  if (castXIs) {
+    if (!opponents(s, pid).length) return `${defOf(s, o).name} needs an opponent to choose`;
+    if (choices?.xOpponent !== undefined && !opponents(s, pid).includes(choices.xOpponent)) return `choose an opponent: X is the number of ${castXIs.opponentGraveyard.text}s in their graveyard`;
+    if (choices?.xOpponent === undefined && (x !== undefined || targets !== undefined)) return `choose an opponent for ${defOf(s, o).name}: X is the number of ${castXIs.opponentGraveyard.text}s in their graveyard`;
+    const fx = definedCastX(s, pid, o, choices);
+    if (fx !== undefined && x !== undefined && x !== fx) return `X is ${fx} for ${defOf(s, o).name}`;
+    x ??= fx;
+  } else if (choices?.xOpponent !== undefined) return `${defOf(s, o).name} doesn't ask you to choose an opponent`;
   if ((choices?.alt === "prototype" || choices?.prototyped) && !o.prototyped) {
     // Cast prototyped, only its alternative characteristics are looked at (CR 718.3a).
     if (!altCost(defOf(s, o), "prototype")) return `${defOf(s, o).name} doesn't have prototype`;
@@ -7087,6 +7098,10 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const castNumber = compileCard(defOf(s, o)).castNumber;
   if (castNumber && choices.number === undefined) throw new RulesError(`choose a number between ${castNumber.min} and ${castNumber.max} for ${defOf(s, o).name}`);
   if (compileCard(defOf(s, o)).castChooseType && choices.creatureType === undefined) throw new RulesError(`choose a creature type for ${defOf(s, o).name}`);
+  if (compileCard(defOf(s, o)).castXIs) {
+    if (choices.xOpponent === undefined) throw new RulesError(castProblem(s, p.id, id, undefined, modes, convoke, improvise, undefined, choices) ?? `choose an opponent for ${defOf(s, o).name}`);
+    x ??= definedCastX(s, p.id, o, choices);
+  }
   const madness = madnessCastOf(s, p.id, id);
   const suspended = s.pending?.kind === "castFree" && s.pending.how === "suspend" && s.pending.objectId === id;
   const d = defOf(s, o);
@@ -8959,6 +8974,17 @@ const loyaltyAtInstantSpeed = (s: GameState, pid: PlayerId, o?: GameObject) =>
   [...s.battlefield.map((x) => obj(s, x)).filter((x) => controllerOf(s, x) === pid), ...liveEmblems(s).filter((x) => x.owner === pid)].some((x) => abilitiesOf(s, x).loyaltyAtInstantSpeed);
 
 /**
+ * Spoils of War: the X a spell's own text sets as it's cast (CR 107.3c), from the opponent chosen then (CostChoices.xOpponent):
+ * the cards like the filter in that player's graveyard now. Undefined with no such text or no opponent chosen yet.
+ */
+export function definedCastX(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices): number | undefined {
+  const xIs = compileCard(defOf(s, o)).castXIs;
+  const opp = choices?.xOpponent;
+  if (!xIs || opp === undefined || !s.players[opp]) return undefined;
+  return s.players[opp]!.graveyard.filter((id) => id !== o.id && printedMatches(xIs.opponentGraveyard, defOf(s, obj(s, id)))).length;
+}
+
+/**
  * The X an ability's own text sets (CR 107.3c), its controller not choosing it: Prototype Portal's "X is the mana value of
  * that card", the card exiled with it (X in that card's mana cost as 0, CR 107.3g). Null with no such card: X isn't defined,
  * so it can't be paid (rulings). Undefined for an ability whose X is chosen.
@@ -10667,6 +10693,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     // "You may collect evidence X": the X chosen, then the cards (CR 701.59a); "none" doesn't collect any.
     (r.scratch ??= {}).payX = choice;
     log(s, choice === "none" ? `${p.name} chooses not to collect evidence.` : `${p.name} chooses X = ${choice} for ${pend.source}.`);
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "payWhich") {
+    // "You may pay {G}, {W}, or {U}" (Isu the Abominable): the one chosen, paid next.
+    (r.scratch ??= {}).payX = choice;
+    log(s, choice === "none" ? `${p.name} doesn't pay for ${pend.source}.` : `${p.name} chooses to ${(pend.labels?.[pend.options.indexOf(choice)] ?? "pay").replace(/^Pay/, "pay")} for ${pend.source}.`);
     continueResolution(s);
     return;
   }
@@ -12830,6 +12863,14 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   for (const f of a.cantBeBlockedBy) if (objectMatches(s, f, blocker, b.controller, false)) return `${a.name} can't be blocked by ${f.text}`; // CR 509.1b
   // Tanglewalker: while the player it's attacking controls such a permanent (CR 506.2, 509.1b).
   for (const f of a.cantBeBlockedIfDefending ?? []) if (defender !== undefined && s.battlefield.some((id) => { const x = obj(s, id); return controllerOf(s, x) === defender && objectMatches(s, f, x, defender, false); })) return `${a.name} can't be blocked while defending player controls ${f.text.startsWith("a") ? "an" : "a"} ${f.text}`;
+  // Become the Pilot: unless it's attacking its owner, or a planeswalker or battle its owner controls (CR 506.2, 509.1b);
+  // a battle's controller as it was attacked (CR 506.4).
+  if (a.cantBeBlockedUnlessAttackingOwner) {
+    const at = attacker.attackingPermanent;
+    const atObj = at ? s.objects[at.id] : undefined;
+    const whose = at ? (at.battleController ?? (atObj && atObj.zone === "battlefield" && (atObj.zoneChanges ?? 0) === at.zc ? controllerOf(s, atObj) : undefined)) : defender;
+    if (whose !== attacker.owner) return `${a.name} can't be blocked unless it's attacking its owner or a permanent its owner controls`;
+  }
   for (const only of a.blockableOnlyBy ?? []) if (!only.filters.some((f) => objectMatches(s, f, blocker, b.controller, false))) return `${a.name} can't be blocked except by ${only.text}`; // CR 509.1b
   for (const f of b.cantBlockCreatures) if (objectMatches(s, f, attacker, a.controller, false)) return `${b.name} can't block ${f.text}`; // CR 509.1b
   if (blocker.cantBlockThis?.some((x) => x.turn === s.turn && x.selfZc === (blocker.zoneChanges ?? 0) && x.id === attacker.id && x.zc === (attacker.zoneChanges ?? 0))) return `${b.name} can't block ${a.name} this turn`; // CR 509.1b

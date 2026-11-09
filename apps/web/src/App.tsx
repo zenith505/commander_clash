@@ -4113,7 +4113,7 @@ function PilePicker({
             <div key={i} data-pile={i}>
               <h4>
                 {faceDown ? (i === 0 ? "Face-down pile" : "Face-up pile") : `Pile ${i + 1}`} ({pile.length === 1 ? `1 ${pending.sacrificePile ? "permanent" : "card"}` : `${pile.length} ${pending.sacrificePile ? "permanents" : "cards"}`}){" "}
-                <button onClick={() => onDone(String(i))}>{pending.destroyPile ? `Destroy pile ${i + 1}` : pending.sacrificePile ? `Sacrifice pile ${i + 1}` : pending.pileMode === "pickOne" ? `Choose pile ${i + 1}` : pending.pileMode === "turnFaceUp" ? `Turn pile ${i + 1} face up` : pending.pileMode === "battlefield" ? `Put pile ${i + 1} onto the battlefield` : faceDown ? `Put the ${i === 0 ? "face-down" : "face-up"} pile into ${whose} hand` : `Put pile ${i + 1} into ${whose} hand`}</button>
+                <button onClick={() => onDone(String(i))}>{pending.destroyPile ? `Destroy pile ${i + 1}` : pending.sacrificePile ? `Sacrifice pile ${i + 1}` : pending.pileMode === "pickOne" ? `Choose pile ${i + 1}` : pending.pileMode === "turnFaceUp" ? `Turn pile ${i + 1} face up` : pending.pileMode === "battlefield" ? `Put pile ${i + 1} onto the battlefield` : pending.pileMode === "exile" ? `Exile pile ${i + 1}` : faceDown ? `Put the ${i === 0 ? "face-down" : "face-up"} pile into ${whose} hand` : `Put pile ${i + 1} into ${whose} hand`}</button>
               </h4>
               <div className="modal-cards">
                 {pile.length === 0 && <span className="muted">{pending.sacrificePile ? "No permanents" : "No cards"}</span>}
@@ -4183,7 +4183,7 @@ function LibrarySearch({
             {pending.piles
               ? dig?.to === "for the face-down pile"
                 ? `${pending.source}: separate ${pending.forPlayer !== undefined ? `${s.players[pending.forPlayer]!.name}'s` : "your"} cards into a face-down pile and a face-up pile. Choose the cards for the face-down pile`
-                : `${pending.source}: separate ${pending.forPlayer !== undefined ? `${s.players[pending.forPlayer]!.name}'s` : "your"} ${pending.exiled ? "exiled" : "revealed"} cards into two piles. Choose the cards for the first pile`
+                : `${pending.source}: separate ${pending.forPlayer !== undefined ? `${s.players[pending.forPlayer]!.name}'s` : "your"} ${pending.exiled ? "exiled" : pending.yardPiles ? "graveyard's" : "revealed"} cards into two piles. Choose the cards for the first pile`
               : dig && (pending.hand !== undefined || pending.forPlayer !== undefined || pending.exiled)
               ? `${pending.source}: choose ${pending.what} ${dig.to}`
               : dig

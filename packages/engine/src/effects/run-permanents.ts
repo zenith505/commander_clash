@@ -1357,6 +1357,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     case "removeAnyCounters": {
+      // Price of Betrayal, Etched Slith: a target that may be an opponent; a player's counters are removed the same way.
+      const playerT = e.what.ref === "target" && !e.what.n ? ctx.targets[e.what.index] : undefined;
+      if (playerT?.kind === "player" && e.what.ref === "target") return ctx.legal[e.what.index] ? removePlayerCounters(s, e, playerT.id, ctx, src) : undefined;
       // The counters are chosen one at a time as it resolves, any kinds (rulings on Glissa Sunslayer), then removed
       // together; with fewer on it than that, all of them (rulings on Thornmantle Striker).
       const o0 = objects(s, e.what, ctx)[0];
@@ -2709,4 +2712,43 @@ function explore(s: GameState, self: GameObject | undefined, ctx: ResolveCtx, sr
   // Done: "it explores, then it explores again" (Jadelight Ranger) starts over, revealing the same card if it stayed.
   sc.explored = sc.may = undefined;
   explored("nonland");
+}
+
+/**
+ * Price of Betrayal's or Etched Slith's target opponent: their poison, energy, experience and rad counters (CR 122.1),
+ * chosen one at a time as it resolves (rulings: any kinds, several of one kind), then removed together.
+ */
+function removePlayerCounters(s: GameState, e: Extract<Effect, { type: "removeAnyCounters" }>, pid: PlayerId, ctx: ResolveCtx, src: string): "paused" | void {
+  const p = player(s, pid);
+  if (p.lost) return;
+  const kinds = ["poison", "energy", "experience", "rad"] as const;
+  const sc = (s.resolving!.scratch ??= {});
+  const picked = (sc.countersPicked ??= {});
+  const n = amountNow(s, e.n, ctx);
+  const left = (k: (typeof kinds)[number]) => (p[k] ?? 0) - (picked[k] ?? 0);
+  const count = () => Object.values(picked).reduce((a, b) => a + b, 0);
+  while (count() < n && !sc.countersDone) {
+    const have = kinds.filter((k) => left(k) > 0);
+    if (!have.length) break;
+    if (sc.counterKind !== undefined) {
+      if (sc.counterKind === "done") sc.countersDone = true;
+      else if ((kinds as readonly string[]).includes(sc.counterKind) && left(sc.counterKind as (typeof kinds)[number]) > 0) picked[sc.counterKind] = (picked[sc.counterKind] ?? 0) + 1;
+      sc.counterKind = undefined;
+      continue;
+    }
+    if (have.length === 1 && !e.upTo) {
+      picked[have[0]!] = (picked[have[0]!] ?? 0) + Math.min(left(have[0]!), n - count());
+      break;
+    }
+    s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "removeCounter", of: pid, options: [...have, ...(e.upTo ? ["done"] : [])], labels: [...have.map((k) => `A ${k} counter (${left(k)} left)`), ...(e.upTo ? [count() ? "That's all" : "None"] : [])], prompt: `choose a counter to remove from ${p.name} (${count() + 1} of ${n})` };
+    return "paused";
+  }
+  sc.countersPicked = undefined;
+  sc.countersDone = undefined;
+  for (const k of kinds) {
+    const m = Math.min(picked[k] ?? 0, p[k] ?? 0);
+    if (m <= 0) continue;
+    p[k] = (p[k] ?? 0) - m;
+    log(s, `${p.name} loses ${m} ${k} counter${m > 1 ? "s" : ""} (${src}).`);
+  }
 }

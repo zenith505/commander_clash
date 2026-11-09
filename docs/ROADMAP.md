@@ -7107,7 +7107,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   target opponent decides; if not, the revealed cards go to the graveyard, not milled, CR 701.17, and the caster draws
   five; the bot declines when the caster's library is nearly out; a browser test where Ana casts it at you). Wakanda
   Forever! (a permanent card onto the battlefield with an indestructible counter, then one into the hand, from the six
-  revealed, the rest to the graveyard). Kayla's Reconstruction ("up to X" cards onto the battlefield). +10 (30,680 of 31,936 with B154 and rounds 315 and 316).
+  revealed, the rest to the graveyard). Kayla's Reconstruction ("up to X" cards onto the battlefield). +10 (30,678 of 31,936 with B154 and rounds 315 and 316).
 - Out after round B155 (looked at, not done): Reality Twist and Pulse of Llanowar (after the replacement, a land with
   two basic land types lets its controller choose the mana, rulings: the choice isn't modelled for mana replacements),
   Yixlid Jailer (cards in graveyards losing all abilities would have to reach every graveyard-zone ability check).

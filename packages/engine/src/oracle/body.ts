@@ -16,6 +16,7 @@ import { parseCopyExcept, parseToken } from "./tokens";
 import { parsePunisherOptions } from "./sentences/basics";
 import { X_MODES_MAX } from "../modes";
 import { round318Sentence } from "./round318";
+import { round319WholeText } from "./round319";
 
 export interface Ctx {
   targets: TargetSpec[];
@@ -3944,7 +3945,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   }
   // Whole-text forms (Fblthp, Bounty of Skemfar, Planar Genesis) and rewrites (Arlinn, the Pack's Hope; Contractual
   // Safeguard; one X for two instructions), in a helper: this function is at TypeScript's control-flow limit.
-  const r303 = wholeTextForms(text, !!opts.selfEntered);
+  const r303 = wholeTextForms(text, !!opts.selfEntered, opts);
   if (typeof r303 !== "string") return r303;
   text = r303;
   // Demonic Counsel: "search your library for any card, put it into your hand": one card, like "a card".
@@ -20148,9 +20149,11 @@ function roundB155WholeText(text: string): AbilityBody | null {
 }
 
 /** Whole-text forms and rewrites, run by parseBodyText before its sentence loop: a body, or the rewritten text. */
-function wholeTextForms(text: string, selfEntered: boolean): AbilityBody | string {
+function wholeTextForms(text: string, selfEntered: boolean, opts: Parameters<typeof parseBody>[1] = {}): AbilityBody | string {
   const b155 = roundB155WholeText(text);
   if (b155) return b155;
+  const r319 = round319WholeText(text, (t) => parseBody(t, opts));
+  if (r319) return r319;
   // Fblthp, the Lost: "When ~ enters, draw a card. If it entered from your library or was cast from your library, draw two
   // cards instead." How it entered (rulings: not cast from exile after an effect exiled it from the library).
   if (selfEntered && /^draw a card\. If it entered from your library or was cast from your library, draw two cards instead\.$/.test(text.trim()))

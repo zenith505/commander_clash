@@ -1328,7 +1328,7 @@ export function moveObject(
   // A creature put into a graveyard from the battlefield died (CR 700.4), a token too (it goes there first, CR 111.7).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedThisTurn ??= []).push(lastController);
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedNamesThisTurn ??= []).push(o.faceDown ? "" : last.name);
-  if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedTypesThisTurn ??= []).push(o.faceDown ? { subtypes: [], controller: lastController } : { subtypes: [...last.subtypes], ...(last.allCreatureTypes ? { all: true as const } : {}), controller: lastController });
+  if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedTypesThisTurn ??= []).push(o.faceDown ? { subtypes: [], controller: lastController, power: last.power } : { subtypes: [...last.subtypes], ...(last.allCreatureTypes ? { all: true as const } : {}), controller: lastController, power: last.power });
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature && !o.isToken) (s.nontokenDiedThisTurn ??= []).push(lastController);
   // "Put into your graveyard from the battlefield": its owner's graveyard (CR 404.2), a token too (CR 111.7).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) ((s.turnLog ??= {}).creaturesToYard ??= []).push({ owner: o.owner, ...(o.isToken ? { token: true as const } : {}) });
@@ -5602,6 +5602,14 @@ function askChoosers(s: GameState, p: Player, act: DeferredAct["act"], restore?:
   const what = specs[slot]!.text;
   const withChoices = (c: CostChoices): DeferredAct["act"] => (act.type === "castSpell" ? { ...act, targets, ...c } : { ...act, targets, costs: { ...act.costs, ...c } });
   let chooser = choosers[k];
+  // Mogg Assassin: "that opponent" is the controller of the creature chosen for another of its targets.
+  const ofSlot = specs[slot]!.chooserOf;
+  if (chooser === undefined && ofSlot !== undefined) {
+    const t = targets[ofSlot];
+    const owner = t?.kind === "object" && s.objects[t.id] ? controllerOf(s, s.objects[t.id]!) : undefined;
+    if (owner === undefined || owner === p.id || player(s, owner).lost) throw new RulesError(`choose ${specs[ofSlot]!.text} first`);
+    chooser = owner;
+  }
   if (chooser === undefined) {
     // Only an opponent with something to choose: choosing another would make it illegal to cast (CR 601.2c).
     const src = cast ? undefined : sourceQuality(s, o.id);
@@ -10618,6 +10626,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "nextExiled") {
     if (!r.scratch?.chaos) throw new RulesError("no exiled permanents to order");
     r.scratch.nextExiled = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "nextTarget") {
+    // Soulfire Eruption: the next target of the group (Effect exileTopDamageEach).
+    (r.scratch ??= {}).nextTarget = Number(choice);
     continueResolution(s);
     return;
   }

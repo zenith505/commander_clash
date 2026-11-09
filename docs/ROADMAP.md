@@ -1,7 +1,7 @@
 # Roadmap
 
-30,722 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,762 of
+30,730 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,769 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2363,6 +2363,39 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 319 took cards back off the "Out after round N" lists, most played first: "look at the top two cards of your
+   library, put them back in any order, then choose land or nonland. An opponent guesses whether the top card of your
+   library is the chosen kind. Reveal that card. If they guessed right, remove ~ from combat. Otherwise, you draw a card
+   and ~ can't be blocked this turn." (Gollum, Scheming Guide: the opponent who guesses chosen as it resolves, an empty
+   library never guessed right, the card revealed either way, rulings; a browser test of the guess); "for each player,
+   choose target permanent that player controls. Those players sacrifice those permanents. Each player who sacrificed a
+   permanent this way reveals the top card of their library, then puts it onto the battlefield if it's a permanent
+   card." (Vaevictis Asmadi, the Dire: one required target for each player, you included, the ability removed from the
+   stack if any player has nothing it could target, CR 603.3d, rulings; TargetSpec.perPlayerAll; a browser test); "you
+   gain control of a creature of your choice that player controls until end of turn. If you gain control of a creature
+   this way, tap it, and it's attacking that player." as a villainous choice's second option (Midnight Crusader Shuttle:
+   the creature chosen as it's done, attacking without being declared, CR 506.3, 701.55a; a browser test of the pick);
+   "Destroy all Dalek creatures and each of your opponents loses life equal to the total power of Daleks that died this
+   turn" (Genesis of the Daleks chapter IV: every Dalek that died this turn, anyone's, each as it last existed, CR
+   608.2h; TurnLog diedTypesThisTurn power); "Roll a d20 and add the toughness of the creature you sacrificed this way"
+   and "Return a creature card put into a graveyard this way" / "up to two creature cards put into graveyards this way"
+   (Danse Macabre: you choose among the sacrificed cards, rulings); "you and defending player each discard a card or
+   sacrifice a permanent. You draw a card for each land card put into a graveyard this way." (Eumidian Wastewaker: you
+   first, each choosing and doing it in turn, a sacrificed land counting too; a browser test); "Choose any number of
+   target creatures, planeswalkers, and/or players. For each of them, exile the top card of your library, then ~ deals
+   damage equal to that card's mana value to that permanent or player. You may play the exiled cards until the end of
+   your next turn." (Soulfire Eruption: the targets taken player by player in APNAP order, a player and the permanents
+   they control together, the order within that group chosen as it resolves, rulings; a browser test of "which target
+   is next"); "You choose target creature an opponent controls, and that opponent chooses target creature. Flip a coin.
+   ..." (Mogg Assassin: both chosen as it's activated, yours first, the second by the first one's controller without a
+   question, rulings, CR 602.2b; TargetSpec.chooserOf; a browser test). +8, 30,730 of 31,936 with B157 and B158.
+   Out after round 319 (looked at, not done): Rootweaver Druid (each opponent's search, one after another, for cards
+   put onto the battlefield under their control), Guff Rewrites History (each player casting during the resolution of
+   another spell, no rulings to settle the order), Hellish Rebuke (a granted trigger that refers back to the spell's
+   caster), Extract Brain, and the cards of the round 318 list (still out, for the reasons in their earlier lists).
+   Bots don't activate Mogg Assassin (the second target is any creature, which can be theirs); as its second chooser
+   a bot picks a creature that isn't its own. Bots guess at Gollum's card at random and answer "which target is next"
+   with the first one (the order changes nothing a bot weighs).
    Round 318 took cards back off the "Out after round N" lists, most played first: "look at the top five cards of your
    library and separate them into a face-down pile and a face-up pile. An opponent chooses one of those piles. Put that
    pile into your hand and the other into your graveyard." (Curator of Destinies: only looked at, never revealed; the

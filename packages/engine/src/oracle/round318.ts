@@ -5,6 +5,7 @@ import { num } from "./words";
 import type { Ctx } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseSentence } from "./sentence";
+import { round319Sentence } from "./round319";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -16,6 +17,9 @@ const pushed = (effects: Effect[], before: Effect[], last: Effect, next: number)
 
 export function round318Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
   void effects;
+  // Round 319's sentences first (oracle/round319.ts).
+  const r319 = round319Sentence(s, sentences, si, ctx, effects);
+  if (r319 !== null) return r319;
     // Curator of Destinies: "look at the top five cards of your library and separate them into a face-down pile and a
   // face-up pile. An opponent chooses one of those piles. Put that pile into your hand and the other into your
   // graveyard." You only look (the cards aren't revealed); the opponent, one you choose as it resolves (rulings), sees the

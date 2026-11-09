@@ -230,10 +230,11 @@ export function expandPerOpponent(body: AbilityBody, opponents: PlayerId[], able
     ...(t.differentManaValueFrom ? { differentManaValueFrom: t.differentManaValueFrom.map(shift) } : {}),
     ...(t.divided ? { divided: { ...t.divided, first: shift(t.divided.first) } } : {}),
   });
-  const { perOpponent: _p, perPlayer: _e, controller: _c, perOpponentRequired: required, ...spec } = body.targets[i]!;
+  const { perOpponent: _p, perPlayer: _e, controller: _c, perOpponentRequired: required, perPlayerAll: all, ...spec } = body.targets[i]!;
   // Not "up to one" (Blatant Thievery, Sylvan Primordial): one must be chosen for each opponent who has one (rulings),
   // none for an opponent who doesn't.
-  const one = (pid: PlayerId): TargetSpec => (required ? (able && !able({ ...spec, controlledBy: pid }) ? { ...spec, controlledBy: pid, skip: true } : { ...spec, controlledBy: pid }) : { ...spec, optional: true, controlledBy: pid });
+  // Vaevictis Asmadi, the Dire (perPlayerAll): every player's, so none for one leaves no legal choice (rulings).
+  const one = (pid: PlayerId): TargetSpec => (required ? (!all && able && !able({ ...spec, controlledBy: pid }) ? { ...spec, controlledBy: pid, skip: true } : { ...spec, controlledBy: pid }) : { ...spec, optional: true, controlledBy: pid });
   const copies: TargetSpec[] = opponents.length ? opponents.map(one) : [{ ...spec, skip: true }];
   return { ...body, targets: [...body.targets.slice(0, i).map(fix), ...copies, ...body.targets.slice(i + 1).map(fix)], effects: body.effects.map((e) => spreadRefs(e, i, n)) };
 }

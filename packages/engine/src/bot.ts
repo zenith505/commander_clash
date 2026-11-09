@@ -5,6 +5,7 @@ import { chooseVote } from "./bot-votes";
 import { mayPayUse } from "./spend";
 import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planIgnoreEffect, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { cantSearch } from "./effects/run-library";
+import { GUESS_PROMPT } from "./effects/run-round319";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
 import { reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
@@ -1434,6 +1435,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const pick = controllerOf(s, c) === pid ? (tt < 1 ? "setToughness" : "setPower") : p - 1 > tt - 1 ? "setPower" : "setToughness";
       return [{ type: "chooseOption", player: pid, choice: pend.options.includes(at(pick)) ? at(pick) : pend.options[0]! }];
     }
+    // Gollum, Scheming Guide: its controller saw the card and chose the kind, so there's nothing to go on; a guess that
+    // changes with the game (the rng state, read but not drawn from), so it can't be read off the bot's habits.
+    if (pend.kind === "chooseOption" && pend.what === "either" && pend.prompt?.startsWith(GUESS_PROMPT)) return [{ type: "chooseOption", player: pid, choice: String((s.rngState >>> 3) % 2) }];
     if (pend.kind === "chooseOption" && pend.what === "either") {
       const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
       return [{ type: "chooseOption", player: pid, choice: pend.options[Math.max(0, i)]! }];
@@ -1449,6 +1453,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Chaotic Transformation: the order of its own exiled permanents doesn't matter much; the first.
     if (pend.kind === "chooseOption" && pend.what === "nextExiled") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "nextRevealed") return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => mv(s, a) - mv(s, b))[0]! }];
+    // Soulfire Eruption: the order of one player's targets doesn't change how much damage is dealt; first one.
+    if (pend.kind === "chooseOption" && pend.what === "nextTarget") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Which opponent to clash with: nothing is known about their libraries, so the next one in turn order.
     if (pend.kind === "chooseOption" && pend.what === "clash") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Damage shields: the options come in the order we'd pick them (damage.ts shieldPreference).
@@ -1912,9 +1918,25 @@ function villainCost(s: GameState, pid: PlayerId, fx: Effect[]): number {
   const us = (w: { ref: string } | undefined) => w?.ref === "eventPlayer";
   return fx.reduce((sum, e) => {
     switch (e.type) {
-      case "loseLife":
+      case "loseLife": {
+        // Genesis of the Daleks: "each of your opponents loses life equal to the total power of Daleks that died this turn"
+        // after destroying all Daleks: those on the battlefield now and those that already died.
+        const c = typeof e.n === "object" && "count" in e.n ? e.n.count : undefined;
+        if (e.who.ref === "eachOpponent" && c?.kind === "diedThisTurnPower") {
+          const lose = s.battlefield.map((id) => obj(s, id)).filter((o) => objIsType(s, o, "Creature") && characteristics(s, o).subtypes.includes(c.subtype)).reduce((t, o) => t + Math.max(0, power(s, o)), 0) + (s.diedTypesThisTurn ?? []).filter((d) => d.all || d.subtypes.includes(c.subtype)).reduce((t, d) => t + Math.max(0, d.power ?? 0), 0);
+          return sum + (lose >= me.life ? 100 : lose);
+        }
         // Not the option that would lose us the game (CR 104.3b).
         return sum + (us(e.who) ? (typeof e.n === "number" && e.n >= me.life ? 100 : n(e.n, 3)) : 0);
+      }
+      case "destroy":
+        // "Destroy all Dalek creatures" or "destroy all non-Dalek creatures": ours count against it, the others' for it.
+        if (e.what.ref === "each" && !e.what.of) {
+          const filter = e.what.filter;
+          const hit = s.battlefield.map((id) => obj(s, id)).filter((o) => objectMatches(s, filter, o, pid, false));
+          return sum + hit.reduce((t, o) => t + (controllerOf(s, o) === pid ? 3 : -1), 0);
+        }
+        return sum + 3;
       case "shuffleIntoLibrary":
         return sum;
       case "damage": {
@@ -2974,6 +2996,12 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
         if (!spec.optional) return null;
         out.push({ kind: "none" });
       } else out.push(pick);
+      continue;
+    }
+    // "For each player, choose target permanent that player controls. Those players sacrifice those permanents." (Vaevictis
+    // Asmadi, the Dire): our own one is the one we'd miss least.
+    if (harm[i] && spec.controlledBy === pid && pool.every((t) => isMine(s, pid, t))) {
+      out.push(worst(s, pid, pool));
       continue;
     }
     out.push(copying ? worst(s, pid, pool) : best(s, pid, pool, harm[i]!, damageTo(body, i, x) + fightDamage(i)));

@@ -270,6 +270,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.blockTax) return [{ type: "chooseMay", player: pid, yes: false }];
     // Pardic Dragon: "that player may put a time counter on ~": an opponent's suspended card, kept from being cast longer.
     const theirMay = pend.kind === "chooseMay" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    // Covenant of Minds: the three cards seen rather than five unseen, unless five more draws would empty that library.
+    if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && s.resolving!.item.controller !== pid && theirMay.effects.length === 1 && theirMay.effects[0]!.type === "revealedTo") {
+      const lib = player(s, s.resolving!.item.controller).library.length - (s.resolving!.revealedUntil?.length ?? 0);
+      return [{ type: "chooseMay", player: pid, yes: lib >= 5 }];
+    }
     if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && s.resolving!.item.controller !== pid)
       return [{ type: "chooseMay", player: pid, yes: theirMay.effects.every((x) => x.type === "counters" && x.counter === "time" && x.what.ref === "selfCard") }];
     // Trench Gorger: searching makes its base P/T the number of lands exiled (0/0 with none); the bot keeps its lands and
@@ -5183,6 +5188,14 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
   // Roots of Life: life whenever a land of the chosen type an opponent controls becomes tapped, so the type most opponents
   // control a land of.
   if (what === "basicLandType" && /land of the chosen type an opponent controls/.test(card?.oracleText ?? "")) return chooseLandwalkType(s, pid, options, false);
+  // Illusionary Terrain, Vision Charm: lands of the first chosen type become the second, so first a type opponents
+  // control more lands of than we do, then a basic land type whose color their commanders don't use.
+  if ((what === "basicLandType" || what === "landType") && /first chosen type/.test(card?.oracleText ?? "")) {
+    const pend = s.pending;
+    const holder = pend?.kind === "chooseOption" && pend.objectId ? s.objects[pend.objectId] : undefined;
+    const second = holder ? !!holder.chosen?.landTypes?.length : what === "basicLandType" && s.resolving?.scratch?.swapFrom !== undefined;
+    return chooseSwapLandType(s, pid, options, second);
+  }
   if (what === "basicLandType" || what === "landType") return chooseLandType(s, pid, options);
   if (what === "keyword") return chooseKeyword(s, pid, options);
   // "The color or colors of your choice": one color is enough, the one it would choose alone.
@@ -7616,6 +7629,23 @@ function chooseLandwalkType(s: GameState, pid: PlayerId, options: string[], snow
     return controllerOf(s, o) === op && c.types.includes("Land") && c.subtypes.includes(t) && (!snow || c.supertypes.includes("Snow"));
   })).length;
   return options.reduce((best, t) => (score(t) > score(best) ? t : best), options[0]!);
+}
+
+/** Illusionary Terrain, Vision Charm: the type to change (`second` false), or the basic land type to change it into. */
+function chooseSwapLandType(s: GameState, pid: PlayerId, options: string[], second: boolean): string {
+  const opps = opponents(s, pid);
+  if (second) {
+    const identity = new Set<Color>();
+    for (const o of Object.values(s.objects)) if (o.isCommander && opps.includes(o.owner)) defOf(s, o).colorIdentity.forEach((c) => identity.add(c));
+    return options.find((o) => !identity.has(LAND_COLOR[o]!)) ?? options[0]!;
+  }
+  const score = (t: string) =>
+    s.battlefield.reduce((n, id) => {
+      const o = obj(s, id);
+      if (!objIsType(s, o, "Land") || !characteristics(s, o).subtypes.includes(t)) return n;
+      return n + (opps.includes(controllerOf(s, o)) ? 1 : controllerOf(s, o) === pid ? -1 : 0);
+    }, 0);
+  return [...options].sort((a, b) => score(b) - score(a))[0]!;
 }
 
 function chooseLandType(s: GameState, pid: PlayerId, options: string[]): string {

@@ -1531,6 +1531,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "attackYouNextTurn":
     case "attach":
     case "becomeLicid":
+    case "landTypeSwap":
     case "attachAny":
     case "attachAll":
     case "attachLastKnown":
@@ -1611,6 +1612,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileRevealedToCast":
     case "discardRevealed":
     case "revealedUntilToBottom":
+    case "revealedTo":
     case "forEachRevealed":
     case "parleyReveal":
     case "parleyToGraveyards":

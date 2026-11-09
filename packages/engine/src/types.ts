@@ -2337,6 +2337,8 @@ export interface Chosen {
   color?: Color;
   /** "The basic land type of your choice" (Reef Shaman). */
   landType?: string;
+  /** "As ~ enters, choose two basic land types" (Illusionary Terrain): both, in the order chosen ("the first", "the second"). */
+  landTypes?: string[];
   /** "Gains your choice of menace or lifelink" (Rattleback Apothecary). */
   keyword?: string;
   /** "As ~ enters, choose two abilities from among first strike, vigilance, and lifelink" (Greymond), in the order chosen. */
@@ -2705,6 +2707,9 @@ export interface Resolving {
   /** "Each player rolls a d20" (Chaos Dragon): each player's result. */
   rolledEach?: Partial<Record<PlayerId, number>>;
   scratch?: {
+    /** Effect "landTypeSwap" (Vision Charm): the land type chosen first, then the basic land type chosen second. */
+    swapFrom?: string;
+    swapTo?: string;
     /** Effect "loreChoices" (Shrouded Lore): the cards the opponent has chosen, the last of them, and whether paying for another choice is asked next. */
     lore?: { chosen: ObjectId[]; last?: ObjectId; pay: boolean };
     /** Effect "counterOfKindEach" (The Caves of Androzani): the permanents picked, as the objects they were, and the kind chosen for each. */

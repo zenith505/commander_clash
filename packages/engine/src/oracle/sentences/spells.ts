@@ -1092,7 +1092,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "A spell from your hand with mana value less than or equal to that damage" (Glamdring): the same, written the other way.
   // In Search of Greatness: "... from your hand with mana value equal to 1 plus the greatest mana value among other
   // permanents you control ...": exactly that, counted as it resolves.
-  if ((m = /^(You may c|C)ast an? (.*?spell(?: with mana value (?:(?:\d+|X) or less|less than or equal to .+?))?) from your hand( with mana value (?:(?:\d+|X) or less|(?:less than or )?equal to .+?))? without paying its mana cost$/.exec(s)) && (m[1] === "You may c" || ctx.mayNow) && !(m[3] && / with /.test(m[2]!))) {
+  // Brain in a Jar: "an instant or sorcery spell with mana value equal to the number of charge counters on ~ from your hand":
+  // exactly that, counted as it resolves (the counter just put on it too; as it last existed if it has left, rulings).
+  if ((m = /^(You may c|C)ast an? (.*?spell(?: with mana value (?:(?:\d+|X) or less|(?:less than or )?equal to .+?))?) from your hand( with mana value (?:(?:\d+|X) or less|(?:less than or )?equal to .+?))? without paying its mana cost$/.exec(s)) && (m[1] === "You may c" || ctx.mayNow) && !(m[3] && / with /.test(m[2]!))) {
     m.splice(1, 1);
     m[1] = `${m[1]!}${m[2] ?? ""}`;
     // With "where X is ...", X is that amount, counted as it resolves (TargetSpec.bound, replaced in body.ts).

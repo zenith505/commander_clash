@@ -6453,7 +6453,8 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
 /** Does a cost change from a resolved spell or ability (GameState.costModsThisTurn) apply to `d` as `pid` casts it? */
 function costModThisTurnApplies(s: GameState, c: NonNullable<GameState["costModsThisTurn"]>[number], pid: PlayerId, d: CardDef, mv: number): boolean {
   const m = c.mod;
-  if (m.who === "opponents" ? c.player === pid || !opponents(s, c.player).includes(pid) : c.player !== pid) return false;
+  // "Spells with the chosen name" (Cheering Fanatic): anyone's.
+  if (m.who === "opponents" ? c.player === pid || !opponents(s, c.player).includes(pid) : m.who !== "all" && c.player !== pid) return false;
   const { manaValue: range, ...rest } = m.filter;
   if (!printedMatches(rest, d)) return false;
   return !range || ((range.min === undefined || mv >= range.min) && (range.max === undefined || mv <= range.max));

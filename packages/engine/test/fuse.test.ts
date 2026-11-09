@@ -90,9 +90,9 @@ describe("fuse (CR 702.102)", () => {
     expect(s.players[opp]!.life).toBe(40 - 2 - (before + 2));
   });
 
-  it("a fuse card whose halves can't be read as one spell stays unsupported", () => {
-    // Breaking // Entering: Entering's "Put a creature card from a graveyard onto the battlefield" isn't supported, so the
-    // card isn't either.
+  it("fuse cards whose halves both compile are supported (Breaking // Entering since Lane B round B157)", () => {
+    // Breaking // Entering: Entering's "Put a creature card from a graveyard onto the battlefield under your control. It
+    // gains haste until end of turn." is since Lane B round B157 (laneb-round157.test.ts), the last fuse card left.
     const breakingEntering = scry(
       "split",
       [
@@ -101,7 +101,7 @@ describe("fuse (CR 702.102)", () => {
       ],
       { keywords: ["Fuse"] },
     );
-    expect(isFullySupported(breakingEntering)).toBe(false);
+    expect(isFullySupported(breakingEntering)).toBe(true);
     // Flesh's "where X is the power of the card you exiled" is since Lane B round B100, and Blood's "Target creature you
     // control deals damage" names its source by target, shifted like any other in the fused spell (laneb-round100.test.ts).
     expect(isFullySupported(fleshBlood)).toBe(true);

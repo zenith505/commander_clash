@@ -723,6 +723,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.of?.ref === "castSpell") {
         // As it was cast (CR 601.2h), while it's still that spell on the stack.
         const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+        if (c.asCast) return item?.castColorsSpent ?? 0;
         const o = item?.objectId !== undefined ? s.objects[item.objectId] : undefined;
         return o && o.zone === "stack" ? (o.colorsSpent?.length ?? 0) : 0;
       }

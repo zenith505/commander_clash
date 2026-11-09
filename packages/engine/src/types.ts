@@ -1096,6 +1096,8 @@ export interface StackItem {
   castMv?: number;
   /** The spell's colors as it was cast (Ramos, Dragon Engine), for when it has left the stack (CR 113.7a). */
   castColors?: Color[];
+  /** In `castItems` only: how many colors of mana were spent to cast it (CR 601.2h), for when it has left the stack (Magmablood Archaic). */
+  castColorsSpent?: number;
   /** The spell's name as it was cast, a split card's half's (CR 709.3b); none face down (CR 708.2a). In `castItems` only. */
   castName?: string;
   /** An amount "as you cast this spell" (Count asCast), counted as it became cast (rulings on Lifestream's Blessing). */

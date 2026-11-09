@@ -7230,7 +7230,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cast a spell with its name this turn loses 6 life, a face-down spell having no name, CR 708.2; the bot reveals a name an
   opponent cast; a browser test). Infernal Kirin ("discards all cards with that spell's mana value": the spell's mana value
   as cast, X included, even if it has left the stack, rulings, CR 202.3e, 701.9b). +8 (30,730 of 31,936 with B158 and round 318).
-- Out after round B159 (looked at, not done): Kaboom! and Soulfire Eruption (a card revealed per target, each target's own
+- Out after round B159 (looked at, not done): Kaboom! (a card revealed per target, each target's own
   loop, the order among them a choice), Ulamog's Despoiler, Sutured Ghoul, Frankenstein's Monster and Living Lore (a choice
   made as they enter, new), Charmed Pendant (mana of the milled card's colors), Nafs Asp, Glass Asp and Sabertooth Cobra
   ("unless that player pays {1} before their next draw step": a payment window), Spoils of War.

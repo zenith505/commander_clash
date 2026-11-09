@@ -1410,7 +1410,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Broodlord: "When ~ enters, distribute X +1/+1 counters among any number of other target creatures you control": the X it
   // was cast with, divided as the ability is put on the stack (rulings).
   // Numa, Joraga Chieftain: "among any number of target Elves" after "you may pay {X}{X}. When you do": any Elves, the X paid.
-  if ((m = /^[Dd]istribute X ([+-]1\/[+-]1) counters among any number of ((?:other )?target (?:creatures you control|[A-Z][a-z]+))$/.exec(s)) && !ctx.whereX && (ctx.spell || ctx.ownX)) {
+  if ((m = /^[Dd]istribute X ([+-]1\/[+-]1) counters among any number of ((?:other )?target (?:creatures you control|creatures|[A-Z][a-z]+))$/.exec(s)) && !ctx.whereX && (ctx.spell || ctx.ownX)) {
     const tribe = /target ([A-Z][a-z]+)$/.exec(m[2]!)?.[1];
     if (tribe && !CREATURE_TYPES.has(singular(tribe))) return null;
     const spec = parseTargetPhrase(tribe ? singular(tribe) : m[2]!.replace(/^(?:other )?target /, "").replace(/creatures/, "creature"));
@@ -1556,7 +1556,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Broodlord: "When ~ enters, distribute X +1/+1 counters among any number of other target creatures you control": the X it
   // was cast with, divided as the ability is put on the stack (rulings).
   // Numa, Joraga Chieftain: "among any number of target Elves" after "you may pay {X}{X}. When you do": any Elves, the X paid.
-  if ((m = /^[Dd]istribute X ([+-]1\/[+-]1) counters among any number of ((?:other )?target (?:creatures you control|[A-Z][a-z]+))$/.exec(s)) && !ctx.whereX && (ctx.spell || ctx.ownX)) {
+  if ((m = /^[Dd]istribute X ([+-]1\/[+-]1) counters among any number of ((?:other )?target (?:creatures you control|creatures|[A-Z][a-z]+))$/.exec(s)) && !ctx.whereX && (ctx.spell || ctx.ownX)) {
     const tribe = /target ([A-Z][a-z]+)$/.exec(m[2]!)?.[1];
     if (tribe && !CREATURE_TYPES.has(singular(tribe))) return null;
     const spec = parseTargetPhrase(tribe ? singular(tribe) : m[2]!.replace(/^(?:other )?target /, "").replace(/creatures/, "creature"));
@@ -1776,6 +1776,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const stat = parseMostStat(m[1] ?? m[2] ?? m[3]!);
     return stat ? [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "uniqueMost", stat } }] : null;
   }
+  // Contested Game Ball: "Whenever you're dealt combat damage, the attacking player gains control of ~": the active player,
+  // who is the attacking player (CR 506.2), for the rest of the game (layer 2).
+  if (/^[Tt]he attacking player gains control of ~$/.test(s) && !ctx.spell && !ctx.activated && !ctx.targets.length) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "activePlayer" } }];
   // "That player gains control of ~" (Coveted Jewel): the trigger's player, for the rest of the game (layer 2).
   // Jeweled Amulet: "Note the type of mana spent to pay this activation cost."
   if (s === "Note the type of mana spent to pay this activation cost" && ctx.activated) return [{ type: "noteManaSpent" }];

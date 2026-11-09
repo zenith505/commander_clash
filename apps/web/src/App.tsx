@@ -9,6 +9,7 @@ import {
   registerFace,
   abilityProblem,
   definedX,
+  definedCastX,
   altCost,
   isEmerge,
   altCostsFor,
@@ -360,6 +361,8 @@ type TapPick =
  */
 type CastDraft = {
   objectId: string;
+  /** Spoils of War: the opponent whose graveyard sets X as it's cast (CR 107.3c, rulings). */
+  xOpponent?: PlayerId;
   /** Selective Snare: the creature type chosen as it's cast, before its targets (rulings). */
   creatureType?: string;
   /** Which once-each-turn graveyard permission it's cast with (Muldrotha's artifact or creature slot). */
@@ -456,7 +459,7 @@ type DelvePick = { draft: CastDraft; label: string; max: number; candidates: str
 /** Gift's opponent (CR 702.174a), or with `life`, the opponent had gain that much life for an alternative cost (Invigorate). */
 type GiftPick = { draft: CastDraft; label: string; what: string; options: PlayerId[]; life?: number };
 /** Bargaining Table, Spoils of War: the opponent chosen as it's announced, whose cards set X (rulings). */
-type XOpponentPick = { label: string; what: string; options: PlayerId[]; onPick: (pid: PlayerId) => void };
+type XOpponentPick = { label: string; what: string; options: PlayerId[]; /** Button labels, by option. */ labels?: string[]; onPick: (pid: PlayerId) => void };
 
 /** Paying buyback or not (CR 702.27). */
 type BuybackPick = { draft: CastDraft; label: string; cost: string; /** A cost that isn't mana: "sacrifice a land". */ text?: string };
@@ -1063,6 +1066,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const lifeOffers = d.lifeFor === undefined ? lifeCostOffers(s, HUMAN, d.objectId, d.x ?? 0) : [];
     if (lifeOffers.length)
       return setCostPick({ draft: d, kind: "lifeFor", label: card.name, what: `you may pay ${lifeOffers[0]!.life} life for each to make it cost one colored mana less`, n: lifeOffers.length, min: 0, candidates: lifeOffers.map((l) => l.id), chosen: [] });
+    // Spoils of War: an opponent chosen first, whose graveyard sets X (CR 107.3c, rulings); X isn't asked.
+    if (compiled.castXIs && d.xOpponent === undefined) {
+      const what = `choose an opponent: X is the number of ${compiled.castXIs.opponentGraveyard.text}s in their graveyard`;
+      return setXOppPick({ label: card.name, what, options: opps, labels: opps.map((pid) => `${s.players[pid]!.name} (X=${definedCastX(s, HUMAN, s.objects[d.objectId]!, { xOpponent: pid }) ?? 0})`), onPick: (pid) => continueCast({ ...d, xOpponent: pid, x: definedCastX(s, HUMAN, s.objects[d.objectId]!, { xOpponent: pid }) ?? 0 }) });
+    }
     const costX = costsHaveX(card, d);
     // An alternative cost with X in it: overloaded Street Spasm's {X}{X}{R}{R} (CR 107.3a).
     const altMana = d.alt ? altCost(card, d.alt, s, HUMAN)?.mana : undefined;
@@ -1241,6 +1249,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...(d.lifeTo !== undefined ? { lifeTo: d.lifeTo } : {}),
       ...(d.number !== undefined ? { number: d.number } : {}),
       ...(d.creatureType ? { creatureType: d.creatureType } : {}),
+      ...(d.xOpponent !== undefined ? { xOpponent: d.xOpponent } : {}),
       ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}),
       ...(d.discard?.length ? { discard: d.discard } : {}),
       ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}),
@@ -1902,7 +1911,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                     xOppPick.onPick(pid);
                   }}
                 >
-                  {s.players[pid]!.name}
+                  {xOppPick.labels?.[xOppPick.options.indexOf(pid)] ?? s.players[pid]!.name}
                 </button>
               ))}
               <button className="ghost" onClick={() => setXOppPick(null)}>
@@ -5316,7 +5325,7 @@ function Controls({
       </div>
     );
   if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "bid" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy" || pending.what === "evidenceX" || pending.what === "payLifeRound") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "faceUpForm" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "chosenObject" || pending.what === "anchor" || pending.what === "playerWord" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "unlessWay" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "addOrRemoveCounter" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser" || pending.what === "modeChooser" || pending.what === "direction" || pending.what === "skipChoice" || pending.what === "payLifeOrDestroy" || pending.what === "nextTarget" || ((pending.what === "textFrom" || pending.what === "textTo" || pending.what === "typeOrder") && pending.options.length <= 10)) && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "faceUpForm" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "chosenObject" || pending.what === "anchor" || pending.what === "playerWord" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "unlessWay" || pending.what === "payWhich" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "addOrRemoveCounter" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser" || pending.what === "modeChooser" || pending.what === "direction" || pending.what === "skipChoice" || pending.what === "payLifeOrDestroy" || pending.what === "nextTarget" || ((pending.what === "textFrom" || pending.what === "textTo" || pending.what === "typeOrder") && pending.options.length <= 10)) && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

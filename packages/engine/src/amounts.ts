@@ -466,6 +466,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.stackCountered ?? 0;
     case "poisonLostThisWay":
       return s.resolving?.poisonLost ?? 0;
+    case "controlGivenThisWay": {
+      const to = refPlayers(s, c.to, ctx);
+      return refObjects(s, c.what, ctx).filter((o) => o.zone === "battlefield" && to.includes(controllerOf(s, o))).length;
+    }
     case "bouncedThisWayCount":
       return (s.resolving?.bouncedThisWay ?? []).filter((b) => b.returned).length;
     case "returnedFromCount":

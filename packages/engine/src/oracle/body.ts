@@ -10955,8 +10955,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Delver of Secrets: "look at the top card of your library. You may reveal that card. If an instant or sorcery card is
     // revealed this way, transform ~.": only revealing a card of that kind does anything, so you're asked only then; the
-    // card stays on top either way (rulings).
-    const delver = /^[Ll]ook at the top card of your library$/.test(s) && /^You may reveal that card\.?$/.test(sentences[si + 1] ?? "") ? /^If an? (.+? card) is revealed this way, transform ~\.?$/.exec(sentences[si + 2] ?? "") : null;
+    // card stays on top either way (rulings). Runo Stromkirk: "a creature card with mana value 6 or greater".
+    const delver = /^[Ll]ook at the top card of your library$/.test(s) && /^You may reveal that card\.?$/.test(sentences[si + 1] ?? "") ? /^If an? (.+? card(?: with mana value \d+ or (?:greater|less))?) is revealed this way, transform ~\.?$/.exec(sentences[si + 2] ?? "") : null;
     if (delver && !ctx.spell) {
       const filter = parseSearchFilter(delver[1]!);
       if (!filter) return null;

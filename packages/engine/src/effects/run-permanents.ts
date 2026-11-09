@@ -888,10 +888,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         const n = (sc.n = e.type === "connive" ? amountNow(s, e.n, ctx) : 1);
         sc.connive = { pid, ...(o ? { id: o.id, zc: o.zoneChanges ?? 0 } : {}) };
         if (n <= 0) return;
+        // Leader, Super-Genius: a creature its controller controls that would connive: that player draws a card first, once
+        // for each such replacement they control (CR 614.5), then it connives.
+        const first = e.type === "connive" && o?.zone === "battlefield" ? s.battlefield.filter((x) => controllerOf(s, obj(s, x)) === pid && abilitiesOf(s, obj(s, x)).conniveDrawsFirst).length : 0;
+        if (first) log(s, `${player(s, pid).name} draws ${first === 1 ? "a card" : `${first} cards`} first (${defOf(s, obj(s, s.battlefield.find((x) => controllerOf(s, obj(s, x)) === pid && abilitiesOf(s, obj(s, x)).conniveDrawsFirst)!)).name}).`);
         log(s, e.type === "recruit" ? `${player(s, pid).name} recruits.` : `${o ? defOf(s, o).name : src} connives${n > 1 ? ` ${n}` : ""}.`);
         sc.queue = [pid];
         sc.chosen = {};
-        if (!draw(s, pid, n)) return "paused"; // dredge's choice finishes the draws (CR 702.52a)
+        if (!draw(s, pid, first + n)) return "paused"; // dredge's choice finishes the draws (CR 702.52a)
       }
       const { pid, id, zc } = sc.connive;
       const n = sc.n ?? 0;

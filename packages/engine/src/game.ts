@@ -3671,6 +3671,11 @@ function advanceStep(s: GameState): void {
   // this combat only (CR 702.39a).
   if (s.step === "endCombat") {
     s.thatCombat = undefined;
+    // "Prevent all combat damage that would be dealt to you this combat" (Suppressor Skyguard): this combat is over.
+    if (s.damageRules?.some((r) => r.thisCombat)) {
+      s.damageRules = s.damageRules.filter((r) => !r.thisCombat);
+      if (!s.damageRules.length) s.damageRules = undefined;
+    }
     // "Whenever that creature deals combat damage to a player this combat" (Stensian Sanguinist): this combat is over.
     s.floatingTriggers = s.floatingTriggers?.filter((f) => f.until !== "endOfCombat");
     if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;

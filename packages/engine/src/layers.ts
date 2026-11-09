@@ -963,6 +963,9 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "noOtherAttackingEventPlayer":
       // A creature attacking that player's planeswalker or battle isn't attacking that player (CR 506.3, 508.1b).
       return eventPlayer !== undefined && !s.battlefield.some((id) => id !== subjectId && s.objects[id]!.attacking === eventPlayer && !s.objects[id]!.attackingPermanent);
+    case "eventPlayerHasUnattackedOpponent":
+      // Suppressor Skyguard: an opponent of the attacking player other than you that no creature attacks itself (rulings).
+      return eventPlayer !== undefined && s.turnOrder.some((p) => p !== you && p !== eventPlayer && !s.players[p]!.lost && !s.battlefield.some((id) => s.objects[id]!.attacking === p && !s.objects[id]!.attackingPermanent));
     case "attackedPlayerPoisoned":
       return s.players.some((p) => !p.lost && (p.poison ?? 0) > 0 && s.battlefield.some((id) => s.objects[id]!.attacking === p.id && !s.objects[id]!.attackingPermanent));
     case "eventPlayerMoreThanAnotherOpponent":

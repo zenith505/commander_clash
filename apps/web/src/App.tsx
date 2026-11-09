@@ -69,6 +69,7 @@ import {
   copyTargetQuality,
   stackItemQuality,
   castHow,
+  CREATURE_TYPES,
   lifeCostOffers,
   isSummoningSick,
   legalActions,
@@ -159,6 +160,7 @@ import {
   hiddenInExile,
   tapCostCandidates,
   counterOnCandidates,
+  exileSpellCandidates,
   untapViaMana,
   counterCostCandidates,
   counterCostKinds,
@@ -306,7 +308,7 @@ type ZoneView = { pid: PlayerId; zone: "graveyard" | "exile" | "hand" };
 /** The human is picking targets for a spell, an activated ability, or a triggered ability (after its modes, if modal). */
 type Targeting = (
   | { mode: "cast"; draft: CastDraft; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
-  | { mode: "activate"; objectId: string; index: number; specs: TargetSpec[]; chosen: TargetChoice[]; label: string; modes?: number[]; x?: number }
+  | { mode: "activate"; objectId: string; index: number; specs: TargetSpec[]; chosen: TargetChoice[]; label: string; modes?: number[]; x?: number; xOpponent?: PlayerId }
   | { mode: "trigger"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
   /** New targets for a copy of a spell (CR 707.10c), or keep the old ones. */
   | { mode: "copy"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
@@ -358,6 +360,8 @@ type TapPick =
  */
 type CastDraft = {
   objectId: string;
+  /** Selective Snare: the creature type chosen as it's cast, before its targets (rulings). */
+  creatureType?: string;
   /** Which once-each-turn graveyard permission it's cast with (Muldrotha's artifact or creature slot). */
   permit?: string;
   /** Aminatou's Augury: the card type it's cast as. */
@@ -451,6 +455,8 @@ type DelvePick = { draft: CastDraft; label: string; max: number; candidates: str
 /** Promising a gift to an opponent, or not (CR 702.174a). */
 /** Gift's opponent (CR 702.174a), or with `life`, the opponent had gain that much life for an alternative cost (Invigorate). */
 type GiftPick = { draft: CastDraft; label: string; what: string; options: PlayerId[]; life?: number };
+/** Bargaining Table, Spoils of War: the opponent chosen as it's announced, whose cards set X (rulings). */
+type XOpponentPick = { label: string; what: string; options: PlayerId[]; onPick: (pid: PlayerId) => void };
 
 /** Paying buyback or not (CR 702.27). */
 type BuybackPick = { draft: CastDraft; label: string; cost: string; /** A cost that isn't mana: "sacrifice a land". */ text?: string };
@@ -460,7 +466,7 @@ type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boole
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
 type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; faceUp?: undefined; ignore?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined; faceUp?: undefined; ignore?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined; faceUp?: undefined; ignore?: undefined } | { faceUp: FaceUpDraft; draft?: undefined; activate?: undefined; mana?: undefined; ignore?: undefined } | { /** Paying to ignore this permanent's effect this turn (CR 116.2d): Volrath's Curse, Lost in Thought. */ ignore: string; draft?: undefined; activate?: undefined; mana?: undefined; faceUp?: undefined }) & {
-  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "offering" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice" | "lifeFor" | "craft" | "counterOn";
+  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "offering" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice" | "lifeFor" | "craft" | "counterOn" | "exileSpell";
   label: string;
   /** "Any number of": fewer than `n` are fine, down to this many (splice). */
   min?: number;
@@ -490,7 +496,7 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; fac
 /** `pick`: for a mana ability, the mana chosen in the menu ("one mana of any color", Fertile Ground's extra). */
 /** Turning a face-down permanent face up for a morph cost that isn't mana ("Morph—Sacrifice two Mountains", CR 702.37e). */
 type FaceUpDraft = { objectId: string; way: number; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; reveal?: string[] };
-type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; reveal?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; exileCards?: string[]; collect?: string[]; counters?: { id: string; kind: string }[]; craft?: string[]; counterOn?: string[]; pick?: ManaPick };
+type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; reveal?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; exileCards?: string[]; collect?: string[]; counters?: { id: string; kind: string }[]; craft?: string[]; counterOn?: string[]; exileSpell?: string[]; xOpponent?: PlayerId; pick?: ManaPick };
 type ManaPick = { mana?: ManaType; extra?: ManaType[] };
 
 /** Announcing X for a spell or activated ability with {X} in its cost (CR 107.3a, 601.2b, 602.2b). */
@@ -585,6 +591,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [kickPick, setKickPick] = useState<KickPick | null>(null);
   const [buybackPick, setBuybackPick] = useState<BuybackPick | null>(null);
   const [giftPick, setGiftPick] = useState<GiftPick | null>(null);
+  const [xOppPick, setXOppPick] = useState<XOpponentPick | null>(null);
+  const [castTypePick, setCastTypePick] = useState<{ draft: CastDraft; label: string } | null>(null);
   const [costOrPick, setCostOrPick] = useState<CostOrPick | null>(null);
   const [numberPick, setNumberPick] = useState<NumberPick | null>(null);
   const [foragePick, setForagePick] = useState<ForagePick | null>(null);
@@ -633,7 +641,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const attackablePlaneswalker = (id: string) => !!s && !!aim && opponentWalkers.includes(id) && !attackProblem(s, s.objects[aim]!, defenderOf(id), true);
 
   // Space passes priority (or resolves); Escape cancels targeting or closes the ability menu.
-  const picking = !!(xPick || kickPick || costPick || costOrPick || numberPick || foragePick || delvePick || dividing || giftPick || buybackPick);
+  const picking = !!(xPick || kickPick || costPick || costOrPick || numberPick || foragePick || delvePick || dividing || giftPick || xOppPick || castTypePick || buybackPick);
   const keys = useRef({ s, pending, targeting, modePick, tapPick, picking, dispatch });
   keys.current = { s, pending, targeting, modePick, tapPick, picking, dispatch };
   useEffect(() => {
@@ -748,10 +756,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (tg.mode === "change") return dispatch([{ type: "changeTarget", player: HUMAN, target: chosen[0]! }]);
     if (tg.mode === "retarget") return dispatch([{ type: "newTargets", player: HUMAN, targets: chosen }]);
     if (tg.mode === "cast") return continueCast({ ...tg.draft, targets: chosen });
-    continueActivate({ objectId: tg.objectId, index: tg.index, modes: tg.modes, x: tg.x, targets: chosen });
+    continueActivate({ objectId: tg.objectId, index: tg.index, modes: tg.modes, x: tg.x, ...(tg.xOpponent !== undefined ? { xOpponent: tg.xOpponent } : {}), targets: chosen });
   }
 
-  function useAbility(objectId: string, index: number, modes?: number[], x?: number, pick?: ManaPick) {
+  function useAbility(objectId: string, index: number, modes?: number[], x?: number, pick?: ManaPick, xOpponent?: PlayerId) {
     if (!s) return;
     setMenu(null);
     const ab = abilitiesOf(s, s.objects[objectId]!).activated[index]!;
@@ -764,8 +772,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       return setTapPick({ kind: "station", objectId, index, chosen: best ? [best.id] : [] });
     }
     if (ab.body.modal && !modes) return setModePick({ mode: "activate", objectId, index, label, body: ab.body });
+    // Bargaining Table: "X is the number of cards in an opponent's hand": the opponent is chosen first (rulings).
+    if (ab.xIs && typeof ab.xIs === "object" && "opponentHand" in ab.xIs && xOpponent === undefined)
+      return setXOppPick({ label, what: "choose an opponent: X is the number of cards in their hand", options: opps, onPick: (pid) => useAbility(objectId, index, modes, undefined, pick, pid) });
     // Prototype Portal: an X the ability's text sets isn't chosen (CR 107.3c).
-    const fixedX = definedX(s, s.objects[objectId]!, ab);
+    const fixedX = definedX(s, s.objects[objectId]!, ab, xOpponent !== undefined ? { xOpponent } : undefined);
     if (x === undefined && fixedX != null) x = fixedX;
     // X is announced after modes and before targets (CR 602.2b, 601.2b-c).
     if (x === undefined && parseManaCost(ab.manaCost).hasX) {
@@ -809,10 +820,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // "Any number of target ...": an "up to" target for each there could be (CR 601.2c).
     // "Target ... of an opponent's choice" (Magus of the Arena): that opponent chooses it, after you choose yours.
     const offered = forController(offerTargets(s, body.targets, HUMAN, x ?? 0, sourceQuality(s, objectId), objectId));
-    if (offered.length && offered.every((t) => t.skip) && body.targets.some((t) => t.chosenBy === "opponent")) return continueActivate({ objectId, index, modes, x, targets: offered.map(() => ({ kind: "none" as const })), ...(pick ? { pick } : {}) });
+    const xOpp = xOpponent !== undefined ? { xOpponent } : {};
+    if (offered.length && offered.every((t) => t.skip) && body.targets.some((t) => t.chosenBy === "opponent")) return continueActivate({ objectId, index, modes, x, ...xOpp, targets: offered.map(() => ({ kind: "none" as const })), ...(pick ? { pick } : {}) });
     // Goblin Test Pilot: "any target chosen at random", which the game picks as it's activated.
-    if (offered.length && !body.targets.some((t) => t.random)) return setTargeting({ mode: "activate", objectId, index, specs: offered, chosen: skipped(offered, []), label, modes, x });
-    continueActivate({ objectId, index, modes, x, ...(pick ? { pick } : {}) });
+    if (offered.length && !body.targets.some((t) => t.random)) return setTargeting({ mode: "activate", objectId, index, specs: offered, chosen: skipped(offered, []), label, modes, x, ...xOpp });
+    continueActivate({ objectId, index, modes, x, ...xOpp, ...(pick ? { pick } : {}) });
   }
 
   /** After targets: pick what to sacrifice or discard for the ability's costs (CR 602.2b, 601.2h), then activate. */
@@ -894,6 +906,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         if (c.toBottom) return setCostPick({ activate: d, kind: "exileCards", label: cardOf(s, d.objectId).name, what: `put ${c.n} cards from your graveyard on the bottom of your library`, n: c.n, candidates, chosen: [] });
         return setCostPick({ activate: d, kind: "exileCards", label: cardOf(s, d.objectId).name, what: `exile from your graveyard ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
       }
+      if (c.kind === "exileSpell") {
+        // Nivmagus Elemental: click one of your spells on the stack (a copy too) to exile.
+        if (d.exileSpell !== undefined) continue;
+        return setCostPick({ activate: d, kind: "exileSpell", label: cardOf(s, d.objectId).name, what: `exile ${/^[aeiou]/i.test(c.filter.text) ? "an" : "a"} ${c.filter.text}`, n: 1, candidates: exileSpellCandidates(s, HUMAN, c), chosen: [] });
+      }
       if (c.kind === "reveal" && !c.orControl) {
         // "Reveal X red cards from your hand" (Martyr of Ashes): click the cards in your hand; they stay there.
         if (d.reveal !== undefined) continue;
@@ -917,7 +934,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const many = c.kind === "sacrifice" && c.oneOfEach ? `a ${what}` : `${c.n === 1 ? article : c.n} ${c.n > 1 ? plural(what) : what}${c.kind === "discard" && c.differentNames ? " with different names" : c.kind === "discard" && c.sameName ? " with the same name" : ""}`;
       return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind === "sacrifice" && c.exile ? "exile" : c.kind} ${many}`, n: c.n, candidates, chosen: [], ...(c.kind === "sacrifice" && c.exile ? { exile: true as const } : {}), ...(c.kind === "discard" && c.differentNames ? { differentNames: true as const } : {}), ...(c.kind === "discard" && c.sameName ? { sameName: true as const } : {}) });
     }
-    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.reveal?.length ? { reveal: d.reveal } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}), ...(d.collect ? { collect: d.collect } : {}), ...(d.counters?.length ? { counters: d.counters } : {}), ...(d.craft?.length ? { craft: d.craft } : {}), ...(d.counterOn?.length ? { counterOn: d.counterOn } : {}) };
+    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.reveal?.length ? { reveal: d.reveal } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}), ...(d.collect ? { collect: d.collect } : {}), ...(d.counters?.length ? { counters: d.counters } : {}), ...(d.craft?.length ? { craft: d.craft } : {}), ...(d.counterOn?.length ? { counterOn: d.counterOn } : {}), ...(d.exileSpell?.length ? { exileSpell: d.exileSpell } : {}), ...(d.xOpponent !== undefined ? { xOpponent: d.xOpponent } : {}) };
     dispatch(
       planActivate(s, HUMAN, d.objectId, d.index, d.targets, d.modes, undefined, d.x, costs, d.pick) ?? [
         { type: "activateAbility", player: HUMAN, objectId: d.objectId, index: d.index, targets: d.targets, modes: d.modes, ...(d.x ? { x: d.x } : {}), costs, ...d.pick },
@@ -1088,7 +1105,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     // "Any number of target ...": an "up to" target for each there could be, "up to X" no more than X (CR 601.2c).
     // The spliced cards' targets come after the spell's own (CR 702.47b).
-    const own = spellTargets(s, d.objectId, d.modes, d.alt, castHow({ ...(d.alt ? { alt: d.alt } : {}), ...(d.kicks ? { kicks: d.kicks } : {}), ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}), ...(d.teamwork ? { teamwork: d.teamwork } : {}), ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}) }));
+    // Selective Snare, Aphetto Dredging: the creature type is chosen before the targets (rulings, CR 601.2b-c).
+    if (d.creatureType === undefined && compiled.castChooseType) return setCastTypePick({ draft: d, label: card.name });
+    const own = spellTargets(s, d.objectId, d.modes, d.alt, castHow({ ...(d.creatureType ? { creatureType: d.creatureType } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.kicks ? { kicks: d.kicks } : {}), ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}), ...(d.teamwork ? { teamwork: d.teamwork } : {}), ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}) }));
     // "Target ... of an opponent's choice" (Evangelize): that opponent chooses it, after you choose yours.
     const specs = forController(offerTargets(s, d.splice?.length ? withSplices({ targets: own, effects: [], text: "" }, splicedBodies(s, d.splice)).targets : own, HUMAN, d.x ?? 0, sourceQuality(s, d.objectId), d.objectId));
     // Every target skipped: it's cast as if it had none.
@@ -1117,6 +1136,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (!c.n) continue; // "sacrifice X creatures" with X = 0
       if (c.kind === "exileFromGraveyard" && c.top) continue; // "the top three black cards of your graveyard": no choice
       if (c.kind === "craft") continue; // an ability's cost only (CR 702.167a)
+      if (c.kind === "exileSpell") continue; // an ability's cost only (Nivmagus Elemental)
       // Blight N (CR 701.68a): the one creature you control to put the counters on.
       if (c.kind === "putCounter") {
         if (d.counterOn !== undefined) continue;
@@ -1220,6 +1240,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}),
       ...(d.lifeTo !== undefined ? { lifeTo: d.lifeTo } : {}),
       ...(d.number !== undefined ? { number: d.number } : {}),
+      ...(d.creatureType ? { creatureType: d.creatureType } : {}),
       ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}),
       ...(d.discard?.length ? { discard: d.discard } : {}),
       ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}),
@@ -1868,6 +1889,27 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setTapPick(null)}
             />
           )}
+          {xOppPick && (
+            <div className="targeting x-opponent-pick">
+              <span>
+                <strong>{xOppPick.label}</strong>: {xOppPick.what}
+              </span>
+              {xOppPick.options.map((pid) => (
+                <button
+                  key={pid}
+                  onClick={() => {
+                    setXOppPick(null);
+                    xOppPick.onPick(pid);
+                  }}
+                >
+                  {s.players[pid]!.name}
+                </button>
+              ))}
+              <button className="ghost" onClick={() => setXOppPick(null)}>
+                Cancel
+              </button>
+            </div>
+          )}
           {giftPick && (
             <div className="targeting gift-pick">
               <span>
@@ -1964,6 +2006,18 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 Cancel
               </button>
             </div>
+          )}
+          {castTypePick && (
+            <TypePicker
+              key={`cast-${castTypePick.draft.objectId}`}
+              s={s}
+              pending={{ kind: "chooseOption", player: HUMAN, source: castTypePick.label, what: "creatureType", options: [...CREATURE_TYPES].sort(), prompt: "choose a creature type" }}
+              onDone={(creatureType) => {
+                setCastTypePick(null);
+                continueCast({ ...castTypePick.draft, creatureType });
+              }}
+              onCancel={() => setCastTypePick(null)}
+            />
           )}
           {numberPick && (
             <div className="targeting">
@@ -3926,10 +3980,13 @@ function TypePicker({
   s,
   pending,
   onDone,
+  onCancel,
 }: {
   s: GameState;
   pending: Extract<NonNullable<GameState["pending"]>, { kind: "chooseOption" }>;
   onDone: (choice: string) => void;
+  /** A choice made while casting (Selective Snare), which can still be called off. */
+  onCancel?: () => void;
 }) {
   const [query, setQuery] = useState("");
   const counts = new Map<string, { yours: number; theirs: number; yard: number }>();
@@ -3974,6 +4031,11 @@ function TypePicker({
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && exact && onDone(exact)}
           />
+          {onCancel && (
+            <button className="ghost" onClick={onCancel}>
+              Cancel
+            </button>
+          )}
         </header>
         <div className="modal-body">
           {seen.length > 0 && !q && (

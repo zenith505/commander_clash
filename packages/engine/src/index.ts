@@ -19,5 +19,5 @@ export * from "./shortcuts";
 export * from "./scryfall";
 export { partySize, PARTY_TYPES } from "./amounts";
 export { blightOptions } from "./counters";
-export { keywordLabel } from "./keywords";
+export { keywordLabel, CREATURE_TYPES } from "./keywords";
 export { mayPayUse } from "./spend";

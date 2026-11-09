@@ -5449,7 +5449,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
 }
 
 /** What mana casting it can spend (CR 106.6): Security Rhox's alternative cost only mana from Treasures (CR 106.3). */
-export const spellUse = (d: CardDef, alt?: AltCostKind, cost?: ParsedCost, choices?: CostChoices, o?: GameObject): ManaUse => ({ spell: d, ...(altCost(d, alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(cost ? { xCost: cost.hasX } : {}), ...spellHow(d, choices, o) });
+export const spellUse = (d: CardDef, alt?: AltCostKind, cost?: ParsedCost, choices?: CostChoices, o?: GameObject): ManaUse => ({ spell: d, ...(altCost(d, alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(compileCard(d).creatureManaOnly ? { creatureOnly: true as const } : {}), ...(cost ? { xCost: cost.hasX } : {}), ...spellHow(d, choices, o) });
 
 /** Kicked (CR 702.33d), cast for its disturb cost (CR 702.146a) or from a hand, for mana spent only on such spells or not on them (ManaUse). */
 export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true; fromExile?: true; fromGraveyard?: true; flashbackFromGraveyard?: true; owner?: PlayerId; faceDown?: true } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}), ...(o?.zone === "exile" ? { fromExile: true as const } : {}), ...(o?.zone === "graveyard" ? { fromGraveyard: true as const } : {}), ...(o?.zone === "graveyard" && (d.keywords.includes("Flashback") || choices?.via === "grantedFlashback") ? { flashbackFromGraveyard: true as const } : {}), ...(o ? { owner: o.owner } : {}), ...(choices?.faceDown ? { faceDown: true as const } : {}) });
@@ -5772,6 +5772,10 @@ export function castProblem(
   // Liquid Fire: the number is chosen as it's cast (CR 601.2b), one in the range.
   const castNumber = compileCard(defOf(s, o)).castNumber;
   if (castNumber && choices?.number !== undefined && (!Number.isInteger(choices.number) || choices.number < castNumber.min || choices.number > castNumber.max)) return `choose a number between ${castNumber.min} and ${castNumber.max} for ${defOf(s, o).name}`;
+  // Selective Snare: one existing creature type, not several or another kind of subtype (rulings, CR 205.3m).
+  const typeChoice = compileCard(defOf(s, o)).castChooseType;
+  if (choices?.creatureType !== undefined && (!typeChoice || !CREATURE_TYPES.has(choices.creatureType))) return typeChoice ? `${choices.creatureType} isn't a creature type` : `${defOf(s, o).name} doesn't ask you to choose a creature type`;
+  if (typeChoice && targets !== undefined && choices?.creatureType === undefined) return `choose a creature type for ${defOf(s, o).name} before its targets`;
   if ((choices?.alt === "prototype" || choices?.prototyped) && !o.prototyped) {
     // Cast prototyped, only its alternative characteristics are looked at (CR 718.3a).
     if (!altCost(defOf(s, o), "prototype")) return `${defOf(s, o).name} doesn't have prototype`;
@@ -6917,7 +6921,8 @@ function harmonizeProblem(s: GameState, pid: PlayerId, choices?: CostChoices, co
 export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?: AltCostKind, how?: CastHow) => asFace(s, obj(s, id), how?.face, () => { const d = castDef(s, id, alt); return castTimeTargets(d, spellTargetSpecs(d, modes, how)); });
 
 /** Which optional costs these choices announce, for the targets that depend on them (see gateTargets). */
-export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamwork" | "gift" | "evidence" | "alt" | "face">): CastHow => ({
+export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamwork" | "gift" | "evidence" | "alt" | "face" | "creatureType">): CastHow => ({
+  ...(choices?.creatureType ? { castType: choices.creatureType } : {}),
   ...(choices?.alt ? { alt: choices.alt } : {}),
   ...(choices?.face !== undefined ? { face: choices.face } : choices?.alt === "convert" ? { face: 1 } : {}),
   ...(choices?.kicks?.length ? { kicks: choices.kicks } : {}),
@@ -7026,6 +7031,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Liquid Fire: the number is part of casting it (CR 601.2b).
   const castNumber = compileCard(defOf(s, o)).castNumber;
   if (castNumber && choices.number === undefined) throw new RulesError(`choose a number between ${castNumber.min} and ${castNumber.max} for ${defOf(s, o).name}`);
+  if (compileCard(defOf(s, o)).castChooseType && choices.creatureType === undefined) throw new RulesError(`choose a creature type for ${defOf(s, o).name}`);
   const madness = madnessCastOf(s, p.id, id);
   const suspended = s.pending?.kind === "castFree" && s.pending.how === "suspend" && s.pending.objectId === id;
   const d = defOf(s, o);
@@ -7217,12 +7223,13 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     kind: "spell",
     objectId: id,
     controller: p.id,
-    description: hasX ? `${d.name} (X=${x ?? 0})` : compileCard(d).castNumber && choices.number !== undefined ? `${d.name} (chose ${choices.number})` : d.name,
+    description: `${hasX ? `${d.name} (X=${x ?? 0})` : compileCard(d).castNumber && choices.number !== undefined ? `${d.name} (chose ${choices.number})` : d.name}${compileCard(d).castChooseType && choices.creatureType ? ` (${choices.creatureType})` : ""}`,
     body,
     targets: specs.length ? stampTargets(s, targets) : undefined,
     modes: chosen,
     ...(hasX ? { x: x ?? 0 } : {}),
     ...(compileCard(d).castNumber && choices.number !== undefined ? { chosenNumber: choices.number } : {}),
+    ...(compileCard(d).castChooseType && choices.creatureType ? { chosenType: choices.creatureType } : {}),
     ...(spell?.modal?.chooser && choices.modeChooser !== undefined ? { modeChooser: choices.modeChooser } : {}),
     ...(kicks ? { kicked: kicks } : {}),
     ...(byControl ? { kickedByControl: true as const } : {}),
@@ -7260,7 +7267,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (costOrMana(d, choices.costOr) ? `, paying ${costOrMana(d, choices.costOr)} more` : "") +
     (choices.delve?.length ? `, exiling ${choices.delve.map((c) => nameOf(s, c)).join(", ")} from their graveyard (delve)` : "");
   if (o.faceDown) log(s, `${p.name} casts a face-down creature spell (${o.faceDown})${tax ? ` (commander tax ${tax})` : ""}.`);
-  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
+  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${compileCard(d).castChooseType && choices.creatureType ? `, choosing ${choices.creatureType}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Ethereal Forager: the cards delve exiled are linked to the permanent this spell becomes, one zone change from now
   // (rulings, CR 607.2q).
@@ -8140,6 +8147,14 @@ export function counterOnCandidates(s: GameState, pid: PlayerId, c: Extract<Addi
   return s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.filter, obj(s, id), pid, false) && !countersBanned(s, obj(s, id), c.counter));
 }
 
+/**
+ * The spells `pid` could exile for "Exile an instant or sorcery spell you control" (Nivmagus Elemental): their objects, each
+ * a spell on the stack they control that matches, a copy too (rulings, CR 707.10).
+ */
+export function exileSpellCandidates(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "exileSpell" }>): ObjectId[] {
+  return s.stack.flatMap((x) => (x.kind === "spell" && x.objectId && x.controller === pid && s.objects[x.objectId]?.zone === "stack" && spellMatches(s, c.filter, x) ? [x.objectId] : []));
+}
+
 /** Does casting it this way have an X to announce in a cost beyond mana, as Toxic Deluge's "pay X life" (CR 107.3a)? */
 export function costsHaveX(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">): boolean {
   // Nahiri's Sacrifice: "sacrifice an artifact or creature with mana value X", X announced for it (CR 107.3a).
@@ -8165,6 +8180,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
   if (choices?.craft?.length && !costs.some((c) => c.kind === "craft")) return `${d.name} doesn't ask you to exile materials`;
   if (choices?.counters?.length && !costs.some((c) => c.kind === "removeCounters")) return `${d.name} doesn't ask you to remove counters`;
   if (choices?.counterOn?.length && !costs.some((c) => c.kind === "putCounter")) return `${d.name} doesn't ask you to put a counter on a permanent`;
+  if (choices?.exileSpell?.length && !costs.some((c) => c.kind === "exileSpell")) return `${d.name} doesn't ask you to exile a spell`;
   if (costs.filter((c) => c.kind === "collectEvidence").length > 1) return `${d.name} would collect evidence twice`;
   for (const c of costs) {
     if (c.kind === "collectEvidence") {
@@ -8196,6 +8212,18 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       continue;
     }
     if (c.kind === "revealHand") continue; // always possible, even with an empty or already revealed hand (rulings)
+    if (c.kind === "exileSpell") {
+      // Nivmagus Elemental: one spell of yours on the stack that matches (CR 602.2b, 601.2h).
+      const pool = exileSpellCandidates(s, pid, c);
+      const what = `${/^[aeiou]/i.test(c.filter.text) ? "an" : "a"} ${c.filter.text}`;
+      const chosen = choices?.exileSpell;
+      if (!chosen) {
+        if (!pool.length) return `you need to exile ${what} to ${doing}`;
+        continue;
+      }
+      if (chosen.length !== 1 || !pool.includes(chosen[0]!)) return `choose ${what} to exile`;
+      continue;
+    }
     if (c.kind === "forage") {
       // CR 701.61a: three cards from your graveyard (the card itself isn't there while it's cast, CR 601.2a), or a Food.
       const ways = forageWays(s, pid, o);
@@ -8625,6 +8653,22 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       closeZoneBatch(s);
       continue;
     }
+    if (c.kind === "exileSpell") {
+      // Nivmagus Elemental: the spell leaves the stack for exile, not countered (CR 701.6a, rulings); a copy of a spell
+      // ceases to exist there (CR 707.10a). "The exiled spell's mana value" (Synthesis Pod): as it last existed on the
+      // stack, its X counted (CR 202.3e, 608.2h).
+      for (const id of choices.exileSpell ?? []) {
+        const i = s.stack.findIndex((x) => x.kind === "spell" && x.objectId === id);
+        if (i < 0) continue;
+        const item = s.stack[i]!;
+        sacrificed.push({ manaValue: spellManaValue(s, item), counters: {}, ...(obj(s, id).spellCopy ? {} : { copyKey: cardIdOf(obj(s, id)) }) });
+        s.stack.splice(i, 1);
+        log(s, `${p.name} exiles ${item.description} from the stack.`);
+        moveObject(s, id, "exile");
+      }
+      closeZoneBatch(s);
+      continue;
+    }
     if (c.kind === "forage") {
       // CR 701.61a.
       if (choices.sacrifice?.length) {
@@ -8849,7 +8893,9 @@ const loyaltyAtInstantSpeed = (s: GameState, pid: PlayerId, o?: GameObject) =>
  * that card", the card exiled with it (X in that card's mana cost as 0, CR 107.3g). Null with no such card: X isn't defined,
  * so it can't be paid (rulings). Undefined for an ability whose X is chosen.
  */
-export function definedX(s: GameState, o: GameObject, ab: ActivatedAbility): number | null | undefined {
+export function definedX(s: GameState, o: GameObject, ab: ActivatedAbility, costs?: CostChoices): number | null | undefined {
+  // Bargaining Table: the chosen opponent's hand as it's activated; none chosen yet, X isn't known (a choice to make).
+  if (ab.xIs && typeof ab.xIs === "object" && "opponentHand" in ab.xIs) return costs?.xOpponent !== undefined && s.players[costs.xOpponent] ? s.players[costs.xOpponent]!.hand.length : undefined;
   if (ab.xIs && typeof ab.xIs === "object") return o.counters[ab.xIs.counters] ?? 0;
   if (ab.xIs !== "linkedCardMv") return undefined;
   const card = linkedCards(s, o.id)[0];
@@ -8863,8 +8909,15 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
   if (!ab) return `${d.name} has no such ability`;
-  const fixedX = definedX(s, o, ab);
+  const fixedX = definedX(s, o, ab, costs);
   if (fixedX === null) return `no card is exiled with ${d.name}, so X isn't defined`;
+  // Bargaining Table: an opponent is chosen (not targeted) as it's announced, before X (rulings, CR 602.2b, 601.2b).
+  if (ab.xIs && typeof ab.xIs === "object" && "opponentHand" in ab.xIs) {
+    const opps = opponents(s, pid);
+    if (!opps.length) return `${d.name}'s ability needs an opponent to choose`;
+    if (costs?.xOpponent !== undefined && !opps.includes(costs.xOpponent)) return "choose an opponent: X is the number of cards in their hand";
+    if (costs?.xOpponent === undefined && x0 !== undefined) return "choose an opponent: X is the number of cards in their hand";
+  } else if (costs?.xOpponent !== undefined) return `${d.name}'s ability doesn't ask you to choose an opponent`;
   if (fixedX !== undefined && x0 !== undefined && x0 !== fixedX) return `X is ${fixedX} for ${d.name}'s ability`;
   const x = x0 ?? fixedX;
   // Stabilizer: "Players can't cycle cards" (typecycling too, CR 702.29f).
@@ -9376,7 +9429,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
   // Prototype Portal: an X its text sets (CR 107.3c).
-  const x = x0 ?? (ab && definedX(s, o, ab)) ?? undefined;
+  const x = x0 ?? (ab && definedX(s, o, ab, costs)) ?? undefined;
+  if (ab?.xIs && typeof ab.xIs === "object" && "opponentHand" in ab.xIs && costs?.xOpponent === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose an opponent: X is the number of cards in their hand");
   if (ab?.body.modal && modes === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose ${describeCount(ab.body.modal.min, ab.body.modal.max)} for ${d.name}'s ability`);
   if (ab?.station && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose a creature to tap for station");
   if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.saddle ? "saddle" : "crew"} with`);
@@ -9384,6 +9438,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // or says for one cost and not another, can't skip it. As for spells (castSpell).
   if (ab && activatedCosts(ab, x, o).some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
   if (ab?.costs?.some((c) => c.kind === "forage") && !costs?.sacrifice?.length && !costs?.exileCards?.length) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose how to forage: three cards in your graveyard to exile, or a Food to sacrifice");
+  if (ab?.costs?.some((c) => c.kind === "exileSpell") && !costs?.exileSpell?.length) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose a spell you control to exile");
   let body = ab ? settleDivided(s, withModes(ab.body, modes), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
   // Goblin Test Pilot: "any target chosen at random", as part of activating it, each legal target with an equal chance
   // (rulings); players can respond knowing it.

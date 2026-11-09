@@ -1,7 +1,7 @@
 # Roadmap
 
-30,696 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,970 of 4,988 (99%), top 10,000: 9,756 of
+30,704 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,762 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2382,7 +2382,8 @@ line blocks.
    turn counted, TurnLog.attackPower; rulings); "each player chooses a creature type and returns any number of cards of
    that type from their graveyard to their hand" (Grave Sifter: each player's own type, rulings; Chosen.typesBy);
    "Whenever a creature dealt damage this way dies this turn, populate" (Ghired's Belligerence: any creature it damaged,
-   whoever controls it, however it dies this turn, rulings). +8.
+   whoever controls it, however it dies this turn, rulings). +8,
+   30,704 of 31,936 with B156.
    Out after round 318 (looked at, not done): Moxite Refinery (X counters of any kinds removed from one permanent as a
    cost), Night Soil (a cost exiling cards from any single graveyard), Mogg Assassin (a second target chosen by the
    first target's controller), Mastermind's Acquisition and the wishes (cards from outside the game), Encroaching

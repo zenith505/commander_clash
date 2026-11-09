@@ -64,6 +64,8 @@ export function manaOriginsOf(s: GameState, o: GameObject): ManaOrigin[] {
   if (here && c.subtypes.includes("Treasure")) out.push("treasure");
   // Cataclysmic Prospecting: "for each mana from a Desert spent to cast ~" (CR 106.3), a Desert as it made the mana.
   if (here && c.subtypes.includes("Desert")) out.push("desert");
+  // Bat Colony: "for each mana from a Cave spent to cast it": a Cave as it made the mana, the same way.
+  if (here && c.subtypes.includes("Cave")) out.push("cave");
   // Imperiosaur: "mana produced by basic lands": a land with the basic supertype as it made the mana (CR 205.4a), not a
   // triggered mana ability's source when a basic land is tapped (rulings).
   if (here && c.types.includes("Land") && c.supertypes.includes("Basic")) out.push("basicLand");
@@ -229,7 +231,7 @@ export function canPayFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, u
 }
 
 /** What spending mana from these sources counts as (CR 106.3): "mana from a Treasure", "from creatures", "from an artifact". */
-export type SpentFrom = Record<"treasure" | "creature" | "artifact" | "desert", number>;
+export type SpentFrom = Record<"treasure" | "creature" | "artifact" | "desert" | "cave", number>;
 
 /**
  * Pay this from `pid`'s pool for `use`. Returns the payment (with the mana spent by type, and how much of it each kind
@@ -248,7 +250,7 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, us
   const lots = usableLots(s, pid, use);
   const plain = treasureOnly(use) || creatureOnly(use) ? emptyPool() : plainMana(s, pid);
   const spent = emptyPool();
-  const from: SpentFrom = { treasure: 0, creature: 0, artifact: 0, desert: 0 };
+  const from: SpentFrom = { treasure: 0, creature: 0, artifact: 0, desert: 0, cave: 0 };
   let uncounterable = false;
   const spentTriggers: ManaSpentTrigger[] = [];
   let haste: "endOfTurn" | "game" | undefined;

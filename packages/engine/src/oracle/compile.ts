@@ -4955,6 +4955,15 @@ export function compile(d: CardDef): CompiledCard {
       out.damageToOpponentsMills = true;
       continue;
     }
+    // Hostility (CR 615.5): see staticRules in damage.ts.
+    const hostility = /^If a spell you control would deal damage to an opponent, prevent that damage\. (Create an? [^.]+ token(?: with [a-z ]+)?) for each 1 damage prevented this way\.$/.exec(line);
+    if (hostility && !isSpell) {
+      const made = parseBody(`${hostility[1]!}.`, {});
+      const e = made && made.targets.length === 0 && made.effects.length === 1 ? made.effects[0]! : undefined;
+      if (e?.type === "createToken" && JSON.stringify(e.n) === "1" && Object.keys(e).every((k) => ["type", "token", "n", "who"].includes(k)) && (!e.who || JSON.stringify(e.who) === '{"ref":"you"}')) out.spellDamageToOpponentsTokens = e.token;
+      else out.unsupported.push(raw);
+      continue;
+    }
     // Angel of Suffering (CR 615.5, 615.12): see staticRules in damage.ts.
     if (line === "If damage would be dealt to you, prevent that damage and mill twice that many cards.") {
       out.damageToYouMillsTwice = true;

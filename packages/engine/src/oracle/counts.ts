@@ -973,6 +973,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^mana from a Treasure (?:that was )?spent to cast (~|it)$/i.exec(p)) && ctx !== null && (ctx.spell || (ctx.selfIt && m[1] === "it"))) return count({ kind: "treasureSpent" });
   // Cataclysmic Prospecting: "for each mana from a Desert spent to cast this spell": the spell's own.
   if (/^mana from a Desert spent to cast ~$/i.test(p) && ctx?.spell) return count({ kind: "spentFrom", origin: "desert" });
+  // Bat Colony: "When ~ enters, create a ... token ... for each mana from a Cave spent to cast it": the spell that became
+  // this permanent (CR 106.3, 601.2h), from its enters event; none if it wasn't cast.
+  if (/^mana from a Cave spent to cast it$/i.test(p) && ctx?.selfIt && !ctx.spell) return count({ kind: "spentFrom", origin: "cave" });
   // "For each {S} spent to cast ~", "the amount of {S} spent to cast ~" (CR 107.4h): the spell's, or its permanent's
   // enters trigger's (compile checks it's one of those).
   if ((m = /^(?:the )?(?:amount of )?\{S\} spent to cast (~|it)$/i.exec(p)) && ctx !== null && (ctx.spell || (ctx.selfIt && m[1] === "it") || m[1] === "~")) return count({ kind: "snowSpent" });

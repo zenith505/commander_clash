@@ -550,6 +550,10 @@ function staticRules(s: GameState, events: DamageEvent[]): DamageRule[] {
     const cover = obj(s, id);
     // The Mindskinner: "If a source you control would deal damage to an opponent, prevent that damage and each opponent
     // mills that many cards."
+    // Hostility: "If a spell you control would deal damage to an opponent, prevent that damage. Create a 3/1 ... token for
+    // each 1 damage prevented this way": a spell, not a permanent's ability (CR 112.1), its controller as it deals it.
+    const hostility = abilitiesOf(s, cover).spellDamageToOpponentsTokens;
+    if (hostility) out.push({ id: `static-spelltokens:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, to: { players: "opponents" }, sourceYours: true, by: { spellOnly: true }, tokens: hostility });
     if (abilitiesOf(s, cover).damageToOpponentsMills) out.push({ id: `static-mill:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, to: { players: "opponents" }, sourceYours: true, mill: true });
     // Angel of Suffering: "If damage would be dealt to you, prevent that damage and mill twice that many cards": the cards
     // are milled even if the damage can't be prevented (rulings, CR 615.12).
@@ -1596,7 +1600,7 @@ export function shieldChoicesPossible(s: GameState): boolean {
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     const a = abilitiesOf(s, o);
-    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.attachedDamageToController || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills || a.damageToYouMillsTwice || a.preventToYou || a.preventToYouCounter || a.preventToSelfCounters || a.spellDamageToYouToController || a.preventToSelfExileTop);
+    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.attachedDamageToController || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills || a.spellDamageToOpponentsTokens || a.damageToYouMillsTwice || a.preventToYou || a.preventToYouCounter || a.preventToSelfCounters || a.spellDamageToYouToController || a.preventToSelfExileTop);
   });
 }
 

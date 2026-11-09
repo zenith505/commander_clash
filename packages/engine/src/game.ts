@@ -6075,7 +6075,7 @@ export function castProblem(
   }
   // "X damage divided as you choose": the X announced (CR 601.2b, 601.2d).
   // Before targets are chosen, "with mana value X" asks for none in particular: X is announced as it's cast (601.2b).
-  let specs = settleDivided(s, { targets: bindModeChooser(castTimeTargets(d, spellTargetSpecs(d, modes, castHow(choices))), spell?.modal?.chooser ? choices?.modeChooser : undefined), effects: [], text: "" }, { controller: pid, sourceId: id, x: x ?? 0 }, !targets).targets;
+  let specs = settleDivided(s, { targets: bindModeChooser(castTimeTargets(d, spellTargetSpecs(d, modes, castHowNow(s, pid, id, choices))), spell?.modal?.chooser ? choices?.modeChooser : undefined), effects: [], text: "" }, { controller: pid, sourceId: id, x: x ?? 0 }, !targets).targets;
   // "Any number of target creatures" could take a Flagbearer more (flagbearerProblem).
   const manySpecs = specs.filter((t) => t.many === "any" && !t.skip);
   if (targets && manySlot(specs) >= 0) {
@@ -6992,6 +6992,12 @@ function harmonizeProblem(s: GameState, pid: PlayerId, choices?: CostChoices, co
 export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?: AltCostKind, how?: CastHow) => asFace(s, obj(s, id), how?.face, () => { const d = castDef(s, id, alt); return castTimeTargets(d, spellTargetSpecs(d, modes, how)); });
 
 /** Which optional costs these choices announce, for the targets that depend on them (see gateTargets). */
+/** castHow, and a spell cast for its madness cost as its madness ability resolves (Avacyn's Judgment's amount, CR 702.35b). */
+const castHowNow = (s: GameState, pid: PlayerId, id: ObjectId, choices?: Pick<CostChoices, "kicks" | "bargain" | "teamwork" | "gift" | "evidence" | "alt" | "face" | "creatureType">): CastHow => {
+  const pend = s.pending;
+  const how = castHow(choices);
+  return pend?.kind === "castFree" && pend.how === "madness" && pend.player === pid && pend.objectId === id ? { ...how, alt: "madness" } : how;
+};
 export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamwork" | "gift" | "evidence" | "alt" | "face" | "creatureType">): CastHow => ({
   ...(choices?.creatureType ? { castType: choices.creatureType } : {}),
   ...(choices?.alt ? { alt: choices.alt } : {}),
@@ -7116,7 +7122,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // "Sacrifice a creature or pay {3}{B}": which one is announced as it's cast (CR 601.2b).
   const or = compileCard(d).costOr;
   if (or && choices.costOr === undefined) throw new RulesError(`choose how to pay ${d.name}'s additional cost: ${or.map((x) => x.text).join(" or ")}`);
-  const specs = withSplices({ targets: spellTargets(s, id, modes, undefined, castHow(choices)), effects: [], text: "" }, splicedBodies(s, choices.splice)).targets;
+  const specs = withSplices({ targets: spellTargets(s, id, modes, undefined, castHowNow(s, p.id, id, choices)), effects: [], text: "" }, splicedBodies(s, choices.splice)).targets;
   // Tegwyll's Scouring: cast as though it had flash only with its tapping paid (kicks left out are none).
   const problem = castProblem(s, p.id, id, specs.length ? (targets ?? []) : undefined, spell?.modal ? modes : undefined, convoke, improvise, x, compileCard(d).flashIfKicked && choices.kicks === undefined ? { ...choices, kicks: [] } : choices);
   if (problem) throw new RulesError(problem);
@@ -7125,7 +7131,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const unpicked = castExtraCosts(d, { ...choices, objectId: id, ...(spell?.modal && modes ? { modes } : {}) }, x ?? 0, s, p.id).find((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !choices[costPickKey(c)]?.length);
   if (unpicked) throw new RulesError(`choose what to pay ${d.name}'s additional cost with`);
   // The targets it has, cast this way (CR 702.33g): copies of it have the same ones (CR 707.10).
-  let body = spell ? settleDivided(s, gateBody(withModes(spell, modes), castHow(choices)), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
+  let body = spell ? settleDivided(s, gateBody(withModes(spell, modes), castHowNow(s, p.id, id, choices)), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
   // "Target creatures that player controls" in a mode an opponent chose (Fatal Lore): theirs, for good (askModeChooser).
   if (body && spell?.modal?.chooser) body = { ...body, targets: bindModeChooser(body.targets, choices.modeChooser) };
   if (body && manySlot(body.targets) >= 0) {
@@ -10654,6 +10660,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const st = r.scratch?.castAmong;
     if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered, or none");
     st.pick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "bribeCounter") {
+    const st = r.scratch?.bribe;
+    if (!st || !pend.counterKind || !pend.options.includes(choice)) throw new RulesError("choose a +1/+1 counter, a counter of that kind, or none");
+    st.picks[pend.counterKind] = choice;
+    log(s, choice === "none" ? `${p.name} chooses no counter for the ${pend.counterKind} counters (${pend.source}).` : `${p.name} chooses a ${choice === "plus" ? "+1/+1" : pend.counterKind} counter for the ${pend.counterKind} counters (${pend.source}).`);
     continueResolution(s);
     return;
   }

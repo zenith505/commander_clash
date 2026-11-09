@@ -171,12 +171,14 @@ export function gateBody(b0: AbilityBody, how: CastHow = {}): AbilityBody {
   // "Target creatures of the creature type of your choice": of the type chosen (CR 601.2b-c), bound for good.
   const b = b0.targets.some((t) => t.chosen === "type") ? { ...b0, targets: b0.targets.map((t) => (t.chosen !== "type" ? t : (({ chosen: _, ...rest }) => (how.castType ? { ...rest, subtypes: [...(rest.subtypes ?? []), how.castType] } : rest))(t))) } : b0;
   if (!hasGatedTargets(b.targets)) return b;
+  // Avacyn's Judgment: the amount divided, known once the alternative cost is chosen (CR 601.2b), before it's divided (601.2d).
+  if (b.targets.some((t) => t.divided?.altAmount)) return gateBody({ ...b, targets: b.targets.map((t) => (t.divided?.altAmount ? { ...t, divided: (({ altAmount, ...d }) => (how.alt === altAmount!.alt ? { ...d, amount: altAmount!.amount } : d))(t.divided) } : t)) }, how);
   const gated = b.targets.some((t) => t.onlyIf) ? { ...b, targets: b.targets.map((t) => (t.onlyIf && castConditionMet(t.onlyIf.cond, how) === !!t.onlyIf.not ? { ...t, skip: true as const } : t)) } : b;
   return gated.targets.some((t) => t.many === "kicked") ? expandMany(gated, how.kicks?.length ?? 0) : gated;
 }
 
 /** Whether some of these targets depend on how the spell is cast (see gateTargets). */
-export const hasGatedTargets = (specs: TargetSpec[]) => specs.some((t) => t.onlyIf || t.many === "kicked");
+export const hasGatedTargets = (specs: TargetSpec[]) => specs.some((t) => t.onlyIf || t.many === "kicked" || t.divided?.altAmount);
 
 /** The target entry that stands for "any number of target ..." or "up to X target ..." (TargetSpec.many), or -1. */
 export const manySlot = (specs: TargetSpec[]): number => specs.findIndex((t) => t.many);

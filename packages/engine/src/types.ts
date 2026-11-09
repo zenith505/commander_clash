@@ -2070,6 +2070,12 @@ export interface GameState {
   extraUpkeeps?: number;
   /** The added beginning phase going on now has only an upkeep step (Obeka, Splitter of Seconds; see addedPhases). */
   upkeepPhase?: true;
+  /**
+   * The attackers declared in this combat that a requirement applied to as they were declared (CR 508.1d), as
+   * "id@zoneChanges" (CR 400.7): Firkraag, Cunning Instigator's "if that creature had to attack this combat" (rulings:
+   * the creature's own requirements, not its controller's).
+   */
+  hadToAttack?: { turn: number; combat: number; keys: string[] };
   /** The key of the added combat phase going on now (see addedPhases), and the last key given out. */
   thatCombat?: number;
   combatKeys?: number;

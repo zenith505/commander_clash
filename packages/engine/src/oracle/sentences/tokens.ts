@@ -1,7 +1,7 @@
 // Sentences that create tokens (including token copies and predefined tokens), delayed draws, proliferate, amass, populate, blink, investigate, explore.
 
 import type { Effect, TokenSpec } from "../../abilities";
-import { compileQuoted } from "../grants";
+import { compileNamedToken, compileQuoted } from "../grants";
 import { allEffects } from "../../abilities";
 import { NUMX, X, amt, num, singularWord, isGroup, isSeveral, BASIC_TYPES, COLOR_WORDS } from "../words";
 import { parsePlayer, parseObject, parseKeywordList } from "../targets";
@@ -192,6 +192,16 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!keywords) return null;
     const token: TokenSpec = { name: m[4] ?? "Vehicle", ...(m[4] ? { named: true as const } : {}), power: xx ? 0 : Number(m[2]), toughness: xx ? 0 : Number(m[3]), colors: [], types: ["Artifact"], subtypes: ["Vehicle"], keywords, abilities: `Crew ${m[6]}` };
     return [{ type: "createToken", who: { ref: "you" }, n: amt(m[1]!), token, ...(xx ? { pt: X } : {}) }];
+  }
+  // Toggo, Goblin Weaponsmith: "create a colorless Equipment artifact token named Rock with "Equipped creature has '{1},
+  // {T}, Sacrifice Rock: This creature deals 2 damage to any target'" and equip {1}": a named Equipment token (CR 111.4,
+  // 702.6a) whose granted ability is the equipped creature's, the creature the source of its damage (rulings), and
+  // "Rock" in it is that Equipment only (CR 201.5a), as Ninja's Kunai's own name is.
+  if ((m = /^(?:You )?[Cc]reate a colorless Equipment artifact token named ([A-Z][\w'-]*(?: [A-Z][\w'-]*)*) with "(Equipped creature has )'([^'"]+)'" and equip (\{\d+\})$/.exec(s))) {
+    // Its "This creature" was read as "~" with the rest of the line; in the ability it gives, it's the equipped creature.
+    const text = `${m[2]!}"${m[3]!.replace(/^([^:]+: )~ /, "$1This creature ").replace(/^([^.]*[^.])$/, "$1.")}"`;
+    const token: TokenSpec = { name: m[1]!, named: true, colors: [], types: ["Artifact"], subtypes: ["Equipment"], keywords: [], abilities: `${text}\nEquip ${m[4]!}` };
+    return compileNamedToken(m[1]!, token.abilities!, token.types, token.subtypes) ? [{ type: "createToken", who: { ref: "you" }, n: 1, token }] : null;
   }
   // A named noncreature token with an ability of its own: "create eight colorless snow artifact tokens named Replicated Ring
   // with "{T}: Add one mana of any color."" (Replicating Ring, CR 111.4).

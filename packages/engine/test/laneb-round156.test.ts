@@ -20,6 +20,8 @@ const deathOrGlory = (): CardDef => ({"oracleId":"b2ae0968-28ed-4ebb-a4e8-69ff6e
 const mercurial = (): CardDef => ({"oracleId":"c7efe6c6-3da1-47a6-a8ad-30c36502a7ab","name":"Mercurial Transformation","manaCost":"{1}{U}","cmc":2,"typeLine":"Sorcery — Lesson","supertypes":[],"types":["Sorcery"],"subtypes":["Lesson"],"oracleText":"Until end of turn, target nonland permanent loses all abilities and becomes your choice of a blue Frog creature with base power and toughness 1/1 or a blue Octopus creature with base power and toughness 4/4.","colors":["U"],"colorIdentity":["U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/a/d/adcbe115-5482-4e5a-95bb-8ccbb01d3547.jpg?1783927377","artUrl":"https://cards.scryfall.io/art_crop/front/a/d/adcbe115-5482-4e5a-95bb-8ccbb01d3547.jpg?1783927377","commanderLegal":"legal","set":"stx","releasedAt":"2021-04-23","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
 const doubling = (): CardDef => ({"oracleId":"01546b7d-a233-4176-8843-d732074dc5b6","name":"Doubling Season","manaCost":"{4}{G}","cmc":5,"typeLine":"Enchantment","supertypes":[],"types":["Enchantment"],"subtypes":[],"oracleText":"If an effect would create one or more tokens under your control, it creates twice that many of those tokens instead.\nIf an effect would put one or more counters on a permanent you control, it puts twice that many of those counters on that permanent instead.","colors":["G"],"colorIdentity":["G"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/2/9/29ba5a2d-d787-4214-8cd7-7f2bcea938f8.jpg?1783934805","artUrl":"https://cards.scryfall.io/art_crop/front/2/9/29ba5a2d-d787-4214-8cd7-7f2bcea938f8.jpg?1783934805","commanderLegal":"legal","set":"bbd","releasedAt":"2018-06-08","rarity":"mythic","layout":"normal","gameChanger":false}) as CardDef;
 
+const judgment = (): CardDef => ({"oracleId":"932177b8-70f8-4908-a48f-fe03204daddc","name":"Light of Judgment","manaCost":"{4}{R}","cmc":5,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Light of Judgment deals 6 damage to target creature. Destroy up to one Equipment attached to that creature.","colors":["R"],"colorIdentity":["R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/9/8/98bb716d-ca66-445f-9cb3-0fc656c8ebff.jpg?1783906602","artUrl":"https://cards.scryfall.io/art_crop/front/9/8/98bb716d-ca66-445f-9cb3-0fc656c8ebff.jpg?1783906602","commanderLegal":"legal","set":"fin","releasedAt":"2025-06-13","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
+
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const tgt = (id: string) => ({ kind: "object" as const, id });
 const ply = (id: PlayerId) => ({ kind: "player" as const, id });
@@ -339,5 +341,53 @@ describe("Lane B round B156", () => {
         expect(botActions(t, ap2)).toEqual([{ type: "chooseOption", player: ap2, choice: "0" }]);
       }
     }
+  });
+
+  it("Light of Judgment: 6 damage to target creature, then destroy up to one Equipment attached to it, chosen as it resolves (rulings)", () => {
+    expect(isFullySupported(judgment())).toBe(true);
+    const gear = (name: string) => card(name, "Artifact — Equipment", "{1}", { oracleText: "Equipped creature gets +1/+1.\nEquip {1}" });
+    const { s: s0, ap, ids, opp } = setup([judgment()]);
+    const big = putOnBattlefield(s0, opp, beast("Big Beast", 8));
+    const eq = putOnBattlefield(s0, opp, gear("Test Blade"));
+    const eq2 = putOnBattlefield(s0, opp, gear("Second Blade"));
+    const loose = putOnBattlefield(s0, opp, gear("Loose Blade"));
+    const elsewhere = putOnBattlefield(s0, opp, beast("Other Beast", 2));
+    const away = putOnBattlefield(s0, opp, gear("Away Blade"));
+    s0.objects[eq]!.attachedTo = big;
+    s0.objects[eq2]!.attachedTo = big;
+    s0.objects[away]!.attachedTo = elsewhere;
+    invalidateCharacteristics(s0);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(big)])));
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: ap, min: 0, count: 1 });
+    expect(s.pending?.kind === "pickPermanents" && [...s.pending.options].sort()).toEqual([eq, eq2].sort());
+    // A bot destroys an opponent's Equipment.
+    expect(botActions(s, ap)).toMatchObject([{ type: "pickPermanents", player: ap }]);
+    s = settle(act(s, { type: "pickPermanents", player: ap, ids: [eq2] }));
+    expect([zone(s, eq), zone(s, eq2), zone(s, loose), zone(s, away)]).toEqual(["battlefield", "graveyard", "battlefield", "battlefield"]);
+    // An 8/8 with two +1/+1 Equipment survives 6 damage; with one destroyed it is 9/9.
+    expect(zone(s, big)).toBe("battlefield");
+    expect(s.objects[big]!.damage).toBe(6);
+    // Choosing none destroys nothing; a creature with no Equipment is a fine target.
+    const { s: t0, ap: ap2, ids: ids2, opp: opp2 } = setup([judgment()]);
+    const bare = putOnBattlefield(t0, opp2, beast("Bare Beast", 4));
+    const t = settle(run(t0, planCast(t0, ap2, ids2[0]!, [tgt(bare)])));
+    expect(t.pending?.kind).not.toBe("pickPermanents");
+    expect(zone(t, bare)).toBe("graveyard");
+  });
+
+  it("Light of Judgment: with the creature an illegal target as it resolves, no Equipment is destroyed (rulings)", () => {
+    const { s: s0, ap, ids, opp } = setup([judgment()]);
+    const big = putOnBattlefield(s0, opp, beast("Big Beast", 8));
+    const eq = putOnBattlefield(s0, opp, card("Test Blade", "Artifact — Equipment", "{1}", { oracleText: "Equipped creature gets +1/+1.\nEquip {1}" }));
+    s0.objects[eq]!.attachedTo = big;
+    invalidateCharacteristics(s0);
+    const s1 = run(s0, planCast(s0, ap, ids[0]!, [tgt(big)]));
+    // The creature gains hexproof in response: it's an illegal target, so the spell doesn't resolve.
+    s1.effects.push({ id: `x${s1.nextId++}`, timestamp: s1.nextTimestamp++, controller: opp, sourceName: "test", duration: "endOfTurn", affected: [big], mods: [{ kind: "addKeywords", keywords: ["Hexproof"] }] });
+    invalidateCharacteristics(s1);
+    const s = settle(s1);
+    expect(zone(s, big)).toBe("battlefield");
+    expect(s.pending?.kind).not.toBe("pickPermanents");
+    expect(zone(s, eq)).toBe("battlefield");
   });
 });

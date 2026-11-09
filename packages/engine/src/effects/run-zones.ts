@@ -224,7 +224,10 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const options3 = (other.length ? options2.filter((id) => !other.includes(id)) : options2).filter((id) => !(e.destroyable && !e.least && objHasKeyword(s, obj(s, id), "indestructible")));
     // Kamiz, Obscura Oculus: "with lesser power" than the target, as it is now (after it connived).
     const than = e.lesserPowerThanTarget !== undefined ? objects(s, { ref: "target", index: e.lesserPowerThanTarget }, ctx).find((o) => o.zone === "battlefield") : undefined;
-    const options = e.lesserPowerThanTarget === undefined ? options3 : than ? options3.filter((id) => power(s, obj(s, id)) < power(s, than)) : [];
+    const options4 = e.lesserPowerThanTarget === undefined ? options3 : than ? options3.filter((id) => power(s, obj(s, id)) < power(s, than)) : [];
+    // Light of Judgment: only what's attached to that target as it resolves.
+    const host = e.attachedToTargetAt !== undefined ? objects(s, { ref: "target", index: e.attachedToTargetAt }, ctx).find((o) => o.zone === "battlefield") : undefined;
+    const options = e.attachedToTargetAt === undefined ? options4 : host ? options4.filter((id) => obj(s, id).attachedTo === host.id) : [];
     // "Sacrifice any number of other creatures": as many as they like, asked even with only one.
     if (e.anyNumber) {
       if (!options.length) {

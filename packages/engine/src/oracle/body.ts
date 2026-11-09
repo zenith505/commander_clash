@@ -1543,6 +1543,13 @@ function roundB156Sentence(s: string, sentences: string[], si: number, ctx: Ctx,
     const heads: Amount = { count: { kind: "flipsWon", heads: true } };
     return out([{ type: "if", cond: both[1] === "heads" ? { kind: "amountNow", amount: heads, min: 2 } : { kind: "amountNow", amount: heads, max: 0 }, effects: inner }], 0);
   }
+  // Light of Judgment: "~ deals 6 damage to target creature. Destroy up to one Equipment attached to that creature.": one
+  // chosen as it resolves, not targeted, among those attached to it then (rulings); none if the creature is an illegal
+  // target (it doesn't resolve, CR 608.2b).
+  if (s === "Destroy up to one Equipment attached to that creature" && prev?.type === "damage" && ctx.spell && ctx.targets.length === 1 && ctx.targets[0]!.kind === "object" && ctx.targets[0]!.types?.includes("Creature")) {
+    const filter: TargetSpec = { kind: "object", types: ["Artifact"], subtypes: ["Equipment"], notTypes: [], notColors: [], text: "Equipment attached to that creature" };
+    return out([{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose", upTo: true, anyController: true, attachedToTargetAt: 0, prompt: "click up to one Equipment attached to that creature. ~ destroys it." }, { type: "destroy", what: { ref: "created" } }], 0);
+  }
   // Mercurial Transformation: "Until end of turn, target nonland permanent loses all abilities and becomes your choice of a
   // blue Frog creature with base power and toughness 1/1 or a blue Octopus creature with base power and toughness 4/4.":
   // chosen as it resolves (rulings); either replaces its card types, creature types and colors (CR 205.1a, 105.3).
@@ -6815,8 +6822,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
-    // rounds B156, B155, B154, B153, B152, B151, B148 and 311 to 315's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    // rounds B156, B155, B154, B153, B152, B151, B148 and 311 to 316's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
+    const faceDown = roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);
@@ -20266,6 +20273,61 @@ function round315Sentence(s: string, sentences: string[], si: number, ctx: Ctx, 
     effects.push({ type: "gatherCounters", from: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creatures you control" }, kinds: [counter] });
     const removed: Amount = { count: { kind: "countersRemovedThisWay" }, times: put[1] === "twice" ? 2 : 3 };
     return { effect: { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "countersRemovedThisWay" } }, min: 1 }, effects: [{ type: "counters", what: { ref: "self" }, counter: counterKind(put[2]!), n: removed }] }, next: si + 2 };
+  }
+  return null;
+}
+
+/** Round 316's sentences, kept out of parseBodyText (TS2563). */
+function round316Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  // Fiery Annihilation: "~ deals 5 damage to target creature. Exile up to one target Equipment attached to that creature.
+  // If that creature would die this turn, exile it instead.": a second target, attached to the first as it's chosen and as
+  // it resolves, and not exiled with the creature an illegal target (rulings); "that creature" is still the first target,
+  // exiled instead of dying for any reason this turn (rulings, CR 614.1a).
+  // Stoic Farmer: "search your library for a basic Plains card and reveal it. If an opponent controls more lands than you,
+  // put it onto the battlefield tapped. Otherwise, put it into your hand. Then shuffle.": the lands counted as the card is
+  // put there, after the search (CR 608.2c), then one shuffle (CR 701.23).
+  const farmer = /^[Ss]earch your library for (an? [^,.]+ card) and reveal it$/.exec(s);
+  const farmerIf = farmer && /^If (.+), put it onto the battlefield( tapped)?$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+  if (farmer && farmerIf && sentences[si + 2]?.replace(/\.$/, "") === "Otherwise, put it into your hand" && sentences[si + 3]?.replace(/\.$/, "") === "Then shuffle") {
+    const fx = parseOne(`Search your library for ${farmer[1]!}, reveal it, put it into your hand, then shuffle`, ctx);
+    const cond = parseStaticCondition(farmerIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+    if (fx?.length !== 1 || fx[0]!.type !== "search" || fx[0]!.dest.zone !== "hand" || !fx[0]!.reveal || fx[0]!.condDest || !cond) return "fail";
+    return { effect: { ...fx[0]!, condDest: { cond, dest: { zone: "battlefield", ...(farmerIf[2] ? { tapped: true as const } : {}) } } }, next: si + 4 };
+  }
+  // Boreas Charger: "choose an opponent who controls more lands than you. Search your library for a number of Plains cards
+  // equal to the difference, reveal those cards, put one of them onto the battlefield tapped and the rest into your hand,
+  // then shuffle.": chosen as it resolves, then the lands counted again; with no such opponent, the library is still
+  // searched and shuffled, for nothing (rulings). Fewer may be found (rulings, CR 701.23b).
+  const boreas = /^[Cc]hoose an opponent who controls more lands than you$/.test(s) ? /^Search your library for a number of ([A-Z][a-z]+) cards equal to the difference, reveal those cards, put one of them onto the battlefield tapped and the rest into your hand, then shuffle\.?$/.exec(sentences[si + 1] ?? "") : null;
+  if (boreas && si + 2 === sentences.length) {
+    const filter = parseSearchFilter(`${boreas[1]!} card`);
+    const theirs = parseCount("the number of lands that player controls", { ...ctx, chosenOpponent: true });
+    const yours = parseCount("the number of lands you control", ctx);
+    if (!filter || !theirs || !yours || typeof theirs === "number" || typeof yours === "number" || Object.keys(theirs).length !== 1 || Object.keys(yours).length !== 1 || !JSON.stringify(theirs).includes('"chosenPlayer"')) return "fail";
+    effects.push({ type: "choose", choice: "opponent", moreLandsThanYou: true });
+    return { effect: { type: "search", filter, n: { count: { kind: "difference", of: [theirs.count, yours.count] } }, upTo: false, reveal: true, dest: { zone: "battlefield", tapped: true }, others: { zone: "hand" }, firstN: 1 }, next: si + 2 };
+  }
+  const creatureAt = ctx.lastObjectTarget;
+  if (/^Exile up to one target Equipment attached to that creature$/.test(s) && creatureAt !== undefined && /^If that creature would die this turn, exile it instead\.?$/.test(sentences[si + 1] ?? "") && si + 2 === sentences.length) {
+    const host = ctx.targets[creatureAt];
+    const last = effects[effects.length - 1];
+    if (host?.kind !== "object" || host.many || host.optional || !host.types?.includes("Creature") || last?.type !== "damage" || last.to.ref !== "target" || last.to.index !== creatureAt) return "fail";
+    const index = ctx.targets.length;
+    ctx.targets.push({ kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Equipment"], text: "target Equipment attached to that creature", optional: true, attachedToTarget: creatureAt });
+    effects.push({ type: "exile", what: { ref: "target", index } });
+    return { effect: { type: "exileIfDies", what: { ref: "target", index: creatureAt } }, next: si + 2 };
+  }
+  // Quintorius Kand: "Exile any number of target cards from your graveyard. Add {R} for each card exiled this way. You may
+  // play those cards this turn.": each card the targets became in exile (CR 400.7), played this turn with its usual timing
+  // and costs (rulings), a land with a land play (CR 305.1); the mana is added between, which changes nothing.
+  if (/^You may play those cards this turn\.?$/.test(s) && !ctx.spell) {
+    const [ex, mana] = effects.slice(-2);
+    const spec = ex?.type === "exile" && ex.what.ref === "target" ? ctx.targets[ex.what.index] : undefined;
+    if (ex?.type !== "exile" || ex.what.ref !== "target" || spec?.kind !== "card" || spec.many !== "any" || spec.owner !== "you" || ex.until || ex.linked || ex.ownerMay || ex.youMay || ex.counters || ex.suspend) return null;
+    if (mana?.type !== "addMana" || typeof mana.times !== "object" || !("count" in mana.times) || mana.times.count.kind !== "cardsExiledThisWay" || effects.length !== 2) return null;
+    ex.youMay = { thisTurn: true, play: true };
+    effects.pop();
+    return { effect: mana, next: si + 1 };
   }
   return null;
 }

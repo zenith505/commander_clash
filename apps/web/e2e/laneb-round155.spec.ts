@@ -69,7 +69,7 @@ test("Covenant of Minds: Ana casts it at you, you click No, and she draws five",
   let s: GameState = scene({ board: LANDS }, [{ hand: ["Covenant of Minds"], board: ["Island", "Island", "Island", "Island", "Island"], library: ["Llanowar Elves", "Grizzly Bears", "Hill Giant", "Forest"] }]);
   const [covenant, bears] = [one(s, "Covenant of Minds"), one(s, "Grizzly Bears")];
   s = playUntil(s, (x) => x.activePlayer === 1 && x.step === "main1" && x.priority === 1 && x.stack.length === 0 && !x.pending);
-  const hand = s.players[1]!.hand.length;
+  const library = s.players[1]!.library.length;
   for (const a of planCast(s, 1, covenant, [{ kind: "player", id: 0 }])!) s = applyAction(s, a);
   s = playUntil(s, (x) => x.pending?.kind === "chooseMay" && x.pending.player === 0);
   await open(page, s);
@@ -77,7 +77,9 @@ test("Covenant of Minds: Ana casts it at you, you click No, and she draws five",
   await expect(bar).toContainText("Covenant of Minds");
   await bar.getByRole("button", { name: "No", exact: true }).click();
   const after = await resolveUntil(page, (x) => !x.pending && x.objects[covenant]!.zone === "graveyard" && x.objects[bears]!.zone === "graveyard");
-  // Covenant left her hand; the three revealed went to her graveyard and she drew five.
-  expect(after.players[1]!.hand.length).toBe(hand - 1 + 5);
+  // The three revealed went to her graveyard and she drew five: eight cards fewer in her library. (Her hand size isn't
+  // checked: she's a bot in her own main phase and may play one of the drawn lands before the poll sees the state.)
+  expect(after.players[1]!.library.length).toBe(library - 8);
+  expect(after.objects[one(s, "Hill Giant")]!.zone).toBe("graveyard");
   expect(pageErrors(page)).toEqual([]);
 });

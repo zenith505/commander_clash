@@ -1,6 +1,6 @@
 // Lane B round B156 in the browser: Price of Betrayal's counters picked one at a time off an opponent (rulings), Wicked
 // Slumber's two "either of them" picks, Death or Glory's graveyard piles (CR 700.3) with Ana choosing the pile exiled, and
-// Mercurial Transformation's Frog-or-Octopus choice as it resolves.
+// Mercurial Transformation's Frog-or-Octopus choice as it resolves, and Light of Judgment's up-to-one Equipment pick.
 import { expect, test } from "@playwright/test";
 import { applyAction, characteristics, planCast, type GameState } from "@cc/engine";
 import { LANDS, one, open, pageErrors, playUntil, scene } from "./scene";
@@ -79,5 +79,22 @@ test("Mercurial Transformation: you click the Octopus, and your Llanowar Elves i
   const after = await resolveUntil(page, (x) => !x.pending && x.stack.length === 0 && x.objects[spell]!.zone === "graveyard");
   const c = characteristics(after, after.objects[elves]!);
   expect([c.power, c.toughness, c.subtypes, c.colors]).toEqual([4, 4, ["Octopus"], ["U"]]);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Light of Judgment: 6 damage to Ana's Hill Giant, then you destroy Bonesplitter attached to it; Short Sword isn't offered", async ({ page }) => {
+  let s: GameState = scene({ hand: ["Light of Judgment"], board: LANDS }, [{ board: ["Hill Giant", "Bonesplitter", "Short Sword"] }]);
+  const [spell, giant, splitter, sword] = [one(s, "Light of Judgment"), one(s, "Hill Giant"), one(s, "Bonesplitter"), one(s, "Short Sword")];
+  s.objects[splitter]!.attachedTo = giant;
+  for (const a of planCast(s, 0, spell, [{ kind: "object", id: giant }])!) s = applyAction(s, a);
+  s = playUntil(s, (x) => x.pending?.kind === "pickPermanents" && x.pending.player === 0);
+  await open(page, s);
+  await expect(controls(page)).toContainText("click up to one Equipment attached to that creature. Light of Judgment destroys it.");
+  await expect(page.locator(`.targetable[data-obj="${sword}"]`)).toHaveCount(0);
+  // Attached under the giant: its visible corner.
+  await page.locator(`[data-obj="${splitter}"]`).first().click({ position: { x: 6, y: 6 } });
+  await controls(page).getByRole("button", { name: "Choose", exact: true }).click();
+  const after = await resolveUntil(page, (x) => !x.pending && x.stack.length === 0 && x.objects[spell]!.zone === "graveyard");
+  expect([after.objects[splitter]!.zone, after.objects[sword]!.zone, after.objects[giant]!.zone]).toEqual(["graveyard", "battlefield", "graveyard"]);
   expect(pageErrors(page)).toEqual([]);
 });

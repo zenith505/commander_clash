@@ -732,6 +732,15 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             return keep();
           }
         }
+        // Boreas Charger: "an opponent who controls more lands than you", counted now; with none, none is chosen (rulings).
+        if (e.moreLandsThanYou) {
+          const lands = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Land")).length;
+          opps = opps.filter((x) => lands(x) > lands(ctx.controller));
+          if (!opps.length) {
+            log(s, `No opponent controls more lands than ${player(s, ctx.controller).name}, so none is chosen for ${src}.`);
+            return keep();
+          }
+        }
         // "At random": no one chooses (CR 608.2d doesn't apply).
         if (e.random && opps.length > 1) {
           const pick = opps[Math.floor(nextRandom(s) * opps.length)]!;
@@ -744,7 +753,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           log(s, `${player(s, ctx.controller).name} chooses ${player(s, opps[0]!).name} for ${src}.`);
         }
         if (opps.length <= 1) return keep();
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: e.mostLife === "opponents" ? "choose an opponent with the most life" : e.mostLife === "least" ? "choose a player with the lowest life total" : e.mostLife ? "choose a player with the most life" : "choose an opponent" };
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: e.moreLandsThanYou ? "choose an opponent who controls more lands than you" : e.mostLife === "opponents" ? "choose an opponent with the most life" : e.mostLife === "least" ? "choose a player with the lowest life total" : e.mostLife ? "choose a player with the most life" : "choose an opponent" };
         return "paused";
       }
       if (e.each) {

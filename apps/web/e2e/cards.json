@@ -3721,6 +3721,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f6dae324-cc79-4093-8cce-667015c1de6d",
+  "name": "Boreas Charger",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Pegasus",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Pegasus"
+  ],
+  "oracleText": "Flying\nWhen this creature leaves the battlefield, choose an opponent who controls more lands than you. Search your library for a number of Plains cards equal to the difference, reveal those cards, put one of them onto the battlefield tapped and the rest into your hand, then shuffle.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "c18",
+  "releasedAt": "2018-08-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cf5bf1ef-e40b-4fb5-8148-d4ca7a307501",
   "name": "Boros Battleshaper",
   "manaCost": "{5}{R}{W}",
@@ -10575,6 +10607,32 @@
   "gameChanger": true
  },
  {
+  "oracleId": "d44f3724-17b7-48f0-885d-75292669f971",
+  "name": "Fiery Annihilation",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Fiery Annihilation deals 5 damage to target creature. Exile up to one target Equipment attached to that creature. If that creature would die this turn, exile it instead.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fdn",
+  "releasedAt": "2024-11-15",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3c22e031-4804-4c31-bd3c-c3f29d456b34",
   "name": "Fiery Confluence",
   "manaCost": "{2}{R}{R}",
@@ -17286,6 +17344,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "932177b8-70f8-4908-a48f-fe03204daddc",
+  "name": "Light of Judgment",
+  "manaCost": "{4}{R}",
+  "cmc": 5,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Light of Judgment deals 6 damage to target creature. Destroy up to one Equipment attached to that creature.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1718a442-b878-4690-b608-a013de3d79fc",
   "name": "Light-Paws, Emperor's Voice",
   "manaCost": "{1}{W}",
@@ -23293,6 +23377,35 @@
   "commanderLegal": "legal",
   "set": "fdn",
   "releasedAt": "2024-11-15",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "307be184-176a-40a8-944c-48aa00cfdd29",
+  "name": "Radiant Lotus",
+  "manaCost": "{6}",
+  "cmc": 6,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}, Sacrifice one or more artifacts: Choose a color. Target player adds three mana of the chosen color for each artifact sacrificed this way. (Activate only as an instant.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "dft",
+  "releasedAt": "2025-02-14",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false

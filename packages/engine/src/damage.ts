@@ -772,6 +772,7 @@ function modApplies(s: GameState, m: LiveMod, e: DamageEvent, preventing: boolea
       if (o && o.zone === "battlefield" && !(t.other && o.id === h?.id))
         ok =
           (!!t.self && o.id === h?.id) ||
+          (!!t.bandedWithHolder && !!h?.band && o.id !== h.id && o.band === h.band && o.attacking !== undefined && h.attacking !== undefined) ||
           (!!t.objects && objectMatches(s, t.objects, o, d.you, false)) ||
           (!!t.chosen && o.id === t.chosen.id && (o.zoneChanges ?? 0) === t.chosen.zc) ||
           (!!t.chosenPermanents && h?.chosen?.player !== undefined && controllerOf(s, o) === h.chosen.player) ||

@@ -5321,7 +5321,7 @@ function Controls({
             : pending.action === "reveal"
               ? `reveal any number of cards in your hand that share a creature type with it (amplify): click them, then reveal.`
               : pending.action === "band"
-                ? `put attacking creatures in a band if you want: click creatures with banding and up to one without, all attacking the same player. Blocking one blocks them all, and you divide blockers' damage among them.`
+                ? `put attacking creatures in a band if you want: click creatures with banding and up to one without, or creatures that all have the quality one's "bands with other" ability names, all attacking the same player. Blocking one blocks them all, and you divide blockers' damage among them.`
                 : pending.action === "tap"
                 ? pending.min === undefined
                   ? `click ${pending.count} ${pending.what} of yours to tap.`

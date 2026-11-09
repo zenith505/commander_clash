@@ -437,6 +437,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (/^the chosen creature$/i.test(p.trim()) && !ctx.spell && !ctx.targets.length) return { ref: "chosenObject" };
   // "Each creature that convoked it" (Venerated Loxodon, CR 702.51a): the creatures tapped to cast it.
   if (/^each creature that convoked (?:it|~)$/i.test(p.trim())) return { ref: "convokers" };
+  // Icatian Skirmishers: "all creatures banded with it"; Urza's Engine: "attacking creatures banded with ~": the other
+  // creatures in its attacking band as this resolves (CR 702.22c, 611.2c), none once it's left combat (CR 702.22f).
+  if (/^(?:all creatures|attacking creatures) banded with (?:it|~)$/i.test(p.trim()) && !ctx.spell) return { ref: "bandedWithSelf" };
   // Kjeldoran Frostbeast: "all creatures blocking or blocked by ~": the ones in combat with it as this resolves.
   if (/^(?:all creatures|each creature) blocking or blocked by ~$/i.test(p.trim()) && !ctx.spell) return { ref: "inCombatWithSelf" };
   // Trial: "all creatures blocking or blocked by target creature": those in combat with the target as this resolves.

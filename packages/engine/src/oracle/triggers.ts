@@ -3286,6 +3286,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`${notBase[1]}, ${notBase[2]}`);
     return t && t !== "fail" && t.event === "permanentDies" && !t.ifCond ? { ...t, ifCond: { kind: "subjectPowerNotBase" } } : "fail";
   }
+  // Wall of Caltrops: "Whenever ~ blocks a creature, if at least one other Wall creature is blocking that creature and no
+  // non-Wall creatures are blocking that creature, ...": an intervening if (CR 603.4) on that creature's blockers, checked
+  // as it triggers and again as it resolves in the declare blockers step (rulings).
+  const onlyKind = /^(Whenever ~ blocks a creature), if at least one other ([A-Z][a-z]+) creature is blocking that creature and no non-\2 creatures are blocking that creature, (.+)$/.exec(line);
+  if (onlyKind) {
+    const t = parseTrigger(`${onlyKind[1]}, ${onlyKind[3]}`);
+    return t && t !== "fail" && t.event === "selfBlocksCreature" && !t.ifCond ? { ...t, ifCond: { kind: "subjectBlockedOnlyBy", subtype: onlyKind[2]! } } : "fail";
+  }
   // Sharp-Eyed Rookie: "Whenever a creature you control enters, if its power is greater than ~'s power or its toughness is
   // greater than ~'s toughness, ...": an intervening if (CR 603.4) on the entering creature, checked as it enters and again
   // as the ability resolves, that creature as it last existed if it has left, ~ likewise (rulings).

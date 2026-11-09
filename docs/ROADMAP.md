@@ -1,6 +1,6 @@
 # Roadmap
 
-30,746 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,758 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,769 of
 9,979 (97%).
 
@@ -2356,7 +2356,7 @@ line blocks.
    target); Next of Kin; Phyrexian Portal (an opponent's face-down piles, chosen blind); Magnetic Web, Raging River,
    Defensive Formation, Sorrow's Path, Blaze of Glory (done in round B145) (block requirements and damage assignment); Piracy (tapping lands you
    don't control for mana); Aetherplasm (put onto the battlefield blocking); Lightform (done in round B155) (manifest, then becoming an Aura);
-   Cathedral of Serra and the other "bands with other" lands; Mangara's Tome and Aladdin's Lamp (a draw replaced); All
+   Cathedral of Serra and the other "bands with other" lands (done in round B161); Mangara's Tome and Aladdin's Lamp (a draw replaced); All
    Hallow's Eve (scream counters in exile); Land Equilibrium; Disciple of Caelus Nin (permanents can't phase in);
    Advancing the Spirit (power-up costs); Spy Kit (all names); Lightning Storm (an ability activated while it's on the
    stack); Damping Engine (done in round 313); Dimensional Breach; Phyrexian Splicer (a keyword chosen as a cost, then the target with it);
@@ -2987,7 +2987,7 @@ line blocks.
    (Null Summoner, linked to its exile from a hand); "When you play a card exiled with ~, transform ~" (Voltaic Visionary).
    +10, 30,190 of 31,936 with B123 and B124. After it, every unsupported name has been looked at by some round.
    Out after round 294 (looked at, not done): Adventurers' Guildhouse, Mountain Stronghold, Unholy Citadel, Seafarer's
-   Quay, Shelkin Brownie ("bands with other"); Oracle en-Vec (chosen creatures attack next turn, the others can't); False
+   Quay, Shelkin Brownie (done in round B161) ("bands with other"); Oracle en-Vec (chosen creatures attack next turn, the others can't); False
    Orders, Balduvian Warlord, General Jarkeld (a blocker removed, then blocking another attacker); Takklemaggot; Jötun Grunt
    (cumulative upkeep paid with cards from a single graveyard each time); Soul Echo; Goblin Artisans; Ice Cauldron (noted
    mana); Illusionary Mask; Stand or Fall and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
@@ -7280,6 +7280,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   enters under its owner's control, rulings; the bot chooses its cheapest creature card; a browser test). Booby Trap (an
   opponent and a nonbasic name chosen as it enters, CR 614.12; that player's draws are revealed, and drawing the name
   triggers the sacrifice and the 10 damage, only the first such trigger finding it, rulings). +8 (30,746 of 31,936 with B159 and round 319).
+- Round B161 (least played first, every remaining card already examined, so mechanics that could be built): "bands with
+  other [quality]" (CR 702.22b-c, j-k), a keyword of its own: Seafarer's Quay, Unholy Citadel, Adventurers' Guildhouse,
+  Cathedral of Serra and Mountain Stronghold give "bands with other legendary creatures" to legendary creatures of their
+  color you control; any attacking legendary creatures can be one band if one of them has it (a creature that isn't
+  legendary can't join, and a band with banding still takes only one creature without banding, even with "bands with
+  other"); blocked by two legendary creatures, one with it, the defending player divides the attacker's damage, and a
+  creature blocking two such attackers has its damage divided by the attacking player. Master of the Hunt's Wolves of the
+  Hunt band with each other ("bands with other creatures named Wolves of the Hunt", the name written into its own text).
+  Shelkin Brownie (loses every "bands with other", not banding, rulings) and Tolaria (banding and every "bands with
+  other", only during an upkeep step; losing banding loses them anyway, CR 702.22b). "Creatures banded with ~": the other
+  creatures in its attacking band as the effect starts, none once it's left combat (CR 702.22c, f): Icatian Skirmishers'
+  first strike, Urza's Engine's trample, Camel's prevention of Deserts' damage to it and to them while it's attacking.
+  Wall of Caltrops (an intervening if on the blockers of the creature it blocks, CR 603.4: another Wall and no non-Wall
+  creature, checked as it triggers and as it resolves). The band picker's prompt names "bands with other" (a browser
+  test). +12 (30,758 of 31,936 with B160).
+- Out after round B161 (looked at, not done): Gloom again (activated abilities of white enchantments cost {3} more: the
+  tax reaches mana abilities too, for instance a white enchantment creature given one by Cryptolith Rite, and mana
+  abilities take no cost increase here), Tourach's Chant and Thelon's Chant (the player who puts the land onto the
+  battlefield, even if someone else controls it, rulings: not tracked apart from its controller).
 - Out after round B160 (looked at, not done): Whippoorwill ("can't be prevented or dealt instead to another permanent or
   player": no rule bans redirection of damage to one creature yet), Bösium Strip (casting from the top of a graveyard: a
   permission by position in the graveyard), Tetravus (the tokens created with ~ remembered for its second upkeep trigger),
@@ -7510,8 +7529,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   your opponents may activate this ability"), Grinning Totem (done in round B159), Failure // Comply (Comply's chosen name), Musician, Soul
   Sculptor ("until a player casts a creature spell"), Heat Wave (done in round B136) (a block cost per creature), Bane Alley Broker, Essence of
   the Wild, Dreams of the Dead (done in round B136), Ludevic, Necrogenius. Bot gap: bots don't use Carrionette from the graveyard.
-- Out after round B97 (looked at, not done): Wall of Caltrops, Nature's Blessing (done in round B142), Master of the Hunt and the "bands with
-  other legendary creatures" lands (banding), Shield Dancer (a combat damage redirection to its source), Mirror-Shield
+- Out after round B97 (looked at, not done): Wall of Caltrops (done in round B161), Nature's Blessing (done in round B142), Master of the Hunt and the "bands with
+  other legendary creatures" lands (done in round B161) (banding), Shield Dancer (a combat damage redirection to its source), Mirror-Shield
   Hoplite (copy a backup ability), Speedball (new targets for that spell), Bill Ferny (done in round 272), Elemental Expressionist (a granted replacement and exile trigger), Wormfang Drake and Wormfang Crab (returns
   for a card exiled by a different ability), Split the Spoils (done in round B153) (piles), Swindler's Scheme (counter and cast the revealed
   card), Legion Angel (outside the game, as the Wishes). (B97 had Brilliance Unleashed's robot become one only after it
@@ -7794,8 +7813,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   stops after one round; the UI only repeats a loop that ends in the step it began in. A mandatory loop is recognized
   when the game state repeats with everyone only passing; one that needs a choice each time (a target) or grows a
   number forever is a draw only after 5,000 resolutions in a row.
-- Banding: "bands with other", "creatures banded with ~" (Icatian Skirmishers, Camel, Urza's Engine). Bots never
-  form bands. Banding's damage division (702.22j-k) is done automatically for the player who divides it, keeping as
+- Banding: bots never form bands ("bands with other" and "creatures banded with ~" done in round B161). Banding's damage division (702.22j-k) is done automatically for the player who divides it, keeping as
   many of their creatures alive as possible.
 - Enlist: two instances on one creature (702.154d), "if it enlisted a creature this combat" (Aradesh), Guardian of New
   Benalia's "Tap it." Offspring and squad: non-mana costs, granting them. Sunburst: Engineered Explosives.

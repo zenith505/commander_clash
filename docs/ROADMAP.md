@@ -1,7 +1,7 @@
 # Roadmap
 
-30,642 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,737 of
+30,650 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,739 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -284,7 +284,7 @@ line blocks.
    Unnatural Moonrise, Rally the Ancestors, Ever After, Olivia, Mobilized for War, Kurbis, Vile Redeemer and others),
    taking the easy ones.
    Out after round 180: Tom, Bert, and William and Fang, Roku's Companion (both done in round 312) (returning as another type), Spellweaver
-   Helix, Ian Malcolm, Chaotician, New Way Forward, Grenzo, Dungeon Warden, Trove Warden, The Nipton Lottery, Emergent
+   Helix, Ian Malcolm, Chaotician, New Way Forward, Grenzo, Dungeon Warden, Trove Warden (done in round 314), The Nipton Lottery, Emergent
    Sequence, The Seventh Doctor, Lucy MacLean, Treacherous Greed ("a creature that dealt damage this
    turn"), Foggy Swamp Visions, Gate to the Afterlife (done in round B71), Galloping
    Lizrog, Dimir Machinations (done in round B108) (exiling some of target player's top cards), Read the Runes, Liege of the Tangle, Sunder
@@ -662,7 +662,7 @@ line blocks.
    Out after round 200 (looked at, not done): Enchanter's Bane (a
    punisher whose option sacrifices the target), You Cannot Pass! (done in round B110) (no record of which creatures blocked or were blocked by a legendary creature),
    Candlekeep Inspiration (cards in exile and graveyard that "have an Adventure"), Convert to Slime (done in round 275), Canoptek Wraith, Mishra's Command, Furygale Flocking, Sentinel Tower (done in round 298), Fishing
-   Gear, Phyrexian Dreadnought (done in round 303). Soulfire Grand Master, Radiant Scrollwielder and Lo and Li still miss another line;
+   Gear, Phyrexian Dreadnought (done in round 303). Soulfire Grand Master, Radiant Scrollwielder (done in round 314) and Lo and Li still miss another line;
    Firesong and Sunspeaker's "red instant and sorcery spells" isn't read yet.
    Round 201 went on from the top: "is put into a graveyard from the battlefield or is put into exile from the
    battlefield" (Psychomancer, Shard of the Void Dragon, Slagstone Refinery), "you may put any number of them into your
@@ -706,7 +706,7 @@ line blocks.
    (Sengir). No new prompts.
    Out after round 202 (looked at, not done): Masako the Humorless (tapped creatures blocking: every blocker check reads
    untapped), Sea Gate Stormcaller ("copy that spell twice instead" if kicked, inside the delayed trigger), Ramses,
-   Assassin Lord (done in round 265), Kros, Defense Contractor (no record of who put
+   Assassin Lord (done in round 265), Kros, Defense Contractor (done in round 314) (no record of who put
    counters on a creature), Glorious Purpose (the sixth
    plan counter), Loot Dispute (done in round 299) (attacking the player who has the initiative), Rhys, the Evermore (done in round 276; remove any number of
    counters), Bladegriff Prototype (a target the damaged player chooses), Zidane, Tantalus Thief (done in round 297) ("an
@@ -925,7 +925,7 @@ line blocks.
    of 31,936 with rounds 210, 211 and B40 to B43).
    Out after round 212 (looked at, not done): Sheltering Ancient (done in round 312) (cumulative upkeep putting a counter on an opponent's
    creature); Power Sink (done in round 304) ("tap all lands with mana abilities"); Zilortha (lethal damage by power everywhere); Ravenous
-   Slime (a die replacement); Astral Drift and Paranormal Analyst ("whenever you manifest dread" and cycling triggers);
+   Slime (a die replacement); Astral Drift (done in round 314) and Paranormal Analyst ("whenever you manifest dread" and cycling triggers);
    Rowan, Scion of War; Aven Courier (done in round 296); Galactus. Eligeth with Kenessos: Kenessos's "scry one more" applies first (draws
    n+1), not the controller's choice of order (CR 616.1).
    Round 213 took fresh cards from ranks 11,900 to 13,500: "each opponent chooses a permanent they control that shares a
@@ -1267,7 +1267,7 @@ line blocks.
    Apprentice's Folly). +16 (28,647 of 31,936 with B64).
    Out after round 226 (looked at, not done): Ixhel, Scion of Atraxa (done in round 273; each poisoned opponent's face-down exiled card,
    playable with mana of any color); Firkraag, Cunning Instigator ("if that creature had to attack this combat");
-   Waterbender's Restoration (waterbend {X} as an additional cost); Eruth, Tormented Prophet and Uba Mask (done in round 297) (every draw
+   Waterbender's Restoration (done in round 314) (waterbend {X} as an additional cost); Eruth, Tormented Prophet and Uba Mask (done in round 297) (every draw
    replaced, alongside dredge and the other draw replacements, CR 616.1); Hofri Ghostforge and Timothar, Baron of Bats
    (a token's granted ability linked to the card the trigger exiled, rulings); Anrakyr the Traveller (cast an artifact
    spell from hand or graveyard for life during a trigger's resolution); Crabomination (done in round 267; a card at random from the
@@ -1316,7 +1316,7 @@ line blocks.
    of 31,936 with round 227 and B66).
    Out after round 228 (looked at, not done): Bilbo, Thief in the Night (a paid cast from a graveyard during
    resolution); Lazav, Dimir Mastermind and Valki, God of Lies (becoming a copy of a card outside the battlefield, "that
-   card" in a graveyard trigger); Ixidron and Illithid Harvester (turning permanents face down); Brazen Cannonade ("until
+   card" in a graveyard trigger); Ixidron and Illithid Harvester (turning permanents face down); Brazen Cannonade (done in round 314) ("until
    end of combat on your next turn"); Auntie Ool, Cursewretch (done in round 266); Arlinn's back face (a temporary "enters with
    an additional counter"); River Song's Diary, Knowledge Pool, Black Cat, Cunning Thief (done in round 273), Ninja Teen (granted sneak from
    the graveyard), Grothama, All-Devouring, Tovolar, Dire Overlord, God-Eternal Kefnet, Hierophant Bio-Titan, Falco
@@ -2363,6 +2363,27 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 314 took cards back off the "Out after round N" lists, most played first: "As an additional cost to cast this
+   spell, waterbend {X}. ... Exile X target creatures you control. Return those cards ... at the beginning of the next end
+   step" (Waterbender's Restoration: X announced as it's cast, CR 107.3a, 601.2b, exactly X targets, CR 601.2c, and up to
+   X artifacts and creatures tapped for the {X}, CR 701.67a; a browser test for the X picker); "{4}, {T}: Draw a card.
+   For each mana in this ability's activation cost, you may tap an untapped creature you control rather than pay that
+   mana" (Heirloom Epic: creatures only, as many as the generic mana in the cost after increases and reductions, rulings;
+   a browser test); "Whenever you cycle this card or cycle another card while this enchantment is on the battlefield"
+   (Astral Drift: its own cycling from the hand, CR 702.29c, and another card's while it's on the battlefield, before the
+   draw, rulings); "Whenever you put one or more counters on a creature you don't control, tap that creature and goad it"
+   (Kros, Defense Contractor); "When this creature dies, put each permanent card exiled with it onto the battlefield under
+   the control of that card's owner" (Trove Warden: the cards its landfall ability exiled, CR 607.2a); "As long as there
+   are four or more card types among cards exiled with this creature" (Keen-Eyed Curator: CR 205.2a, an artifact creature
+   card counting twice); "exile an instant or sorcery card at random from your graveyard. You may cast it this turn. If a
+   spell cast this way would be put into your graveyard, exile it instead" (Radiant Scrollwielder: cast paying its costs,
+   rulings); "Until end of combat on your next turn, you may play that card" (Brazen Cannonade: over as that end of combat
+   step ends, CR 511.3, or as that turn ends if it has no combat). +8, 30,642 of 31,936 with rounds 312, 313 and B153.
+   Out after round 314 (looked at, not done): Crashing Wave and Foggy Swamp Visions (their "waterbend {X}" now reads, but
+   "distribute three stun counters among any number of tapped creatures your opponents control" and "for each creature
+   card exiled this way, create a token that's a copy of it" don't yet); Professor Hojo, Disorienting Choice, Hot Pursuit,
+   Karn, Living Legacy, Into the Pit, Hatchery Sliver, Abstruse Appropriation, Kusari-Gama and Urgent Necropsy (still out,
+   for the reasons in their earlier lists).
    Round 313 took cards back off the "Out after round N" lists, most played first: paying to ignore a permanent's effect
    until end of turn, a special action (CR 116.2d) offered from that permanent's menu, with nothing on the stack:
    "Players can't search libraries. Any player may pay {2} for that player to ignore this effect until end of turn"
@@ -3042,7 +3063,7 @@ line blocks.
    Out after round 256 (looked at, not done): Scrap Welder (done in round 270); Lynde, Cheerful Tormentor (a Curse returned "attached to you", then moved to an opponent);
    Supper for Spiders (cards that become Food artifacts losing their other card types and subtypes but keeping their
    abilities); Nahiri, the Unforgiving ("attacks a player each combat if able" until your next turn); Cherished Hatchling
-   (Dinosaur spells cast this turn gain an enters-and-fight ability); Heirloom Epic and Crashing Wave (tap creatures, or
+   (Dinosaur spells cast this turn gain an enters-and-fight ability); Heirloom Epic (done in round 314) and Crashing Wave (tap creatures, or
    artifacts and creatures, to pay generic mana of an ability's or a waterbend cost).
    Out after round 255 (looked at, not done): Benevolent Blessing (done in round 277) (protection that doesn't remove Auras and Equipment
    already attached when the effect began: no record of what was attached then); Overgrown Zealot (mana spendable only to
@@ -3175,7 +3196,7 @@ line blocks.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
-   10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, The Foretold Soldier, Radiant Scrollwielder, Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
+   10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator (done in round 314), The Foretold Soldier, Radiant Scrollwielder (done in round 314), Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
    7, Grappling Hook (done in round 278), Otrimi, Zhao, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained (done in round 278), Identity
    Thief, Mishra, Eminent One, Spell Queller, Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon, Grub, Storied Matriarch,
    Taskmaster, Mercenary Mimic, Gideon Blackblade (done in round 296), Kolvori, God of Kinship, Fisher's Talent, Niko, Light of Hope,
@@ -7021,7 +7042,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   search, as none found makes it 0/0). Faces of the Past (tap all untapped or untap all tapped creatures sharing a
   creature type with the creature that died, as it last existed, chosen as it resolves, rulings, CR 608.2h; a browser
   test). Tomb of Urami ("~ deals 1 damage to you if you don't control an Ogre" as the mana ability resolves; "Sacrifice
-  all lands you control", itself too, rulings). +8 (30,642 of 31,936 with B153).
+  all lands you control", itself too, rulings). +8 (30,650 of 31,936 with B153 and round 314).
 - Out after round B154 (looked at, not done): Blood Scrivener (two draws and a life loss instead of one draw: with
   another Scrivener, Phial of Galadriel or an Archive, which replacement applies to which of the new draws isn't tracked,
   CR 614.5, 616.1), Selective Snare and Aphetto Dredging (a creature type chosen as it's cast, before targets).

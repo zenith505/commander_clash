@@ -2393,7 +2393,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Coronation of Chaos: "Up to three target creatures can't block this turn. Goad them.": the same targets.
   if ((m = /^Goad (them|it|that creature)$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
-    return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "goad" }], duration: "yourNextTurn" }] : null;
+    // Kros, Defense Contractor: "Whenever you put one or more counters on a creature you don't control, tap that creature
+    // and goad it": the creature the counters were put on, the trigger's subject.
+    return what?.ref === "target" || (what?.ref === "subject" && m[1] === "it") ? [{ type: "continuous", what, mods: [{ kind: "goad" }], duration: "yourNextTurn" }] : null;
   }
   if ((m = /^Goad ((?:up to (?:one|two|three|four|five|X) |any number of |two |three |X )?target .+|(?:all|each) .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

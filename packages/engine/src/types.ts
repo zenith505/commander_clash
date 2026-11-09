@@ -444,7 +444,7 @@ export interface GameObject {
   mayPlay?: {
     player: PlayerId;
     zc: number;
-    until: "thisTurn" | "nextTurn" | "exiled" | "warp" | "plot" | "foretell" | "yourNextTurn" | "source" | "yourNextEndStep" | "adventure" | "duringNextTurn" | "whileControlled" | "yourNextUpkeep";
+    until: "thisTurn" | "nextTurn" | "exiled" | "warp" | "plot" | "foretell" | "yourNextTurn" | "source" | "yourNextEndStep" | "adventure" | "duringNextTurn" | "whileControlled" | "yourNextUpkeep" | /** "Until end of combat on your next turn" (Brazen Cannonade): over as the end of combat step of `player`'s next turn ends (CR 511.3), or as that turn ends if it has none. */ "yourNextCombat";
     turn: number;
     source?: { id: ObjectId; zc: number };
     /** "Without paying its mana cost" (CR 118.9). */

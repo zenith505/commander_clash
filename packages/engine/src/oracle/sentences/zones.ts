@@ -1778,6 +1778,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Safe Haven: "return each card exiled with ~ to the battlefield under its owner's control", all at once and whatever
     // they are now (rulings).
     if (/^Return each card exiled with ~ to the battlefield under its owner's control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield", ownersControl: true }];
+    // Trove Warden: "When ~ dies, put each permanent card exiled with it onto the battlefield under the control of that
+    // card's owner": the cards its landfall ability exiled (CR 607.2a), all at once; others stay in exile.
+    if (/^Put each permanent card exiled with (?:it|~) onto the battlefield under the control of that card's owner$/i.test(s) && ctx.selfCard)
+      return [{ type: "moveLinked", dest: "battlefield", ownersControl: true, filter: { kind: "card", types: [...PERMANENT_TYPES], notTypes: [], notColors: [], text: "permanent card" } }];
     // Bane Alley Broker: "Return a card exiled with ~ to its owner's hand": one of them, chosen as it resolves (CR 607.2a).
     if (/^Return a card exiled with ~ to its owner's hand$/.test(s)) return [{ type: "moveLinked", dest: "hand", exactly: 1 }];
     // Vault 13: Dweller's Journey: "Return two cards exiled with ~ to the battlefield under their owners' control and put the

@@ -3,7 +3,7 @@ import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { MANA_ABILITY_OFFSET, activatedAsMana, payableActivatedMana, manaAbilityCost, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, costIsPaid, spellHow, definedX, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, ignorableBy, ignoreEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, sylexed, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
+import { abilityProblem, costIsPaid, spellHow, definedX, firstArtifactLess, lessWaterbend, waterbendCap, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, ignorableBy, ignoreEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, sylexed, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
@@ -368,7 +368,7 @@ export function planCast(
   // Waterbend as an additional cost (CR 701.67a): mana first, then artifacts and creatures for the rest of it.
   const wk = compileCard(d).kicker;
   if (wk?.waterbend !== undefined && (wk.required || choices.kicks?.includes(0)) && !choices.waterbend?.length) {
-    const wb = autoWaterbend(s, pid, cost, extra, wk.waterbend, [...sacrificedTargets(s, targets), ...targetIds, ...tapping, ...(choices.tap ?? [])], use);
+    const wb = autoWaterbend(s, pid, cost, extra, wk.waterbend === "X" ? (x ?? 0) : wk.waterbend, [...sacrificedTargets(s, targets), ...targetIds, ...tapping, ...(choices.tap ?? [])], use);
     const c = cast([])[0]!;
     if (wb && c.type === "castSpell") return [...wb.taps, { ...c, waterbend: wb.tapped }];
   }
@@ -471,10 +471,10 @@ export function autoImprovise(s: GameState, pid: PlayerId, cost: ParsedCost, ext
  * Artifacts and creatures to tap for a waterbend cost (CR 701.67a), no more than `cap`, when mana sources can't pay alone:
  * ones that make no mana first, then noncreatures, then creatures that can't attack this turn, then the smallest.
  */
-export function autoWaterbend(s: GameState, pid: PlayerId, cost: ParsedCost, extra: number, cap: number, exclude: ObjectId[], use: ManaUse = "other"): { tapped: ObjectId[]; taps: Action[] } | null {
+export function autoWaterbend(s: GameState, pid: PlayerId, cost: ParsedCost, extra: number, cap: number, exclude: ObjectId[], use: ManaUse = "other", creaturesOnly?: true): { tapped: ObjectId[]; taps: Action[] } | null {
   const candidates = s.battlefield
     .map((id) => obj(s, id))
-    .filter((a) => controllerOf(s, a) === pid && !a.tapped && !exclude.includes(a.id) && (objIsType(s, a, "Artifact") || objIsType(s, a, "Creature")))
+    .filter((a) => controllerOf(s, a) === pid && !a.tapped && !exclude.includes(a.id) && ((!creaturesOnly && objIsType(s, a, "Artifact")) || objIsType(s, a, "Creature")))
     .sort((a, b) => Number(manaOptions(s, a).length > 0) - Number(manaOptions(s, b).length > 0) || Number(objIsType(s, a, "Creature")) - Number(objIsType(s, b, "Creature")) || Number(isSummoningSick(s, b)) - Number(isSummoningSick(s, a)) || power(s, a) - power(s, b));
   const tapped: ObjectId[] = [];
   for (const a of candidates.slice(0, cap)) {
@@ -614,7 +614,7 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
   if (first && taps) taps = taps.map((a) => (a.type === "activateMana" || a.type === "activateAbility" ? { ...a, forNext: true as const } : a));
   // Waterbend with nothing chosen to tap: mana first, then as few artifacts and creatures as it takes (CR 701.67a).
   if (!taps && ab.waterbend !== undefined && tapCreatures === undefined) {
-    const wb = autoWaterbend(s, pid, cost, (x ?? 0) * xCount(cost), ab.waterbend === "X" ? (x ?? 0) : ab.waterbend, ab.tap ? [objectId, ...exclude] : exclude, use);
+    const wb = autoWaterbend(s, pid, cost, (x ?? 0) * xCount(cost), waterbendCap(s, pid, obj(s, objectId), ab, x ?? 0, targets), ab.tap ? [objectId, ...exclude] : exclude, use, ab.bendCreaturesOnly);
     if (wb) [taps, tapCreatures] = [wb.taps, wb.tapped];
   }
   if (!taps) return null;

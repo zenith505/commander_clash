@@ -2,8 +2,10 @@
 // Stake's tapped creatures (picked on the battlefield), Hierophant Bio-Titan's removed +1/+1 counters (the counter
 // window), Dargo, the Shipwrecker's sacrifices, Galloping Lizrog's counters picked one at a time as it enters, and
 // activation costs of any size: Baba Lysaga's "sacrifice up to three permanents", Ooze Flux's and The Astonishing Ant-Man's
-// removed +1/+1 counters.
+// removed +1/+1 counters, Simic Manipulator's "one or more" of its counters, and Aetherborn Marauder's counters moved
+// onto it one at a time as it enters.
 import { expect, test } from "@playwright/test";
+import { controllerOf } from "@cc/engine";
 import { idsOf, one, open, pageErrors, scene } from "./scene";
 import { card, clickPlayer, controls, menu, resolveUntil } from "./ui";
 
@@ -176,5 +178,46 @@ test("The Astonishing Ant-Man: X = 2 of its +1/+1 counters make two Insects", as
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.battlefield.filter((id) => st.cards[st.objects[id]!.cardId]!.name === "Insect Token").length === 2);
   expect(after.objects[ant]!.counters["+1/+1"]).toBe(1);
   expect(after.objects[ant]!.tapped).toBe(true);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Simic Manipulator: X = 2 of its +1/+1 counters, gain control of Ana's 2-power Bears", async ({ page }) => {
+  const s = scene({ board: ["Simic Manipulator", "Island"] }, [{ board: ["Grizzly Bears", "Hill Giant"] }]);
+  const sim = one(s, "Simic Manipulator");
+  const bears = one(s, "Grizzly Bears");
+  s.objects[sim]!.counters["+1/+1"] = 3;
+  await open(page, s);
+  await card(page, "Simic Manipulator", s).click();
+  const item = menu(page).locator("button", { hasText: "Gain control" });
+  if (await item.count()) await item.click();
+  const x = page.locator(".x-pick");
+  await expect(x).toContainText("remove X +1/+1 counters");
+  await x.getByLabel("X", { exact: true }).fill("2");
+  await x.getByRole("button", { name: "X = 2" }).click();
+  await expect(page.locator(".targeting")).toContainText("choose target creature");
+  await page.locator(`[data-obj="${bears}"]`).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && controllerOf(st, st.objects[bears]!) === 0);
+  expect(after.objects[sim]!.counters["+1/+1"]).toBe(1);
+  expect(after.objects[sim]!.tapped).toBe(true);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Aetherborn Marauder: as it enters, move one +1/+1 counter from each of two creatures onto it", async ({ page }) => {
+  const s = scene({ hand: ["Aetherborn Marauder"], board: ["Swamp", "Swamp", "Swamp", "Island", "Grizzly Bears", "Hill Giant"] });
+  const [bears, giant, mar] = [one(s, "Grizzly Bears"), one(s, "Hill Giant"), one(s, "Aetherborn Marauder")];
+  s.objects[bears]!.counters["+1/+1"] = 1;
+  s.objects[giant]!.counters["+1/+1"] = 2;
+  await open(page, s);
+  await card(page, "Aetherborn Marauder", s).click();
+  await resolveUntil(page, (st) => st.pending?.kind === "chooseOption" && st.pending.what === "removeCounter");
+  const bar = controls(page);
+  await expect(bar).toContainText("choose a counter to move onto Aetherborn Marauder (0 so far)");
+  await bar.getByRole("button", { name: "A +1/+1 counter from Grizzly Bears (1 left)" }).click();
+  await expect(bar).toContainText("(1 so far)");
+  await bar.getByRole("button", { name: "A +1/+1 counter from Hill Giant (2 left)" }).click();
+  await expect(bar).toContainText("(2 so far)");
+  await bar.getByRole("button", { name: "That's all" }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && (st.objects[mar]!.counters["+1/+1"] ?? 0) === 2);
+  expect([after.objects[bears]!.counters["+1/+1"] ?? 0, after.objects[giant]!.counters["+1/+1"] ?? 0]).toEqual([0, 1]);
   expect(pageErrors(page)).toEqual([]);
 });

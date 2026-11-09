@@ -20068,6 +20068,10 @@ function round315Sentence(s: string, sentences: string[], si: number, ctx: Ctx, 
   // it, though counters may still be removed (rulings, CR 400.7).
   const remove = new RegExp(`^(?:[Yy]ou may )?remove any number of ${COUNTER} counters from among creatures you control$`).exec(s);
   const put = remove ? new RegExp(`^If you do, put (twice|three times) that many ${COUNTER} counters on ~\\.?$`).exec(sentences[si + 1] ?? "") : null;
+  // Aetherborn Marauder: "move any number of +1/+1 counters from other permanents you control onto ~": chosen one at a
+  // time as it resolves, from any number of them, none too (rulings), then moved together (CR 122.5); none if ~ is gone.
+  const moveOnto = new RegExp(`^[Mm]ove any number of ${COUNTER} counters from other permanents you control onto ~$`).exec(s);
+  if (moveOnto && !ctx.spell) return { effect: { type: "gatherCounters", onto: { ref: "self" }, from: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "other permanents you control" }, kinds: [counterKind(moveOnto[1]!)] }, next: si + 1 };
   // Baba Lysaga, Night Witch: "If there were three or more card types among the sacrificed permanents, each opponent loses
   // 3 life, you gain 3 life, and you draw three cards.": the permanents its cost sacrificed, by their card types as they
   // last existed (CR 205.2a, 608.2h; rulings), checked as it resolves.

@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, putOnBattlefield, setup } from "./helpers";
-import { applyAction, botActions, moveObject, planActivate, abilityProblem, castProblem, invalidateCharacteristics, isFullySupported, manaValue, planCast, power, spellCost, toughness, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { applyAction, botActions, controllerOf, moveObject, planActivate, abilityProblem, castProblem, invalidateCharacteristics, isFullySupported, manaValue, planCast, power, spellCost, toughness, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -44,6 +44,8 @@ const dargo = (): CardDef => ({"oracleId":"a2414a2d-0fd8-4084-8762-ace48f70c853"
 const flux = (): CardDef => ({"oracleId":"631d0de7-4810-4bc3-b86b-8e2505ed91f4","name":"Ooze Flux","manaCost":"{3}{G}","cmc":4,"typeLine":"Enchantment","supertypes":[],"types":["Enchantment"],"subtypes":[],"oracleText":"{1}{G}, Remove one or more +1/+1 counters from among creatures you control: Create an X/X green Ooze creature token, where X is the number of +1/+1 counters removed this way.","colors":["G"],"colorIdentity":["G"],"keywords":[],"layout":"normal"} as CardDef);
 const antMan = (): CardDef => ({"oracleId":"6c7e4e51-099a-4398-a4b7-e2f0ddd36429","name":"The Astonishing Ant-Man","manaCost":"{G}{U}","cmc":2,"typeLine":"Legendary Creature — Human Scientist Hero","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Scientist","Hero"],"oracleText":"Whenever you draw a card, put a +1/+1 counter on The Astonishing Ant-Man.\n{2}{G}, {T}, Remove any number of +1/+1 counters from The Astonishing Ant-Man: Create that many 1/1 green Insect creature tokens.","power":"1","toughness":"1","colors":["G","U"],"colorIdentity":["G","U"],"keywords":[],"layout":"normal"} as CardDef);
 const baba = (): CardDef => ({"oracleId":"d6cd4aa1-ff3a-4453-8735-e5ace5cbe386","name":"Baba Lysaga, Night Witch","manaCost":"{1}{B}{G}","cmc":3,"typeLine":"Legendary Creature — Human Warlock","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Warlock"],"oracleText":"{T}, Sacrifice up to three permanents: If there were three or more card types among the sacrificed permanents, each opponent loses 3 life, you gain 3 life, and you draw three cards.","power":"3","toughness":"3","colors":["B","G"],"colorIdentity":["B","G"],"keywords":[],"layout":"normal"} as CardDef);
+const manipulator = (): CardDef => ({"oracleId":"8f06fcc9-9018-4c55-af63-c44350a6cfeb","name":"Simic Manipulator","manaCost":"{1}{U}{U}","cmc":3,"typeLine":"Creature — Mutant Wizard","supertypes":[],"types":["Creature"],"subtypes":["Mutant","Wizard"],"oracleText":"Evolve (Whenever a creature you control enters, if that creature has greater power or toughness than this creature, put a +1/+1 counter on this creature.)\n{T}, Remove one or more +1/+1 counters from this creature: Gain control of target creature with power less than or equal to the number of +1/+1 counters removed this way.","power":"0","toughness":"1","colors":["U"],"colorIdentity":["U"],"keywords":["Evolve"],"layout":"normal"} as CardDef);
+const marauder = (): CardDef => ({"oracleId":"ff6427f6-d2b1-4e33-984d-c06bd15d7c2c","name":"Aetherborn Marauder","manaCost":"{3}{B}","cmc":4,"typeLine":"Creature — Aetherborn Rogue","supertypes":[],"types":["Creature"],"subtypes":["Aetherborn","Rogue"],"oracleText":"Flying, lifelink\nWhen this creature enters, move any number of +1/+1 counters from other permanents you control onto this creature.","power":"2","toughness":"2","colors":["B"],"colorIdentity":["B"],"keywords":["Flying","Lifelink"],"layout":"normal"} as CardDef);
 const clue = (name: string) => card(name, "Artifact — Clue", "", { oracleText: "{2}, Sacrifice this artifact: Draw a card." });
 
 const bears = (s: GameState, pid: PlayerId, n: number, sick = false) => Array.from({ length: n }, (_, i) => putOnBattlefield(s, pid, bear({ name: `Bear ${i}` }), { sick }));
@@ -331,5 +333,74 @@ describe("Baba Lysaga, Night Witch: sacrifice up to three permanents, then card 
     const s = settle(run(s0, planActivate(s0, ap, b, 0, [], undefined, undefined, 0)));
     expect(s.objects[b]!.tapped).toBe(true);
     expect(s.players[ap]!.life).toBe(s0.players[ap]!.life);
+  });
+});
+
+describe("Simic Manipulator: remove one or more +1/+1 counters, gain control of a creature with that much power or less", () => {
+  const scene = () => {
+    const { s, ap, opp } = setup([]);
+    const m = putOnBattlefield(s, ap, manipulator());
+    s.objects[m]!.counters["+1/+1"] = 3;
+    const [theirs] = bears(s, opp, 1);
+    const big = putOnBattlefield(s, opp, card("Hill Giant", "Creature — Giant", "{3}{R}", { power: "3", toughness: "3" }));
+    invalidateCharacteristics(s);
+    return { s, ap, opp, m, theirs: theirs!, big };
+  };
+
+  it("two removed: a 2-power Bears is yours, not the 3-power Giant", () => {
+    supported(manipulator());
+    const { s: s0, ap, m, theirs, big } = scene();
+    expect(planActivate(s0, ap, m, 0, [{ kind: "object", id: big }], undefined, undefined, 2)).toBeNull();
+    const s = settle(run(s0, planActivate(s0, ap, m, 0, [{ kind: "object", id: theirs }], undefined, undefined, 2)));
+    expect(controllerOf(s, s.objects[theirs]!)).toBe(ap);
+    expect(s.objects[m]!.counters["+1/+1"]).toBe(1);
+  });
+
+  it("not with none removed (X can't be 0)", () => {
+    const { s: s0, ap, m } = scene();
+    const zero = putOnBattlefield(s0, s0.turnOrder.find((p) => p !== ap)!, card("Ornithopter", "Artifact Creature — Thopter", "{0}", { power: "0", toughness: "2" }));
+    expect(planActivate(s0, ap, m, 0, [{ kind: "object", id: zero }], undefined, undefined, 0)).toBeNull();
+  });
+
+  it("the target's power grew past X by then: it doesn't resolve, the counters stay removed (rulings)", () => {
+    const { s: s0, ap, opp, m, theirs } = scene();
+    let s = run(s0, planActivate(s0, ap, m, 0, [{ kind: "object", id: theirs }], undefined, undefined, 2));
+    s.objects[theirs]!.counters["+1/+1"] = 1;
+    invalidateCharacteristics(s);
+    s = settle(s);
+    expect(controllerOf(s, s.objects[theirs]!)).toBe(opp);
+    expect(s.objects[m]!.counters["+1/+1"]).toBe(1);
+  });
+});
+
+describe("Aetherborn Marauder: move any number of +1/+1 counters from your other permanents onto it", () => {
+  it("one from each of two creatures, both chosen as it resolves (rulings)", () => {
+    supported(marauder());
+    const { s: s0, ap, ids } = setup([marauder()]);
+    const [a, b] = bears(s0, ap, 2);
+    s0.objects[a!]!.counters["+1/+1"] = 1;
+    s0.objects[b!]!.counters["+1/+1"] = 2;
+    invalidateCharacteristics(s0);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)), ap);
+    expect(s.pending?.kind === "chooseOption" && [...s.pending.options].sort()).toEqual([`${a}:+1/+1`, `${b}:+1/+1`, "done"].sort());
+    s = act(s, { type: "chooseOption", player: ap, choice: `${a}:+1/+1` });
+    s = act(s, { type: "chooseOption", player: ap, choice: `${b}:+1/+1` });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "done" }), ap);
+    expect(s.objects[ids[0]!]!.counters["+1/+1"]).toBe(2);
+    expect([s.objects[a!]!.counters["+1/+1"] ?? 0, s.objects[b!]!.counters["+1/+1"]]).toEqual([0, 1]);
+  });
+
+  it("an opponent's counters aren't offered, and none may be moved", () => {
+    const { s: s0, ap, ids, opp } = setup([marauder()]);
+    const [theirs] = bears(s0, opp, 1);
+    const [mine] = bears(s0, ap, 1);
+    s0.objects[theirs!]!.counters["+1/+1"] = 2;
+    s0.objects[mine!]!.counters["+1/+1"] = 1;
+    invalidateCharacteristics(s0);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)), ap);
+    expect(s.pending?.kind === "chooseOption" && s.pending.options).toEqual([`${mine}:+1/+1`, "done"]);
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "done" }), ap);
+    expect(s.objects[ids[0]!]!.counters["+1/+1"] ?? 0).toBe(0);
+    expect(s.objects[mine!]!.counters["+1/+1"]).toBe(1);
   });
 });

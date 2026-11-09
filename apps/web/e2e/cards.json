@@ -376,6 +376,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ff6427f6-d2b1-4e33-984d-c06bd15d7c2c",
+  "name": "Aetherborn Marauder",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Aetherborn Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Aetherborn",
+   "Rogue"
+  ],
+  "oracleText": "Flying, lifelink\nWhen this creature enters, move any number of +1/+1 counters from other permanents you control onto this creature.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying",
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "kld",
+  "releasedAt": "2016-09-30",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "151c867f-cc77-42de-9ae5-5fd2233ccdab",
   "name": "Afterlife from the Loam",
   "manaCost": "{5}{B}{B}{B}",
@@ -26371,6 +26405,39 @@
   "set": "dis",
   "releasedAt": "2006-05-05",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8f06fcc9-9018-4c55-af63-c44350a6cfeb",
+  "name": "Simic Manipulator",
+  "manaCost": "{1}{U}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Mutant Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Mutant",
+   "Wizard"
+  ],
+  "oracleText": "Evolve (Whenever a creature you control enters, if that creature has greater power or toughness than this creature, put a +1/+1 counter on this creature.)\n{T}, Remove one or more +1/+1 counters from this creature: Gain control of target creature with power less than or equal to the number of +1/+1 counters removed this way.",
+  "power": "0",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Evolve"
+  ],
+  "commanderLegal": "legal",
+  "set": "gtc",
+  "releasedAt": "2013-02-01",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

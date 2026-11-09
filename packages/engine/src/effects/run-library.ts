@@ -83,8 +83,17 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // replaces (see draw in game.ts), even from an empty library (CR 614.11).
       const p = player(s, ctx.controller);
       if (p.lost) return;
-      (p.nextDrawInstead ??= []).push({ turn: s.turn, source: src, ...(ctx.sourceId !== undefined ? { sourceId: ctx.sourceId, sourceZc: ctx.sourceZc ?? 0 } : {}), ...(e.gain !== undefined ? { gain: e.gain } : {}), ...(e.token ? { token: e.token } : {}) });
-      log(s, `The next time ${p.name} would draw a card this turn, ${e.token ? `they create a ${e.token.power}/${e.token.toughness} ${e.token.name} token` : `they gain ${e.gain} life`} instead (${src}).`);
+      // Words of War: the target chosen as it was activated, still legal now (CR 608.2b), is the one dealt the damage
+      // later; an object only while it's still that object (CR 400.7).
+      let damage: NonNullable<typeof p.nextDrawInstead>[number]["damage"];
+      if (e.damage) {
+        const t = ctx.targets[e.damage.target];
+        if (!ctx.legal[e.damage.target] || !t || (t.kind !== "player" && t.kind !== "object")) return;
+        damage = { n: e.damage.n, to: t.kind === "player" ? { player: t.id } : { object: t.id, zc: t.zc ?? obj(s, t.id).zoneChanges ?? 0 } };
+      }
+      (p.nextDrawInstead ??= []).push({ turn: s.turn, source: src, ...(ctx.sourceId !== undefined ? { sourceId: ctx.sourceId, sourceZc: ctx.sourceZc ?? 0 } : {}), ...(e.gain !== undefined ? { gain: e.gain } : {}), ...(e.token ? { token: e.token } : {}), ...(damage ? { damage } : {}) });
+      const whom = damage && ("player" in damage.to ? player(s, damage.to.player).name : characteristics(s, obj(s, damage.to.object)).name);
+      log(s, `The next time ${p.name} would draw a card this turn, ${damage ? `${src} deals ${damage.n} damage to ${whom}` : e.token ? `they create a ${e.token.power}/${e.token.toughness} ${e.token.name} token` : `they gain ${e.gain} life`} instead (${src}).`);
       return;
     }
     case "revealUntilLandToGraveyard":

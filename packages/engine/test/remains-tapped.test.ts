@@ -8,7 +8,6 @@ import { act, activate, addEffect, bear, card, forest, passUntil, pt, putOnBattl
 import { botActions, controllerOf, invalidateCharacteristics, isFullySupported, moveObject, untapPermanent, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
-const unsupported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(false));
 
 // Real oracle text (Scryfall).
 const weaponry = card("Tawnos's Weaponry", "Artifact", "{2}", { oracleText: "You may choose not to untap this artifact during your untap step.\n{2}, {T}: Target creature gets +1/+1 for as long as this artifact remains tapped." });
@@ -27,9 +26,8 @@ const toUntap = (s: GameState, pid: PlayerId) => passUntil(act(s, { type: "passP
 const keep = (s: GameState, pid: PlayerId, ids: string[]) => act(s, { type: "pickPermanents", player: pid, ids });
 
 describe("for as long as ~ remains tapped", () => {
-  it("parses; Old Man of the Sea's second condition stays unsupported", () => {
-    supported(weaponry, rubinia, leech, squid, thran, courier, satyr, helm, dreamsower);
-    unsupported(oldMan);
+  it("parses; Old Man of the Sea's second condition is supported since round B163 (laneb-round163.test.ts)", () => {
+    supported(weaponry, rubinia, leech, squid, thran, courier, satyr, helm, dreamsower, oldMan);
   });
 
   it("lasts while its source stays tapped; its controller chooses in the untap step (CR 502.3)", () => {

@@ -388,6 +388,8 @@ export interface GameObject {
   preparedFrom?: { id: ObjectId; zc: number };
   /** Saddled (CR 702.171b): until end of turn or until it leaves the battlefield. */
   saddled?: true;
+  /** The turn this permanent last became saddled (Stubborn Burrowfiend's "for the first time each turn"); cleared as it changes zones. */
+  saddledTurn?: number;
   /** It escaped: the spell that became this permanent was cast with escape (CR 702.138b). */
   escaped?: boolean;
   /** "~ doesn't untap during your next untap step" (from a mana ability like Cinder Marsh's). */
@@ -956,7 +958,7 @@ export interface Player {
    * Bear creature token (you gain 5 life) instead." One entry for each activation, in turn `turn`; each replaces one draw
    * (CR 614.1a, 614.11); with different ones waiting, the player chooses (PendingDecision "drawInstead").
    */
-  nextDrawInstead?: { turn: number; source: string; sourceId?: ObjectId; sourceZc?: number; gain?: number; token?: TokenSpec }[];
+  nextDrawInstead?: { turn: number; source: string; sourceId?: ObjectId; sourceZc?: number; gain?: number; token?: TokenSpec; /** Words of War: the damage and the target chosen as the ability was activated (an object as the one it was then, CR 400.7). */ damage?: { n: number; to: { player: PlayerId } | { object: ObjectId; zc: number } } }[];
   /** The turn this player was last dealt combat damage, and the turns their current and previous turns began (s.turn), for "if you haven't been dealt combat damage since your last turn". */
   combatDamagedTurn?: number;
   turnBegan?: number;
@@ -1512,6 +1514,12 @@ export interface ContinuousEffect {
    * battlefield or phases out (CR 702.26f); `controller`: "for as long as you control ~" too.
    */
   whileTapped?: { id: ObjectId; zc: number; untaps: number; controller?: PlayerId };
+  /**
+   * Old Man of the Sea: "and that creature's power remains less than or equal to ~'s power" (CR 611.2b): over for a
+   * permanent once its power is greater than that object's (`zc` as it was); a permanent that isn't a creature has power 0
+   * here (rulings). Checked with the state-based actions, like `whileTapped`.
+   */
+  powerAtMost?: { id: ObjectId; zc: number };
   /**
    * "For as long as you control ~" (CR 611.2b): it ends when that object (`zc` as it was) leaves the battlefield, phases
    * out (CR 702.26f) or comes under another player's control, and doesn't start again if `controller` regains it (rulings

@@ -242,6 +242,8 @@ export type TriggerSourceEvent =
   | { type: "solved"; id: ObjectId; controller: PlayerId }
   /** A permanent transformed (CR 701.27a), now with the face `face` up (0: the front). */
   | { type: "transformed"; id: ObjectId; face: number }
+  /** A permanent's saddle ability resolved (CR 702.171b), its first time this turn. */
+  | { type: "becameSaddledFirst"; id: ObjectId }
   /** An attacker was exerted as it attacked (CR 701.43d). */
   | { type: "exerted"; id: ObjectId; /** By its "you may exert ~ as it attacks" (its "when you do" is linked to that, CR 607.2h). */ attacking?: true }
   /** A player declared these attackers (CR 508.1): "whenever one or more creatures you control attack". */
@@ -774,6 +776,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       fromGraveyards((o, owner) => owner === you && add(o, you, (e) => e === "anotherCreatureYouControlEnters", undefined, undefined, entering, lki));
       fromEmblems((o, owner) => owner === you && add(o, you, (e) => e === "anotherCreatureYouControlEnters", undefined, undefined, entering, lki));
     }
+    // Corruption of Towashi: "or a permanent you control enters transformed": a transforming double-faced card entering
+    // with its back face up (CR 712.14a); a modal double-faced or melded one doesn't (rulings).
+    if (entering.face === 1 && !entering.faceDown && s.cards[entering.cardId]?.layout === "transform")
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        const ctrl = controllerOf(s, w);
+        add(w, ctrl, (e, t) => e === "permanentTransformsInto" && !!t.orEntersTransformed && !!t.tappedFilter && objectMatches(s, t.tappedFilter, entering, ctrl, false), undefined, undefined, entering);
+      }
     // Landfall. The land itself sees itself enter too (CR 603.6a).
     if (objIsType(s, entering, "Land")) {
       // Faldorn: "Whenever you cast a spell from exile or a land you control enters from exile".
@@ -1470,6 +1480,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const w = obj(s, id);
       if (controllerOf(s, w) === you) add(w, you, (e) => e === "youExert", undefined, undefined, o);
     }
+  } else if (ev.type === "becameSaddledFirst") {
+    // Stubborn Burrowfiend: "Whenever ~ becomes saddled for the first time each turn".
+    const o = obj(s, ev.id);
+    add(o, controllerOf(s, o), (e) => e === "selfBecomesSaddledFirst");
   } else if (ev.type === "transformed") {
     // "When this creature transforms into [this face]" (CR 701.27e): an ability of the face now up.
     const o = obj(s, ev.id);

@@ -2385,7 +2385,7 @@ line blocks.
    mana of any type can be spent to cast that spell" (Summon: Esper Valigarmanda: not targeted, you choose in each
    graveyard; CR 607.2a, 609.4b; a browser test); "Each player mills four cards. Then you may exile a creature or
    planeswalker card from each graveyard" and "Until end of turn, you may cast spells from among cards exiled with this
-   Saga, and you may spend mana as though it were mana of any color to cast those spells" (King Narfi's Betrayal). +8, 30,676 of 31,936 with B154.
+   Saga, and you may spend mana as though it were mana of any color to cast those spells" (King Narfi's Betrayal). +8, 30,686 of 31,936 with B154 and B155.
    Out after round 317 (looked at, not done): Encroaching Mycosynth and Biotransference (types in every zone and on
    spells), Crucible of the Spirit Dragon (storage counters with spend-only mana), Jinnie Fay, Mirrormind Crown and
    Moonlit Meditation (token replacement choices), Guff Rewrites History, Possibility Storm, Sokrates, Sunken Palace,

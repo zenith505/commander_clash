@@ -5,11 +5,14 @@ import { CREATURE_TYPES } from "../keywords";
 import { parseSentence } from "./sentence";
 import { parseTrigger } from "./triggers";
 import { num } from "./words";
+import { round323Sentence, round323Trigger } from "./round323";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 export function round322Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void sentences;
+  // Round 323's sentences first (oracle/round323.ts).
+  const r323 = round323Sentence(s, sentences, si, ctx, effects);
+  if (r323 !== null) return r323;
   const prev = effects.at(-1);
   // Puca's Mischief: "exchange control of target nonland permanent you control and target nonland permanent an opponent
   // controls with equal or lesser mana value": the second's mana value at most the first's, the two chosen as a set (rulings),
@@ -40,6 +43,9 @@ export function round322Sentence(s: string, sentences: string[], si: number, ctx
 }
 
 export function round322Trigger(raw: string): TriggeredAbility | "fail" | null {
+  // Round 323's triggers first (oracle/round323.ts).
+  const r323 = round323Trigger(raw);
+  if (r323 !== null) return r323;
   // Coveted Falcon: "Whenever this creature attacks, gain control of target permanent you own but don't control.": owned by
   // you, controlled by another player (every other player is an opponent, CR 102.3), for the rest of the game (layer 2).
   const owned = /^(Whenever ~ attacks, gain control of target permanent you own) but don't control\.$/.exec(raw);

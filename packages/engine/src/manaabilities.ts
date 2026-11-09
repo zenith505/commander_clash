@@ -401,6 +401,8 @@ export interface ManaTriggerResult {
   from: ManaOrigin[][];
   /** Winter's Night (ManaTrigger.landSkipsUntap): the permanent tapped for mana doesn't untap during its controller's next untap step. */
   skipUntap?: true;
+  /** Overabundance, Barbflare Gremlin (ManaTrigger.damage): 1 damage from each of these sources to the player who tapped it, after the mana. */
+  damage?: ObjectId[];
 }
 
 /**
@@ -411,9 +413,11 @@ export interface ManaTriggerResult {
  */
 export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, ab: ManaAbility, made: ManaType[], sources = manaTriggerSources(s)): ManaTriggerResult[] {
   let results: ManaTriggerResult[] = [{ extra: [], adds: [], from: [] }];
-  if (!made.length) return results;
   for (const { src, controller: ctl, t } of sources) {
+    // Only when it made mana (CR 106.12a), except Overabundance's (rulings: its damage even when the land made none).
+    if (!made.length && !t.evenWithoutMana) continue;
     if (!ab.tap && !t.anyAbility) continue;
+    if (t.ifSelfTapped && !src?.tapped) continue; // Barbflare Gremlin's intervening if (CR 603.4)
     if (t.madeType && !made.includes(t.madeType)) continue;
     const chosen = src?.chosen?.color;
     if (t.you && ctl !== pid) continue;
@@ -434,7 +438,7 @@ export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, a
     else if (a.kind === "produced") {
       // One of the types it made, picked if it made several (rulings on Mana Flare).
       const types = [...new Set(made)];
-      picks = types.length === 1 ? [{ extra: [], adds: types }] : types.map((m) => ({ extra: [m], adds: [m] }));
+      picks = types.length <= 1 ? [{ extra: [], adds: types }] : types.map((m) => ({ extra: [m], adds: [m] }));
     } else {
       // n mana in any combination of colors: each combination once.
       let combos: Color[][] = [[]];
@@ -443,7 +447,9 @@ export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, a
     }
     // Each mana's source is the triggered ability's source (CR 106.3), as it is now.
     const from = src ? manaOriginsOf(s, src) : [];
-    results = results.flatMap((r) => picks.map((p) => ({ extra: [...r.extra, ...p.extra], adds: [...r.adds, ...p.adds], from: [...r.from, ...p.adds.map(() => from)], ...(r.skipUntap || t.landSkipsUntap ? { skipUntap: true as const } : {}) })));
+    // Overabundance deals its damage, Barbflare Gremlin has the land deal it.
+    const hurts = t.damage === "self" ? src?.id : t.damage === "land" ? o.id : undefined;
+    results = results.flatMap((r) => picks.map((p) => ({ extra: [...r.extra, ...p.extra], adds: [...r.adds, ...p.adds], from: [...r.from, ...p.adds.map(() => from)], ...(r.skipUntap || t.landSkipsUntap ? { skipUntap: true as const } : {}), ...(hurts || r.damage ? { damage: [...(r.damage ?? []), ...(hurts ? [hurts] : [])] } : {}) })));
   }
   return results;
 }

@@ -3535,6 +3535,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Prize Pig: "put that many ribbon counters on ~. Then if there are three or more ribbon counters on ~, remove those
   // counters and untap it": all of them, whether or not it's tapped (rulings).
   text = text.replace(/^([Pp]ut (?:that many|X) ([a-z]+) counters on ~\.) Then if there are ([a-z]+) or more \2 counters on ~, remove those counters and untap it\.$/, "$1 If there are $3 or more $2 counters on ~, remove all $2 counters from ~ and untap ~.");
+  // Smoldering Egg: "put a number of ember counters on ~ equal to the amount of mana spent to cast that spell. Then if ~ has
+  // seven or more ember counters on it, remove them and transform ~.": the counters first, then the count as it resolves;
+  // all of that kind removed ("them", the ones on it), then it transforms (CR 701.27).
+  text = text.replace(/^([Pp]ut a number of ([a-z]+) counters on ~ equal to [^.]+\.) Then if ~ has ([a-z]+) or more \2 counters on it, remove them and transform ~\.$/, "$1 If there are $3 or more $2 counters on ~, remove all $2 counters from ~ and transform ~.");
   // Sinner's Judgment: "put a judgment counter on this Aura. Then if there are three or more judgment counters on it,
   // enchanted player loses the game": "it" is ~.
   text = text.replace(/([Pp]ut an? ([a-z]+) counter on ~\.) Then if there are ([a-z]+) or more \2 counters on it, (?!remove )/, "$1 Then if there are $3 or more $2 counters on ~, ");

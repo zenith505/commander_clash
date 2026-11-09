@@ -489,6 +489,8 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; fac
   required?: true;
   /** "Exile four other artifact creatures you control" (Mechtitan Core): a sacrifice-kind cost that exiles instead. */
   exile?: true;
+  /** Night Soil: "from a single graveyard": the cards picked all have the same owner. */
+  singleYard?: true;
   what: string;
   n: number;
   candidates: string[];
@@ -905,7 +907,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         // "Exile a card from your graveyard" (Stonerise Spirit): click the cards in your graveyard.
         if (d.exileCards !== undefined) continue;
         const what = c.filter?.text ?? "card";
-        const candidates = s.players[HUMAN]!.graveyard.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
+        // Night Soil: "from a single graveyard": anyone's, all from the same one (the engine checks that).
+        const yards = c.singleGraveyard ? s.turnOrder.filter((q) => !s.players[q]!.lost).flatMap((q) => s.players[q]!.graveyard) : s.players[HUMAN]!.graveyard;
+        const candidates = yards.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
+        if (c.singleGraveyard) return setCostPick({ activate: d, kind: "exileCards", label: cardOf(s, d.objectId).name, what: `exile ${c.n} ${what}s from a single graveyard`, n: c.n, candidates, chosen: [], singleYard: true });
         if (c.toBottom) return setCostPick({ activate: d, kind: "exileCards", label: cardOf(s, d.objectId).name, what: `put ${c.n} cards from your graveyard on the bottom of your library`, n: c.n, candidates, chosen: [] });
         return setCostPick({ activate: d, kind: "exileCards", label: cardOf(s, d.objectId).name, what: `exile from your graveyard ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
       }
@@ -2165,7 +2170,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               chosen={costPick.chosen}
               n={costPick.n}
               {...(costPick.min !== undefined ? { min: costPick.min } : {})}
-              valid={(!costPick.oneOf || costPick.chosen.some((id) => printedMatches(costPick.oneOf!, cardOf(s, id)))) && (!costPick.differentNames || namesDiffer(s, costPick.chosen)) && (!costPick.sameName || costPick.chosen.every((id) => sameName(cardOf(s, id).name, cardOf(s, costPick.chosen[0]!).name))) && (!costPick.share || costChoiceShares(s, costPick.share, costPick.chosen))}
+              owners={!!costPick.singleYard}
+              valid={(!costPick.oneOf || costPick.chosen.some((id) => printedMatches(costPick.oneOf!, cardOf(s, id)))) && (!costPick.differentNames || namesDiffer(s, costPick.chosen)) && (!costPick.sameName || costPick.chosen.every((id) => sameName(cardOf(s, id).name, cardOf(s, costPick.chosen[0]!).name))) && (!costPick.share || costChoiceShares(s, costPick.share, costPick.chosen)) && (!costPick.singleYard || costPick.chosen.every((id) => s.objects[id]!.owner === s.objects[costPick.chosen[0]!]!.owner))}
               onHover={setHover}
               onToggle={(id) =>
                 setCostPick({ ...costPick, chosen: costPick.chosen.includes(id) ? costPick.chosen.filter((x) => x !== id) : [...costPick.chosen, id].slice(-costPick.n) })
@@ -2698,6 +2704,7 @@ function CardChoice({
   n,
   min,
   valid = true,
+  owners = false,
   onHover,
   onToggle,
   onDone,
@@ -2712,6 +2719,8 @@ function CardChoice({
   min?: number;
   /** False while the cards chosen don't make up the cost (Foil's "an Island card and another card"). */
   valid?: boolean;
+  /** Night Soil: cards from several players' graveyards, each labeled with its owner's. */
+  owners?: boolean;
   onHover: (d: CardDef | null) => void;
   onToggle: (id: string) => void;
   onDone: () => void;
@@ -2744,6 +2753,7 @@ function CardChoice({
             return (
               <div key={id} className={`card big ${chosen.includes(id) ? "selected" : "targetable"}`} data-pick={id} onClick={() => onToggle(id)} {...hoverProps(d, onHover)}>
                 <CardFace d={d} />
+                {owners && <span className="zone-label">{s.objects[id]!.owner === HUMAN ? "your graveyard" : `${s.players[s.objects[id]!.owner]!.name}'s graveyard`}</span>}
               </div>
             );
           })}
@@ -2836,7 +2846,7 @@ function DistributeChoice({
     <div className="controls">
       <span>
         <strong>{pending.source}:</strong>{" "}
-        {pending.remove ? `remove up to ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from among ${pending.what}, if you want (${left} left)` : pending.move ? `move up to ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from it onto ${pending.what}, if you want (${left} left)` : `distribute ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} among any number of ${pending.what} (${left} left)`}
+        {pending.remove && pending.exact ? `remove ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from among ${pending.what} (${left} left)` : pending.remove ? `remove up to ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from among ${pending.what}, if you want (${left} left)` : pending.move ? `move up to ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from it onto ${pending.what}, if you want (${left} left)` : `distribute ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} among any number of ${pending.what} (${left} left)`}
       </span>
       {pending.options.map((id) => {
         const n = parts[id] ?? 0;
@@ -2855,7 +2865,7 @@ function DistributeChoice({
           </span>
         );
       })}
-      <button disabled={pending.move || pending.remove ? left < 0 : left !== 0} onClick={() => dispatch([{ type: "distribute", player: HUMAN, parts }])}>
+      <button disabled={(pending.move || pending.remove) && !pending.exact ? left < 0 : left !== 0} onClick={() => dispatch([{ type: "distribute", player: HUMAN, parts }])}>
         Done
       </button>
     </div>

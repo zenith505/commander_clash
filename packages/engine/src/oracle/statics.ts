@@ -2281,6 +2281,15 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const a = parseStaticMods(m[1]!);
     return a ? [...a, { kind: "setColors", colors: [COLOR_WORDS[m[4]!]!] }] : null;
   }
+  // Super-Soldier Serum: "gets +2/+2, has first strike and vigilance, and is a legendary Soldier in addition to its other
+  // types": the creature type and the supertype both added in layer 4 (CR 205.4a, 613.1d), so the legend rule applies to it
+  // (CR 704.5j).
+  const legendaryIs = /\bis a legendary ([A-Z][a-z]+) in addition to its other types$/.exec(rest);
+  if (legendaryIs) {
+    const t = legendaryIs[1]!;
+    const plain = parseStaticMods(`${rest.slice(0, legendaryIs.index)}is ${/^[AEIOU]/.test(t) ? "an" : "a"} ${t} in addition to its other types`);
+    return plain?.some((x) => x.kind === "addTypes" && x.subtypes.includes(t)) ? [...plain, { kind: "addTypes", types: [], subtypes: [], supertypes: ["Legendary"] }] : null;
+  }
   // Captain's Hook: "is a Pirate in addition to its other creature types" says the same (CR 205.1b).
   const IS = "is an? ([A-Z][a-z]+) in addition to its other (?:creature )?types";
   if ((m = new RegExp(`^${IS}$`).exec(rest))) return typed(m[1]!, []);

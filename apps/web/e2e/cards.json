@@ -5584,6 +5584,36 @@
   ]
  },
  {
+  "oracleId": "5fbd39e9-8736-4722-bb9b-6a7da8e47c84",
+  "name": "Clarion Ultimatum",
+  "manaCost": "{G}{G}{W}{W}{W}{U}{U}",
+  "cmc": 7,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose five permanents you control. For each of those permanents, you may search your library for a card with the same name as that permanent. Put those cards onto the battlefield tapped, then shuffle.",
+  "colors": [
+   "G",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ala",
+  "releasedAt": "2008-10-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "66566999-f70a-4f14-9bf0-23325295a977",
   "name": "Clergy of the Holy Nimbus",
   "manaCost": "{W}",
@@ -28917,6 +28947,32 @@
   "set": "all",
   "releasedAt": "1996-06-10",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "797bb53d-b111-41fe-95d7-64cb0f833b22",
+  "name": "Stronghold Gambit",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player chooses a card in their hand. Then each player reveals their chosen card. The owner of each creature card revealed this way with the lowest mana value puts it onto the battlefield.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "nem",
+  "releasedAt": "2000-02-14",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

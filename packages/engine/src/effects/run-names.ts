@@ -335,6 +335,9 @@ export function namesFrom(s: GameState, ref: SameNameRef, ctx: ResolveCtx): stri
       .filter((o) => !o.faceDown && controllerOf(s, o) === whose && !(ref.other && o.id === ctx.sourceId) && objectMatches(s, ref.permanents, o, ctx.controller, false))
       .map((o) => characteristics(s, o).name);
   }
+  if ("chosenThisWay" in ref)
+    // Clarion Ultimatum: the chosen permanents still on the battlefield, by their names now (a copy's copied name, rulings).
+    return (s.resolving?.created ?? []).map((id) => s.objects[id]).filter((o): o is NonNullable<typeof o> => !!o && o.zone === "battlefield" && !o.faceDown).map((o) => characteristics(s, o).name);
   if ("yourGraveyard" in ref) return player(s, ctx.controller).graveyard.map((id) => defOf(s, obj(s, id)).name);
   // Assembly Hall: "that card", the one revealed from your hand, still there.
   if ("revealed" in ref) return (s.resolving?.revealedFromHandIds ?? []).filter((id) => s.objects[id]?.zone === "hand").map((id) => defOf(s, obj(s, id)).name);

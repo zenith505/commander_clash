@@ -2827,6 +2827,12 @@ function parseManaTapTrigger(line: string): TriggeredAbility | "fail" | null {
 }
 
 function parseDrawTrigger(line0: string): TriggeredAbility | "fail" | null {
+  // Booby Trap: "When the chosen player draws a card with the chosen name, ...": the player and the name chosen as ~ entered.
+  const trap = /^When(?:ever)? the chosen player draws a card with the chosen name, (.+)$/.exec(line0);
+  if (trap) {
+    const body = parseBody(theyAreThatPlayer(trap[1]!), { eventPlayer: true });
+    return body ? { event: "playerDraws", draws: { by: "chosenPlayer", chosenName: true }, body } : "fail";
+  }
   // Sneaky Snacker: "When you draw your third card in a turn, ...": the same event as "each turn" (CR 121.2).
   const line = line0.replace(/^When (you draw your|an opponent draws their|a player draws their) (first|second|third|fourth|fifth) card in a turn, /, "Whenever $1 $2 card each turn, ");
   // "Whenever a player draws their second card during their turn" (The Council of Four): only cards drawn in their own

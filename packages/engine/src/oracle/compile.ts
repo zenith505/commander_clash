@@ -697,6 +697,9 @@ export function compile(d: CardDef): CompiledCard {
       .replace(/^Choose up to two\. Return those cards from your graveyard to your hand\.((?:\n• Target [a-z]+ card\.)+)$/m, (_, b: string) => `Choose up to two —${b.replace(/• Target ([a-z]+) card\./g, "• Return target $1 card from your graveyard to your hand.")}`)
       // Canker Abomination: "As ~ enters, choose an opponent. ~ enters with a -1/-1 counter on it for each creature that
       // player controls.": the chosen player, counted once chosen (EntersWithCounters.afterPlayer).
+      // Booby Trap: "As ~ enters, choose an opponent and a card name other than a basic land card name.": two choices as it
+      // enters (CR 614.12), each its own.
+      .replace(/^As ~ enters, choose an opponent and (a card name other than a basic land card name)\.$/m, "As ~ enters, choose an opponent.\nAs ~ enters, choose $1.")
       .replace(/^As ~ enters, choose an opponent\. (~ enters with an? [-+\/\d]+ counter on it for each creature) that player controls\.$/m, "As ~ enters, choose an opponent.\n$1 the chosen player controls.")
       // Sludge Strider: "Whenever another artifact you control enters or leaves the battlefield, ...": two trigger events
       // (CR 603.1), an ability for each.
@@ -1810,6 +1813,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Circu, Dimir Lobotomist: "Your opponents can't cast spells with the same name as a card exiled with ~": the names of
     // the cards its exile abilities exiled that are still exiled (CR 607.2a, 201.2).
+    // Booby Trap (CompiledCard.revealsChosenPlayersDraws), with a player chosen as it enters.
+    if (line === "The chosen player reveals each card they draw." && out.entersChoosePlayer && !out.revealsChosenPlayersDraws) {
+      out.revealsChosenPlayersDraws = true;
+      continue;
+    }
     // Cornered Market (CompiledCard.permanentNameBan).
     if (line === "Players can't cast spells with the same name as a nontoken permanent." && !out.permanentNameBan?.cast) {
       out.permanentNameBan = { ...out.permanentNameBan, cast: true };
@@ -7010,6 +7018,14 @@ function linkExile(out: CompiledCard) {
     const others = all.filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.anyGraveyard));
     if (!yards.length || others.length) out.unsupported.push("(compares with exiled cards it can't link to one exile ability)");
     else for (const e of yards) e.linked = true;
+  }
+  // Mourner's Shield: "a source of your choice that shares a color with the exiled card" is about the card its imprint ability
+  // exiled as it entered, its only exile (CR 607.2a).
+  if (out.activated.some((a) => a.body.effects.some((e) => e.type === "damageRule" && !!e.rule.by?.choose?.sharesColorWithLinked))) {
+    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileGraveyard" || e.type === "chooseFromGraveyard" || e.type === "exileTop");
+    if (imprints.length !== 1 || others.length !== 1) out.unsupported.push("(compares with an exiled card it can't link to one imprint ability)");
+    else imprints[0]!.linked = true;
   }
   // Mirror Golem: "the exiled card" its protection reads is the one its imprint ability exiled as it entered, its only
   // exile (CR 607.2a).

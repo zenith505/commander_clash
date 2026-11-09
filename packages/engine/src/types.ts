@@ -2899,6 +2899,8 @@ export interface Resolving {
     pileChoice?: number;
     /** Hostile Negotiations (effect faceDownPiles): the two piles exiled, and which one was turned face up. */
     facePiles?: [ObjectId[], ObjectId[]];
+    /** Effect "eachChoosesFromHand" (Stronghold Gambit): the players still to choose, in turn order, and each one's card. */
+    gambit?: { queue: PlayerId[]; picks: Partial<Record<PlayerId, ObjectId>> };
     faceUpPile?: number;
     /** Effect "permanentPiles": each separated player's permanents, and the pile chosen for each (Make an Example). */
     pileOf?: Record<number, ObjectId[]>;

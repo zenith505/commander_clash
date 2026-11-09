@@ -1114,6 +1114,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? amountNow(s, e.cond.a, ctx) >= amountNow(s, e.cond.atLeast, ctx)
             : e.cond.kind === "xAtLeast"
             ? (ctx.x ?? 0) >= e.cond.n
+            : e.cond.kind === "sharesColor"
+            ? ((a, b) => !!a && !!b && a.zone === "battlefield" && b.zone === "battlefield" && characteristics(s, a).colors.some((c) => characteristics(s, b).colors.includes(c)))(objects(s, e.cond.a, ctx)[0], objects(s, e.cond.b, ctx)[0])
             : kickedMatches(ctx.kicked, e.cond);
       return runBranch(s, holds, holds ? e.effects : (e.otherwise ?? []), ctx);
     }

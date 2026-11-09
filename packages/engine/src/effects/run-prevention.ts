@@ -2,7 +2,7 @@ import type { DamageRecipient, Effect, TargetSpec } from "../abilities";
 import { cardIdOf, defOf } from "../cards";
 import { log, obj, player } from "../game";
 import { characteristics, controllerOf } from "../layers";
-import type { DamageRule, GameState, ObjectId, PlayerId } from "../types";
+import type { Color, DamageRule, GameState, ObjectId, PlayerId } from "../types";
 import { ResolveCtx, amountNow, damageRecipients, objects, players } from "./resolve";
 import { bindChosen, objectMatches, printedMatches } from "./targeting";
 import { addDelayed } from "./run-spells";
@@ -87,6 +87,19 @@ export function chooseDamageSource(s: GameState, ctx: ResolveCtx, filter: Target
   return { id: o.id, zc: Number(zc), ...(spell ? { spell: true as const } : {}) };
 }
 
+/** The colors of the face-up cards still exiled with this ability's source by its linked exile ability (CR 607.2a). */
+function colorsOfLinkedExile(s: GameState, ctx: ResolveCtx): Color[] {
+  const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+  if (!me) return [];
+  const links = s.linkedExile?.[`${me.id}@${ctx.sourceZc ?? me.zoneChanges ?? 0}`] ?? [];
+  const out = new Set<Color>();
+  for (const l of links) {
+    const c = s.objects[l.id];
+    if (c?.zone === "exile" && !c.faceDown && !c.hiddenExile && (c.zoneChanges ?? 0) === l.zc) for (const col of defOf(s, c).colors) out.add(col);
+  }
+  return [...out];
+}
+
 /** The permanent or player a reference means now, as the object it is (CR 400.7), or null if it's gone or illegal. */
 function fixedRecipient(s: GameState, to: DamageRecipient, ctx: ResolveCtx): { object: ObjectId; zc: number } | { player: PlayerId } | null {
   const r = to.ref === "attached" ? { objs: objects(s, to, ctx), pids: [] } : damageRecipients(s, to, ctx);
@@ -113,11 +126,19 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
   };
   // The source of your choice, chosen as it resolves (CR 609.7a): asked first, then the rest is worked out.
   if (spec.by?.choose) {
-    const filter = bindChosen(spec.by.choose, ctx.chosen);
+    // Mourner's Shield: the colors of the card its imprint ability exiled, as the source is chosen; once chosen, it's that
+    // source whose damage is prevented (CR 609.7a), as Guard Dogs' rulings have its color checked only as it resolves.
+    const linkedColors = spec.by.choose.sharesColorWithLinked ? colorsOfLinkedExile(s, ctx) : undefined;
+    if (linkedColors && !linkedColors.length) {
+      log(s, `${src}: no source shares a color with the exiled card.`);
+      return;
+    }
+    const { sharesColorWithLinked: _, ...plain } = spec.by.choose;
+    const filter = bindChosen(linkedColors ? { ...plain, colors: linkedColors } : spec.by.choose, ctx.chosen);
     const chosen = chooseDamageSource(s, ctx, filter, src, spec.by.permanent);
     if (chosen === "paused") return "paused";
     if (!chosen) return;
-    rule.by = { chosen, filter };
+    rule.by = linkedColors ? { chosen } : { chosen, filter };
   }
   if (spec.by?.filter) rule.by = { ...rule.by, filter: bindChosen(spec.by.filter, ctx.chosen) };
   // Encircling Fissure: sources that target player controls; an illegal target gets nothing done (CR 608.2b).

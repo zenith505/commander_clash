@@ -26,6 +26,7 @@ import { runSpellsEffect, addDelayed } from "./run-spells";
 import { runNamesEffect } from "./run-names";
 import { runLibraryEffect } from "./run-library";
 import { runFaceDownPilesEffect } from "./run-round318";
+import { runLaneB160Effect } from "./run-laneb160";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
 import { ringBearer } from "./run-ring";
@@ -1663,6 +1664,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runDiceEffect(s, e, ctx, src);
     case "faceDownPiles":
       return runFaceDownPilesEffect(s, e, ctx, src);
+    case "revealRandomDiscardNamed":
+    case "counterCauseIfNamed":
+    case "eachChoosesFromHand":
+      return runLaneB160Effect(s, e, ctx, src);
     case "flipCoin":
       return runCoinEffect(s, e, ctx, src);
     case "flipCoinEach":

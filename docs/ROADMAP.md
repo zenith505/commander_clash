@@ -1,6 +1,6 @@
 # Roadmap
 
-30,730 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,738 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,762 of
 9,979 (97%).
 
@@ -7230,6 +7230,28 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cast a spell with its name this turn loses 6 life, a face-down spell having no name, CR 708.2; the bot reveals a name an
   opponent cast; a browser test). Infernal Kirin ("discards all cards with that spell's mana value": the spell's mana value
   as cast, X included, even if it has left the stack, rulings, CR 202.3e, 701.9b). +8 (30,730 of 31,936 with B158 and round 318).
+- Round B160 (least played first, every remaining card already examined, so mechanics that could be built): Magus of the
+  Mind ("exile the top X cards, where X is one plus the number of spells cast this turn": every player's spells, counted as
+  it resolves, one with none; the lands and spells played free this turn with their normal timing, a land only with a land
+  play left, rulings). Nebuchadnezzar (the name chosen as it resolves, then X cards of the target opponent's hand at random,
+  all of it with fewer; the revealed ones with that name discarded, rulings). Bazaar of Wonders ("counter it if a card with
+  the same name is in a graveyard or a nontoken permanent with the same name is on the battlefield": checked as it
+  resolves, not an intervening if, CR 603.4; a face-down spell has no name, CR 708.2a; a split card has both names,
+  CR 709.4a). Guard Dogs (the target chosen as it's activated, the permanent as it resolves, their colors compared only then,
+  rulings). Mourner's Shield (the source chosen must share a color with the card its imprint ability exiled, CR 607.2a; once
+  chosen it's that source's damage that's prevented, as Guard Dogs' rulings check the color only as it resolves; nothing with
+  no exiled card or a colorless one). Clarion Ultimatum (five permanents chosen as it resolves, each one if fewer, then one
+  search for up to one permanent card with each one's name now, all entering tapped at once; a nonpermanent card stays,
+  rulings; the bot chooses the ones with copies left in its library; a browser test). Stronghold Gambit (each player in turn
+  order chooses a card in their hand, none revealed until all have chosen; every creature card tied for the lowest mana value
+  enters under its owner's control, rulings; the bot chooses its cheapest creature card; a browser test). Booby Trap (an
+  opponent and a nonbasic name chosen as it enters, CR 614.12; that player's draws are revealed, and drawing the name
+  triggers the sacrifice and the 10 damage, only the first such trigger finding it, rulings). +8 (30,738 of 31,936 with B159).
+- Out after round B160 (looked at, not done): Whippoorwill ("can't be prevented or dealt instead to another permanent or
+  player": no rule bans redirection of damage to one creature yet), Bösium Strip (casting from the top of a graveyard: a
+  permission by position in the graveyard), Tetravus (the tokens created with ~ remembered for its second upkeep trigger),
+  Alpine Moon (losing land types and abilities by a chosen name, opponents' lands only), Null Chamber (an opponent naming a
+  card too), Grimoire Thief (face-down exiles you may look at, then spells countered by their names).
 - Out after round B159 (looked at, not done): Kaboom! (a card revealed per target, each target's own
   loop, the order among them a choice), Ulamog's Despoiler, Sutured Ghoul, Frankenstein's Monster and Living Lore (a choice
   made as they enter, new), Charmed Pendant (mana of the milled card's colors), Nafs Asp, Glass Asp and Sabertooth Cobra

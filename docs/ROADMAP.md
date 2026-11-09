@@ -1,6 +1,6 @@
 # Roadmap
 
-30,730 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,738 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,769 of
 9,979 (97%).
 
@@ -4004,7 +4004,7 @@ line blocks.
    graveyard):
    - "With power / mana value less than or equal to <amount>" works for targets, groups, searches and free casts, and
      "you may ... if that creature's power is less than or equal to" (Nimbus Champion); still out: "that damage" in other
-     trigger shapes (Broodcaller Scourge), Old Man of the Sea, Sphere of Annihilation, Quag Feast
+     trigger shapes (Broodcaller Scourge), Old Man of the Sea, Sphere of Annihilation (done in round B159), Quag Feast
      ("the chosen permanent"), Titan's Presence (a reveal cost), Vulpine Harvester (done in round 312) ("their total power"), Sundering
      Archaic (colors spent).
    - "Your team" is "you" (CR 102.4), as is Azra Bladeseeker's "each player on your team", and "Partner with" works (27
@@ -4154,7 +4154,7 @@ line blocks.
      modal trigger about "that Vehicle"). Commanders: Drillworks Mole ("up to one target commander creature"),
      Subjugate the Hobbits ("each noncommander creature with mana value 3 or less").
    Left from the filter lands/divided damage/X costs round:
-   - Divided damage still out: Impact Resonance, Ghired's Belligerence's populate (done in round 318), Pollen Remedy (kicker that isn't
+   - Divided damage still out: Impact Resonance, Ghired's Belligerence's populate (done in round 318), Pollen Remedy (done in round B159) (kicker that isn't
      mana). The divide panel says "divide the damage" for prevention too (Remedy).
    - "Any number of target players" still out: Communal Brewing, Hollow Marauder, Kaboom!, Memory Vampire, Singularity
      Rupture, Curse of Surveillance; Will of the Abzan (below).
@@ -4567,7 +4567,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   rulings), "unless you return a basic land card from your graveyard to your hand"; "Whenever you play an Island";
   "Exile the top ten cards of your library" as a cost. +48 (26,245 with round B11).
 - Skipped there, with reasons: Drake Familiar (returns any player's enchantment), Storm Elemental (a condition on the
-  exiled card), Gift of Doom, Dralnu's Pet, Pollen Remedy, Chocobo Kick, Blood Tribute, Thought Lash and Phyrexian
+  exiled card), Gift of Doom, Dralnu's Pet, Pollen Remedy (done in round B159), Chocobo Kick, Blood Tribute, Thought Lash and Phyrexian
   Devourer (their other lines aren't parsed yet).
 - Round B13 (harder skipped cards, least played first): state triggers (CR 603.8) are checked between the instructions
   of a resolving spell or ability too ("even if only for a brief moment", rulings on Emperor Crocodile and Veiled
@@ -5037,7 +5037,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   attacking creature of yours is dealt 3), "Target Assembly-Worker creature" (the type, not the card's name). +20
   (27,347 of 31,936 with B32 and rounds 199-201).
 - Out after round B33: Mangara's Equity (damage to "you or a white creature" grouped per event), Thick-Skinned Goblin
-  (echo paid as {0} inside the upkeep's may-pay), Grim Reminder (a search that reveals and leaves the card in the
+  (echo paid as {0} inside the upkeep's may-pay), Grim Reminder (done in round B159) (a search that reveals and leaves the card in the
   library, then a check against the names of spells each opponent cast this turn), Cycle of Life (a target "creature
   you cast this turn", "has base power and toughness 0/1 until your next upkeep", and a delayed counter at that
   upkeep), Soldevi Sage ("draw three cards, then discard one of them": only the cards just drawn).
@@ -5563,7 +5563,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   graveyard on an event that isn't one yet), Old Fat Spider Can't See Me (a damage rule for as long as ~ remains on the
   battlefield), Isu the Abominable (a choice of payment), Etched Slith (done in round B156) ("target permanent or opponent"), Reiterating
   Bolt (an energy additional cost), Dodgy Jalopy (scavenge with a variable power), Chancellor of the Dross (opening-hand
-  reveals), Words of Worship, Garruk, Curse Breaker (its −4), Kaima, Infernal Kirin, Celestial Judgment (done in round B148) and Ancestral
+  reveals), Words of Worship, Garruk, Curse Breaker (its −4), Kaima, Infernal Kirin (done in round B159), Celestial Judgment (done in round B148) and Ancestral
   Knowledge (new mechanics), Fatal Fissure (a delayed trigger with a target of its own), Mudslide (done in round B145) and Dream Tides (done in round B145) (pay
   {2} for each of any number of creatures to untap: a new picker), Incriminate (two targets controlled by the same
   player, like Cannibalize).
@@ -5668,7 +5668,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (28,489 of 31,936).
 - Out after round B59 (looked at, not done): Djinn Illuminatus and Reiterating Bolt (done in round 304) (replicate granted or paid with
   energy), Heliod's Punishment (a granted ability that refers to its source), Creeping Peeper and Karfell Harbinger (mana
-  for special actions), Quarantine Field (X targets from its counters), Shivan Sand-Mage and Timebender (suspended cards as
+  for special actions), Quarantine Field (done in round B159) (X targets from its counters), Shivan Sand-Mage and Timebender (suspended cards as
   targets), Emrakul's Evangel (sacrificing any number as a cost), Ancestral Knowledge, Ral and the Implicit Maze (the
   Spellgorger Weird token), plus Awe Strike, Pulsemage Advocate, Aphetto Dredging and text-changing cards.
 - Round B60 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 15,000, plus All Suns'
@@ -7250,6 +7250,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   one of each if able, only the one there is otherwise, rulings, then discarded together; a browser test). Goblin Festival
   ("Flip a coin. If you lose the flip, choose one of your opponents. That player gains control of ~.": an opponent of the
   ability's controller, chosen as it resolves, rulings). +9 (30,714 of 31,936 with B157).
+- Round B159 (least played first, every remaining card already examined, so mechanics that could be built): Pollen Remedy
+  ("If this spell was kicked, prevent the next 6 damage this way instead": one division of 6 when kicked, of 3 otherwise,
+  chosen as it's cast, CR 601.2d). Sphere of Annihilation (exiles itself, the creatures and planeswalkers and the creature
+  and planeswalker cards in graveyards with mana value up to its void counters, counted as it resolves or as it last existed,
+  CR 608.2h). Quarantine Field ("for each isolation counter on it, exile up to one target ...": up to X targets, X its
+  counters as the trigger is put on the stack, all returned when it leaves, CR 610.3). Drafna's Restoration (any number of
+  target artifact cards in the graveyard of the target player, put on top of that player's library in an order you choose,
+  CR 401.4). Bounty of the Hunt (a +1/+1 counter removed for each one put, at the beginning of the next cleanup step,
+  CR 514.3). Grinning Totem (the exiled card playable until the beginning of your next upkeep, then into its owner's
+  graveyard if not played; a browser test). Grim Reminder (the card is revealed and stays in your library; each opponent who
+  cast a spell with its name this turn loses 6 life, a face-down spell having no name, CR 708.2; the bot reveals a name an
+  opponent cast; a browser test). Infernal Kirin ("discards all cards with that spell's mana value": the spell's mana value
+  as cast, X included, even if it has left the stack, rulings, CR 202.3e, 701.9b). +8 (30,738 of 31,936 with B158 and rounds 318 and 319).
+- Out after round B159 (looked at, not done): Kaboom! (a card revealed per target, each target's own
+  loop, the order among them a choice), Ulamog's Despoiler, Sutured Ghoul, Frankenstein's Monster and Living Lore (a choice
+  made as they enter, new), Charmed Pendant (mana of the milled card's colors), Nafs Asp, Glass Asp and Sabertooth Cobra
+  ("unless that player pays {1} before their next draw step": a payment window), Spoils of War.
 - Out after round B157 (looked at, not done): Musician (a granted upkeep ability it checks for by its text),
   Makeshift Mannequin (a granted trigger "for as long as it has a mannequin counter"), Flameskull (rejuvenation's "play one
   of those cards", a permission shared by two cards) and Cleansing (each land's destruction paid off by any player) were
@@ -7312,7 +7329,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B139 (looked at, not done): Tourach's Chant and Thelon's Chant (the player who put a land onto the
   battlefield, not its controller, rulings: not tracked), Jötun Grunt (cumulative upkeep paid in pairs of cards from one
   graveyard), Meddle ("if target spell has only one target and that target is a creature": a condition on the spell's
-  targets as it resolves), Drafna's Restoration, Sutured Ghoul, Twinning Glass and Pardic Dragon (done in round B152), still out for the
+  targets as it resolves), Drafna's Restoration (done in round B159), Sutured Ghoul, Twinning Glass and Pardic Dragon (done in round B152), still out for the
   reasons in the earlier lists.
 - Out after round B138 (looked at, not done): Kodama of the Center Tree (soulshift X counted from the Spirits on the
   battlefield just before it died, Spirits dying with it included, CR 603.10a), Lantern Flare (X in its cleave cost).
@@ -7468,7 +7485,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   fight), Sevinne, the Chronoclasm (copy the first instant or sorcery cast from a graveyard each turn), Soulcipher Board
   (omen counters off for each creature card put into your graveyard), Biolume Egg ("When you sacrifice ~, return it ...
   transformed"), Wumpus Aberration, Roving Actuator, Kianne, Dean of Substance, Chong and Lily, Nomads, Soul Ransom (done in round B142) ("Only
-  your opponents may activate this ability"), Grinning Totem, Failure // Comply (Comply's chosen name), Musician, Soul
+  your opponents may activate this ability"), Grinning Totem (done in round B159), Failure // Comply (Comply's chosen name), Musician, Soul
   Sculptor ("until a player casts a creature spell"), Heat Wave (done in round B136) (a block cost per creature), Bane Alley Broker, Essence of
   the Wild, Dreams of the Dead (done in round B136), Ludevic, Necrogenius. Bot gap: bots don't use Carrionette from the graveyard.
 - Out after round B97 (looked at, not done): Wall of Caltrops, Nature's Blessing (done in round B142), Master of the Hunt and the "bands with
@@ -7504,7 +7521,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   hand ability (bots skip "Exile ~ from your hand" abilities).
 - Out after round B93 (looked at, not done): Bewitching Leechcraft ("If ~ would untap during your untap step, remove a
   +1/+1 counter from it instead": with Freyalise's Winds too, its controller would order the two replacements, CR 616.1),
-  Drafna's Restoration (targets in the graveyard of an earlier target player), Rite of Ruin (done in round B129) (an order for three card
+  Drafna's Restoration (done in round B159) (targets in the graveyard of an earlier target player), Rite of Ruin (done in round B129) (an order for three card
   types, then three rounds of sacrifices), Tariff (a punisher whose cost is the chosen creature's mana cost), Powerleech (done in round B122)
   and Haunting Wind (done in round B122) ("activates an artifact's ability without {T} in its activation cost", and "that artifact's
   controller"), Fasting (done in round B136) (a may skip of the draw step as it would begin), Naked Singularity (a land with two basic land
@@ -7765,7 +7782,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Racers' Scoreboard, Lightwheel Enhancements), "where X is your speed" in The Speed Demon, Samut and Point the Way,
   Outpace Oblivion.
 - "As though it weren't blocked" from an effect rather than an ability (Predatory Focus, Outmaneuver), Ruxa,
-  Gurzigost (done in round B126). "At the beginning of the next cleanup step" for counters (Bounty of the Hunt), Cunning, Necromancy.
+  Gurzigost (done in round B126). "At the beginning of the next cleanup step" for counters (Bounty of the Hunt (done in round B159)), Cunning, Necromancy.
 - Damage shields: outside combat damage the choices of which damage a prevention or redirection shield takes, and
   which shield applies first (CR 615.7, 616.1), are made for the player (bots' heuristic); so is splitting a shared
   "next N damage" among several recipients (Harm's Way). Turn-long rules (`GameState.damageRules`, "a source of your

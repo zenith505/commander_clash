@@ -572,6 +572,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const who = players(s, e.who, ctx);
       // "Discards all cards with that name" (Cabal Therapy): the name chosen as it resolved.
       let filter = e.filter && bindChosen(e.filter, ctx.chosen);
+      // Infernal Kirin: "cards with that spell's mana value": the number worked out as this resolves.
+      if (filter?.bound) filter = bindBound(s, filter, amountCtx(s, ctx));
       // Mind Extraction: the colors of the creature the spell's cost sacrificed, as it last existed; a colorless one has
       // none, so nothing is discarded (rulings).
       if (filter?.sharesColorWithSacrificed) {
@@ -1470,7 +1472,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           kind: "searchLibrary",
           player: agent?.controller ?? p.id,
           source: src,
-          what,
+          // Grim Reminder: the card found is only revealed.
+          what: e.dest.zone === "reveal" ? `${what} ${describeDest(e.dest)}` : what,
           cards,
           min,
           max,
@@ -1557,7 +1560,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const lib = libOf(pid);
         const found = foundBy(pid).filter((id) => dest(pid, id).zone !== "battlefield" || !defOf(s, obj(s, id)).subtypes.includes("Aura") || hosts.has(id));
         // Sunforger: the card to cast stays where it is until it's cast (castSearched).
-        lib.library = lib.library.filter((id) => !found.includes(id) || dest(pid, id).zone === "cast");
+        // Grim Reminder: the card revealed stays too.
+        lib.library = lib.library.filter((id) => !found.includes(id) || dest(pid, id).zone === "cast" || dest(pid, id).zone === "reveal");
         const names = found.map((id) => defOf(s, obj(s, id)).name);
         // Found cards aren't revealed unless the effect says so (CR 701.23e).
         const shown = e.reveal || e.dest.zone === "battlefield" || (e.dest.zone === "exile" && !e.dest.faceDown) || exiledFor(pid) !== undefined ? ` (${names.join(", ")})` : "";
@@ -1593,6 +1597,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           const p = player(s, pid);
           const to = dest(pid, id);
           if (to.zone === "cast") r.searchCast = id;
+          else if (to.zone === "reveal") continue;
           else if (to.zone === "libraryTop" && obj(s, id).zone === "graveyard") moveObject(s, id, "library", { top: true });
           else if (to.zone === "libraryTop") {
             obj(s, id).zone = "library";
@@ -1624,6 +1629,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           if (to.play && to.zone === "exile" && obj(s, id).zone === "exile" && exiledFor(pid) === undefined) {
             const { until, ...how } = to.play;
             obj(s, id).mayPlay = { player: pid, zc: obj(s, id).zoneChanges ?? 0, until, turn: s.turn, ...how };
+            // Grinning Totem: into its owner's graveyard at your next upkeep unless it was played (it's a new object then).
+            if (to.upkeepGraveyard) addDelayed(s, "yourNextUpkeep", pid, obj(s, id), { targets: [], effects: [{ type: "putInGraveyard", what: { ref: "subjectCard", zone: "public" } }], text: "Put that card, if you haven't played it, into its owner's graveyard." }, ctx.sourceDef.oracleId);
           }
           // Opposition Agent: exiled face up (CR 406.3), its controller may play it for as long as it remains exiled, a land
           // too (following the normal timing rules) and spend mana as though it were mana of any color to cast it (CR
@@ -1883,7 +1890,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (got === "paused") return "paused";
       const rest = looked.filter((id) => !got.includes(id));
       enterTogether(s, () => {
-        const zone = (d: SearchDest) => (d.zone === "libraryTop" || d.zone === "cast" ? "library" : d.zone);
+        const zone = (d: SearchDest) => (d.zone === "libraryTop" || d.zone === "cast" || d.zone === "reveal" ? "library" : d.zone);
         for (const id of got) moveObject(s, id, zone(e.to), e.to.zone === "battlefield" ? { controller: p.id, ...(e.to.tapped ? { tapped: true } : {}) } : undefined);
         if (e.rest) for (const id of rest) moveObject(s, id, zone(e.rest));
       });

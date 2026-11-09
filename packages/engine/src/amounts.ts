@@ -501,6 +501,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.resolving?.created ?? []).filter((id) => s.objects[id]?.zone === "battlefield").length;
     case "handPutOnTopThisWay":
       return s.resolving?.handPutOnTop ?? 0;
+    case "castSameNameAsFound": {
+      const who = ctx.players?.({ ref: "eachOne" })[0];
+      const names = (s.resolving?.searchFound ?? []).map((id) => s.objects[id] && defOf(s, s.objects[id]!).name);
+      return who !== undefined && (s.castThisTurn ?? []).some((c) => c.player === who && names.some((n) => sameName(c.name, n))) ? 1 : 0;
+    }
     case "blockingIt":
       return ctx.objects?.({ ref: c.subject ? "subject" : "self" })[0]?.blockedBy?.length ?? 0;
     case "itBlocks":
@@ -1414,6 +1419,8 @@ function describeCount(c: Count): string {
       return "#put onto the battlefield";
     case "handPutOnTopThisWay":
       return "#cards put on top from their hand";
+    case "castSameNameAsFound":
+      return "cast a spell with that name this turn";
     case "blockingIt":
       return "#creatures blocking it";
     case "itBlocks":

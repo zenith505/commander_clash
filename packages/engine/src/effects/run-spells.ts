@@ -610,10 +610,13 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (!abouts.length) return;
       const toPlayer = e.aboutPlayer !== undefined ? players(s, { ref: "target", index: e.aboutPlayer }, ctx)[0] : undefined;
       if (e.aboutPlayer !== undefined && toPlayer === undefined) return;
+      const forPlayer = e.forPlayer ? players(s, e.forPlayer, ctx)[0] : undefined;
+      if (e.forPlayer && forPlayer === undefined) return;
       for (const about of e.each || e.aboutGroup ? abouts : abouts.slice(0, 1)) {
         (s.floatingTriggers ??= []).push({
           ...(about ? { about: { id: about.id, zc: about.zoneChanges ?? 0 } } : {}),
           ...(toPlayer !== undefined ? { toPlayer } : {}),
+          ...(forPlayer !== undefined ? { forPlayer } : {}),
           id: `f${s.nextId++}`,
           controller: ctx.controller,
           sourceId: id,

@@ -1,7 +1,7 @@
 # Roadmap
 
-30,768 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,770 of
+30,776 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,777 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -870,7 +870,7 @@ line blocks.
    Summoner, In the Eye of Chaos and Afflicted Deserter // Werewolf Ransacker.
    Out after round 210 (looked at, not done): Eivor, Battle-Ready ("a Saga card and/or a land card from among them" needs
    a one-of-each picker); Puca's Mischief (a second target's mana value bound by the first one's, chosen as a set);
-   Hand of Vecna ("equipped creature or a creature you control named Vecna" and a life-per-card equip cost); Grave Sifter (done in round 318)
+   Hand of Vecna (done in round 321) ("equipped creature or a creature you control named Vecna" and a life-per-card equip cost); Grave Sifter (done in round 318)
    (each player's own creature type); Overseer of Vault 76 ("remove three quest counters from among permanents you
    control"); Dragon's Approach (done in round 296) (exiling four named cards as an optional cost); Signal the Clans (done in round 304) (a random pick if the
    three names differ); Fblthp, the Lost (done in round 303) (entered or cast from the library; "becomes the target of a spell");
@@ -1079,9 +1079,9 @@ line blocks.
    Blade (a color chosen each time it becomes attached); Eater of Virtue (keywords of the cards exiled with it); Life and
    Limb (Forests that are Saprolings and Saprolings that are Forests, a layer 4 dependency); Tombstone Stairwell (done in round 296) (tokens
    "created with this enchantment" destroyed at each end step); Inferno of the Star Mounts ("when its power becomes 20
-   this way"); Anzrag's Rampage (put a creature card from among the exiled ones onto the battlefield, return it at end
+   this way"); Anzrag's Rampage (done in round 321) (put a creature card from among the exiled ones onto the battlefield, return it at end
    step); Regna's Sanction and Zndrsplt's Judgment (friend or foe with "chooses one ..., then taps the rest" and "a
-   token that's a copy of a creature they control"; Lane B's range); Swooping Pteranodon (a delayed trigger in which a
+   token that's a copy of a creature they control"; Lane B's range); Swooping Pteranodon (done in round 321) (a delayed trigger in which a
    target land deals the damage); Hellish Rebuke; Osteomancer Adept; Hostile Negotiations (done in round 318); Unexplained Absence.
    Round 219: the Will of the Planeswalkers paths (Path of the Enigma, Animist, Ghosthunter, Pyromancer, Schemer: a
    planeswalk-or-chaos vote, both no-ops outside Planechase, CR 701.31a, 311.7); "Players can't draw cards" (Maralen of
@@ -1275,7 +1275,7 @@ line blocks.
    a creature you chose for them); Grolnok, the Omnivore (done in round 297) (a card trigger for each permanent card milled, croak counters,
    playing them from exile); Coram, the Undertaker (lands and spells from every graveyard, cards you don't own);
    Territorial Hellkite (done in round 266); Boreas Charger (an opponent who controls
-   more lands, a search for the difference); Eivor, Wolf-Kissed ("a Saga card and/or a land card" from among the milled
+   more lands, a search for the difference); Eivor, Wolf-Kissed (done in round 321) ("a Saga card and/or a land card" from among the milled
    ones).
    Round 227 (fresh cards from the top): "Other creatures you control are Assassins ... The same is true for creature
    spells you control and creature cards you own that aren't on the battlefield" (Roshan, Hidden Magister); "becomes
@@ -2363,6 +2363,29 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 321 took cards back off the "Out after round N" lists, most played first: "You may put a creature card exiled
+   this way onto the battlefield. It gains haste. Return it to your hand at the beginning of the next end step." (Anzrag's
+   Rampage: up to one of the exiled cards, CR 110.4b, the delayed trigger about the permanent it became, CR 603.7c; a
+   browser test); "each player returns up to two cards from their graveyard to their hand, then you exile ~" (Sail into
+   the West: the spell exiles itself as it resolves, CR 608.2n, also after a vote's outcome); "You may put a Saga card
+   and/or a land card from among them onto the battlefield." (Eivor, Wolf-Kissed: up to one of each from among the milled
+   cards, found where they went, CR 701.17c, put onto the battlefield together; a browser test); "equipped creature or a
+   creature you control named Vecna gets +X/+X" and "Equip—Pay 1 life for each card in your hand" (Hand of Vecna: the one
+   chosen as it resolves, rulings; a browser test); "At the beginning of the next end step, target land deals 3 damage to
+   that creature." (Swooping Pteranodon: the land targeted as the delayed trigger is put on the stack, CR 603.3d, rulings);
+   "+1: Until your next turn, whenever a creature an opponent controls attacks, it gets -1/-0 until end of turn." and
+   "−8: For each player, search that player's library for a nonland card and exile it, then that player shuffles. You may
+   cast those cards without paying their mana costs." (Jace, Architect of Thought: all the searches first, in turn order,
+   then any number cast one after another, the rest staying exiled, rulings; a browser test); "until the end of defending
+   player's next turn, that player gets two rad counters whenever they cast a spell" (Nuka-Nuke Launcher: a delayed
+   trigger for that player's spells, CR 603.7b, gone if they leave the game, CR 800.4m); "any number of target players
+   other than that player each draw cards equal to the number of Curses attached to that player" (Curse of Surveillance:
+   never the enchanted player, CR 115.1). +8, 30,776 of 31,936 with round 320, B160 and B161.
+   Out after round 321 (looked at, not done): Brimaz, Blight of Oreskos (which spells "Phyrexian creature or artifact
+   creature spell" covers), Bre of Clan Stoutarm (whether "Otherwise" applies when you decline to cast), Desert Warfare
+   (one ability with two trigger conditions, and "from your hand or library"), Karn, Living Legacy and Ob Nixilis of the
+   Black Oath (emblems with activated abilities; "Pay any amount of mana"), Bilbo, Thief in the Night (a paid cast from
+   the graveyard during resolution). Bots give Hand of Vecna's bonus to the creature with the greatest power.
    Round 320 took cards back off the "Out after round N" lists, most played first: "Tap up to three target creatures. Put
    a stun counter on one of them." (Aerith Rescue Mission: the one chosen as it resolves among the targets still legal,
    rulings; a mode named with a number, CR 207.2d; a browser test); "+1: Whenever one or more creatures you control deal
@@ -2684,7 +2707,7 @@ line blocks.
    it on top of its owner's library instead": no optional self-replacement of that kind yet); Grave Sifter (done in round 318) (each player's
    own creature type, then any number of cards of it); Eumidian Wastewaker ("you and defending player each discard a card
    or sacrifice a permanent", mandatory, then the land cards put into graveyards this way); Detective's Phoenix (bestow
-   with collect evidence, cast from the graveyard with bestow); Hand of Vecna ("equipped creature or a creature you
+   with collect evidence, cast from the graveyard with bestow); Hand of Vecna (done in round 321) ("equipped creature or a creature you
    control named Vecna", chosen as it resolves, and a life-per-card equip cost); Saruman of Many Colors (its ward needs a
    discard of a kind, but its second-spell trigger is the harder part); Infernal Offering (both modes choose an
    opponent first).
@@ -2759,7 +2782,7 @@ line blocks.
    Out after round 305 (looked at, not done): Spell Queller (casting the exiled card when it leaves: needs the exiled
    card linked to its leaves trigger); Karplusan Minotaur (done in round 318) ("any target of an opponent's choice" in a triggered ability
    with a coin flip cumulative upkeep); Toggo, Goblin Weaponsmith (a named Equipment token granting an ability with a
-   sacrifice of that token); Jace, Architect of Thought (a delayed "until your next turn, whenever a creature an opponent
+   sacrifice of that token); Jace, Architect of Thought (done in round 321) (a delayed "until your next turn, whenever a creature an opponent
    controls attacks" and a search of every player's library).
    Round 304 took cards back off the "Out after round N" lists, most played first: "Choose a creature card and/or a land
    card from among them" with "If X is 5 or more, instead put the chosen cards onto the battlefield or into your hand"
@@ -3284,7 +3307,7 @@ line blocks.
    Out after round 245 (looked at, not done): Back for Seconds (done in round 295) (bargained: one of the returned target cards onto the
    battlefield instead of into the hand, chosen as it resolves); World War Hulk (chapter I's "the next red or green
    creature spell you cast this turn can be cast without paying its mana cost" and chapter III's doubled power and
-   toughness); Jace, Architect of Thought (+1 needs an "until your next turn" attack trigger for opponents' creatures,
+   toughness); Jace, Architect of Thought (done in round 321) (+1 needs an "until your next turn" attack trigger for opponents' creatures,
    −8 a search of every library and casting the cards); Rat King, Verminister ("and all other cards with the same name as
    that card"); Noctis, Heir Apparent (its "enters during combat" line now compiles; Warp-Strike's return at that player's
    next declare attackers step doesn't).
@@ -3309,7 +3332,7 @@ line blocks.
    which); Jaya's Phoenix and Repeated Reverberation (copy the next loyalty ability); Coveted Falcon, Shadow Kin, Arna
    Kennerüd, Confusion in the Ranks, Imodane, Mavinda, Manascape Refractor, Cass, Bronzehide Lion, Ria Ivor and
    Fabrication Foundry (looked at, not done this round).
-   Out after round 241 (looked at, not done): Nuka-Nuke Launcher ("until the end of defending player's next turn, that
+   Out after round 241 (looked at, not done): Nuka-Nuke Launcher (done in round 321) ("until the end of defending player's next turn, that
    player gets two rad counters whenever they cast a spell": a floating trigger lasting until another player's turn
    ends); Psionic Ritual (done in round 304), Exterminate! (done in round 304) and Reiterating Bolt (done in round 304) (replicate with a cost that isn't mana, paid any number of
    times); Nacatl War-Pride and Gorm the Great ("must be blocked by exactly one creature" / "by two or more creatures if
@@ -3805,7 +3828,7 @@ line blocks.
    like Hickory Woodlot and Land Cap):
    - Votes still out: Tivit ("enters or deals combat damage"), Council Guardian (done in round B148) (protection from the colors with the
      most votes), Split Decision ("Choose target spell", then "the spell"), Messenger Jays ("for each card drawn this
-     way"), Sail into the West, Galadriel, Expropriate, Fateful Tempest, Selvala's Stampede, Travel Through Caradhras;
+     way"), Sail into the West (done in round 321), Galadriel, Expropriate, Fateful Tempest, Selvala's Stampede, Travel Through Caradhras;
      votes for a player (Mob Verdict, Círdan), Trap the Trespassers, Truth or Consequences ("an opponent at random");
      the Sagas Vault 11 and Trial of a Time Lord; "whenever players finish voting" (Grudge Keeper (done in round 302), Model of Unity (done in round 302),
      Erestor: an opponent counts only if none of their votes match yours, rulings); Elrond; the Planechase "Will of the
@@ -4181,7 +4204,7 @@ line blocks.
    - Divided damage still out: Impact Resonance, Ghired's Belligerence's populate (done in round 318), Pollen Remedy (done in round B159) (kicker that isn't
      mana). The divide panel says "divide the damage" for prevention too (Remedy).
    - "Any number of target players" still out: Communal Brewing, Hollow Marauder, Kaboom!, Memory Vampire, Singularity
-     Rupture, Curse of Surveillance; Will of the Abzan (below).
+     Rupture, Curse of Surveillance (done in round 321); Will of the Abzan (below).
    - X in additional costs still out: Bond of Agony and Necrologia (their effect lines), "each player sacrifices X
      lands" (Devastating Dreams), "with mana value X" (Fix What's Broken, Vicious Rivalry), Devastating Summons' X/X
      tokens, Insidious Dreams, Recall (done in round B108), Nahiri's Wrath, Abandon Hope; X in an activated ability's non-mana cost (Gix,

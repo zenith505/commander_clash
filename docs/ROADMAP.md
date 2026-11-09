@@ -7319,6 +7319,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Wall of Caltrops (an intervening if on the blockers of the creature it blocks, CR 603.4: another Wall and no non-Wall
   creature, checked as it triggers and as it resolves). The band picker's prompt names "bands with other" (a browser
   test). +12 (30,768 of 31,936 with B160 and round 320).
+- Round B162 (least played first, mechanics that could be built from the skip lists): "As ~ enters, look at an opponent's
+  hand, then choose any card name" (CR 614.12; the opponent chosen first, their hand shown to you alone): Sorcerous
+  Spyglass (the named sources' non-mana activated abilities can't be activated) and Anointed Peacekeeper (opponents'
+  spells with the name cost {2} more; the named sources' non-mana activated abilities cost {2} more for everyone). Nivmagus
+  Elemental: "Exile an instant or sorcery spell you control" as a cost (CR 602.2b, 701.6a: it leaves the stack, it isn't
+  countered; a copy you control counts, CR 707.10a, rulings); the cost picker lists your spells on the stack, and the bot
+  only exiles a spell of its own an opponent is countering (a browser test). Bargaining Table: "X is the number of cards in
+  an opponent's hand", the opponent chosen as it's activated, before X (rulings, CR 107.3c); a picker for the opponent (a
+  browser test). "Target creatures of the creature type of your choice" (Selective Snare, Aphetto Dredging): the creature
+  type chosen as the spell is cast, before its targets (CR 601.2b-c; only a creature type, rulings), shown in the cast log
+  line, with the bot choosing the type with the most targets; the type picker opens while casting and can call the cast
+  off (browser tests). Myr Superion: "Spend only mana produced by creatures to cast ~" (CR 106.6, 109.2: creatures on the
+  battlefield; not Elvish Spirit Guide's mana from a hand, rulings). The bot doesn't activate Bargaining Table, as with
+  other "{N}, {T}: Draw a card" abilities. +7 (30,775 of 31,936 with B161).
+- Out after round B162 (looked at, not done): Synthesis Pod (reveal until a card with mana value one more than the exiled
+  spell's, then cast it free: the Nivmagus cost works, the reveal-and-cast doesn't yet), Imperiosaur (mana from basic
+  lands isn't told apart in the mana pool), Graceful Takedown (two groups of targets), Peace Talks (activated abilities
+  apart from triggered ones as sources of targeting), Wall of Shadows (every target spec of a source), Noxious Vapors and
+  Grime Gorger (multicolored or multitype cards, no rulings on how they count).
 - Out after round B161 (looked at, not done): Gloom again (activated abilities of white enchantments cost {3} more: the
   tax reaches mana abilities too, for instance a white enchantment creature given one by Cryptolith Rite, and mana
   abilities take no cost increase here), Tourach's Chant and Thelon's Chant (the player who puts the land onto the

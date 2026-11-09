@@ -7265,7 +7265,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (costOrMana(d, choices.costOr) ? `, paying ${costOrMana(d, choices.costOr)} more` : "") +
     (choices.delve?.length ? `, exiling ${choices.delve.map((c) => nameOf(s, c)).join(", ")} from their graveyard (delve)` : "");
   if (o.faceDown) log(s, `${p.name} casts a face-down creature spell (${o.faceDown})${tax ? ` (commander tax ${tax})` : ""}.`);
-  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
+  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${compileCard(d).castChooseType && choices.creatureType ? `, choosing ${choices.creatureType}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Ethereal Forager: the cards delve exiled are linked to the permanent this spell becomes, one zone change from now
   // (rulings, CR 607.2q).

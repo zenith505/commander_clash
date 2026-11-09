@@ -1666,8 +1666,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       // this early, layer 6 grants come later). Its basic land types give it their mana abilities (manaAbilitiesOn).
       // Card types and supertypes stay: a nonbasic land stays nonbasic, a land creature stays a creature.
       if (!c.types.includes("Land")) return;
-      // Convincing Mirage's "the chosen type": the basic land type chosen as the source entered; none chosen, no change.
-      if (m.subtypes.includes(CHOSEN_LAND_TYPE)) {
+      // Illusionary Terrain's "the second chosen type", of the two basic land types chosen as the source entered.
+      if (m.chosenIndex !== undefined) {
+        const chosen = e.sourceId ? s.objects[e.sourceId]?.chosen?.landTypes?.[m.chosenIndex] : undefined;
+        if (!chosen) return;
+        c.subtypes = [...c.subtypes.filter((st) => subtypeSet(st) !== "Land"), chosen];
+      } else if (m.subtypes.includes(CHOSEN_LAND_TYPE)) {
         const chosen = e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined;
         if (!chosen) return;
         c.subtypes = [...c.subtypes.filter((st) => subtypeSet(st) !== "Land"), ...m.subtypes.map((st) => (st === CHOSEN_LAND_TYPE ? chosen : st))];

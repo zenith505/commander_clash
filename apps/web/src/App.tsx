@@ -5498,7 +5498,7 @@ function Controls({
     return (
       <div className="controls color-pick">
         <span>
-          <strong>{pending.source}:</strong> choose a basic land type
+          <strong>{pending.source}:</strong> {pending.prompt ?? "choose a basic land type"}
         </span>
         {pending.options.map((o) => (
           <button key={o} className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
@@ -5512,7 +5512,7 @@ function Controls({
     return (
       <div className="controls color-pick">
         <span>
-          <strong>{pending.source}:</strong> choose a land type
+          <strong>{pending.source}:</strong> {pending.prompt ?? "choose a land type"}
         </span>
         {pending.options.map((o) => (
           <button key={o} className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>

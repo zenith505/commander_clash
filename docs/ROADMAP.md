@@ -2355,7 +2355,7 @@ line blocks.
    (an additional cost choosing a creature or a warped card in exile); Captured by the Consulate (changing a single
    target); Next of Kin; Phyrexian Portal (an opponent's face-down piles, chosen blind); Magnetic Web, Raging River,
    Defensive Formation, Sorrow's Path, Blaze of Glory (done in round B145) (block requirements and damage assignment); Piracy (tapping lands you
-   don't control for mana); Aetherplasm (put onto the battlefield blocking); Lightform (manifest, then becoming an Aura);
+   don't control for mana); Aetherplasm (put onto the battlefield blocking); Lightform (done in round B155) (manifest, then becoming an Aura);
    Cathedral of Serra and the other "bands with other" lands; Mangara's Tome and Aladdin's Lamp (a draw replaced); All
    Hallow's Eve (scream counters in exile); Land Equilibrium; Disciple of Caelus Nin (permanents can't phase in);
    Advancing the Spirit (power-up costs); Spy Kit (all names); Lightning Storm (an ability activated while it's on the
@@ -2920,7 +2920,7 @@ line blocks.
    Ogre Battlecaster ({R}{R} added to the graveyard spell's costs, then +X/+0 as it's cast); Kylox's Voltstrider (spells
    from the cards its collect evidence exiled); Reversal of Fortune (a copy of a card in an opponent's hand, cast from
    there); Dubious Challenge (done in round B152); Evolving Door (a creature card exactly one color more); Storm Herald (Auras returned
-   attached, exiled if they'd leave); Livio, Oathsworn Sentinel (aegis counters); Vision Charm (land type changes);
+   attached, exiled if they'd leave); Livio, Oathsworn Sentinel (aegis counters); Vision Charm (done in round B155) (land type changes);
    Unpredictable Cyclone; Bell Borca, Spectral Sergeant (noted mana values); Mirror of Fate; Dack Fayden, Helping Hand;
    Sanar, Innovative First-Year; Mairsil, the Pretender (cage counters); Spellweaver Volute; Inniaz, the Gale Force.
    Out after round 291 (looked at, not done): Skyway Robber (escapes with a granted trigger about the cards its escape cost
@@ -3778,7 +3778,7 @@ line blocks.
      Dyadrine and Gyrus are blocked on other lines.
    - Dies-return still out: Not Dead After All, Vincent's Limit Break.
    - Several cards from among the top ones: "with total mana value N or less" (Ao, Michelangelo's Technique, Smelting
-     Vat), two destinations in one sentence (Bounty of Skemfar (done in round 303), Wakanda Forever!), "tapped and attacking" (Arthur, Jet,
+     Vat), two destinations in one sentence (Bounty of Skemfar (done in round 303), Wakanda Forever! (done in round B155)), "tapped and attacking" (Arthur, Jet,
      Owlbear Cub), "where X is" in the look (Ajani Outland Chaperone, Famished Worldsire, Emergent Woodwurm), the X
      of an enters or cast trigger (Knickknack Ouphe, Genesis Hydra), exiled top cards (Xenagos, Tezzeret), "that many
      cards" (Gishath), "If you put fewer than two lands" (Expand the Sphere), "When a creature is put onto the battlefield this way" (Vivien's Invocation, Gilgamesh).
@@ -3980,7 +3980,7 @@ line blocks.
      Bypass, Crowd of True Believers, Viper), and "choose target face-up exiled card" (Riftsweeper done in round 272; Blink).
    Left from the delayed end step round ("sacrifice / exile / return it at the beginning of the next end step" about
    objects named earlier, exile now and return later, "until your next end step", "if you controlled that permanent"):
-   - Still out: haste for a card put from the hand with a filter or from the graveyard (Meek Attack, Treacherous Urge,
+   - Still out: haste for a card put from the hand with a filter or from the graveyard (Meek Attack, Treacherous Urge (done in round B155),
      Swift Warkite, Greasefang); "gets ... and gains" with no duration (Goblin Ski Patrol); Manaform Hellkite and
      Urabrask's Forge (X/X tokens); "any number of target ... return each of them" (Semester's End, Brago); Flickerform
      ("and all Auras attached to it"); Memory Jar (exile hands face down); Teferi's Time Twist, Phelia, Koya, Norin,
@@ -4148,7 +4148,7 @@ line blocks.
      Lighthouse Chronologist, Lord of Shatterskull Pass); "stations permanents using its toughness" (Tapestry Warden).
      Bots station after combat with summoning-sick creatures, or any creature while above 20 life.
 2. By `npm run blockers` (a long tail of 2- and 3-card lines): Rageform-style "it becomes an Aura ... manifest the
-   top card", "for each other attacking ~" naming the card itself (Aurochs Herd) and Shared Animosity's "that share a
+   top card" (done in round B155), "for each other attacking ~" naming the card itself (Aurochs Herd) and Shared Animosity's "that share a
    creature type with it". Left from the additional-combat round: "at the beginning of that combat" and "each combat
    this turn" delayed triggers (Moraug, World at War, Full Throttle), "only the chosen creatures / land creatures can
    attack during that combat phase" (Last Night Together, Bumi), "skips their next combat phase" (Stonehorn Dignitary,
@@ -5327,7 +5327,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature that makes seven doesn't trigger it, but granted abilities are read after the event), Pinnacle Starcage
   ("Put each card exiled with ~ into its owner's graveyard, then create ... Robot"), Not Forgotten (done in round B113) and Swat Away (top or
   bottom of the library, owner's choice), Case the Joint (done in round B146) and Medomai's Prophecy (the top card of each player's
-  library), Kayla's Reconstruction, Treacherous Urge, Rogues' Gallery, Liberated Livestock, Borderland Explorer (done in round B148),
+  library), Kayla's Reconstruction (done in round B155), Treacherous Urge (done in round B155), Rogues' Gallery, Liberated Livestock, Borderland Explorer (done in round B148),
   Cathedral Membrane (done in round B108), Dimensional Infiltrator (done in round B108), Sharp-Eyed Rookie; harder: Grand Master of Flowers, Mana Maze (done in round B148), Eureka,
   Portcullis.
 - Round B51 (cards no earlier round wrote down, least played first, EDHREC rank about 24,700 to 23,200):
@@ -7094,6 +7094,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature type with the creature that died, as it last existed, chosen as it resolves, rulings, CR 608.2h; a browser
   test). Tomb of Urami ("~ deals 1 damage to you if you don't control an Ogre" as the mana ability resolves; "Sacrifice
   all lands you control", itself too, rulings). +8 (30,660 of 31,936 with rounds 314 and 315).
+- Round B155 (least played first, every remaining card already examined, so mechanics that could be built): Rageform,
+  Cloudform and Lightform ("When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your library
+  and attach ~ to it": a game-long type change, CR 611.2c; with no card to manifest, or no ~ left to attach, it stays an
+  Aura attached to nothing and goes to the graveyard, CR 704.5m, 701.3b, rulings). Write into Being (one of the top two
+  cards manifested, CR 701.40a; the other on top or, if you take none, on the bottom; a browser test). Illusionary Terrain
+  (two different basic land types chosen as it enters; basic lands of the first are the second, CR 305.7, nonbasic lands
+  untouched; the bot changes the type its opponents rely on into a color outside their commanders' identities; a browser
+  test). Vision Charm's second mode (a land type and a basic land type chosen as it resolves; the lands of that type then
+  are fixed until end of turn, CR 611.2c; a browser test). Treacherous Urge (a creature card from the opponent's revealed
+  hand onto the battlefield under your control, with haste, sacrificed at the next end step). Covenant of Minds (the
+  target opponent decides; if not, the revealed cards go to the graveyard, not milled, CR 701.17, and the caster draws
+  five; the bot declines when the caster's library is nearly out; a browser test where Ana casts it at you). Wakanda
+  Forever! (a permanent card onto the battlefield with an indestructible counter, then one into the hand, from the six
+  revealed, the rest to the graveyard). Kayla's Reconstruction ("up to X" cards onto the battlefield). +10 (30,678 of 31,936 with B154 and rounds 315 and 316).
+- Out after round B155 (looked at, not done): Reality Twist and Pulse of Llanowar (after the replacement, a land with
+  two basic land types lets its controller choose the mana, rulings: the choice isn't modelled for mana replacements),
+  Yixlid Jailer (cards in graveyards losing all abilities would have to reach every graveyard-zone ability check).
 - Out after round B154 (looked at, not done): Blood Scrivener (two draws and a life loss instead of one draw: with
   another Scrivener, Phial of Galadriel or an Archive, which replacement applies to which of the new draws isn't tracked,
   CR 614.5, 616.1), Selective Snare and Aphetto Dredging (a creature type chosen as it's cast, before targets).
@@ -7371,7 +7388,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   by the keyword, not just a keyword to remove), Brothers Yamazaki (an exception to the legend rule), Rogue Skycaptain
   and Rohgahh of Kher Keep ("an opponent gains control of ~"), Stangg and Dance of the Many (linked tokens that leave
   with their source), Sengir Nosferatu (done in round B129) (a token's ability returns an exiled card named ~), Splintering Wind,
-  Negative Zone Portal (done in round B137), Sol'Kanar the Tainted, Mystic Barrier, Covenant of Minds.
+  Negative Zone Portal (done in round B137), Sol'Kanar the Tainted, Mystic Barrier, Covenant of Minds (done in round B155).
 - Out after round B87 (looked at, not done): Kodama of the Center Tree (soulshift X: a target bounded by a changing
   number), Hide // Seek (the mana value of a card found by the search), Revival Experiment (one card of each permanent
   type, and a battle's protector on entering is unclear), Love on the Battlefield (a combat damage trigger granted until
@@ -7391,7 +7408,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Guard Dogs, Carry Away, Jandor's Ring.
 - Out after round B83 (looked at, not done): Fighting Chance (a coin flip for each blocking creature), Ersatz Gnomes (done in round B126)
   (a spell becomes colorless: no rule for changing a spell's color yet), Clash of Elements (the owner's choice decides
-  what happens to it and who is dealt damage), Write into Being (manifest one of the top two cards), Samite Elder (done in round B117)
+  what happens to it and who is dealt damage), Write into Being (done in round B155) (manifest one of the top two cards), Samite Elder (done in round B117)
   (protection from each of a target permanent's colors).
 - Out after round B82 (looked at, not done): Builder's Bane (destroy X target artifacts: a variable number of
   targets), Burning of Xinye (done in round B139) (each player destroys lands of their choice), Sirocco and Wand of Ith (a punisher per
@@ -7438,7 +7455,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   abilities naming the permanent that made them), Earnest Fellowship and Pledge of Loyalty (done in round B112) (Lane A's round 236, now
   merged, changed the same keyword-binding code: next).
 - Out after round B73 (looked at, not done): Nafs Asp and Glass Asp ("unless they pay {1} before that draw step": a
-  payment the player may make any time before then, not as the trigger resolves), Illusionary Terrain (two basic land
+  payment the player may make any time before then, not as the trigger resolves), Illusionary Terrain (done in round B155) (two basic land
   types chosen, the first changed into the second), Chromatic Armor (the last chosen color, chosen again with sleight
   counters).
 - Out after round B72 (looked at, not done): Ghost Ark (unearth until end of turn: Lane A's round 233 added escape until
@@ -7669,7 +7686,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   in", "whenever ~ phases in or out", Teferi's Protection; flavor words before an ability ("Teleport —", CR 207.2d).
 - Manifest and cloak: from another player's library ("manifest the top card of that player's library"), from a hand
   (Scroll of Fate), several cards from a face-down pile (Become Anonymous, Primordial Mist), "manifest dread X times",
-  "whenever you manifest dread", Cloudform's "it becomes an Aura with enchant creature"; Arbiter of the Ideal's
+  "whenever you manifest dread", Cloudform's "it becomes an Aura with enchant creature" (done in round B155); Arbiter of the Ideal's
   manifestation counters. Ward granted with a variable or non-mana cost (Minthara's ward {X}, Mishra's "Ward—Sacrifice a
   permanent"), Thran Power Suit's "for each Aura and Equipment", Plate Armor's equip reduction, Leyline Immersion's
   restricted mana ability; anthems for legendary or nonlegendary creatures and "each creature you control with a counter

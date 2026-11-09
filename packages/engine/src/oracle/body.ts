@@ -1481,7 +1481,26 @@ function wandPunisher(who: PlayerRef, landLife: number): Effect {
  * reads parseFaceDownPlay's: the last effect and the next sentence's index in parseFaceDownPlay's shape (the effects
  * before the last one already pushed), "fail" for one that can't be read, or null when it isn't one of them.
  */
-/** Lane B round B153's sentences, chained before round B152's (parseBodyText is at TS2563's limit). */
+/** Lane B round B155's sentences, chained first (parseBodyText is at TS2563's limit). */
+function roundB155Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  const next = (sentences[si + 1] ?? "").replace(/\.$/, "");
+  const prev = effects[effects.length - 1];
+  // Treacherous Urge: "Target opponent reveals their hand. You may put a creature card from it onto the battlefield under
+  // your control.": a card from that player's hand, put under your control (CR 110.2a); "That creature gains haste" and
+  // the delayed sacrifice after it read as for Sneak Attack's.
+  const fromTheirs = /^You may put an? ([^.]+? card) from it onto the battlefield under your control$/.exec(s);
+  if (fromTheirs && prev?.type === "lookAtHand" && prev.who.ref === "target" && !prev.atRandom && ctx.targets[prev.who.index]?.kind === "player") {
+    const filter = parseSearchFilter(fromTheirs[1]!);
+    if (!filter?.types?.includes("Creature")) return "fail";
+    return { effect: { type: "putFromHand", fromHandOf: prev.who, filter, may: true }, next: si + 1 };
+  }
+  // Vision Charm: "Choose a land type and a basic land type. Each land of the first chosen type becomes the second chosen
+  // type until end of turn." Both chosen as it resolves; the lands affected are fixed then (CR 611.2c), see landTypeSwap.
+  if (/^[Cc]hoose a land type and a basic land type$/.test(s) && next === "Each land of the first chosen type becomes the second chosen type until end of turn") return { effect: { type: "landTypeSwap" }, next: si + 2 };
+  return null;
+}
+
+/** Lane B round B154's sentences, chained before round B153's (parseBodyText is at TS2563's limit). */
 function roundB154Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
   const prev = effects[effects.length - 1];
   let m: RegExpExecArray | null;
@@ -6719,8 +6738,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
-    // rounds B154, B153, B152, B151, B148 and 311 to 316's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    // rounds B155, B154, B153, B152, B151, B148 and 311 to 316's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
+    const faceDown = roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);
@@ -19873,8 +19892,56 @@ function greenSunsTwilight(text: string): AbilityBody | null {
   return { targets: [], effects: [{ type: "if", cond: { kind: "xAtLeast", n: Number(m[3]) }, effects: [dig("battlefield")], otherwise: [dig("hand")] }], text };
 }
 
+/** Lane B round B155's whole-text forms, read first by wholeTextForms. */
+function roundB155WholeText(text: string): AbilityBody | null {
+  // Write into Being: "Look at the top two cards of your library. Manifest one of those cards, then put the other on the top
+  // or bottom of your library.": one is manifested (CR 701.40a), the other stays on top for the second instruction, which
+  // keeps it there or puts it on the bottom. With one card, it's manifested and nothing is left (rulings).
+  if (text.trim() === "Look at the top two cards of your library. Manifest one of those cards, then put the other on the top or bottom of your library.")
+    return {
+      targets: [],
+      effects: [
+        { type: "dig", n: 2, count: 1, upTo: false, required: true, into: "manifest", rest: "keep", reveal: false },
+        { type: "dig", n: 1, count: 1, upTo: true, into: "libraryTop", rest: "bottom", reveal: false },
+      ],
+      text,
+    };
+  // Wakanda Forever!: "Reveal the top six cards of your library. You may put a permanent card from among them onto the
+  // battlefield with an indestructible counter on it. You may put a permanent card from among them into your hand. Put the
+  // rest into your graveyard.": in that order, each one up to one card; the second picks among the revealed cards left
+  // (as Bounty of Skemfar's two picks), then the rest go to the graveyard (not milled, CR 701.17).
+  if (text.trim() === "Reveal the top six cards of your library. You may put a permanent card from among them onto the battlefield with an indestructible counter on it. You may put a permanent card from among them into your hand. Put the rest into your graveyard.") {
+    const permanent = parseSearchFilter("permanent card");
+    if (!permanent) return null;
+    const toHand = (k: number): Effect => ({ type: "dig", n: k, count: 1, upTo: true, filter: permanent, into: "hand", rest: "graveyard", reveal: true });
+    return {
+      targets: [],
+      effects: [
+        { type: "dig", n: 6, count: 1, upTo: true, filter: permanent, into: "battlefield", counters: { counter: "indestructible", n: 1 }, rest: "keep", reveal: true },
+        { type: "if", cond: { kind: "digTook" }, effects: [toHand(5)], otherwise: [toHand(6)] },
+      ],
+      text,
+    };
+  }
+  // Covenant of Minds: "Reveal the top three cards of your library. Target opponent may choose to put those cards into your
+  // hand. If they don't, put those cards into your graveyard and draw five cards.": the opponent decides (rulings); the
+  // three are put into your hand, not drawn, or into your graveyard, then you draw five.
+  if (text.trim() === "Reveal the top three cards of your library. Target opponent may choose to put those cards into your hand. If they don't, put those cards into your graveyard and draw five cards.")
+    return {
+      targets: [{ kind: "player", opponent: true, text: "target opponent" }],
+      effects: [
+        { type: "revealTop", n: 3 },
+        { type: "may", decider: { ref: "target", index: 0 }, effects: [{ type: "revealedTo", dest: "hand" }], otherwise: [{ type: "revealedTo", dest: "graveyard" }, { type: "draw", who: { ref: "you" }, n: 5 }], text: "let ~'s controller put the revealed cards into their hand (if not, they go to their graveyard and that player draws five cards)" },
+      ],
+      text,
+    };
+  return null;
+}
+
 /** Whole-text forms and rewrites, run by parseBodyText before its sentence loop: a body, or the rewritten text. */
 function wholeTextForms(text: string, selfEntered: boolean): AbilityBody | string {
+  const b155 = roundB155WholeText(text);
+  if (b155) return b155;
   // Fblthp, the Lost: "When ~ enters, draw a card. If it entered from your library or was cast from your library, draw two
   // cards instead." How it entered (rulings: not cast from exile after an effect exiled it from the library).
   if (selfEntered && /^draw a card\. If it entered from your library or was cast from your library, draw two cards instead\.$/.test(text.trim()))

@@ -75,7 +75,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     // permanent itself and one of each of the others.
     .replace(/(^|, )Sacrifice (an? [a-z]+ creature|a creature named [A-Z][A-Za-z' -]*), (an? [a-z]+ creature|a creature named [A-Z][A-Za-z' -]*), and (an? [a-z]+ creature|a creature named [A-Z][A-Za-z' -]*|~)(?=:)/, (_, pre: string, a: string, b: string, c: string) => (c === "~" ? `${pre}Sacrifice ~, Sacrifice ${a}; and ${b}` : `${pre}Sacrifice ${a}; ${b}; and ${c}`));
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~ and any number of [^,:]+?|Sacrifice ~ and (?:an?|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen) [^,:]+?|Sacrifice ~|Exert ~|Unattach ~|Sacrifice \u27easource\u27eb|Unattach \u27easource\u27eb|Tap enchanted (?:creature|land)|Sacrifice (?:enchanted|equipped) creature|Return ~ to its owner's hand|Put ~ on the bottom of its owner's library|Discard ~|Discard your hand|Reveal ~ from your hand|Exile ~ from your graveyard|Exile ~ from your hand|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifty|\d+|X) (?:[+-]\d+/[+-]\d+|[a-z]+) counters? from ~|Remove all (?:[+-]1/[+-]1|[a-z]+) counters from ~|Remove (?:a counter|two counters|three counters) from ~|Remove (?:a|one|two|three|four|five|six|seven|eight|nine|ten|X) (?:(?:[+-]1/[+-]1|[a-z]+) )?counters? from among (?:[^,:]+?, )*?[^,:]+? you control|Remove an? (?:[+-]1/[+-]1|[a-z]+) counter or an? (?:[+-]1/[+-]1|[a-z]+) counter from an? permanent you control|Remove an? (?:(?:[+-]1/[+-]1|[a-z]+) )?counter from (?:an?|another) (?:permanent|nonland permanent|creature|artifact|(?:artifact|creature|land|planeswalker|enchantment)(?:, (?:artifact|creature|land|planeswalker|enchantment))*,? or (?:artifact|creature|land|planeswalker|enchantment)) you control|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Put an? [+-]1/[+-]1 counter on an? creature you control|Blight \d+|Pay \d+ life for each [a-z]+ counter on ~|Pay \d+ life|Pay X life|Pay life equal to the number of colors in your commanders' color identity|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five|six|seven|eight|nine|ten|X) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random| with different names)?|Discard (?:two|three) (?:nonland )?cards with the same name|Discard a card with mana value X|Discard another card named ~|Discard X cards|Discard the last card you drew this turn|Reveal X (?:white|blue|black|red|green) cards from your hand|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a (?:creature )?card exiled with ~ into its owner's graveyard|Put a card an opponent owns from exile into that player's graveyard|Tap (?:an|another|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|X) (?:other )?untapped [^,:]+? you control(?: other than ~| that share a creature type)?|Reveal two cards from your hand that share a color|Untap (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty) tapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile the top (?:card|[a-z]+ cards) of your library|Exile (?:a|an|another|one|two|three|four|five|six|seven|eight|nine|ten) [^,:]*?cards? from your graveyard|Exile any number of cards from your graveyard|Put (?:two|three|four|five) cards from your graveyard on the bottom of your library|Exile any number of [a-z ]+? cards from your graveyard with total mana value \d+ or greater|Exile X cards from your graveyard|Exile an? (?:artifact|creature) card with mana value X from your graveyard|Exile (?:a|an|one|two) [^,:]*?cards? from your hand|Exile (?:an?|another) [^,:]+? you control(?: face up)?|Exile ~ and (?:one|two|three|four|five) other [^,:]+? you control|Return (?:an?|two|three) [^,:]+? you control to (?:its|their) owner's hand|Forage`;
+  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~ and any number of [^,:]+?|Sacrifice ~ and (?:an?|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen) [^,:]+?|Sacrifice ~|Exert ~|Unattach ~|Sacrifice \u27easource\u27eb|Unattach \u27easource\u27eb|Tap enchanted (?:creature|land)|Sacrifice (?:enchanted|equipped) creature|Return ~ to its owner's hand|Put ~ on the bottom of its owner's library|Discard ~|Discard your hand|Reveal ~ from your hand|Exile ~ from your graveyard|Exile ~ from your hand|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifty|\d+|X|any number of|one or more) (?:[+-]\d+/[+-]\d+|[a-z]+) counters? from ~|Remove all (?:[+-]1/[+-]1|[a-z]+) counters from ~|Remove (?:a counter|two counters|three counters) from ~|Remove (?:a|one|two|three|four|five|six|seven|eight|nine|ten|X|one or more) (?:(?:[+-]1/[+-]1|[a-z]+) )?counters? from among (?:[^,:]+?, )*?[^,:]+? you control|Remove an? (?:[+-]1/[+-]1|[a-z]+) counter or an? (?:[+-]1/[+-]1|[a-z]+) counter from an? permanent you control|Remove an? (?:(?:[+-]1/[+-]1|[a-z]+) )?counter from (?:an?|another) (?:permanent|nonland permanent|creature|artifact|(?:artifact|creature|land|planeswalker|enchantment)(?:, (?:artifact|creature|land|planeswalker|enchantment))*,? or (?:artifact|creature|land|planeswalker|enchantment)) you control|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Put an? [+-]1/[+-]1 counter on an? creature you control|Blight \d+|Pay \d+ life for each [a-z]+ counter on ~|Pay \d+ life|Pay X life|Pay life equal to the number of colors in your commanders' color identity|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five|six|seven|eight|nine|ten|X) [^,:]+?|Sacrifice up to (?:two|three) permanents|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random| with different names)?|Discard (?:two|three) (?:nonland )?cards with the same name|Discard a card with mana value X|Discard another card named ~|Discard X cards|Discard the last card you drew this turn|Reveal X (?:white|blue|black|red|green) cards from your hand|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a (?:creature )?card exiled with ~ into its owner's graveyard|Put a card an opponent owns from exile into that player's graveyard|Tap (?:an|another|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|X) (?:other )?untapped [^,:]+? you control(?: other than ~| that share a creature type)?|Reveal two cards from your hand that share a color|Untap (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty) tapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile the top (?:card|[a-z]+ cards) of your library|Exile (?:a|an|another|one|two|three|four|five|six|seven|eight|nine|ten) [^,:]*?cards? from your graveyard|Exile any number of cards from your graveyard|Put (?:two|three|four|five) cards from your graveyard on the bottom of your library|Exile any number of [a-z ]+? cards from your graveyard with total mana value \d+ or greater|Exile X cards from your graveyard|Exile an? (?:artifact|creature) card with mana value X from your graveyard|Exile (?:a|an|one|two) [^,:]*?cards? from your hand|Exile (?:an?|another) [^,:]+? you control(?: face up)?|Exile ~ and (?:one|two|three|four|five) other [^,:]+? you control|Return (?:an?|two|three) [^,:]+? you control to (?:its|their) owner's hand|Forage`;
   // "Waterbend {N}" (CR 701.67a) is paying {N}, part of which tapped artifacts and creatures can pay.
   const water = /^Waterbend \{(\d+|X)\}(?=[,:])/.exec(line);
   // Heirloom Epic: "For each mana in this ability's activation cost, you may tap an untapped creature you control rather
@@ -95,6 +95,10 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   /** Corpseweft: "where X is twice the number of cards exiled this way" (see its cost). */
   let twiceExiled = false;
   let removeCounters: ActivatedAbility["removeCounters"];
+  /** Ooze Flux: "Remove one or more +1/+1 counters from among ...": X counters, X at least 1. */
+  let oneOrMoreCounters = false;
+  /** The Astonishing Ant-Man: "Remove any number of +1/+1 counters from ~": X counters, X 0 or more, "that many" its X. */
+  let anyCountersSelf = false;
   let putCounters: ActivatedAbility["putCounters"];
   // "From among other artifacts, creatures, and planeswalkers you control" is one cost, commas and all.
   // Soul Diviner: "Remove a counter from an artifact, creature, land, or planeswalker you control": one cost, its commas kept.
@@ -110,7 +114,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       // Blight N (CR 701.68a): N -1/-1 counters on one creature you control (Gristle Glutton, Sting-Slinger).
       extra.push(blightCost(Number(c[1])));
     }
-    else if ((c = new RegExp(`^Remove (X|${NUM.slice(1, -1)}) (?:([+-]1/[+-]1|[a-z]+) )?counters? from among (other )?(.+) you control$`).exec(part))) {
+    else if ((c = new RegExp(`^Remove (X|one or more|${NUM.slice(1, -1)}) (?:([+-]1/[+-]1|[a-z]+) )?counters? from among (other )?(.+) you control$`).exec(part))) {
+      // Ooze Flux: "Remove one or more +1/+1 counters from among creatures you control": as many as chosen, one at least,
+      // that number its X (CR 107.3a, 602.2b), "the number of +1/+1 counters removed this way" (see below).
+      if (c[1] === "one or more") {
+        c[1] = "X";
+        oneOrMoreCounters = true;
+      }
       // Retribution of the Ancients: "Remove X +1/+1 counters from among creatures you control": X announced, then that many
       // (CR 107.3a, 602.2b). NUM's own group is dropped, so the first group is the number or X.
       // Tekuthal, Hopeful Initiate: counters on permanents you control, any mix of them (CR 602.2b). "Artifacts,
@@ -142,10 +152,14 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       // Sage of Hours: however many there are, none included (rulings); see StackItem.countersRemoved.
       if (removeCounters) return "fail";
       removeCounters = { counter: counterKind(c[1]!), n: 0, all: true };
-    } else if ((c = /^Remove X ([+-]1\/[+-]1|[a-z]+) counters from ~$/.exec(part))) {
+    } else if ((c = /^Remove (X|any number of|one or more) ([+-]1\/[+-]1|[a-z]+) counters from ~$/.exec(part))) {
       // The Bakus: "Remove X ki counters from ~": X announced, then that many removed (CR 107.3a, 601.2b).
+      // The Astonishing Ant-Man: "Remove any number of +1/+1 counters from ~": the same, none too. Simic Manipulator: "one
+      // or more", one at least.
       if (removeCounters) return "fail";
-      removeCounters = { counter: counterKind(c[1]!), n: 0, x: true };
+      removeCounters = { counter: counterKind(c[2]!), n: 0, x: true };
+      anyCountersSelf = c[1] === "any number of";
+      if (c[1] === "one or more") oneOrMoreCounters = true;
     } else if (/^Remove /.test(part)) {
       const rc = removeCounterCost(part);
       if (!rc || !Number.isFinite(rc.n)) return "fail"; // "Remove X counters" isn't modeled
@@ -220,6 +234,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const filter = pickFilter(c[1]!);
       if (!filter) return "fail";
       extra.push({ kind: "sacrifice", filter: { ...filter, text: `${c[1]} with mana value X${c[3] ?? ""}` }, n: 1, ...(c[3] ? { other: true as const } : {}), mvX: true });
+    } else if ((c = /^Sacrifice up to (two|three) permanents$/.exec(part))) {
+      // Baba Lysaga, Night Witch: "Sacrifice up to three permanents": none to three, any of yours (CR 602.2b, 601.2h), even
+      // ones that share card types (rulings); the number chosen is its X, announced as it's activated (CR 107.3a).
+      const filter = pickFilter("permanent");
+      if (!filter || extra.some((x) => "x" in x && x.x)) return "fail";
+      extra.push({ kind: "sacrifice", filter, n: 0, x: true, optional: true, upTo: num(c[1]!) });
     } else if (part !== "Sacrifice ~" && (c = new RegExp(`^Sacrifice (another|X|${NUM}) (other )?(.+)$`).exec(part))) {
       // "Sacrifice two other artifacts and/or creatures" (Mondrak): not this permanent; any mix of the two.
       const andOr = / and\/or /.test(c[4]!) ? c[4]!.split(" and/or ").map((w) => singular(w)).join(" or ") : undefined;
@@ -394,6 +414,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   if (/(?:^|, )Exile any number of cards from your graveyard(?=, |$)/.test(costs) && extra.some((c) => c.kind === "exileFromGraveyard" && c.x)) effectText = effectText.replace(/, where X is the number of cards exiled this way\.$/, ".");
   // Relic Amulet: "Remove all charge counters from ~: It deals that much damage to target creature": as many as were
   // removed, none if there were none (see StackItem.countersRemoved).
+  // Ooze Flux: "where X is the number of +1/+1 counters removed this way" is the X its cost announced (see above).
+  if (oneOrMoreCounters) effectText = effectText.replace(/, where X is the number of (?:[+-]1\/[+-]1 )?counters removed this way\.$/, ".");
+  // Simic Manipulator: "target creature with power less than or equal to the number of +1/+1 counters removed this way":
+  // the X its cost announced, checked as it's targeted and again as it resolves (rulings, CR 608.2b).
+  if (oneOrMoreCounters) effectText = effectText.replace(/^Gain control of target creature with power less than or equal to the number of (?:[+-]1\/[+-]1 )?counters removed this way\.$/, "Gain control of target creature with power X or less.");
+  // The Astonishing Ant-Man: "Create that many 1/1 green Insect creature tokens": the X its cost announced.
+  if (anyCountersSelf) effectText = effectText.replace(/^Create that many /, "Create X ");
   if (removeCounters?.all) effectText = effectText.replace(/^It deals that much damage to (target [a-z ]+)\.$/, "~ deals X damage to $1, where X is the number of counters removed this way.");
   let sorcerySpeed = false;
   let oncePerTurn = keyword === "Boast" || keyword === "Forecast";
@@ -721,6 +748,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     tok.pt = { count: { kind: "x" }, times: 2 };
     xMin = 1;
   }
+  if (oneOrMoreCounters) {
+    if (xMin || !usesX(body)) return "fail";
+    xMin = 1;
+  }
+  if (anyCountersSelf && !usesX(body)) return "fail";
+  // Baba Lysaga: "card types among the sacrificed permanents" needs a cost that sacrifices them.
+  if (JSON.stringify(body).includes('"costSacrificedCardTypes"') && !extra.some((c) => c.kind === "sacrifice" && c.x)) return "fail";
   if (uncopyable) body.uncopyable = true;
   // An activated ability without a target that could add mana, and that moves no card to or from a library, is a mana
   // ability (CR 605.1a): it doesn't use the stack (605.3b). One whose other instructions aren't known to stay clear of

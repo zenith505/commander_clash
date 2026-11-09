@@ -8211,6 +8211,8 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       if (chosen.length !== 1 || !pool.includes(chosen[0]!)) return `choose ${what} to put ${counters} on`;
       continue;
     }
+    // Baba Lysaga, Night Witch: "Sacrifice up to three permanents", so no more than three.
+    if (c.kind === "sacrifice" && c.upTo !== undefined && c.n > c.upTo) return `you can sacrifice at most ${c.upTo} permanents to ${doing}`;
     if (c.kind === "mill") {
       // Not with fewer cards in the library (CR 701.17b).
       if (p.library.length < c.n) return `you need ${c.n === 1 ? "a card" : `${c.n} cards`} in your library to ${c.exile ? "exile" : "mill"} to ${doing}`;

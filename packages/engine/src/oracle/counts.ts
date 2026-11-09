@@ -566,6 +566,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Keldon Battlewagon: "Tap an untapped creature you control: ~ gets +X/+0 until end of turn, where X is the power of the
   // creature tapped this way"; Unerring Sling: "the tapped creature's power". compile() checks the ability has that cost.
   if (ctx?.activated && /^(?:the power of the creature tapped this way|the tapped creature's power)$/i.test(p)) return { count: { kind: "stationPower" } };
+  // Burn at the Stake: "the number of creatures tapped this way" by its additional cost, the X announced for it (CR
+  // 107.3a); a copy has the same X (CR 707.10).
+  if (ctx?.costTappedX && /^(?:the number of )?creatures tapped this way$/.test(p)) return { count: { kind: "x" } };
   if (ctx?.tappedThisWay && /^(?:the number of )?(?:[A-Z][a-z]+ )?(?:creatures?|artifacts?|Gates?|Humans?|permanents?) tapped this way$/.test(p)) return { count: { kind: "tappedThisWay" } };
   // "For each card manifested this way" (Kozilek, the Broken Reality), after its manifest-from-hand instruction.
   if (ctx?.manifested && each && /^card manifested this way$/i.test(p)) return { count: { kind: "manifestedThisWay" } };

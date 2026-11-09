@@ -93,7 +93,9 @@ export function evalAmount(s: GameState, a: Amount, ctx: AmountCtx): number {
   const v1 = a.twiceIfX !== undefined && (ctx.x ?? 0) >= a.twiceIfX ? v0 * 2 : v0;
   // Dwarven Catapult: split evenly among that many, rounded down (rulings: none if there are more of them than X).
   const by = a.divBy ? evalCount(s, a.divBy, ctx) : 1;
-  const v = a.divBy ? (by > 0 ? Math.floor(v1 / by) : 0) : v1;
+  const v2 = a.divBy ? (by > 0 ? Math.floor(v1 / by) : 0) : v1;
+  // Myriad Construct: only if kicked ("wasKicked", 0 or 1).
+  const v = a.mulBy ? v2 * evalCount(s, a.mulBy, ctx) : v2;
   const n0 = a.signed ? v : Math.max(0, a.half ? (a.third || a.tenth ? ((d) => (a.half === "up" ? Math.ceil(v / d) : Math.floor(v / d)))(a.tenth ? 10 : 3) : halve(v, a.half)) : v);
   const n = a.max !== undefined ? Math.min(n0, a.max) : n0;
   return a.negate ? -n : n;
@@ -659,6 +661,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return c.n;
     case "difference":
       return evalCount(s, c.of[0], ctx) - evalCount(s, c.of[1], ctx);
+    case "untappedLandsAtTurnStart":
+      return s.turnLog?.untappedLands ?? 0;
     case "behindMost": {
       // Scholarship Sponsor: the most any player in the game controls, less this player's (0 when they're the most).
       // Tales of the Ancestors: the cards in their hands.
@@ -1314,7 +1318,8 @@ export function describeAmount(a: Amount): string {
   const v0 = a.plus ? `${times} ${a.plus > 0 ? "+" : "-"} ${Math.abs(a.plus)}` : times;
   const v1 = a.half ? `${a.third ? "a third of" : a.tenth ? "a tenth of" : "half"} ${v0}, rounded ${a.half}` : v0;
   const v2 = a.twiceIfX !== undefined ? `${v1} (twice that if X is ${a.twiceIfX} or more)` : v1;
-  const v = a.divBy ? `${v2} / ${describeCount(a.divBy)}, rounded down` : v2;
+  const v3 = a.divBy ? `${v2} / ${describeCount(a.divBy)}, rounded down` : v2;
+  const v = a.mulBy ? `${v3} × ${describeCount(a.mulBy)}` : v3;
   return a.negate ? `-(${v})` : v;
 }
 
@@ -1558,6 +1563,8 @@ function describeCount(c: Count): string {
       return `the greater of ${describeCount(c.of[0])} and ${describeCount(c.of[1])}`;
     case "difference":
       return `${describeCount(c.of[0])} - ${describeCount(c.of[1])}`;
+    case "untappedLandsAtTurnStart":
+      return "#untapped lands they controlled at the beginning of this turn";
     case "behindMost":
       return c.hand ? "the most cards in a player's hand - the cards in their hand" : `the most ${c.filter.text}s a player controls - their ${c.filter.text}s`;
     case "absDifference":

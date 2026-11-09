@@ -106,6 +106,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // value once (CR 202.3).
   // Sudden Insight: "for each different mana value among nonland cards in your graveyard".
   if (each && /^different mana value among nonland cards in your graveyard$/i.test(p)) return { count: { kind: "graveyardManaValues", who: { ref: "you" }, filter: { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "nonland card" } } };
+  // All-Seeing Arbiter: "where X is the number of different mana values among cards in your graveyard": every card, a
+  // land's 0 too (rulings, CR 202.3).
+  if (!each && /^the number of different mana values among cards in your graveyard$/i.test(p)) return { count: { kind: "graveyardManaValues", who: { ref: "you" } } };
   if (each && (m = /^different mana value among (instant (?:and|or) sorcery) cards in your graveyard$/i.exec(p))) return { count: { kind: "graveyardManaValues", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } } };
   // Treva, the Renewer: "you gain 1 life for each permanent of the chosen color", the color chosen as it resolves.
   if ((m = each ? /^(permanent|creature) of the chosen color$/.exec(p) : /^the number of (permanent|creature)s of the chosen color$/.exec(p)))

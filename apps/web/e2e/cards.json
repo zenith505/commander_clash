@@ -376,6 +376,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "14c3e48b-4c4e-4787-8c50-0e3aee19aa23",
+  "name": "Aerith Rescue Mission",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose one —\n• Take the Elevator — Create three 1/1 colorless Hero creature tokens.\n• Take 59 Flights of Stairs — Tap up to three target creatures. Put a stun counter on one of them. (If a permanent with a stun counter would become untapped, remove one from it instead.)",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Take 59 Flights of Stairs",
+   "Take the Elevator"
+  ],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ff6427f6-d2b1-4e33-984d-c06bd15d7c2c",
   "name": "Aetherborn Marauder",
   "manaCost": "{3}{B}",
@@ -14728,6 +14757,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4f31eea0-61b9-467d-8393-0ab9f1b6e882",
+  "name": "Insatiable Frugivore",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Rat Berserker",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Rat",
+   "Berserker"
+  ],
+  "oracleText": "When this creature enters, create a Food token, then you may exile three cards from your graveyard. If you do, repeat this process.\n{3}{B}, Sacrifice X Foods: Creatures you control get +X/+0 and gain menace until end of turn.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Food"
+  ],
+  "commanderLegal": "legal",
+  "set": "blc",
+  "releasedAt": "2024-08-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "760e8561-4ec6-4594-ba5d-f79cb9f25fd0",
   "name": "Inscription of Ruin",
   "manaCost": "{2}{B}",
@@ -24003,6 +24065,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "74316be1-041f-4a2e-a296-0b496f90ca25",
+  "name": "Read the Runes",
+  "manaCost": "{X}{U}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw X cards. For each card drawn this way, discard a card unless you sacrifice a permanent.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "77398866-eebb-4091-b566-7726f8194a59",
   "name": "Realmbreaker, the Invasion Tree",
   "manaCost": "{3}",
@@ -27046,6 +27134,43 @@
   "set": "dmc",
   "releasedAt": "2022-09-09",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ed15a3c4-110e-4f08-bf09-fabbf5b4eeb9",
+  "name": "Sivriss, Nightmare Speaker",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Snake Cleric Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Snake",
+   "Cleric",
+   "Warlock"
+  ],
+  "oracleText": "{T}, Sacrifice another creature or an artifact: For each opponent, you mill a card, then return that card from your graveyard to your hand unless that player pays 3 life. (To mill a card, put the top card of your library into your graveyard.)\nChoose a Background (You can have a Background as a second commander.)",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Choose a background",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

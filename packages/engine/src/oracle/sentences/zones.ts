@@ -652,7 +652,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // Startled Awake: "{3}{U}{U}: Put ~ from your graveyard onto the battlefield transformed": its back face up (CR 712.14a),
   // under your control (CR 110.2a).
-  if (ctx.selfCard && ctx.activated && /^Put ~ from your graveyard onto the battlefield transformed$/.test(s)) return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, transformed: true }];
+  // Garland, Knight of Cornelia: "Return this card from your graveyard to the battlefield transformed", the same.
+  if (ctx.selfCard && ctx.activated && /^(?:Put ~ from your graveyard onto|Return ~ from your graveyard to) the battlefield transformed$/.test(s)) return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, transformed: true }];
   // Sandman, Shifting Scoundrel: "{3}{G}{G}: Return ~ and target land card from your graveyard to the battlefield tapped":
   // the card and the target enter at the same time (CR 608.2c); with the target illegal the ability doesn't resolve, so
   // the card stays too (CR 608.2b).

@@ -26,6 +26,7 @@ import { runSpellsEffect, addDelayed } from "./run-spells";
 import { runNamesEffect } from "./run-names";
 import { runLibraryEffect } from "./run-library";
 import { runFaceDownPilesEffect } from "./run-round318";
+import { runAttackingNowEffect, runDiscardOrSacrificeEffect, runExileTopDamageEachEffect, runGuessTopKindEffect, runReturnSacrificedCardsEffect, runSacrificeTargetsRevealEffect } from "./run-round319";
 import { runLaneB160Effect } from "./run-laneb160";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
@@ -1662,6 +1663,18 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runDungeonsEffect(s, e, ctx, src);
     case "roll":
       return runDiceEffect(s, e, ctx, src);
+    case "guessTopKind":
+      return runGuessTopKindEffect(s, e, ctx, src);
+    case "sacrificeTargetsReveal":
+      return runSacrificeTargetsRevealEffect(s, e, ctx);
+    case "attackingNow":
+      return runAttackingNowEffect(s, e, ctx);
+    case "returnSacrificedCards":
+      return runReturnSacrificedCardsEffect(s, e, ctx, src);
+    case "discardOrSacrifice":
+      return runDiscardOrSacrificeEffect(s, e, ctx, src);
+    case "exileTopDamageEach":
+      return runExileTopDamageEachEffect(s, e, ctx, src);
     case "faceDownPiles":
       return runFaceDownPilesEffect(s, e, ctx, src);
     case "revealRandomDiscardNamed":

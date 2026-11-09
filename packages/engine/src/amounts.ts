@@ -484,6 +484,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.sacrificedThisWay?.at(-1)?.manaValue ?? 0;
     case "sacrificedThisWayTotalPower":
       return (s.resolving?.sacrificedThisWay ?? []).reduce((n, l) => n + (l.power ?? 0), 0);
+    case "sacrificedThisWayToughnessYours":
+      return (s.resolving?.sacrificedThisWay ?? []).filter((l) => l.controller === ctx.controller).reduce((n, l) => n + (l.toughness ?? 0), 0);
     case "sacrificedThisWayColors":
       return new Set((s.resolving?.sacrificedThisWay ?? []).flatMap((l) => l.colors ?? [])).size;
     case "destroyedThisWayTotalPower": {
@@ -632,6 +634,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       // A changeling is every creature type (CR 702.73a), so never "non-Skeleton".
       if (c.notSubtype) return (s.diedTypesThisTurn ?? []).filter((d) => !(d.all || d.subtypes.includes(c.notSubtype!)) && (!c.yours || d.controller === ctx.controller)).length;
       return ((c.nontoken ? s.nontokenDiedThisTurn : s.diedThisTurn) ?? []).filter((p) => (!c.yours || p === ctx.controller) && (!c.opponents || p !== ctx.controller)).length;
+    case "diedThisTurnPower":
+      return (s.diedTypesThisTurn ?? []).filter((d) => d.all || d.subtypes.includes(c.subtype)).reduce((n, d) => n + Math.max(0, d.power ?? 0), 0);
     case "plusOnesPutThisTurn":
       return (s.turnLog?.plusOnes ?? [])
         .filter((p) => (!c.byYou || p.by === ctx.controller) && (!c.onYours || p.controller === ctx.controller) && (!c.creature || p.creature) && (!c.self || (p.id === ctx.sourceId && p.zc === (ctx.sourceZc ?? s.objects[p.id]?.zoneChanges ?? 0))))
@@ -1402,6 +1406,8 @@ function describeCount(c: Count): string {
       return "the sacrificed creature's mana value";
     case "sacrificedThisWayColors":
       return "#colors of the sacrificed creature";
+    case "sacrificedThisWayToughnessYours":
+      return "the toughness of the creature you sacrificed";
     case "sacrificedThisWayTotalPower":
     case "costSacrificedTotalPower":
       return "the total power sacrificed";
@@ -1538,6 +1544,8 @@ function describeCount(c: Count): string {
       return `#${c.nontoken ? "nontoken " : ""}creatures put into your graveyard from the battlefield this turn`;
     case "diedThisTurn":
       return `#${c.nontoken ? "nontoken " : ""}${c.notSubtype ? `non-${c.notSubtype} creature` : (c.subtype ?? "creature")}s that died${c.yours ? " under your control" : c.opponents ? " under your opponents' control" : ""} this turn`;
+    case "diedThisTurnPower":
+      return `the total power of ${c.subtype}s that died this turn`;
     case "plusOnesPutThisTurn":
       return `#+1/+1 counters ${c.byYou ? "you've " : ""}put on ${c.self ? "~" : `${c.onYours ? "your " : ""}${c.creature ? "creatures" : "permanents"}`} this turn`;
     case "tokensCreatedThisTurn":

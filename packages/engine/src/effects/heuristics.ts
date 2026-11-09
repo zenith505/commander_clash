@@ -92,6 +92,8 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     // Controlling a player's turn (CR 723): an opponent's, who then does what we like.
     if (e.type === "controlPlayer" && e.who.ref === "target") mark(e.who.index);
     if (e.type === "counterSpell") mark(e.index);
+    // Vaevictis Asmadi, the Dire: each player's target is sacrificed (our own one the least useful).
+    if (e.type === "sacrificeTargetsReveal" && e.what.ref === "target") mark(e.what.index, e.what.n);
     // Retribution, Cannibalize: one of the two is sacrificed, exiled or dealt damage: an opponent's creatures.
     if (e.type === "splitTargets") mark(0, 2);
     // Exchanging control (Oko): the opponent's permanent taken, our least useful one given.

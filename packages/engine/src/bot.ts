@@ -559,6 +559,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const names = new Set<string>();
       return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => { const n = defOf(s, obj(s, id)).name; return !names.has(n) && !!names.add(n); }) }];
     }
+    // Stronghold Gambit: our cheapest creature card, the likeliest to be the lowest; with none, the cheapest card.
+    if (pend.kind === "searchLibrary" && pend.fromHand && pend.reveal && s.resolving?.body.effects[s.resolving.next]?.type === "eachChoosesFromHand") {
+      const creature = (id: ObjectId) => (isType(defOf(s, obj(s, id)), "Creature") ? 0 : 1);
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => creature(a) - creature(b) || mv(s, a) - mv(s, b)).slice(0, 1) }];
+    }
     // Manifesting (Kozilek, the Broken Reality): creature cards first, which can be turned face up later for their mana
     // cost (CR 701.40b), the cheapest first; then the least costly of the rest.
     if (pend.kind === "searchLibrary" && pend.fromHand && pend.manifest) {
@@ -705,6 +710,21 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Order of Succession: the best of the creatures we gain control of.
     if (pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "successionControl"))
       return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
+    // Guard Dogs: a permanent of ours that shares a color with the creature targeted, so the shield is made.
+    const guard = pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next + 1] : undefined;
+    if (pend.kind === "pickPermanents" && guard?.type === "if" && guard.cond.kind === "sharesColor" && guard.cond.a.ref === "target") {
+      const t = s.resolving!.item.targets?.[guard.cond.a.index];
+      const colors = t?.kind === "object" && s.objects[t.id] ? characteristics(s, obj(s, t.id)).colors : [];
+      const fits = pend.options.find((id) => characteristics(s, obj(s, id)).colors.some((c) => colors.includes(c)));
+      return [{ type: "pickPermanents", player: pid, ids: [fits ?? pend.options[0]!] }];
+    }
+    // Clarion Ultimatum: the permanents with the most permanent cards of their name left in our library.
+    const clarion = pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next + 1] : undefined;
+    if (pend.kind === "pickPermanents" && clarion?.type === "search" && clarion.sameName && "chosenThisWay" in clarion.sameName) {
+      const lib = player(s, pid).library.map((id) => defOf(s, obj(s, id))).filter((d) => isPermanentCard(d));
+      const copies = (id: ObjectId) => (obj(s, id).faceDown ? 0 : lib.filter((d) => sameName(d.name, characteristics(s, obj(s, id)).name)).length);
+      return [{ type: "pickPermanents", player: pid, ids: [...pend.options].sort((a, b) => copies(b) - copies(a)).slice(0, pend.count) }];
+    }
     if (pend.kind === "pickPermanents" && pend.secret) {
       const sorted = [...pend.options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)));
       return [{ type: "pickPermanents", player: pid, ids: [pend.secret === "theirs" ? sorted[sorted.length - 1]! : sorted[0]!] }];

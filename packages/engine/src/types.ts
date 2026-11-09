@@ -2910,6 +2910,8 @@ export interface Resolving {
     nextTarget?: number;
     soulDamage?: { index: number; n: number };
     discardOrSac?: { queue: PlayerId[]; keep: string[]; before: ObjectId[]; pick?: number };
+    /** Effect "eachChoosesFromHand" (Stronghold Gambit): the players still to choose, in turn order, and each one's card. */
+    gambit?: { queue: PlayerId[]; picks: Partial<Record<PlayerId, ObjectId>> };
     faceUpPile?: number;
     /** Effect "permanentPiles": each separated player's permanents, and the pile chosen for each (Make an Example). */
     pileOf?: Record<number, ObjectId[]>;

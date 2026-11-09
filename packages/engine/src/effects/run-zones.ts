@@ -489,6 +489,8 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
     for (const { id, pid } of moves) log(s, `${player(s, pid).name} exiles ${defOf(s, obj(s, id)).name} from their graveyard.`);
     for (const { id } of moves) moveObject(s, id, "exile");
     s.resolving!.yardChosen = moves.map((m) => m.id).filter((id) => obj(s, id).zone === "exile");
+    // Summon: Esper Valigarmanda, King Narfi's Betrayal: "exiled with ~" for its later chapters (CR 607.2a).
+    if (e.linked && ctx.sourceId) for (const id of s.resolving!.yardChosen) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: obj(s, id).zoneChanges ?? 0 });
     return;
   }
   const under = (pid: PlayerId) => (e.youChoose || e.underYours ? ctx.controller : pid);
@@ -1683,7 +1685,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const mv = maxMv === undefined && st.exactMv === undefined ? undefined : { ...(maxMv !== undefined ? { max: maxMv } : {}), ...(st.exactMv !== undefined ? { exact: st.exactMv } : {}) };
       // Invoke Calamity: the spell's types as it's cast, not the card's (rulings).
       // Jacob Frye: "You may cast the copy", paying its costs (rulings).
-      const freeCast = (id: ObjectId) => ({ kind: "castFree" as const, player: you.id, objectId: id, source: src, ...(mv ? { mv } : {}), ...((e.handAndYard || e.asSpell) && e.filter?.types?.length ? { types: e.filter.types } : {}), ...(e.handAndYard && e.filter?.supertypes?.length ? { supertypes: e.filter.supertypes } : {}), ...(e.asSpell && e.filter && !e.filter.types?.length ? { spellFilter: e.filter } : {}), ...(e.paid ? { how: "paid" as const } : {}) });
+      const freeCast = (id: ObjectId) => ({ kind: "castFree" as const, player: you.id, objectId: id, source: src, ...(mv ? { mv } : {}), ...((e.handAndYard || e.asSpell) && e.filter?.types?.length ? { types: e.filter.types } : {}), ...(e.handAndYard && e.filter?.supertypes?.length ? { supertypes: e.filter.supertypes } : {}), ...(e.asSpell && e.filter && !e.filter.types?.length ? { spellFilter: e.filter } : {}), ...(e.paid ? { how: "paid" as const } : {}), ...(e.anyType ? { anyType: true as const } : {}) });
       if (st.handPick) return finish();
       // Plargg and Nassari: an opponent chosen by you picks one of the nonland cards; the others may be cast (rulings).
       if (e.opponentExcludes && !st.excluded) {
@@ -2095,6 +2097,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "mayPlayLinked": {
       // Muse Vessel: one of the cards exiled with this object (as it is or last was, CR 400.7, 607.2a), chosen as this
       // resolves (CR 608.2d); its controller may play that one this turn, paying for it as usual.
+      // King Narfi's Betrayal: every card still exiled with it, spells only, this turn, with mana of any type (CR 609.4b);
+      // each with its usual timing (rulings), not again once it's a new object (CR 400.7).
+      if (e.all) {
+        const ids = linkedCards(s, ctx.sourceId, ctx.sourceZc).map((l) => l.id).filter((id) => s.objects[id]?.zone === "exile");
+        for (const id of ids) {
+          const o = obj(s, id);
+          o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}) };
+        }
+        return void log(s, ids.length ? `Until end of turn, ${player(s, ctx.controller).name} may cast ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}${e.anyType ? ", spending mana as though it were mana of any color" : ""}.` : `There's no card exiled with ${src}.`);
+      }
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.impulseChoice) {
         const ids = linkedCards(s, ctx.sourceId, ctx.sourceZc).map((l) => l.id);

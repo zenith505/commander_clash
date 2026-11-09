@@ -20157,6 +20157,26 @@ function round317Sentence(s: string, sentences: string[], si: number, ctx: Ctx, 
   // Triple Triad: "... Until end of turn, you may play the card you own exiled this way and each other card exiled this way
   // with lesser mana value than it without paying their mana costs.": yours, and the others with lesser mana value than
   // yours (X as 0), played with their usual timing (rulings), a land with a land play (CR 305.1).
+  // Summon: Esper Valigarmanda: "Exile an instant or sorcery card from each graveyard." King Narfi's Betrayal: "Then you may
+  // exile a creature or planeswalker card from each graveyard.": not targeted, you choose one in each graveyard as it
+  // resolves (rulings), a card just milled or one already there; they're "exiled with ~" (CR 607.2a).
+  const eachYard = /^(?:Then )?([Yy]ou may )?[Ee]xile an? (instant or sorcery|creature or planeswalker) card from each graveyard$/.exec(s);
+  if (eachYard && !ctx.spell) {
+    const filter = parseSearchFilter(`${eachYard[2]!} card`);
+    if (!filter) return "fail";
+    return { effect: { type: "chooseFromGraveyard", who: { ref: "eachPlayer" }, youChoose: true, dest: "exile", n: 1, filter, linked: true, ...(eachYard[1] ? { upTo: true as const } : {}) }, next: si + 1 };
+  }
+  // Summon: Esper Valigarmanda: "You may cast an instant or sorcery card exiled with ~, and mana of any type can be spent to
+  // cast that spell.": as this resolves (rulings), paying its costs (CR 608.2g), with mana of any type (CR 609.4b).
+  const castLinked = /^You may cast an? (instant or sorcery) card exiled with ~, and mana of any type can be spent to cast that spell$/.exec(s);
+  if (castLinked && !ctx.spell) {
+    const filter = parseSearchFilter(`${castLinked[1]!} card`);
+    if (!filter) return "fail";
+    return { effect: { type: "castFromAmong", who: { ref: "you" }, n: 0, fromLinked: true, max: 1, filter, paid: true, anyType: true }, next: si + 1 };
+  }
+  // King Narfi's Betrayal: "Until end of turn, you may cast spells from among cards exiled with ~, and you may spend mana as
+  // though it were mana of any color to cast those spells.": each with its usual timing (rulings).
+  if (/^Until end of turn, you may cast spells from among cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells$/.test(s) && !ctx.spell) return { effect: { type: "mayPlayLinked", all: true, castOnly: true, anyType: true }, next: si + 1 };
   // Zenos yae Galvus: "choose a creature an opponent controls. Until end of turn, creatures other than ~ and the chosen
   // creature get -2/-2.": not targeted, chosen as it resolves (CR 608.2d), noted on Zenos for its "when the chosen creature
   // leaves the battlefield" (CR 607.2d); the creatures affected are fixed then (CR 611.2c), and they still get -2/-2 with

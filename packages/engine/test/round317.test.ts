@@ -51,6 +51,8 @@ const rocco = (): CardDef => ({"oracleId":"071f5b4b-6a1e-4dc3-9c08-b79713191811"
 const yangchen = (): CardDef => ({"oracleId":"521a63cf-5e83-4649-9800-c62b2fc474d6","name":"The Legend of Yangchen // Avatar Yangchen","manaCost":"{3}{W}{W}","cmc":5,"typeLine":"Enchantment — Saga // Legendary Creature — Avatar","supertypes":[],"types":["Enchantment"],"subtypes":["Saga"],"oracleText":"(As this Saga enters and after your draw step, add a lore counter.)\nI — Starting with you, each player chooses up to one permanent with mana value 3 or greater from among permanents your opponents control. Exile those permanents.\nII — You may have target opponent draw three cards. If you do, draw three cards.\nIII — Exile this Saga, then return it to the battlefield transformed under your control.","colors":["W"],"colorIdentity":["W"],"keywords":["Flying","Airbend","Transform"],"imageUrl":"https://cards.scryfall.io/normal/front/a/6/a60e8f23-90b2-4bc6-bd54-a95055556389.jpg?1783905002","artUrl":"https://cards.scryfall.io/art_crop/front/a/6/a60e8f23-90b2-4bc6-bd54-a95055556389.jpg?1783905002","commanderLegal":"legal","set":"tla","releasedAt":"2025-11-21","rarity":"mythic","layout":"transform","gameChanger":false,"faces":[{"name":"The Legend of Yangchen","manaCost":"{3}{W}{W}","typeLine":"Enchantment — Saga","supertypes":[],"types":["Enchantment"],"subtypes":["Saga"],"oracleText":"(As this Saga enters and after your draw step, add a lore counter.)\nI — Starting with you, each player chooses up to one permanent with mana value 3 or greater from among permanents your opponents control. Exile those permanents.\nII — You may have target opponent draw three cards. If you do, draw three cards.\nIII — Exile this Saga, then return it to the battlefield transformed under your control.","colors":["W"],"imageUrl":"https://cards.scryfall.io/normal/front/a/6/a60e8f23-90b2-4bc6-bd54-a95055556389.jpg?1783905002","artUrl":"https://cards.scryfall.io/art_crop/front/a/6/a60e8f23-90b2-4bc6-bd54-a95055556389.jpg?1783905002"},{"name":"Avatar Yangchen","manaCost":"","typeLine":"Legendary Creature — Avatar","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Avatar"],"oracleText":"Flying\nWhenever you cast your second spell each turn, airbend up to one other target nonland permanent. (Exile it. While it's exiled, its owner may cast it for {2} rather than its mana cost.)","power":"4","toughness":"5","colors":[],"imageUrl":"https://cards.scryfall.io/normal/back/a/6/a60e8f23-90b2-4bc6-bd54-a95055556389.jpg?1783905002","artUrl":"https://cards.scryfall.io/art_crop/back/a/6/a60e8f23-90b2-4bc6-bd54-a95055556389.jpg?1783905002"}]} as CardDef);
 const zenos = (): CardDef => ({"oracleId":"8f52fc65-a914-421a-9426-21eb520d55d5","name":"Zenos yae Galvus // Shinryu, Transcendent Rival","manaCost":"{3}{B}{B}","cmc":5,"typeLine":"Legendary Creature — Human Noble Warrior // Legendary Creature — Dragon","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Noble","Warrior"],"oracleText":"My First Friend — When Zenos yae Galvus enters, choose a creature an opponent controls. Until end of turn, creatures other than Zenos yae Galvus and the chosen creature get -2/-2.\nWhen the chosen creature leaves the battlefield, transform Zenos yae Galvus.","power":"4","toughness":"4","colors":["B"],"colorIdentity":["B"],"keywords":["Flying","Transform","My First Friend","Burning Chains"],"imageUrl":"https://cards.scryfall.io/normal/front/b/6/b65ffce4-bb58-418a-9bad-81533a5f2ba2.jpg?1783906617","artUrl":"https://cards.scryfall.io/art_crop/front/b/6/b65ffce4-bb58-418a-9bad-81533a5f2ba2.jpg?1783906617","commanderLegal":"legal","set":"fin","releasedAt":"2025-06-13","rarity":"rare","layout":"transform","gameChanger":false,"faces":[{"name":"Zenos yae Galvus","manaCost":"{3}{B}{B}","typeLine":"Legendary Creature — Human Noble Warrior","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Noble","Warrior"],"oracleText":"My First Friend — When Zenos yae Galvus enters, choose a creature an opponent controls. Until end of turn, creatures other than Zenos yae Galvus and the chosen creature get -2/-2.\nWhen the chosen creature leaves the battlefield, transform Zenos yae Galvus.","power":"4","toughness":"4","colors":["B"],"imageUrl":"https://cards.scryfall.io/normal/front/b/6/b65ffce4-bb58-418a-9bad-81533a5f2ba2.jpg?1783906617","artUrl":"https://cards.scryfall.io/art_crop/front/b/6/b65ffce4-bb58-418a-9bad-81533a5f2ba2.jpg?1783906617"},{"name":"Shinryu, Transcendent Rival","manaCost":"","typeLine":"Legendary Creature — Dragon","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Dragon"],"oracleText":"Flying\nAs this creature transforms into Shinryu, choose an opponent.\nBurning Chains — When the chosen player loses the game, you win the game.","power":"8","toughness":"8","colors":["B"],"colorIndicator":["B"],"imageUrl":"https://cards.scryfall.io/normal/back/b/6/b65ffce4-bb58-418a-9bad-81533a5f2ba2.jpg?1783906617","artUrl":"https://cards.scryfall.io/art_crop/back/b/6/b65ffce4-bb58-418a-9bad-81533a5f2ba2.jpg?1783906617"}]} as CardDef);
 const ashiok = (): CardDef => ({"oracleId":"ebc9ff52-c914-4c48-9d35-0e4cd07741cb","name":"Ashiok, Nightmare Muse","manaCost":"{3}{U}{B}","cmc":5,"typeLine":"Legendary Planeswalker — Ashiok","supertypes":["Legendary"],"types":["Planeswalker"],"subtypes":["Ashiok"],"oracleText":"+1: Create a 2/3 blue and black Nightmare creature token with \"Whenever this token attacks or blocks, each opponent exiles the top two cards of their library.\"\n−3: Return target nonland permanent to its owner's hand, then that player exiles a card from their hand.\n−7: You may cast up to three spells from among face-up cards your opponents own from exile without paying their mana costs.","loyalty":"5","colors":["B","U"],"colorIdentity":["B","U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/1/1/112eb5ce-4fe5-45b3-b810-79fef74b07f9.jpg?1783931525","artUrl":"https://cards.scryfall.io/art_crop/front/1/1/112eb5ce-4fe5-45b3-b810-79fef74b07f9.jpg?1783931525","commanderLegal":"legal","set":"thb","releasedAt":"2020-01-24","rarity":"mythic","layout":"normal","gameChanger":false} as CardDef);
+const valigarmanda = (): CardDef => ({"oracleId":"cecd2f49-8ccb-472d-9cf1-fd0f4d93546d","name":"Summon: Esper Valigarmanda","manaCost":"{3}{R}","cmc":4,"typeLine":"Enchantment Creature — Saga Drake","supertypes":[],"types":["Enchantment","Creature"],"subtypes":["Saga","Drake"],"oracleText":"(As this Saga enters and after your draw step, add a lore counter. Sacrifice after IV.)\nI — Exile an instant or sorcery card from each graveyard.\nII, III, IV — Add {R} for each lore counter on this Saga. You may cast an instant or sorcery card exiled with this Saga, and mana of any type can be spent to cast that spell.\nFlying, haste","power":"3","toughness":"3","colors":["R"],"colorIdentity":["R"],"keywords":["Flying","Haste"],"producedMana":["R"],"imageUrl":"https://cards.scryfall.io/normal/front/7/f/7f0298b4-c7ca-49b8-baaa-b9fad4c2bfd5.jpg?1783906354","artUrl":"https://cards.scryfall.io/art_crop/front/7/f/7f0298b4-c7ca-49b8-baaa-b9fad4c2bfd5.jpg?1783906354","commanderLegal":"legal","set":"fic","releasedAt":"2025-06-13","rarity":"rare","layout":"saga","gameChanger":false} as CardDef);
+const narfi = (): CardDef => ({"oracleId":"35c416c6-f522-4b4c-93db-75c4e01843d1","name":"King Narfi's Betrayal","manaCost":"{1}{U}{B}","cmc":3,"typeLine":"Enchantment — Saga","supertypes":[],"types":["Enchantment"],"subtypes":["Saga"],"oracleText":"(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Each player mills four cards. Then you may exile a creature or planeswalker card from each graveyard.\nII, III — Until end of turn, you may cast spells from among cards exiled with this Saga, and you may spend mana as though it were mana of any color to cast those spells.","colors":["B","U"],"colorIdentity":["B","U"],"keywords":["Mill"],"imageUrl":"https://cards.scryfall.io/normal/front/c/3/c30ff1fa-6639-492a-b257-934e5818c98f.jpg?1783928194","artUrl":"https://cards.scryfall.io/art_crop/front/c/3/c30ff1fa-6639-492a-b257-934e5818c98f.jpg?1783928194","commanderLegal":"legal","set":"khm","releasedAt":"2021-02-05","rarity":"rare","layout":"saga","gameChanger":false} as CardDef);
 const bolt = (): CardDef => ({"oracleId":"4457ed35-7c10-48c8-9776-456485fdf070","name":"Lightning Bolt","manaCost":"{R}","cmc":1,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Lightning Bolt deals 3 damage to any target.","colors":["R"],"colorIdentity":["R"],"keywords":[],"layout":"normal"} as CardDef);
 const divination = () => card("Divination", "Sorcery", "{2}{U}", { cmc: 3, oracleText: "Draw two cards." });
 const ogre = (name: string, cost: string, cmc: number) => card(name, "Creature — Ogre", cost, { cmc, power: "3", toughness: "3" });
@@ -59,7 +61,7 @@ const testForest = card("Forest", "Basic Land — Forest", "", { supertypes: ["B
 const testWastes = card("Test Wastes", "Land", "");
 
 describe("round 317", () => {
-  it("are fully supported", () => supported(tasha(), triad(), rocco(), yangchen(), zenos(), ashiok()));
+  it("are fully supported", () => supported(tasha(), triad(), rocco(), yangchen(), zenos(), ashiok(), valigarmanda(), narfi()));
 });
 
 describe("round 317: Tasha, the Witch Queen", () => {
@@ -404,5 +406,74 @@ describe("round 317: Ashiok, Nightmare Muse", () => {
     expect(zone(s, r2)).toBe("battlefield");
     expect(s.objects[r1]!.controller).toBe(ap);
     expect(zone(s, own)).toBe("exile");
+  });
+});
+
+describe("round 317: Summon: Esper Valigarmanda", () => {
+  it("I exiles an instant or sorcery card from each graveyard; II and III add {R} per lore counter and cast one of them with mana of any type", () => {
+    const { s: s0, ap, ids } = setup([valigarmanda()]);
+    const o1 = nextOf(s0, ap);
+    const o2 = nextOf(s0, o1);
+    const o3 = nextOf(s0, o2);
+    const b = inZone(s0, o1, bolt(), "graveyard");
+    const d = inZone(s0, o2, divination(), "graveyard");
+    const stays = inZone(s0, o3, ogre("Dead Ogre", "{2}{R}", 3), "graveyard");
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)), ap);
+    expect(zone(s, b)).toBe("exile");
+    expect(zone(s, d)).toBe("exile");
+    expect(zone(s, stays)).toBe("graveyard");
+    // Chapter II on your next turn: {R}{R}, then Lightning Bolt cast for its cost as it resolves.
+    s = passUntil(s, "upkeep", o1);
+    s = passUntil(s, "main1", ap);
+    s = settle(s, ap);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap, what: "castFromAmong" });
+    expect((s.pending as { options: string[] }).options).toEqual(expect.arrayContaining([b, d]));
+    s = act(s, { type: "chooseOption", player: ap, choice: b });
+    expect(s.pending).toMatchObject({ kind: "castFree", player: ap, objectId: b, how: "paid", anyType: true });
+    for (const id of s.battlefield) if (s.objects[id]!.controller === ap && s.cards[s.objects[id]!.cardId]!.types.includes("Land")) s.objects[id]!.tapped = true;
+    const life = s.players[o2]!.life;
+    s = settle(run(s, planCast(s, ap, b, [ply(o2)])), ap);
+    expect(s.players[o2]!.life).toBe(life - 3);
+    expect(s.players[o1]!.graveyard).toContain(b);
+    // Chapter III: {R}{R}{R} pays for Divination's {2}{U} (mana of any type).
+    s = passUntil(s, "upkeep", o1);
+    s = passUntil(s, "main1", ap);
+    s = settle(s, ap);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap, what: "castFromAmong" });
+    s = act(s, { type: "chooseOption", player: ap, choice: d });
+    for (const id of s.battlefield) if (s.objects[id]!.controller === ap && s.cards[s.objects[id]!.cardId]!.types.includes("Land")) s.objects[id]!.tapped = true;
+    const hand = s.players[ap]!.hand.length;
+    s = settle(run(s, planCast(s, ap, d)), ap);
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect(s.players[o2]!.graveyard).toContain(d);
+  });
+});
+
+describe("round 317: King Narfi's Betrayal", () => {
+  it("I mills four each, then you may exile a creature or planeswalker card from each graveyard; II lets you cast them this turn with mana of any color", () => {
+    const { s: s0, ap, ids } = setup([narfi()]);
+    const o1 = nextOf(s0, ap);
+    const o2 = nextOf(s0, o1);
+    const theirs = inZone(s0, o1, ogre("Milled Ogre", "{2}{R}", 3), "library");
+    const skipped = inZone(s0, o2, ogre("Skipped Ogre", "{2}{R}", 3), "library");
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)), ap);
+    expect(zone(s, theirs)).toBe("graveyard");
+    // You choose in each graveyard with one (not targeted, rulings): this one, then none from the next.
+    for (let i = 0; i < 8 && s.pending?.kind === "searchLibrary" && s.pending.player === ap; i++) {
+      const cards = (s.pending as { cards: string[] }).cards;
+      s = settle(act(s, { type: "searchLibrary", player: ap, found: cards.includes(theirs) ? [theirs] : [] }), ap);
+    }
+    expect(zone(s, theirs)).toBe("exile");
+    expect(zone(s, skipped)).toBe("graveyard");
+    // Chapter II: cast it this turn, with mana of any color (blue pays the red).
+    s = passUntil(s, "upkeep", o1);
+    s = passUntil(s, "main1", ap);
+    s = settle(s, ap);
+    expect(s.objects[theirs]!.mayPlay).toMatchObject({ player: ap, until: "thisTurn", castOnly: true, anyType: true });
+    for (const id of s.battlefield) if (s.objects[id]!.controller === ap && s.cards[s.objects[id]!.cardId]!.types.includes("Land")) s.objects[id]!.tapped = true;
+    s.players[ap]!.manaPool.U = 3;
+    s = settle(run(s, planCast(s, ap, theirs)), ap);
+    expect(zone(s, theirs)).toBe("battlefield");
+    expect(s.objects[theirs]!.controller).toBe(ap);
   });
 });

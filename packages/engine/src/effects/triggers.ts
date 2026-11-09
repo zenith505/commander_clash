@@ -2258,6 +2258,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy) || (!ev.copy && t.cast.onlyCopy)) return false;
         const by = t.cast.by;
         if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller) || (by === "chosen" && o.chosen?.player !== ev.controller)) return false;
+        // Nuka-Nuke Launcher: "that player ... whenever they cast a spell": only that player's spells.
+        if (floating?.forPlayer !== undefined && floating.forPlayer !== ev.controller) return false;
         if (t.cast.ownTurn && ev.controller !== s.activePlayer) return false;
         // "Your commander" (Skyfire Phoenix): a commander you own (CR 903.3); a copy isn't one.
         if (t.cast.commander && !(spell && !ev.copy && spell.isCommander && spell.owner === you)) return false;

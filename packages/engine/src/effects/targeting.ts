@@ -1131,7 +1131,7 @@ export function swapKeepsOthersLegal(s: GameState, specs: TargetSpec[], targets:
     const c = next[i];
     if (i === j || !c || c.kind === "none") return true;
     if (x.distinctFrom?.includes(j) && sameTarget(c, t)) return false;
-    const related = [x.sameGraveyardAs, x.inGraveyardOfControllerOf, x.inGraveyardOfTarget === undefined ? undefined : [x.inGraveyardOfTarget], x.controlledByTarget === undefined ? undefined : [x.controlledByTarget], x.controlledByOpponentOfTarget === undefined ? undefined : [x.controlledByOpponentOfTarget], x.differentControllerFrom, x.sameControllerAs, x.differentNameFrom, x.differentManaValueFrom, x.sharesCreatureTypeWith, x.sharesCardTypeWith, x.sharesNoCreatureTypeWith].some((g) => g?.includes(j));
+    const related = [x.sameGraveyardAs, x.inGraveyardOfControllerOf, x.inGraveyardOfTarget === undefined ? undefined : [x.inGraveyardOfTarget], x.controlledByTarget === undefined ? undefined : [x.controlledByTarget], x.attachedToTarget === undefined ? undefined : [x.attachedToTarget], x.controlledByOpponentOfTarget === undefined ? undefined : [x.controlledByOpponentOfTarget], x.differentControllerFrom, x.sameControllerAs, x.differentNameFrom, x.differentManaValueFrom, x.sharesCreatureTypeWith, x.sharesCardTypeWith, x.sharesNoCreatureTypeWith].some((g) => g?.includes(j));
     return !related || relatedOk(s, x, next, c);
   });
 }
@@ -1159,6 +1159,9 @@ export function relatedOk(s: GameState, spec: TargetSpec, chosen: TargetChoice[]
   // Run Away Together).
   const ctl = (x: GameObject) => (x.zone === "battlefield" ? controllerOf(s, x) : (s.lastKnown?.[x.id]?.controller ?? x.owner));
   if (o.zone === "battlefield" && others(spec.differentControllerFrom).some((x) => ctl(x) === controllerOf(s, o))) return false;
+  // Fiery Annihilation: attached to that target, while it's that object (CR 400.7).
+  const host = spec.attachedToTarget === undefined ? undefined : chosen[spec.attachedToTarget];
+  if (host?.kind === "object" && (o.zone !== "battlefield" || o.attachedTo !== host.id || s.objects[host.id]?.zone !== "battlefield")) return false;
   // Simic Guildmage: the same controller as those targets (one that has left: as it last existed).
   if (others(spec.sameControllerAs).some((x) => o.zone !== "battlefield" || ctl(x) !== controllerOf(s, o))) return false;
   if (others(spec.differentNameFrom).some((x) => sameName(defOf(s, x).name, defOf(s, o).name))) return false;

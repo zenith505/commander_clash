@@ -12103,6 +12103,18 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     payLife(s, p.id, lifeTax);
     log(s, `${p.name} pays ${lifeTax} life to attack.`);
   }
+  // Firkraag, Cunning Instigator: the attackers a requirement applied to as they were declared (CR 508.1d), before anything
+  // changes: their own ("attacks each combat if able", goad, encore's or a taunt's player, Gideon's planeswalker), and War's
+  // Toll's, Viashino Bey's and Ekundu Cyclops's, which apply to them once a creature attacks; not one on their controller
+  // (Trove of Temptation, rulings).
+  const tollNow = attacks.length ? attackAllIfOne(s, p.id) : undefined;
+  const beyNow = attacks.some((a) => abilitiesOf(s, obj(s, a.attacker)).allAttackIfSelfAttacks);
+  const hadTo = attacks.filter((a) => {
+    const o = obj(s, a.attacker);
+    return tollNow || beyNow || characteristics(s, o).attacksIfAble || mustAttackPlayers(s, o).length > 0 || walkersToAttack(s, o).length > 0 || (abilitiesOf(s, o).attacksIfOneAttacks && attacks.some((x) => x.attacker !== o.id));
+  });
+  if (hadTo.length) s.hadToAttack = { turn: s.turn, combat: s.combatsThisTurn ?? 0, keys: hadTo.map((a) => `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`) };
+  else delete s.hadToAttack;
   // The attackers become tapped at the same time (CR 508.1f): "one or more ... become tapped" triggers once.
   batchTaps(s, () => {
     // Johan: while it's untapped, attacking doesn't cause the creatures its controller controls to tap this combat.

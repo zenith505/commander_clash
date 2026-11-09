@@ -397,3 +397,9 @@ export function emblemAbilityOk(text: string): boolean {
   if (!statics.every((st) => damageMod(st) || (st.affects.kind === "filter" && !st.affects.other && !st.condition && st.affects.controller !== "enchanted"))) return false;
   return (costMods ?? []).every((m) => !m.if && m.who !== "enchanted");
 }
+
+/** A named token's whole ability text compiles fully when it's that token's own (CR 111.4: its name is its name, so "Sacrifice Rock" in an ability it gives means it, CR 201.5a). */
+export function compileNamedToken(name: string, text: string, types: string[], subtypes: string[]): boolean {
+  const c = compile({ name, oracleText: text, types, subtypes, supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", oracleId: "" } as unknown as CardDef);
+  return c.unsupported.length === 0;
+}

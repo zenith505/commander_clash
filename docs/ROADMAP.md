@@ -1,6 +1,6 @@
 # Roadmap
 
-30,660 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,679 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,743 of
 9,979 (97%).
 
@@ -7083,6 +7083,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   five; the bot declines when the caster's library is nearly out; a browser test where Ana casts it at you). Wakanda
   Forever! (a permanent card onto the battlefield with an indestructible counter, then one into the hand, from the six
   revealed, the rest to the graveyard). Kayla's Reconstruction ("up to X" cards onto the battlefield). +10 (30,670 of 31,936 with B154 and round 315).
+- Round B156 (least played first, every remaining card already examined, so mechanics that could be built): Price of
+  Betrayal ("Remove up to five counters from target artifact, creature, planeswalker, or opponent": one target, any kinds
+  and several of one kind, chosen one at a time as it resolves, a player's poison, energy, experience and rad counters
+  too, rulings, CR 122.1; a browser test). Etched Slith ("When you do, you may remove a counter from another target
+  permanent or opponent": once for each +1/+1 counter put on it, so twice with Doubling Season, rulings, CR 603.12a).
+  Wicked Slumber ("Put a stun counter on either of them. Then put a stun counter on either of them.": each picked anew
+  among the targets still legal, both on one if one is left, rulings; a browser test). Highcliff Felidar (for each
+  opponent you choose one of their creatures tied for the greatest power, not targeted, all destroyed at once).
+  Two-Headed Giant (two coins no one calls, CR 705.2: both heads double strike, both tails menace). Chandra, the
+  Firebrand ("6 damage to each of up to six targets", rulings). Soul-Shackled Zombie ("If at least one creature card was
+  exiled this way", as Kaya, Orzhov Usurper's). Death or Glory (you separate your graveyard's creature cards where they
+  are, CR 700.3c; an opponent chosen as it resolves picks the pile exiled and the other returns at once; a browser test).
+  Mercurial Transformation (a 1/1 Frog or a 4/4 Octopus, blue, chosen as it resolves, rulings; its card types replaced,
+  CR 205.1a; a browser test). +9 (30,679 of 31,936 with B155).
+- Out after round B156 (looked at, not done): Light of Judgment ("Destroy up to one Equipment attached to that
+  creature", chosen as it resolves, rulings): Lane A's round 316 adds TargetSpec attachedToTarget for Fiery
+  Annihilation, so it's best done once that has merged, with a pick limited to the Equipment attached to the target.
 - Out after round B155 (looked at, not done): Reality Twist and Pulse of Llanowar (after the replacement, a land with
   two basic land types lets its controller choose the mana, rulings: the choice isn't modelled for mana replacements),
   Yixlid Jailer (cards in graveyards losing all abilities would have to reach every graveyard-zone ability check).

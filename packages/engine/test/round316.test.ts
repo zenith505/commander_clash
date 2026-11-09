@@ -55,6 +55,7 @@ const lotus = (): CardDef => ({"oracleId":"307be184-176a-40a8-944c-48aa00cfdd29"
 const annihilation = (): CardDef => ({"oracleId":"d44f3724-17b7-48f0-885d-75292669f971","name":"Fiery Annihilation","manaCost":"{2}{R}","cmc":3,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Fiery Annihilation deals 5 damage to target creature. Exile up to one target Equipment attached to that creature. If that creature would die this turn, exile it instead.","colors":["R"],"colorIdentity":["R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/5/4/54fe00aa-d284-48f9-b5a2-1bd4c5fa8e58.jpg?1783909102","artUrl":"https://cards.scryfall.io/art_crop/front/5/4/54fe00aa-d284-48f9-b5a2-1bd4c5fa8e58.jpg?1783909102","commanderLegal":"legal","set":"fdn","releasedAt":"2024-11-15","rarity":"uncommon","layout":"normal","gameChanger":false} as CardDef);
 const farmer = (): CardDef => ({"oracleId":"42820e09-f817-4485-a96a-ac2b0b798269","name":"Stoic Farmer","manaCost":"{3}{W}","cmc":4,"typeLine":"Creature — Dwarf Peasant","supertypes":[],"types":["Creature"],"subtypes":["Dwarf","Peasant"],"oracleText":"When this creature enters, search your library for a basic Plains card and reveal it. If an opponent controls more lands than you, put it onto the battlefield tapped. Otherwise, put it into your hand. Then shuffle.\nForetell {1}{W} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)","power":"3","toughness":"3","colors":["W"],"colorIdentity":["W"],"keywords":["Foretell"],"imageUrl":"https://cards.scryfall.io/normal/front/f/5/f53f39e9-f07e-444f-8420-4545e56253e5.jpg?1783928340","artUrl":"https://cards.scryfall.io/art_crop/front/f/5/f53f39e9-f07e-444f-8420-4545e56253e5.jpg?1783928340","commanderLegal":"legal","set":"khc","releasedAt":"2021-02-05","rarity":"rare","layout":"normal","gameChanger":false} as CardDef);
 const feast = (): CardDef => ({"oracleId":"31cae00a-3a74-4a59-80b0-a656f524e878","name":"Heroic Feast","manaCost":"{2}{G}","cmc":3,"typeLine":"Enchantment","supertypes":[],"types":["Enchantment"],"subtypes":[],"oracleText":"When this enchantment enters, create a Food token. (It's an artifact with \"{2}, {T}, Sacrifice this token: You gain 3 life.\")\nWhenever you gain life, choose up to that many target creatures you control. Put a +1/+1 counter on each of them.","colors":["G"],"colorIdentity":["G"],"keywords":["Food"],"imageUrl":"https://cards.scryfall.io/normal/front/3/2/32d05c3d-cf03-492e-a956-2e77c36e36c4.jpg?1783902917","artUrl":"https://cards.scryfall.io/art_crop/front/3/2/32d05c3d-cf03-492e-a956-2e77c36e36c4.jpg?1783902917","commanderLegal":"legal","set":"msh","releasedAt":"2026-06-26","rarity":"rare","layout":"normal","gameChanger":false} as CardDef);
+const boreas = (): CardDef => ({"oracleId":"f6dae324-cc79-4093-8cce-667015c1de6d","name":"Boreas Charger","manaCost":"{2}{W}","cmc":3,"typeLine":"Creature — Pegasus","supertypes":[],"types":["Creature"],"subtypes":["Pegasus"],"oracleText":"Flying\nWhen this creature leaves the battlefield, choose an opponent who controls more lands than you. Search your library for a number of Plains cards equal to the difference, reveal those cards, put one of them onto the battlefield tapped and the rest into your hand, then shuffle.","power":"2","toughness":"1","colors":["W"],"colorIdentity":["W"],"keywords":["Flying"],"imageUrl":"https://cards.scryfall.io/normal/front/5/c/5cd3b85b-7d8d-402e-829a-6080fd4eb7a1.jpg?1783934345","artUrl":"https://cards.scryfall.io/art_crop/front/5/c/5cd3b85b-7d8d-402e-829a-6080fd4eb7a1.jpg?1783934345","commanderLegal":"legal","set":"c18","releasedAt":"2018-08-10","rarity":"rare","layout":"normal","gameChanger":false} as CardDef);
 const bolt = (): CardDef => ({"oracleId":"4457ed35-7c10-48c8-9776-456485fdf070","name":"Lightning Bolt","manaCost":"{R}","cmc":1,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Lightning Bolt deals 3 damage to any target.","colors":["R"],"colorIdentity":["R"],"keywords":[],"layout":"normal"} as CardDef);
 const thing = (name: string) => card(name, "Artifact", "{1}");
 const gear = (name: string) => card(name, "Artifact — Equipment", "{1}", { oracleText: "Equipped creature gets +1/+1.\nEquip {1}" });
@@ -62,7 +63,7 @@ const testPlains = card("Plains", "Basic Land — Plains", "", { supertypes: ["B
 const testForest = card("Forest", "Basic Land — Forest", "", { supertypes: ["Basic"] });
 
 describe("round 316", () => {
-  it("are fully supported", () => supported(toggo(), quintorius(), firkraag(), lotus(), annihilation(), farmer(), feast()));
+  it("are fully supported", () => supported(toggo(), quintorius(), firkraag(), lotus(), annihilation(), farmer(), feast(), boreas()));
 });
 
 describe("round 316: Toggo, Goblin Weaponsmith", () => {
@@ -312,5 +313,45 @@ describe("round 316: Heroic Feast", () => {
     expect(() => act(s, { type: "chooseTargets", player: ap, targets: bears.map(tgt) })).toThrow();
     s = settle(act(s, { type: "chooseTargets", player: ap, targets: [] }), ap);
     expect(bears.map((b) => s.objects[b]!.counters["+1/+1"] ?? 0)).toEqual([0, 0]);
+  });
+});
+
+describe("round 316: Boreas Charger", () => {
+  const doom = card("Test Doom", "Instant", "{B}", { oracleText: "Destroy target creature." });
+  const leave = (oppLands: number[]) => {
+    const { s: s0, ap, ids } = setup([doom]);
+    const c = putOnBattlefield(s0, ap, boreas());
+    const plains = [0, 1, 2, 3].map(() => inZone(s0, ap, testPlains, "library"));
+    let o = nextOf(s0, ap);
+    for (const n of oppLands) {
+      for (let i = 0; i < n; i++) putOnBattlefield(s0, o, card(`Land ${o}-${i}`, "Land"));
+      o = nextOf(s0, o);
+    }
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(c)])), ap);
+    return { s, ap, plains };
+  };
+  it("you choose among the opponents with more lands; a Plains for each land of difference, one onto the battlefield tapped", () => {
+    // You control fourteen lands; one opponent sixteen, another seventeen.
+    let { s, ap, plains } = leave([16, 17]);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap, what: "opponent" });
+    const options = (s.pending as { options: string[] }).options;
+    expect(options.length).toBe(2);
+    const most = nextOf(s, nextOf(s, ap));
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: String(most) }), ap);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, max: 3 });
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: plains.slice(0, 3) }), ap);
+    expect(zone(s, plains[0]!)).toBe("battlefield");
+    expect(s.objects[plains[0]!]!.tapped).toBe(true);
+    expect(zone(s, plains[1]!)).toBe("hand");
+    expect(zone(s, plains[2]!)).toBe("hand");
+    expect(zone(s, plains[3]!)).toBe("library");
+  });
+  it("with no opponent that controls more lands, nothing is found (rulings)", () => {
+    const { s: s1, ap, plains } = leave([14, 3]);
+    // The library is still searched (and shuffled), for no cards.
+    expect(s1.pending).toMatchObject({ kind: "searchLibrary", player: ap, max: 0 });
+    expect(() => act(s1, { type: "searchLibrary", player: ap, found: [plains[0]!] })).toThrow();
+    const s = settle(act(s1, { type: "searchLibrary", player: ap, found: [] }), ap);
+    expect(plains.every((p) => zone(s, p) === "library")).toBe(true);
   });
 });

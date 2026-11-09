@@ -1029,6 +1029,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const fewest = [...opps].sort((a, b) => player(s, Number(a)).graveyard.length - player(s, Number(b)).graveyard.length)[0]!;
         return [{ type: "chooseOption", player: pid, choice: fewest }];
       }
+      // Boreas Charger: "an opponent who controls more lands than you. Search ... for a number of Plains cards equal to the
+      // difference": the one with the most lands.
+      const cur = r && pend.what === "opponent" ? r.body.effects[r.next] : undefined;
+      if (cur?.type === "choose" && cur.moreLandsThanYou && opps.length) {
+        const lands = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Land")).length;
+        return [{ type: "chooseOption", player: pid, choice: [...opps].sort((a, b) => lands(Number(b)) - lands(Number(a)))[0]! }];
+      }
       // Loxodon Peacekeeper: "that player gains control of ~": ourselves if we're among those tied, else the opponent with
       // the least power on the battlefield.
       if (next?.type === "continuous" && next.giveTo?.ref === "chosenPlayer" && next.what.ref === "self") {

@@ -20107,6 +20107,19 @@ function round316Sentence(s: string, sentences: string[], si: number, ctx: Ctx, 
     if (fx?.length !== 1 || fx[0]!.type !== "search" || fx[0]!.dest.zone !== "hand" || !fx[0]!.reveal || fx[0]!.condDest || !cond) return "fail";
     return { effect: { ...fx[0]!, condDest: { cond, dest: { zone: "battlefield", ...(farmerIf[2] ? { tapped: true as const } : {}) } } }, next: si + 4 };
   }
+  // Boreas Charger: "choose an opponent who controls more lands than you. Search your library for a number of Plains cards
+  // equal to the difference, reveal those cards, put one of them onto the battlefield tapped and the rest into your hand,
+  // then shuffle.": chosen as it resolves, then the lands counted again; with no such opponent, the library is still
+  // searched and shuffled, for nothing (rulings). Fewer may be found (rulings, CR 701.23b).
+  const boreas = /^[Cc]hoose an opponent who controls more lands than you$/.test(s) ? /^Search your library for a number of ([A-Z][a-z]+) cards equal to the difference, reveal those cards, put one of them onto the battlefield tapped and the rest into your hand, then shuffle\.?$/.exec(sentences[si + 1] ?? "") : null;
+  if (boreas && si + 2 === sentences.length) {
+    const filter = parseSearchFilter(`${boreas[1]!} card`);
+    const theirs = parseCount("the number of lands that player controls", { ...ctx, chosenOpponent: true });
+    const yours = parseCount("the number of lands you control", ctx);
+    if (!filter || !theirs || !yours || typeof theirs === "number" || typeof yours === "number" || Object.keys(theirs).length !== 1 || Object.keys(yours).length !== 1 || !JSON.stringify(theirs).includes('"chosenPlayer"')) return "fail";
+    effects.push({ type: "choose", choice: "opponent", moreLandsThanYou: true });
+    return { effect: { type: "search", filter, n: { count: { kind: "difference", of: [theirs.count, yours.count] } }, upTo: false, reveal: true, dest: { zone: "battlefield", tapped: true }, others: { zone: "hand" }, firstN: 1 }, next: si + 2 };
+  }
   const creatureAt = ctx.lastObjectTarget;
   if (/^Exile up to one target Equipment attached to that creature$/.test(s) && creatureAt !== undefined && /^If that creature would die this turn, exile it instead\.?$/.test(sentences[si + 1] ?? "") && si + 2 === sentences.length) {
     const host = ctx.targets[creatureAt];

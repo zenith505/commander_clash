@@ -61,7 +61,8 @@ export function phaseOut(s: GameState, ids: ObjectId[]) {
  */
 export function phaseIn(s: GameState, ids: ObjectId[]) {
   const list = (s.phasedOut ??= []);
-  const all = [...new Set(ids)].filter((id) => s.objects[id]?.zone === "phasedOut");
+  // "They can't phase in" (Teferi, Timeless Voyager) until that lock ends, whatever would phase them in.
+  const all = [...new Set(ids)].filter((id) => s.objects[id]?.zone === "phasedOut" && !s.objects[id]!.phased?.lock);
   for (let i = 0; i < all.length; i++)
     for (const id of list) if (s.objects[id]!.phased?.indirect && s.objects[id]!.attachedTo === all[i] && !all.includes(id)) all.push(id);
   if (!all.length) return;
@@ -93,7 +94,7 @@ export function untapStepPhasing(s: GameState, ap: PlayerId) {
   const out = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === ap && objHasKeyword(s, obj(s, id), "Phasing"));
   const back = (s.phasedOut ?? []).filter((id) => {
     const p = s.objects[id]!.phased;
-    return p && !p.indirect && !p.until && (p.by === ap || p.released);
+    return p && !p.indirect && !p.until && !p.lock && (p.by === ap || p.released);
   });
   phaseOut(s, out);
   phaseIn(s, back);

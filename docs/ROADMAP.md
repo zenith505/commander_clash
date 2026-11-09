@@ -1,6 +1,6 @@
 # Roadmap
 
-30,634 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,642 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,739 of
 9,979 (97%).
 
@@ -2378,7 +2378,7 @@ line blocks.
    card counting twice); "exile an instant or sorcery card at random from your graveyard. You may cast it this turn. If a
    spell cast this way would be put into your graveyard, exile it instead" (Radiant Scrollwielder: cast paying its costs,
    rulings); "Until end of combat on your next turn, you may play that card" (Brazen Cannonade: over as that end of combat
-   step ends, CR 511.3, or as that turn ends if it has no combat). +8, 30,634 of 31,936 with rounds 312 and 313.
+   step ends, CR 511.3, or as that turn ends if it has no combat). +8, 30,642 of 31,936 with rounds 312, 313 and B153.
    Out after round 314 (looked at, not done): Crashing Wave and Foggy Swamp Visions (their "waterbend {X}" now reads, but
    "distribute three stun counters among any number of tapped creatures your opponents control" and "for each creature
    card exiled this way, create a token that's a copy of it" don't yet); Professor Hojo, Disorienting Choice, Hot Pursuit,
@@ -4942,9 +4942,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B35: Aegis Sculptor and Skywarp Skaab (done in Lane A's round 204, left to it), Carrion Rats ("any
   player may exile a card from their graveyard. If a player does"), Flameskull (rejuvenation: "play one of those
   cards" until the end of your next turn), Mindreaver (done in round B126) (a counter by name among the cards it exiled), Lethal Exploit
-  and Flame Discharge ("modified creature you controlled as you cast ~"), Ardent Dustspeaker (an instant or sorcery
+  and Flame Discharge ("modified creature you controlled as you cast ~"), Ardent Dustspeaker (done in round B153) (an instant or sorcery
   card to the bottom as a may-cost), Break Out (a revealed card's mana value deciding a second may), Turf War
-  (contested counters), Capricious Efreet (destroy one of three targets at random), Touch of Moonglove (a creature
+  (contested counters), Capricious Efreet (done in round B153) (destroy one of three targets at random), Touch of Moonglove (a creature
   dealt damage by that creature dying this turn), Thelon's Curse (done in round B145) (each player's upkeep may-pay per tapped blue
   creature), Pick Up the Pace ("a creature you control that entered this turn attacks" and play "as long as you
   attacked this turn").
@@ -4968,7 +4968,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B36: North Star (spend mana as though any type for one spell), Silhouette (prevent damage only
   from sources whose spell or ability targets it), Suffocation (damage history of red spells), Oracle of Dust (a card an
   opponent owns from exile as a cost), Haphazard Bombardment (aim counters), Bladecoil Serpent (done in round B128) ("for each {U}{U}
-  spent"), Wall of Shadows ("spells that can target only Walls"), Fickle Efreet (a delayed flip at end of combat, then
+  spent"), Wall of Shadows ("spells that can target only Walls"), Fickle Efreet (done in round B153) (a delayed flip at end of combat, then
   an opponent gains control), Tam, Mindful First-Year (hexproof from each of its colors; its "becomes all colors"
   line now parses), Dragon's Disciple (reveal a Dragon as it enters), Lamplight Phoenix (collect evidence as a dies
   may), Enslaved Horror (each other player may return a creature), Outlaw Stitcher (counters per spell other than the
@@ -5054,7 +5054,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B40: Erosion, Insubordination and Aggression (the enchanted creature is locked in as the upkeep
   trigger triggers, rulings), Bramble Elemental (no "becomes attached" event), Hipparion (a cost to block), Agonizing
   Memories ("in any order"), Noggin Whack and Pulse of the Dross (the target player chooses which cards to reveal),
-  Fickle Efreet ("an opponent gains control of ~" after a lost coin flip), The Abyss (done in round B110) (the active player chooses the
+  Fickle Efreet (done in round B153) ("an opponent gains control of ~" after a lost coin flip), The Abyss (done in round B110) (the active player chooses the
   target), Retribution, Barrin's Spite, Vicious Betrayal, Sacred Guide, Scrounge.
 - Round B41 (harder skipped cards, least played first): "Whenever you activate an exhaust ability" (Afterburner
   Expert, Adrenaline Jockey, Rangers' Aetherhive, Rangers' Refueler), "Exhaust abilities you activate cost {1} less"
@@ -5072,7 +5072,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   of permanents"), "If a card is put into exile this way" (Corpse Appraiser). +30 (27,742 of 31,936 with round 209 and B40).
 - Out after round B41: Nimble Hobbit (done in round B130) ("sacrifice a Food or pay {2}{W}": an either cost with a mana payment), Cadaverous
   Bloom and Rasputin (mana abilities with non-tap costs), Bullseye, Lava Burst (done in round B121), Sivvi's Valor, Treacherous Link,
-  Kitesail Skirmisher, Bill Ferny (done in round 272), Rayami, Hankyu, Boros Battleshaper, Aura Graft (each needs a new mechanic).
+  Kitesail Skirmisher, Bill Ferny (done in round 272), Rayami, Hankyu, Boros Battleshaper (done in round B153), Aura Graft (done in round B153) (each needs a new mechanic).
 - Round B42 (harder skipped cards, least played first): the Dragons of Tarkir "you may reveal a Dragon card from your
   hand ... If you revealed a Dragon card or controlled a Dragon as you cast this spell" cycle (Draconic Roar,
   Dragonlord's Prerogative, Foul-Tongue Invocation, Orator of Ojutai, Silumgar's Scorn, Scaleguard Sentinels; control
@@ -7014,6 +7014,21 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cards exiled from the top ten; the target opponent may put one onto the battlefield, then you put the rest).
   Death-Mask Duplicant (the keywords, landwalk and protection of the creature cards exiled with it, CR 607.2a). +8
   (30,611 of 31,936 with round 311).
+- Round B153 (least played first, every remaining card already examined, so mechanics that could be built): Teferi,
+  Timeless Voyager ("Each creature target opponent controls phases out. Until the end of your next turn, they can't phase
+  in": they skip their controller's untap steps until that turn has ended, then phase in at the next one, rulings, CR
+  702.26a; nothing else phases them in meanwhile). Capricious Efreet (one target you control and up to two you don't; as it
+  resolves one of those still legal is chosen at random and destroyed, rulings, CR 608.2b; bots risk their cheapest
+  permanent). Fickle Efreet ("flip a coin at end of combat. If you lose the flip, an opponent gains control of ~": a
+  delayed trigger, CR 603.7, the opponent chosen as it resolves). Dancing Sword (a "[creature type] artifact creature"
+  keeps its other subtypes, CR 205.1b, so "it isn't an Equipment" takes the subtype away in the same effect). Boros
+  Battleshaper ("up to one target creature attacks or blocks this combat if able and up to one target creature can't
+  attack or block this combat": CR 500.5a; the same creature may be both targets, CR 115.3, and then it can't, CR
+  508.1d). Ardent Dustspeaker ("you may put an instant or sorcery card from your graveyard on the bottom of your library.
+  If you do, ...": only with one there). Aura Graft (gain control of the Aura, then attach it to another permanent it can
+  enchant, chosen as it resolves, CR 303.4d; with none it stays, rulings). Split the Spoils (you separate the exiled cards
+  into two piles, an opponent chosen as it resolves picks the pile for your hand, CR 700.3, rulings). +8 (30,634 of 31,936
+  with B152 and rounds 311-313).
 - Out after round B152 (looked at, not done): Peace Talks ("can't be the targets of spells or activated abilities":
   a triggered source isn't told apart from an activated one when targets are checked).
 - Out after round B151 (looked at, not done): Thelon's Chant and Tourach's Chant (the player who put a land onto the
@@ -7217,7 +7232,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Delif's Cone (a delayed "attacks and isn't blocked" with no combat damage), Winter's Chill (pay {1} or {2} per creature),
   Rhystic Cave (a mana ability with "unless any player pays {1}"), Booby Trap (revealed draws), Sasaya (flip by revealing
   seven lands).
-- Out after round B98 (looked at, not done): Teferi, Timeless Voyager ("Until the end of your next turn, they can't phase
+- Out after round B98 (looked at, not done): Teferi, Timeless Voyager (done in round B153) ("Until the end of your next turn, they can't phase
   in"), Time Reaper (targeting a face-up card in exile), Strax, Sontaran Nurse (a player chosen at random, then a reflexive
   fight), Sevinne, the Chronoclasm (copy the first instant or sorcery cast from a graveyard each turn), Soulcipher Board
   (omen counters off for each creature card put into your graveyard), Biolume Egg ("When you sacrifice ~, return it ...
@@ -7228,7 +7243,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B97 (looked at, not done): Wall of Caltrops, Nature's Blessing (done in round B142), Master of the Hunt and the "bands with
   other legendary creatures" lands (banding), Shield Dancer (a combat damage redirection to its source), Mirror-Shield
   Hoplite (copy a backup ability), Speedball (new targets for that spell), Bill Ferny (done in round 272), Elemental Expressionist (a granted replacement and exile trigger), Wormfang Drake and Wormfang Crab (returns
-  for a card exiled by a different ability), Split the Spoils (piles), Swindler's Scheme (counter and cast the revealed
+  for a card exiled by a different ability), Split the Spoils (done in round B153) (piles), Swindler's Scheme (counter and cast the revealed
   card), Legion Angel (outside the game, as the Wishes). (B97 had Brilliance Unleashed's robot become one only after it
   entered; B98 fixed that: see round B98.)
 - Out after round B96 (looked at, not done): Sword of the Ages and Emrakul's Evangel ("Sacrifice ~ and any number of
@@ -7292,7 +7307,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B87 (looked at, not done): Kodama of the Center Tree (soulshift X: a target bounded by a changing
   number), Hide // Seek (the mana value of a card found by the search), Revival Experiment (one card of each permanent
   type, and a battle's protector on entering is unclear), Love on the Battlefield (a combat damage trigger granted until
-  end of turn), Sharkey, Tyrant of the Shire, Woodcaller Automaton, Dancing Sword, Elemental Resonance, Bat Colony.
+  end of turn), Sharkey, Tyrant of the Shire, Woodcaller Automaton, Dancing Sword (done in round B153), Elemental Resonance, Bat Colony.
 - Out after round B86 (looked at, not done): Goblin Maskmaker (cost reduction for face-down spells), Bortuk
   Bonerattle (a destination chosen by mana value against domain), Nick Fury (put onto the battlefield tapped and
   attacking from the hand), Oath of Mages (done in round B143) (a target chosen by another player), Glyph of Life (done in round B130), Mob Mentality,

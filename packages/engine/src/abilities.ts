@@ -2702,7 +2702,7 @@ export type Effect =
   | { type: "loseUnspentMana"; who: PlayerRef }
   /** "Exchange its power and the power of target creature it's blocking until end of combat" (Serene Master): CR 701.12g. */
   | { type: "exchangePower"; what: ObjRef; duration: "endOfTurn" | "endOfCombat" }
-  | { type: "destroy"; what: ObjRef; /** "It can't be regenerated." "creatures": "Creatures destroyed this way can't be regenerated" (Catastrophe), only those that are creatures as they're destroyed. */ noRegen?: boolean | "creatures" }
+  | { type: "destroy"; what: ObjRef; /** Capricious Efreet: "Destroy one of them at random": only one of `what`'s objects still there (legal targets, CR 608.2b), chosen at random as it resolves (rulings). */ oneAtRandom?: true; /** "It can't be regenerated." "creatures": "Creatures destroyed this way can't be regenerated" (Catastrophe), only those that are creatures as they're destroyed. */ noRegen?: boolean | "creatures" }
   /** Pyramids: "The next time target land would be destroyed this turn, remove all damage marked on it instead" (CR 614.1a): a one-turn destruction shield, not regeneration (game.ts destroyPermanent). */
   | { type: "removeDamageShield"; what: ObjRef }
   /** "Regenerate ~": a shield that replaces its next destruction this turn (CR 701.19a). */
@@ -3793,7 +3793,7 @@ export type Effect =
    */
   | { type: "attachEquipmentTo"; what: ObjRef }
   /** "Attach target Aura attached to a creature to another creature" (Crown of the Ages): a creature chosen as it resolves. */
-  | { type: "attachElsewhere"; source: ObjRef; /** Where to (default: another creature, Crown of the Ages): "another permanent with the same controller" as the permanent it's attached to (Simic Guildmage), "another permanent of that type", creature or land (Enchantment Alteration). */ host?: "sameController" | "sameType"; /** "Attach all Auras enchanting target permanent to another permanent with the same controller" (Glamer Spinners): `source` is that permanent, and every Aura on it goes to one permanent they could all enchant. */ aurasOn?: true }
+  | { type: "attachElsewhere"; source: ObjRef; /** Where to (default: another creature, Crown of the Ages): "another permanent with the same controller" as the permanent it's attached to (Simic Guildmage), "another permanent of that type", creature or land (Enchantment Alteration). */ host?: "sameController" | "sameType" | /** Aura Graft: "another permanent it can enchant", any permanent. */ "anyPermanent"; /** "Attach all Auras enchanting target permanent to another permanent with the same controller" (Glamer Spinners): `source` is that permanent, and every Aura on it goes to one permanent they could all enchant. */ aurasOn?: true }
   /**
    * "Attach ~ to another one of your opponents chosen at random" (Maddening Hex): a Curse moves to one of its controller's
    * opponents other than the player it enchants, at random; with no other one, it stays (rulings).
@@ -4574,7 +4574,7 @@ export type Effect =
   | { type: "juxtapose"; who: PlayerRef; types: string[] }
   /** Time and Tide: "Simultaneously, all phased-out creatures phase in and all creatures with phasing phase out." (CR 702.26). */
   | { type: "phaseSwap" }
-  | { type: "phaseOut"; what: ObjRef; /** Oubliette: "until ~ leaves the battlefield. Tap that creature as it phases in this way." (CR 610.3): it phases in tapped only then, not in an untap step. */ untilSourceLeaves?: true; /** With `untilSourceLeaves`: Out of Time's creatures phase in as they were, not tapped (only Oubliette's text taps them). */ noTap?: true; /** "You may have any number of them phase out" (Change of Plans): the controller picks which of them, none too. */ anyNumber?: true }
+  | { type: "phaseOut"; what: ObjRef; /** Oubliette: "until ~ leaves the battlefield. Tap that creature as it phases in this way." (CR 610.3): it phases in tapped only then, not in an untap step. */ untilSourceLeaves?: true; /** With `untilSourceLeaves`: Out of Time's creatures phase in as they were, not tapped (only Oubliette's text taps them). */ noTap?: true; /** "You may have any number of them phase out" (Change of Plans): the controller picks which of them, none too. */ anyNumber?: true; /** Teferi, Timeless Voyager: "Until the end of your next turn, they can't phase in": they skip their controller's untap steps until then (GameObject.phased.lock). */ lockedUntilYourNextTurnEnds?: true }
   /** Speed's inherent trigger (CR 702.179d): "if your speed is less than 4, your speed increases by 1". */
   | { type: "increaseSpeed" }
   /**
@@ -4737,7 +4737,7 @@ export type Effect =
    * the battlefield under your control and the rest into their owners' graveyards." The cards this resolution exiled from
    * graveyards (ResolvingInfo.exiledCards), separated by an opponent chosen as it resolves, not targeted (rulings).
    */
-  | { type: "exiledPiles" }
+  | { type: "exiledPiles"; /** Split the Spoils: "separate them into two piles. An opponent chooses one of those piles. Put that pile into your hand and the other into your graveyard": you separate, an opponent chosen as it resolves chooses (rulings). */ youSeparate?: true }
   /**
    * Collision of Realms: "Each player shuffles all creatures they own into their library. Each player who shuffled a
    * nontoken creature into their library this way reveals cards from the top of their library until they reveal a

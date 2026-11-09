@@ -1,7 +1,7 @@
 # Roadmap
 
-30,652 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,743 of
+30,660 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,748 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2363,6 +2363,31 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 316 took cards back off the "Out after round N" lists, most played first: a named Equipment token whose granted
+   ability names it, "create a colorless Equipment artifact token named Rock with "Equipped creature has '{1}, {T},
+   Sacrifice Rock: This creature deals 2 damage to any target'" and equip {1}" (Toggo, Goblin Weaponsmith: the granted
+   ability sacrifices the Rock that grants it, CR 201.5a); "Exile any number of target cards from your graveyard. Add {R}
+   for each card exiled this way. You may play those cards this turn." (Quintorius Kand: each card as it is in exile, CR
+   400.7, played with its usual timing and costs, a land with a land play, CR 305.1, rulings); "Whenever one or more
+   Dragons you control attack an opponent, goad target creature that player controls" and "Whenever a creature deals
+   combat damage to one of your opponents, if that creature had to attack this combat, ..." (Firkraag, Cunning
+   Instigator: the creatures an attack requirement applied to as attackers were declared, CR 508.1d, goad included,
+   checked as an intervening if, CR 603.4); "{T}, Sacrifice one or more artifacts: Choose a color. Target player adds
+   three mana of the chosen color for each artifact sacrificed this way." (Radiant Lotus: X at least 1, itself included;
+   it targets, so it isn't a mana ability and uses the stack, CR 605.1a; a browser test, and the X picker now keeps an
+   ability's "X can't be 0"); "Exile up to one target Equipment attached to that creature. If that creature would die
+   this turn, exile it instead." (Fiery Annihilation: only Equipment attached to the targeted creature can be chosen,
+   checked again as it resolves, and it isn't exiled if the creature became an illegal target, rulings; a browser
+   test); "search your library for a basic Plains card and reveal it. If an opponent controls more lands than you, put it
+   onto the battlefield tapped. Otherwise, put it into your hand." (Stoic Farmer: lands counted as the card is put,
+   CR 608.2c); "Whenever you gain life, choose up to that many target creatures you control." (Heroic Feast: the life
+   gained sets the number of targets, CR 601.2c, 603.3d); "choose an opponent who controls more lands than you. Search
+   your library for a number of Plains cards equal to the difference, ... put one of them onto the battlefield tapped and
+   the rest into your hand" (Boreas Charger: only those opponents are offered, none when there are none, rulings; a
+   browser test). +8, 30,660 of 31,936.
+   Out after round 316 (looked at, not done): Spectral Searchlight (a mana ability that adds mana to another player's
+   pool), Glowcap Lantern (a granted "look at the top card of your library any time"), Kusari-Gama and Urgent Necropsy
+   (still out, for the reasons in their earlier lists). Bots haven't been taught to activate Radiant Lotus.
    Round 315 took cards back off the "Out after round N" lists, most played first: additional costs of any size as a
    spell is cast, X the number paid (CR 601.2b, 601.2f, 601.2h, 107.3a): "As an additional cost to cast this spell, you
    may tap any number of untapped creatures you control. This spell costs {1} less to cast for each creature tapped this

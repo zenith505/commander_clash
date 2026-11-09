@@ -148,6 +148,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // its mana cost": one now, as this resolves (rulings), from every card you own in exile with one (not only those it
   // exiled), timing ignored.
   if (/^[Yy]ou may cast a spell from among cards you own in exile with dream counters on them without paying its mana cost$/.test(s) && !ctx.spell) return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, ownExileCounter: "dream", max: 1 }];
+  // Ashiok, Nightmare Muse: "You may cast up to three spells from among face-up cards your opponents own from exile without
+  // paying their mana costs": one at a time as this resolves, timing ignored (rulings), not later.
+  if (/^[Yy]ou may cast up to three spells from among face-up cards your opponents own from exile without paying their mana costs$/.test(s) && !ctx.spell) return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, opponentsExile: true, max: 3 }];
+  // Tasha, the Witch Queen: "You may cast a spell from among cards in exile with page counters on them without paying its
+  // mana cost": anyone's cards in exile with one (not only those this Tasha exiled), cast only as this resolves (rulings).
+  if (/^[Yy]ou may cast a spell from among cards in exile with page counters on them without paying its mana cost$/.test(s) && !ctx.spell) return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, ownExileCounter: "page", anyOwnerExile: true, max: 1 }];
   // Amy Pond: "choose a suspended card you own and remove that many time counters from it" ("that many" read as X by the
   // trigger): one chosen as it resolves, not targeted (CR 702.62b: in exile, with suspend and a time counter); the last
   // one removed, its suspend casts it (rulings).

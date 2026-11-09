@@ -1,7 +1,7 @@
 # Roadmap
 
-30,688 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,748 of
+30,696 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,970 of 4,988 (99%), top 10,000: 9,756 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2363,6 +2363,35 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 317 took cards back off the "Out after round N" lists, most played first: "Starting with you, each player
+   chooses up to one permanent with mana value 3 or greater from among permanents your opponents control. Exile those
+   permanents." (The Legend of Yangchen chapter I: chosen in turn order, then exiled at once, rulings; a browser test) and
+   "You may have target opponent draw three cards. If you do, draw three cards." (chapter II); "+1: ... For each opponent,
+   exile up to one target instant or sorcery card from that player's graveyard and put a page counter on it" and "−3: You
+   may cast a spell from among cards in exile with page counters on them without paying its mana cost" (Tasha, the Witch
+   Queen: whoever owns them, a browser test); "When ~ enters, choose a creature an opponent controls. Until end of turn,
+   creatures other than ~ and the chosen creature get -2/-2. When the chosen creature leaves the battlefield, transform
+   ~." with Shinryu's "As this creature transforms into Shinryu, choose an opponent" and "When the chosen player loses the
+   game, you win the game" (Zenos yae Galvus: the choice linked to the object as it was, CR 607.2d, 400.7; CR 712.20,
+   104.2b; a browser test); "each player exiles the top card of their library. Until end of turn, you may play the card
+   you own exiled this way and each other card exiled this way with lesser mana value than it without paying their mana
+   costs" (Triple Triad, a browser test); "each player exiles the top card of their library. Until your next end step,
+   each player may play the card they exiled this way" and "Whenever a player plays a land from exile or casts a spell
+   from exile, you put a +1/+1 counter on target creature and create a Food token" (Rocco, Street Chef: the permission
+   ends at Rocco's controller's end step, rulings); "Return target nonland permanent to its owner's hand, then that player
+   exiles a card from their hand" (a bounced token isn't a card, CR 111.7, 111.8, rulings) and "−7: You may cast up to three spells from among
+   face-up cards your opponents own from exile without paying their mana costs" (Ashiok, Nightmare Muse); "Exile an
+   instant or sorcery card from each graveyard" and "You may cast an instant or sorcery card exiled with this Saga, and
+   mana of any type can be spent to cast that spell" (Summon: Esper Valigarmanda: not targeted, you choose in each
+   graveyard; CR 607.2a, 609.4b; a browser test); "Each player mills four cards. Then you may exile a creature or
+   planeswalker card from each graveyard" and "Until end of turn, you may cast spells from among cards exiled with this
+   Saga, and you may spend mana as though it were mana of any color to cast those spells" (King Narfi's Betrayal). +8, 30,686 of 31,936 with B154 and B155.
+   Out after round 317 (looked at, not done): Encroaching Mycosynth and Biotransference (types in every zone and on
+   spells), Crucible of the Spirit Dragon (storage counters with spend-only mana), Jinnie Fay, Mirrormind Crown and
+   Moonlit Meditation (token replacement choices), Guff Rewrites History, Possibility Storm, Sokrates, Sunken Palace,
+   Ulalek, Surge to Victory, Norman Osborn, Filigree Vector and the rest above rank 6,800 (still out, for the reasons in
+   their earlier lists); Kusari-Gama, Urgent Necropsy, Spectral Searchlight and Glowcap Lantern (still out). Bots haven't been
+   taught when The Legend of Yangchen's chapter II is worth it (they give it the usual answer to a "you may").
    Round 316 took cards back off the "Out after round N" lists, most played first: a named Equipment token whose granted
    ability names it, "create a colorless Equipment artifact token named Rock with "Equipped creature has '{1}, {T},
    Sacrifice Rock: This creature deals 2 damage to any target'" and equip {1}" (Toggo, Goblin Weaponsmith: the granted
@@ -7123,7 +7152,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Mercurial Transformation (a 1/1 Frog or a 4/4 Octopus, blue, chosen as it resolves, rulings; its card types replaced,
   CR 205.1a; a browser test). Light of Judgment ("Destroy up to one Equipment attached to that creature": chosen as it
   resolves among the Equipment attached to the target, none if the target is illegal, rulings; a browser test). +10
-  (30,688 of 31,936 with B155).
+  (30,696 of 31,936 with B155 and round 317).
 - Out after round B155 (looked at, not done): Reality Twist and Pulse of Llanowar (after the replacement, a land with
   two basic land types lets its controller choose the mana, rulings: the choice isn't modelled for mana replacements),
   Yixlid Jailer (cards in graveyards losing all abilities would have to reach every graveyard-zone ability check).

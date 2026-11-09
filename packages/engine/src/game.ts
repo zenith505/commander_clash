@@ -4302,7 +4302,7 @@ function beginStep(s: GameState, step: Step): void {
       for (const q of s.players)
         for (const id of q.exile) {
           const m = obj(s, id).mayPlay;
-          if (m?.until === "yourNextEndStep" && m.player === ap) obj(s, id).mayPlay = undefined;
+          if (m?.until === "yourNextEndStep" && (m.untilOf ?? m.player) === ap) obj(s, id).mayPlay = undefined;
         }
       (s.turnLog ??= {}).endSteps = (s.turnLog.endSteps ?? 0) + 1;
       fireEvent(s, { type: "step", step: "end", active: ap });
@@ -9750,7 +9750,7 @@ function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
   if (pend?.kind !== "discard" || pend.player !== p.id || !r?.scratch?.queue) throw new RulesError("no discard pending");
   if ((pend.upTo ? new Set(ids).size !== ids.length || ids.length > pend.count : new Set(ids).size !== pend.count) || ids.some((id) => !p.hand.includes(id))) throw new RulesError(pend.upTo ? `choose up to ${pend.count} card(s) from your hand` : `choose exactly ${pend.count} card(s) from your hand`);
   if (pend.filter && ids.some((id) => !printedMatches(pend.filter!, defOf(s, obj(s, id))))) throw new RulesError(`choose ${pend.filter.text.replace(/^(?!an? )/, "a ")}`);
-  if (pend.among && ids.some((id) => !pend.among!.includes(id))) throw new RulesError("choose one of the cards just drawn");
+  if (pend.among && ids.some((id) => !pend.among!.includes(id))) throw new RulesError(pend.exile ? "a token isn't a card: choose a card" : "choose one of the cards just drawn");
   r.scratch.chosen![p.id] = ids;
   r.scratch.queue.shift();
   s.pending = null;

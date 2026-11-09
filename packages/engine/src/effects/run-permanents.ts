@@ -40,6 +40,8 @@ export function transformPermanent(s: GameState, o: GameObject, byDayNight = fal
     const ctx: ResolveCtx = { controller: controllerOf(s, o), sourceId: o.id, sourceZc: o.zoneChanges ?? 0, sourceDef: defOf(s, o), targets: [], legal: [] };
     for (const e of as.effects) runEffect(s, e, ctx);
   }
+  // Shinryu: "choose an opponent" as it transforms, asked before anyone gets priority (askEntersChoice).
+  if (compileCard(defOf(s, o)).asTransformsChoose === "opponent") (s.entersChoices ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, what: "player", except: "you" });
   fireEvent(s, { type: "transformed", id: o.id, face: to });
   return true;
 }

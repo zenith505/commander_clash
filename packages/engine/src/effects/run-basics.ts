@@ -188,6 +188,14 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "winGame":
       for (const pid of players(s, e.who, ctx)) winGame(s, pid, src);
       return;
+    case "rememberChosenObject": {
+      // Zenos yae Galvus: noted on the source only while it's still the object whose ability this is (CR 400.7, 607.2d).
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const picked = s.resolving?.created?.find((id) => s.objects[id]?.zone === "battlefield");
+      if (!me || me.zone !== "battlefield" || (me.zoneChanges ?? 0) !== (ctx.sourceZc ?? me.zoneChanges ?? 0) || picked === undefined) return;
+      me.chosen = { ...me.chosen, object: { id: picked, zc: obj(s, picked).zoneChanges ?? 0 } };
+      return;
+    }
     case "highestLifeWins": {
       // Celestial Convergence: among the players still in the game (CR 800.4a), the one with the most life wins (CR 104.2a);
       // two or more tied for it is a draw (CR 104.4c).

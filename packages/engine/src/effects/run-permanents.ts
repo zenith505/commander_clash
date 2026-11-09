@@ -533,6 +533,12 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         o.saddled = true;
         invalidateCharacteristics(s); // "as long as ~ is saddled"
         log(s, `${defOf(s, o).name} becomes saddled.`);
+        // It becomes saddled each time this resolves, even if it already was (rulings); the first time this turn is
+        // what "for the first time each turn" asks, for this object (CR 400.7: a new one starts over).
+        if (o.saddledTurn !== s.turn) {
+          o.saddledTurn = s.turn;
+          fireEvent(s, { type: "becameSaddledFirst", id: o.id });
+        }
       }
       return;
     case "toggleTapped": {
@@ -1797,6 +1803,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           duration: e.duration,
           ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : e.duration === "endOfYourNextTurn" || e.duration === "yourNextUpkeep" ? { turnOf: ctx.controller, sinceTurn: s.turn } : e.duration === "endOfYourNextUpkeep" ? { turnOf: ctx.controller, sinceTurn: s.turn, sinceUpkeeps: s.activePlayer === ctx.controller ? (s.turnLog?.upkeeps ?? 0) : 0 } : e.duration === "controllersNextUntap" ? { turnOf: controllerOf(s, obj(s, group[0]!)), sinceTurn: s.turn } : e.duration === "controllersNextCombat" ? nextCombatOf(s, controllerOf(s, obj(s, group[0]!))) : {}),
           ...(whileTapped ? { whileTapped } : {}),
+          ...(whileTapped && e.whilePowerAtMostSource ? { powerAtMost: { id: whileTapped.id, zc: whileTapped.zc } } : {}),
           ...(whileControlled ? { whileControlled } : {}),
           ...(e.whileCounter ? { whileCounter: e.whileCounter } : {}),
           ...(e.whileEnchanted ? { whileEnchanted: true as const } : {}),

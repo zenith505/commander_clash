@@ -519,6 +519,9 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Exile this Saga, then return it to the battlefield (front face up)" (The Great Synthesis): under your control, since
   // you put it there (CR 110.2a), front face up (CR 712.14a).
   if (/^[Ee]xile ~, then return it to the battlefield$/.test(s)) return [{ type: "flicker", what: { ref: "self" }, under: "you" }];
+  // Sol'Kanar the Tainted: "Exile ~, then return it to the battlefield under an opponent's control": an opponent of the
+  // ability's controller, chosen as it resolves (not targeted, rulings), before anything moves; a new object (CR 400.7).
+  if (/^[Ee]xile ~, then return it to the battlefield under an opponent's control$/.test(s) && !ctx.spell) return [{ type: "choose", choice: "opponent" }, { type: "flicker", what: { ref: "self" }, under: "you", underPlayer: { ref: "chosenPlayer" } }];
   if ((m = /^Exile (.+?),? then return (?:it|that card|them|those cards) to the battlefield( transformed| tapped)? under (its owner's|their owner's|their owners'|your) control(?: with an? (\+1\/\+1) counter on it)?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     if (m[2] === " transformed" && what?.ref !== "self") return null;

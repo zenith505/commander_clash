@@ -880,9 +880,13 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Maelstrom Muse's X, Mutated Cultist's "for each counter removed this way": counted as it resolves.
       const k = e.times !== undefined ? Math.max(0, amountNow(s, e.times, ctx)) : 1;
       if (e.times !== undefined && !k) return;
-      const mod = k === 1 ? e.mod : { ...e.mod, n: e.mod.n * k };
+      // Cheering Fanatic: the name chosen as it resolves (CR 611.2c); with none chosen, nothing.
+      const name = e.chosenName ? ctx.chosen?.name : undefined;
+      if (e.chosenName && name === undefined) return;
+      const named = name !== undefined ? { ...e.mod, filter: { ...e.mod.filter, named: name, text: `spells named ${name}` }, text: `Spells named ${name} cost {${-e.mod.n}} less to cast this turn.` } : e.mod;
+      const mod = k === 1 ? named : { ...named, n: named.n * k };
       (s.costModsThisTurn ??= []).push({ player: ctx.controller, mod, ...(e.untilYourNextTurn ? { untilYourNextTurn: true as const } : {}), ...(e.next ? { next: true as const } : {}) });
-      log(s, `${player(s, ctx.controller).name}: ${e.mod.text.replace(/ you cast this turn /, " they cast this turn ").replace(/\{X\}/, `{${k}}`)}`);
+      log(s, `${player(s, ctx.controller).name}: ${mod.text.replace(/ you cast this turn /, " they cast this turn ").replace(/\{X\}/, `{${k}}`)}`);
       return;
     }
     case "cantBlockRule": {

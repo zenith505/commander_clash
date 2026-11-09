@@ -245,6 +245,8 @@ export type Count =
   | { kind: "costSacrificedCardTypes" }
   /** Vengeful Regrowth: "Return up to three target land cards ... to the battlefield tapped. Create that many ...": the permanents this resolution just put onto the battlefield. */
   | { kind: "putThisWay" }
+  /** Jester's Mask: "Search that player's library for that many cards" after "Target opponent puts the cards from their hand on top of their library": how many cards this resolution put there from a hand (ResolvingState.handPutOnTop). */
+  | { kind: "handPutOnTopThisWay" }
   /** She-Hulk, Wallbreaker: "for each creature blocking it": the creatures blocking the source (`subject`: the trigger's attacker) as it resolves. */
   | { kind: "blockingIt"; subject?: true }
   /** "For each creature it's blocking" (Guardian of the Gateless): the creatures the source is blocking as this resolves. */
@@ -4080,6 +4082,8 @@ export type Effect =
       youMay?: { anyType?: true; /** Cruelclaw's Heist: "If the gift was promised, you may cast that card ...": only then. */ ifGift?: true; /** Psychic Theft: "At the beginning of the next end step, if you haven't cast the card, return it to its owner's hand": a delayed trigger for the card while it's still exiled as that object. */ returnAtEnd?: true };
       /** Rakdos Augermage: "discard a card of target opponent's choice": who chooses the card, if not the controller (CR 701.9b). */
       by?: PlayerRef;
+      /** Distended Mindbender: "a nonland card with mana value 3 or less and a card with mana value 4 or greater": a second card, matching this, chosen after the first (one of each if able, rulings), both then discarded at once (action "discard"). */
+      also?: TargetSpec;
     }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
@@ -4165,7 +4169,7 @@ export type Effect =
   | { type: "earthbend"; what: ObjRef; n: Amount }
   /** "Put two cards from your hand on top of your library in any order" (Brainstorm): the controller's own hand. */
   /** `bottom`: "put a card from your hand on the bottom of your library" instead (Volcanic Spite). */
-  | { type: "handToTop"; n: Amount; bottom?: true; /** See Beyond: "shuffle a card from your hand into your library". */ shuffle?: true; /** "Target opponent puts a card from their hand on top of their library" (Chimney Imp), "each player ..." (Sadistic Augermage): each of them, from their own hand, in turn order (default: you). */ who?: PlayerRef }
+  | { type: "handToTop"; n: Amount; bottom?: true; /** Jester's Mask: "puts the cards from their hand on top of their library": every card in the hand, ordered by that player (CR 401.4); `n` is unused. */ all?: true; /** See Beyond: "shuffle a card from your hand into your library". */ shuffle?: true; /** "Target opponent puts a card from their hand on top of their library" (Chimney Imp), "each player ..." (Sadistic Augermage): each of them, from their own hand, in turn order (default: you). */ who?: PlayerRef }
   /** Scroll Rack: any number of cards from the hand exiled face down, that many from the top of the library put into the hand (not drawn), then the exiled cards on top in any order. */
   | { type: "scrollRack" }
   /**
@@ -4680,7 +4684,7 @@ export type Effect =
   | { type: "topTurn"; top: FromTop }
   | { type: "graveyardTurn"; cast?: TargetSpec; lands?: true; exileInstead?: true; /** "From any graveyard" (The Great Work). */ anyGraveyard?: true; /** "If a spell cast this way would be put into a graveyard, exile it instead." */ exileCast?: true }
   /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
-  | { type: "costModThisTurn"; mod: CostMod; /** "... until your next turn" (Elspeth Conquers Death): as that turn begins (CR 611.2b). */ untilYourNextTurn?: true; /** "The next spell you cast this turn costs {1} less to cast" (Hardened Berserker): only the next such spell its controller casts this turn, used up as it becomes cast (CR 601.2f, 601.2i). */ next?: true; /** "Costs {X} less ..., where X is ~'s power as this ability resolves" (Maelstrom Muse): generic mana `mod.n` times this, counted as it resolves. */ times?: Amount }
+  | { type: "costModThisTurn"; mod: CostMod; /** "... until your next turn" (Elspeth Conquers Death): as that turn begins (CR 611.2b). */ untilYourNextTurn?: true; /** "The next spell you cast this turn costs {1} less to cast" (Hardened Berserker): only the next such spell its controller casts this turn, used up as it becomes cast (CR 601.2f, 601.2i). */ next?: true; /** "Costs {X} less ..., where X is ~'s power as this ability resolves" (Maelstrom Muse): generic mana `mod.n` times this, counted as it resolves. */ times?: Amount; /** Cheering Fanatic: "spells with the chosen name": the card name chosen as it resolves, locked into `mod.filter.named`. */ chosenName?: true }
   /**
    * "Your opponents can't cast spells this turn" (Silence), "target player can't ..." (Orim's Chant), "players can't cast
    * noncreature spells this turn" (Calamity's Wake): those players, chosen as it resolves, until the turn ends; `filter`

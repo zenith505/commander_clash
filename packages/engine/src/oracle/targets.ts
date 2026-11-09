@@ -1385,6 +1385,13 @@ export function parseTargetPhrase(
     const head = parseTargetPhrase(notOwned[1]!, opts);
     return head?.kind === "object" && head.controller === "you" && !head.owner ? { ...head, owner: "opponent", text: `${head.text} but don't own` } : null;
   }
+  // "Permanent you neither own nor control" (Conjured Currency): one another player owns and another player controls, not
+  // necessarily the same one (rulings, CR 108.3).
+  const neitherOwn = /^(.+) you neither own nor control$/.exec(phrase.trim());
+  if (neitherOwn) {
+    const head = parseTargetPhrase(`${neitherOwn[1]!} you don't control`, opts);
+    return head?.kind === "object" && head.controller === "opponent" && !head.owner ? { ...head, owner: "opponent", text: `${neitherOwn[1]} you neither own nor control` } : null;
+  }
   // "Enchanted creature or enchantment creature" (Karametra's Blessing, Nyx Herald, Feast of Dreams): a creature that's
   // enchanted or is an enchantment, either one (TargetSpec.anyOf).
   const enchOr = /^(target )?enchanted creature or enchantment creature((?: you control)?)$/.exec(phrase.trim());

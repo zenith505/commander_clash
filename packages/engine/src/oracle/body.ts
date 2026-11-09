@@ -1481,6 +1481,90 @@ function wandPunisher(who: PlayerRef, landLife: number): Effect {
  * reads parseFaceDownPlay's: the last effect and the next sentence's index in parseFaceDownPlay's shape (the effects
  * before the last one already pushed), "fail" for one that can't be read, or null when it isn't one of them.
  */
+/** Lane B round B156's sentences, chained first (parseBodyText is at TS2563's limit). */
+function roundB156Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  const out = (fx: Effect[], skip: number) => {
+    effects.push(...fx.slice(0, -1));
+    return { effect: fx[fx.length - 1]!, next: si + 1 + skip };
+  };
+  const next = (k = 1) => (sentences[si + k] ?? "").replace(/\.$/, "");
+  const prev = effects[effects.length - 1];
+  const allPermanents = ["Artifact", "Creature", "Enchantment", "Land", "Planeswalker", "Battle"];
+  // Price of Betrayal: "Remove up to five counters from target artifact, creature, planeswalker, or opponent.": one target,
+  // a permanent of those types or an opponent; any kinds, as many of a kind as it has, chosen one at a time as it resolves
+  // (rulings). Etched Slith: "you may remove a counter from another target permanent or opponent" (its kind chosen by you,
+  // rulings), not ~ itself (CR 115.4 "another").
+  if (s === "Remove up to five counters from target artifact, creature, planeswalker, or opponent") {
+    const index = addTarget(ctx, { kind: "any", types: ["Artifact", "Creature", "Planeswalker"], opponent: true, text: "target artifact, creature, planeswalker, or opponent" });
+    return out([{ type: "removeAnyCounters", what: { ref: "target", index }, n: 5, upTo: true }], 0);
+  }
+  if (s === "You may remove a counter from another target permanent or opponent" && !ctx.spell) {
+    const index = addTarget(ctx, { kind: "any", types: allPermanents, opponent: true, notSource: true, text: "another target permanent or opponent" });
+    return out([{ type: "may", effects: [{ type: "removeAnyCounters", what: { ref: "target", index }, n: 1 }], text: "remove a counter from another target permanent or opponent" }], 0);
+  }
+  // Death or Glory: "Separate all creature cards in your graveyard into two piles. Exile the pile of an opponent's choice
+  // and return the other to the battlefield." (exiledPiles fromYourGraveyard).
+  if (s === "Separate all creature cards in your graveyard into two piles" && next() === "Exile the pile of an opponent's choice and return the other to the battlefield" && ctx.spell)
+    return out([{ type: "exiledPiles", fromYourGraveyard: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" } }], 1);
+  // Wicked Slumber: "Tap up to two target creatures. Put a stun counter on either of them. Then put a stun counter on
+  // either of them.": each counter on one of the targets still legal, picked as each is put (both may go on the same one,
+  // and with one target left both go on it, rulings).
+  if (s === "Put a stun counter on either of them" && /^(?:Then p|P)ut a stun counter on either of them$/.test(next()) && prev?.type === "tap" && prev.what.ref === "target" && prev.what.index === 0 && prev.what.n === 2 && ctx.targets.length === 2) {
+    const one: Effect = { type: "splitTargets", chooser: "you", again: true, options: [0, 1].map((index) => [{ type: "counters", what: { ref: "target", index }, counter: "stun", n: 1 } as Effect]), label: "Put a stun counter on {0}" };
+    return out([one, one], 1);
+  }
+  // Soul-Shackled Zombie: "exile up to two target cards from a single graveyard. If at least one creature card was exiled
+  // this way, each opponent loses 2 life and you gain 2 life." (as Kaya, Orzhov Usurper's: any of those targets, still
+  // legal as it resolves and so exiled).
+  let m: RegExpExecArray | null;
+  if ((m = /^If at least one ([a-z]+) card was exiled this way, (.+)$/.exec(s))) {
+    const filter = parseSearchFilter(`${m[1]!} card`);
+    if (prev?.type !== "exile" || prev.what.ref !== "target" || !prev.what.n || prev.what.index + prev.what.n !== ctx.targets.length || !filter) return "fail";
+    const first = prev.what.index;
+    if (ctx.targets.slice(first).some((t) => t.kind !== "card" || t.many)) return "fail";
+    const before = ctx.targets.length;
+    const inner = parseOne(capital(m[2]!), ctx);
+    if (!inner || ctx.targets.length !== before) return "fail";
+    return out([{ type: "if", cond: { kind: "targetCardWas", index: first, n: prev.what.n, filter }, effects: inner }], 0);
+  }
+  // Highcliff Felidar: "for each opponent, choose a creature with the greatest power among creatures that player controls.
+  // Destroy those creatures.": you choose for each opponent as it resolves, one tied for their greatest power (not
+  // targeted), then all are destroyed at once (as Ultimate Magic: Meteor's).
+  if (/^[Ff]or each opponent, choose a creature with the greatest power among creatures that player controls$/.test(s) && next() === "Destroy those creatures") {
+    const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+    return out([{ type: "pick", who: { ref: "eachOpponent" }, filter, n: 1, action: "choose", youChoose: true, greatest: "power", prompt: "click a creature with the greatest power among {player} creatures. ~ destroys the chosen creatures." }, { type: "destroy", what: { ref: "created" } }], 1);
+  }
+  // Two-Headed Giant: "flip two coins. If both coins come up heads, ~ gains double strike until end of turn. If both coins
+  // come up tails, ~ gains menace until end of turn.": flips no one calls (CR 705.2), the heads counted.
+  const both = /^If both coins come up (heads|tails), (.+)$/.exec(s);
+  if (both && ctx.uncalledFlips && effects.some((e) => e.type === "flipCoin" && e.n === 2 && e.uncalled)) {
+    const inner = parseSentence(capital(both[2]!), ctx);
+    if (!inner) return "fail";
+    const heads: Amount = { count: { kind: "flipsWon", heads: true } };
+    return out([{ type: "if", cond: both[1] === "heads" ? { kind: "amountNow", amount: heads, min: 2 } : { kind: "amountNow", amount: heads, max: 0 }, effects: inner }], 0);
+  }
+  // Light of Judgment: "~ deals 6 damage to target creature. Destroy up to one Equipment attached to that creature.": one
+  // chosen as it resolves, not targeted, among those attached to it then (rulings); none if the creature is an illegal
+  // target (it doesn't resolve, CR 608.2b).
+  if (s === "Destroy up to one Equipment attached to that creature" && prev?.type === "damage" && ctx.spell && ctx.targets.length === 1 && ctx.targets[0]!.kind === "object" && ctx.targets[0]!.types?.includes("Creature")) {
+    const filter: TargetSpec = { kind: "object", types: ["Artifact"], subtypes: ["Equipment"], notTypes: [], notColors: [], text: "Equipment attached to that creature" };
+    return out([{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose", upTo: true, anyController: true, attachedToTargetAt: 0, prompt: "click up to one Equipment attached to that creature. ~ destroys it." }, { type: "destroy", what: { ref: "created" } }], 0);
+  }
+  // Mercurial Transformation: "Until end of turn, target nonland permanent loses all abilities and becomes your choice of a
+  // blue Frog creature with base power and toughness 1/1 or a blue Octopus creature with base power and toughness 4/4.":
+  // chosen as it resolves (rulings); either replaces its card types, creature types and colors (CR 205.1a, 105.3).
+  const choice = /^(Until end of turn, target [a-z ]+ loses all abilities and becomes) your choice of (an? [a-z]+ [A-Z][a-z]+ creature with base power and toughness \d+\/\d+) or (an? [a-z]+ [A-Z][a-z]+ creature with base power and toughness \d+\/\d+)$/.exec(s);
+  if (choice && ctx.spell) {
+    const before = ctx.targets.length;
+    const a = parseSentence(`${choice[1]!} ${choice[2]!}`, ctx);
+    const ctx2: Ctx = { ...ctx, targets: ctx.targets.slice(0, before) };
+    const b = parseSentence(`${choice[1]!} ${choice[3]!}`, ctx2);
+    if (!a || !b || ctx.targets.length !== before + 1 || JSON.stringify(ctx2.targets) !== JSON.stringify(ctx.targets)) return "fail";
+    return out([{ type: "either", options: [a, b], labels: [`It becomes ${choice[2]!}`, `It becomes ${choice[3]!}`] }], 0);
+  }
+  return null;
+}
+
 /** Lane B round B155's sentences, chained first (parseBodyText is at TS2563's limit). */
 function roundB155Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
   const next = (sentences[si + 1] ?? "").replace(/\.$/, "");
@@ -2213,8 +2297,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   const ctx: Ctx = {
     targets: [],
     // Ral Zarek: "Flip five coins. ... for each coin that comes up heads": flips no one calls (CR 705.2). Ral Zarek, Guest
-    // Lecturer: "where X is the number of coins that came up heads".
-    ...(/\b[Ff]lip (?:two|three|four|five) coins\b/.test(text) && /\b(?:for each coin that comes up heads|the number of coins that came up heads)\b/.test(text) ? { uncalledFlips: true } : {}),
+    // Lecturer: "where X is the number of coins that came up heads"; Two-Headed Giant: "If both coins come up heads".
+    ...(/\b[Ff]lip (?:two|three|four|five) coins\b/.test(text) && /\b(?:for each coin that comes up heads|the number of coins that came up heads|If both coins come up heads)\b/.test(text) ? { uncalledFlips: true } : {}),
     ...(opts.subject ? { subject: true } : {}),
     ...(opts.subjectIt ? { subject: true, subjectIt: true } : {}),
     ...(opts.subjectLeft ? { subjectLeft: true } : {}),
@@ -6741,8 +6825,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
-    // rounds B155, B154, B153, B152, B151, B148 and 311 to 317's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    // rounds B156, B155, B154, B153, B152, B151, B148 and 311 to 317's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
+    const faceDown = roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);
@@ -15779,7 +15863,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         continue;
       }
       // Craig Boone, Novac Guard: "Put two quest counters on ~. When you do, ...": once for every two put this way (rulings).
-      if (counted && prev.type === "counters" && typeof prev.n === "number" && prev.n >= 2 && !prev.orCounter && !prev.eventCounter) {
+      // Etched Slith: "put a +1/+1 counter on it. When you do, you may remove a counter from another target permanent or
+      // opponent": once for each counter put on it this way (rulings, CR 603.12a), so twice with Doubling Season.
+      if (counted && prev.type === "counters" && typeof prev.n === "number" && (prev.n >= 2 || (prev.n === 1 && /^you may remove a counter from another target permanent or opponent\.?$/.test(whenText))) && !prev.orCounter && !prev.eventCounter) {
         effects.push({ type: "reflexive", body: reflexive, perCounters: { counter: prev.counter, n: prev.n } });
         continue;
       }

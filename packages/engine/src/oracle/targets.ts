@@ -97,7 +97,8 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
   if (notType && CREATURE_TYPES.has(notType[1]!)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", notSubtypes: [notType[1]!], text: p }) };
   let several: RegExpExecArray | null;
   // "... and 3 damage to each of up to two other targets" (Drakuseth, Maw of Flames): none of the targets before either.
-  if ((several = /^each of (up to )?(two|three|four|one or two)( other)? targets$/i.exec(p))) {
+  // Chandra, the Firebrand: "6 damage to each of up to six targets": no damage divided, 6 to each (rulings).
+  if ((several = /^each of (up to )?(two|three|four|five|six|one or two)( other)? targets$/i.exec(p))) {
     const [required, n] = several[2] === "one or two" ? [1, 2] : several[1] ? [0, num(several[2]!)] : [num(several[2]!), num(several[2]!)];
     const first = ctx.targets.length;
     const before = several[3] ? ctx.targets.flatMap((t, i) => (t.kind === "object" || t.kind === "any" || t.kind === "player" ? [i] : [])) : [];

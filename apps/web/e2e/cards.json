@@ -7357,6 +7357,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b2ae0968-28ed-4ebb-a4e8-69ff6e6a6f1d",
+  "name": "Death or Glory",
+  "manaCost": "{4}{W}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Separate all creature cards in your graveyard into two piles. Exile the pile of an opponent's choice and return the other to the battlefield.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "inv",
+  "releasedAt": "2000-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a7d4f5aa-26d4-4363-aa5a-a26d6f791b82",
   "name": "Deathmist Raptor",
   "manaCost": "{1}{G}{G}",
@@ -17318,6 +17344,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "932177b8-70f8-4908-a48f-fe03204daddc",
+  "name": "Light of Judgment",
+  "manaCost": "{4}{R}",
+  "cmc": 5,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Light of Judgment deals 6 damage to target creature. Destroy up to one Equipment attached to that creature.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1718a442-b878-4690-b608-a013de3d79fc",
   "name": "Light-Paws, Emperor's Voice",
   "manaCost": "{1}{W}",
@@ -18563,6 +18615,34 @@
   "set": "acr",
   "releasedAt": "2024-07-05",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c7efe6c6-3da1-47a6-a8ad-30c36502a7ab",
+  "name": "Mercurial Transformation",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Sorcery — Lesson",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [
+   "Lesson"
+  ],
+  "oracleText": "Until end of turn, target nonland permanent loses all abilities and becomes your choice of a blue Frog creature with base power and toughness 1/1 or a blue Octopus creature with base power and toughness 4/4.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "stx",
+  "releasedAt": "2021-04-23",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -22628,6 +22708,32 @@
   "set": "who",
   "releasedAt": "2023-10-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "43a2bfe4-9705-4d0f-901a-21f9803b50f1",
+  "name": "Price of Betrayal",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Remove up to five counters from target artifact, creature, planeswalker, or opponent.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "war",
+  "releasedAt": "2019-05-03",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -33761,6 +33867,34 @@
   "set": "who",
   "releasedAt": "2023-10-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5b27b794-580c-472d-b63e-99b271eb115d",
+  "name": "Wicked Slumber",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Convoke (Your creatures can help cast this spell. Each creature you tap while casting this spell pays for {1} or one mana of that creature's color.)\nTap up to two target creatures. Put a stun counter on either of them. Then put a stun counter on either of them. (If a permanent with a stun counter would become untapped, remove one from it instead.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Convoke"
+  ],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -97,6 +97,14 @@ export function parseNamesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const filter = base && m[3] === " of the chosen type" ? { ...base, chosen: "type" as const, text: `${base.text} of the chosen type` } : base && m[3] ? { ...base, chosen: "number" as const, equalsChosen: ["manaValue" as const], text: `${base.text} with mana value equal to the chosen number` } : base;
     return who && filter ? [{ type: "lookAtHand", who, reveal: true }, { type: "discard", who, n: 0, hand: true, filter }] : null;
   }
+  // Infernal Kirin: "Whenever you cast a Spirit or Arcane spell, target player reveals their hand and discards all cards with
+  // that spell's mana value": the spell's mana value as cast, X included (CR 202.3e, rulings), even if it has left the stack;
+  // every such card, no choice (CR 701.9b).
+  if ((m = /^([Tt]arget player|[Tt]arget opponent) reveals their hand and discards all cards with that spell's mana value$/.exec(s)) && ctx.castSpell) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = { kind: "card" as const, types: [], notTypes: [], notColors: [], bound: { key: "manaValue" as const, at: "exact" as const, amount: { count: { kind: "manaValue" as const, of: { ref: "castSpell" as const } } } }, text: "card with that spell's mana value" };
+    return who ? [{ type: "lookAtHand", who, reveal: true }, { type: "discard", who, n: 0, hand: true, filter }] : null;
+  }
   // Mind Extraction: "Target player reveals their hand and discards all cards of each of the sacrificed creature's colors":
   // every card sharing a color with the creature its cost sacrificed, as it last existed (CR 608.2h); none for a colorless one
   // (rulings). compile() checks there's such a cost.

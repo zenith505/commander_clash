@@ -3881,7 +3881,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         const flashback = (id: ObjectId) => graveyardWays(s, obj(s, id)).some((w) => w.kind === "flashback" || w.kind === "grantedFlashback");
         // Cry of the Carnarium: "that were put there from the battlefield this turn" (GameObject.fromBattlefieldTurn).
-        const cards = p.graveyard.filter((id) => (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!e.filter?.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn) && (!e.withFlashback || flashback(id)));
+        // Sphere of Annihilation: "with mana value less than or equal to the number of void counters on ~", worked out now.
+        const yardFilter = e.filter?.bound ? bindBound(s, e.filter, amountCtx(s, ctx)) : e.filter;
+        const cards = p.graveyard.filter((id) => (!yardFilter || printedMatches(yardFilter, defOf(s, obj(s, id)))) && (!e.filter?.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn) && (!e.withFlashback || flashback(id)));
         const n = cards.length;
         for (const id of cards) {
           // "Creature cards exiled this way": their power as it was in the graveyard (rulings on Szat's Will).

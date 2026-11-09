@@ -1355,9 +1355,16 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const flashback = all.what === "cards with flashback";
     // Shadows' Verdict: "all creature and planeswalker cards with mana value 3 or less from all graveyards".
     const kind = /^(.+?) cards( with mana value \d+ or (?:less|greater))?$/.exec(all.what);
+    // Sphere of Annihilation (body.ts rewrites its sentence): "... with mana value less than or equal to the number of void
+    // counters on ~", worked out as it resolves (TargetSpec.bound; the exile binds it).
+    const bounded = !kind ? /^(.+?) cards with mana value less than or equal to (the number of [a-z]+ counters on ~)$/.exec(all.what) : null;
+    const bound = bounded ? parseBoundCount(bounded[2]!, ctx) : null;
+    if (bounded && !bound) return null;
+    const kindOf = kind ?? bounded;
     // "All cards": the whole graveyard.
     // "All artifact and enchantment cards" (Saprazzan Bailiff): each card that's either.
-    const filter = flashback || all.what === "cards" ? undefined : kind ? parseSearchFilter(`${kind[1]!.replace(/^(artifact|creature|enchantment|instant|sorcery|land|planeswalker) and (artifact|creature|enchantment|instant|sorcery|land|planeswalker)$/, "$1 or $2")} card${kind[2] ?? ""}`) : null;
+    const filter0 = flashback || all.what === "cards" ? undefined : kindOf ? parseSearchFilter(`${kindOf[1]!.replace(/^(artifact|creature|enchantment|instant|sorcery|land|planeswalker) and (artifact|creature|enchantment|instant|sorcery|land|planeswalker)$/, "$1 or $2")} card${kind?.[2] ?? ""}`) : null;
+    const filter = filter0 && bound ? { ...filter0, bound: { key: "manaValue" as const, at: "most" as const, amount: bound }, text: `${filter0.text} with mana value less than or equal to ${bounded![2]}` } : filter0;
     const w = all.whose;
     const who: PlayerRef | null = w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" ? { ref: "eachOpponent" } : w === "your" ? { ref: "you" } : parsePlayer(w.replace(/'s$/, ""), ctx);
     return filter !== null && who ? [{ type: "exileGraveyard", who, ...(filter ? { filter } : {}), ...(flashback ? { withFlashback: true as const } : {}) }] : null;
@@ -1536,6 +1543,19 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
       return null;
     }
     return [{ type: "putInLibrary", what, position: m[2] === "top" ? "top" : "bottom" }];
+  }
+  // Drafna's Restoration: "Put any number of target artifact cards from target player's graveyard on top of their library in
+  // any order": the player is a target too and the cards must be in that player's graveyard (TargetSpec.inGraveyardOfTarget,
+  // as Suffer the Past's), put on that player's library in the order the spell's controller chooses (CR 401.4: the order is
+  // the one the effect gives, here "in any order" for its controller, as Misinformation's rulings say).
+  if ((m = /^Put (any number of target (?:[a-z]+ )?cards) from target player's graveyard on top of their library in any order$/.exec(s))) {
+    const who = parsePlayer("target player", ctx);
+    const pi = ctx.targets.length - 1;
+    const first = ctx.targets.length;
+    const what = who?.ref === "target" ? parseCardTarget(`${m[1]} from a graveyard`, ctx) : null;
+    if (!what || what.ref !== "target" || ctx.targets[pi]?.kind !== "player" || ctx.targets.length !== first + 1 || ctx.targets[first]!.many !== "any") return null;
+    ctx.targets[first] = { ...ctx.targets[first]!, inGraveyardOfTarget: pi, text: `${ctx.targets[first]!.text.replace(/ from a graveyard$/, "")} from that player's graveyard` };
+    return [{ type: "putInLibrary", what, position: "top", youOrder: true }];
   }
   // Misinformation: "Put up to three target cards from an opponent's graveyard on top of their library in any order": all
   // from one opponent's graveyard (into "their" library), in the order the spell's controller chooses (rulings), not
@@ -1719,7 +1739,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Exile target creature an opponent controls until ~ leaves the battlefield" (CR 610.3), "up to one other target
   // creature you control" (Mardu Siegebreaker).
-  if ((m = /^Exile (target .+|up to one (?:other )?target .+|another target .+) until ~ leaves the battlefield$/i.exec(s)) && !ctx.spell) {
+  // Quarantine Field (body.ts rewrites its sentence): "up to X target nonland permanents an opponent controls until ~ leaves
+  // the battlefield, where X is ...": X counted as the targets are chosen (TargetSpec.manyCount), all of them returned together.
+  if ((m = /^Exile (target .+|up to one (?:other )?target .+|another target .+|up to X target .+) until ~ leaves the battlefield$/i.exec(s)) && !ctx.spell && (!/^up to X /i.test(m[1]!) || ctx.whereX)) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "exile", what, until: "sourceLeaves" }] : null;
   }

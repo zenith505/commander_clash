@@ -461,6 +461,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const found = chooseSearch(s, pid, pend.cards, pend.cards.length).filter((id) => !seen.has(defOf(s, obj(s, id)).name) && !!seen.add(defOf(s, obj(s, id)).name)).slice(0, pend.max);
       return [{ type: "searchLibrary", player: pid, found }];
     }
+    // Grim Reminder: a card with the name of a spell the most opponents cast this turn (CR 201.2a), else any; it stays.
+    if (pend.kind === "searchLibrary" && !pend.dig && s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "search" && x.dest.zone === "reveal")) {
+      const hits = (id: ObjectId) => new Set((s.castThisTurn ?? []).filter((c) => c.player !== pid && sameName(c.name, defOf(s, obj(s, id)).name)).map((c) => c.player)).size;
+      const best = [...pend.cards].sort((a, b) => hits(b) - hits(a))[0];
+      return [{ type: "searchLibrary", player: pid, found: best && pend.max > 0 ? [best] : [] }];
+    }
     if (pend.kind === "searchLibrary" && pend.what === "one of those creatures to copy") return [{ type: "searchLibrary", player: pid, found: [[...pend.cards].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
     if (pend.kind === "searchLibrary" && pend.zonesOf !== undefined) {
       const rank = (id: string) => (s.objects[id]!.zone === "hand" ? 1 : 0);

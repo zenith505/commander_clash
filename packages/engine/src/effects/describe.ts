@@ -24,7 +24,9 @@ export function describeDest(d: SearchDest): string {
           ? "into your graveyard"
           : d.zone === "cast"
             ? "to cast"
-            : "into exile";
+            : d.zone === "reveal"
+              ? "to reveal (it stays in your library)"
+              : "into exile";
 }
 
 const sign = (n: Amount) => (typeof n !== "number" ? describeAmount(n) : n >= 0 ? `+${n}` : `${n}`);

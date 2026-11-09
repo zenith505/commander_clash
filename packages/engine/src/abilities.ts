@@ -228,6 +228,8 @@ export type Count =
   | { kind: "sacrificedThisWayManaValue" }
   /** "The total power of the creatures sacrificed this way" (Reign of the Pit): as each last existed, negative powers included (rulings). */
   | { kind: "sacrificedThisWayTotalPower" }
+  /** Danse Macabre: "the toughness of the creature you sacrificed this way": the one this resolution had its controller sacrifice, as it last existed (CR 608.2h); 0 if they sacrificed none (rulings). */
+  | { kind: "sacrificedThisWayToughnessYours" }
   /** "The number of colors that creature was" after "Sacrifice a creature." (Bound): its colors as it last existed (CR 608.2h). */
   | { kind: "sacrificedThisWayColors" }
   /**
@@ -566,6 +568,8 @@ export type Count =
   /** "If an enchantment was put into your graveyard from the battlefield this turn" (Kami of Transience): 1 if one was, as it last existed there (a token too, CR 111.7), else 0. */
   | { kind: "typeToYourGraveyardThisTurn"; type: string; /** "A land you controlled was put into a graveyard from the battlefield this turn" (The Lady of Otaria): any graveyard, controlled by you as it left. */ controlled?: true }
   | { kind: "diedThisTurn"; yours?: true; /** "If a creature died under an opponent's control this turn" (Sidequest: Hunt the Mark). */ opponents?: true; nontoken?: true; /** "For each Zubera that died this turn": of this creature type as it last existed. */ subtype?: string; /** "A non-Skeleton creature died under your control this turn" (Cult Conscript): not of this type as it last existed. */ notSubtype?: string }
+  /** Genesis of the Daleks: "the total power of Daleks that died this turn": of this creature type, each one's power as it last existed (CR 608.2h), anyone's. */
+  | { kind: "diedThisTurnPower"; subtype: string }
   /** "The number of (Treasure) tokens you created this turn" (CR 111.2): tokens its controller created. */
   | { kind: "tokensCreatedThisTurn"; subtype?: string }
   /**
@@ -755,6 +759,8 @@ export interface TargetSpec {
    * CostChoices.targetChoosers and chooserPicks, effects/opponent-choice.ts).
    */
   chosenBy?: "eventPlayer" | "subjectController" | "opponent";
+  /** With `chosenBy` "opponent", Mogg Assassin's "and that opponent chooses target creature": the opponent who chooses is the controller of the permanent chosen for this target slot, not one the ability's controller picks. */
+  chooserOf?: number;
   /** "Target creature of an opponent's choice they control" (Evangelize): controlled by the opponent chosen to choose it (bindChoosers). */
   chooserControls?: true;
   keywords?: string[]; // "creature with flying"
@@ -1274,6 +1280,10 @@ export interface TargetSpec {
    * "up to one", so each opponent's target must be chosen if that opponent has one to target (CR 601.2c; rulings on
    * Sylvan Primordial), and none for one who doesn't. */
   perOpponentRequired?: true;
+  /** With `perOpponentRequired` and `perPlayer`: "for each player, choose target permanent that player controls" (Vaevictis
+   * Asmadi, the Dire): every player's target must be chosen, so with none for one player the ability can't be put on the
+   * stack, or is removed from it (rulings, CR 603.3d). */
+  perPlayerAll?: true;
   /** Original text, for display. */
   text: string;
 }
@@ -4754,6 +4764,32 @@ export type Effect =
    */
   /** Hostile Negotiations: two piles of `n` cards exiled face down from the top of your library, one turned face up by you, an opponent choosing the one for your hand (see runFaceDownPilesEffect). */
   | { type: "faceDownPiles"; n: number }
+  /** Gollum, Scheming Guide: an opponent you choose guesses whether the top card of your library is of the kind chosen just
+   * before (Chosen.landOrNonland), then it's revealed; `right` happens if they guessed right, `wrong` otherwise (an empty
+   * library: never right, rulings). */
+  | { type: "guessTopKind"; right: Effect[]; wrong: Effect[] }
+  /** Vaevictis Asmadi, the Dire: "Those players sacrifice those permanents. Each player who sacrificed a permanent this way
+   * reveals the top card of their library, then puts it onto the battlefield if it's a permanent card." Each target still
+   * legal is sacrificed by its controller, all at once; each player who sacrificed one reveals, and the permanent cards
+   * revealed enter together (rulings). */
+  | { type: "sacrificeTargetsReveal"; what: ObjRef }
+  /** Midnight Crusader Shuttle: "If you gain control of a creature this way, tap it, and it's attacking that player": only
+   * while you control it now, and during combat; it's attacking without having been declared an attacker (CR 506.3,
+   * rulings). */
+  | { type: "attackingNow"; what: ObjRef; whom: PlayerRef }
+  /** Danse Macabre: "Return a creature card put into a graveyard this way to the battlefield under your control" (`n` 1),
+   * "Return up to two creature cards put into graveyards this way ..." (`upTo`): chosen by you among the cards this
+   * resolution's sacrifice put into graveyards, still there (a commander its owner hasn't moved yet too, rulings). */
+  | { type: "returnSacrificedCards"; n: number; upTo?: true }
+  /** Eumidian Wastewaker: "you and defending player each discard a card or sacrifice a permanent. You draw a card for each
+   * land card put into a graveyard this way." In this order, each chooses which and then does it before the next chooses
+   * (rulings); one who can't discard must sacrifice. Land cards only, not land tokens (rulings). */
+  | { type: "discardOrSacrifice"; players: PlayerRef[]; drawPerLand?: true }
+  /** Soulfire Eruption: "For each of them, exile the top card of your library, then ~ deals damage equal to that card's mana
+   * value to that permanent or player. You may play the exiled cards until the end of your next turn." The targets are
+   * done one at a time in APNAP order of the player each is or is controlled by, you choosing the order within each group
+   * (rulings). */
+  | { type: "exileTopDamageEach"; to: { ref: "anyTarget"; index: number; n?: number } }
   | { type: "exiledPiles"; /** Split the Spoils: "separate them into two piles. An opponent chooses one of those piles. Put that pile into your hand and the other into your graveyard": you separate, an opponent chosen as it resolves chooses (rulings). */ youSeparate?: true; /** Death or Glory: "Separate all creature cards in your graveyard into two piles. Exile the pile of an opponent's choice and return the other to the battlefield.": your graveyard's cards matching this, separated where they are (CR 700.3c) by you; the opponent chosen as it resolves picks the pile exiled. */ fromYourGraveyard?: TargetSpec }
   /**
    * Collision of Realms: "Each player shuffles all creatures they own into their library. Each player who shuffled a

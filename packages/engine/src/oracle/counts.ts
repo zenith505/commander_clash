@@ -204,6 +204,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const who = parsePlayer(m[1]!, ctx);
     return who ? { count: { kind: "destroyedThisWayTotalPower", survivorsOf: who } } : null;
   }
+  // Danse Macabre: "Roll a d20 and add the toughness of the creature you sacrificed this way" (after "each player
+  // sacrifices a nontoken creature of their choice").
+  if (ctx?.spell && /^the toughness of the creature you sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayToughnessYours" } };
   // Reign of the Pit: "the total power of the creatures sacrificed this way".
   if (ctx && /^the total power of (?:the )?creatures sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayTotalPower" } };
   // Vicious Betrayal: "for each creature sacrificed this way" after a cost that sacrifices any number is that cost's X (below).

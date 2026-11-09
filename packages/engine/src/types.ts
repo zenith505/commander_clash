@@ -801,8 +801,8 @@ export interface ManaLot {
   hasteType?: string;
   /** Opal Palace's "if you spend this mana to cast your commander": see ManaAbility.spentCommanderCounters. */
   commanderCounters?: true;
-  /** Biophagus: see ManaAbility.spentCreatureCounter. */
-  creatureCounter?: true;
+  /** Biophagus, Guildmages' Forum, Animal Attendant: see ManaAbility.spentCreatureCounter. */
+  creatureCounter?: true | "multicolored" | "nonHuman";
   /** Boseiju, Who Shelters All: see ManaAbility.spentUncounterable. */
   uncounterableInstantSorcery?: true;
   /** "Using mana produced by Tecutlan": the permanent that made it, "id#zoneChanges" (TriggeredAbility.cast.manaFromSelf). */
@@ -1797,7 +1797,7 @@ export interface TurnLog {
   /** Each token created this turn (CR 111.2): who created it and its subtypes then ("Treasure tokens you created"). */
   tokensCreated?: { player: PlayerId; subtypes: string[] }[];
   /** Permanents that entered the battlefield, with their controller, card types and colors as they entered. */
-  entered?: { controller: PlayerId; types: string[]; subtypes?: string[]; colors: Color[]; /** The permanent, for "another" (Éowyn). */ id?: ObjectId; zc?: number; /** A token (Gyome's "nontoken creatures"). */ token?: true; /** It had flying as it entered (Flying Drone's "another creature with flying entered"). */ flying?: true }[];
+  entered?: { controller: PlayerId; types: string[]; subtypes?: string[]; colors: Color[]; /** The permanent, for "another" (Éowyn). */ id?: ObjectId; zc?: number; /** A token (Gyome's "nontoken creatures"). */ token?: true; /** It had flying as it entered (Flying Drone's "another creature with flying entered"). */ flying?: true; /** It had every creature type as it entered (changeling, CR 702.73a). */ allCreatureTypes?: true }[];
   /** Noncreature permanents destroyed by a spell or ability: their controller and the destroying spell's or ability's (Cobra Trap). */
   destroyed?: { controller: PlayerId; by: PlayerId }[];
   /** For each player, the creatures (`id@zoneChanges`) that dealt them damage (Inferno Trap). */

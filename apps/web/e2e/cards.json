@@ -2785,6 +2785,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "46e50ee9-91f8-416e-82fa-f1a76e61fb73",
+  "name": "Belbe's Portal",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "As this artifact enters, choose a creature type.\n{3}, {T}: You may put a creature card of the chosen type from your hand onto the battlefield.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "nem",
+  "releasedAt": "2000-02-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "74c9cc13-c03f-4322-82af-b7bce1f2a0d8",
   "name": "Beloved Beggar // Generous Soul",
   "manaCost": "{1}{W}",
@@ -19027,6 +19049,41 @@
   "set": "csp",
   "releasedAt": "2006-07-21",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "bb9e77c0-eb94-4bba-9b71-1935be280b75",
+  "name": "Masako the Humorless",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Advisor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Advisor"
+  ],
+  "oracleText": "Flash\nTapped creatures you control can block as though they were untapped.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

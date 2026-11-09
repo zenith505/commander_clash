@@ -3,6 +3,7 @@ import type { AbilityBody, Effect } from "../abilities";
 import { addTarget, type Ctx } from "./body";
 import { parseObject, parsePlayer } from "./targets";
 import { parseSentence } from "./sentence";
+import { round320Sentence } from "./round320";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -13,6 +14,9 @@ const pushed = (effects: Effect[], before: Effect[], last: Effect, next: number)
 };
 
 export function round319Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 320's sentences first (oracle/round320.ts).
+  const r320 = round320Sentence(s, sentences, si, ctx, effects);
+  if (r320 !== null) return r320;
   // Gollum, Scheming Guide: "look at the top two cards of your library, put them back in any order, then choose land or
   // nonland. An opponent guesses whether the top card of your library is the chosen kind. Reveal that card. If they
   // guessed right, remove ~ from combat. Otherwise, you draw a card and ~ can't be blocked this turn." You choose the

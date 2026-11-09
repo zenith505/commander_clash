@@ -3996,6 +3996,9 @@ function startNextTurn(s: GameState, skipping = false) {
   // Rasputin Dreamweaver: which permanents that care started this turn untapped (before the untap step, CR 502.3).
   const startedUntapped = s.battlefield.filter((id) => !obj(s, id).tapped && abilitiesOf(s, obj(s, id)).triggers.some((t) => t.ifCond?.kind === "self" && t.ifCond.is === "startedTurnUntapped")).map((id) => `${id}@${obj(s, id).zoneChanges ?? 0}`);
   if (startedUntapped.length) s.turnLog = { startedUntapped };
+  // Power Surge: the untapped lands the active player controls as the turn begins, before the untap step (CR 502.3).
+  const untappedLands = s.battlefield.filter((id) => !obj(s, id).tapped && controllerOf(s, obj(s, id)) === s.activePlayer && objIsType(s, obj(s, id), "Land")).length;
+  if (untappedLands) s.turnLog = { ...s.turnLog, untappedLands };
   s.extraEndSteps = undefined;
   s.extraUpkeeps = undefined;
   s.upkeepPhase = undefined;

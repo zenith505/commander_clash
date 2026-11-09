@@ -123,6 +123,7 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     })(),
     ...(spec.combat ? { combat: spec.combat } : {}),
     ...(spec.untilYourNextTurn ? { untilYourNextTurn: true as const } : {}),
+    ...(spec.thisCombat ? { thisCombat: true as const } : {}),
   };
   // The source of your choice, chosen as it resolves (CR 609.7a): asked first, then the rest is worked out.
   if (spec.by?.choose) {
@@ -246,5 +247,5 @@ export function describeRule(s: GameState, r: DamageRule): string {
   const to = who.length ? ` to ${who.join(" and ")}` : "";
   const what = r.left !== undefined ? `the next ${r.left} ${r.combat === "only" ? "combat " : ""}damage` : r.nextTime ? `the next ${r.combat === "only" ? "combat " : ""}damage` : `all ${r.combat === "only" ? "combat " : r.combat === "non" ? "noncombat " : ""}damage`;
   const dest = r.redirect ? ("sourceController" in r.redirect ? "its controller" : "player" in r.redirect ? player(s, r.redirect.player).name : defOf(s, obj(s, r.redirect.object)).name) : "";
-  return `${what}${by ? ` ${by} would deal` : " that would be dealt"}${to} this turn will be ${dest ? `dealt to ${dest} instead` : "prevented"}`;
+  return `${what}${by ? ` ${by} would deal` : " that would be dealt"}${to} ${r.thisCombat ? "this combat" : "this turn"} will be ${dest ? `dealt to ${dest} instead` : "prevented"}`;
 }

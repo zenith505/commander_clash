@@ -45,6 +45,8 @@ export interface DamageSource {
   ref?: { object: ObjectId; zc: number };
   /** It's a spell (CR 112.1), for "if a spell would deal damage" (Benevolent Unicorn, Fire Servant). */
   spell?: true;
+  /** A permanent with a corruption counter on it (Geyadrone Dihada's protection). */
+  corrupted?: true;
   /** The damage it deals can't be prevented (CR 615.12): all of it, or its combat damage. */
   unpreventable?: "all" | "combat";
   /** Lava Burst's damage to a creature: it can't be dealt instead to another permanent or player (redirection, CR 614.9). */
@@ -60,7 +62,7 @@ export interface DamageSource {
 export function objectSource(s: GameState, o: GameObject): DamageSource {
   const c = characteristics(s, o);
   const zc = o.zone === "battlefield" ? (o.zoneChanges ?? 0) : (s.lastKnown?.[o.id]?.zc ?? o.zoneChanges ?? 0);
-  return { name: c.name, controller: controllerOf(s, o), colors: c.colors, types: c.types, subtypes: c.subtypes, supertypes: c.supertypes, allCreatureTypes: c.allCreatureTypes, keywords: c.keywords, manaValue: c.manaValue, id: o.id, ref: { object: o.id, zc }, ...(wasCastThisTurn(s, o) ? { castThisTurn: true as const } : {}), ...(isRingBearer(s, o) ? { ringBearer: true as const } : {}), ...(o.isCommander ? { commanderId: commanderOf(s, o)?.id ?? o.id } : {}), ...(c.unpreventable ? { unpreventable: c.unpreventable } : {}) };
+  return { name: c.name, controller: controllerOf(s, o), colors: c.colors, types: c.types, subtypes: c.subtypes, supertypes: c.supertypes, allCreatureTypes: c.allCreatureTypes, keywords: c.keywords, manaValue: c.manaValue, id: o.id, ref: { object: o.id, zc }, ...(wasCastThisTurn(s, o) ? { castThisTurn: true as const } : {}), ...(isRingBearer(s, o) ? { ringBearer: true as const } : {}), ...(o.zone === "battlefield" && (o.counters.corruption ?? 0) > 0 ? { corrupted: true as const } : {}), ...(o.isCommander ? { commanderId: commanderOf(s, o)?.id ?? o.id } : {}), ...(c.unpreventable ? { unpreventable: c.unpreventable } : {}) };
 }
 
 /** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix). */

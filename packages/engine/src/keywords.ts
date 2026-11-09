@@ -115,6 +115,8 @@ export interface SourceQuality {
   ringBearer?: true;
   /** Its mana value, a spell's with its X (CR 202.3e), for protection from a mana value (Reaver Titan); none is 0 (CR 202.3a). */
   manaValue?: number;
+  /** A permanent with a corruption counter on it, for Geyadrone Dihada's protection (a spell isn't a permanent, CR 110.1). */
+  corrupted?: true;
 }
 
 /** "Goblins" -> "Goblin", "Elves" -> "Elf", "Sphinxes" -> "Sphinx": a creature type's plural, as protection names it. */
@@ -159,7 +161,7 @@ export function canonicalKeyword(text: string): string | undefined {
   if (!m) return undefined;
   const q = m[1]!;
   if (q === "each of your opponents") return PROTECTION_FROM_OPPONENTS;
-  if (q === "spells" || q === "permanents that were cast this turn") return `Protection from ${q}`;
+  if (q === "spells" || q === "permanents that were cast this turn" || q === "permanents with corruption counters on them") return `Protection from ${q}`;
   if (q === "ring-bearers") return "Protection from Ring-bearers";
   // Ronom Hulk: "protection from snow" (snow permanents, spells and abilities from snow sources); Kitsune Riftwalker:
   // "from Arcane" (Arcane spells, CR 702.16a).
@@ -358,6 +360,9 @@ export function protectedFrom(keywords: readonly string[], src: SourceQuality, h
     if (q === "spells" && src.spell) return true;
     if (q === "permanents that were cast this turn" && src.castThisTurn && !src.spell) return true;
     if (q === "ring-bearers" && src.ringBearer) return true;
+    // Geyadrone Dihada: "protection from permanents with corruption counters on them": only a permanent with one (rulings:
+    // its activated and triggered abilities too), not a spell.
+    if (q === "permanents with corruption counters on them" && src.corrupted && !src.spell) return true;
     if (q === "snow" && src.supertypes?.includes("Snow")) return true;
     if (q === "arcane" && src.subtypes?.includes("Arcane")) return true;
     if ((q === "each color" || q === "all colors") && src.colors.length > 0) return true;

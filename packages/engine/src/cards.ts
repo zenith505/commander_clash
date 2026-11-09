@@ -283,9 +283,11 @@ export const describeAbility = (d: CardDef, text: string) => `${d.name}: ${text.
 /** A permanent that was cast this turn: it entered as its spell resolved, this turn (Emrakul, the World Anew's protection). */
 export const wasCastThisTurn = (s: GameState, o: GameObject) => o.zone === "battlefield" && !!o.wasCast && o.enteredTurn === s.turn;
 /** Its characteristics as a source of protection-relevant quality, with whether it was cast this turn. */
-export const withCastThisTurn = <T extends object>(s: GameState, o: GameObject, c: T): T & { castThisTurn?: true; ringBearer?: true } => {
-  const out: T & { castThisTurn?: true; ringBearer?: true } = wasCastThisTurn(s, o) ? { ...c, castThisTurn: true as const } : c;
-  return isRingBearer(s, o) ? { ...out, ringBearer: true as const } : out;
+export const withCastThisTurn = <T extends object>(s: GameState, o: GameObject, c: T): T & { castThisTurn?: true; ringBearer?: true; corrupted?: true } => {
+  const out: T & { castThisTurn?: true; ringBearer?: true; corrupted?: true } = wasCastThisTurn(s, o) ? { ...c, castThisTurn: true as const } : c;
+  // Geyadrone Dihada: a permanent with a corruption counter on it.
+  const corrupt = o.zone === "battlefield" && (o.counters.corruption ?? 0) > 0 ? { ...out, corrupted: true as const } : out;
+  return isRingBearer(s, o) ? { ...corrupt, ringBearer: true as const } : corrupt;
 };
 
 export const isPermanentCard = (d: CardDef) =>

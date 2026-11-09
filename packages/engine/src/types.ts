@@ -51,6 +51,8 @@ export interface DamageRule {
   base?: string;
   /** "Until your next turn" (Ascent of the Worthy): it lasts past this turn, until `controller`'s next turn begins (CR 611.2b). */
   untilYourNextTurn?: true;
+  /** "This combat" (Suppressor Skyguard): removed as the end of combat step ends (CR 511.3). */
+  thisCombat?: true;
   /** Gloom Surgeon: "prevent that damage and exile that many cards from the top of your library" (CR 615.5): its controller exiles them, even if the damage can't be prevented (rulings, 615.12). */
   exileTop?: true;
   gainLife?: { colors?: Color[] };

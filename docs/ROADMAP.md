@@ -7355,7 +7355,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   line, with the bot choosing the type with the most targets; the type picker opens while casting and can call the cast
   off (browser tests). Myr Superion: "Spend only mana produced by creatures to cast ~" (CR 106.6, 109.2: creatures on the
   battlefield; not Elvish Spirit Guide's mana from a hand, rulings). The bot doesn't activate Bargaining Table, as with
-  other "{N}, {T}: Draw a card" abilities. +7 (30,775 of 31,936 with B161).
+  other "{N}, {T}: Draw a card" abilities. +7 (30,783 of 31,936 with B161 and round 321).
 - Out after round B162 (looked at, not done): Synthesis Pod (reveal until a card with mana value one more than the exiled
   spell's, then cast it free: the Nivmagus cost works, the reveal-and-cast doesn't yet), Imperiosaur (mana from basic
   lands isn't told apart in the mana pool), Graceful Takedown (two groups of targets), Peace Talks (activated abilities

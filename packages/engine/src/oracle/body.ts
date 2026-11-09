@@ -1504,6 +1504,44 @@ function wandPunisher(who: PlayerRef, landLife: number): Effect {
  * reads parseFaceDownPlay's: the last effect and the next sentence's index in parseFaceDownPlay's shape (the effects
  * before the last one already pushed), "fail" for one that can't be read, or null when it isn't one of them.
  */
+/** Lane B round B164's text rewrites, outside parseBodyText (at TS2563's limit). */
+function roundB164Text(text: string): string {
+  // Contested Game Ball: "the attacking player gains control of ~ and untaps it": two instructions about ~, in order.
+  text = text.replace(/^[Tt]he attacking player gains control of ~ and untaps it\.$/, "The attacking player gains control of ~. Untap ~.");
+  // Contested Game Ball: "Draw a card and put a point counter on ~. Then if it has five or more point counters on it,
+  // sacrifice it and create a Treasure token": ~'s counters as it resolves (rulings), ~ the one sacrificed.
+  text = text.replace(/^(Draw a card and put an? ([a-z]+) counter on ~\.) Then if it has ([a-z]+) or more \2 counters on it, sacrifice it and (create [^.]+)\.$/, "$1 If there are $3 or more $2 counters on ~, sacrifice ~ and $4.");
+  // Sungold Sentinel: "Choose a color. ~ gains hexproof from that color until end of turn and can't be blocked by
+  // creatures of that color this turn": two instructions about ~ with the color chosen as it resolves (as Skrelv's).
+  text = text.replace(/(^|\. )Choose a color\. ~ gains hexproof from that color until end of turn and can't be blocked by creatures of that color this turn\./, "$1Choose a color. ~ gains hexproof from that color until end of turn. ~ can't be blocked by creatures of that color this turn.");
+  return text;
+}
+
+/** Lane B round B164's sentences, chained first (parseBodyText is at TS2563's limit). */
+function roundB164Sentence(s: string, sentences: string[], si: number, ctx: Ctx): { effect: Effect; next: number } | "fail" | null {
+  // Arni Brokenbrow: "You may have ~'s base power become 1 plus the greatest power among other creatures you control
+  // until end of turn": chosen and counted as it resolves, the actual power of that creature, negative too, and 1 with
+  // none (rulings); set in layer 7b, so modifiers and counters still apply on top (CR 613.4b).
+  const arni = !ctx.spell ? /^[Yy]ou may have ~'s base power become (\d+) plus the greatest power among other creatures you control until end of turn$/.exec(s) : null;
+  if (arni) {
+    const c = parseCount("the greatest power among other creatures you control", ctx);
+    if (!c || typeof c !== "object" || c.count.kind !== "greatestPower" || !c.count.other || c.count.toughness || c.count.total || c.count.least || Object.keys(c).length !== 1) return "fail";
+    const power: AmountExpr = { count: { ...c.count, signedMax: true }, plus: Number(arni[1]), signed: true };
+    return { effect: { type: "may", effects: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPower", power }], duration: "endOfTurn" }], text: `have ~'s base power become ${arni[1]} plus the greatest power among other creatures you control until end of turn` }, next: si + 1 };
+  }
+  // Isu the Abominable: "you may pay {G}, {W}, or {U}. If you do, put a +1/+1 counter on ~": one of the three, which one
+  // chosen as it resolves (CR 608.2d), then paid; the instruction after it as with any "if you do".
+  const payOneOf = /^[Yy]ou may pay ((?:\{[WUBRGC0-9]\}, )+)or (\{[WUBRGC0-9]\})$/.exec(s);
+  if (payOneOf) {
+    const costs = [...payOneOf[1]!.split(", ").filter(Boolean), payOneOf[2]!];
+    const then = /^If you do, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
+    const inner = then ? parseOne(then[1]!.charAt(0).toUpperCase() + then[1]!.slice(1), ctx) : null;
+    if (!then || !inner?.length || inner.some((e) => pauses(e)) || new Set(costs).size !== costs.length) return "fail";
+    return { effect: { type: "may", effects: inner, pay: { mana: costs[0]! }, payOneOf: costs, text: `pay ${payOneOf[1]}or ${payOneOf[2]}. If you do, ${then[1]}` }, next: si + 2 };
+  }
+  return null;
+}
+
 /** Lane B round B160's sentences, chained first (parseBodyText is at TS2563's limit). */
 function roundB160Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
   const next = (k = 1) => (sentences[si + k] ?? "").replace(/\.$/, "");
@@ -2941,6 +2979,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Legion Loyalist: "creatures you control gain first strike and trample until end of turn and can't be blocked by
   // creature tokens this turn": two instructions about the same creatures (those there as it resolves, CR 611.2c).
   text = text.replace(/(^|\. )([Cc]reatures you control) gain ([^.]+?) until end of turn and can't be blocked by ([^.]+?) this turn\./, "$1$2 gain $3 until end of turn. Creatures you control can't be blocked by $4 this turn.");
+  text = roundB164Text(text);
   // Kitesail Larcenist: "For each player, choose up to one other target artifact or creature that player controls. For as
   // long as ~ remains on the battlefield, the chosen permanents become Treasure artifacts with "..." and lose all other
   // abilities." One instruction for each player's target; each loses its other card types and subtypes too, keeping its
@@ -7044,7 +7083,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
     // rounds B158, B157, B156, B155, B154, B153, B152, B151, B148 and 311 to 317's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB160Sentence(s, sentences, si, ctx, effects) ?? roundB159Sentence(s, sentences, si, ctx, effects) ?? roundB158Sentence(s, sentences, si, ctx, effects) ?? roundB157Sentence(s, sentences, si, ctx, effects) ?? roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    const faceDown = roundB164Sentence(s, sentences, si, ctx) ?? roundB160Sentence(s, sentences, si, ctx, effects) ?? roundB159Sentence(s, sentences, si, ctx, effects) ?? roundB158Sentence(s, sentences, si, ctx, effects) ?? roundB157Sentence(s, sentences, si, ctx, effects) ?? roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);

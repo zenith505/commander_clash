@@ -167,6 +167,8 @@ export type Count =
   | { kind: "affectedManaValue" }
   /** "For each of its colors" in a static ability (Civic Saber): the colors of the permanent the effect is applied to. */
   | { kind: "affectedColors" }
+  /** "For each of its creature types" in a static ability (Diligent Zookeeper): the creature types of the permanent the effect is applied to, as layer 4 left them (CR 205.3m; changeling, every one, CR 702.73a). */
+  | { kind: "affectedCreatureTypes" }
   /** "For each poison counter its controller has" (Phyresis Outbreak): of the affected permanent's controller, counted for each one as the effect is made (rulings). */
   | { kind: "affectedControllerPoison" }
   /** "For each card in its controller's hand" (Righteous Authority): the hand of the affected permanent's controller. */
@@ -478,6 +480,8 @@ export type Count =
       inEventGroup?: true;
       /** "The least power among creatures on the battlefield" (Wretched Banquet): the least instead, 0 with none. */
       least?: true;
+      /** Arni Brokenbrow: "1 plus the greatest power among other creatures you control": a negative greatest is kept (rulings), still 0 with none. */
+      signedMax?: true;
     }
   /** "The greatest mana value among permanents you control": 0 when there are none; X is 0 on the battlefield (CR 202.3, 107.3). */
   /** `total`: "the total mana value of historic permanents you control" (Excalibur), the sum instead. */
@@ -2029,6 +2033,8 @@ export type Modification =
   | { kind: "minBlockers"; n: number }
   /** Tromokratis: "can't be blocked unless all creatures defending player controls block it" (CR 509.1b): every creature that player controls, tapped ones included (rulings). */
   | { kind: "blockedOnlyByAll" }
+  /** Become the Pilot: "can't be blocked unless it's attacking its owner or a permanent its owner controls" (CR 509.1b): only a planeswalker or battle is a permanent that can be attacked (rulings, CR 506.2, 508.1b). */
+  | { kind: "cantBeBlockedUnlessAttackingOwner" }
   /** "Can't attack unless defending player controls an Island": checked per defending player (CR 508.1c). */
   | { kind: "cantAttackUnless"; defenderControls: TargetSpec }
   /** "Can't attack unless defending player has seven or more cards in their graveyard" (Vantress Gargoyle). */
@@ -4455,7 +4461,7 @@ export type Effect =
    * chooses X as it resolves (CR 107.1c, 608.2d), at most `max` ("where X is less than or equal to the amount of life you
    * gained", Well of Lost Dreams), then pays `pay` with that X; `effects` use it as X.
    */
-  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; /** Pardic Dragon: "that player may ...": this player decides, not the ability's controller (no payment). */ decider?: PlayerRef; /** Learn's "you may discard a card" (CR 701.48a): a Retriever Phoenix in the player's graveyard may replace the whole learn first (CompiledCard.returnInsteadOfLearn). */ learn?: true; /** The payment is ~'s cumulative upkeep (CR 702.24a), for mana spent "only to pay cumulative upkeep costs". */ cumulativeUpkeep?: true; /** The payment is ~'s echo cost (CR 702.30a): Thick-Skinned Goblin lets {0} be paid instead. */ echo?: true; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G"; /** "You may pay any amount of life" (Necrodominance): X life, up to the life the player could pay (CR 119.4). */ life?: true; /** "You may pay any amount of {E}" (Galvanic Discharge): X energy, up to the energy the player has (CR 107.14). */ energy?: true; /** "You may pay one or more {E}. If you do" (Localized Destruction): paying none is not paying. */ atLeastOne?: true; /** "You may collect evidence X" (Incinerator of the Guilty): X chosen first, from 0 to the total mana value of the cards in the graveyard, then the cards (CR 701.59a); `effects` start with that collectEvidence. */ evidence?: true; /** "You may pay {1}{W} any number of times" (Intrepid Adversary): `pay` X times, X chosen first (none is not paying), at most as many times as the player could pay. */ times?: true }; /** "Pay {E}{E}. If you can't, ..." (Greenbelt Rampager): energy paid whenever it can be, with no choice (rulings). */ must?: true; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /** "Unless you pay {1} for each card in your hand" (Megatherium): `pay` that many times, counted as it resolves. */ payTimes?: Amount; /** "Unless you pay its mana cost" (Pendrell Flux): the source's mana cost as it resolves, X as 0 (unpayable with none, CR 118.6). */ payManaCost?: true; /**
+  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; /** Isu the Abominable: "you may pay {G}, {W}, or {U}": one of these mana costs, which one chosen first (only those the player could pay), then paid (`pay` is the first). */ payOneOf?: string[]; keep?: boolean; /** Pardic Dragon: "that player may ...": this player decides, not the ability's controller (no payment). */ decider?: PlayerRef; /** Learn's "you may discard a card" (CR 701.48a): a Retriever Phoenix in the player's graveyard may replace the whole learn first (CompiledCard.returnInsteadOfLearn). */ learn?: true; /** The payment is ~'s cumulative upkeep (CR 702.24a), for mana spent "only to pay cumulative upkeep costs". */ cumulativeUpkeep?: true; /** The payment is ~'s echo cost (CR 702.30a): Thick-Skinned Goblin lets {0} be paid instead. */ echo?: true; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G"; /** "You may pay any amount of life" (Necrodominance): X life, up to the life the player could pay (CR 119.4). */ life?: true; /** "You may pay any amount of {E}" (Galvanic Discharge): X energy, up to the energy the player has (CR 107.14). */ energy?: true; /** "You may pay one or more {E}. If you do" (Localized Destruction): paying none is not paying. */ atLeastOne?: true; /** "You may collect evidence X" (Incinerator of the Guilty): X chosen first, from 0 to the total mana value of the cards in the graveyard, then the cards (CR 701.59a); `effects` start with that collectEvidence. */ evidence?: true; /** "You may pay {1}{W} any number of times" (Intrepid Adversary): `pay` X times, X chosen first (none is not paying), at most as many times as the player could pay. */ times?: true }; /** "Pay {E}{E}. If you can't, ..." (Greenbelt Rampager): energy paid whenever it can be, with no choice (rulings). */ must?: true; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /** "Unless you pay {1} for each card in your hand" (Megatherium): `pay` that many times, counted as it resolves. */ payTimes?: Amount; /** "Unless you pay its mana cost" (Pendrell Flux): the source's mana cost as it resolves, X as 0 (unpayable with none, CR 118.6). */ payManaCost?: true; /**
    * "For each opponent, you may put up to one target creature card from that player's graveyard onto the battlefield"
    * (Sepulchral Primordial): asked about each target in turn, then done at once to the ones chosen (rulings: they enter
    * simultaneously). The targets turned down aren't affected.
@@ -7353,6 +7359,11 @@ export interface CompiledCard {
    * cast, before its targets (CostChoices.creatureType, rulings), its one target spec (`chosen` "type") bound to it.
    */
   castChooseType?: true;
+  /**
+   * Spoils of War: "X is the number of artifact and/or creature cards in an opponent's graveyard as you cast ~": X set by its
+   * text as it's cast (CR 107.3c, rulings), the opponent chosen then (CostChoices.xOpponent); cards like `filter` counted.
+   */
+  castXIs?: { opponentGraveyard: TargetSpec };
   /**
    * Myr Superion: "Spend only mana produced by creatures to cast ~": its whole total cost (CR 601.2f-h) from mana a creature
    * on the battlefield made (CR 106.3, 109.2); not a creature card's elsewhere (Elvish Spirit Guide, rulings).

@@ -24,7 +24,7 @@ import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
 import { liveEmblems } from "./emblems";
-import { bindChosenKeywords, CHOSEN_LAND_TYPE, COLOR_WORD, CREATURE_TYPES, IDENTITY_PROTECTION, isLandwalk, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, YOURS_COLORS_PROTECTION, protectionFromCardTypes, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
+import { bindChosenKeywords, CHOSEN_LAND_TYPE, COLOR_WORD, CREATURE_TYPES, IDENTITY_PROTECTION, isLandwalk, YOURS_BASIC_LANDWALK, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, YOURS_COLORS_PROTECTION, protectionFromCardTypes, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
 import { bindGrantSource, compileCard, compileGranted, QUOTED_SOURCE_NAME } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
@@ -215,6 +215,8 @@ export interface Characteristics {
   minBlockers: number;
   /** Tromokratis: blocked only by all the creatures its defending player controls (CR 509.1b). */
   blockedOnlyByAll?: true;
+  /** Become the Pilot: can't be blocked unless it's attacking its owner or a permanent its owner controls (CR 509.1b). */
+  cantBeBlockedUnlessAttackingOwner?: true;
   /**
    * The players who goaded it (CR 701.15), or whose effect asks the same of it without goading it (Kardur): it attacks
    * each combat if able, and a player other than them if able.
@@ -1507,6 +1509,13 @@ function colorsAmongYours(chars: CharMap, pid: PlayerId): Color[] {
   return (["W", "U", "B", "R", "G"] as Color[]).filter((col) => all.has(col));
 }
 
+/** The basic land types among the lands this player controls, as layer 4 left them (Magnigoth Treefolk's domain). */
+function basicLandTypesAmongYours(chars: CharMap, pid: PlayerId): string[] {
+  const all = new Set<string>();
+  for (const c of chars.values()) if (c.controller === pid && c.types.includes("Land")) for (const t of c.subtypes) all.add(t);
+  return ["Plains", "Island", "Swamp", "Mountain", "Forest"].filter((t) => all.has(t));
+}
+
 function controllerOfInst(e: Inst, chars: CharMap): PlayerId {
   if (e.controller !== undefined) return e.controller;
   return chars.get(e.sourceId!)!.controller;
@@ -1725,7 +1734,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "addKeywords":
       // "Has protection from the chosen color": the color chosen as the source entered.
       // Empty-Shrine Kannushi: "protection from each color among permanents you control", the colors layer 5 left them.
-      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) || m.keywords.includes(YOURS_COLORS_PROTECTION) || m.keywords.some((k) => k.startsWith(LINKED_CARD_KEYWORD)) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : k === YOURS_COLORS_PROTECTION ? colorsAmongYours(chars, controllerOfInst(e, chars)).map((col) => `Protection from ${COLOR_WORD[col]}`) : k.startsWith(LINKED_CARD_KEYWORD) ? linkedCardKeyword(s, e.sourceId, k.slice(LINKED_CARD_KEYWORD.length)) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors, e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.parity : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.number : undefined)) {
+      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) || m.keywords.includes(YOURS_COLORS_PROTECTION) || m.keywords.includes(YOURS_BASIC_LANDWALK) || m.keywords.some((k) => k.startsWith(LINKED_CARD_KEYWORD)) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : k === YOURS_COLORS_PROTECTION ? colorsAmongYours(chars, controllerOfInst(e, chars)).map((col) => `Protection from ${COLOR_WORD[col]}`) : k === YOURS_BASIC_LANDWALK ? basicLandTypesAmongYours(chars, controllerOfInst(e, chars)).map((t) => `${t}walk`) : k.startsWith(LINKED_CARD_KEYWORD) ? linkedCardKeyword(s, e.sourceId, k.slice(LINKED_CARD_KEYWORD.length)) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors, e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.parity : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.number : undefined)) {
         const key = k.toLowerCase();
         if (/^ward\b/i.test(k)) delete c.wardLost;
         if (!c.keywords.some((x) => sameCI(x, k))) {
@@ -1999,6 +2008,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "blockedOnlyByAll":
       c.blockedOnlyByAll = true;
+      return;
+    case "cantBeBlockedUnlessAttackingOwner":
+      c.cantBeBlockedUnlessAttackingOwner = true;
       return;
     case "cantAttackUnless":
       c.attackUnless.push(m.defenderControls);

@@ -181,6 +181,15 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
       return o ? (view(o)?.colors.length ?? 0) : 0;
     }
+    case "affectedCreatureTypes": {
+      // Diligent Zookeeper: the affected creature's creature types as layer 4 left them (CR 613.1d), every one with
+      // changeling (CR 702.73a); its other subtypes aren't creature types (CR 205.3m).
+      const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      const ch = o && view(o);
+      if (!ch) return 0;
+      if (ch.allCreatureTypes && ch.types.includes("Creature")) return CREATURE_TYPES.size;
+      return new Set(ch.subtypes.filter((t) => CREATURE_TYPES.has(t))).size;
+    }
     case "affectedCounters": {
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
       if (c.counter === ANY_COUNTER) return Object.values(o?.counters ?? {}).reduce((a, b) => a + Math.max(0, b ?? 0), 0);
@@ -1135,6 +1144,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       // 0 with none, or with only negative values (rulings on Inscription of Abundance: no life gained or lost).
       let best = 0;
       let least: number | undefined;
+      let most: number | undefined;
       const filter = bindChosen(c.filter, ctx.chosen);
       const whose = c.whose && refPlayers(s, c.whose, ctx);
       for (const id of s.battlefield) {
@@ -1146,6 +1156,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
           const n = c.toughness ? ch.toughness : ch.power;
           best = c.total ? best + n : Math.max(best, n);
           least = Math.min(least ?? n, n);
+          most = Math.max(most ?? n, n);
         }
       }
       // Those of the event's group that have left the battlefield count as they last existed (Witch-king's rulings).
@@ -1155,6 +1166,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
           const lk = s.lastKnown?.[g.id];
           if (o && (o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== g.zc) && lk?.zc === g.zc) best += (c.toughness ? lk.toughness : lk.power) ?? 0;
         }
+      if (c.signedMax) return most ?? 0;
       return c.least ? (least ?? 0) : best;
     }
     case "cardsInExile": {
@@ -1356,6 +1368,8 @@ function describeCount(c: Count): string {
       return "its mana value";
     case "affectedColors":
       return "#its colors";
+    case "affectedCreatureTypes":
+      return "#its creature types";
     case "affectedControllerHand":
       return "cards in its controller's hand";
     case "affectedControllerPoison":

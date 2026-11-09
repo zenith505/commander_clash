@@ -25,6 +25,7 @@ import {
   abilityProblem,
   loyaltyChange,
   definedX,
+  definedCastX,
   faceUpWays,
   faceUpFormsOf,
   faceUpManaCost,
@@ -1686,6 +1687,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Command Beacon with two commanders: the one that costs the most to cast from the command zone.
     // Spellskite: the target of ours the spell or ability would hurt most, else the first.
     // "Ward—Discard a card or pay {2}": the mana if we have it, else a card, else neither (the spell is countered).
+    // Isu the Abominable: "you may pay {G}, {W}, or {U}": a +1/+1 counter is worth one mana; the first we can pay (the
+    // payment itself is the yes or no that follows).
+    if (pend.kind === "chooseOption" && pend.what === "payWhich") return [{ type: "chooseOption", player: pid, choice: pend.options.find((o) => o !== "none") ?? "none" }];
     if (pend.kind === "chooseOption" && pend.what === "unlessWay") {
       const u = s.resolving?.body.effects.find((e) => e.type === "counterUnlessPays");
       const ways = u?.type === "counterUnlessPays" && u.unless.orElse ? [u.unless, u.unless.orElse] : [];
@@ -3374,11 +3378,24 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   }
   // Nissa, Steward of Elements: X loyalty, so X 0 would put it straight into the graveyard (CR 306.5b, 704.5i).
   if (cost.hasX && d.loyalty === "X") xs = xs.filter((x) => x !== undefined && x >= 1);
+  // Spoils of War: X is set by the chosen opponent's graveyard (CR 107.3c): the opponent with the most such cards, and
+  // only when that's at least 1 (no counters otherwise).
+  const xOpp = compileCard(d).castXIs ? botXOpponent(s, pid, id) : undefined;
+  if (compileCard(d).castXIs) {
+    const fx = xOpp !== undefined ? definedCastX(s, pid, obj(s, id), { xOpponent: xOpp }) : undefined;
+    xs = fx ? [fx] : [];
+  }
   for (const x of xs) {
     const plan = castPlanWithX(s, pid, id, free, x, via, alt);
     if (plan) return plan;
   }
   return null;
+}
+
+/** Spoils of War: the opponent whose graveyard has the most cards its X counts (the first in turn order on a tie). */
+function botXOpponent(s: GameState, pid: PlayerId, id: ObjectId): PlayerId | undefined {
+  const count = (p: PlayerId) => definedCastX(s, pid, obj(s, id), { xOpponent: p }) ?? 0;
+  return opponents(s, pid).sort((a, b) => count(b) - count(a))[0];
 }
 
 /**
@@ -4022,6 +4039,10 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
     const num = castNumberFor(s, id, targets ?? undefined);
     if (num !== undefined) e.number = num;
     if (castType) e.creatureType = castType;
+    if (compileCard(castDef(s, id, alt)).castXIs) {
+      const xo = botXOpponent(s, pid, id);
+      if (xo !== undefined) e.xOpponent = xo;
+    }
     if (costOr === undefined || planCast(s, pid, id, targets ?? undefined, modes, "auto", x, { ...e, ...(via ? { via } : {}), ...(alt ? { alt } : {}) })) {
       extra = e;
       break;
@@ -4722,6 +4743,9 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     const me = r.item.sourceId ? s.objects[r.item.sourceId] : undefined;
     if (!me || me.zone !== "battlefield") return false;
     const now = power(s, me) - (me.counters["+1/+1"] ?? 0) + (me.counters["-1/-1"] ?? 0);
+    // Arni Brokenbrow: "1 plus the greatest power among other creatures you control": that amount now.
+    const pw = setPow.power;
+    if (typeof pw === "object" && "count" in pw && pw.count.kind === "greatestPower" && pw.count.signedMax) return evalAmount(s, pw, { controller: pid, sourceId: me.id }) > now;
     const sub = r.item.subject ? s.objects[r.item.subject.id] : undefined;
     return !!sub && sub.zone === "battlefield" && power(s, sub) > now;
   }

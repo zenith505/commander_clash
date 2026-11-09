@@ -1,6 +1,6 @@
 import type { Amount, AmountExpr, Affects, Modification, MostStat, StaticAbility, StaticCondition, CostMod, EntersChoice, EntersCondition, TargetSpec, TurnPoint, Untargetable } from "../abilities";
 import { ANY_COUNTER } from "../abilities";
-import { CHOSEN_KEYWORDS, CREATURE_TYPES, LINKED_TYPES_PROTECTION, SUPPORTED_KEYWORDS, subtypeSet } from "../keywords";
+import { CHOSEN_KEYWORDS, CREATURE_TYPES, LINKED_TYPES_PROTECTION, YOURS_BASIC_LANDWALK, SUPPORTED_KEYWORDS, subtypeSet } from "../keywords";
 import { STARTING_LIFE, type Color } from "../types";
 import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, TYPE_WORDS, capital, singular, singularWord } from "./words";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
@@ -2523,6 +2523,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't be blocked by more than one creature$/.test(rest)) return [{ kind: "maxOneBlocker" }];
   if ((m = new RegExp(`^can't be blocked except by ${NUM} or more creatures$`).exec(rest)) && num(m[1]!) >= 2) return [{ kind: "minBlockers", n: num(m[1]!) }];
   if (rest === "can't be blocked unless all creatures defending player controls block it") return [{ kind: "blockedOnlyByAll" }];
+  if (rest === "can't be blocked unless it's attacking its owner or a permanent its owner controls") return [{ kind: "cantBeBlockedUnlessAttackingOwner" }];
   // "Can't be blocked except by creatures with flying or reach", "... except by black creatures", "... except by
   // Walls and/or creatures with flying" (CR 509.1b).
   // "Can't be blocked except by Krakens, Leviathans, Octopuses, and Serpents" (Serpent of Yawning Depths): a creature of
@@ -2619,6 +2620,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
 }
 
 export function parseStatic(line: string): StaticAbility | null {
+  // Magnigoth Treefolk: "Domain — For each basic land type among lands you control, ~ has landwalk of that type": each
+  // basic land type among them as the layers apply it (YOURS_BASIC_LANDWALK; the ability word has no rules meaning, CR 207.2c).
+  if (/^(?:Domain — )?For each basic land type among lands you control, ~ has landwalk of that type\.$/.test(line)) return { affects: { kind: "self" }, mods: [{ kind: "addKeywords", keywords: [YOURS_BASIC_LANDWALK] }], text: line };
   // Seafarer's Quay: "Blue legendary creatures you control have "bands with other legendary creatures."": the keyword
   // ability "bands with other [quality]" (CR 702.22b-c) granted in quotes, the same as unquoted.
   const bwo = /^(.+) have "(bands with other [^"]+)\."$/.exec(line);
@@ -3308,6 +3312,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   }
   // "~ gets +1/+1 for each artifact you control": counted continuously (CR 611.3a).
   const each = new RegExp(`^(gets? ${PT}/${PT}) for each (.+)$`).exec(m[2]!);
+  // Diligent Zookeeper: "gets +1/+1 for each of its creature types, to a maximum of 10": never more than +10/+10.
+  const capAt = each && each[1] === "gets +1/+1" ? /, to a maximum of (\d+)$/.exec(each[4]!) : null;
+  if (capAt) each![4] = each![4]!.slice(0, capAt.index);
   // "~ has "Whenever Kosei deals combat damage ..."": the name in an ability it gives itself is that object (CR 201.5a).
   const said = affects.kind === "self" ? m[2]!.replaceAll(QUOTED_SOURCE_NAME, "~") : m[2]!;
   let mods = parseStaticMods(each ? each[1]! : said);
@@ -3364,8 +3371,10 @@ function parseStaticLine(line: string): StaticAbility | null {
     const per = masterwork ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], controller: "you" as const, text: each[4]! }, sharesTypeWithAffected: true as const } } : mirror ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], controller: "you" as const, text: "creature you control" }, sameNameAsAffected: true as const } } : coat ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], text: each[4]! }, sharesTypeWithAffected: true as const } } : attacks ? { count: { kind: "timesAffectedAttacked" as const } } : bushido ? { count: { kind: "affectedBushido" as const } } : ownCounters ? { count: { kind: "affectedCounters" as const, counter: counterKind(ownCounters[1]!) } } : attachedCounters ? { count: { kind: "affectedCounters" as const, counter: ANY_COUNTER } } : counts(parseCount(each[4]!, null, true), each[4]!);
     const pt = mods[0];
     if (!per || mods.length !== 1 || pt?.kind !== "modifyPT") return null;
-    const [p, t] = [scaleAmount(pt.power, ofAffected(per, affects, m[1]!)), scaleAmount(pt.toughness, ofAffected(per, affects, m[1]!))];
-    if (p === null || t === null) return null;
+    const [p0, t0] = [scaleAmount(pt.power, ofAffected(per, affects, m[1]!)), scaleAmount(pt.toughness, ofAffected(per, affects, m[1]!))];
+    if (p0 === null || t0 === null) return null;
+    const [p, t] = capAt ? [p0, t0].map((a) => (typeof a === "object" && "count" in a ? { ...a, max: Number(capAt[1]) } : null)) : [p0, t0];
+    if (p === null || p === undefined || t === null || t === undefined) return null;
     mods = [{ kind: "modifyPT", power: p, toughness: t }, ...alsoHas];
   }
   // Elturel Survivors: "where X is the number of lands defending player controls": the player ~ is attacking (or whose

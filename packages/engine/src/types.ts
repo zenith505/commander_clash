@@ -2708,6 +2708,8 @@ export interface Resolving {
   rolled?: { sides: number; naturals: number[]; result: number; /** "The other result" (Effect roll's chooseOne). */ other?: number };
   /** "Each player rolls a d20" (Chaos Dragon): each player's result. */
   rolledEach?: Partial<Record<PlayerId, number>>;
+  /** Jester's Mask: how many cards this resolution put on top of a library from a hand (Count handPutOnTopThisWay). */
+  handPutOnTop?: number;
   scratch?: {
     /** Effect "landTypeSwap" (Vision Charm): the land type chosen first, then the basic land type chosen second. */
     swapFrom?: string;
@@ -2758,6 +2760,9 @@ export interface Resolving {
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
     /** "Each player puts a card from their hand on top of their library": the players whose cards have moved. */
     handTopDone?: Record<string, true>;
+    /** Distended Mindbender (takeFromHand `also`): which of its two picks comes next, and the cards picked so far. */
+    alsoStep?: number;
+    alsoPicked?: ObjectId[];
     /** Library of Leng: the discarded cards each player put on top of their library instead, the first ending on top. */
     toTop?: Record<string, ObjectId[]>;
     /** The cards each player discards at random, picked before they're asked about Library of Leng. */

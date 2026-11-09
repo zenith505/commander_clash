@@ -1,6 +1,6 @@
 # Roadmap
 
-30,705 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,714 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,970 of 4,988 (99%), top 10,000: 9,756 of
 9,979 (97%).
 
@@ -168,7 +168,7 @@ line blocks.
    source you control), Amped Raptor (casting a card by paying energy instead of its mana cost), Repeated
    Reverberation (a delayed copy of the next instant, sorcery or loyalty ability), Scuttlemutt ("the color or colors of your choice" needs a multi-color
    picker), Role Reversal (done in round 273), Shifting Loyalties, Daring Thief and The Trickster-God's Heist (two targets that "share a
-   card type" or "permanent type": no target rule between two targets yet), Conjured Currency ("target permanent you
+   card type" or "permanent type": no target rule between two targets yet), Conjured Currency (done in round B158) ("target permanent you
    neither own nor control"), Visions of Duplicity (flashback cheaper by a commander's mana value). Round 173 went
    down the list from Godsend to Dovin, Hand of Control (rank 8,497), taking the cards that parse with small pieces,
    and took the other cards that share their mechanics wherever they are in the list: exchanging control (Switcheroo,
@@ -3740,7 +3740,7 @@ line blocks.
      name into your hand" (Desperate Research, Wood Sage (done in round B137), Tamiyo), the chosen card
      from a revealed hand (Lobotomy, Shimian Specter, Pick the Brain, Reap Intellect), Deadly Cover-Up, Deicide ("if the
      exiled card is a God card"), Invasive Surgery, Kotose, "look at an opponent's hand, then choose any card name"
-     (Sorcerous Spyglass, Anointed Peacekeeper), Alpine Moon, Skyseer's Chariot, Cheering Fanatic, Null Chamber, Booby
+     (Sorcerous Spyglass, Anointed Peacekeeper), Alpine Moon, Skyseer's Chariot, Cheering Fanatic (done in round B158), Null Chamber, Booby
      Trap, Petrified Hamlet, names another player chooses (Conundrum Sphinx, Petra Sphinx, Vexing Arcanix), random
      cards from an opponent's hand (Dementia Sliver (done in round B127), Nebuchadnezzar), Mindblaze (done in round B129), Liar's Pendulum, Lammastide
      Weave ("its mana value"), "an additional ... for each card named ~" (Growth Cycle, Rune Snag), "as you cast ~"
@@ -5203,7 +5203,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Doomsday Specter. +25 (27,918 of 31,936 with rounds 210-213 and B43). Ultron's Auxiliary was left to round 213, which has it.
 - Out after round B44: Mana Cache (a mana ability any player may activate), Torrent Elemental (an ability activated
   from exile needs the UI and the bot), Keldon Twilight ("that player sacrifices a creature they controlled since the
-  beginning of the turn"), Leshrac's Sigil ("you may pay {B}{B}. If you do, look at that player's hand and choose a
+  beginning of the turn"), Leshrac's Sigil (done in round B158) ("you may pay {B}{B}. If you do, look at that player's hand and choose a
   card from it": the look sits inside the "if you do"), Rewrite History (done in round 265), Spiny Starfish (counting regenerations, done in round B132), Magmablood Archaic (colors spent on the triggering spell),
   Wanderwine Farewell (Kindred), Archery Training and Heartseeker (a granted ability that names the source),
   Stormwild Capridor (prevented damage turned into counters), Awesome Presence (a block cost for each blocker).
@@ -5524,12 +5524,12 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Return of the Mole Man). +18 (28,436 of 31,936 with round 222).
 - Out after round B56 (looked at, not done): Sudden Salvation ("for each opponent who controls one or more of those
   permanents"), Jhoira, Weatherlight Corsair (life loss equal to the mana value of the card put onto the battlefield),
-  Djinn of Wishes (playing the revealed card from the library, else exiling it), The Kingpin of Crime (a group "assign
+  Djinn of Wishes (done in round B158) (playing the revealed card from the library, else exiling it), The Kingpin of Crime (a group "assign
   combat damage equal to their toughness" until end of turn), Yasova Dragonclaw ("gain control of target creature an
   opponent controls with power less than ~'s power ..., untap that creature, and it gains haste"), Tajuru Paragon ("a
   card that shares a creature type with it from among them"), Makeshift Mannequin (a granted ability for as long as it
   has a counter), Phylactery Lich (an "as enters" counter on another permanent and a state trigger), Undiscovered
-  Paradise (done in round B154), Hold for Ransom, Mercurial Transformation, Goblin Festival, Trench Gorger (done in round B154), Tatsumasa, Adipose Offspring,
+  Paradise (done in round B154), Hold for Ransom, Mercurial Transformation, Goblin Festival (done in round B158), Trench Gorger (done in round B154), Tatsumasa, Adipose Offspring,
   Fractal Tender, Keldon Flamesage, Sporogenesis, Kentaro, Immard, Feldon, Corruption of Towashi, Donnie & April, Path of
   Mettle, Rise from the Wreck, plus the multi-line and new-mechanic cards in the same range (Bomb Squad, Word of Command,
   Celestial Dawn, Death or Glory (done in round B156), Selective Adaptation and the like).
@@ -5632,9 +5632,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the Past (a group sharing a creature type with the dying creature), Loki Laufeyson (a mana value limit from its power on
   a delayed cast trigger), The Fugitive Doctor and Filigree Racer (flashback or jump-start granted until end of turn),
   Mazzy (an Aura put into a graveyard, cast until your next turn), Saheeli's Lattice, Paleontologist's Pick-Axe and Throne
-  of the Grim Captain ("craft with one or more"), Seifer (blocked by two or more), Distended Mindbender (a choice of two
+  of the Grim Captain ("craft with one or more"), Seifer (blocked by two or more), Distended Mindbender (done in round B158) (a choice of two
   cards by different rules), plus Shaun & Rebecca, Wild Shape, Bridge from Below, Aetherborn Marauder (done in round 315), Sigardian Zealot,
-  Rhuk (done in round B70), Alpha Brawl, Brain in a Jar, Sita Varma (done in round B114), Munda and Hans Eriksson.
+  Rhuk (done in round B70), Alpha Brawl, Brain in a Jar (done in round B158), Sita Varma (done in round B114), Munda and Hans Eriksson.
 - Round B61 (the unlisted ones from EDHREC rank about 19,700 up, and from the B10/B11 lists below): "gets +2/+2 until
   end of turn if its power is 2" (Savage Swipe), "costs {2} less if a creature is attacking you" and "If a Hero enters
   this way, it enters with two additional +1/+1 counters" (Heroic Return; the same condition lets Confront the Assault
@@ -7170,6 +7170,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the target, the dying creature's controller losing the life, rulings). Break Out (the creature card revealed goes onto the
   battlefield with haste or into your hand, the choice only with mana value 2 or less; a browser test). +9 (30,705 of
   31,936 with B156).
+- Round B158 (least played first, every remaining card already examined, so mechanics that could be built): Woodcaller
+  Automaton ("untap target land you control. It becomes a Treefolk creature with haste and base power and toughness equal
+  to ~'s power and toughness. It's still a land.": for the rest of the game, the numbers locked in as it resolves, ~'s as it
+  last existed if it has left, rulings, CR 608.2h, 613.4b; prototyped a 3/3, cast for {10} an 8/8). Conjured Currency
+  ("target permanent you neither own nor control": owner and controller both another player, not necessarily the same one;
+  the exchange only with both on the battlefield under different controllers, rulings, CR 701.12b). Leshrac's Sigil ("you
+  may pay {B}{B}. If you do, look at that player's hand and choose a card from it. The player discards that card.": all of it
+  only if paid). Cheering Fanatic ("Spells with the chosen name cost {1} less to cast this turn": anyone's, the generic part
+  only, rulings, CR 601.2f; the bot names a spell in its hand). Djinn of Wishes ("You may play that card without paying its
+  mana cost. If you don't, exile it.": only as it resolves, a land only on your turn with a land play left, rulings). Brain in
+  a Jar ("an instant or sorcery spell with mana value equal to the number of charge counters on ~": exactly that, the counter
+  just put on it counted, rulings). Jester's Mask (the opponent orders their whole hand on top, CR 401.4; you search their
+  library for that many cards, any cards, CR 701.23d, which go to their hand; the bot gives the ones it rates lowest; a
+  browser test). Distended Mindbender ("a nonland card with mana value 3 or less and a card with mana value 4 or greater":
+  one of each if able, only the one there is otherwise, rulings, then discarded together; a browser test). Goblin Festival
+  ("Flip a coin. If you lose the flip, choose one of your opponents. That player gains control of ~.": an opponent of the
+  ability's controller, chosen as it resolves, rulings). +9 (30,714 of 31,936 with B157).
 - Out after round B157 (looked at, not done): Musician (a granted upkeep ability it checks for by its text),
   Makeshift Mannequin (a granted trigger "for as long as it has a mannequin counter"), Flameskull (rejuvenation's "play one
   of those cards", a permission shared by two cards) and Cleansing (each land's destruction paid off by any player) were
@@ -7213,7 +7230,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   sorcery spell you control deals damage": once per source and damage event, which Lane A's round 305, PR #452, adds for
   The Red Terror; merged now, so they're next), Bargaining Table (still: the opponent chosen as it's activated sets X), Foraging
   Wickermaw (a mana ability that also makes ~ the color of the mana it made), Isu the Abominable ("you may pay {G}, {W},
-  or {U}": one of three payments), Cheering Fanatic ("spells with the chosen name cost {1} less to cast this turn").
+  or {U}": one of three payments), Cheering Fanatic (done in round B158) ("spells with the chosen name cost {1} less to cast this turn").
 - Out after round B144 (looked at, not done): Merseine ("pay enchanted creature's mana cost" as a cost, activated only
   by that creature's controller), Yare (done in round B145) and Blaze of Glory (done in round B145) ("target creature defending player controls" on a spell, with
   several defending players, CR 508.5a), North Star (mana spent as though any type for one spell), Lumbering Laundry
@@ -7371,7 +7388,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   paid as something resolves), Jorn's Kaldring (playing a snow permanent card from a graveyard, entering tapped), Yannik,
   Lucius the Eternal, Cemetery Desecrator and The Spot, Crumbling Sanctuary (damage to players replaced by exiling cards),
   Ancient Hellkite (done in round B112) ("defending player" in an activated ability's target), Alluring Siren ("attacks you if able"), Dreams of
-  Steel and Oil (the chosen cards exiled at once), Jester's Mask, The Ruinous Wrecking Crew (choose up to X).
+  Steel and Oil (the chosen cards exiled at once), Jester's Mask (done in round B158), The Ruinous Wrecking Crew (choose up to X).
 - Out after round B100 (looked at, not done): Necrotic Plague (a target chosen by the dead creature's controller, not the
   ability's), Nyla, Shirshu Sleuth and Sentinel of Lost Lore (targeting cards in exile, linked or with an Adventure), Close
   Encounter (a warped card in exile as an additional cost), Redemptor Dreadnought (an optional additional cost that exiles a
@@ -7458,7 +7475,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B87 (looked at, not done): Kodama of the Center Tree (soulshift X: a target bounded by a changing
   number), Hide // Seek (the mana value of a card found by the search), Revival Experiment (one card of each permanent
   type, and a battle's protector on entering is unclear), Love on the Battlefield (a combat damage trigger granted until
-  end of turn), Sharkey, Tyrant of the Shire, Woodcaller Automaton, Dancing Sword (done in round B153), Elemental Resonance, Bat Colony.
+  end of turn), Sharkey, Tyrant of the Shire, Woodcaller Automaton (done in round B158), Dancing Sword (done in round B153), Elemental Resonance, Bat Colony.
 - Out after round B86 (looked at, not done): Goblin Maskmaker (cost reduction for face-down spells), Bortuk
   Bonerattle (a destination chosen by mana value against domain), Nick Fury (put onto the battlefield tapped and
   attacking from the hand), Oath of Mages (done in round B143) (a target chosen by another player), Glyph of Life (done in round B130), Mob Mentality,

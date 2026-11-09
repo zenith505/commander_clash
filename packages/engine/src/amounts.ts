@@ -497,6 +497,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return new Set((ctx.sacrificed ?? []).flatMap((l) => l.types ?? [])).size;
     case "putThisWay":
       return (s.resolving?.created ?? []).filter((id) => s.objects[id]?.zone === "battlefield").length;
+    case "handPutOnTopThisWay":
+      return s.resolving?.handPutOnTop ?? 0;
     case "blockingIt":
       return ctx.objects?.({ ref: c.subject ? "subject" : "self" })[0]?.blockedBy?.length ?? 0;
     case "itBlocks":
@@ -1404,6 +1406,8 @@ function describeCount(c: Count): string {
       return "the total power of those creatures";
     case "putThisWay":
       return "#put onto the battlefield";
+    case "handPutOnTopThisWay":
+      return "#cards put on top from their hand";
     case "blockingIt":
       return "#creatures blocking it";
     case "itBlocks":

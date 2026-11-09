@@ -1353,7 +1353,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, drawn || milled ? `${p.name} can't cast any of them.` : `${p.name} has no ${filter.text.replace(/^an? /, "")} ${e.fromGraveyard ? "in their graveyard" : "in hand"} to cast.`);
           return;
         }
-        const text = filter.text.replace(/^(?!an? )/, /^[aeiou]/i.test(filter.text) ? "an " : "a ");
+        // Brain in a Jar: "with mana value equal to the number of charge counters on ~" says the number it is now.
+        const exact = e.filter.bound?.at === "exact" && filter.manaValue?.min !== undefined && filter.manaValue.min === filter.manaValue.max ? filter.manaValue.min : undefined;
+        const said = exact !== undefined ? filter.text.replace(/ with mana value equal to .+$/, ` with mana value ${exact}`) : filter.text;
+        const text = said.replace(/^(?!an? )/, /^[aeiou]/i.test(said) ? "an " : "a ");
         s.pending = { kind: "chooseOption", player: p.id, source: src, what: "castFromHand", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Don't cast"], prompt: drawn ? "cast one of the cards you drew without paying its mana cost?" : milled ? `cast ${text} from among the milled cards without paying its mana cost?` : `cast ${text} from your ${e.fromGraveyard ? "graveyard" : "hand"} without paying its mana cost?` };
         return "paused";
       }

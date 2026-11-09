@@ -2191,7 +2191,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // still be on the battlefield).
   // Gilded Drake: "Exchange control of ~ and up to one target creature an opponent controls" (with none chosen, no exchange).
   // Shrewd Negotiation: "... and target artifact or creature you don't control": the same (no teammates here).
-  if ((m = /^[Ee]xchange control of (~|target .+? you control) and ((?:up to one )?target .+? (?:an opponent controls|you don't control)(?: with .+)?)$/.exec(s))) {
+  // Conjured Currency: "... and target permanent you neither own nor control" (TargetSpec owner and controller both another
+  // player's; rulings: nothing happens unless both are on the battlefield under different controllers, CR 701.12b).
+  if ((m = /^[Ee]xchange control of (~|target .+? you control) and ((?:up to one )?target .+? (?:an opponent controls|you don't control|you neither own nor control)(?: with .+)?)$/.exec(s))) {
     if (m[2]!.startsWith("up to") && m[1] !== "~") return null;
     const a: ObjRef | null = m[1] === "~" ? { ref: "self" } : parseObject(m[1]!, ctx);
     // Spawnbroker: "... and target creature with power less than or equal to that creature's power an opponent controls":

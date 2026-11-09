@@ -716,6 +716,31 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
         log(s, `${p.name} reveals ${sc.handRevealed.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand.`);
       }
+      // Distended Mindbender: "a nonland card with mana value 3 or less and a card with mana value 4 or greater": the first
+      // card, then the second, each one if there is one (rulings: both must be chosen if able), then both discarded at once.
+      if (e.also && e.action === "discard") {
+        const picked = (sc.alsoPicked ??= []);
+        if (sc.found) {
+          picked.push(...sc.found.filter((id) => p.hand.includes(id)));
+          delete sc.found;
+        }
+        for (let k = sc.alsoStep ?? 0; k < 2; k++) {
+          const f = k === 0 ? e.filter : e.also;
+          sc.alsoStep = k + 1;
+          const cards = p.hand.filter((id) => !picked.includes(id) && (!f || printedMatches(f, defOf(s, obj(s, id)))));
+          if (!cards.length) continue;
+          const kind = f?.text ?? "card";
+          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`, cards, min: 1, max: 1, dig: { looked: [...p.hand], to: `for ${p.name} to discard`, rest: `stay in ${p.name}'s hand` }, hand: pid };
+          return "paused";
+        }
+        const ids = picked.filter((id) => p.hand.includes(id));
+        s.resolving!.tookFromHand = ids.length;
+        if (!ids.length) return;
+        const tops = discardToTop(s, pid, ids, src, ctx);
+        if (tops === "paused") return "paused";
+        discardCards(s, pid, ids, "", false, false, ctx.controller, undefined, tops);
+        return;
+      }
       if (!sc.found) {
         // "With mana value X or less" (Venarian Glimmer): the X it was cast with (CR 107.3a).
         // Addle: "a card of the chosen color", the color chosen as this resolved; with none chosen, none matches.
@@ -1056,7 +1081,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const p = player(s, pid);
         let ids = sc.chosen?.[p.id];
         if (!ids) {
-          const n = Math.min(amountNow(s, e.n, ctx), p.hand.length);
+          // Jester's Mask: the whole hand, in an order that player chooses (CR 401.4).
+          const n = e.all ? p.hand.length : Math.min(amountNow(s, e.n, ctx), p.hand.length);
           if (!n) {
             done[pid] = true;
             continue;
@@ -1078,6 +1104,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
         // On the bottom the first pick goes lowest; on top it ends on top.
         for (const id of [...cards].reverse()) moveObject(s, id, "library", e.bottom ? {} : { top: true });
+        // "That many" (Jester's Mask): those now in the library.
+        if (!e.bottom) s.resolving!.handPutOnTop = (s.resolving!.handPutOnTop ?? 0) + cards.filter((id) => obj(s, id).zone === "library").length;
         log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand on ${e.bottom ? "the bottom" : "top"} of their library.`);
         done[pid] = true;
       }

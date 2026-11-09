@@ -8159,6 +8159,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "36d32194-d547-4e2d-894f-f4bf13cf7da6",
+  "name": "Distended Mindbender",
+  "manaCost": "{8}",
+  "cmc": 8,
+  "typeLine": "Creature — Eldrazi Insect",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi",
+   "Insect"
+  ],
+  "oracleText": "Emerge {5}{B}{B} (You may cast this spell by sacrificing a creature and paying the emerge cost reduced by that creature's mana value.)\nWhen you cast this spell, target opponent reveals their hand. You choose from it a nonland card with mana value 3 or less and a card with mana value 4 or greater. That player discards those cards.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Emerge"
+  ],
+  "commanderLegal": "legal",
+  "set": "emn",
+  "releasedAt": "2016-07-22",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "273b339c-964b-4a18-8eb5-ceb8abcdfd9e",
   "name": "Divination",
   "manaCost": "{2}{U}",
@@ -15344,6 +15375,28 @@
   "commanderLegal": "legal",
   "set": "arn",
   "releasedAt": "1993-12-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "bcc797b9-d2e5-4fde-8d80-c890c871f344",
+  "name": "Jester's Mask",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "This artifact enters tapped.\n{1}, {T}, Sacrifice this artifact: Target opponent puts the cards from their hand on top of their library. Search that player's library for that many cards. That player puts those cards into their hand, then shuffles.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

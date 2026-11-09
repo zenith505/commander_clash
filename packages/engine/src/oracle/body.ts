@@ -1499,6 +1499,70 @@ function wandPunisher(who: PlayerRef, landLife: number): Effect {
  * reads parseFaceDownPlay's: the last effect and the next sentence's index in parseFaceDownPlay's shape (the effects
  * before the last one already pushed), "fail" for one that can't be read, or null when it isn't one of them.
  */
+/** Lane B round B158's sentences, chained first (parseBodyText is at TS2563's limit). */
+function roundB158Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  const out = (fx: Effect[], skip: number) => {
+    effects.push(...fx.slice(0, -1));
+    return { effect: fx[fx.length - 1]!, next: si + 1 + skip };
+  };
+  const next = (k = 1) => (sentences[si + k] ?? "").replace(/\.$/, "");
+  const prev = effects[effects.length - 1];
+  // Woodcaller Automaton: "untap target land you control. It becomes a Treefolk creature with haste and base power and
+  // toughness equal to ~'s power and toughness. It's still a land.": for the rest of the game (CR 611.2a), its base power
+  // and toughness locked in as the ability resolves, ~'s as it last existed if it has left (rulings, CR 608.2h, 613.4b).
+  const becomes = /^It becomes an? ([A-Z][a-z]+) creature with haste and base power and toughness equal to ~'s power and toughness$/.exec(s);
+  if (becomes && next() === "It's still a land" && prev?.type === "untap" && prev.what.ref === "target" && !prev.what.n && ctx.targets[prev.what.index]?.types?.includes("Land")) {
+    const self = { ref: "self" as const };
+    return out([{ type: "continuous", what: prev.what, mods: [{ kind: "addTypes", types: ["Creature"], subtypes: [becomes[1]!] }, { kind: "setPT", power: { count: { kind: "power", of: self } }, toughness: { count: { kind: "toughness", of: self } } }, { kind: "addKeywords", keywords: ["Haste"] }], duration: "game" }], 1);
+  }
+  // Leshrac's Sigil: "you may pay {B}{B}. If you do, look at that player's hand and choose a card from it. The player
+  // discards that card.": the look, the choice and the discard all only if paid; the hand seen only by you (as Doomsday
+  // Specter's).
+  const pay = /^[Yy]ou may pay ((?:\{[WUBRGC0-9]\})+)$/.exec(s);
+  if (pay && next() === "If you do, look at that player's hand and choose a card from it" && next(2) === "The player discards that card" && si + 3 === sentences.length) {
+    const look = parseOne("Look at that player's hand", ctx);
+    if (look?.length !== 1 || look[0]!.type !== "lookAtHand") return "fail";
+    return out([{ type: "may", effects: [look[0]!, { type: "takeFromHand", who: look[0]!.who, action: "discard" }], pay: { mana: pay[1]! }, text: `pay ${pay[1]}. If you do, look at that player's hand and choose a card from it. The player discards that card` }], 2);
+  }
+  // Cheering Fanatic: "choose a card name. Spells with the chosen name cost {1} less to cast this turn.": anyone's spells
+  // with that name (a split card's half by its own name, CR 709.3b), the name locked in as it resolves (CR 611.2c); the
+  // generic part only (rulings, CR 601.2f).
+  const fanatic = /^Spells with the chosen name cost \{(\d+)\} less to cast this turn$/.exec(s);
+  if (fanatic && prev?.type === "choose" && prev.choice === "cardName") {
+    prev.purpose = "own";
+    return out([{ type: "costModThisTurn", mod: { who: "all", filter: { kind: "spell", types: [], notTypes: [], notColors: [], text: "spells with the chosen name" }, n: -Number(fanatic[1]), text: `${s}.` }, chosenName: true }], 0);
+  }
+  // Djinn of Wishes: "Reveal the top card of your library. You may play that card without paying its mana cost. If you
+  // don't, exile it.": played only as this resolves, a land only on your turn with a land play left (rulings); not played,
+  // it's exiled.
+  if (s === "Reveal the top card of your library" && next() === "You may play that card without paying its mana cost" && next(2) === "If you don't, exile it")
+    return out([{ type: "revealTop" }, { type: "playLinked", revealed: true }, { type: "exile", what: { ref: "revealed" } }], 2);
+  // Distended Mindbender: "target opponent reveals their hand. You choose from it a nonland card with mana value 3 or less
+  // and a card with mana value 4 or greater. That player discards those cards.": one of each if able, only the one there is
+  // otherwise (rulings), discarded together.
+  const two = /^You choose from it (an? .+?) and (an? .+?)$/.exec(s);
+  if (two && next() === "That player discards those cards" && prev?.type === "lookAtHand" && prev.reveal && !prev.library && !prev.atRandom && !prev.topCard) {
+    const [first, second] = [two[1]!, two[2]!].map((x) => parseSearchFilter(x.replace(/^an? /, "")));
+    if (!first || !second) return "fail";
+    return out([{ type: "takeFromHand", who: prev.who, filter: first, also: second, action: "discard" }], 1);
+  }
+  // Jester's Mask: "Target opponent puts the cards from their hand on top of their library. Search that player's library for
+  // that many cards. That player puts those cards into their hand, then shuffles.": that player orders their hand on top
+  // (CR 401.4); you search for as many cards as were put there, any cards (no quality stated, so as many as there are, CR
+  // 701.23d), and they go to that player's hand; the bot gives the ones it rates lowest.
+  if (s === "Target opponent puts the cards from their hand on top of their library" && next() === "Search that player's library for that many cards" && next(2) === "That player puts those cards into their hand, then shuffles") {
+    const who = parsePlayer("target opponent", ctx);
+    if (!who) return "fail";
+    return out([{ type: "handToTop", who, n: 0, all: true }, { type: "search", library: who, n: { count: { kind: "handPutOnTopThisWay" } }, upTo: false, dest: { zone: "hand" }, reveal: false, away: true }], 2);
+  }
+  // Goblin Festival: "Flip a coin. If you lose the flip, choose one of your opponents. That player gains control of ~.": an
+  // opponent of the player who activated it (the ability's controller), chosen as it resolves, not targeted (rulings); the
+  // flip happens even if ~ has left or changed control, and it changes control only while it's still on the battlefield.
+  if (s === "Flip a coin" && next() === "If you lose the flip, choose one of your opponents" && next(2) === "That player gains control of ~" && ctx.activated && !ctx.spell)
+    return out([{ type: "flipCoin" }, { type: "if", cond: { kind: "wonFlip", lost: true }, effects: [{ type: "choose", choice: "opponent" }, { type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }] }], 2);
+  return null;
+}
+
 /** Lane B round B156's sentences, chained first (parseBodyText is at TS2563's limit). */
 function roundB157Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
   const out = (fx: Effect[], skip: number) => {
@@ -6878,8 +6942,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
-    // rounds B157, B156, B155, B154, B153, B152, B151, B148 and 311 to 317's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB157Sentence(s, sentences, si, ctx, effects) ?? roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    // rounds B158, B157, B156, B155, B154, B153, B152, B151, B148 and 311 to 317's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
+    const faceDown = roundB158Sentence(s, sentences, si, ctx, effects) ?? roundB157Sentence(s, sentences, si, ctx, effects) ?? roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);

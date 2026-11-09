@@ -96,6 +96,7 @@ import {
   blockProblem,
   blockRequirementProblem,
   maxBlocks,
+  untappedForBlocking,
   pairedWith,
   hauntedBy,
   cardIdOf,
@@ -1413,7 +1414,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // Odric, Master Tactician: you may be choosing another player's blocks (pending.defender).
     if (pending?.kind === "declareBlockers") {
       const defender = pending.defender ?? HUMAN;
-      if (controllerOf(s, o) === defender && o.zone === "battlefield" && isCreature(s, o.id) && !o.tapped) {
+      // Masako the Humorless: tapped ones too (untappedForBlocking).
+      if (controllerOf(s, o) === defender && o.zone === "battlefield" && isCreature(s, o.id) && untappedForBlocking(s, o)) {
         const mine = blocks[o.id] ?? [];
         if (blocker === o.id) setBlocker(null);
         else if (mine.length && mine.length >= maxBlocks(s, o)) {
@@ -5282,6 +5284,8 @@ function Controls({
     // Odric, Master Tactician: choosing another player's blocks; they decide whether to pay what blocking costs.
     const defender = pending.defender ?? HUMAN;
     const theirs = defender !== HUMAN ? s.players[defender]!.name : null;
+    // Masako the Humorless: the blocking player's tapped creatures can block too.
+    const tappedBlock = s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === defender && s.objects[id]!.tapped && isCreature(s, id) && untappedForBlocking(s, s.objects[id]!));
     // Heat Wave: life for some blocks, paid with them (CR 509.1d); only with that much life to pay (CR 119.4).
     const blockLife = blockLifeCost(s, list);
     const blockTaps = blockTax || blockLife ? (theirs ? [] : blockLife && s.players[HUMAN]!.life < blockLife ? null : blockTax ? planMana(s, HUMAN, parseManaCost(blockTax)) : []) : [];
@@ -5297,8 +5301,8 @@ function Controls({
             : needed
               ? `${needed.charAt(0).toUpperCase()}${needed.slice(1)}.`
               : theirs
-                ? `You choose ${theirs}'s blocks: click one of their untapped creatures, then the attacker it blocks.`
-                : "Click one of your untapped creatures, then the attacker it blocks."}
+                ? `You choose ${theirs}'s blocks: click one of their ${tappedBlock ? "" : "untapped "}creatures, then the attacker it blocks.`
+                : `Click one of your ${tappedBlock ? "" : "untapped "}creatures, then the attacker it blocks.`}
         </span>
         <button
           disabled={!!needed || !blockTaps}

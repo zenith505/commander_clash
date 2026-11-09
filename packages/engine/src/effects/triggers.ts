@@ -470,7 +470,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   // The Traps look back at what entered this turn, as it entered (after "as it enters" choices, CR 614.12).
   if (ev.type === "enters" && s.objects[ev.id]) {
     const c = characteristics(s, s.objects[ev.id]!);
-    ((s.turnLog ??= {}).entered ??= []).push({ controller: c.controller, types: [...c.types], subtypes: [...c.subtypes], colors: [...c.colors], id: ev.id, zc: s.objects[ev.id]!.zoneChanges ?? 0, ...(s.objects[ev.id]!.isToken ? { token: true as const } : {}), ...(c.keywords.some((k) => k.toLowerCase() === "flying") ? { flying: true as const } : {}) });
+    ((s.turnLog ??= {}).entered ??= []).push({ controller: c.controller, types: [...c.types], subtypes: [...c.subtypes], colors: [...c.colors], id: ev.id, zc: s.objects[ev.id]!.zoneChanges ?? 0, ...(s.objects[ev.id]!.isToken ? { token: true as const } : {}), ...(c.keywords.some((k) => k.toLowerCase() === "flying") ? { flying: true as const } : {}), ...(c.allCreatureTypes ? { allCreatureTypes: true as const } : {}) });
   }
   // While set, `add` is looking at an Aura's or Equipment's abilities about this creature it's attached to.
   let hosting: GameObject | null = null;

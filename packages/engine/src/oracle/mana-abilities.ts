@@ -128,7 +128,10 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     }
     else if (extra === "If that mana is spent on an instant or sorcery spell, that spell can't be countered.") out.spentUncounterable = true;
     else if (extra === "If this mana is spent to cast a creature spell, that creature enters with an additional +1/+1 counter on it.") out.spentCreatureCounter = true;
-    else if (/^When you next cast an? (?:[a-z ]+ )?spell(?: with \{X\} in its mana cost)? this turn, /.test(extra) && !out.nextCast) {
+    // Guildmages' Forum, Animal Attendant: only for a creature spell that's multicolored, or that isn't a Human.
+    else if ((m2 = /^If that mana is (?:spent on|spent to cast) an? (multicolored|non-Human) creature spell, that creature enters with an additional \+1\/\+1 counter on it\.$/.exec(extra)) && !out.spentCreatureCounter) out.spentCreatureCounter = m2[1] === "multicolored" ? "multicolored" : "nonHuman";
+    // Chocobo Camp: "When you next cast a Bird creature spell this turn, ...": a creature type too.
+    else if (/^When you next cast an? (?:(?:[A-Z][a-z]+ )?[a-z ]+ )?spell(?: with \{X\} in its mana cost)? this turn, /.test(extra) && !out.nextCast) {
       const body = parseBody(extra);
       const e = body?.effects.length === 1 && !body.targets.length ? body.effects[0]! : undefined;
       if (e?.type !== "nextCast" || e.cascade || e.who) return null;

@@ -1,7 +1,7 @@
 # Roadmap
 
-30,819 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,788 of
+30,830 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,789 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -302,12 +302,12 @@ line blocks.
    Symbiote, Mask of the Schemer, Vantress Gargoyle, Aether Snap, Serra Avenger and others), taking the easy ones.
    Out after round 181: Horrid Shadowspinner (done in round B105) (the number discarded is fixed as you choose to draw), Luminate Primordial (done in round 276),
    Old Man Willow (done in round B105) ("another creature or a token" to
-   sacrifice), Terrifying Presence, Delirium, Heroic Feast, Fated Clash, Rent Is Due, Avengers Assemble!, Chocobo Camp,
+   sacrifice), Terrifying Presence, Delirium, Heroic Feast, Fated Clash, Rent Is Due, Avengers Assemble! (done in round 324), Chocobo Camp (done in round 324),
    Transcendence (done in round B105), Fumble, Goblin Assassin (done in round 276), Kasmina, Enigma Sage, Codie, Vociferous Codex, Jetfire, Hollow Marauder,
    Gorex, the Tombshell, Council's Deliberation (done in round 276), Lumbering Megasloth (done in round 299), Braids's Frightful Return (done in round 276), Awakening of
    Vitu-Ghazi, Quiet Speculation, Breaking of the Fellowship (done in round 276), Stoic Farmer, See the Unwritten, Razorlash
-   Transmogrant, Auntie Blyte, Nimble Trapfinder, Willie Lumpkin, Ajani Unrelenting, Kitt Kanto, Ellie, Azor, Oko the
-   Ringleader, Fiery Annihilation, Spell Crumple; past rank 12,200: Academy Loremaster, Cait, Celebrate the Harvest,
+   Transmogrant, Auntie Blyte, Nimble Trapfinder (done in round 324), Willie Lumpkin, Ajani Unrelenting, Kitt Kanto, Ellie, Azor, Oko the
+   Ringleader, Fiery Annihilation, Spell Crumple; past rank 12,200: Academy Loremaster, Cait, Celebrate the Harvest (done in round 324),
    Cephalid Constable, Choice of Damnations, Cut Propulsion and Wisecrack (done in round 276; "deals damage to itself equal to its
    power"), Evin, Ghired (populate tapped and attacking), Last-Ditch Effort, Misfortune Teller, Peer Pressure, Reckless
    Blaze, Resplendent Marshal, Sporogenic Infection, Ward of Bones. Round 181 went down from rank 11,770 to about rank
@@ -321,9 +321,9 @@ line blocks.
    "instead" sweepers), Chandra, Heart of Fire, Lynde, Salt Road Ambushers, Origin of the Hidden Ones, Grab the Reins,
    Pyromancer Ascension, Verdant Mastery, Primal Adversary, Planar Void (done in round 299), In Too Deep, Dollhouse of Horrors, Harald
    Unites the Elves, Exquisite Archangel, Kellan, Planar
-   Trailblazer, Najal, Rescue from the Underworld, Seal of the Guildpact (done in round 299), Fear of Infinity, Elderscale Wurm, Cradle of
-   Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order,
-   Scheming Fence, Oath of Lieges (done in round B143), Helm of Obedience, Concerted Effort, Belbe's Portal, Edgewall Innkeeper, Simic
+   Trailblazer, Najal, Rescue from the Underworld, Seal of the Guildpact (done in round 299), Fear of Infinity, Elderscale Wurm (done in round 324), Cradle of
+   Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order (done in round 324),
+   Scheming Fence, Oath of Lieges (done in round B143), Helm of Obedience, Concerted Effort, Belbe's Portal (done in round 324), Edgewall Innkeeper, Simic
    Manipulator, Endless Whispers, Burn from Within, Skyfire Phoenix (done in round 276), Contagion, Gutter Grime, Coffin Queen, Genesis
    Storm, Grim Return, Infernal Offering, Varolz, Undercellar Sweep, Wave of Vitriol, Martyrdom, Soul-Scar Mage,
    Remembrance, Spy Network, Dimir Doppelganger, Jailbreak, Inverter of Truth, Immovable Rod, Hypergenesis, Soul
@@ -704,7 +704,7 @@ line blocks.
    turn" (Azor, Sphinx's Decree), "Whenever an opponent becomes the monarch, if you were the monarch as the turn began"
    (Knights of the Black Rose), "Whenever another player loses the game ... that player's life total as the turn began"
    (Sengir). No new prompts.
-   Out after round 202 (looked at, not done): Masako the Humorless (tapped creatures blocking: every blocker check reads
+   Out after round 202 (looked at, not done): Masako the Humorless (done in round 324) (tapped creatures blocking: every blocker check reads
    untapped), Sea Gate Stormcaller ("copy that spell twice instead" if kicked, inside the delayed trigger), Ramses,
    Assassin Lord (done in round 265), Kros, Defense Contractor (done in round 314) (no record of who put
    counters on a creature), Glorious Purpose (the sixth
@@ -2363,6 +2363,26 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 324 took cards back off the "Out after round N" lists, most played first: "Tapped creatures you control can block
+   as though they were untapped." (Masako the Humorless: only the untapped requirement of CR 509.1a goes, every other
+   restriction still applies, rulings; bots block with them and count them when attacking; a browser test); "{3}, {T}: You
+   may put a creature card of the chosen type from your hand onto the battlefield." (Belbe's Portal: the type chosen as it
+   entered, CR 614.12, none put too, rulings; a browser test); "Sacrifice ~ and another green creature" (Magus of the
+   Order: both at once, another than ~ even once ~ isn't green, rulings); "where X is the number of different powers among
+   creatures you control" (Celebrate the Harvest, counted as it resolves, rulings); "If this spell was kicked, it has split
+   second." (Molten Disaster, CR 702.61a, 702.33d); "When ~ enters, if your life total is less than 7, your life total
+   becomes 7." and "As long as you have 7 or more life, damage that would reduce your life total to less than 7 reduces it
+   to 7 instead." (Elderscale Wurm: the damage is dealt, only the life lost changes, rulings); "If that mana is spent on a
+   multicolored creature spell" and "... to cast a non-Human creature spell, that creature enters with an additional +1/+1
+   counter on it." (Guildmages' Forum, Animal Attendant: a changeling is a Human, CR 702.73a); "When you next cast a Bird
+   creature spell this turn, it enters with an additional +1/+1 counter on it." (Chocobo Camp: a delayed trigger, CR
+   603.7, whatever mana pays for it); "~ can't be blocked if you had another Cleric, Rogue, Warrior, or Wizard enter the
+   battlefield under your control this turn." (Nimble Trapfinder: its types as it entered, a changeling counting, rulings;
+   "you had ... enter" conditions now count a changeling for any creature type, Cleaving Reaper's too); "if you attacked
+   with a Hero this turn or a Hero entered the battlefield under your control this turn" (Avengers Assemble!). +11, 30,823
+   of 31,936 with round 323 and B164.
+   Bots: Belbe's Portal is activated only with a card of the chosen type in hand; Masako's tapped blockers block like
+   untapped ones; under Masako the blocking prompt says "click one of your creatures".
    Round 323 took cards back off the "Out after round N" lists, most played first: "Whenever a player taps a land for
    mana, if this creature is tapped, that player adds one mana of any type that land produced. Then that land deals 1
    damage to that player." (Barbflare Gremlin: all one triggered mana ability, CR 605.1b, 605.4a, the land the damage's
@@ -3689,7 +3709,7 @@ line blocks.
    on other lines; companions can't be used as companions (decks have nothing outside the game; the card plays as
    itself, CR 702.139a); counters of several kinds put at once (All Will Be One with Guide of Souls) are put one kind
    after another, so "whenever you put counters" triggers fire once per kind; Chandra, Torch of Defiance casts the
-   exiled card for its mana cost only; Celebrate the Harvest, Surveyor's Scope, Vaan,
+   exiled card for its mana cost only; Celebrate the Harvest (done in round 324), Surveyor's Scope, Vaan,
    Leonardo (another "if the discarded card" variant), Interdict (done in round B137), Bruenor's {0}
    equip. Smaller gaps from round 102: Hithlain Rope (seating left and right); "can't be sacrificed"
    granted to another permanent (Garland, Assault Suit, Jon Irenicus, Stilt-Man, Zurgo); Kindle the Carnage, Forbidden
@@ -4156,7 +4176,7 @@ line blocks.
    - "Each other creature you control enters with an additional +1/+1 counter on it" works from permanents already on
      the battlefield (Renata, Grumgully, Dragonstorm Globe, Oath of Gideon, Arlinn); still out: "for each" (Giada,
      Bioengineered Future), "of the chosen type" (Metallic Mimic), conditions (Vampire Socialite, Dearly Departed (done in round B106)),
-     "this turn" (Combine Guildmage (done in round B106), Zameck Guildmage (done in round B106)), mana that adds the counter (Animal Attendant, Guildmages' Forum),
+     "this turn" (Combine Guildmage (done in round B106), Zameck Guildmage (done in round B106)), mana that adds the counter (Animal Attendant (done in round 324), Guildmages' Forum (done in round 324)),
      and one without "other" that could describe its own card.
    - Bots take the first offer for "what does it attack" (the player the source attacks) and search both zones.
    - "Whenever a creature attacks you (or a planeswalker you control)", "whenever a creature blocks", "whenever a creature
@@ -7452,7 +7472,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   with either can't be played, by anyone; a bot opponent names a card of the Chamber's controller; a browser test).
   Protective Sphere ("a source of your choice that shares a color with the mana spent on this activation cost": the
   activation's mana colors as the source is chosen, CR 609.7a; colorless mana prevents nothing). The bot doesn't activate
-  Musician. +7, 30,819 of 31,936 with B164 and rounds 322 and 323.
+  Musician. +7, 30,830 of 31,936 with round 324.
 - Out after round B165 (looked at, not done): Gloom (the tax reaches mana abilities), Twinning Glass, Yixlid Jailer,
   Decaying Soil, Nature's Wrath, Graceful Takedown, Alpine Moon, Thought Prison, Grimoire Thief and Kianne, Dean of Substance
   stay out for the reasons in the earlier lists. Protective Sphere and Imperiosaur, out after B162 and B67, are done.
@@ -7962,7 +7982,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   granted trigger Breathkeeper Seraph's "at the beginning of your next upkeep".
 - Faceless One ("choose a color before the game begins"). The sample decks have one commander each; two commanders (partners or a Background) work
   in the engine and `sample-decks.json` (`secondCommander`) but no sample deck uses them yet.
-- Split second conditional on a kicker (Molten Disaster's "if it was kicked"); Shadow the Hedgehog's "if mana from an
+- Split second conditional on a kicker (Molten Disaster's "if it was kicked", done in round 324); Shadow the Hedgehog's "if mana from an
   artifact was spent" works.
 - Exploit granted to other creatures (Colonel Autumn, Henry Wu), "the exploited creature", "if it exploited that
   creature"; devour on tokens (Dragon Broodmother), "the number of Goblins it devoured".

@@ -2481,7 +2481,7 @@ export type StaticCondition =
    * entered under your control this turn, as they entered, even if they've left since; with all of `types`, none of
    * `notTypes`, and `subtype`.
    */
-  | { kind: "youEntered"; types: string[]; notTypes?: string[]; subtype?: string; /** "An Angel or Berserker" (Cleaving Reaper): either subtype. */ orSubtype?: string; n: number; /** "another": not the source itself (Éowyn, Shieldmaiden). */ other?: true; /** "Another creature with flying" (Flying Drone): it had flying as it entered (TurnLog.entered). */ flying?: true; /** "Last turn" (Ephara, God of the Polis): during the turn before this one (GameState.lastTurn.creaturesEntered; creatures only). */ lastTurn?: true }
+  | { kind: "youEntered"; types: string[]; notTypes?: string[]; subtype?: string; /** "An Angel or Berserker" (Cleaving Reaper): either subtype. */ orSubtype?: string; /** "Another Cleric, Rogue, Warrior, or Wizard" (Nimble Trapfinder): any of these creature types. */ anySubtype?: string[]; n: number; /** "another": not the source itself (Éowyn, Shieldmaiden). */ other?: true; /** "Another creature with flying" (Flying Drone): it had flying as it entered (TurnLog.entered). */ flying?: true; /** "Last turn" (Ephara, God of the Polis): during the turn before this one (GameState.lastTurn.creaturesEntered; creatures only). */ lastTurn?: true }
   /**
    * "If a noncreature permanent under your control was destroyed this turn by a spell or ability an opponent controlled"
    * (Cobra Trap): only an effect that says "destroy" (rulings), not lethal damage or sacrifice.
@@ -6774,8 +6774,12 @@ export interface ManaAbility {
    * (rulings: two mana from it give two counters for each cast).
    */
   spentCommanderCounters?: true;
-  /** Biophagus: "If this mana is spent to cast a creature spell, that creature enters with an additional +1/+1 counter on it" (one for each such mana). */
-  spentCreatureCounter?: true;
+  /**
+   * Biophagus: "If this mana is spent to cast a creature spell, that creature enters with an additional +1/+1 counter on it"
+   * (one for each such mana, CR 614.1c). Guildmages' Forum: "a multicolored creature spell" (two or more colors, CR 105.2b);
+   * Animal Attendant: "a non-Human creature spell" (a changeling is a Human, CR 702.73a).
+   */
+  spentCreatureCounter?: true | "multicolored" | "nonHuman";
   /**
    * Yuna, Grand Summoner: "When you next cast a creature spell this turn, that creature enters with two additional +1/+1
    * counters on it", a delayed trigger the ability creates as it resolves (CR 603.7a, 605.3b), whatever the mana is spent on.
@@ -8253,6 +8257,10 @@ export interface CompiledCard {
   spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; /** 'Have "Cascade, cascade."' (Zhulodok): two instances. */ twice?: true; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];
   /** Shadow the Hedgehog: "Each spell you cast has split second if mana from an artifact was spent to cast it" (CR 702.61a, 106.3). */
   splitSecondIfArtifactMana?: true;
+  /** Masako the Humorless: "Tapped creatures you control can block as though they were untapped" (CR 509.1a): only the untapped requirement goes; every other block restriction still applies (rulings). */
+  tappedCreaturesCanBlock?: true;
+  /** Molten Disaster: "If this spell was kicked, it has split second" (CR 702.61a, 702.33d): while it's on the stack, kicked. */
+  splitSecondIfKicked?: true;
   /** Samut, Tyrant of Naktamun: "Instant and sorcery spells you control have split second" (CR 702.61a): spells of its controller's on the stack that match. */
   spellsHaveSplitSecond?: TargetSpec[];
   /** Cast Through Time: "Instant and sorcery spells you control have rebound" (CR 702.88a), as they finish resolving. */

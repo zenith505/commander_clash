@@ -376,6 +376,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ff6427f6-d2b1-4e33-984d-c06bd15d7c2c",
+  "name": "Aetherborn Marauder",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Aetherborn Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Aetherborn",
+   "Rogue"
+  ],
+  "oracleText": "Flying, lifelink\nWhen this creature enters, move any number of +1/+1 counters from other permanents you control onto this creature.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying",
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "kld",
+  "releasedAt": "2016-09-30",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "151c867f-cc77-42de-9ae5-5fd2233ccdab",
   "name": "Afterlife from the Loam",
   "manaCost": "{5}{B}{B}{B}",
@@ -2272,6 +2306,41 @@
   "set": "bbd",
   "releasedAt": "2018-06-08",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d6cd4aa1-ff3a-4453-8735-e5ace5cbe386",
+  "name": "Baba Lysaga, Night Witch",
+  "manaCost": "{1}{B}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warlock"
+  ],
+  "oracleText": "{T}, Sacrifice up to three permanents: If there were three or more card types among the sacrificed permanents, each opponent loses 3 life, you gain 3 life, and you draw three cards.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -4201,6 +4270,32 @@
   "set": "shm",
   "releasedAt": "2008-05-02",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "eb23bbb0-dd12-44f1-8645-d92f46cbe8ff",
+  "name": "Burn at the Stake",
+  "manaCost": "{2}{R}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, tap any number of untapped creatures you control.\nBurn at the Stake deals damage to any target equal to three times the number of creatures tapped this way.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "avr",
+  "releasedAt": "2012-05-04",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -6920,6 +7015,42 @@
   "set": "dmu",
   "releasedAt": "2022-09-09",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a2414a2d-0fd8-4084-8762-ace48f70c853",
+  "name": "Dargo, the Shipwrecker",
+  "manaCost": "{6}{R}",
+  "cmc": 7,
+  "typeLine": "Legendary Creature — Giant Pirate",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Giant",
+   "Pirate"
+  ],
+  "oracleText": "As an additional cost to cast this spell, you may sacrifice any number of artifacts and/or creatures. This spell costs {2} less to cast for each permanent sacrificed this way and {2} less to cast for each other artifact or creature you've sacrificed this turn.\nTrample\nPartner (You can have two commanders if both have partner.)",
+  "power": "7",
+  "toughness": "5",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Partner",
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -9754,6 +9885,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "30d79f61-f9d9-441a-b600-83721af8553b",
+  "name": "Explosive Singularity",
+  "manaCost": "{8}{R}{R}",
+  "cmc": 10,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, you may tap any number of untapped creatures you control. This spell costs {1} less to cast for each creature tapped this way.\nExplosive Singularity deals 10 damage to any target.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a69265b2-0e37-4d86-866e-e4a923233b4d",
   "name": "Expropriate",
   "manaCost": "{7}{U}{U}",
@@ -11083,6 +11240,41 @@
   "set": "m11",
   "releasedAt": "2010-07-16",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3561cd52-961f-4098-9287-58ee43970f0f",
+  "name": "Galloping Lizrog",
+  "manaCost": "{3}{G}{U}",
+  "cmc": 5,
+  "typeLine": "Creature — Frog Lizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Frog",
+   "Lizard"
+  ],
+  "oracleText": "Trample\nWhen this creature enters, you may remove any number of +1/+1 counters from among creatures you control. If you do, put twice that many +1/+1 counters on this creature.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "rna",
+  "releasedAt": "2019-01-25",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -13573,6 +13765,42 @@
   "set": "lci",
   "releasedAt": "2023-11-17",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f334c57b-0a57-4fbd-8798-948371d6589d",
+  "name": "Hierophant Bio-Titan",
+  "manaCost": "{10}{G}{G}",
+  "cmc": 12,
+  "typeLine": "Creature — Tyranid",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Tyranid"
+  ],
+  "oracleText": "Frenzied Metabolism — As an additional cost to cast this spell, you may remove any number of +1/+1 counters from among creatures you control. This spell costs {2} less to cast for each counter removed this way.\nReach, vigilance, ward {2}\nTitanic — This creature can't be blocked by creatures with power 2 or less.",
+  "power": "12",
+  "toughness": "12",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Reach",
+   "Vigilance",
+   "Ward",
+   "Titanic",
+   "Frenzied Metabolism"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -20634,6 +20862,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "631d0de7-4810-4bc3-b86b-8e2505ed91f4",
+  "name": "Ooze Flux",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}{G}, Remove one or more +1/+1 counters from among creatures you control: Create an X/X green Ooze creature token, where X is the number of +1/+1 counters removed this way.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "gtc",
+  "releasedAt": "2013-02-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1f438b8f-fe23-4f3b-ab2e-f6c33676c462",
   "name": "Opposition Agent",
   "manaCost": "{2}{B}",
@@ -26235,6 +26489,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8f06fcc9-9018-4c55-af63-c44350a6cfeb",
+  "name": "Simic Manipulator",
+  "manaCost": "{1}{U}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Mutant Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Mutant",
+   "Wizard"
+  ],
+  "oracleText": "Evolve (Whenever a creature you control enters, if that creature has greater power or toughness than this creature, put a +1/+1 counter on this creature.)\n{T}, Remove one or more +1/+1 counters from this creature: Gain control of target creature with power less than or equal to the number of +1/+1 counters removed this way.",
+  "power": "0",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Evolve"
+  ],
+  "commanderLegal": "legal",
+  "set": "gtc",
+  "releasedAt": "2013-02-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "745efa76-7063-4971-9d1b-b2b4cb336a57",
   "name": "Sin Prodder",
   "manaCost": "{2}{R}",
@@ -29413,6 +29700,42 @@
   "commanderLegal": "legal",
   "set": "leg",
   "releasedAt": "1994-06-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6c7e4e51-099a-4398-a4b7-e2f0ddd36429",
+  "name": "The Astonishing Ant-Man",
+  "manaCost": "{G}{U}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Human Scientist Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Scientist",
+   "Hero"
+  ],
+  "oracleText": "Whenever you draw a card, put a +1/+1 counter on The Astonishing Ant-Man.\n{2}{G}, {T}, Remove any number of +1/+1 counters from The Astonishing Ant-Man: Create that many 1/1 green Insect creature tokens.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

@@ -66,6 +66,8 @@ export interface Ctx {
   bouncedAny?: string;
   /** Devouring Rage: its additional cost sacrifices any number of these, the number its X: "for each Spirit sacrificed this way". */
   costSacrificedX?: string;
+  /** Burn at the Stake: its additional cost taps any number of creatures, the number tapped its X: "the number of creatures tapped this way". */
+  costTappedX?: boolean;
   /** "Each opponent discards a card" came just before: "for each opponent who can't". */
   opponentsDiscarded?: boolean;
   opponentsDiscardedTwo?: boolean;
@@ -1130,7 +1132,7 @@ function prevAsDamageRule(e: Effect | undefined): Extract<Effect, { type: "damag
   return undefined;
 }
 
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfAttacking?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfAttacking?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; costTappedX?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
   // Vildin-Pack Alpha: "Whenever a Werewolf you control enters, you may transform it": the whole instruction, about the
   // permanent that entered while it's still that object (CR 400.7); one that can't transform doesn't (CR 701.27c).
   // "Target creature of an opponent's choice they control" (Evangelize, Magus of the Arena), "any target of an opponent's
@@ -1968,7 +1970,7 @@ function decayedZombieMods(sentence: string | undefined): Modification[] | null 
   return mods ? [...mods, { kind: "addKeywords", keywords: ["Decayed"] }] : null;
 }
 
-function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfAttacking?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
+function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfAttacking?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; costTappedX?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~")
     // Ecstatic Beauty: "You may play those cards until end of turn." after an exile from the top: the usual wording.
@@ -2237,6 +2239,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ...(opts.revealedFromHand ? { revealedFromHand: true } : {}),
     ...(opts.tappedThisWay ? { tappedThisWay: true } : {}),
     ...(opts.costSacrificedX ? { costSacrificedX: opts.costSacrificedX } : {}),
+    ...(opts.costTappedX ? { costTappedX: true } : {}),
     ...(opts.eventGroup ? { lastGroup: { ref: "eventGroup" as const } } : {}),
     ...(opts.clashed ? { clashed: true } : {}),
     ...(opts.discardBatch ? { discardBatch: true } : {}),
@@ -6735,8 +6738,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
-    // rounds B154, B153, B152, B151, B148, 311, 312, 313 and 314's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? parseFaceDownPlay(sentences, si, ctx);
+    // rounds B155, B154, B153, B152, B151, B148 and 311 to 315's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
+    const faceDown = roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);
@@ -20154,6 +20157,36 @@ function round314Sentence(s: string, sentences: string[], si: number, ctx: Ctx):
   if (/^[Ee]xile the top card of your library$/.test(s) && next(1) === "Until end of combat on your next turn, you may play that card") {
     ctx.exiledTop = true;
     return { effect: { type: "impulse", n: 1, until: "yourNextCombat" }, next: si + 2 };
+  }
+  return null;
+}
+
+/** Round 315's sentences, kept out of parseBodyText (TS2563). */
+function round315Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  // Galloping Lizrog: "you may remove any number of +1/+1 counters from among creatures you control. If you do, put twice
+  // that many +1/+1 counters on ~.": chosen one at a time as it resolves (CR 608.2d), from any creature you control then,
+  // ~ too; removed together, then twice as many put on ~, all while it resolves (rulings). Gone by then, none are put on
+  // it, though counters may still be removed (rulings, CR 400.7).
+  const remove = new RegExp(`^(?:[Yy]ou may )?remove any number of ${COUNTER} counters from among creatures you control$`).exec(s);
+  const put = remove ? new RegExp(`^If you do, put (twice|three times) that many ${COUNTER} counters on ~\\.?$`).exec(sentences[si + 1] ?? "") : null;
+  // Aetherborn Marauder: "move any number of +1/+1 counters from other permanents you control onto ~": chosen one at a
+  // time as it resolves, from any number of them, none too (rulings), then moved together (CR 122.5); none if ~ is gone.
+  const moveOnto = new RegExp(`^[Mm]ove any number of ${COUNTER} counters from other permanents you control onto ~$`).exec(s);
+  if (moveOnto && !ctx.spell) return { effect: { type: "gatherCounters", onto: { ref: "self" }, from: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "other permanents you control" }, kinds: [counterKind(moveOnto[1]!)] }, next: si + 1 };
+  // Baba Lysaga, Night Witch: "If there were three or more card types among the sacrificed permanents, each opponent loses
+  // 3 life, you gain 3 life, and you draw three cards.": the permanents its cost sacrificed, by their card types as they
+  // last existed (CR 205.2a, 608.2h; rulings), checked as it resolves.
+  const typesIf = new RegExp(`^If there were ${NUM} or more card types among the sacrificed permanents, (.+?), (.+?), and (.+?)\\.?$`).exec(s);
+  if (typesIf && ctx.activated) {
+    const parts = [typesIf[2]!, typesIf[3]!, typesIf[4]!].map((p) => parseOne(capital(p), ctx));
+    if (parts.some((p) => !p?.length)) return "fail";
+    return { effect: { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "costSacrificedCardTypes" } }, min: num(typesIf[1]!) }, effects: parts.flatMap((p) => p!) }, next: si + 1 };
+  }
+  if (remove && put && !ctx.spell) {
+    const counter = counterKind(remove[1]!);
+    effects.push({ type: "gatherCounters", from: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creatures you control" }, kinds: [counter] });
+    const removed: Amount = { count: { kind: "countersRemovedThisWay" }, times: put[1] === "twice" ? 2 : 3 };
+    return { effect: { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "countersRemovedThisWay" } }, min: 1 }, effects: [{ type: "counters", what: { ref: "self" }, counter: counterKind(put[2]!), n: removed }] }, next: si + 2 };
   }
   return null;
 }

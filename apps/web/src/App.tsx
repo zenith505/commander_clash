@@ -173,6 +173,7 @@ import {
   type GameEvent,
   type GameObject,
   type GameState,
+  type CostChoices,
   type PlayerId,
   type PTPart,
   type AbilityBody,
@@ -1053,16 +1054,20 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const madnessX = free && parseManaCost(madnessCastOf(s, HUMAN, d.objectId) ?? "").hasX;
     if (d.x === undefined && ((parseManaCost(card.manaCost).hasX && (!free || madnessX) && !d.via && !d.alt) || altX || costX || madnessX)) {
       // Rottenmouth Viper: with as many sacrificed as X (the ones picked later may differ).
-      const plan = (n: number) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, compiled.sacrificedReduction ? { ...kicks, sacrifice: reducingSacrifices(s, d.objectId).slice(0, n) } : kicks);
+      const plan = (n: number) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, compiled.sacrificedReduction ? { ...kicks, ...reducingChoices(s, d.objectId, n) } : kicks);
       // "You may sacrifice one or more creatures" (Plumb the Forbidden): X is how many, none unless you pick more.
       const optional = compiled.additionalCosts?.find((c) => c.kind === "sacrifice" && c.optional);
+      // Explosive Singularity, Burn at the Stake, Hierophant Bio-Titan: "tap any number of untapped creatures you control",
+      // "remove any number of +1/+1 counters from among creatures you control", X the number.
+      const anyNumber = compiled.additionalCosts?.find((c) => (c.kind === "tap" || c.kind === "removeCounters") && c.x && !(c.kind === "removeCounters" && c.self));
+      const anyText = anyNumber?.kind === "tap" ? `tap X ${anyNumber.filter.text.replace(/(\w)( you control)$/, "$1s$2")}` : anyNumber?.kind === "removeCounters" ? `remove X ${anyNumber.counter ?? ""} counters from among ${anyNumber.filter.text}`.replace(/  +/g, " ") : undefined;
       // Rottenmouth Viper: each one sacrificed makes it cheaper, so the X that can be paid runs from the fewest
       // sacrifices the mana allows to as many as there are; the fewest is offered (none payable: the engine says why).
       const range = compiled.sacrificedReduction ? xRange(plan) : undefined;
       // Nahiri's Sacrifice: "sacrifice an artifact or creature with mana value X": only some X work, so the greatest that does.
       const mvSac = compiled.additionalCosts?.some((c) => c.kind === "sacrifice" && c.mvX);
       const max = range ? range.max : mvSac ? (Array.from({ length: 21 }, (_, n) => 20 - n).find((n) => !!plan(n)) ?? 0) : maxX(plan);
-      const extra = optional?.kind === "sacrifice" ? (compiled.sacrificedReduction ? `sacrifice X ${optional.filter.text.replace(/s?$/, "s")}, each making it {${compiled.sacrificedReduction}} cheaper` : `sacrifice X ${optional.filter.text.replace(/s?$/, "s")} (X can be 0)`) : costX ? (/\b(?:(?:pay|discard|sacrifice|return|exile) X [^.(]*|sacrifice an? [^.(]*?with mana value X)/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
+      const extra = optional?.kind === "sacrifice" ? (compiled.sacrificedReduction ? `sacrifice X ${optional.filter.text.replace(/s?$/, "s")}, each making it {${compiled.sacrificedReduction}} cheaper` : `sacrifice X ${optional.filter.text.replace(/s?$/, "s")} (X can be 0)`) : anyText ? (compiled.sacrificedReduction ? `${anyText}, each making it {${compiled.sacrificedReduction}} cheaper` : `${anyText} (X can be 0)`) : costX ? (/\b(?:(?:pay|discard|sacrifice|return|exile) X [^.(]*|sacrifice an? [^.(]*?with mana value X)/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
       return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : card.manaCost), max, value: range ? range.min : optional ? 0 : Math.max(max, compiled.xMin ?? 0), ...(range?.min ? { min: range.min } : !costX && compiled.xMin ? { min: compiled.xMin } : {}), ...(extra ? { extra } : {}) });
     }
     // "Kicker {X}": X is announced once it's kicked (CR 601.2b), "X can't be 0" (Thieving Skydiver).
@@ -1131,7 +1136,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         return setCostPick({ draft: d, kind: "returnToHand", label: card.name, what: `return ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text} to hand`, n: c.n, candidates: returnCandidates(s, HUMAN, c), chosen: [] });
       // "Tap an untapped creature you control" (Lashknife's alternative cost): clicked on the battlefield.
       if (c.kind === "tap")
-        return setCostPick({ draft: d, kind: "tap", label: card.name, what: `tap ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`, n: c.n, candidates: tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c).filter((id) => !d.convoke?.includes(id)), chosen: [] });
+        return setCostPick({ draft: d, kind: "tap", label: card.name, what: `tap ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.n === 1 ? c.filter.text : c.filter.text.replace(/([^s])( you control)$/, "$1s$2")}`, n: c.n, candidates: tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c).filter((id) => !d.convoke?.includes(id)), chosen: [] });
       // Behold (CR 701.4a): a card from your hand or a permanent you control, picked from both together.
       if (c.kind === "reveal" && c.orControl) {
         const kind = beholdWhat(c);
@@ -2318,6 +2323,28 @@ function reducingSacrifices(s: GameState, id: string): string[] {
   return s.battlefield.filter((x) => x !== id && controllerOf(s, s.objects[x]!) === HUMAN && objectMatches(s, c.filter, s.objects[x]!, HUMAN, false)).sort((a, b) => Number(makesMana(a)) - Number(makesMana(b)));
 }
 
+/**
+ * The cost that makes it cheaper for each one paid, n of them: Rottenmouth Viper's sacrifices, Explosive Singularity's
+ * tapped creatures (those that make no mana first), Hierophant Bio-Titan's removed +1/+1 counters.
+ */
+function reducingChoices(s: GameState, id: string, n: number): Pick<CostChoices, "sacrifice" | "tap" | "counters"> {
+  const costs = compileCard(cardOf(s, id)).additionalCosts ?? [];
+  const tap = costs.find((x) => x.kind === "tap" && x.x);
+  if (tap?.kind === "tap") {
+    const makesMana = (x: string) => abilitiesOf(s, s.objects[x]!).mana.length > 0;
+    return { tap: tapCostCandidates(s, HUMAN, s.objects[id]!, tap).sort((a, b) => Number(makesMana(a)) - Number(makesMana(b))).slice(0, n) };
+  }
+  const counters = costs.find((x) => x.kind === "removeCounters" && x.x);
+  if (counters?.kind === "removeCounters") return { counters: counterCostCandidates(s, HUMAN, s.objects[id]!, counters).flatMap((x) => Array.from({ length: x.n }, () => ({ id: x.id, kind: x.kind }))).slice(0, n) };
+  return { sacrifice: reducingSacrifices(s, id).slice(0, n) };
+}
+
+/** How many of reducingChoices' there are to pay with. */
+function reducingRoom(s: GameState, id: string): number {
+  const c = reducingChoices(s, id, Infinity);
+  return (c.tap ?? c.counters ?? c.sacrifice ?? []).length;
+}
+
 function canCastWithTaps(s: GameState, id: string, convoke?: string[], teamwork?: string[]) {
   if (teamwork?.length) return planCast(s, HUMAN, id, undefined, undefined, convoke ?? "auto", undefined, { teamwork }) !== null;
   if ((!convoke && canCast(s, HUMAN, id)) || planCast(s, HUMAN, id, undefined, undefined, convoke ?? "auto") !== null) return true;
@@ -2335,8 +2362,8 @@ function canCastWithTaps(s: GameState, id: string, convoke?: string[], teamwork?
   }
   // Rottenmouth Viper: cheaper for each permanent sacrificed as it's cast, so with some of them.
   if (!convoke && c?.sacrificedReduction) {
-    const pool = reducingSacrifices(s, id);
-    for (let n = 1; n <= pool.length; n++) if (planCast(s, HUMAN, id, undefined, undefined, "auto", n, { sacrifice: pool.slice(0, n) }) !== null) return true;
+    const most = reducingRoom(s, id);
+    for (let n = 1; n <= most; n++) if (planCast(s, HUMAN, id, undefined, undefined, "auto", n, reducingChoices(s, id, n)) !== null) return true;
   }
   // Offering (CR 702.48a): castable now, or cheap enough, with one of the permanents it could sacrifice.
   if (!convoke && c?.offering && offeringCandidates(s, HUMAN, id).some((x) => planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { offering: x }) !== null)) return true;

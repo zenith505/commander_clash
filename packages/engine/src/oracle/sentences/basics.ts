@@ -1827,6 +1827,18 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!to || !c || typeof c !== "object" || !("count" in c) || c.times || !JSON.stringify(c).includes('"eachOne"')) return null;
     return [{ type: "damage", amount: m[2] ? { ...c, times: 2 } : c, to }];
   }
+  // Incite Rebellion: "For each player, ~ deals damage to that player and each creature that player controls equal to the
+  // number of creatures they control": each player and each of their creatures that player's own count, as it resolves,
+  // all dealt at once (CR 120.3, rulings).
+  if ((m = /^For each player, ~ deals damage to that player and each creature that player controls equal to the number of (creatures) (?:they|that player) control$/.exec(s))) {
+    const to = parseDamageRecipient("each player", ctx);
+    const also = parseDamageRecipient("each creature", ctx);
+    ctx.eachOne = true;
+    const c = parseCount(`${m[1]} that player controls`, ctx);
+    ctx.eachOne = undefined;
+    if (!to || !also || !c || typeof c !== "object" || !("count" in c) || c.times || !JSON.stringify(c).includes('"eachOne"')) return null;
+    return [{ type: "damage", amount: c, to, also: [also] }];
+  }
   // Olórin's Searing Light: "~ deals damage to each opponent equal to the power of the creature they exiled": after
   // "each opponent exiles a creature ...", each that creature's power as it last existed (rulings, CR 608.2h), all
   // dealt at once (CR 120.3).

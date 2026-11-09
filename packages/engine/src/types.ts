@@ -390,6 +390,11 @@ export interface GameObject {
   escaped?: boolean;
   /** "~ doesn't untap during your next untap step" (from a mana ability like Cinder Marsh's). */
   skipNextUntap?: boolean;
+  /**
+   * Undiscovered Paradise: "During your next untap step, as you untap your permanents, return ~ to its owner's hand": the
+   * player whose next untap step returns it, while it's this object (rulings: even if it doesn't untap then).
+   */
+  returnAtUntapOf?: PlayerId;
   /** How many more of its controller's untap steps it skips after the next one (Telekinesis). */
   skipMoreUntaps?: number;
   /** The permanents that dealt it damage this turn, for "whenever a creature dealt damage by ~ this turn dies". */

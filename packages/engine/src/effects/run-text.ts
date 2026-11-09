@@ -113,6 +113,7 @@ function respell(s: GameState, o: GameObject, before: CardDef, after: CardDef) {
     ...(o.gift !== undefined ? { gift: true } : {}),
     ...(o.castAlt ? { alt: o.castAlt } : {}),
     ...(o.face !== undefined ? { face: o.face } : {}),
+    ...(item.chosenType ? { castType: item.chosenType } : {}),
   };
   const body = (d: CardDef) => {
     const spell = compileCard(d).spell;

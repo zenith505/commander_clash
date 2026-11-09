@@ -6518,7 +6518,7 @@ export interface ActivatedAbility {
    * "{X}, {T}: Create a token that's a copy of the exiled card. X is the mana value of that card." (Prototype Portal): X is
    * defined by the ability, not chosen (CR 107.3c), worked out as it's activated; with no card exiled it can't be (rulings).
    */
-  xIs?: "linkedCardMv" | /** Voodoo Doll: "X is the number of pin counters on ~": that many on it as it's activated (rulings). */ { counters: CounterKind };
+  xIs?: "linkedCardMv" | /** Voodoo Doll: "X is the number of pin counters on ~": that many on it as it's activated (rulings). */ { counters: CounterKind } | /** Bargaining Table: "X is the number of cards in an opponent's hand": the opponent chosen as it's announced (CostChoices.xOpponent, rulings). */ { opponentHand: true };
   /** "Activate only if you have the city's blessing" (CR 602.5b). */
   activateIf?: StaticCondition;
   /** "Pay 2 life" as part of the cost (CR 119.4: only with at least that much life). */
@@ -6950,6 +6950,11 @@ export type AdditionalCost =
    * linked exile took (CR 607.2a), moved to its owner's graveyard, chosen in CostChoices.exileCards.
    */
   | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true; linked?: true; /** Osgir, the Reconstructor: "{X}, Exile an artifact card with mana value X from your graveyard": the one X announced as it's activated (CR 107.3a, 602.2b), and `filter` gets that mana value. */ mvX?: true; /** "Put three cards from your graveyard on the bottom of your library" (Battlefield Scrounger): the chosen cards go to the bottom of your library, in the order chosen (CR 401.4), not into exile. */ toBottom?: true; /** "Put a card an opponent owns from exile into that player's graveyard" (the Eldrazi processors): any card an opponent owns in exile, chosen in CostChoices.exileCards. */ process?: true }
+  /**
+   * "Exile an instant or sorcery spell you control" (Nivmagus Elemental, CR 602.2b): one of the ability's controller's spells
+   * on the stack that matches, a copy too, chosen in CostChoices.exileSpell; it leaves the stack without being countered.
+   */
+  | { kind: "exileSpell"; filter: TargetSpec; /** Always one spell. */ n: number }
   /** Ninjutsu (CR 702.49a): "Return an unblocked attacker you control to hand". */
   | { kind: "returnToHand"; filter: TargetSpec; n: number; unblockedAttacker?: boolean; x?: true }
   /**
@@ -7332,6 +7337,16 @@ export interface CompiledCard {
   flashIfXAtMost?: number;
   /** Molten Exhale: "You may cast ~ as though it had flash if you behold a Dragon as an additional cost to cast it" (CR 601.3c): cast at instant speed only with its optional `kicker` cost paid. */
   flashIfKicked?: true;
+  /**
+   * Selective Snare, Aphetto Dredging: "target creatures of the creature type of your choice": a creature type chosen as it's
+   * cast, before its targets (CostChoices.creatureType, rulings), its one target spec (`chosen` "type") bound to it.
+   */
+  castChooseType?: true;
+  /**
+   * Myr Superion: "Spend only mana produced by creatures to cast ~": its whole total cost (CR 601.2f-h) from mana a creature
+   * on the battlefield made (CR 106.3, 109.2); not a creature card's elsewhere (Elvish Spirit Guide, rulings).
+   */
+  creatureManaOnly?: true;
   /** "As ~ enters, choose a player" / "an opponent" (CR 614.12): kept while it's on the battlefield, as Chosen.player. */
   entersChoosePlayer?: "player" | "opponent";
   /** "As ~ enters, choose another creature you control" (Dauntless Bodyguard, CR 614.12): one of these, not one entering with it (rulings), kept as Chosen.object. */

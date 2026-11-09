@@ -1,6 +1,6 @@
 # Roadmap
 
-30,791 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,797 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,785 of
 9,979 (98%).
 
@@ -7395,8 +7395,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   this object). Depth Defiler ("When you cast this spell, choose one. If it was kicked, choose both instead.": the spell
   as cast, CR 603.3c, 702.33d). Corruption of Towashi ("Whenever a permanent you control transforms or a permanent you
   control enters transformed": either direction, an Incubator too, or a transforming double-faced card entering back face
-  up, CR 712.14a, not a modal double-faced one, rulings; "Do this only once each turn" counts only a yes, CR 603.2h). +6, 30,789 of 31,936
-  with B162 and round 321.
+  up, CR 712.14a, not a modal double-faced one, rulings; "Do this only once each turn" counts only a yes, CR 603.2h). +6, 30,797 of 31,936
+  with B162 and rounds 321 and 322.
 - Out after round B163 (looked at, not done): Words of Waste and Words of Wind (an opponent's discard or each player's
   bounce chosen in the middle of a draw: a pause the draw sequence resumes from only for some replacements), Strax,
   Sontaran Nurse ("Choose a player at random. When you do, ~ fights another target creature that player controls": a

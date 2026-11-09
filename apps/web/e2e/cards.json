@@ -1135,6 +1135,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ce690a21-8117-420e-be00-cd6d9923a812",
+  "name": "Anzrag's Rampage",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Destroy all artifacts you don't control, then exile the top X cards of your library, where X is the number of artifacts that were put into graveyards from the battlefield this turn. You may put a creature card exiled this way onto the battlefield. It gains haste. Return it to your hand at the beginning of the next end step.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "697ac261-263b-4879-bf45-6d10d23312ae",
   "name": "Ao, the Dawn Sky",
   "manaCost": "{3}{W}{W}",
@@ -9047,6 +9073,48 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cb8289e9-1e59-41f1-a994-6e34d2da2da2",
+  "name": "Eivor, Wolf-Kissed",
+  "manaCost": "{3}{R}{G}{W}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Human Assassin Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Assassin",
+   "Warrior"
+  ],
+  "oracleText": "Trample, haste\nWhenever Eivor deals combat damage to a player, you mill that many cards. You may put a Saga card and/or a land card from among them onto the battlefield.",
+  "power": "7",
+  "toughness": "6",
+  "colors": [
+   "G",
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Haste",
+   "Trample",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "acr",
+  "releasedAt": "2024-07-05",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9aff3d55-e25d-4f06-a783-c3aa9eb9fd50",
   "name": "Eladamri, Korvecdal",
   "manaCost": "{1}{G}{G}",
@@ -13608,6 +13676,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3b7f0dd3-5b4c-4ac0-a43a-ddc62a44663e",
+  "name": "Hand of Vecna",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Legendary Artifact — Equipment",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "At the beginning of combat on your turn, equipped creature or a creature you control named Vecna gets +X/+X until end of turn, where X is the number of cards in your hand.\nEquip—Pay 1 life for each card in your hand.\nEquip {2}",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0e735ba6-7fd1-4d12-b20c-21525dc1e2b5",
   "name": "Hanweir Battlements",
   "manaCost": "",
@@ -15594,6 +15690,37 @@
   "commanderLegal": "legal",
   "set": "dd2",
   "releasedAt": "2008-11-07",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2274c7ae-5a40-4fd4-a4ac-6f56b23034e4",
+  "name": "Jace, Architect of Thought",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Jace",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Jace"
+  ],
+  "oracleText": "+1: Until your next turn, whenever a creature an opponent controls attacks, it gets -1/-0 until end of turn.\n−2: Reveal the top three cards of your library. An opponent separates those cards into two piles. Put one pile into your hand and the other on the bottom of your library in any order.\n−8: For each player, search that player's library for a nonland card and exile it, then that player shuffles. You may cast those cards without paying their mana costs.",
+  "loyalty": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ddm",
+  "releasedAt": "2014-03-14",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
@@ -30894,6 +31021,34 @@
   "releasedAt": "2021-07-23",
   "rarity": "mythic",
   "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "44ed4c0c-a012-4895-a547-b04150553bba",
+  "name": "The Eldest Reborn",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Each opponent sacrifices a creature or planeswalker of their choice.\nII — Each opponent discards a card.\nIII — Put target creature or planeswalker card from a graveyard onto the battlefield under your control.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dom",
+  "releasedAt": "2018-04-27",
+  "rarity": "uncommon",
+  "layout": "saga",
   "gameChanger": false
  },
  {

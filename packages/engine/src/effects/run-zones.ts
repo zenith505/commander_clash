@@ -1406,6 +1406,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           sc.castAmong = { ids: ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
         }
       }
+      // Jace, Architect of Thought: the cards its searches exiled this resolution (see searchEachExile).
+      if (!sc.castAmong && e.fromSearched) sc.castAmong = { ids: (s.resolving!.searchedExiled ?? []).filter((x) => (obj(s, x.id).zoneChanges ?? 0) === x.zc && obj(s, x.id).zone === "exile"), declined: [] };
       if (!sc.castAmong && e.pushLuck !== undefined) {
         // Dance with Calamity: one card at a time, looked at before deciding to go on (rulings), a card's mana value with
         // X as 0 (CR 202.3e). Over the limit, none can be cast and they all stay exiled.

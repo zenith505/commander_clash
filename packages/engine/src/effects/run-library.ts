@@ -283,20 +283,23 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       return;
     case "putFromExiledTop": {
       const sc = (s.resolving!.scratch ??= {});
-      if (e.any) {
+      if (e.any || e.may) {
         // Only permanent cards can be put onto the battlefield (CR 110.4b); still exiled face up as they're chosen.
+        // Anzrag's Rampage: up to one ("a creature card"), which is "it" after (ObjRef "created").
         const fits = (id: ObjectId) => s.objects[id]?.zone === "exile" && printedMatches(e.filter, defOf(s, obj(s, id))) && isPermanentCard(defOf(s, obj(s, id)));
         if (!sc.found) {
           const looked = (s.resolving?.exiledTopCards ?? []).filter((id) => s.objects[id]?.zone === "exile");
           const cards = looked.filter(fits);
           if (!cards.length) return;
-          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: `any number of ${e.filter.text}s`, cards, min: 0, max: cards.length, exiled: true, dig: { looked, to: "to put onto the battlefield", rest: "stay in exile" } };
+          const what = e.any ? `any number of ${e.filter.text}s` : `${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text}`;
+          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: 0, max: e.any ? cards.length : 1, exiled: true, dig: { looked, to: "to put onto the battlefield", rest: "stay in exile" } };
           return "paused";
         }
         const found = sc.found.filter(fits);
         sc.found = undefined;
         if (found.length) log(s, `${player(s, ctx.controller).name} puts ${found.map((id) => defOf(s, obj(s, id)).name).join(", ")} from exile onto the battlefield.`);
         enterTogether(s, () => found.forEach((id) => moveObject(s, id, "battlefield", { controller: ctx.controller })));
+        if (e.may) s.resolving!.created = found.filter((id) => s.objects[id]?.zone === "battlefield");
         return;
       }
       if (!sc.impulseChoice) {

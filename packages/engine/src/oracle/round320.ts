@@ -4,10 +4,14 @@ import type { AbilityBody, Effect, TriggeredAbility } from "../abilities";
 import type { Ctx } from "./body";
 import { parseSentence } from "./sentence";
 import { parseTrigger } from "./triggers";
+import { round321Sentence, round321Trigger } from "./round321";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 export function round320Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 321's sentences first (oracle/round321.ts).
+  const r321 = round321Sentence(s, sentences, si, ctx, effects);
+  if (r321 !== null) return r321;
   const prev = effects.at(-1);
   // Aerith Rescue Mission: "Tap up to three target creatures. Put a stun counter on one of them.": the one chosen as it
   // resolves (rulings, CR 608.2d), among the targets still legal (CR 608.2b), with one left that one.
@@ -57,6 +61,9 @@ export function round320WholeText(text: string, parse: (t: string) => AbilityBod
 }
 
 export function round320Trigger(raw: string): TriggeredAbility | "fail" | null {
+  // Round 321's triggers first (oracle/round321.ts).
+  const r321 = round321Trigger(raw);
+  if (r321 !== null) return r321;
   // Power Surge: "At the beginning of each player's upkeep, ~ deals X damage to that player, where X is the number of
   // untapped lands they controlled at the beginning of this turn.": counted as the turn began, before its untap step (CR
   // 502.3), whether or not ~ was there then (rulings); TurnLog.untappedLands.

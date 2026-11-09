@@ -532,7 +532,9 @@ const checkableMay = (e: Effect): boolean =>
   e.type === "processExile" ||
   // Dakra Mystic: "You may put the revealed cards into their owners' graveyards. If you don't, ...": only with cards revealed.
   e.type === "parleyToGraveyards" ||
-  (e.type === "chooseFromGraveyard" && e.dest === "exile" && e.n >= 1 && !e.nAmount && !e.upTo && !e.who && !e.milled && !e.eventGroup && !e.notSacrificed && e.totalMv === undefined && e.mvMax === undefined) ||
+  // Ardent Dustspeaker: "You may put an instant or sorcery card from your graveyard on the bottom of your library. If you
+  // do, ...": only with one there.
+  (e.type === "chooseFromGraveyard" && (e.dest === "exile" || e.dest === "libraryBottom") && e.n >= 1 && !e.nAmount && !e.upTo && !e.who && !e.milled && !e.eventGroup && !e.notSacrificed && e.totalMv === undefined && e.mvMax === undefined) ||
   // "You may discard a card or sacrifice a land. If you do, ..." (Highway Robbery): one of them, only one that can be done.
   (e.type === "either" && !!e.onlyDoable && e.options.every((o) => o.length === 1 && checkableMay(o[0]!))) ||
   // "You may create a Treasure token. When you do, ..." (Generous Plunderer): creating it is doing it.
@@ -1477,6 +1479,79 @@ function wandPunisher(who: PlayerRef, landLife: number): Effect {
  * reads parseFaceDownPlay's: the last effect and the next sentence's index in parseFaceDownPlay's shape (the effects
  * before the last one already pushed), "fail" for one that can't be read, or null when it isn't one of them.
  */
+/** Lane B round B153's sentences, chained before round B152's (parseBodyText is at TS2563's limit). */
+function roundB153Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  const out = (fx: Effect[], skip: number) => {
+    effects.push(...fx.slice(0, -1));
+    return { effect: fx[fx.length - 1]!, next: si + 1 + skip };
+  };
+  const next = (k = 1) => (sentences[si + k] ?? "").replace(/\.$/, "");
+  const prev = effects[effects.length - 1];
+  // Teferi, Timeless Voyager: "Each creature target opponent controls phases out. Until the end of your next turn, they
+  // can't phase in.": they skip their controller's untap steps until that turn has ended, then phase in at the next one
+  // (rulings, CR 702.26a); "until the end of your next turn" ends early once you've left the game (CR 800.4m).
+  if (s === "Until the end of your next turn, they can't phase in" && prev?.type === "phaseOut" && prev.what.ref === "each" && !prev.untilSourceLeaves && !prev.anyNumber) {
+    effects.pop();
+    return { effect: { ...prev, lockedUntilYourNextTurnEnds: true }, next: si + 1 };
+  }
+  // Capricious Efreet: "choose target nonland permanent you control and up to two target nonland permanents you don't
+  // control. Destroy one of them at random.": one to three targets; as it resolves, one of those still legal is chosen at
+  // random and destroyed (rulings, CR 608.2b).
+  let m: RegExpExecArray | null;
+  if ((m = /^[Cc]hoose (target [a-z ]+?) and (up to (?:one|two) target [a-z' ]+?)$/.exec(s)) && next() === "Destroy one of them at random") {
+    const a = parseObject(m[1]!, ctx);
+    const b = parseObject(m[2]!, ctx);
+    if (a?.ref !== "target" || a.n || b?.ref !== "target" || b.index !== a.index + 1) return "fail";
+    return out([{ type: "destroy", what: { ref: "target", index: a.index, n: 1 + (b.n ?? 1) }, oneAtRandom: true }], 1);
+  }
+  // Fickle Efreet: "flip a coin at end of combat. If you lose the flip, an opponent gains control of ~.": a delayed trigger
+  // (CR 603.7) that flips then; the opponent is chosen as it resolves, not targeted (as Akroan Horse's).
+  if (/^[Ff]lip a coin at end of combat$/.test(s) && next() === "If you lose the flip, an opponent gains control of ~" && !ctx.spell) {
+    const control: Effect[] = [{ type: "choose", choice: "opponent" }, { type: "continuous", what: { ref: "subject" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }];
+    return out([{ type: "delayed", when: "endOfCombat", effects: [{ type: "flipCoin" }, { type: "if", cond: { kind: "wonFlip", lost: true }, effects: control }], text: "Flip a coin. If you lose the flip, an opponent gains control of ~" }], 1);
+  }
+  // Dancing Sword: "you may have ~ become a 2/1 Construct artifact creature with flying and ward {1}. If you do, it isn't
+  // an Equipment.": a "[creature type] artifact creature" keeps its other subtypes (CR 205.1b), so the Equipment subtype
+  // goes as part of the same effect; not having it become one, it stays an Equipment (rulings).
+  if (s === "If you do, it isn't an Equipment" && prev?.type === "may" && !prev.pay && prev.effects.length === 1) {
+    const c = prev.effects[0]!;
+    if (c.type === "continuous" && c.what.ref === "self" && c.duration === "game" && c.mods.some((x) => x.kind === "addTypes" && x.types.includes("Creature"))) {
+      effects.pop();
+      return { effect: { ...prev, effects: [{ ...c, mods: [...c.mods, { kind: "loseTypes", types: [], subtypes: ["Equipment"] }] }] }, next: si + 1 };
+    }
+    return "fail";
+  }
+  // Boros Battleshaper: "up to one target creature attacks or blocks this combat if able and up to one target creature
+  // can't attack or block this combat": two targets, which may be the same creature (CR 115.3; then it can't, CR 508.1d,
+  // 509.1c); each only for this combat (CR 500.5a), chosen by its controller where it attacks or what it blocks (rulings).
+  if (/^[Uu]p to one target creature attacks or blocks this combat if able and up to one target creature can't attack or block this combat$/.test(s)) {
+    const a = parseObject("up to one target creature", ctx);
+    const b = parseObject("up to one target creature", ctx);
+    if (a?.ref !== "target" || b?.ref !== "target") return "fail";
+    return out([
+      { type: "continuous", what: a, mods: [{ kind: "attacksIfAble" }, { kind: "mustBlock" }], duration: "endOfCombat" },
+      { type: "continuous", what: b, mods: [{ kind: "cantAttack" }, { kind: "cantBlock" }], duration: "endOfCombat" },
+    ], 0);
+  }
+  // Aura Graft: "Gain control of target Aura that's attached to a permanent. Attach it to another permanent it can
+  // enchant.": a permanent chosen as it resolves (not targeted), one it can enchant under your control (CR 303.4d); with
+  // none, it doesn't move but you still control it (rulings).
+  if (s === "Gain control of target Aura that's attached to a permanent" && next() === "Attach it to another permanent it can enchant" && ctx.spell) {
+    const what = parseObject("target Aura attached to a permanent", ctx);
+    if (what?.ref !== "target" || what.n) return "fail";
+    return out([{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game" }, { type: "attachElsewhere", source: what, host: "anyPermanent" }], 1);
+  }
+  // Split the Spoils: "Exile up to five target permanent cards from your graveyard and separate them into two piles. An
+  // opponent chooses one of those piles. Put that pile into your hand and the other into your graveyard.": you separate
+  // the cards exiled (CR 700.3), a pile may be empty; the opponent is chosen as it resolves (rulings).
+  if (s === "Exile up to five target permanent cards from your graveyard and separate them into two piles" && next() === "An opponent chooses one of those piles" && next(2) === "Put that pile into your hand and the other into your graveyard" && ctx.spell) {
+    const ex = parseSentence("Exile up to five target permanent cards from your graveyard", ctx);
+    if (ex?.length !== 1 || ex[0]!.type !== "exile") return "fail";
+    return out([ex[0]!, { type: "exiledPiles", youSeparate: true }], 2);
+  }
+  return null;
+}
+
 /** Lane B round B152's sentences (Grenzo's Rebuttal, Muse Vessel, Gauntlets of Chaos), chained before round B151's. */
 function roundB152Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
   const out = (fx: Effect[], skip: number) => {
@@ -6605,8 +6680,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
-    // rounds B152, B151, B148, 311, 312 and 313's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    // rounds B153, B152, B151, B148, 311, 312 and 313's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
+    const faceDown = roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);

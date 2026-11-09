@@ -1506,6 +1506,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "370974e7-d242-4f24-a031-cba71c935306",
+  "name": "Ardent Dustspeaker",
+  "manaCost": "{4}{R}",
+  "cmc": 5,
+  "typeLine": "Creature — Minotaur Shaman",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Minotaur",
+   "Shaman"
+  ],
+  "oracleText": "Whenever this creature attacks, you may put an instant or sorcery card from your graveyard on the bottom of your library. If you do, exile the top two cards of your library. You may play those cards this turn.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "stx",
+  "releasedAt": "2021-04-23",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f8aa1893-60e5-439e-9316-872a9f6b6c94",
   "name": "Argothian Wurm",
   "manaCost": "{3}{G}",
@@ -1982,6 +2013,32 @@
   "set": "ecc",
   "releasedAt": "2026-01-23",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "00317e4f-0228-469a-9789-fb6c39976860",
+  "name": "Aura Graft",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Gain control of target Aura that's attached to a permanent. Attach it to another permanent it can enchant.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ody",
+  "releasedAt": "2001-10-01",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -3595,6 +3652,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cf5bf1ef-e40b-4fb5-8148-d4ca7a307501",
+  "name": "Boros Battleshaper",
+  "manaCost": "{5}{R}{W}",
+  "cmc": 7,
+  "typeLine": "Creature — Minotaur Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Minotaur",
+   "Soldier"
+  ],
+  "oracleText": "At the beginning of each combat, up to one target creature attacks or blocks this combat if able and up to one target creature can't attack or block this combat.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dgm",
+  "releasedAt": "2013-05-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "73c423b7-cab8-4e69-8070-9edbf96a6c2c",
   "name": "Boros Guildgate",
   "manaCost": "",
@@ -4431,6 +4521,36 @@
   "commanderLegal": "legal",
   "set": "40k",
   "releasedAt": "2022-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9abd2286-23e9-49cd-be53-39423890f35c",
+  "name": "Capricious Efreet",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Creature — Efreet",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Efreet"
+  ],
+  "oracleText": "At the beginning of your upkeep, choose target nonland permanent you control and up to two target nonland permanents you don't control. Destroy one of them at random.",
+  "power": "6",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m10",
+  "releasedAt": "2009-07-17",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -27318,6 +27438,32 @@
   "commanderLegal": "legal",
   "set": "afr",
   "releasedAt": "2021-07-23",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "48ad5bd6-9568-4813-be29-99aef8b9327a",
+  "name": "Split the Spoils",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile up to five target permanent cards from your graveyard and separate them into two piles. An opponent chooses one of those piles. Put that pile into your hand and the other into your graveyard. (Piles can be empty.)",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

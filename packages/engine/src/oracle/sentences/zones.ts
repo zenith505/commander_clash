@@ -809,10 +809,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (ctx.afterMill && /^[Pp]ut a card from among (?:those cards|them) into your hand$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, milled: true }];
   // "You may put a land card from your graveyard on top of your library" (Halo-Charged Skaab, after milling): chosen as
   // it resolves, not targeted.
-  if ((m = /^(?:[Yy]ou may )?[Pp]ut (an?|one) (.+?) from your graveyard on top of your library$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[2]!)) {
+  // Ardent Dustspeaker: "you may put an instant or sorcery card from your graveyard on the bottom of your library".
+  if ((m = /^(?:[Yy]ou may )?[Pp]ut (an?|one) (.+?) from your graveyard on (top|the bottom) of your library$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[2]!) && (m[3] === "top" || (m[1] !== "one" && m[2] !== "card"))) {
     const filter = parseSearchFilter(m[2]!.replace(/ and\/or /g, " or "));
     if (filter === null) return null;
-    return [{ type: "chooseFromGraveyard", n: 1, dest: "libraryTop", ...(filter ? { filter } : {}), ...(/^[Yy]ou may /.test(s) ? { upTo: true as const } : {}) }];
+    return [{ type: "chooseFromGraveyard", n: 1, dest: m[3] === "top" ? "libraryTop" : "libraryBottom", ...(filter ? { filter } : {}), ...(/^[Yy]ou may /.test(s) ? { upTo: true as const } : {}) }];
   }
   // Anurid Scavenger: "sacrifice ~ unless you put a card from your graveyard on the bottom of your library": any card,
   // chosen as it resolves (not targeted).

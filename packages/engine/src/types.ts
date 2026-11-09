@@ -607,7 +607,7 @@ export interface GameObject {
    * `host`: for an Aura or Equipment that phased out directly, what it was attached to (702.26i).
    * `released`: `by` left the game and their next turn would have begun, so it phases in at the next untap step (702.26n).
    */
-  phased?: { by: PlayerId; indirect?: true; host?: { id: ObjectId; zc: number }; released?: true; /** Oubliette: it phases in (tapped) only when this object leaves the battlefield; Out of Time: `noTap`, not tapped. */ until?: { id: ObjectId; zc: number; noTap?: true } };
+  phased?: { by: PlayerId; indirect?: true; host?: { id: ObjectId; zc: number }; released?: true; /** Oubliette: it phases in (tapped) only when this object leaves the battlefield; Out of Time: `noTap`, not tapped. */ until?: { id: ObjectId; zc: number; noTap?: true }; /** Teferi, Timeless Voyager: it can't phase in until the end of `turnOf`'s next turn after turn `sinceTurn` (cleared in that cleanup step, CR 514.2, or once that player has left the game, CR 800.4m). */ lock?: { turnOf: PlayerId; sinceTurn: number } };
   /** As a spell: the zone it was cast from, how (flashback, escape, ...), and whether buyback was paid. */
   castFrom?: ZoneName;
   /** On the battlefield: it entered as a spell cast from its owner's hand ("if you cast it from your hand"). */

@@ -1742,9 +1742,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       sc.looked ??= (r.exiledCards ?? []).filter((id) => obj(s, id).zone === "exile");
       const looked = sc.looked.filter((id) => obj(s, id).zone === "exile");
       if (!looked.length) return;
-      const opp = chooseAnOpponent(s, ctx, src, "choose an opponent to separate the cards into two piles");
+      const opp = chooseAnOpponent(s, ctx, src, e.youSeparate ? "choose an opponent to choose a pile" : "choose an opponent to separate the cards into two piles");
       if (opp === "paused") return "paused";
       if (opp === undefined || player(s, opp).lost) return;
+      // Split the Spoils: you separate them and the opponent chooses the pile put into your hand.
+      const separator = e.youSeparate ? p.id : opp;
       if (sc.separating && sc.found) {
         sc.pileOne = sc.found;
         sc.separating = undefined;
@@ -1752,19 +1754,26 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       if (!sc.pileOne) {
         sc.separating = true;
-        s.pending = { kind: "searchLibrary", player: opp, source: src, what: "the cards", cards: looked, min: 0, max: looked.length, exiled: true, dig: { looked, to: "for the first pile", rest: "form the second pile" }, piles: true, forPlayer: p.id };
+        s.pending = { kind: "searchLibrary", player: separator, source: src, what: "the cards", cards: looked, min: 0, max: looked.length, exiled: true, dig: { looked, to: "for the first pile", rest: "form the second pile" }, piles: true, ...(separator !== p.id ? { forPlayer: p.id } : {}) };
         return "paused";
       }
       const one = sc.pileOne.filter((id) => looked.includes(id));
       const two = looked.filter((id) => !one.includes(id));
       if (sc.pileChoice === undefined) {
-        log(s, `${player(s, opp).name} separates them into two piles: ${names(one) || "no cards"}; and ${names(two) || "no cards"}.`);
+        log(s, `${player(s, separator).name} separates them into two piles: ${names(one) || "no cards"}; and ${names(two) || "no cards"}.`);
         const label = (pile: ObjectId[], i: number) => `Pile ${i + 1}: ${pile.length ? names(pile) : "no cards"}`;
-        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "pile", options: ["0", "1"], labels: [label(one, 0), label(two, 1)], piles: [one, two], of: p.id, pileMode: "battlefield", prompt: "choose the pile to put onto the battlefield under your control (the other goes to its owners' graveyards)" };
+        if (e.youSeparate) s.pending = { kind: "chooseOption", player: opp, source: src, what: "pile", options: ["0", "1"], labels: [label(one, 0), label(two, 1)], piles: [one, two], of: p.id, prompt: `choose the pile to put into ${p.name}'s hand (the other goes into their graveyard)` };
+        else s.pending = { kind: "chooseOption", player: p.id, source: src, what: "pile", options: ["0", "1"], labels: [label(one, 0), label(two, 1)], piles: [one, two], of: p.id, pileMode: "battlefield", prompt: "choose the pile to put onto the battlefield under your control (the other goes to its owners' graveyards)" };
         return "paused";
       }
       const mine = sc.pileChoice === 0 ? one : two;
       const rest = sc.pileChoice === 0 ? two : one;
+      if (e.youSeparate) {
+        log(s, `${player(s, opp).name} chooses ${mine.length ? names(mine) : "the empty pile"} for ${p.name}'s hand${rest.length ? `; ${names(rest)} go${rest.length === 1 ? "es" : ""} into their graveyard` : ""}.`);
+        for (const id of mine) moveObject(s, id, "hand");
+        for (const id of rest) moveObject(s, id, "graveyard");
+        return;
+      }
       log(s, `${p.name} puts ${mine.length ? names(mine) : "no cards"} onto the battlefield${rest.length ? ` and ${names(rest)} into ${rest.every((id) => obj(s, id).owner === p.id) ? "their" : "their owners'"} graveyard${rest.every((id) => obj(s, id).owner === obj(s, rest[0]!).owner) ? "" : "s"}` : ""}.`);
       enterTogether(s, () => {
         for (const id of mine) moveObject(s, id, "battlefield", { controller: p.id });

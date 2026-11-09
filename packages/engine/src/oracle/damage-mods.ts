@@ -117,6 +117,16 @@ export function parseDamageMod(line: string): StaticAbility | null {
     const a = parseDamageMod("During your turn, if a source would deal damage to ~, prevent that damage.");
     return a && { ...a, text: line, mods: a.mods.map((m) => (m.kind === "damageMod" ? { ...m, mod: { ...m.mod, text: line } } : m)) };
   }
+  // Camel: "As long as ~ is attacking, prevent all damage Deserts would deal to ~ and to creatures banded with ~": each
+  // Desert source's damage (an animated Desert in combat too, rulings) to it and to the other creatures in its attacking
+  // band as the damage would be dealt (CR 615.1a, 702.22c), only while it's attacking.
+  if (line === "As long as ~ is attacking, prevent all damage Deserts would deal to ~ and to creatures banded with ~.") {
+    const a = parseDamageMod("Prevent all damage that would be dealt to ~ by Deserts.");
+    const m = a?.mods[0];
+    const cond = parseStaticCondition("~ is attacking", { affects: { kind: "self" }, mods: [], text: "" });
+    if (!a || a.mods.length !== 1 || m?.kind !== "damageMod" || !m.mod.to?.self || !cond) return null;
+    return { ...a, condition: cond, mods: [{ ...m, mod: { ...m.mod, to: { ...m.mod.to, bandedWithHolder: true }, text: line } }], text: line };
+  }
   // Personal Sanctuary: "During your turn, prevent all damage that would be dealt to you": only while it's your turn.
   const during = /^During your turn, ([a-z].+)$/.exec(line);
   if (during) {

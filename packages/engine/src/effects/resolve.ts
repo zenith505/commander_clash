@@ -568,6 +568,11 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     return players(s, ref.who, ctx)
       .map((pid) => graveyardEnd(s, pid, { ...(ref.filter ? { filter: ref.filter } : {}), ...(ref.bottom ? { bottom: true } : {}), ...(ref.only ? { only: true } : {}) }))
       .filter((o): o is GameObject => !!o);
+  if (ref.ref === "bandedWithSelf") {
+    const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc) || !me.band || me.attacking === undefined) return [];
+    return s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== me.id && o.band === me.band && o.attacking !== undefined);
+  }
   if (ref.ref === "inCombatWithSelf" && ref.lastKnown) {
     const lk = ctx.sourceId ? s.lastKnown?.[ctx.sourceId] : undefined;
     // A leaves-the-battlefield trigger's source is the object it became (one zone change later, CR 400.7).
@@ -1874,7 +1879,7 @@ export function damageRecipients(s: GameState, to: DamageRecipient, ctx: Resolve
     }
     return out;
   }
-  if (to.ref === "self" || to.ref === "created" || to.ref === "subject" || to.ref === "attached" || to.ref === "allCreatures" || to.ref === "each" || to.ref === "blockingIt" || to.ref === "blockHistory" || to.ref === "inCombatWithSelf" || to.ref === "eventGroup" || to.ref === "targetHost" || to.ref === "attachedHost" || (to.ref === "target" && (("n" in to && !!to.n) || isObjectTarget(ctx, to.index))))
+  if (to.ref === "self" || to.ref === "created" || to.ref === "subject" || to.ref === "attached" || to.ref === "allCreatures" || to.ref === "each" || to.ref === "blockingIt" || to.ref === "blockHistory" || to.ref === "inCombatWithSelf" || to.ref === "bandedWithSelf" || to.ref === "eventGroup" || to.ref === "targetHost" || to.ref === "attachedHost" || (to.ref === "target" && (("n" in to && !!to.n) || isObjectTarget(ctx, to.index))))
     return { objs: objects(s, to as ObjRef, ctx), pids: [] };
   return { objs: [], pids: players(s, to as PlayerRef, ctx) };
 }

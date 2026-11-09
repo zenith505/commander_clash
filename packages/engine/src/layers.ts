@@ -351,7 +351,9 @@ function onKeywordLine(d: CardDef, k: string): boolean {
  */
 export function printedKeywords(d: CardDef): string[] {
   const c = compileCard(d);
-  const fromText = c.textKeywords;
+  // Wolves of the Hunt's "bands with other creatures named Wolves of the Hunt": its own text has its name as "~", but the
+  // quality is that name, whichever creature has the ability.
+  const fromText = c.textKeywords.map((k) => (/^Bands with other /.test(k) ? k.replace(/~/g, d.name) : k));
   // A keyword in a level or station striation is there only while the striation applies (CR 711.2, 721.2).
   const striated = new Set((c.striatedKeywords ?? []).map((k) => k.toLowerCase()));
   // Scryfall lists "Protection from X" as "Protection".
@@ -805,6 +807,16 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "subjectAttackingYou": {
       const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
       return !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && sub.attacking === you;
+    }
+    case "subjectBlockedOnlyBy": {
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      if (!sub || sub.zone !== "battlefield" || (sub.zoneChanges ?? 0) !== subjectZc || sub.attacking === undefined) return false;
+      const blockers = s.battlefield.filter((id) => s.objects[id]!.blocking?.includes(sub.id));
+      const kind = (id: ObjectId) => {
+        const c = chars.get(id);
+        return !!c && c.types.includes("Creature") && (c.subtypes.includes(cond.subtype) || c.allCreatureTypes);
+      };
+      return blockers.some((id) => id !== sourceId && kind(id)) && blockers.every(kind);
     }
     case "subjectPT": {
       const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
@@ -1733,10 +1745,11 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       }
       return;
     case "removeKeywords":
-      // Losing hexproof loses each "hexproof from [quality]" too (CR 702.11e).
+      // Losing hexproof loses each "hexproof from [quality]" too (CR 702.11e); losing banding loses every "bands with other"
+      // ability (CR 702.22b), and "Bands with other" alone is all of those (Shelkin Brownie).
       // Losing protection or ward loses every one of them, whatever its quality or cost (Shay Cormac). "Landwalk" is every
       // landwalk ability (Hammerheim: "loses all landwalk abilities").
-      c.keywords = c.keywords.filter((x) => !m.keywords.some((k) => sameCI(x, k) || (sameCI(k, "Hexproof") && /^hexproof from /i.test(x)) || (sameCI(k, "Protection") && /^protection from /i.test(x)) || (sameCI(k, "Ward") && /^ward\b/i.test(x)) || (sameCI(k, "Landwalk") && isLandwalk(x))));
+      c.keywords = c.keywords.filter((x) => !m.keywords.some((k) => sameCI(x, k) || (sameCI(k, "Hexproof") && /^hexproof from /i.test(x)) || (sameCI(k, "Protection") && /^protection from /i.test(x)) || (sameCI(k, "Ward") && /^ward\b/i.test(x)) || (sameCI(k, "Landwalk") && isLandwalk(x)) || ((sameCI(k, "Banding") || sameCI(k, "Bands with other")) && /^bands with other /i.test(x))));
       for (const k of m.keywords) if (c.sparedBy) delete c.sparedBy[k.toLowerCase()];
       if (c.sparedBy && m.keywords.some((k) => sameCI(k, "Protection"))) for (const k of Object.keys(c.sparedBy)) if (k.startsWith("protection from ")) delete c.sparedBy[k];
       if (m.keywords.some((k) => sameCI(k, "Ward"))) c.wardLost = true;

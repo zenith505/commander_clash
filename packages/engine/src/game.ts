@@ -12211,11 +12211,38 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   finishAttacks(s);
 }
 
-/** Attackers not in a band yet that could form one: one with banding and another attacking the same player (CR 702.22c-d). */
+/** The qualities of a creature's "bands with other [quality]" abilities (CR 702.22b): "legendary creatures", "creatures named X". */
+function bandsWithOther(s: GameState, o: GameObject): string[] {
+  return characteristics(s, o).keywords.flatMap((k) => /^Bands with other (.+)$/.exec(k)?.[1] ?? []);
+}
+/** Whether a creature has the quality a "bands with other" ability names: legendary, or that name (CR 702.22c). */
+function hasBandQuality(s: GameState, o: GameObject, quality: string): boolean {
+  if (quality === "legendary creatures") return characteristics(s, o).supertypes.includes("Legendary");
+  const named = /^creatures named (.+)$/.exec(quality);
+  return !!named && hasName(currentName(s, o), named[1]!);
+}
+/**
+ * Whether these creatures together band for combat damage (CR 702.22j-k): one has banding, or one with "bands with
+ * other [quality]" has that quality and another of them has it too.
+ */
+function bandingAmong(s: GameState, group: GameObject[]): boolean {
+  if (group.some((o) => objHasKeyword(s, o, "Banding"))) return true;
+  return group.some((o) => bandsWithOther(s, o).some((q) => hasBandQuality(s, o, q) && group.some((x) => x !== o && hasBandQuality(s, x, q))));
+}
+/**
+ * Whether these attackers can be one band (CR 702.22c): creatures with banding and up to one without (even if it has
+ * "bands with other"), or creatures that all have a quality, one or more with "bands with other [that quality]".
+ */
+function canBeBand(s: GameState, ids: ObjectId[]): boolean {
+  const os = ids.map((id) => obj(s, id));
+  if (os.some((o) => objHasKeyword(s, o, "Banding")) && os.filter((o) => !objHasKeyword(s, o, "Banding")).length <= 1) return true;
+  return os.some((o) => bandsWithOther(s, o).some((q) => os.every((x) => hasBandQuality(s, x, q))));
+}
+
+/** Attackers not in a band yet that could form one with another attacking the same player (CR 702.22c-d). */
 function bandOptions(s: GameState, ids: ObjectId[]): ObjectId[] {
   const free = ids.filter((id) => s.objects[id]?.attacking !== undefined && !obj(s, id).band);
-  const bands = (id: ObjectId) => objHasKeyword(s, obj(s, id), "Banding");
-  return free.filter((id) => free.some((x) => x !== id && sameAttack(obj(s, x), obj(s, id)) && (bands(id) || bands(x))));
+  return free.filter((id) => free.some((x) => x !== id && sameAttack(obj(s, x), obj(s, id)) && canBeBand(s, [id, x])));
 }
 const canBand = (s: GameState, ids: ObjectId[]) => bandOptions(s, ids).length > 0;
 /** Attacking the same player or the same planeswalker (CR 702.22c). */
@@ -12226,7 +12253,8 @@ export function bandProblem(s: GameState, ids: ObjectId[]): string | null {
   const options = bandOptions(s, s.declaring?.ids ?? []);
   if (ids.length < 2) return "a band needs two or more attacking creatures";
   if (ids.some((id) => !options.includes(id))) return "choose attacking creatures that aren't in a band yet";
-  if (ids.filter((id) => !objHasKeyword(s, obj(s, id), "Banding")).length > 1) return "a band can have only one creature without banding";
+  if (!canBeBand(s, ids))
+    return ids.some((id) => objHasKeyword(s, obj(s, id), "Banding")) ? "a band can have only one creature without banding" : "a band needs a creature with banding, or creatures that all have the quality one's \"bands with other\" names";
   if (ids.some((id) => !sameAttack(obj(s, id), obj(s, ids[0]!)))) return "all creatures in a band must attack the same player or planeswalker";
   return null;
 }
@@ -12703,7 +12731,7 @@ export function unblockedCandidates(s: GameState): Map<PlayerId, ObjectId[]> {
   const fs = s.step === "firstStrikeDamage";
   for (const at of attackers(s)) {
     if (!at.blockedBy || at.attacking === undefined || !characteristics(s, at).unblockedDamage || at.unblockedDamageTurn === s.turn || !dealsDamageThisStep(s, at, fs) || combatDamageOf(s, at) <= 0) continue;
-    const banded = at.blockedBy.some((id) => s.objects[id] && objHasKeyword(s, obj(s, id), "Banding"));
+    const banded = bandingAmong(s, at.blockedBy.flatMap((id) => s.objects[id] ?? []));
     const who = banded ? at.attacking : controllerOf(s, at);
     out.set(who, [...(out.get(who) ?? []), at.id]);
   }
@@ -12829,9 +12857,9 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
       if (trample) toRecipient(at, target, dmg); // CR 702.19d
       continue;
     }
-    // Blocked by a creature with banding, the defending player divides its damage among the blockers as they
-    // choose (CR 702.22j), none to themselves even with trample.
-    if (blockers.some((bl) => objHasKeyword(s, bl, "Banding"))) {
+    // Blocked by a creature with banding, or by two creatures of a quality one's "bands with other" names, the defending
+    // player divides its damage among the blockers as they choose (CR 702.22j), none to themselves even with trample.
+    if (bandingAmong(s, blockers)) {
       for (const [bl, amount] of bandSplit(s, at, blockers, dmg)) hits.push({ source: at, toObject: bl, amount });
       continue;
     }
@@ -12852,8 +12880,9 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
     const blocked = bl.blocking.map((a) => s.objects[a]).filter((at): at is GameObject => !!at && at.zone === "battlefield");
     let dmg = combatDamageOf(s, bl);
     if (dmg <= 0) continue;
-    // Blocking a creature with banding, the active player divides its damage among those it blocks (CR 702.22k).
-    if (blocked.length > 1 && blocked.some((at) => objHasKeyword(s, at, "Banding"))) {
+    // Blocking a creature with banding, or two of a quality one's "bands with other" names, the active player divides its
+    // damage among those it blocks (CR 702.22k).
+    if (blocked.length > 1 && bandingAmong(s, blocked)) {
       for (const [at, amount] of bandSplit(s, bl, blocked, dmg)) hits.push({ source: bl, toObject: at, amount });
       continue;
     }

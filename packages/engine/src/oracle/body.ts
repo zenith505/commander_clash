@@ -2875,6 +2875,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Dinrova Horror: "return target permanent to its owner's hand, then that player discards a card": its owner.
   // Recoil: "Return target permanent to its owner's hand. Then that player discards a card." The same.
   text = text.replace(/^([Rr]eturn target (?:nonland )?permanent to its owner's hand)(?:, then|\. Then) that player discards a card\.$/, "$1, then its owner discards a card.");
+  // Ashiok, Nightmare Muse: "Return target nonland permanent to its owner's hand, then that player exiles a card from their
+  // hand.": its owner, any card of theirs (the returned one too, rulings).
+  text = text.replace(/^([Rr]eturn target nonland permanent to its owner's hand), then that player exiles a card from their hand\.$/, "$1, then its owner exiles a card from their hand.");
   // Compelling Deterrence: "... Then that player discards a card if you control a Zombie." Checked as it resolves.
   text = text.replace(/^([Rr]eturn target nonland permanent to its owner's hand)\. Then that player discards a card if (you control an? [A-Z][a-z]+)\.$/, "$1. If $2, its owner discards a card.");
   // Hold for Questioning: "tap enchanted permanent and investigate": two instructions.
@@ -6738,8 +6741,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
-    // rounds B155, B154, B153, B152, B151, B148 and 311 to 316's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    // rounds B155, B154, B153, B152, B151, B148 and 311 to 317's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
+    const faceDown = roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);
@@ -17111,7 +17114,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Knollspine Dragon: "you may discard your hand and draw cards equal to ...": the same as ", then draw", in that order
     // (CR 608.2c), one choice for both (Clive, Ifrit's Dominant).
     if (/^[Yy]ou may discard your hand and draw cards equal to /.test(s)) s = s.replace(" and draw ", ", then draw ");
-    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)(?: until the next end step)?$|attach any number of Equipment you control to (?:target creature you control|it|that creature)$|play the exiled card |cast the exiled card without paying its mana cost$|play one of the cards exiled with ~ without paying its mana cost$|cast an? (?:(?:instant or sorcery|instant|sorcery|creature|artifact|enchantment|Hero or noncreature) )?spell(?: with mana value X)? from among cards exiled with ~ without paying its mana cost$|cast an Ally spell from among cards you own exiled with ~$|cast a spell from among cards you own in exile with dream counters on them without paying its mana cost$|cast any number of spells from among cards exiled with ~ with total mana value X or less without paying their mana costs$|exile a(?: nonland)? card from your hand with a number of time counters on it equal to its mana value$|exile it and put \w+ time counters? on it$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |change the targets of target |change any targets of target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$|have any number of them phase out$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)(?: until the next end step)?$|attach any number of Equipment you control to (?:target creature you control|it|that creature)$|play the exiled card |cast the exiled card without paying its mana cost$|play one of the cards exiled with ~ without paying its mana cost$|cast an? (?:(?:instant or sorcery|instant|sorcery|creature|artifact|enchantment|Hero or noncreature) )?spell(?: with mana value X)? from among cards exiled with ~ without paying its mana cost$|cast an Ally spell from among cards you own exiled with ~$|cast a spell from among cards you own in exile with dream counters on them without paying its mana cost$|cast a spell from among cards in exile with page counters on them without paying its mana cost$|cast up to three spells from among face-up cards your opponents own from exile without paying their mana costs$|cast any number of spells from among cards exiled with ~ with total mana value X or less without paying their mana costs$|exile a(?: nonland)? card from your hand with a number of time counters on it equal to its mana value$|exile it and put \w+ time counters? on it$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |change the targets of target |change any targets of target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$|have any number of them phase out$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.
@@ -20242,6 +20245,82 @@ function round316Sentence(s: string, sentences: string[], si: number, ctx: Ctx, 
     ex.youMay = { thisTurn: true, play: true };
     effects.pop();
     return { effect: mana, next: si + 1 };
+  }
+  return null;
+}
+
+/** Round 317's sentences, kept out of parseBodyText (TS2563). */
+function round317Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  void effects;
+  // Rocco, Street Chef: "each player exiles the top card of their library. Until your next end step, each player may play
+  // the card they exiled this way.": each card its owner's to play, with its usual timing and costs, over as this ability's
+  // controller's next end step begins (so one from your end step lasts through your next turn).
+  // Triple Triad: "... Until end of turn, you may play the card you own exiled this way and each other card exiled this way
+  // with lesser mana value than it without paying their mana costs.": yours, and the others with lesser mana value than
+  // yours (X as 0), played with their usual timing (rulings), a land with a land play (CR 305.1).
+  // Summon: Esper Valigarmanda: "Exile an instant or sorcery card from each graveyard." King Narfi's Betrayal: "Then you may
+  // exile a creature or planeswalker card from each graveyard.": not targeted, you choose one in each graveyard as it
+  // resolves (rulings), a card just milled or one already there; they're "exiled with ~" (CR 607.2a).
+  const eachYard = /^(?:Then )?([Yy]ou may )?[Ee]xile an? (instant or sorcery|creature or planeswalker) card from each graveyard$/.exec(s);
+  if (eachYard && !ctx.spell) {
+    const filter = parseSearchFilter(`${eachYard[2]!} card`);
+    if (!filter) return "fail";
+    return { effect: { type: "chooseFromGraveyard", who: { ref: "eachPlayer" }, youChoose: true, dest: "exile", n: 1, filter, linked: true, ...(eachYard[1] ? { upTo: true as const } : {}) }, next: si + 1 };
+  }
+  // Summon: Esper Valigarmanda: "You may cast an instant or sorcery card exiled with ~, and mana of any type can be spent to
+  // cast that spell.": as this resolves (rulings), paying its costs (CR 608.2g), with mana of any type (CR 609.4b).
+  const castLinked = /^You may cast an? (instant or sorcery) card exiled with ~, and mana of any type can be spent to cast that spell$/.exec(s);
+  if (castLinked && !ctx.spell) {
+    const filter = parseSearchFilter(`${castLinked[1]!} card`);
+    if (!filter) return "fail";
+    return { effect: { type: "castFromAmong", who: { ref: "you" }, n: 0, fromLinked: true, max: 1, filter, paid: true, anyType: true }, next: si + 1 };
+  }
+  // King Narfi's Betrayal: "Until end of turn, you may cast spells from among cards exiled with ~, and you may spend mana as
+  // though it were mana of any color to cast those spells.": each with its usual timing (rulings).
+  if (/^Until end of turn, you may cast spells from among cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells$/.test(s) && !ctx.spell) return { effect: { type: "mayPlayLinked", all: true, castOnly: true, anyType: true }, next: si + 1 };
+  // Zenos yae Galvus: "choose a creature an opponent controls. Until end of turn, creatures other than ~ and the chosen
+  // creature get -2/-2.": not targeted, chosen as it resolves (CR 608.2d), noted on Zenos for its "when the chosen creature
+  // leaves the battlefield" (CR 607.2d); the creatures affected are fixed then (CR 611.2c), and they still get -2/-2 with
+  // none to choose (rulings).
+  if (/^[Cc]hoose a creature an opponent controls$/.test(s) && /^Until end of turn, creatures other than ~ and the chosen creature get -2\/-2\.?$/.test(sentences[si + 1] ?? "") && !ctx.spell) {
+    const filter = parseTargetPhrase("creature an opponent controls");
+    if (filter?.kind !== "object" || filter.controller !== "opponent") return "fail";
+    effects.push({ type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose", anyController: true, prompt: "choose a creature an opponent controls. Until end of turn, creatures other than ~ and the chosen creature get -2/-2." }, { type: "rememberChosenObject" });
+    return { effect: { type: "continuous", what: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creatures other than ~ and the chosen creature" }, other: true, notCreated: true }, mods: [{ kind: "modifyPT", power: -2, toughness: -2 }], duration: "endOfTurn" }, next: si + 2 };
+  }
+  // The Legend of Yangchen: "Starting with you, each player chooses up to one permanent with mana value 3 or greater from
+  // among permanents your opponents control. Exile those permanents.": in turn order from you (CR 101.4), not targeted, each
+  // seeing the earlier choices; then all of them exiled at once (rulings).
+  const yangchen = /^Starting with you, each player chooses up to one (permanent with mana value \d+ or greater) from among permanents your opponents control$/.exec(s);
+  if (yangchen && /^Exile those permanents\.?$/.test(sentences[si + 1] ?? "") && !ctx.spell) {
+    const filter = parseTargetPhrase(yangchen[1]!);
+    if (filter?.kind !== "object" || filter.controller || !filter.manaValue) return "fail";
+    effects.push({ type: "pick", who: { ref: "eachPlayer" }, filter: { ...filter, text: yangchen[1]! }, n: 1, action: "choose", fromYou: true, upTo: true, amongYourOpponents: true, prompt: `click up to one ${yangchen[1]!} among the permanents ~'s controller's opponents control. ~ exiles each permanent chosen this way.` });
+    return { effect: { type: "exile", what: { ref: "created" } }, next: si + 2 };
+  }
+  // The Legend of Yangchen: "You may have target opponent draw three cards. If you do, draw three cards.": the target chosen
+  // as it's put on the stack, the choice made as it resolves (rulings).
+  const haveDraw = /^You may have (target opponent) draw (\w+) cards?$/.exec(s);
+  const youDraw = haveDraw && /^If you do, draw (\w+) cards?\.?$/.exec(sentences[si + 1] ?? "");
+  if (haveDraw && youDraw) {
+    const them = parseOne(`Target opponent draws ${haveDraw[2]!} cards`, ctx);
+    if (them?.length !== 1 || them[0]!.type !== "draw" || them[0]!.who.ref !== "target") return "fail";
+    effects.push({ type: "may", effects: them, text: `have target opponent draw ${haveDraw[2]!} cards` });
+    return { effect: { type: "if", cond: { kind: "youDid" }, effects: [{ type: "draw", who: { ref: "you" }, n: num(youDraw[1]!) }] }, next: si + 2 };
+  }
+  if (/^[Ee]ach player exiles the top card of their library$/.test(s) && !ctx.spell) {
+    const next = sentences[si + 1]?.replace(/\.$/, "");
+    if (next === "Until your next end step, each player may play the card they exiled this way") return { effect: { type: "impulse", n: 1, who: { ref: "eachPlayer" }, until: "yourNextEndStep", ownersPlay: true }, next: si + 2 };
+    if (next === "Until end of turn, you may play the card you own exiled this way and each other card exiled this way with lesser mana value than it without paying their mana costs") return { effect: { type: "impulse", n: 1, who: { ref: "eachPlayer" }, until: "thisTurn", ownAndLesser: true, free: true }, next: si + 2 };
+  }
+  // Tasha, the Witch Queen: "For each opponent, exile up to one target instant or sorcery card from that player's graveyard
+  // and put a page counter on it.": each card exiled gets the counter in exile (CR 122.1), whoever owns it.
+  const pageCounter = /^([Ff]or each opponent, exile up to one target [^.]+ card from that player's graveyard) and put an? (page) counter on it$/.exec(s);
+  if (pageCounter) {
+    const before = ctx.targets.length;
+    const fx = parseOne(capital(pageCounter[1]!), ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "exile" || ctx.targets.length !== before + 1 || !ctx.targets[before]!.perOpponent || ctx.targets[before]!.perPlayer || fx[0]!.counters) return "fail";
+    return { effect: { ...fx[0]!, counters: { [pageCounter[2]!]: 1 } }, next: si + 1 };
   }
   return null;
 }

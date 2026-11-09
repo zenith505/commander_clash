@@ -3043,7 +3043,7 @@ function payToUntapTrigger(raw: string): TriggeredAbility | "fail" | null {
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const untapPaid = payToUntapTrigger(raw);
   if (untapPaid) return untapPaid;
-  const r312 = round312Trigger(raw) ?? round316Trigger(raw);
+  const r312 = round312Trigger(raw) ?? round316Trigger(raw) ?? round317Trigger(raw);
   if (r312) return r312;
   // Johan: "At the beginning of combat on your turn, you may have ~ gain "~ can't attack" until end of combat. If you do,
   // attacking doesn't cause creatures you control to tap this combat if ~ is untapped.": it can't attack this combat, and
@@ -5655,6 +5655,35 @@ function round316Trigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger("Whenever a creature deals combat damage to one of your opponents, put a +1/+1 counter on ~ and draw a card.");
     if (!t || t === "fail" || t.event !== "creatureYouControlDealsCombatDamageToPlayer" || !t.toOpponent || t.ifCond) return "fail";
     return { ...t, body: { ...t.body, text: "If that creature had to attack this combat, you put a +1/+1 counter on ~ and you draw a card." }, ifCond: { kind: "subjectHadToAttack" } };
+  }
+  return null;
+}
+
+/** Round 317's trigger templates, read before the others. */
+function round317Trigger(raw: string): TriggeredAbility | "fail" | null {
+  // Zenos yae Galvus: "When the chosen creature leaves the battlefield, transform ~.": linked to its enters trigger's "choose
+  // a creature" (CR 607.2d), that object leaving for any zone. Shinryu, Transcendent Rival: "When the chosen player loses
+  // the game, you win the game." (CR 104.2b), linked to "As this creature transforms into Shinryu, choose an opponent."
+  const chosen = /^When the chosen (creature leaves the battlefield|player loses the game), (.+)$/.exec(raw);
+  if (chosen) {
+    const t = parseTrigger(chosen[1] === "player loses the game" ? `When enchanted player loses the game, ${chosen[2]!}` : `When ~ leaves the battlefield, ${chosen[2]!}`);
+    if (!t || t === "fail" || (t.event !== "enchantedPlayerLosesGame" && t.event !== "selfLeaves") || t.ifCond) return "fail";
+    // Only what these two cards say: the subject isn't referred to.
+    if (/\b(it|that creature|that player)\b/.test(chosen[2]!)) return "fail";
+    return { ...t, event: t.event === "selfLeaves" ? "chosenObjectLeaves" : "chosenPlayerLosesGame" };
+  }
+  // Rocco, Street Chef: "Whenever a player plays a land from exile or casts a spell from exile, ...": anyone's spell cast
+  // from exile (CR 601.2), or land played from there (CR 305.1), Urianger's trigger for every player.
+  const anyFromExile = /^Whenever a player plays a land from exile or casts a spell from exile, (.+)$/.exec(raw);
+  if (anyFromExile) {
+    if (/\b(it|its|that card|that spell|that player)\b/.test(anyFromExile[1]!)) return "fail";
+    // "You put ... and create ...": this ability's controller does both, "you" only there because the trigger is about
+    // another player.
+    const body = anyFromExile[1]!.replace(/^you (put [^.]+? and) (create [^.]+\.)$/, "$1 $2");
+    const t = parseTrigger(`Whenever a player casts a spell from exile, ${body}`);
+    if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.cast.by !== "any" || t.cast.orCopy || t.ifCond || t.cast.from !== "exile") return "fail";
+    const land = parseTargetPhrase("land");
+    return land?.kind === "object" ? { ...t, body: { ...t.body, text: capital(anyFromExile[1]!) }, cast: { ...t.cast, orPlaysLand: { ...land, text: "land" } } } : "fail";
   }
   return null;
 }

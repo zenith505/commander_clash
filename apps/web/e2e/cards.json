@@ -15796,6 +15796,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b34823a3-7bee-4e71-a3df-9b533c8ddf15",
+  "name": "Isu the Abominable",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Legendary Snow Creature — Yeti",
+  "supertypes": [
+   "Legendary",
+   "Snow"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Yeti"
+  ],
+  "oracleText": "You may look at the top card of your library any time.\nYou may play snow lands and cast snow spells from the top of your library.\nWhenever another snow permanent you control enters, you may pay {G}, {W}, or {U}. If you do, put a +1/+1 counter on Isu.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "j22",
+  "releasedAt": "2022-12-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8074afbf-190b-4a24-b939-cc559bdffe38",
   "name": "Izoni, Center of the Web",
   "manaCost": "{4}{B}{G}",
@@ -29246,6 +29281,32 @@
   "set": "clb",
   "releasedAt": "2022-06-10",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f3240a86-28b6-4338-9a59-1fb6f795d713",
+  "name": "Spoils of War",
+  "manaCost": "{X}{B}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "X is the number of artifact and/or creature cards in an opponent's graveyard as you cast this spell.\nDistribute X +1/+1 counters among any number of target creatures.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

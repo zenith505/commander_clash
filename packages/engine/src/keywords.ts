@@ -258,6 +258,12 @@ export const IDENTITY_PROTECTION = "Protection from each color not in your comma
  */
 export const YOURS_COLORS_PROTECTION = "Protection from each color among permanents you control";
 /**
+ * Magnigoth Treefolk: "For each basic land type among lands you control, ~ has landwalk of that type": filled in as the
+ * layers apply it with the basic land types of the lands the effect's controller controls, as layer 4 left them
+ * (CR 613.1d, 702.14c; domain counts land types, not lands, rulings).
+ */
+export const YOURS_BASIC_LANDWALK = "Landwalk of each basic land type among lands you control";
+/**
  * Mirror Golem: "~ has protection from each of the exiled card's card types": filled in from the cards its imprint
  * ability exiled (CR 607.2a) that are still in exile, as the layers apply it.
  */

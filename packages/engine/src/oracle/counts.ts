@@ -999,6 +999,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Civic Saber: "Equipped creature gets +1/+0 for each of its colors" (a static ability: the permanent it applies to,
   // colors as layer 5 left them, CR 613.4).
   if (each && ctx === null && /^of its colors$/i.test(p)) return count({ kind: "affectedColors" });
+  // Diligent Zookeeper: "gets +1/+1 for each of its creature types" (a static ability: the permanent it applies to).
+  if (each && ctx === null && /^of its creature types$/i.test(p)) return count({ kind: "affectedCreatureTypes" });
   // Breathe Your Last: "Destroy target creature or planeswalker. You gain 1 life for each of its colors."
   if (/^of its colors$/i.test(p) && ctx?.lastObjectTarget !== undefined) {
     const of = whoseObject("its", ctx);

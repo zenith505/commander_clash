@@ -156,6 +156,17 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           return "paused";
         }
       }
+      // Isu the Abominable: "you may pay {G}, {W}, or {U}": which one first, of those the player could pay (none, not done),
+      // then that payment like any other (CR 608.2d).
+      if (e.payOneOf && sc.may === undefined && sc.payX === undefined) {
+        const can = e.payOneOf.map((m, i) => (planMana(s, ctx.controller, parseManaCost(m)) ? String(i) : null)).filter((i): i is string => i !== null);
+        if (!can.length) sc.may = false;
+        else {
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "payWhich", options: [...can, "none"], labels: [...can.map((i) => `Pay ${e.payOneOf![Number(i)]}`), "Don't pay"], prompt: `${e.text.replace(/~/g, src)}: which do you pay?` };
+          return "paused";
+        }
+      }
+      if (e.payOneOf && sc.may === undefined && sc.payX === "none") sc.may = false;
       // Each target in turn (Sepulchral Primordial); the ones turned down are left alone, as if no longer legal.
       if (e.eachTarget && sc.may === undefined) {
         const ref = allEffects(e.effects).map((x) => ("what" in x ? (x.what as ObjRef | undefined) : undefined)).find((w): w is Extract<ObjRef, { ref: "target" }> => w?.ref === "target");
@@ -191,7 +202,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const zero: Extract<Effect, { type: "may" }> = { ...e, echo: undefined, effects: [{ type: "echoPaid" }], pay: { mana: "{0}" }, text: `${e.text} (paying {0} rather than its echo cost)` };
         return runEffect(s, zero, ctx);
       }
-      const pay = ownCost !== undefined ? (ownCost === null ? undefined : { mana: ownCost }) : e.payEnergy !== undefined ? { ...e.pay, energy: Math.max(0, amountNow(s, e.payEnergy, ctx)) } : e.payLife !== undefined ? { ...e.pay, life: Math.max(0, amountNow(s, e.payLife, ctx)) } : e.payTimes !== undefined && e.pay ? timesPay(e.pay, Math.max(0, amountNow(s, e.payTimes, ctx))) : e.pay;
+      const pay = e.payOneOf && sc.payX !== undefined && sc.payX !== "none" ? { mana: e.payOneOf[Number(sc.payX)]! } : ownCost !== undefined ? (ownCost === null ? undefined : { mana: ownCost }) : e.payEnergy !== undefined ? { ...e.pay, energy: Math.max(0, amountNow(s, e.payEnergy, ctx)) } : e.payLife !== undefined ? { ...e.pay, life: Math.max(0, amountNow(s, e.payLife, ctx)) } : e.payTimes !== undefined && e.pay ? timesPay(e.pay, Math.max(0, amountNow(s, e.payTimes, ctx))) : e.pay;
       // Greenbelt Rampager: "pay {E}{E}. If you can't, ...": paid if it can be (rulings), no choice; energy only.
       if (e.must && sc.may === undefined) {
         const p = player(s, ctx.controller);
@@ -224,7 +235,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           // "You may search your library for an Aura card with mana value less than or equal to that Aura" (Light-Paws): the number.
           const first = e.effects[0];
           const text = first?.type === "search" ? sayBound(s, e.text, first.filter, amountCtx(s, ctx)) : e.text;
-          const prompt = card ? text.replace("the revealed card", defOf(s, card).name) : e.payEnergy !== undefined ? `${text} (${pay!.energy} energy)` : e.payTimes !== undefined || e.payManaCost ? `${text} (${describePay(pay!) || "{0}"})` : text;
+          const prompt = card ? text.replace("the revealed card", defOf(s, card).name) : e.payEnergy !== undefined ? `${text} (${pay!.energy} energy)` : e.payTimes !== undefined || e.payManaCost || e.payOneOf ? `${text} (${describePay(pay!) || "{0}"})` : text;
           // Pardic Dragon: "that player may": the event's player decides (none left in the game: not done).
           const decider = e.decider ? players(s, e.decider, ctx)[0] : ctx.controller;
           if (decider === undefined) {

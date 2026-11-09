@@ -1135,6 +1135,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const lk = subjectId !== undefined ? s.lastKnown?.[subjectId] : undefined;
       return !!lk && lk.zc === subjectZc && !!lk.source?.types.includes(cond.type);
     }
+    case "subjectHadToAttack": {
+      // As that object (CR 400.7), in the combat going on now.
+      const h = s.hadToAttack;
+      return subjectId !== undefined && !!h && h.turn === s.turn && h.combat === (s.combatsThisTurn ?? 0) && h.keys.includes(`${subjectId}@${subjectZc ?? 0}`);
+    }
     case "subjectDealtExcess":
       return subjectId !== undefined && (s.turnLog?.excessDealt ?? []).some((e) => e.id === subjectId && e.zc === subjectZc);
     case "opponentsDealtExcess":

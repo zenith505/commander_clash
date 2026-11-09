@@ -3043,7 +3043,7 @@ function payToUntapTrigger(raw: string): TriggeredAbility | "fail" | null {
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const untapPaid = payToUntapTrigger(raw);
   if (untapPaid) return untapPaid;
-  const r312 = round312Trigger(raw);
+  const r312 = round312Trigger(raw) ?? round316Trigger(raw);
   if (r312) return r312;
   // Johan: "At the beginning of combat on your turn, you may have ~ gain "~ can't attack" until end of combat. If you do,
   // attacking doesn't cause creatures you control to tap this combat if ~ is untapped.": it can't attack this combat, and
@@ -5623,6 +5623,38 @@ function round312Trigger(raw: string): TriggeredAbility | "fail" | null {
   if (paired) {
     const t = parseTrigger(`Whenever ~ is dealt damage, ${paired[1]!}`);
     return t && t !== "fail" && t.event === "selfIsDealtDamage" && !t.minDamage && !t.firstDealtEachTurn ? { ...t, orPaired: true } : "fail";
+  }
+  return null;
+}
+
+/** Round 316's trigger templates, read before the others. */
+function round316Trigger(raw: string): TriggeredAbility | "fail" | null {
+  // Heroic Feast: "Whenever you gain life, choose up to that many target creatures you control. Put a +1/+1 counter on
+  // each of them.": as many targets as the life gained in that one event (CR 119.10), known as it triggers (CR 601.2c,
+  // 603.3d; TriggeredAbility.eventX).
+  if (/^Whenever you gain life, choose up to that many target creatures you control\. Put a \+1\/\+1 counter on each of them\.$/.test(raw)) {
+    const body = parseBody("Put a +1/+1 counter on each of up to X target creatures you control.", { ownX: true });
+    if (!body || body.targets.length !== 1 || body.targets[0]!.many !== "x") return "fail";
+    const t = parseTrigger("Whenever you gain life, you draw a card.");
+    return t && t !== "fail" && t.event === "youGainLife" ? { ...t, body: { ...body, text: raw.replace(/^Whenever you gain life, /, "") }, eventX: true } : "fail";
+  }
+  // Firkraag, Cunning Instigator: "Whenever one or more Dragons you control attack an opponent, goad target creature that
+  // player controls.": every player a creature can attack is an opponent (CR 508.1b), so this is "attack a player": once
+  // for each player those Dragons attack, not a planeswalker or battle (CR 508.3e).
+  const attackOpp = /^Whenever one or more ([A-Z][a-z]+) you control attack an opponent, (.+)$/.exec(raw);
+  if (attackOpp) {
+    if (!CREATURE_TYPES.has(singularWord(attackOpp[1]!))) return "fail";
+    const t = parseTrigger(`Whenever one or more ${attackOpp[1]!} you control attack a player, ${attackOpp[2]!}`);
+    return t && t !== "fail" && t.perPlayer ? t : "fail";
+  }
+  // Firkraag: "Whenever a creature deals combat damage to one of your opponents, if that creature had to attack this combat,
+  // you put a +1/+1 counter on ~ and you draw a card.": anyone's creature, an intervening if (CR 603.4) about whether a
+  // requirement applied to that creature as it was declared an attacker (CR 508.1d; rulings: not one on its controller).
+  const hadTo = /^Whenever a creature deals combat damage to one of your opponents, if that creature had to attack this combat, you put a \+1\/\+1 counter on ~ and you draw a card\.$/.test(raw);
+  if (hadTo) {
+    const t = parseTrigger("Whenever a creature deals combat damage to one of your opponents, put a +1/+1 counter on ~ and draw a card.");
+    if (!t || t === "fail" || t.event !== "creatureYouControlDealsCombatDamageToPlayer" || !t.toOpponent || t.ifCond) return "fail";
+    return { ...t, body: { ...t.body, text: "If that creature had to attack this combat, you put a +1/+1 counter on ~ and you draw a card." }, ifCond: { kind: "subjectHadToAttack" } };
   }
   return null;
 }

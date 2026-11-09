@@ -99,6 +99,8 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   let oneOrMoreCounters = false;
   /** The Astonishing Ant-Man: "Remove any number of +1/+1 counters from ~": X counters, X 0 or more, "that many" its X. */
   let anyCountersSelf = false;
+  /** Radiant Lotus: "Sacrifice one or more artifacts": X permanents, X at least 1. */
+  let oneOrMoreSacrificed: string | undefined;
   let putCounters: ActivatedAbility["putCounters"];
   // "From among other artifacts, creatures, and planeswalkers you control" is one cost, commas and all.
   // Soul Diviner: "Remove a counter from an artifact, creature, land, or planeswalker you control": one cost, its commas kept.
@@ -240,6 +242,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const filter = pickFilter("permanent");
       if (!filter || extra.some((x) => "x" in x && x.x)) return "fail";
       extra.push({ kind: "sacrifice", filter, n: 0, x: true, optional: true, upTo: num(c[1]!) });
+    } else if ((c = /^Sacrifice one or more (artifacts)$/.exec(part))) {
+      // Radiant Lotus: "Sacrifice one or more artifacts": as many as chosen, one at least, ~ itself too (CR 602.2b, 601.2h);
+      // the number is its X, announced as it's activated (CR 107.3a), "for each artifact sacrificed this way" (below).
+      const filter = pickFilter(singular(c[1]!));
+      if (!filter || extra.some((x) => "x" in x && x.x)) return "fail";
+      extra.push({ kind: "sacrifice", filter, n: 0, x: true });
+      oneOrMoreSacrificed = singular(c[1]!);
     } else if (part !== "Sacrifice ~" && (c = new RegExp(`^Sacrifice (another|X|${NUM}) (other )?(.+)$`).exec(part))) {
       // "Sacrifice two other artifacts and/or creatures" (Mondrak): not this permanent; any mix of the two.
       const andOr = / and\/or /.test(c[4]!) ? c[4]!.split(" and/or ").map((w) => singular(w)).join(" or ") : undefined;
@@ -732,7 +741,14 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // exile ~ and those creature cards": the cards its cost put into graveyards, still there (CR 400.7; a token is gone).
   const swordAges = /(?:^|, )Sacrifice ~ and any number of creatures you control(?=, |$)/.test(costs) && effectText === "~ deals X damage to any target, where X is the total power of the creatures sacrificed this way, then exile ~ and those creature cards." ? parseBody("~ deals 1 damage to any target.", { activated: true }) : null;
   if (/(?:^|, )Sacrifice ~ and any number of /.test(costs) && !swordAges) return "fail";
-  const body = swordAges
+  // Radiant Lotus: "Choose a color. Target player adds three mana of the chosen color for each artifact sacrificed this
+  // way.": a target, so not a mana ability (CR 605.1a); the color chosen by its controller as it resolves (CR 608.2d), the
+  // target player adding the mana (CR 106.4), three for each permanent its cost sacrificed (its X).
+  const lotus = oneOrMoreSacrificed && new RegExp(`^Choose a color\\. Target player adds (two|three) mana of the chosen color for each ${oneOrMoreSacrificed} sacrificed this way\\.$`).exec(effectText);
+  if (oneOrMoreSacrificed && !lotus) return "fail";
+  const body = lotus
+    ? { targets: [{ kind: "player" as const, opponent: false, text: "target player" }], effects: [{ type: "choose" as const, choice: "color" as const }, { type: "addMana" as const, chosen: num(lotus[1]!), times: { count: { kind: "x" as const } }, who: { ref: "target" as const, index: 0 } }], text: effectText }
+    : swordAges
     ? { ...swordAges, effects: [{ type: "damage" as const, amount: { count: { kind: "sacrificedTotalPower" as const } }, to: { ref: "anyTarget" as const, index: 0 } }, { type: "exile" as const, what: { ref: "selfCard" as const, moved: true as const } }, { type: "exile" as const, what: { ref: "sacrificedCards" as const } }], text: effectText }
     : putFromHand || putFromCommand ? { targets: [], effects: [{ type: "putOntoBattlefield" as const, what: { ref: "selfCard" as const } }], text: effectText } : parseBody(effectText.replace(/^It (?=deals\b)/, "~ ")
     // Migloz, Maze Crusher: "{1}, Remove an oil counter from ~: It gains vigilance and menace until end of turn": with
@@ -748,7 +764,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     tok.pt = { count: { kind: "x" }, times: 2 };
     xMin = 1;
   }
-  if (oneOrMoreCounters) {
+  if (oneOrMoreCounters || oneOrMoreSacrificed) {
     if (xMin || !usesX(body)) return "fail";
     xMin = 1;
   }

@@ -109,7 +109,11 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
   // Requirements about the other targets, checked again too (CR 608.2b): "controlled by different players" (Run Away
   // Together), "with the same controller" (Simic Guildmage), "in that player's graveyard" (Goblin Welder).
   body.targets.forEach((spec, i) => {
-    if (legal[i] && (spec.differentControllerFrom?.length || spec.sameControllerAs?.length || spec.sharesCardTypeWith?.length || spec.powerAtMostOf?.length || spec.sharesNoCreatureTypeWith?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.controlledByTarget !== undefined) && !relatedOk(s, spec, targets, targets[i]!)) legal[i] = false;
+    if (legal[i] && (spec.differentControllerFrom?.length || spec.sameControllerAs?.length || spec.sharesCardTypeWith?.length || spec.powerAtMostOf?.length || spec.sharesNoCreatureTypeWith?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.controlledByTarget !== undefined || spec.attachedToTarget !== undefined) && !relatedOk(s, spec, targets, targets[i]!)) legal[i] = false;
+  });
+  // Fiery Annihilation: with the creature it's attached to an illegal target, the Equipment isn't exiled either (rulings).
+  body.targets.forEach((spec, i) => {
+    if (spec.attachedToTarget !== undefined && !legal[spec.attachedToTarget]) legal[i] = false;
   });
   // With every target it chose now illegal, it doesn't resolve (CR 608.2b). One that chose none of its
   // "up to" targets isn't targeted at all, and resolves (CR 115.6).

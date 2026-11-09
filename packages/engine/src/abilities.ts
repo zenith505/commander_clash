@@ -1038,6 +1038,11 @@ export interface TargetSpec {
   /** "Another target creature with the same controller" (Simic Guildmage): controlled by the controller of these targets. */
   sameControllerAs?: number[];
   /**
+   * Fiery Annihilation: "up to one target Equipment attached to that creature": attached to this object target, as it's
+   * chosen and as it resolves (CR 608.2b); with that target illegal then, this one is too (rulings).
+   */
+  attachedToTarget?: number;
+  /**
    * "Each opponent may sacrifice a permanent of their choice that shares a card type with it" (Braids, Arisen Nightmare):
    * a card type of what this ability sacrificed, as it last existed (rulings: any one of them if it had several), made into
    * `types` as the choice is made.
@@ -2186,6 +2191,8 @@ export type StaticCondition =
   | { kind: "damagedBySelfDied" }
   /** "If that creature was dealt excess damage this turn" (CR 120.10): the trigger's subject, as the object it was. */
   | { kind: "subjectDealtExcess" }
+  /** Firkraag, Cunning Instigator: "if that creature had to attack this combat": a requirement applied to the trigger's subject as it was declared an attacker in this combat (GameState.hadToAttack). */
+  | { kind: "subjectHadToAttack" }
   /** "If that creature has a +1/+1 counter on it" (Marcus, Mutant Mayor): the trigger's subject, or as it last existed. */
   | { kind: "subjectCounter"; counter: CounterKind; /** "If that creature has three or more +1/+1 counters on it" (Hadana's Climb): at least this many (default 1). */ min?: number }
   /**

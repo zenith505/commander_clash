@@ -743,7 +743,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (e.who) {
         const color = s.resolving?.chosen?.color;
         for (const pid of players(s, e.who, ctx)) {
-          const added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen) : "";
+          // Radiant Lotus: "three mana of the chosen color for each artifact sacrificed this way": that many times over.
+          const added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen * (e.times === undefined ? 1 : amountNow(s, e.times, ctx))) : "";
           const from = manaSourceOrigins(s, ctx);
           for (const m of added.matchAll(/\{([WUBRGC])\}/g)) addMana(s, pid, [m[1] as ManaType], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: e.keep } : {}) });
           if (added) log(s, `${player(s, pid).name} adds ${added}.`);

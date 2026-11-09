@@ -1,7 +1,7 @@
 # Roadmap
 
-30,805 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,785 of
+30,812 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,788 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2363,6 +2363,28 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 323 took cards back off the "Out after round N" lists, most played first: "Whenever a player taps a land for
+   mana, if this creature is tapped, that player adds one mana of any type that land produced. Then that land deals 1
+   damage to that player." (Barbflare Gremlin: all one triggered mana ability, CR 605.1b, 605.4a, the land the damage's
+   source); "Whenever a source you control deals noncombat damage to a creature equal to that creature's toughness, draw a
+   card." and "{X}, {T}: ... it deals that much damage plus X instead." (Taii Wakeen, Perfect Shot: the toughness as the
+   damage is dealt, damage already marked not counting, rulings); "Enchanted creature ... is a legendary Soldier in
+   addition to its other types." and "Whenever enchanted creature attacks or blocks, attach any number of target Equipment
+   you control to it." (Super-Soldier Serum: the supertype in layer 4, so the legend rule applies; a browser test);
+   "{1}, Exile two creature cards from a single graveyard" (Night Soil: any one player's graveyard, rulings; the picker
+   says whose graveyard each card is in; a browser test); "Whenever a player taps a land for mana, that player adds one
+   mana of any type that land produced, and this enchantment deals 1 damage to the player." (Overabundance: the damage even
+   when the land made no mana, rulings); "you may remove three quest counters from among permanents you control. When you
+   do, ..." (Overseer of Vault 76: exactly three, so not an option with fewer, CR 608.2d, rulings; a browser test); "put a
+   number of ember counters on this creature equal to the amount of mana spent to cast that spell. Then if this creature
+   has seven or more ember counters on it, remove them and transform this creature." (Smoldering Egg). +7, 30,812 of
+   31,936 with round 322, B163 and B164.
+   Out after round 323 (looked at, not done): Last Night Together ("only the chosen creatures can attack during that
+   combat phase": an attack restriction for one added combat phase), Island Sanctuary (a draw-step draw skipped for an
+   attack restriction until your next turn), Filigree Vector (still out: two "any number of target" sets in one ability).
+   Bots: they tap lands under Overabundance and Barbflare Gremlin without weighing the damage, remove Overseer of Vault 76's
+   counters whenever they can, take Night Soil's cards from an opponent's graveyard first, and don't activate Taii Wakeen's
+   {X} ability.
    Round 322 took cards back off the "Out after round N" lists, most played first: "Whenever a player attacks you, if
    that player has another opponent who isn't being attacked, prevent all combat damage that would be dealt to you this
    combat." (Suppressor Skyguard: an intervening "if", CR 603.4, checked as attackers are declared and as it resolves; the

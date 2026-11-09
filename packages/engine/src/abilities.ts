@@ -3386,7 +3386,7 @@ export type Effect =
    * `move`: "you may move any number of +1/+1 counters from ~ onto other creatures" (Forgotten Ancient): from this
    * permanent, as many as it has (`n` aside), onto any number of other creatures anyone controls, none at all included.
    */
-  | { type: "distribute"; counter: CounterKind; n: Amount; filter: TargetSpec; move?: true; /** Invoke Justice: "among any number of creatures and/or Vehicles target player controls": that player's, not yours. */ of?: PlayerRef; /** "Remove up to three stun counters from among all permanents" (Sensational Spider-Man): up to `n` of them off any permanents matching `filter`, each no more than it has (rulings), counted for "the number of ... counters removed this way". */ remove?: true }
+  | { type: "distribute"; counter: CounterKind; n: Amount; filter: TargetSpec; move?: true; /** Invoke Justice: "among any number of creatures and/or Vehicles target player controls": that player's, not yours. */ of?: PlayerRef; /** "Remove up to three stun counters from among all permanents" (Sensational Spider-Man): up to `n` of them off any permanents matching `filter`, each no more than it has (rulings), counted for "the number of ... counters removed this way". */ remove?: true; /** Overseer of Vault 76: "remove three quest counters from among permanents you control": exactly `n` of them, never fewer (rulings), so only with that many to remove (CR 608.2d). */ exact?: true }
   /** "Sacrifice ~" as an effect: only a permanent its controller controls (CR 701.21a). */
   /** `byController`: the permanent's controller sacrifices it, whoever controls the effect. */
   /**
@@ -6138,8 +6138,12 @@ export interface TriggeredAbility {
   anyPlayer?: true;
   /** For "sourceYouControlDamagesOpponent": "a source you control other than ~" (Talon of Pain). */
   otherSource?: true;
-  /** For "sourceYouControlDealsDamage": exactly this much at once; `other`: a source other than this permanent. */
-  sourceDamage?: { exactly: number; other?: true };
+  /**
+   * For "sourceYouControlDealsDamage": exactly this much at once; `other`: a source other than this permanent. Taii Wakeen:
+   * `toughness`: noncombat damage to a creature equal to that creature's toughness as it's dealt (damage already marked on
+   * it doesn't matter, rulings), instead of `exactly`.
+   */
+  sourceDamage?: { exactly: number; other?: true; toughness?: true };
   /** For "yourSourceDealsDamage" and "sourceDealsDamage": only a source of this color, as it deals the damage. */
   sourceColor?: Color;
   /**
@@ -6805,6 +6809,16 @@ export interface ManaTrigger {
   /** Winter's Night: "That land doesn't untap during its controller's next untap step." (the permanent tapped for mana). */
   landSkipsUntap?: true;
   /**
+   * Overabundance: "..., and ~ deals 1 damage to the player" (`self`); Barbflare Gremlin: "Then that land deals 1 damage to
+   * that player" (`land`, the permanent tapped for mana as the source): 1 damage to the player who tapped it, dealt as
+   * this mana ability resolves (CR 605.4a), after the mana is added.
+   */
+  damage?: "self" | "land";
+  /** Barbflare Gremlin: "if ~ is tapped" (an intervening if, CR 603.4): only while this ability's source is tapped. */
+  ifSelfTapped?: true;
+  /** Overabundance: it deals its damage even when the land made no mana (rulings), adding nothing then. */
+  evenWithoutMana?: true;
+  /**
    * What it adds: fixed mana ("an additional {G}"); `n` mana each of any color the player picks ("one mana of any
    * color", "two mana in any combination of colors"); one of the color chosen for this permanent; or "one mana of
    * any type that land produced" (picking one of them if it made several, rulings on Mana Flare). The mana has none
@@ -6978,7 +6992,7 @@ export type AdditionalCost =
    * `linked`: "Put a card exiled with ~ into its owner's graveyard" (Jester's Scepter): one of the cards the source's
    * linked exile took (CR 607.2a), moved to its owner's graveyard, chosen in CostChoices.exileCards.
    */
-  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true; linked?: true; /** Osgir, the Reconstructor: "{X}, Exile an artifact card with mana value X from your graveyard": the one X announced as it's activated (CR 107.3a, 602.2b), and `filter` gets that mana value. */ mvX?: true; /** "Put three cards from your graveyard on the bottom of your library" (Battlefield Scrounger): the chosen cards go to the bottom of your library, in the order chosen (CR 401.4), not into exile. */ toBottom?: true; /** "Put a card an opponent owns from exile into that player's graveyard" (the Eldrazi processors): any card an opponent owns in exile, chosen in CostChoices.exileCards. */ process?: true }
+  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true; linked?: true; /** Night Soil: "Exile two creature cards from a single graveyard": all `n` from any one player's graveyard (yours too). */ singleGraveyard?: true; /** Osgir, the Reconstructor: "{X}, Exile an artifact card with mana value X from your graveyard": the one X announced as it's activated (CR 107.3a, 602.2b), and `filter` gets that mana value. */ mvX?: true; /** "Put three cards from your graveyard on the bottom of your library" (Battlefield Scrounger): the chosen cards go to the bottom of your library, in the order chosen (CR 401.4), not into exile. */ toBottom?: true; /** "Put a card an opponent owns from exile into that player's graveyard" (the Eldrazi processors): any card an opponent owns in exile, chosen in CostChoices.exileCards. */ process?: true }
   /**
    * "Exile an instant or sorcery spell you control" (Nivmagus Elemental, CR 602.2b): one of the ability's controller's spells
    * on the stack that matches, a copy too, chosen in CostChoices.exileSpell; it leaves the stack without being countered.

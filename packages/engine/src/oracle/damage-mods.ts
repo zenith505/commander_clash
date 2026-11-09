@@ -389,7 +389,12 @@ export function parseDamageModSentence(text: string, ctx: Ctx): Effect[] | null 
   }
   // "a player or battle" (Rankle and Torbran): battles are permanents too.
   t = t.replace(/ to a player or battle,/, " to a player or battle permanent,");
+  // Taii Wakeen, Perfect Shot: "{X}, {T}: If a source you control would deal noncombat damage to a permanent or player this
+  // turn, it deals that much damage plus X instead": the X paid as it was activated (CR 107.3a), counted as it resolves.
+  const plusX = ctx.activated && / that much damage plus X instead$/.test(t);
+  if (plusX) t = t.replace(/ that much damage plus X instead$/, " that much damage plus 1 instead");
   const st = parseDamageMod(t.replace(/^if /, "If "));
+  if (plusX && st?.mods[0]?.kind === "damageMod") st.mods[0].mod.amount = { count: { kind: "x" } };
   const m = st?.mods[0];
   if (!st || st.affects.kind !== "self" || m?.kind !== "damageMod" || m.mod.by?.self || m.mod.to?.self || m.mod.while || ["enchanted", "chosen"].includes(m.mod.to?.players ?? "")) return null;
   const mod: DamageMod = { ...m.mod, text };

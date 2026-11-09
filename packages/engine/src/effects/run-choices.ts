@@ -18,7 +18,7 @@ import { doesNothingNow } from "./heuristics";
 import { cardNameOptions } from "../names";
 import { voteAmongMost, voteWins } from "./run-votes";
 import { defMv, sameName } from "../faces";
-import { putCounters } from "../counters";
+import { putCounters, removableCounters } from "../counters";
 import { CREATURE_TYPES, LAND_TYPES } from "../keywords";
 import { nextRandom } from "../rng";
 import { fireEvent } from "./triggers";
@@ -1333,6 +1333,9 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "draw" && cantDraw(s, ctx.controller)) return false;
     if (e.type === "draw" && e.who.ref === "target" && !players(s, e.who, ctx).some((pid) => !player(s, pid).lost && player(s, pid).library.length)) return false;
     if (e.type === "handToTop" && !player(s, ctx.controller).hand.length) return false;
+    // Overseer of Vault 76: "you may remove three quest counters from among permanents you control": not with fewer of them
+    // to remove (CR 608.2d; rulings: exactly three).
+    if (e.type === "distribute" && e.remove && e.exact && s.battlefield.reduce((a, id) => a + (objectMatches(s, e.filter, obj(s, id), ctx.controller, false) ? removableCounters(s, obj(s, id), e.counter) : 0), 0) < amountNow(s, e.n, ctx)) return false;
     // Neera, Wild Mage: "you may put it on the bottom of its owner's library. If you do": only while the spell is still on the stack.
     if (e.type === "causeToBottom" && !s.stack.some((x) => x.id === ctx.cause && x.kind === "spell")) return false;
     // "You may mill three cards" (Druidic Ritual): not with fewer cards in your library (CR 701.17b, rulings).

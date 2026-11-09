@@ -1909,7 +1909,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const many = /^any number of /i.test(m[1]!);
     // Thorin, Mountain-king: "any number of target Equipment you control to target creature you control", each to the
     // one creature.
-    if (source?.ref !== "target" || (source.n && !many) || !what || (what.ref === "target" && what.n) || !["self", "subject", "target"].includes(what.ref) || (many && what.ref !== "self" && what.ref !== "target")) return null;
+    if (source?.ref !== "target" || (source.n && !many) || !what || (what.ref === "target" && what.n) || !["self", "subject", "target"].includes(what.ref) || (many && what.ref !== "self" && what.ref !== "target" && !(what.ref === "subject" && ctx.subject))) return null;
     return [{ type: "attach", what, source }];
   }
   // Inventory Management: "For each Aura and Equipment you control, you may attach it to a creature you control": each in

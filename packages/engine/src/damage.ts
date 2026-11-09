@@ -364,7 +364,7 @@ export function dealDamage(
         fireEvent(s, { type: "dealtDamageToCreatures", source: src.id });
       }
     }
-    fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, id: o.id, amount: n, ...(opts.combat ? { combat: true } : {}) });
+    fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, id: o.id, amount: n, ...(opts.combat ? { combat: true } : {}), ...(c.types.includes("Creature") ? { toughness: c.toughness } : {}) });
     noteDealt(s, src, opts.combat, { object: o }, n);
   } else {
     const p = player(s, to.player);

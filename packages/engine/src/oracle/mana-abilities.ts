@@ -252,6 +252,27 @@ export function parseManaTrigger(line: string): ManaTrigger | "fail" | null {
     out.landSkipsUntap = true;
     line = noUntap[1]!;
   }
+  // Overabundance: "Whenever a player taps a land for mana, that player adds one mana of any type that land produced, and ~
+  // deals 1 damage to the player.": the damage too, all one mana ability (rulings, CR 605.1b), dealt even when the land
+  // made no mana (rulings). Barbflare Gremlin: "... if ~ is tapped, that player adds one mana of any type that land
+  // produced. Then that land deals 1 damage to that player.": an intervening if (CR 603.4), checked as it triggers and
+  // resolves, both at once here (CR 605.4a); the land is the damage's source.
+  const selfDamage = /^(Whenever a player taps a land for mana, that player adds .+?), and ~ deals 1 damage to the player\.$/.exec(line);
+  const landDamage = selfDamage ? null : /^(Whenever a player taps a land for mana, (?:if ~ is tapped, )?that player adds .+?\.) Then that land deals 1 damage to that player\.$/.exec(line);
+  if (selfDamage) {
+    out.damage = "self";
+    out.evenWithoutMana = true;
+    line = `${selfDamage[1]!}.`;
+  } else if (landDamage) {
+    out.damage = "land";
+    line = landDamage[1]!;
+  }
+  const ifTapped = /^(Whenever a player taps an? .+? for mana), if ~ is tapped, (that player adds .+)$/.exec(line);
+  if (ifTapped) {
+    if (!out.damage) return "fail";
+    out.ifSelfTapped = true;
+    line = `${ifTapped[1]!}, ${ifTapped[2]!}`;
+  }
   if ((m = /^Whenever (?:(enchanted|fortified) |an? )(.+?) is tapped for mana( of the chosen color)?, its controller adds (?:an additional )?(.+)\.$/.exec(line))) {
     if (m[1]) out.attached = true;
     what = m[2]!;

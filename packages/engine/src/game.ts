@@ -15,7 +15,7 @@ import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
-import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent, type DamageSource } from "./damage";
+import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { canAttachTo, turnFaceDown } from "./effects/run-permanents";
@@ -5512,8 +5512,14 @@ export const isSnowSource = (s: GameState, o: GameObject) => o.zone === "battlef
  * Add the mana that triggered mana abilities add (CR 605.4a). Its source is each ability's source (CR 106.3): mana from
  * Utopia Sprawl on a snow Forest isn't snow mana, mana from a snow Mana Flare is.
  */
-export function addTriggeredMana(s: GameState, pid: PlayerId, picked: { adds: ManaType[]; from?: ManaOrigin[][] }): void {
+export function addTriggeredMana(s: GameState, pid: PlayerId, picked: { adds: ManaType[]; from?: ManaOrigin[][]; damage?: ObjectId[] }): void {
   picked.adds.forEach((m, i) => addMana(s, pid, [m], { from: picked.from?.[i] ?? [] }));
+  // Overabundance, Barbflare Gremlin: then 1 damage to that player from each source, as the triggered mana ability resolves
+  // (CR 605.4a; no chance to respond, rulings). It can't stop for a question, so its shields are chosen as a bot would.
+  for (const id of picked.damage ?? []) {
+    const o = s.objects[id];
+    if (o) withShieldAnswers(null, () => dealDamage(s, objectSource(s, o), { player: pid }, 1));
+  }
 }
 
 /**
@@ -8377,6 +8383,20 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       if (chosen?.length && (chosen.length !== top.length || chosen.some((id) => !top.includes(id)))) return `you exile ${what}, not cards of your choice`;
       continue;
     }
+    // Night Soil: "Exile two creature cards from a single graveyard": all of them from one player's graveyard, any player
+    // still in the game (CR 800.4a), yours too.
+    if (c.kind === "exileFromGraveyard" && c.singleGraveyard) {
+      const fit = (id: ObjectId) => id !== o.id && s.objects[id]?.zone === "graveyard" && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))));
+      const what = `${c.n} ${c.filter?.text ?? "card"}s from a single graveyard`;
+      const chosen = choices?.exileCards;
+      if (!chosen) {
+        if (!livingPlayers(s).some((q) => player(s, q).graveyard.filter(fit).length >= c.n)) return `you need to exile ${what} to ${doing}`;
+        continue;
+      }
+      const yard = chosen.length ? livingPlayers(s).map((q) => player(s, q).graveyard).find((g) => g.includes(chosen[0]!)) : undefined;
+      if (!yard || chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !yard.includes(id) || !fit(id))) return `choose ${what} to exile`;
+      continue;
+    }
     const pool =
       c.kind === "sacrifice"
         ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(c.other && id === o.id && !(c.selfIf && objectMatches(s, c.selfIf, o, pid, false))) && objectMatches(s, c.filter, obj(s, id), pid, false) && (c.exile || canSacrificeForCost(s, obj(s, id))))
@@ -8919,7 +8939,8 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         const o = obj(s, ids[0]!);
         sacrificed.push({ power: cardPT(s, o, "power"), toughness: cardPT(s, o, "toughness"), manaValue: defMv(defOf(s, o)), counters: {}, copyKey: cardIdOf(o) });
       }
-      log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard.`);
+      const whose = c.kind === "exileFromGraveyard" && c.singleGraveyard && obj(s, ids[0]!).owner !== p.id ? `${player(s, obj(s, ids[0]!).owner).name}'s` : "their";
+      log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from ${whose} graveyard.`);
       for (const id of ids) moveObject(s, id, "exile");
       // "Create a token that's a copy of the exiled card" (Tawnos, Solemn Survivor): the one card this cost exiled, the
       // only cost that exiles anything (compile.ts yardCostCard), still that card in exile (CR 400.7).
@@ -10028,6 +10049,8 @@ function distributeChosen(s: GameState, p: Player, parts: Record<ObjectId, numbe
   // Sensational Spider-Man: up to that many, none from a permanent more than it has.
   if (pend.remove) {
     if (sum > pend.total || given.some(([id, n]) => n > (pend.has?.[id] ?? 0))) throw new RulesError(`remove at most ${pend.total} ${pend.counter} counters, no more from each than it has`);
+    // Overseer of Vault 76: exactly that many (rulings).
+    if (pend.exact && sum !== pend.total) throw new RulesError(`remove exactly ${pend.total} ${pend.counter} counters`);
     r.scratch = { ...r.scratch, distributed: Object.fromEntries(given) };
     s.pending = null;
     log(s, sum ? `${p.name} removes ${sum} ${pend.counter} counter${sum > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} from ${nameOf(s, id)}`).join(", ")}.` : `${p.name} removes no ${pend.counter} counters.`);

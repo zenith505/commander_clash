@@ -791,6 +791,8 @@ export function compile(d: CardDef): CompiledCard {
   let paws: { budget: number; costs: number[]; texts: string[]; lines: string[] } | undefined;
   // Devouring Rage: what its additional cost sacrifices any number of, the number sacrificed its X.
   let costSacrificedX: string | undefined;
+  // Burn at the Stake: its additional cost taps any number of creatures, the number tapped its X.
+  let costTappedX = false;
   for (const [li, raw] of lines.entries()) {
     // Converge (CR 207.2c) is an ability word: it has no rules meaning of its own; neither have flavor words, like "Gae
     // Bolg — Equip {4}" (CR 207.2d).
@@ -2265,6 +2267,18 @@ export function compile(d: CardDef): CompiledCard {
         (out.additionalCosts ??= []).push({ kind: "sacrifice", filter: { ...spec, text: singularWord(sacLess[1]!) }, n: 0, x: true, optional: true });
         out.sacrificedReduction = Number(sacLess[2]);
       }
+      continue;
+    }
+    // Round 315's optional costs of any size, each cutting the total cost (CR 601.2b, 601.2f): Explosive Singularity's
+    // tapped creatures, Hierophant Bio-Titan's removed +1/+1 counters, Burn at the Stake's tapped creatures counted by its
+    // effect.
+    const r315 = round315Cost(line, lines, d, out);
+    if (r315 === "fail") {
+      out.unsupported.push(raw);
+      continue;
+    }
+    if (r315) {
+      if (r315 === "tappedX") costTappedX = true;
       continue;
     }
     // Devouring Rage: "As an additional cost to cast this spell, you may sacrifice any number of Spirits." then "For each
@@ -6587,7 +6601,7 @@ export function compile(d: CardDef): CompiledCard {
     // Spiritualize: "Until end of turn, whenever target creature deals damage, ..." then "Draw a card.": the first
     // paragraph's targets are the spell's, as long as the rest has none of its own (its indexes stay the same).
     const joined: AbilityBody | null = parts.length && parts.every((b, i) => b && (i === 0 || !b.targets.length) && !b.modal && Object.keys(b).every((k) => k === "targets" || k === "effects" || k === "text")) ? { targets: parts[0]!.targets, effects: parts.flatMap((b) => b!.effects), text: spellLines.join(" ") } : null;
-    const body = floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}) }) : null;
+    const body = floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}), ...(costTappedX ? { costTappedX } : {}) }) : null;
     if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
     // Into the Time Vortex, Throes of Chaos: cascade and nothing else to do; the spell resolves doing nothing more (CR 608.2).
@@ -7806,4 +7820,57 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
 function spellBodyText(text: string, costSacrificedX: string | undefined): string {
   if (!costSacrificedX) return text;
   return text.replace(new RegExp(`For each ${costSacrificedX} sacrificed this way, that creature gets an additional ([+-]\\d+/[+-]\\d+) until end of turn\\.`), `That creature gets $1 until end of turn for each ${costSacrificedX} sacrificed this way.`);
+}
+
+/**
+ * Round 315's additional costs of any size (CR 601.2b: announced as it's cast, an X of 0 or more, CR 107.3a), each one
+ * counted as the spell's X:
+ * - Explosive Singularity: "you may tap any number of untapped creatures you control. ~ costs {1} less to cast for each
+ *   creature tapped this way." Tapped as the cost is paid (CR 601.2h), any of your untapped creatures, summoning sick ones
+ *   too (CR 302.6 is only about {T}); the cut (CR 601.2f) only takes generic mana, so never below {R}{R}, though more may
+ *   be tapped (rulings).
+ * - Hierophant Bio-Titan: "Frenzied Metabolism — ... you may remove any number of +1/+1 counters from among creatures you
+ *   control. ~ costs {2} less to cast for each counter removed this way." The ability word has no rules meaning (CR
+ *   207.2c); the same cut, never below {G}{G} (rulings).
+ * - Burn at the Stake: "tap any number of untapped creatures you control" with no cut, "the number of creatures tapped
+ *   this way" its X (the damage doesn't change if they untap or leave, rulings; a copy has the same X, CR 707.10).
+ * - Dargo, the Shipwrecker: "you may sacrifice any number of artifacts and/or creatures. ~ costs {2} less to cast for each
+ *   permanent sacrificed this way and {2} less to cast for each other artifact or creature you've sacrificed this turn."
+ *   The total cost is worked out (601.2f) before the cost is paid (601.2h), so "other" ones are those sacrificed before it
+ *   was cast; that part applies with none sacrificed for it too, and {2} for each whether it was an artifact, a creature
+ *   or both (rulings). Never below {R}.
+ * Returns "tappedX" for Burn at the Stake (its effect counts the X), true when the line is read, "fail" when it's one of
+ * these lines that can't be, null otherwise.
+ */
+function round315Cost(line: string, lines: string[], d: CardDef, out: CompiledCard): "tappedX" | true | "fail" | null {
+  const text = line.replace(/^Frenzied Metabolism — /, "");
+  const tapLess = /^As an additional cost to cast ~, you may tap any number of untapped creatures you control\. ~ costs \{(\d+)\} less to cast for each creature tapped this way\.$/.exec(text);
+  const countersLess = /^As an additional cost to cast ~, you may remove any number of \+1\/\+1 counters from among creatures you control\. ~ costs \{(\d+)\} less to cast for each counter removed this way\.$/.exec(text);
+  const tapAny = text === "As an additional cost to cast ~, tap any number of untapped creatures you control.";
+  const dargo = /^As an additional cost to cast ~, you may sacrifice any number of artifacts and\/or creatures\. ~ costs \{(\d+)\} less to cast for each permanent sacrificed this way and \{(\d+)\} less to cast for each other artifact or creature you've sacrificed this turn\.$/.exec(text);
+  if (!tapLess && !countersLess && !tapAny && !dargo) return null;
+  // One such cost on a card with no {X} of its own (its X is the number), and no other cost or cut using that X.
+  if (parseManaCost(d.manaCost).hasX || out.sacrificedReduction !== undefined || out.additionalCosts?.some((c) => "x" in c && c.x)) return "fail";
+  const creatures: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "untapped creature you control" };
+  if (tapLess || tapAny) {
+    // Burn at the Stake: only with its effect counting them.
+    if (tapAny && !lines.some((l) => / equal to (?:twice |three times )?the number of creatures tapped this way\.$/.test(l))) return "fail";
+    (out.additionalCosts ??= []).push({ kind: "tap", filter: creatures, n: 0, x: true });
+    if (tapLess) out.sacrificedReduction = Number(tapLess[1]);
+    return tapAny ? "tappedX" : true;
+  }
+  if (countersLess) {
+    (out.additionalCosts ??= []).push({ kind: "removeCounters", n: 0, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creatures you control" }, counter: "+1/+1", x: true });
+    out.sacrificedReduction = Number(countersLess[1]);
+    return true;
+  }
+  if (dargo) {
+    const spec = parseTargetPhrase("artifact or creature");
+    if (spec?.kind !== "object" || out.additionalCosts?.some((c) => c.kind === "sacrifice")) return "fail";
+    (out.additionalCosts ??= []).push({ kind: "sacrifice", filter: { ...spec, text: "artifact or creature" }, n: 0, x: true, optional: true });
+    out.sacrificedReduction = Number(dargo[1]);
+    out.costLess = [...(out.costLess ?? []), { count: { kind: "sacrificedThisTurn", anyType: ["Artifact", "Creature"] }, times: Number(dargo[2]) }];
+    return true;
+  }
+  return null;
 }

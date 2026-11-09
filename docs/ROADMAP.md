@@ -1,7 +1,7 @@
 # Roadmap
 
-30,650 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,739 of
+30,660 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,743 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -291,7 +291,7 @@ line blocks.
    the Gateway (transform an Incubator you control), Myriad Construct, Zaffai, Thunder Conductor (an opponent chosen at
    random), All-Seeing Arbiter, Life's Finale (an opponent's library into their graveyard), Aerith Rescue Mission (a
    stun counter on one of them), Stunning Reversal, Manabond (done in round 277), Glowcap Lantern (granting "look at
-   the top card of your library any time"), Jinxed Choker, Eligeth (scry replaced by draw), The Astonishing Ant-Man ("remove any number of
+   the top card of your library any time"), Jinxed Choker, Eligeth (scry replaced by draw), The Astonishing Ant-Man (done in round 315) ("remove any number of
    counters" as a cost), Power Surge (untapped lands at the start of the turn), Jace, Cunning Castaway, Curse of
    Vengeance, Shaile ("entered under your control this turn"). Round 180
    fixed "other" in Auras' and group statics (Bravado, Conclave's Blessing, Vampirism, Heroes' Podium, Sliver Legion:
@@ -899,8 +899,8 @@ line blocks.
    from a graveyard, and mana of any type can be spent" (Quistis Trepe). +21 (27,813 of 31,936 with round 210 and Lane B rounds B40 to B42).
    Out after round 211 (looked at, not done): Tegwyll's Scouring (flash by tapping three flyers as an additional cost);
    The Kenriths' Royal Funeral (done in round 303) (a cost cut counted from linked exiled cards); Suppression Ray (done in round 313) ("choose up to that many
-   creatures tapped this way"); Baba Lysaga, Night Witch ("sacrifice up to three permanents" as a cost, then card types
-   among them); Dargo, the Shipwrecker (optional sacrifices as a cost that cut it); Curse of Misfortunes (a Curse not
+   creatures tapped this way"); Baba Lysaga, Night Witch (done in round 315) ("sacrifice up to three permanents" as a cost, then card types
+   among them); Dargo, the Shipwrecker (done in round 315) (optional sacrifices as a cost that cut it); Curse of Misfortunes (a Curse not
    sharing a name with one attached to that player); Archmage Ascension (done in round 297) (a "would draw" replacement by a search);
    Eumidian Wastewaker ("discard a card or sacrifice a permanent", then counting lands put into graveyards this way);
    Plasma Caster (done in round 302) ("target creature that's blocking equipped creature"); Curie, Emergent Intelligence (base power and a
@@ -1204,7 +1204,7 @@ line blocks.
    enters or another nontoken Human you control dies" (Jerren, Corrupted Bishop); "Whenever one or more players
    sacrifice one or more creatures ... only once each turn" (Evin, Waterdeep Opportunist). +24 (28,558 of 31,936 with Lane B B60 and B61).
    Out after round 223 (looked at, not done): Contested War Zone ("that creature's controller gains control of ~" after
-   a creature deals combat damage to you); Chandra, the Firebrand ("each of up to six targets"); Ooze Flux (remove one
+   a creature deals combat damage to you); Chandra, the Firebrand ("each of up to six targets"); Ooze Flux (done in round 315) (remove one
    or more +1/+1 counters as a variable cost); Chancellor of the Annex (the first spell each opponent casts); Kaima,
    the Fractured Calm (a count of creatures goaded this way); Namor the Sub-Mariner; Words of Worship and Words of Wind
    (replacing the next draw this turn); Become the Pilot (can't be blocked unless attacking its owner); Nemesis Phoenix
@@ -1319,7 +1319,7 @@ line blocks.
    card" in a graveyard trigger); Ixidron and Illithid Harvester (turning permanents face down); Brazen Cannonade (done in round 314) ("until
    end of combat on your next turn"); Auntie Ool, Cursewretch (done in round 266); Arlinn's back face (a temporary "enters with
    an additional counter"); River Song's Diary, Knowledge Pool, Black Cat, Cunning Thief (done in round 273), Ninja Teen (granted sneak from
-   the graveyard), Grothama, All-Devouring, Tovolar, Dire Overlord, God-Eternal Kefnet, Hierophant Bio-Titan, Falco
+   the graveyard), Grothama, All-Devouring, Tovolar, Dire Overlord, God-Eternal Kefnet, Hierophant Bio-Titan (done in round 315), Falco
    Spara, Pactweaver, Baral and Kari Zev, Xanathar, Guild Kingpin, Painter's Servant and Warp World (each a new
    mechanism).
    Round 229 (fresh cards from the top): "Cumulative upkeep—Add {R}" (Braid of Fire; the bot keeps it); "Auras
@@ -2363,6 +2363,32 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 315 took cards back off the "Out after round N" lists, most played first: additional costs of any size as a
+   spell is cast, X the number paid (CR 601.2b, 601.2f, 601.2h, 107.3a): "As an additional cost to cast this spell, you
+   may tap any number of untapped creatures you control. This spell costs {1} less to cast for each creature tapped this
+   way" (Explosive Singularity: X announced, then the creatures picked on the battlefield after the target, a browser
+   test), "tap any number of untapped creatures you control" with "three times the number of creatures tapped this way"
+   (Burn at the Stake: X can be 0, a browser test), "you may remove any number of +1/+1 counters from among creatures you
+   control. This spell costs {2} less to cast for each counter removed this way" (Hierophant Bio-Titan: the counters
+   picked in the counter window, a browser test), "you may sacrifice any number of artifacts and/or creatures. This spell
+   costs {2} less to cast for each permanent sacrificed this way and {2} less to cast for each other artifact or creature
+   you've sacrificed this turn" (Dargo, the Shipwrecker: sacrifices from earlier in the turn counted as it's cast, a
+   browser test); "you may remove any number of +1/+1 counters from among creatures you
+   control. If you do, put twice that many +1/+1 counters on this creature" (Galloping Lizrog: picked one at a time as it
+   resolves, a browser test) and "move any number of +1/+1 counters from other permanents you control onto this creature"
+   (Aetherborn Marauder: each chosen as it resolves, rulings, a browser test); activation costs of any size: "Sacrifice up
+   to three permanents: If there were three or more card types among the sacrificed permanents, ..." (Baba Lysaga, Night
+   Witch: CR 205.2a card types of the sacrificed permanents as they last existed, a browser test), "Remove one or more
+   +1/+1 counters from among creatures you control: Create an X/X green Ooze" (Ooze Flux, a browser test), "Remove any
+   number of +1/+1 counters from The Astonishing Ant-Man: Create that many 1/1 green Insect creature tokens" (The Astonishing Ant-Man, a browser test) and
+   "Remove one or more +1/+1 counters from this creature: Gain control of target creature with power less than or equal to
+   the number of +1/+1 counters removed this way" (Simic Manipulator: X at least 1, the target checked as it's chosen and
+   as it resolves, CR 608.2b, a browser test). +10, 30,652 of 31,936 with rounds 314 and B153.
+   Out after round 315 (looked at, not done): Arcee, Sharpshooter (its other line), Jetfire, Ingenious Scientist (convert
+   and mana from removed counters), Tetravus (tokens created with ~ and exiled with it), Gorex, the Tombshell (a card at
+   random from the linked exile, CR 607.2q), Mossbridge Troll (tap creatures with total power 10 or more), Light Up the
+   Night, Kusari-Gama and Urgent Necropsy (still out, for the reasons in their earlier lists). Bots don't yet activate
+   Baba Lysaga or Ooze Flux, or move counters onto Aetherborn Marauder.
    Round 314 took cards back off the "Out after round N" lists, most played first: "As an additional cost to cast this
    spell, waterbend {X}. ... Exile X target creatures you control. Return those cards ... at the beginning of the next end
    step" (Waterbender's Restoration: X announced as it's cast, CR 107.3a, 601.2b, exactly X targets, CR 601.2c, and up to
@@ -2402,7 +2428,7 @@ line blocks.
    cards, rulings; a browser test for each prompt). +7 Commander-legal, 30,626 of 31,936 with round 312, B151 and B152.
    Out after round 313 (looked at, not done): Kusari-Gama (as after round 312); Urgent Necropsy ("collect evidence X,
    where X is the total mana value of the permanents this spell targets": an additional cost counted from the targets
-   chosen in the same casting step); Eumidian Wastewaker, Hierophant Bio-Titan, Firkraag and Moxite Refinery (still
+   chosen in the same casting step); Eumidian Wastewaker, Hierophant Bio-Titan (done in round 315), Firkraag and Moxite Refinery (still
    out, for the reasons in their earlier lists).
    Round 312 took cards back off the "Out after round N" lists, most played first: "When ~ die, if they were a creature,
    return them to the battlefield. They're an artifact." (Tom, Bert, and William: a plural name; it returns under the
@@ -2639,7 +2665,7 @@ line blocks.
    the Dead Tide (its cost "Exile cards from your graveyard equal to the number of opponents you have"; granting encore
    now works); Obsidian Charmaw (a cost cut counting "each land your opponents control that could produce {C}", near Lane B's round B140 template, left for it); Lumbering Battlement
    (the exile until it leaves isn't linked yet); Spectral Searchlight, Greater Gargadon, Ride the Avalanche, Panoptic
-   Projektor, Read the Runes, Draco, Azra Oddsmaker, Leonin Arbiter (done in round 313), Incinerator of the Guilty (done in round 313), Baba Lysaga, Archelos and
+   Projektor, Read the Runes, Draco, Azra Oddsmaker, Leonin Arbiter (done in round 313), Incinerator of the Guilty (done in round 313), Baba Lysaga (done in round 315), Archelos and
    Hatchery Sliver (still out, for the reasons in their earlier notes).
    Round 302 took cards back off the "Out after round N" lists, most played first: "Whenever players finish voting, each
    opponent who voted for a choice you didn't vote for loses 2 life" (Grudge Keeper: with extra votes, only an opponent
@@ -2662,7 +2688,7 @@ line blocks.
    +10, 30,425 of 31,936 with B139.
    Out after round 302 (looked at, not done): Spectral Searchlight and Greater Gargadon (their templates are in Lane B's
    open round B139); Ride the Avalanche, Panoptic Projektor, Read the Runes, Draco, Azra Oddsmaker, Leonin Arbiter (done in round 313),
-   Incinerator of the Guilty (done in round 313), Baba Lysaga, Archelos and Hatchery Sliver (still out, for the reasons in their earlier
+   Incinerator of the Guilty (done in round 313), Baba Lysaga (done in round 315), Archelos and Hatchery Sliver (still out, for the reasons in their earlier
    notes).
    Round 301 took cards back off the "Out after round N" lists, most played first: "the next spell you cast this turn"
    permissions. An alternative cost (CR 118.9) offered only to that spell and used up by it whichever cost is paid
@@ -2690,7 +2716,7 @@ line blocks.
    that spell's mana value); Panoptic Projektor (a cost cut for the next face-down creature spell: face-down costs aren't
    reduced by "next spell" effects yet); Read the Runes (the sacrifices chosen first, then the discards for the rest, in
    one step: rulings); Draco (an upkeep "unless you pay {10}" cut by {2} for each basic land type: a punisher cost with
-   its own reduction); Azra Oddsmaker, Spectral Searchlight, Leonin Arbiter (done in round 313), Incinerator of the Guilty (done in round 313), Baba Lysaga,
+   its own reduction); Azra Oddsmaker, Spectral Searchlight, Leonin Arbiter (done in round 313), Incinerator of the Guilty (done in round 313), Baba Lysaga (done in round 315),
    Archelos and Hatchery Sliver (still out, for the reasons in their earlier notes).
    Round 300 took cards back off the "Out after round N" lists, most played first: an {X} in an alternative cost (CR
    107.3a), announced as the card is cast that way: "Warp {X}{G}" (Broodguard Elite) and "Surge {X}{R}" (Fall of the
@@ -2804,7 +2830,7 @@ line blocks.
    doesn't have a counter of that kind on it" (Aven Courier, with a browser test); "each player creates ... for each creature
    card in their graveyard" and "At the beginning of each end step and when ~ leaves the battlefield, destroy all tokens
    created with ~" (Tombstone Stairwell). +10, 30,241 of 31,936 with B125 to B127.
-   Out after round 296 (looked at, not done): Baba Lysaga, Night Witch ("Sacrifice up to three permanents" as a cost: no
+   Out after round 296 (looked at, not done): Baba Lysaga, Night Witch (done in round 315) ("Sacrifice up to three permanents" as a cost: no
    up-to sacrifice cost or its picker); Fisher's Talent (a level's token replacement that the next level replaces again,
    Fish to Shark to Octopus); Archelos, Lagoon Mystic (other permanents entering tapped or untapped, on every way a
    permanent enters); Curse of Misfortunes (a Curse searched for and put onto the battlefield attached to the enchanted
@@ -3555,7 +3581,7 @@ line blocks.
    - Excess damage still out: Vikya ({Q} costs); Toralf done in round 266.
    - "It" in a cast trigger is the spell only as the first instruction ("Whenever you cast an Elf spell, it gains
      haste"); "untap ~. It gains ..." (Pristine Skywise, Bloodsky Berserker) is about the permanent and isn't parsed.
-   - Tap any number still out: as an additional cost (Burn at the Stake, Explosive Singularity), "each player may tap"
+   - Tap any number still out: as an additional cost (Burn at the Stake (done in round 315), Explosive Singularity (done in round 315)), "each player may tap"
      (Raiding Party), "If you do, ... each of those Vampires" (Urge to Feed). Bots tap every creature offered except,
      on their own turn before combat, ones that could still attack.
    - "With different names" still out: Emergent Ultimatum and Ecological Appreciation (an opponent chooses cards to
@@ -5553,7 +5579,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   a delayed cast trigger), The Fugitive Doctor and Filigree Racer (flashback or jump-start granted until end of turn),
   Mazzy (an Aura put into a graveyard, cast until your next turn), Saheeli's Lattice, Paleontologist's Pick-Axe and Throne
   of the Grim Captain ("craft with one or more"), Seifer (blocked by two or more), Distended Mindbender (a choice of two
-  cards by different rules), plus Shaun & Rebecca, Wild Shape, Bridge from Below, Aetherborn Marauder, Sigardian Zealot,
+  cards by different rules), plus Shaun & Rebecca, Wild Shape, Bridge from Below, Aetherborn Marauder (done in round 315), Sigardian Zealot,
   Rhuk (done in round B70), Alpha Brawl, Brain in a Jar, Sita Varma (done in round B114), Munda and Hans Eriksson.
 - Round B61 (the unlisted ones from EDHREC rank about 19,700 up, and from the B10/B11 lists below): "gets +2/+2 until
   end of turn if its power is 2" (Savage Swipe), "costs {2} less if a creature is attacking you" and "If a Hero enters
@@ -5627,7 +5653,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B63 (looked at, not done): Divine Deflection (prevention shared by you and your permanents),
   Refraction Trap (trap cost and a chosen source), Intermediate Chirography (a modified creature that died this
   turn), Churning Reservoir (oil counters put this turn), Dutiful Knowledge Seeker (cards put into a library from
-  anywhere), Simic Manipulator and Arcee (remove one or more counters as a variable cost), Benalish Commander and
+  anywhere), Simic Manipulator (done in round 315) and Arcee (remove one or more counters as a variable cost), Benalish Commander and
   Detritivore (suspend X), Darigaaz Reincarnated, Sekki, Seasons' Guide, Fugitive Codebreaker, Reroute, Serum Powder,
   Delaying Shield, Immortal Coil, Fires of Mount Doom.
 - Round B64 (the unlisted ones from EDHREC rank about 19,700 up to 15,000): "return to the battlefield target creature
@@ -7042,7 +7068,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   search, as none found makes it 0/0). Faces of the Past (tap all untapped or untap all tapped creatures sharing a
   creature type with the creature that died, as it last existed, chosen as it resolves, rulings, CR 608.2h; a browser
   test). Tomb of Urami ("~ deals 1 damage to you if you don't control an Ogre" as the mana ability resolves; "Sacrifice
-  all lands you control", itself too, rulings). +8 (30,650 of 31,936 with B153 and round 314).
+  all lands you control", itself too, rulings). +8 (30,660 of 31,936 with rounds 314 and 315).
 - Out after round B154 (looked at, not done): Blood Scrivener (two draws and a life loss instead of one draw: with
   another Scrivener, Phial of Galadriel or an Archive, which replacement applies to which of the new draws isn't tracked,
   CR 614.5, 616.1), Selective Snare and Aphetto Dredging (a creature type chosen as it's cast, before targets).
@@ -7420,7 +7446,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B69 (looked at, not done): Day of the Moon (names chosen for the Saga each chapter, then goad by
   them), Anhelo, the Painter (done in round 299) and Ashad, the Lone Cyberman (done in round 299) (granted casualty, several instances), Unidentified Hovership (done in round 273)
   (the owner of each card it exiled), Crafty Cutpurse (tokens an opponent would create, against token doubling and the
-  attack rulings), Insatiable Frugivore (a repeat loop), Galloping Lizrog (counters spread over creatures).
+  attack rulings), Insatiable Frugivore (a repeat loop), Galloping Lizrog (done in round 315) (counters spread over creatures).
 - Out after round B68 (looked at, not done): Oko, Lorwyn Liege (the back face's emblem of a chosen creature type),
   Abuelo's Awakening (the returned artifact that's also a Spirit creature), Light of Judgment ("up to one Equipment"
   chosen as it resolves), Chandra, Chill of Compliance (which cards surveil put into the graveyard).

@@ -1261,6 +1261,24 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Which counter to move: a +1/+1 counter if it has one (moved onto our creature), else the first.
     // Slippery Bogbonder: onto an opponent's creature, our harmful counters (-1/-1, stun); onto ours, none.
+    // Galloping Lizrog: +1/+1 counters off our creatures, each one twice over on it while it's still there: its own, then
+    // others' that leave the creature at least 2 toughness.
+    const gather = s.resolving?.body.effects.find((e) => e.type === "gatherCounters" && !!e.kinds);
+    if (pend.kind === "chooseOption" && pend.what === "removeCounter" && pend.onto === undefined && gather) {
+      const item = s.resolving!.item;
+      const src = item.sourceId ? s.objects[item.sourceId] : undefined;
+      const there = !!src && src.zone === "battlefield" && (item.sourceZc === undefined || (src.zoneChanges ?? 0) === item.sourceZc);
+      const picked = s.resolving?.scratch?.gathered ?? {};
+      const opt = (id: string) => pend.options.find((o) => o.startsWith(`${id}:`));
+      const own = there ? opt(src!.id) : undefined;
+      const other = there
+        ? pend.options.find((o) => {
+            const x = o.includes(":") ? s.objects[o.slice(0, o.indexOf(":"))] : undefined;
+            return !!x && x.id !== src!.id && toughness(s, x) - Object.entries(picked).filter(([k]) => k.startsWith(`${x.id}:`)).reduce((n, [, m]) => n + m, 0) >= 3;
+          })
+        : undefined;
+      return [{ type: "chooseOption", player: pid, choice: own ?? other ?? "done" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "removeCounter" && pend.options.some((o) => o.includes(":")) && pend.onto === undefined) {
       // Eventide's Shadow: removing them costs us a card's worth of life each (and gives a card), so a few at most, while
       // our life stays well up: helpful ones off opponents' permanents, harmful ones off ours.
@@ -3731,6 +3749,8 @@ function xChoices(mana: number, perX: number): number[] {
  */
 function costXRoom(s: GameState, pid: PlayerId, id: string, costs: AdditionalCost[]): number {
   const p = player(s, pid);
+  // A spell's "tap any number of" or "remove any number of" cost (round 315's), not an activated ability's.
+  const spellXCost = obj(s, id).zone !== "battlefield";
   let most = Infinity;
   for (const c of costs) {
     if (!("x" in c) || !c.x) continue;
@@ -3746,6 +3766,12 @@ function costXRoom(s: GameState, pid: PlayerId, id: string, costs: AdditionalCos
               : c.kind === "putCounter"
                 ? // Blight X (Soul Immolation): no more than the greatest toughness among our creatures (its own cap).
                   Math.max(0, ...s.battlefield.map((x) => obj(s, x)).filter((b) => controllerOf(s, b) === pid && objIsType(s, b, "Creature")).map((b) => toughness(s, b)))
+              : c.kind === "tap" && spellXCost
+                ? // Explosive Singularity, Burn at the Stake: "tap any number of untapped creatures you control", those not attacking.
+                  tapCostCandidates(s, pid, obj(s, id), c).filter((x) => obj(s, x).attacking === undefined).length
+              : c.kind === "removeCounters" && spellXCost
+                ? // Hierophant Bio-Titan: "remove any number of +1/+1 counters from among creatures you control".
+                  counterCostCandidates(s, pid, obj(s, id), c).reduce((n, x) => n + x.n, 0)
               : c.kind === "tap" || c.kind === "reveal" || c.kind === "removeCounters"
                 ? 0 // "Tap X untapped ... you control", "Reveal X red cards from your hand", "Remove X +1/+1 counters from among ..." are activated abilities' costs only
                 : returnCandidates(s, pid, c).length;

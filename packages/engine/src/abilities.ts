@@ -212,6 +212,8 @@ export type Count =
   | { kind: "poisonLostThisWay" }
   /** Sweep: "for each Plains returned this way" after "return any number of Plains you control to their owner's hand": how many its instructions put into a hand. */
   | { kind: "bouncedThisWayCount" }
+  /** "Draw a card for each one they gained control of this way" (Coveted Falcon): those objects (the targets still legal, CR 608.2b) now controlled by that player. */
+  | { kind: "controlGivenThisWay"; what: ObjRef; to: PlayerRef }
   /** Wanderwine Farewell: "for each permanent returned to its owner's hand this way": the effect "bounce" sent from the battlefield to a hand (Resolving.returnedFrom). */
   | { kind: "returnedFromCount" }
   /** Dodgy Jalopy: "a number of +1/+1 counters equal to this card's power" for scavenge, its power as the cost exiled it (StackItem.scavengedPower). */
@@ -867,6 +869,8 @@ export interface TargetSpec {
   /** "... that was put there from their library this turn" (Captain N'ghathrod), "... that was milled this turn" (Tato Farmer): GameObject.fromLibraryTurn, milledTurn. */
   fromLibraryThisTurn?: true;
   milledThisTurn?: true;
+  /** "... that was discarded or put there from a library this turn" (Ghost of Ramirez DePietro): GameObject.discardedTurn or fromLibraryTurn this turn. */
+  discardedOrFromLibraryThisTurn?: true;
   /** "... that were put there from the battlefield this turn" (Brought Back): GameObject.fromBattlefieldTurn. */
   fromBattlefieldThisTurn?: true;
   /** "Cards in your graveyard that you cycled or discarded this turn" (Shadow of the Grave): GameObject.discardedTurn. */
@@ -1100,6 +1104,8 @@ export interface TargetSpec {
    * these targets' power, as they're chosen and again as it resolves (rulings).
    */
   powerAtMostOf?: number[];
+  /** "Target nonland permanent an opponent controls with equal or lesser mana value" (Puca's Mischief): its mana value is at most each of these targets', as they're chosen (as a set, rulings) and again as it resolves (CR 608.2b). */
+  mvAtMostOf?: number[];
   /** With `sharesCardTypeWith`: "that shares one of those types with it" (Legerdemain), only these card types count. */
   sharesCardTypeAmong?: string[];
   /** "Two target creatures that share no creature types" (Rivals' Duel): shares none with each of these targets, checked both ways and again as it resolves (rulings). */
@@ -1158,6 +1164,8 @@ export interface TargetSpec {
   notNamed?: string;
   /** "With a different name than each Aura you control" (Light-Paws): no permanent of this kind its controller controls as the search resolves has its name (only for searches; a face-down one has none, CR 708.2). */
   notNamedAsYours?: TargetSpec;
+  /** "A Curse card that doesn't have the same name as a Curse attached to enchanted player" (Curse of Misfortunes): no permanent of this kind attached to that player as the search resolves has its name (only for searches; worked out into `notNamedAny`, rulings). */
+  notNamedAsAttachedTo?: { player: PlayerRef; filter: TargetSpec };
   /** "A basic land card that doesn't share a land type with a land you control" (Hiveheart Shaman): none of the land types among lands the searching player controls as it resolves (only for searches; worked out into `notSubtypes`). */
   noLandTypeOfYours?: true;
   /** `notNamedAsYours` worked out: none of these names. */
@@ -1759,6 +1767,8 @@ export interface DamageRuleSpec {
   redirectToSourceController?: true;
   /** "Until your next turn, ..." (Ascent of the Worthy): it lasts until its controller's next turn begins, not just this turn (CR 611.2b). */
   untilYourNextTurn?: true;
+  /** "This combat" (Suppressor Skyguard): it ends as this combat phase's end of combat step ends (CR 511.3), not at end of turn. */
+  thisCombat?: true;
   /** "You gain life equal to the damage prevented this way" (CR 615.5); `colors`: only for damage from a source of those colors. */
   gainLife?: { colors?: Color[] };
   /** "~ deals that much damage to that source's controller" (CR 615.5); `colors`: only for damage from a source of those colors. */
@@ -2336,6 +2346,8 @@ export type StaticCondition =
   | { kind: "eventPlayerMoreThanAnotherOpponent"; what: "life" }
   /** "If one or more players being attacked are poisoned" (Norn's Decree): attacked themselves, not their planeswalkers or battles (CR 508.3b), with a poison counter. */
   | { kind: "attackedPlayerPoisoned" }
+  /** "If that player has another opponent who isn't being attacked" (Suppressor Skyguard): the trigger's event player (the attacking player) has an opponent other than you, still in the game, that no creature attacks itself (attacking their planeswalkers or battles doesn't count, rulings, CR 508.1b). */
+  | { kind: "eventPlayerHasUnattackedOpponent" }
   /** "If no other creatures are attacking that player" (Jin Sakai, Ghost of Tsushima): no creature but the trigger's subject attacks the event's player itself (not their planeswalkers or battles). */
   | { kind: "noOtherAttackingEventPlayer" }
   /** "You control the creature with the greatest power or tied for the greatest power" (Triumph of Ferocity), "the artifact with the greatest mana value ..." (Padeem): among all on the battlefield. */
@@ -7966,6 +7978,12 @@ export interface CompiledCard {
    * cards.ts canSacrificeForCost.
    */
   noSacrificeCosts?: "creatures" | "nonland";
+  /**
+   * Leader, Super-Genius: "If a creature you control would connive, instead you draw a card, then that creature connives."
+   * A replacement effect (CR 614.1a) on each connive of a creature its controller controls (CR 701.50a); each one applies
+   * once to the event (CR 614.5), so with two of them you draw two first. See the connive case in run-permanents.ts.
+   */
+  conniveDrawsFirst?: true;
   /**
    * Sigarda, Host of Herons: "Spells and abilities your opponents control can't cause you to sacrifice permanents": while a
    * spell or ability an opponent controls resolves, an instruction to sacrifice does nothing and the option to sacrifice

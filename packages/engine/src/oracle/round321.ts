@@ -4,6 +4,7 @@ import type { Ctx } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseSentence } from "./sentence";
 import { parseTrigger } from "./triggers";
+import { round322Sentence, round322Trigger } from "./round322";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -14,6 +15,9 @@ const pushed = (effects: Effect[], before: Effect[], last: Effect, next: number)
 };
 
 export function round321Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 322's sentences first (oracle/round322.ts).
+  const r322 = round322Sentence(s, sentences, si, ctx, effects);
+  if (r322 !== null) return r322;
   const prev = effects.at(-1);
   // Sail into the West: "each player returns up to two cards from their graveyard to their hand, then you exile ~": the
   // spell exiles itself as it resolves instead of going to the graveyard (CR 608.2n). The splitter breaks it at ", then".
@@ -82,6 +86,9 @@ export function round321Sentence(s: string, sentences: string[], si: number, ctx
 }
 
 export function round321Trigger(raw: string): TriggeredAbility | "fail" | null {
+  // Round 322's triggers first (oracle/round322.ts).
+  const r322 = round322Trigger(raw);
+  if (r322 !== null) return r322;
   // Hand of Vecna: "At the beginning of combat on your turn, equipped creature or a creature you control named Vecna gets
   // +X/+X until end of turn, where X is the number of cards in your hand.": one of them, chosen as it resolves, X counted
   // then (rulings); read as a choice of a creature you control, the choice made by chooseHostOrNamed instead.

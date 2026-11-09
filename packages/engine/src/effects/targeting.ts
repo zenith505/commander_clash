@@ -770,6 +770,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (spec.notPutThereThisCombat && inCombatPhase(s) && o.toGraveyardCombat?.turn === s.turn && o.toGraveyardCombat.combat === (s.combatsThisTurn ?? 0)) return false;
     if (spec.fromLibraryThisTurn && o.fromLibraryTurn !== s.turn) return false;
     if (spec.milledThisTurn && o.milledTurn !== s.turn) return false;
+    if (spec.discardedOrFromLibraryThisTurn && o.discardedTurn !== s.turn && o.fromLibraryTurn !== s.turn) return false;
     if (spec.fromBattlefieldThisTurn && o.fromBattlefieldTurn !== s.turn) return false;
     return printedMatches(spec, defOf(s, o));
   }
@@ -1133,7 +1134,7 @@ export function swapKeepsOthersLegal(s: GameState, specs: TargetSpec[], targets:
     const c = next[i];
     if (i === j || !c || c.kind === "none") return true;
     if (x.distinctFrom?.includes(j) && sameTarget(c, t)) return false;
-    const related = [x.sameGraveyardAs, x.inGraveyardOfControllerOf, x.inGraveyardOfTarget === undefined ? undefined : [x.inGraveyardOfTarget], x.controlledByTarget === undefined ? undefined : [x.controlledByTarget], x.attachedToTarget === undefined ? undefined : [x.attachedToTarget], x.controlledByOpponentOfTarget === undefined ? undefined : [x.controlledByOpponentOfTarget], x.differentControllerFrom, x.sameControllerAs, x.differentNameFrom, x.differentManaValueFrom, x.sharesCreatureTypeWith, x.sharesCardTypeWith, x.sharesNoCreatureTypeWith].some((g) => g?.includes(j));
+    const related = [x.sameGraveyardAs, x.inGraveyardOfControllerOf, x.inGraveyardOfTarget === undefined ? undefined : [x.inGraveyardOfTarget], x.controlledByTarget === undefined ? undefined : [x.controlledByTarget], x.attachedToTarget === undefined ? undefined : [x.attachedToTarget], x.controlledByOpponentOfTarget === undefined ? undefined : [x.controlledByOpponentOfTarget], x.differentControllerFrom, x.sameControllerAs, x.differentNameFrom, x.differentManaValueFrom, x.powerAtMostOf, x.mvAtMostOf, x.sharesCreatureTypeWith, x.sharesCardTypeWith, x.sharesNoCreatureTypeWith].some((g) => g?.includes(j));
     return !related || relatedOk(s, x, next, c);
   });
 }
@@ -1175,6 +1176,9 @@ export function relatedOk(s: GameState, spec: TargetSpec, chosen: TargetChoice[]
   // Spawnbroker: power at most each of those targets' power, as they are now (a creature that has left: as it last existed).
   const powerOf = (x: GameObject) => (x.zone === "battlefield" ? power(s, x) : (s.lastKnown?.[x.id]?.power ?? 0));
   if (others(spec.powerAtMostOf).some((x) => o.zone !== "battlefield" || power(s, o) > powerOf(x))) return false;
+  // Puca's Mischief: mana value at most each of those targets', as they are now; both on the battlefield (an exchange
+  // needs both, CR 701.12b).
+  if (others(spec.mvAtMostOf).some((x) => o.zone !== "battlefield" || x.zone !== "battlefield" || characteristics(s, o).manaValue > characteristics(s, x).manaValue)) return false;
   // Rivals' Duel: no creature type in common, as they are now.
   if (others(spec.sharesNoCreatureTypeWith).some((x) => shareCreatureType(creatureTypesOf(s, x), creatureTypesOf(s, o)))) return false;
   return others(spec.sharesCreatureTypeWith).every((x) => shareCreatureType(creatureTypesOf(s, x), creatureTypesOf(s, o)));
@@ -1358,7 +1362,7 @@ export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: P
   const free = (spec: TargetSpec) => spec.optional || spec.skip || (!!spec.many && !spec.manyMin);
   const options = specs.map((spec, i) => (free(spec) ? [] : legalTargets(s, spec, controller, undefined, src, sourceId).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
   if (options.some((o, i) => !free(specs[i]!) && !o.length)) return false;
-  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.differentControllerFrom?.length || spec.sameControllerAs?.length || spec.differentNameFrom?.length || spec.differentManaValueFrom?.length || spec.sharesCardTypeWith?.length || spec.sharesNoCreatureTypeWith?.length || spec.total)) return true;
+  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.differentControllerFrom?.length || spec.sameControllerAs?.length || spec.differentNameFrom?.length || spec.differentManaValueFrom?.length || spec.sharesCardTypeWith?.length || spec.sharesNoCreatureTypeWith?.length || spec.mvAtMostOf?.length || spec.total)) return true;
   // Some targets must differ from each other: look for one way to choose them all.
   const chosen: TargetChoice[] = [];
   const fill = (i: number): boolean => {

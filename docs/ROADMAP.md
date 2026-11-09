@@ -1,7 +1,7 @@
 # Roadmap
 
-30,705 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,970 of 4,988 (99%), top 10,000: 9,756 of
+30,713 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,762 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -72,7 +72,7 @@ line blocks.
    exile, a card exiled with it returns), Tempt with Mayhem (each opponent may copy a spell they don't control, then
    you copy it for each who did), Sin, Unending Cataclysm (removing counters from any number of permanents as it
    enters), Doors of Durin (done in round 295) (reveal the top card, then trample or hexproof until your next turn by what you control),
-   Goldberry, River-Daughter ("a counter of each kind not on ~", "one or more counters"), Sauron's Ransom (an opponent
+   Goldberry, River-Daughter ("a counter of each kind not on ~", "one or more counters"), Sauron's Ransom (done in round 318) (an opponent
    makes a face-down pile and a face-up pile, which the UI would have to hide), Tromokratis ("can't be blocked unless
    all creatures defending player controls block it", CR 509.1c). Out after round 163: Gale, Waterdeep Prodigy (cast
    a card from your graveyard as its trigger resolves, with an exile replacement for that spell), Damping Sphere (a
@@ -870,7 +870,7 @@ line blocks.
    Summoner, In the Eye of Chaos and Afflicted Deserter // Werewolf Ransacker.
    Out after round 210 (looked at, not done): Eivor, Battle-Ready ("a Saga card and/or a land card from among them" needs
    a one-of-each picker); Puca's Mischief (a second target's mana value bound by the first one's, chosen as a set);
-   Hand of Vecna ("equipped creature or a creature you control named Vecna" and a life-per-card equip cost); Grave Sifter
+   Hand of Vecna ("equipped creature or a creature you control named Vecna" and a life-per-card equip cost); Grave Sifter (done in round 318)
    (each player's own creature type); Overseer of Vault 76 ("remove three quest counters from among permanents you
    control"); Dragon's Approach (done in round 296) (exiling four named cards as an optional cost); Signal the Clans (done in round 304) (a random pick if the
    three names differ); Fblthp, the Lost (done in round 303) (entered or cast from the library; "becomes the target of a spell");
@@ -1082,7 +1082,7 @@ line blocks.
    this way"); Anzrag's Rampage (put a creature card from among the exiled ones onto the battlefield, return it at end
    step); Regna's Sanction and Zndrsplt's Judgment (friend or foe with "chooses one ..., then taps the rest" and "a
    token that's a copy of a creature they control"; Lane B's range); Swooping Pteranodon (a delayed trigger in which a
-   target land deals the damage); Hellish Rebuke; Osteomancer Adept; Hostile Negotiations; Unexplained Absence.
+   target land deals the damage); Hellish Rebuke; Osteomancer Adept; Hostile Negotiations (done in round 318); Unexplained Absence.
    Round 219: the Will of the Planeswalkers paths (Path of the Enigma, Animist, Ghosthunter, Pyromancer, Schemer: a
    planeswalk-or-chaos vote, both no-ops outside Planechase, CR 701.31a, 311.7); "Players can't draw cards" (Maralen of
    the Mornsong, Mornsong Aria: draw() stops, CR 121); "Lethal damage dealt to creatures you control is determined by
@@ -1383,7 +1383,7 @@ line blocks.
    Epic (tap creatures for an activation cost's mana, like convoke); Kaldring, the Rimestaff (play a snow permanent card
    from your graveyard this turn, entering tapped); Hostile Hostel (soul counters, transform, then untap; Creeping Inn's
    "creature cards exiled with this creature"); Dawnbreak Reclaimer (an opponent chooses a card in your graveyard);
-   Cryptic Gateway (done in round 302), Mogg Assassin, Karplusan Minotaur, The Phasing of Zhalfir, Mirror of Life Trapping, Grasping Shadows
+   Cryptic Gateway (done in round 302), Mogg Assassin, Karplusan Minotaur (done in round 318), The Phasing of Zhalfir, Mirror of Life Trapping, Grasping Shadows
    ("transform it" is the enchantment, not the attacker).
    Round 233 (top of the list, now done): "you may pay one or more {E}. If you do, create an X/X ... Vehicle token"
    (Pia Nalaar, Chief Mechanic); "If a Hero enters this way, it enters with an additional +1/+1 counter" (Winter Soldier,
@@ -2363,6 +2363,36 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 318 took cards back off the "Out after round N" lists, most played first: "look at the top five cards of your
+   library and separate them into a face-down pile and a face-up pile. An opponent chooses one of those piles. Put that
+   pile into your hand and the other into your graveyard." (Curator of Destinies: only looked at, never revealed; the
+   opponent sees the face-up pile and the face-down pile's size, CR 700.3, rulings; a browser test of the separation);
+   "Choose an opponent. They look at the top four cards of your library and separate them into a face-down pile and a
+   face-up pile. Put one pile into your hand and the other into your graveyard." (Sauron's Ransom, a browser test of the
+   card backs); "Exile the top three cards of your library in a face-down pile, then exile the top three cards of your
+   library in another face-down pile. Look at the cards in each pile, then turn a pile of your choice face up. An
+   opponent chooses one of those piles." (Hostile Negotiations: exiled face down, CR 406.3, the second pile smaller with
+   fewer than six cards, rulings; a browser test of "Turn pile N face up"); "Cumulative upkeep—Flip a coin" and "Whenever
+   you lose a coin flip, ~ deals 1 damage to any target of an opponent's choice" (Karplusan Minotaur: all the flips once
+   begun, each won or lost, CR 702.24a, 705.2; the opponent chosen as the trigger is put on the stack chooses the target,
+   CR 603.3d); "If you would create a Fish token, create a 3/3 blue Shark creature token instead" and the Shark one at
+   level 3 (Fisher's Talent: any Fish token you'd create, the Shark its level 2 made replaced again, CR 616.1e, rulings;
+   "You may reveal it if it's a land card" asked only for a land); "Whenever you attack with creatures with total power
+   12 or greater for the first time each turn" (Desert Were-Worm: the attackers' power as declared, attacks earlier this
+   turn counted, TurnLog.attackPower; rulings); "each player chooses a creature type and returns any number of cards of
+   that type from their graveyard to their hand" (Grave Sifter: each player's own type, rulings; Chosen.typesBy);
+   "Whenever a creature dealt damage this way dies this turn, populate" (Ghired's Belligerence: any creature it damaged,
+   whoever controls it, however it dies this turn, rulings). +8,
+   30,713 of 31,936 with B156 and B157.
+   Out after round 318 (looked at, not done): Moxite Refinery (X counters of any kinds removed from one permanent as a
+   cost), Night Soil (a cost exiling cards from any single graveyard), Mogg Assassin (a second target chosen by the
+   first target's controller), Mastermind's Acquisition and the wishes (cards from outside the game), Encroaching
+   Mycosynth, Biotransference, Crucible of the Spirit Dragon, Jinnie Fay, Mirrormind Crown, Moonlit Meditation, Guff
+   Rewrites History, Possibility Storm, Sokrates, Sunken Palace, Ulalek, Surge to Victory, Norman Osborn, Filigree Vector
+   and the rest above rank 6,800 (still out, for the reasons in their earlier lists); Kusari-Gama, Urgent Necropsy,
+   Spectral Searchlight and Glowcap Lantern (still out). Bots turn Hostile Negotiations' less valuable pile face up and
+   guess at a face-down pile by its size. When Fisher's Talent and Divine Visitation would both replace a Fish token, the
+   order isn't asked (either order ends in the same Angel).
    Round 317 took cards back off the "Out after round N" lists, most played first: "Starting with you, each player
    chooses up to one permanent with mana value 3 or greater from among permanents your opponents control. Exile those
    permanents." (The Legend of Yangchen chapter I: chosen in turn order, then exiled at once, rulings; a browser test) and
@@ -2594,7 +2624,7 @@ line blocks.
    Jolene's); "Discard your hand, then draw a card for each creature you control" and "~ deals 4 damage to each creature
    except for tokens you control" (Ajani Unrelenting). +8, 30,531 of 31,936 with B145 and B146.
    Out after round 308 (looked at, not done): Pulmonic Sliver (a granted "If ~ would be put into a graveyard, you may put
-   it on top of its owner's library instead": no optional self-replacement of that kind yet); Grave Sifter (each player's
+   it on top of its owner's library instead": no optional self-replacement of that kind yet); Grave Sifter (done in round 318) (each player's
    own creature type, then any number of cards of it); Eumidian Wastewaker ("you and defending player each discard a card
    or sacrifice a permanent", mandatory, then the land cards put into graveyards this way); Detective's Phoenix (bestow
    with collect evidence, cast from the graveyard with bestow); Hand of Vecna ("equipped creature or a creature you
@@ -2670,7 +2700,7 @@ line blocks.
    test); "Whenever a red source you control deals damage to one or more permanents and/or players" (The Red Terror:
    once for each source in each batch of damage, CR 603.2c). +8, 30,491 of 31,936 with B142 to B144.
    Out after round 305 (looked at, not done): Spell Queller (casting the exiled card when it leaves: needs the exiled
-   card linked to its leaves trigger); Karplusan Minotaur ("any target of an opponent's choice" in a triggered ability
+   card linked to its leaves trigger); Karplusan Minotaur (done in round 318) ("any target of an opponent's choice" in a triggered ability
    with a coin flip cumulative upkeep); Toggo, Goblin Weaponsmith (a named Equipment token granting an ability with a
    sacrifice of that token); Jace, Architect of Thought (a delayed "until your next turn, whenever a creature an opponent
    controls attacks" and a search of every player's library).
@@ -2885,7 +2915,7 @@ line blocks.
    card in their graveyard" and "At the beginning of each end step and when ~ leaves the battlefield, destroy all tokens
    created with ~" (Tombstone Stairwell). +10, 30,241 of 31,936 with B125 to B127.
    Out after round 296 (looked at, not done): Baba Lysaga, Night Witch (done in round 315) ("Sacrifice up to three permanents" as a cost: no
-   up-to sacrifice cost or its picker); Fisher's Talent (a level's token replacement that the next level replaces again,
+   up-to sacrifice cost or its picker); Fisher's Talent (done in round 318) (a level's token replacement that the next level replaces again,
    Fish to Shark to Octopus); Archelos, Lagoon Mystic (other permanents entering tapped or untapped, on every way a
    permanent enters); Curse of Misfortunes (a Curse searched for and put onto the battlefield attached to the enchanted
    player, by name among the Curses attached to them); Undead Alchemist and Szadek, Lord of Secrets (done in round 297) (Lane B's round B125
@@ -3279,7 +3309,7 @@ line blocks.
    10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator (done in round 314), The Foretold Soldier, Radiant Scrollwielder (done in round 314), Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
    7, Grappling Hook (done in round 278), Otrimi, Zhao, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained (done in round 278), Identity
    Thief, Mishra, Eminent One, Spell Queller, Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon, Grub, Storied Matriarch,
-   Taskmaster, Mercenary Mimic, Gideon Blackblade (done in round 296), Kolvori, God of Kinship, Fisher's Talent, Niko, Light of Hope,
+   Taskmaster, Mercenary Mimic, Gideon Blackblade (done in round 296), Kolvori, God of Kinship, Fisher's Talent (done in round 318), Niko, Light of Hope,
    Stick Together (done in round 302), Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
    Augurelt, Quintorius, Loremaster, Quantum Riddler (done in round 296), Model of Unity (done in round 302), The Flood of Mars, Sigarda's Vanguard (done in round 302), Master of
    the Wild Hunt, Audacious Reshapers, Kiora, Sovereign of the Deep, Quest for
@@ -3575,7 +3605,7 @@ line blocks.
    permanent's controller. With both a doubler and Vorinclex's halving on the same counters the order is picked
    for the player (CR 616.1): halved first for -1/-1, stun and poison counters, doubled first for the rest. Smaller gaps from round 95: Cinder
    Cloud, Intrude on the Mind (counting the cards put into the graveyard this way), face-down piles (Fortune's Favor,
-   Riddles in the Dark, Curator of Destinies, Sauron's Ransom, Atris) and piles of permanents (Liliana of the Veil's
+   Riddles in the Dark, Curator of Destinies (done in round 318), Sauron's Ransom (done in round 318), Atris) and piles of permanents (Liliana of the Veil's
    −6, Do or Die, Make an Example), Jace, Architect of Thought's +1 and −8; Tibalt's Trickery compares only the front
    face's name of a modal double-faced spell; "cast this turn" filters (castThisTurn) read the printed card, so
    Maskwood Nexus's creature types for cards off the battlefield don't count there; Conduit of Worlds casts for the
@@ -4091,7 +4121,7 @@ line blocks.
      modal trigger about "that Vehicle"). Commanders: Drillworks Mole ("up to one target commander creature"),
      Subjugate the Hobbits ("each noncommander creature with mana value 3 or less").
    Left from the filter lands/divided damage/X costs round:
-   - Divided damage still out: Impact Resonance, Ghired's Belligerence's populate, Pollen Remedy (kicker that isn't
+   - Divided damage still out: Impact Resonance, Ghired's Belligerence's populate (done in round 318), Pollen Remedy (kicker that isn't
      mana). The divide panel says "divide the damage" for prevention too (Remedy).
    - "Any number of target players" still out: Communal Brewing, Hollow Marauder, Kaboom!, Memory Vampire, Singularity
      Rupture, Curse of Surveillance; Will of the Abzan (below).
@@ -4182,7 +4212,7 @@ line blocks.
    this turn" delayed triggers (Moraug, World at War, Full Throttle), "only the chosen creatures / land creatures can
    attack during that combat phase" (Last Night Together, Bumi), "skips their next combat phase" (Stonehorn Dignitary,
    False Peace, Moment of Silence), Take the Bait's "after this phase" extra combat, "attacks for the first
-   time each turn" on creatures other than the source and group attack triggers (Desert Were-Worm, Akki Battle Squad,
+   time each turn" on creatures other than the source and group attack triggers (Desert Were-Worm (done in round 318), Akki Battle Squad,
    Éomer), Raphael's "deals combat damage to a player for the first time each turn", "untap it and all Samurai you
    control" (Godo), Moraug's "for each time it has attacked this turn"; "it can't be blocked this combat" (Ma Chao),
    "whenever ~ or a commander you control attacks alone"; play-from-top riders: Bolas's Citadel's life payment,

@@ -384,6 +384,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
   }
   return {
     searched: t.searched,
+    attackPower: t.attackPower,
     cantBecomeMonarch: t.cantBecomeMonarch,
     scried: t.scried,
     surveilled: t.surveilled,

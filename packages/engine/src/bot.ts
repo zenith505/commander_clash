@@ -1332,6 +1332,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: "loyalty" }];
     if (pend.kind === "chooseOption" && pend.what === "counterKind") return [{ type: "chooseOption", player: pid, choice: pend.options.includes("+1/+1") ? "+1/+1" : pend.options[0]! }];
     // Two piles: the better one for our own hand, the worse one for an opponent's.
+    // Hostile Negotiations: turn the pile worth less face up (the opponent choosing sees only the other's size).
+    if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles && pend.pileMode === "turnFaceUp") {
+      const [a, b] = pend.piles.map((pile) => pile.reduce((n, id) => n + handWorth(s, id), 0));
+      return [{ type: "chooseOption", player: pid, choice: a! <= b! ? "0" : "1" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles) {
       // Our own permanents to sacrifice (Liliana of the Veil): the pile worth less.
       // Boneyard Parley: creature cards to put onto the battlefield, worth their mana value.
@@ -5306,7 +5311,7 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
   }
   // "Returns all creature cards of a type chosen this way from their graveyard" (Patriarch's Bidding), "return up to two
   // creature cards of that type from your graveyard" (Haunting Voyage): what's in ours.
-  const fromYard = what === "creatureType" && !!c && allEffects([...(c.spell?.effects ?? []), ...c.triggers.flatMap((t) => t.body.effects)]).some((e) => (e.type === "returnAllFromGraveyard" && (e.filter.chosen === "typesChosen" || e.filter.chosen === "type")) || (e.type === "chooseFromGraveyard" && !e.who && e.filter?.chosen === "type"));
+  const fromYard = what === "creatureType" && !!c && allEffects([...(c.spell?.effects ?? []), ...c.triggers.flatMap((t) => t.body.effects)]).some((e) => (e.type === "returnAllFromGraveyard" && (e.filter.chosen === "typesChosen" || e.filter.chosen === "type")) || (e.type === "chooseFromGraveyard" && !e.who && e.filter?.chosen === "type") || (e.type === "chooseFromGraveyard" && e.filter?.chosen === "pickerType"));
   if (fromYard)
     for (const id of player(s, pid).graveyard) {
       const d = defOf(s, obj(s, id));

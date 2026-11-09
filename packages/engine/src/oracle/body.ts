@@ -15,6 +15,7 @@ import { parseTrigger } from "./triggers";
 import { parseCopyExcept, parseToken } from "./tokens";
 import { parsePunisherOptions } from "./sentences/basics";
 import { X_MODES_MAX } from "../modes";
+import { round318Sentence } from "./round318";
 
 export interface Ctx {
   targets: TargetSpec[];
@@ -20393,6 +20394,9 @@ function round316Sentence(s: string, sentences: string[], si: number, ctx: Ctx, 
 /** Round 317's sentences, kept out of parseBodyText (TS2563). */
 function round317Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
   void effects;
+  // Round 318's sentences first (oracle/round318.ts).
+  const r318 = round318Sentence(s, sentences, si, ctx, effects);
+  if (r318 !== null) return r318;
   // Rocco, Street Chef: "each player exiles the top card of their library. Until your next end step, each player may play
   // the card they exiled this way.": each card its owner's to play, with its usual timing and costs, over as this ability's
   // controller's next end step begins (so one from your end step lasts through your next turn).

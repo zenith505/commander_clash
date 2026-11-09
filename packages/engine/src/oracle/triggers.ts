@@ -8,6 +8,7 @@ import { CREATURE_TYPES } from "../keywords";
 import { parseSearchFilter } from "./search";
 import { parseCount } from "./counts";
 import { parseToken } from "./tokens";
+import { round318Trigger } from "./round318";
 const capital = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
 const TRIGGERS: [RegExp, TriggerEvent][] = [
@@ -2150,7 +2151,10 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever you attack with creatures with total power 6 or greater" (Ugin's Mastery): once for the attack, if the
   // creatures attacking add up to that much power as they're declared.
   let minTotalPower: number | undefined;
-  const totalPower = /^Whenever you attack with creatures with total power (\d+) or greater, /.exec(line);
+  // Desert Were-Worm: "for the first time each turn": only if you hadn't attacked with that much power earlier this turn,
+  // counting attacks before it was on the battlefield (TurnLog.attackPower).
+  const totalPower = /^Whenever you attack with creatures with total power (\d+) or greater( for the first time each turn)?, /.exec(line);
+  const totalPowerFirst = !!totalPower?.[2];
   if (totalPower) {
     minTotalPower = Number(totalPower[1]);
     line = `Whenever you attack, ${line.slice(totalPower[0].length)}`;
@@ -2387,7 +2391,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     const filter: TargetSpec = group ?? { kind: "object", types: ["Creature"], text: "creature" };
     body = { ...body, effects: [...body.effects, { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", fromGroup: true }], text: `return one of those ${phrase} to its owner's hand` }], text: `${body.text} You may return one of those ${phrase} to its owner's hand.` };
   }
-  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(exactly ? { exactAttackers: true as const } : {}), ...(allAttack ? { allAttack } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}), ...(toInitiative ? { toInitiative: true as const } : {}), ...(perWalker ? { perWalker: true as const } : {}), ...(selfOrCommander ? { selfOrCommander: true as const } : {}), ...(selfAnd ? { selfAnd } : {}), ...(minTotalPower ? { minTotalPower } : {}) };
+  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(exactly ? { exactAttackers: true as const } : {}), ...(allAttack ? { allAttack } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}), ...(toInitiative ? { toInitiative: true as const } : {}), ...(perWalker ? { perWalker: true as const } : {}), ...(selfOrCommander ? { selfOrCommander: true as const } : {}), ...(selfAnd ? { selfAnd } : {}), ...(minTotalPower ? { minTotalPower } : {}), ...(totalPowerFirst ? { totalPowerFirst: true as const } : {}) };
 }
 
 /** "Other creatures you control", "tokens you control", "artifacts and/or creatures you control": what a batch trigger counts. */
@@ -5669,6 +5673,9 @@ function round316Trigger(raw: string): TriggeredAbility | "fail" | null {
 
 /** Round 317's trigger templates, read before the others. */
 function round317Trigger(raw: string): TriggeredAbility | "fail" | null {
+  // Round 318's triggers first (oracle/round318.ts).
+  const r318 = round318Trigger(raw);
+  if (r318 !== null) return r318;
   // Zenos yae Galvus: "When the chosen creature leaves the battlefield, transform ~.": linked to its enters trigger's "choose
   // a creature" (CR 607.2d), that object leaving for any zone. Shinryu, Transcendent Rival: "When the chosen player loses
   // the game, you win the game." (CR 104.2b), linked to "As this creature transforms into Shinryu, choose an opponent."

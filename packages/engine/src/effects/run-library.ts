@@ -1644,7 +1644,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         sc.looked = p.library.slice(0, Math.max(0, amountNow(s, e.n, ctx)));
         if (!sc.looked.length) return;
         if (e.faceDown && target?.kind === "player") log(s, `${player(s, target.id).name} looks at the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of ${p.name}'s library.`);
-        else log(s, `${p.name} reveals the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of their library (${names(sc.looked)}).`);
+        // Curator of Destinies: you only look at them (they aren't revealed). Sauron's Ransom: the opponent who looks is
+        // chosen next, and the separation's log names them.
+        else if (e.faceDown) {
+          if (e.separator === "you") log(s, `${p.name} looks at the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of their library.`);
+        } else log(s, `${p.name} reveals the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of their library (${names(sc.looked)}).`);
       }
       if (sc.moved) return toBottom(s, p.id, sc.looked.filter((id) => obj(s, id).zone === "library"), src, false);
       const looked = sc.looked.filter((id) => obj(s, id).zone === "library");
@@ -2372,7 +2376,7 @@ function clashValue(s: GameState, id: ObjectId): number {
  * "An opponent chooses", "an opponent separates": an opponent you choose as it resolves, not targeted (rulings on Steam
  * Augury, Sphinx of Uthuun); kept as the resolving object's chosen player. None when no opponent is left.
  */
-function chooseAnOpponent(s: GameState, ctx: ResolveCtx, src: string, prompt: string): PlayerId | undefined | "paused" {
+export function chooseAnOpponent(s: GameState, ctx: ResolveCtx, src: string, prompt: string): PlayerId | undefined | "paused" {
   const r = s.resolving!;
   const opps = opponents(s, ctx.controller);
   if (r.chosen?.player === undefined && opps.length === 1) {

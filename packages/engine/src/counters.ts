@@ -215,7 +215,8 @@ export function tokenBatch(s: GameState, pid: PlayerId, token: TokenKind, n: num
   for (let changed = true; changed; ) {
     changed = false;
     for (const m of [...insteads]) {
-      const of = live().filter((e) => e.kind.types.includes(m.type) && JSON.stringify(e.spec) !== JSON.stringify(m.token));
+      // Fisher's Talent: by subtype ("a Fish token").
+      const of = live().filter((e) => ("subtype" in m ? e.kind.subtypes.includes(m.subtype) : e.kind.types.includes(m.type)) && JSON.stringify(e.spec) !== JSON.stringify(m.token));
       if (!of.length) continue;
       insteads.splice(insteads.indexOf(m), 1);
       for (const e of of) {

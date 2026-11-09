@@ -109,7 +109,14 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   for (const extra of (m[3] ?? "").split(/(?<=\.) /).map((x) => x.trim()).filter(Boolean)) {
     const dmg = new RegExp(`^~ deals ${NUM} damage to you\\.$`).exec(extra);
     if (dmg) out.selfDamage = num(dmg[1]!);
+    else if ((m2 = new RegExp(`^~ deals ${NUM} damage to you if (you don't control an? [A-Z][a-z]+)\\.$`).exec(extra)) && !out.selfDamage) {
+      const cond = parseStaticCondition(m2[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond) return null;
+      out.selfDamage = num(m2[1]!);
+      out.selfDamageIf = cond;
+    }
     else if (extra === "~ doesn't untap during your next untap step.") out.skipNextUntap = true;
+    else if (extra === "During your next untap step, as you untap your permanents, return ~ to its owner's hand.") out.returnAtNextUntap = true;
     // Farrelite Priest: "If this ability has been activated four or more times this turn, sacrifice ~ at the beginning of
     // the next end step." A mana ability resolves at once (CR 605.3b), so the fourth activation and each one after it
     // make a delayed trigger (rulings on Dragon Whelp).

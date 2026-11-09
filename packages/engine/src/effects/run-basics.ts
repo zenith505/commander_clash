@@ -244,7 +244,11 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
               return { ...damageRecipients(s, { ref: "anyTarget", index: to.index + k }, ctx), n: t && t.kind !== "none" && t.kind !== "stack" ? (t.amount ?? 0) : 0 };
             })
           : perPlayer
-            ? ((r) => r.pids.map((pid) => ({ objs: [], pids: [pid], n: amountNow(s, e.amount, { ...ctx, eachOne: pid }) })))(damageRecipients(s, to, ctx))
+            ? ((r) => [
+                ...r.pids.map((pid) => ({ objs: [], pids: [pid], n: amountNow(s, e.amount, { ...ctx, eachOne: pid }) })),
+                // Incite Rebellion: "and each creature that player controls": each creature its controller's amount.
+                ...r.objs.map((o) => ({ objs: [o], pids: [], n: amountNow(s, e.amount, { ...ctx, eachOne: controllerOf(s, o) }) })),
+              ])(damageRecipients(s, to, ctx))
             : perObject
             ? ((r) => r.objs.map((o) => ({ objs: [o], pids: [], n: Math.max(0, evalAmount(s, e.amount, { ...amountCtx(s, ctx), affected: o.id })) })))(damageRecipients(s, to, ctx))
             : [{ ...damageRecipients(s, to, ctx), n: amount }];

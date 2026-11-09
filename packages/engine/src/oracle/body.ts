@@ -12,7 +12,7 @@ import { boundAtTargeting, parseCardTarget, parseDamageRecipient, parseKeywordLi
 import { parseCardNameChoice, parseSearch, parseSearchFilter } from "./search";
 import { parseManaSpend, parseManaTrigger } from "./mana-abilities";
 import { parseTrigger } from "./triggers";
-import { parseToken } from "./tokens";
+import { parseCopyExcept, parseToken } from "./tokens";
 import { parsePunisherOptions } from "./sentences/basics";
 import { X_MODES_MAX } from "../modes";
 
@@ -1482,6 +1482,36 @@ function wandPunisher(who: PlayerRef, landLife: number): Effect {
  * before the last one already pushed), "fail" for one that can't be read, or null when it isn't one of them.
  */
 /** Lane B round B153's sentences, chained before round B152's (parseBodyText is at TS2563's limit). */
+function roundB154Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  const prev = effects[effects.length - 1];
+  let m: RegExpExecArray | null;
+  // Hour of Eternity: "Exile X target creature cards from your graveyard. For each card exiled this way, create a token
+  // that's a copy of that card, except it's a 4/4 black Zombie.": one copy of each card exiled (a target no longer legal
+  // isn't, CR 608.2b), of the card as printed (rulings, CR 707.2), all created at once.
+  if ((m = /^For each card exiled this way, create a token that's a copy of that card(?:, except (.+))?$/.exec(s)) && prev?.type === "exile" && prev.what.ref === "target" && !prev.until && ctx.targets[prev.what.index]?.kind === "card") {
+    const except = m[1] ? parseCopyExcept(m[1]) : undefined;
+    if (except === null) return "fail";
+    return { effect: { type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "exiledThisWay", cards: true }, each: true, ...(except ? { except } : {}) }, next: si + 1 };
+  }
+  // Trench Gorger: "you may search your library for any number of land cards, exile them, then shuffle. If you do, ~ has
+  // base power and base toughness each equal to the number of cards exiled this way.": a layer 7b effect from then on,
+  // the number locked in as it resolves (rulings, CR 608.2h, 613.4b); none if it didn't search (it stays 6/6), and
+  // nothing for ~ once it has left the battlefield (CR 400.7).
+  const search = prev?.type === "may" && prev.effects.length === 1 && prev.effects[0]!.type === "search" ? prev.effects[0] : undefined;
+  if (s === "If you do, ~ has base power and base toughness each equal to the number of cards exiled this way" && search?.type === "search" && search.dest.zone === "exile" && !search.who && !ctx.spell) {
+    const n: Amount = { count: { kind: "cardsExiledThisWay" } };
+    return { effect: { type: "if", cond: { kind: "youDid" }, effects: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPT", power: n, toughness: n }], duration: "game" }] }, next: si + 1 };
+  }
+  // Faces of the Past: "Whenever a creature dies, tap all untapped creatures that share a creature type with it or untap
+  // all tapped creatures that share a creature type with it.": one or the other, chosen as it resolves (rulings), the
+  // creature types those of the creature as it last existed (CR 608.2h).
+  if (/^[Tt]ap all untapped creatures that share a creature type with it or untap all tapped creatures that share a creature type with it$/.test(s) && ctx.subjectIt && !ctx.selfIt && !ctx.spell) {
+    const kin = (tapped: boolean): ObjRef => ({ ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], tapped, text: `${tapped ? "tapped" : "untapped"} creatures that share a creature type with it` }, sharesTypeWithSubject: true });
+    return { effect: { type: "either", options: [[{ type: "tap", what: kin(false) }], [{ type: "untap", what: kin(true) }]], labels: ["Tap all untapped creatures that share a creature type with it", "Untap all tapped creatures that share a creature type with it"] }, next: si + 1 };
+  }
+  return null;
+}
+
 function roundB153Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
   const out = (fx: Effect[], skip: number) => {
     effects.push(...fx.slice(0, -1));
@@ -2582,6 +2612,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Nalia de'Arnise: "put a +1/+1 counter on each creature you control and those creatures gain deathtouch until end of
   // turn": the same as two sentences, "those creatures" the same group.
   text = text.replace(/\b(put an? [^.]+? counter on each [^.]+? you control) and those creatures gain ([^.]+? until end of turn)\./gi, "$1. Those creatures gain $2.");
+  // Blue Dragon: "until your next turn, target creature an opponent controls gets -3/-0, up to one other target creature
+  // gets -2/-0, and up to one other target creature gets -1/-0": three instructions with the same duration, each its own
+  // target, none the same creature (rulings, CR 115.3).
+  text = text.replace(/(^|\. )[Uu]ntil your next turn, (target [a-z ]+?) gets ([+-]\d+\/[+-]\d+), up to one other (target [a-z]+) gets ([+-]\d+\/[+-]\d+), and up to one other (target [a-z]+) gets ([+-]\d+\/[+-]\d+)\./, "$1$2 gets $3 until your next turn. Up to one other $4 gets $5 until your next turn. Up to one other $6 gets $7 until your next turn.");
   // Torture Chamber: "~ deals damage to you equal to the number of pain counters on it": "it" is ~.
   text = text.replace(/(~ deals damage to [^.]+? equal to the number of [^.]+? counters on) it\b/g, "$1 ~");
   // Acidic Soil: "~ deals damage to each player equal to the number of lands they control": each that player's own.
@@ -6688,8 +6722,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
-    // rounds B153, B152, B151, B148 and 311 to 317's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    // rounds B154, B153, B152, B151, B148 and 311 to 317's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
+    const faceDown = roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);

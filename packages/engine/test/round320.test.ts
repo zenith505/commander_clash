@@ -310,7 +310,7 @@ describe("round 320: Sivriss, Nightmare Speaker", () => {
       s = act(s, { type: "payUnless", player: p.player, pay: p.player === o2 });
     }
     expect(asked).toEqual([opp, o2, o3]);
-    expect([t1, t2, t3].map((id) => s.objects[id]!.zone)).toEqual(["hand", "graveyard", "hand"]);
+    expect([t1, t2, t3].map((id) => s.objects[id!]!.zone)).toEqual(["hand", "graveyard", "hand"]);
     expect(s.players[o2]!.life).toBe(37);
     expect(s.players[opp]!.life).toBe(40);
   });

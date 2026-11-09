@@ -493,6 +493,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "costSacrificedTotalPower":
       return (ctx.sacrificed ?? []).reduce((n, l) => n + (l.power ?? 0), 0);
+    case "costSacrificedCardTypes":
+      return new Set((ctx.sacrificed ?? []).flatMap((l) => l.types ?? [])).size;
     case "putThisWay":
       return (s.resolving?.created ?? []).filter((id) => s.objects[id]?.zone === "battlefield").length;
     case "blockingIt":
@@ -634,7 +636,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.turnLog?.entered ?? []).filter((e) => !(sub && e.id === sub.id && e.zc === (sub.zoneChanges ?? 0)) && e.controller === ctx.controller && (c.types ?? []).every((t) => e.types.includes(t)) && (!c.subtype || !!e.subtypes?.includes(c.subtype)) && (!c.anySubtype || c.anySubtype.some((t) => !!e.subtypes?.includes(t))) && !(c.nontoken && e.token)).length;
     }
     case "sacrificedThisTurn": {
-      const sacrificed = (s.turnLog?.sacrificed ?? []).filter((t) => (c.anyPlayer || t.player === ctx.controller) && (!c.subtype || t.subtypes.includes(c.subtype)) && (!c.type || t.types.includes(c.type)) && !(c.nontoken && t.token));
+      const sacrificed = (s.turnLog?.sacrificed ?? []).filter((t) => (c.anyPlayer || t.player === ctx.controller) && (!c.subtype || t.subtypes.includes(c.subtype)) && (!c.type || t.types.includes(c.type)) && (!c.anyType || c.anyType.some((x) => t.types.includes(x))) && !(c.nontoken && t.token));
       return c.cardTypes ? new Set(sacrificed.flatMap((t) => t.types)).size : sacrificed.length;
     }
     case "attackersThisTurn":
@@ -1395,6 +1397,8 @@ function describeCount(c: Count): string {
     case "sacrificedThisWayTotalPower":
     case "costSacrificedTotalPower":
       return "the total power sacrificed";
+    case "costSacrificedCardTypes":
+      return "#card types among the sacrificed permanents";
     case "destroyedThisWayTotalPower":
       return "the total power of those creatures";
     case "putThisWay":
@@ -1530,7 +1534,7 @@ function describeCount(c: Count): string {
       return `#${c.nontoken ? "nontoken " : ""}${c.anySubtype?.join("/") ?? c.subtype ?? c.types?.join(" ").toLowerCase() ?? "permanent"}s that entered under your control this turn`;
     case "sacrificedThisTurn":
       if (c.cardTypes) return "#card types among permanents you sacrificed this turn";
-      return `#${c.subtype ?? c.type?.toLowerCase() ?? "permanent"}s ${c.anyPlayer ? "" : "you "}sacrificed this turn`;
+      return `#${c.subtype ?? c.type?.toLowerCase() ?? c.anyType?.map((x) => x.toLowerCase()).join("s or ") ?? "permanent"}s ${c.anyPlayer ? "" : "you "}sacrificed this turn`;
     case "attackersThisTurn":
       return "#creatures that attacked this turn";
     case "youAttackedWithThisTurn":

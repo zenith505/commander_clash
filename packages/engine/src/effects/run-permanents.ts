@@ -1431,7 +1431,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           sc.counterKind = undefined;
           continue;
         }
-        const options = sources().flatMap((o) => Object.keys(o.counters).filter((k) => left(o.id, k) > 0 && !countersStay(s, o, k)).map((k) => `${o.id}:${k}`));
+        const options = sources().flatMap((o) => Object.keys(o.counters).filter((k) => left(o.id, k) > 0 && !countersStay(s, o, k) && (!e.kinds || e.kinds.includes(k))).map((k) => `${o.id}:${k}`));
         if (!options.length) break;
         const label = (opt: string) => {
           const id = opt.slice(0, opt.indexOf(":"));

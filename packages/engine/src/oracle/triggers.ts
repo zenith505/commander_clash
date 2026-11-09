@@ -2080,6 +2080,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // planeswalker or battle (CR 508.3e; rulings on Akiri, Fearless Voyager and Horizon Explorer). "That player" is them.
   let perPlayer = false;
   let exactly = false;
+  let allAttack: TargetSpec | undefined;
   // "When you attack with three or more creatures, transform ~" (Legion's Landing): "when" and "whenever" trigger alike.
   line = line.replace(/^When you attack with /, "Whenever you attack with ");
   // Path of Mettle: "Whenever you attack with at least two creatures that have first strike, double strike, vigilance,
@@ -2168,6 +2169,13 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     phrase = m[1];
     bodyText = m[2]!;
     anyone = true;
+  } else if ((m = /^Whenever all non-Wall creatures you control attack, (.+)$/.exec(line))) {
+    // Mob Mentality: when attackers are declared (CR 508.1) and every non-Wall creature its controller controls then is
+    // one of them (one that couldn't attack, summoning sick or tapped, keeps it from triggering); Walls may or may not
+    // attack. X is counted as it resolves.
+    event = "creaturesYouControlAttack";
+    bodyText = m[1]!;
+    allAttack = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], notSubtypes: ["Wall"], text: "non-Wall creature" };
   } else if ((m = /^Whenever you attack with exactly (two|three) creatures, (.+)$/.exec(line))) {
     // Alluring Suitor: "When you attack with exactly two creatures": as many attackers as were declared, no more or fewer
     // (one put onto the battlefield attacking wasn't declared and doesn't count, rulings; CR 508.1).
@@ -2383,7 +2391,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     const filter: TargetSpec = group ?? { kind: "object", types: ["Creature"], text: "creature" };
     body = { ...body, effects: [...body.effects, { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", fromGroup: true }], text: `return one of those ${phrase} to its owner's hand` }], text: `${body.text} You may return one of those ${phrase} to its owner's hand.` };
   }
-  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(exactly ? { exactAttackers: true as const } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}), ...(toInitiative ? { toInitiative: true as const } : {}), ...(perWalker ? { perWalker: true as const } : {}), ...(selfOrCommander ? { selfOrCommander: true as const } : {}), ...(selfAnd ? { selfAnd } : {}), ...(minTotalPower ? { minTotalPower } : {}), ...(totalPowerFirst ? { totalPowerFirst: true as const } : {}) };
+  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(exactly ? { exactAttackers: true as const } : {}), ...(allAttack ? { allAttack } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}), ...(toInitiative ? { toInitiative: true as const } : {}), ...(perWalker ? { perWalker: true as const } : {}), ...(selfOrCommander ? { selfOrCommander: true as const } : {}), ...(selfAnd ? { selfAnd } : {}), ...(minTotalPower ? { minTotalPower } : {}), ...(totalPowerFirst ? { totalPowerFirst: true as const } : {}) };
 }
 
 /** "Other creatures you control", "tokens you control", "artifacts and/or creatures you control": what a batch trigger counts. */

@@ -55,9 +55,10 @@ describe("support", () => {
     expect(s.objects[ids[0]!]!.counters["+1/+1"]).toBeUndefined();
   });
 
-  it("on an instant, any target creatures (CR 701.41a); support X isn't supported", () => {
+  it("on an instant, any target creatures (CR 701.41a); support X on a sorcery since Lane B round B157", () => {
     supported(leadByExample);
-    expect(isFullySupported(crowdGoesWild)).toBe(false);
+    // The Crowd Goes Wild: up to the spell's X targets (laneb-round157.test.ts).
+    expect(isFullySupported(crowdGoesWild)).toBe(true);
     const { s: s0, ap, ids } = setup([leadByExample]);
     const a = putOnBattlefield(s0, ap, bear());
     const b = putOnBattlefield(s0, ap, bear());
@@ -98,8 +99,9 @@ describe("converge", () => {
     expect(s.objects[id]!.counters["+1/+1"]).toBeUndefined();
   });
 
-  it("'that spell' in a cast trigger isn't this spell: not supported", () => {
-    expect(isFullySupported(magmabloodArchaic)).toBe(false);
+  it("'that spell' in a cast trigger is the spell cast, counted as it was cast (Lane B round B157)", () => {
+    // Magmablood Archaic: laneb-round157.test.ts.
+    expect(isFullySupported(magmabloodArchaic)).toBe(true);
   });
 });
 

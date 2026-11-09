@@ -360,13 +360,15 @@ function diesMatches(
   dying: { o: GameObject; c: Characteristics },
   you: PlayerId,
   chosen?: GameObject["chosen"],
+  /** Touch of Moonglove: a delayed trigger about another creature, "dealt damage by that creature", not by its source. */
+  damagedById?: ObjectId,
 ): boolean {
   // "When enchanted creature dies, if that creature was a Horror" (Endless Evil): its types as it last existed (CR 603.10a).
   // "When enchanted permanent leaves the battlefield, if it was historic" (Curator's Ward): any permanent, of that kind.
   if (d.attached) return attachedTo === dying.o.id && (!d.filter.types?.length || d.filter.types.some((ty) => dying.c.types.includes(ty))) && ((!d.filter.subtypes?.length && !d.filter.anyOf?.length) || objectMatches(s, d.filter, dying.o, you, false, undefined, dying.c));
   // One with the Kami: the creature it was attached to, whoever controlled it, or one matching the filter.
   if (d.orAttached && attachedTo !== undefined && attachedTo === dying.o.id) return true;
-  if (d.damagedBySelf && !dying.o.damagedBy?.includes(srcId)) return false;
+  if (d.damagedBySelf && !dying.o.damagedBy?.includes(damagedById ?? srcId)) return false;
   if (d.damagedByEquipped && (!attachedTo || !dying.o.damagedBy?.includes(attachedTo))) return false;
   if (d.blockingSelf && !dying.o.blocking?.includes(srcId)) return false;
   // Thijarian Witness: attacking or blocking alone as it left (CR 506.5), noted then (LastKnown aloneIn).
@@ -926,8 +928,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const dying = { o: ev.snapshot, c: ev.chars };
       const hadCounter = Object.values(ev.counters).some((n) => n > 0);
       const went = (d: NonNullable<TriggeredAbility["dies"]>) => (d.leaves ? !(d.notDies && ev.to === "graveyard") && (!d.toZones || (d.toZones as string[]).includes(ev.to)) : ev.to === "graveyard") && (!d.hadCounter || (d.hadCounter === true ? hadCounter : (ev.counters[d.hadCounter] ?? 0) > 0)) && !(d.notSacrificed && ev.sacrificed);
-      const consider = (src: GameObject, ctrl: PlayerId, attachedTo: ObjectId | undefined, triggers?: TriggeredAbility[]) =>
-        add(src, ctrl, (e, t) => e === "permanentDies" && !!t.dies && went(t.dies) && diesMatches(s, t.dies, src.id, attachedTo, dying, ctrl, src.chosen), triggers, undefined, o, lki);
+      const consider = (src: GameObject, ctrl: PlayerId, attachedTo: ObjectId | undefined, triggers?: TriggeredAbility[], damagedById?: ObjectId) =>
+        add(src, ctrl, (e, t) => e === "permanentDies" && !!t.dies && went(t.dies) && diesMatches(s, t.dies, src.id, attachedTo, dying, ctrl, src.chosen, damagedById), triggers, undefined, o, lki);
       for (const id of s.battlefield) {
         const src = obj(s, id);
         consider(src, controllerOf(s, src), ev.attachments?.includes(id) ? ev.id : src.attachedTo);
@@ -938,7 +940,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (src.zone === "battlefield") continue; // it already came back as a new object
         consider(src, left.controller, left.attachedTo, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
       }
-      fromFloating((src, ctrl, triggers) => consider(src, ctrl, undefined, triggers));
+      // A delayed trigger about a creature (Touch of Moonglove): the creatures that one dealt damage this turn.
+      fromFloating((src, ctrl, triggers) => consider(src, ctrl, undefined, triggers, (floating as { about?: { id: ObjectId } } | null)?.about?.id));
       fromEmblems((src, owner) => consider(src, owner, undefined));
       // "Whenever another creature is put into your graveyard from the battlefield, you may pay {B}. If you do, return ~
       // from your graveyard to the battlefield" (Nether Traitor): a card already in the graveyard (CR 113.6m), not one that
@@ -1666,11 +1669,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Zurzoth, Chaos Rider: only those attacking a player count, and "those players" are the ones they attack (CR 508.3e).
         const hit = fits(t).filter(([x]) => !t.attacksPlayers || (obj(s, x).attacking !== undefined && !obj(s, x).attackingPermanent));
         if (hit.length < (t.minAttackers ?? 1) || (t.exactAttackers && hit.length !== t.minAttackers)) continue;
+        // Mob Mentality: every such creature the attacking player controls is one of the attackers declared.
+        if (t.allAttack && s.battlefield.some((x) => !ev.ids.includes(x) && controllerOf(s, obj(s, x)) === ev.controller && objectMatches(s, t.allAttack!, obj(s, x), ev.controller, false))) continue;
         if (t.minTotalPower && hit.reduce((n, [x]) => n + power(s, obj(s, x)), 0) < t.minTotalPower) continue;
         // Desert Were-Worm: the first attack this turn with that much power (TurnLog.attackPower is from earlier ones).
         if (t.totalPowerFirst && (s.turnLog?.attackPower?.[ev.controller] ?? 0) >= (t.minTotalPower ?? 0)) continue;
         const amount = ev.type === "groupCombatDamage" ? hit.reduce((n, [, i]) => n + ev.amounts[i]!, 0) : undefined;
-        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.exactAttackers === !!t.exactAttackers && tt.minTotalPower === t.minTotalPower && !!tt.totalPowerFirst === !!t.totalPowerFirst && !!tt.anyoneAttacks === anyone && !!tt.perPlayer === !!t.perPlayer && !!tt.selfOrCommander === !!t.selfOrCommander && !!tt.attacksPlayers === !!t.attacksPlayers;
+        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.exactAttackers === !!t.exactAttackers && JSON.stringify(tt.allAttack) === JSON.stringify(t.allAttack) && tt.minTotalPower === t.minTotalPower && !!tt.totalPowerFirst === !!t.totalPowerFirst && !!tt.anyoneAttacks === anyone && !!tt.perPlayer === !!t.perPlayer && !!tt.selfOrCommander === !!t.selfOrCommander && !!tt.attacksPlayers === !!t.attacksPlayers;
         const group = hit.map(([x]) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
         if (t.attacksPlayers) {
           const attackedPlayers = s.turnOrder.filter((p) => hit.some(([x]) => obj(s, x).attacking === p));

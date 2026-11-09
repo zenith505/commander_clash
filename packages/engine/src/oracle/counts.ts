@@ -959,6 +959,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Wildgrowth Archaic: "whenever you cast a creature spell, ... where X is the number of colors of mana spent to cast
   // it": that spell's.
   if (/^colou?rs? of mana spent to cast it$/i.test(p) && ctx?.castSpell && !ctx.selfIt && !ctx.spell) return count({ kind: "colorsSpent", of: { ref: "castSpell" } });
+  // Magmablood Archaic: "whenever you cast an instant or sorcery spell, ... for each color of mana spent to cast that
+  // spell": the spell's, as it was cast, even if it's been countered by the time this resolves (rulings).
+  if (/^colou?rs? of mana spent to cast that spell$/i.test(p) && ctx?.castSpell && !ctx.spell) return count({ kind: "colorsSpent", of: { ref: "castSpell" }, asCast: true });
   if ((m = /^colou?rs? of mana spent to cast (~|it)$/i.exec(p)) && (m[1] === "~" || ctx === null || ctx.selfIt || ctx.spell)) return count({ kind: "colorsSpent" });
   // "For each mana from a Treasure spent to cast it" (CR 106.3): the spell's, or its permanent's enters trigger's (compile
   // checks it's one of those).

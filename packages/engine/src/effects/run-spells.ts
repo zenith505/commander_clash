@@ -606,11 +606,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const id = spell ? item.objectId : ctx.sourceId;
       const o = id ? s.objects[id] : undefined;
       if (!id || !o) return;
-      const abouts = e.aboutCreated ? objects(s, { ref: "created" }, ctx).filter((x) => x.zone === "battlefield") : e.about !== undefined ? objects(s, { ref: "target", index: e.about, ...(e.each ? { n: e.each } : {}) }, ctx).filter((x) => x.zone === "battlefield") : [undefined];
+      const abouts = e.aboutGroup ? objects(s, { ref: "eventGroup" }, ctx).filter((x) => x.zone === "battlefield") : e.aboutCreated ? objects(s, { ref: "created" }, ctx).filter((x) => x.zone === "battlefield") : e.about !== undefined ? objects(s, { ref: "target", index: e.about, ...(e.each ? { n: e.each } : {}) }, ctx).filter((x) => x.zone === "battlefield") : [undefined];
       if (!abouts.length) return;
       const toPlayer = e.aboutPlayer !== undefined ? players(s, { ref: "target", index: e.aboutPlayer }, ctx)[0] : undefined;
       if (e.aboutPlayer !== undefined && toPlayer === undefined) return;
-      for (const about of e.each ? abouts : abouts.slice(0, 1)) {
+      for (const about of e.each || e.aboutGroup ? abouts : abouts.slice(0, 1)) {
         (s.floatingTriggers ??= []).push({
           ...(about ? { about: { id: about.id, zc: about.zoneChanges ?? 0 } } : {}),
           ...(toPlayer !== undefined ? { toPlayer } : {}),

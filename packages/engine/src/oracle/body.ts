@@ -278,6 +278,24 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boo
     if (!trigger || trigger === "fail" || trigger.event !== "selfBlockedByCreature" || trigger.subjectFilter || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
     return { type: "floatingTrigger", trigger: { ...trigger, subjectFilter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], chosen: "color", text: "creature of the chosen color" } }, until: "endOfTurn" };
   }
+  // Touch of Moonglove: "Target creature you control gets +1/+0 and gains deathtouch until end of turn. Whenever a creature
+  // dealt damage by that creature dies this turn, its controller loses 2 life.": a delayed trigger about the target (CR
+  // 603.7b-c), for each creature it dealt damage to this turn that dies; the dying creature's controller loses the life, as it
+  // last existed (rulings, CR 608.2h).
+  const moonglove = ctx?.spell && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many && !after.length ? /^Whenever a creature dealt damage by that creature dies this turn, (its controller loses \d+ life)$/.exec(s) : null;
+  if (moonglove) {
+    const trigger = parseTrigger(`Whenever a creature dealt damage by ~ this turn dies, ${moonglove[1]!}.`);
+    if (!trigger || trigger === "fail" || trigger.event !== "permanentDies" || !trigger.dies?.damagedBySelf || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
+    return { type: "floatingTrigger", trigger, until: "endOfTurn", about: ctx!.lastObjectTarget! };
+  }
+  // Love on the Battlefield: "Whenever you attack with exactly two creatures, those creatures gain first strike until end of
+  // turn, then draw a card. Whenever either of those creatures deals combat damage to a player this combat, put a +1/+1
+  // counter on it.": a delayed trigger about each of the attackers (CR 603.7b-c), until this combat ends; "it" is the one
+  // that dealt the damage.
+  if (ctx?.lastGroup?.ref === "eventGroup" && !ctx.spell && !after.length && s === "Whenever either of those creatures deals combat damage to a player this combat, put a +1/+1 counter on it") {
+    const trigger: TriggeredAbility = { event: "selfDealsCombatDamageToPlayer", body: { targets: [], effects: [{ type: "counters", what: { ref: "subject" }, counter: "+1/+1", n: 1 }], text: "put a +1/+1 counter on it." } };
+    return { type: "floatingTrigger", trigger, until: "endOfCombat", aboutGroup: true };
+  }
   // "Choose target creature you control. Whenever that creature deals combat damage to a player or planeswalker this
   // turn, draw that many cards." (Hunter's Insight): a delayed trigger about that creature (CR 603.7b-c), this turn.
   // Stensian Sanguinist: "Whenever you attack, target creature gains deathtouch until end of turn. Whenever that creature
@@ -1484,6 +1502,41 @@ function wandPunisher(who: PlayerRef, landLife: number): Effect {
  * before the last one already pushed), "fail" for one that can't be read, or null when it isn't one of them.
  */
 /** Lane B round B156's sentences, chained first (parseBodyText is at TS2563's limit). */
+function roundB157Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  const out = (fx: Effect[], skip: number) => {
+    effects.push(...fx.slice(0, -1));
+    return { effect: fx[fx.length - 1]!, next: si + 1 + skip };
+  };
+  const prev = effects[effects.length - 1];
+  // Entering: "Put a creature card from a graveyard onto the battlefield under your control. It gains haste until end of
+  // turn.": the permanent the card chosen as it resolves became (not targeted, rulings; CR 400.7), kept in `created`.
+  if (s === "It gains haste until end of turn" && prev?.type === "chooseFromGraveyard" && prev.anyGraveyard && prev.dest === "battlefield" && prev.n === 1 && !prev.upTo && !prev.milled && !prev.who && !prev.alsoMods && !prev.fromExile)
+    return out([{ type: "continuous", what: { ref: "created" }, mods: [{ kind: "addKeywords", keywords: ["Haste"] }], duration: "endOfTurn" }], 0);
+  // Break Out: "Look at the top six cards of your library. You may reveal a creature card from among them. If that card has
+  // mana value 2 or less, you may put it onto the battlefield and it gains haste until end of turn. If you didn't put the
+  // revealed card onto the battlefield this way, put it into your hand. Put the rest on the bottom of your library in a
+  // random order.": the card revealed goes onto the battlefield or into the hand, the choice there only with mana value 2
+  // or less (as Green Sun's Twilight's orHand).
+  const look = /^Look at the top (one|two|three|four|five|six|seven|eight|nine|ten) cards of your library$/.exec(s);
+  const reveal = look ? /^You may reveal an? ([a-z]+ card) from among them$/.exec((sentences[si + 1] ?? "").replace(/\.$/, "")) : null;
+  if (look && reveal && ctx.spell && /^If that card has mana value (\d+) or less, you may put it onto the battlefield and it gains haste until end of turn$/.test((sentences[si + 2] ?? "").replace(/\.$/, "")) && /^If you didn't put the revealed card onto the battlefield this way, put it into your hand$/.test((sentences[si + 3] ?? "").replace(/\.$/, "")) && /^Put the rest on the bottom of your library in a random order$/.test((sentences[si + 4] ?? "").replace(/\.$/, ""))) {
+    const filter = parseSearchFilter(reveal[1]!);
+    const mv = Number(/mana value (\d+)/.exec(sentences[si + 2]!)![1]);
+    if (!filter) return "fail";
+    return out([{ type: "dig", n: num(look[1]!), reveal: true, count: 1, upTo: true, filter, into: "battlefield", orHand: true, orHandMvMax: mv, hasteOnto: true, rest: "bottom", random: true }], 4);
+  }
+  // Reincarnation: "Choose target creature. When that creature dies this turn, return a creature card from its owner's
+  // graveyard to the battlefield under the control of that creature's owner.": a delayed trigger about the target (CR
+  // 603.7), for the rest of this turn; the card is chosen as it resolves by the player who controlled Reincarnation, in the
+  // graveyard of the creature's owner, and enters under that owner's control; the creature's own card may be the one
+  // (rulings).
+  if (s === "When that creature dies this turn, return a creature card from its owner's graveyard to the battlefield under the control of that creature's owner" && ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]!.many) {
+    const filter: TargetSpec = { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" };
+    return out([{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", who: { ref: "subjectOwner" }, chooser: { ref: "you" }, filter }], text: "return a creature card from its owner's graveyard to the battlefield under the control of that creature's owner", thisTurn: true }], 0);
+  }
+  return null;
+}
+
 function roundB156Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
   const out = (fx: Effect[], skip: number) => {
     effects.push(...fx.slice(0, -1));
@@ -6827,8 +6880,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
-    // rounds B156, B155, B154, B153, B152, B151, B148 and 311 to 317's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    // rounds B157, B156, B155, B154, B153, B152, B151, B148 and 311 to 317's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
+    const faceDown = roundB157Sentence(s, sentences, si, ctx, effects) ?? roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);
@@ -19225,8 +19278,10 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   // Support N (CR 701.41a): "other" target creatures on a permanent, any on an instant or sorcery.
   // "When ~ enters, support X" (Blitzball Stadium): up to X targets, X being the one its spell was cast with (CR 107.3m),
   // known as the trigger's targets are chosen.
+  // The Crowd Goes Wild: "Support X." on a sorcery: up to the spell's X targets, announced before they're chosen (CR
+  // 601.2b-c); one counter on each (rulings).
   const support = /^[Ss]upport (\d+|X)$/.exec(s);
-  if (support?.[1] === "X" && !ctx.ownX) return null;
+  if (support?.[1] === "X" && !ctx.ownX && !ctx.spell) return null;
   if (support) s = `Put a +1/+1 counter on each of up to ${support[1] === "X" ? "X" : num(support[1]!) === 1 ? "one" : support[1]} ${ctx.spell ? "" : "other "}target creature${support[1] === "1" ? "" : "s"}`;
   // "Target player reveals their hand, you choose a nonland card from it, then that player discards that card" (River's
   // Grasp): the three-sentence hand disruption in one (see parseBody), another player picking the card (CR 701.9b).

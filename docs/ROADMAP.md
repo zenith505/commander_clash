@@ -1,6 +1,6 @@
 # Roadmap
 
-30,704 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,713 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,762 of
 9,979 (97%).
 
@@ -2383,7 +2383,7 @@ line blocks.
    that type from their graveyard to their hand" (Grave Sifter: each player's own type, rulings; Chosen.typesBy);
    "Whenever a creature dealt damage this way dies this turn, populate" (Ghired's Belligerence: any creature it damaged,
    whoever controls it, however it dies this turn, rulings). +8,
-   30,704 of 31,936 with B156.
+   30,713 of 31,936 with B156 and B157.
    Out after round 318 (looked at, not done): Moxite Refinery (X counters of any kinds removed from one permanent as a
    cost), Night Soil (a cost exiling cards from any single graveyard), Mogg Assassin (a second target chosen by the
    first target's controller), Mastermind's Acquisition and the wishes (cards from outside the game), Encroaching
@@ -7183,6 +7183,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   CR 205.1a; a browser test). Light of Judgment ("Destroy up to one Equipment attached to that creature": chosen as it
   resolves among the Equipment attached to the target, none if the target is illegal, rulings; a browser test). +10
   (30,696 of 31,936 with B155 and round 317).
+- Round B157 (least played first, every remaining card already examined, so mechanics that could be built): Breaking //
+  Entering (Entering's "Put a creature card from a graveyard onto the battlefield under your control. It gains haste until
+  end of turn.": not targeted, chosen as it resolves, the cards Breaking just milled too, rulings; the last fuse card).
+  Failure // Comply ("Until your next turn, your opponents can't cast spells with the chosen name": one half of a split card
+  named bans only that half, rulings). Reincarnation (a delayed trigger about the target, this turn; Reincarnation's
+  controller chooses a creature card in the dead creature's owner's graveyard, the creature's own card too, and it enters
+  under that owner's control, rulings, CR 603.7). Love on the Battlefield ("Whenever either of those creatures deals combat
+  damage to a player this combat": a delayed trigger about each of the two attackers, until end of combat, CR 603.7b-c).
+  Magmablood Archaic ("for each color of mana spent to cast that spell": as it was cast, even if the spell is countered
+  before the trigger resolves, rulings, CR 608.2h). Mob Mentality ("Whenever all non-Wall creatures you control attack":
+  every non-Wall creature you control then is among the attackers declared, one that couldn't attack keeps it from
+  triggering; Walls may stay home). The Crowd Goes Wild (support X on a sorcery: up to X targets, CR 601.2b-c; the
+  creatures with +1/+1 counters as it resolves gain trample, later counters don't, rulings, CR 611.2c). Touch of Moonglove
+  ("Whenever a creature dealt damage by that creature dies this turn, its controller loses 2 life": a delayed trigger about
+  the target, the dying creature's controller losing the life, rulings). Break Out (the creature card revealed goes onto the
+  battlefield with haste or into your hand, the choice only with mana value 2 or less; a browser test). +9 (30,705 of
+  31,936 with B156).
+- Out after round B157 (looked at, not done): Musician (a granted upkeep ability it checks for by its text),
+  Makeshift Mannequin (a granted trigger "for as long as it has a mannequin counter"), Flameskull (rejuvenation's "play one
+  of those cards", a permission shared by two cards) and Cleansing (each land's destruction paid off by any player) were
+  looked at again and stay out.
 - Out after round B155 (looked at, not done): Reality Twist and Pulse of Llanowar (after the replacement, a land with
   two basic land types lets its controller choose the mana, rulings: the choice isn't modelled for mana replacements),
   Yixlid Jailer (cards in graveyards losing all abilities would have to reach every graveyard-zone ability check).

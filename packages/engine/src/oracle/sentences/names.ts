@@ -114,7 +114,9 @@ export function parseNamesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // "Until your next turn, spells with the chosen name can't be cast and lands with the chosen name can't be played"
   // (Conjurer's Ban), "Opponents can't cast spells with the chosen name until your next turn" (Academic Probation).
   if (/^Until your next turn, spells with the chosen name can't be cast and lands with the chosen name can't be played$/.test(s)) return [{ type: "banName", lands: true }];
-  if (/^(?:Your opponents|Opponents) can't cast spells with the chosen name until your next turn$/.test(s)) return [{ type: "banName", who: { ref: "eachOpponent" } }];
+  // Comply: "Until your next turn, your opponents can't cast spells with the chosen name" says the same (rulings: either
+  // half of a split card may be named, the other half can still be cast; a land's name only stops nothing, lands aren't cast).
+  if (/^(?:(?:Your opponents|Opponents) can't cast spells with the chosen name until your next turn|Until your next turn, your opponents can't cast spells with the chosen name)$/.test(s)) return [{ type: "banName", who: { ref: "eachOpponent" } }];
   // "Return target creature an opponent controls to its owner's hand. That creature's owner can't cast spells with the same
   // name as that creature until your next turn." (Reflector Mage): the name it had on the battlefield (CR 608.2h).
   if (/^That creature's owner can't cast spells with the same name as that creature until your next turn$/.test(s)) {

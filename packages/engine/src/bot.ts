@@ -1082,6 +1082,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const weakest = [...pend.options].sort((a, b) => might(Number(a)) - might(Number(b)))[0]!;
         return [{ type: "chooseOption", player: pid, choice: weakest }];
       }
+      // Sol'Kanar the Tainted: "Exile ~, then return it to the battlefield under an opponent's control": the opponent
+      // with the least power on the battlefield.
+      if (next?.type === "flicker" && next.underPlayer?.ref === "chosenPlayer" && opps.length) {
+        const weakest = [...opps].sort((a, b) => might(Number(a)) - might(Number(b)))[0]!;
+        return [{ type: "chooseOption", player: pid, choice: weakest }];
+      }
       // Rogue Skycaptain: "If you don't, ... an opponent gains control of it" (inside the unpaid branch): the opponent with
       // the least power on the battlefield.
       if (r && pend.what === "opponent" && opps.length && allEffects(r.body.effects).some((e) => e.type === "continuous" && e.giveTo?.ref === "chosenPlayer" && e.what.ref === "self" && e.mods.some((m) => m.kind === "control"))) {
@@ -5529,6 +5535,10 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
         break;
       case "bounce":
         v += e.what.ref === "target" ? 5 : 0;
+        break;
+      // Sol'Kanar the Tainted: giving itself to an opponent only when nothing else is left (a forced choice).
+      case "flicker":
+        if (e.underPlayer) v -= 100;
         break;
       case "phaseOut":
         v += e.what.ref === "target" ? 3 : 0;

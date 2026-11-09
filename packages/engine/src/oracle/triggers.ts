@@ -17,6 +17,9 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // "When this creature transforms into [this face]" (CR 701.27e): it transformed or converted and now has this face up,
   // so this face's abilities are the ones it has. Entering transformed isn't transforming (712.14a).
   [/^When(?:ever)? ~ transforms into ~, (.+)$/, "selfTransformsInto"],
+  // Stubborn Burrowfiend: "Whenever ~ becomes saddled for the first time each turn" (CR 702.171b): its saddle ability
+  // resolving, the first time this turn for this object (GameObject.saddledTurn).
+  [/^Whenever ~ becomes saddled for the first time each turn, (.+)$/, "selfBecomesSaddledFirst"],
   // Coin flips (CR 705.2): each one won or lost.
   [/^Whenever you win a coin flip, (.+)$/, "youWinFlip"],
   [/^Whenever you lose a coin flip, (.+)$/, "youLoseFlip"],
@@ -4704,6 +4707,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(transformsInto[2]!.replace(/\bthat (creature|permanent)\b/g, "it"), { subjectIt: true });
     const ok = filter?.kind === "object" && (non ? filter.types?.length === 1 && filter.types[0] === "Creature" && filter.notSubtypes?.length === 1 && filter.notSubtypes[0] === non[1] && !filter.subtypes?.length : filter.subtypes?.length === 1);
     return ok && body ? { event: "permanentTransformsInto", tappedFilter: filter, body } : "fail";
+  }
+  // Corruption of Towashi: "Whenever a permanent you control transforms or a permanent you control enters transformed":
+  // either way it turns over (CR 701.27a; a converted permanent transformed, CR 701.28d), or a transforming double-faced
+  // permanent entering with its back face up (CR 712.14a; not a modal double-faced or melded one, rulings).
+  const transformsOrEnters = /^Whenever a permanent you control transforms or a permanent you control enters transformed, (.+)$/.exec(line);
+  if (transformsOrEnters) {
+    const filter = parseTargetPhrase("permanent you control");
+    const body = parseBody(transformsOrEnters[1]!.replace(/\bthat permanent\b/g, "it"), { subjectIt: true });
+    return filter?.kind === "object" && body ? { event: "permanentTransformsInto", tappedFilter: filter, orEntersTransformed: true, body } : "fail";
   }
   // Essence Symbiote: "Whenever a creature you control mutates, put a +1/+1 counter on that creature" (CR 702.140d).
   const mutates = /^Whenever an? (creature you control) mutates, (.+)$/.exec(line);

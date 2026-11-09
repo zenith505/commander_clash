@@ -28247,6 +28247,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4efcdefc-e49d-4bce-8581-69037bb48c0a",
+  "name": "Sol'Kanar the Tainted",
+  "manaCost": "{2}{U}{B}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Elemental Demon",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental",
+   "Demon"
+  ],
+  "oracleText": "At the beginning of your end step, choose one that hasn't been chosen —\n• Draw a card.\n• Each opponent loses 2 life and you gain 2 life.\n• Sol'Kanar deals 3 damage to up to one other target creature or planeswalker.\n• Exile Sol'Kanar, then return it to the battlefield under an opponent's control.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dmu",
+  "releasedAt": "2022-09-09",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0f7a7348-3081-4fbb-9386-719a4ae7fa57",
   "name": "Solar Tide",
   "manaCost": "{4}{W}{W}",
@@ -35407,6 +35444,32 @@
   "commanderLegal": "legal",
   "set": "leg",
   "releasedAt": "1994-06-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "76d6d4cc-607f-4a33-a964-a38b5dbfe710",
+  "name": "Words of War",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}: The next time you would draw a card this turn, this enchantment deals 2 damage to any target instead.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

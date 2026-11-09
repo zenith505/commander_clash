@@ -2440,7 +2440,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // on Prophetic Titan).
   const bothIf = /^[Cc]hoose one\. If (.+?), (you may )?choose both instead(?:\.| —)\s*((?:•[^•]+)+)$/.exec(text.trim());
   if (bothIf && !opts.spell && !opts.activated) {
-    const cond = parseStaticCondition(bothIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+    // Depth Defiler: "When you cast this spell, choose one. If it was kicked, choose both instead.": the spell as it was
+    // cast (CR 702.33d), known as the trigger is put on the stack (CR 603.3c).
+    const kickedCast = opts.selfCastSpell && /^(?:it|~|this spell) was kicked$/.test(bothIf[1]!) && !bothIf[2];
+    const cond: StaticCondition | null = kickedCast ? { kind: "self", is: "kicked" } : parseStaticCondition(bothIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
     const body = cond && parseModal("one", bothIf[3]!, text.trim(), opts);
     if (!body || body.modal!.modes.length !== 2) return null;
     return { ...body, modal: { ...body.modal!, both: "control", bothIf: cond, ...(bothIf[2] ? {} : { bothExactly: true as const }) } };
@@ -4743,7 +4746,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Nor "exile the top two cards of your library, then choose one of them" (Party Thrasher): the choice is of those cards.
     // Nor "you may exile target creature you control, then return that card to the battlefield" (Conjurer's Closet), "...
     // transformed" (Ral, Monsoon Mage): one blink, all of it optional.
-    .flatMap((x) => (/^(?:Then i|I)f [^,]+, /.test(x) || /^Otherwise, remove all but one [^,]+, then you gain 1 life for each [^,]+ removed this way\.?$/.test(x) || / faces? a villainous choice — /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield(?: transformed)? under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then (?:reveals|exiles) the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) || /^[Ee]ach player reveals the top card of their library, loses life equal to that card's mana value, then puts it into their hand\.?$/.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|destroy all other creatures and planeswalkers\.?$|meld them into |choose one of them$|exile them again$|the choices are revealed\.?$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    .flatMap((x) => (/^(?:Then i|I)f [^,]+, /.test(x) || /^Otherwise, remove all but one [^,]+, then you gain 1 life for each [^,]+ removed this way\.?$/.test(x) || / faces? a villainous choice — /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield(?: transformed)? under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then (?:reveals|exiles) the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) || /^[Ee]ach player reveals the top card of their library, loses life equal to that card's mana value, then puts it into their hand\.?$/.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!return it to the battlefield under an opponent's control\.?$|shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|destroy all other creatures and planeswalkers\.?$|meld them into |choose one of them$|exile them again$|the choices are revealed\.?$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -5500,10 +5503,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Words of Wilding, Words of Worship: "The next time you would draw a card this turn, create a 2/2 green Bear creature
     // token (you gain 5 life) instead." A replacement effect for the controller's next draw this turn (Player.nextDrawInstead).
-    // Words of War (a target), Waste and Wind (choices) aren't done.
-    const wordsOf = /^[Tt]he next time you would draw a card this turn, (you gain (\d+) life|create an? [^.]+? token) instead$/.exec(s);
+    // Words of War: "~ deals 2 damage to any target instead": the target chosen as the ability is activated (CR 115.1c,
+    // 602.2b), and the damage dealt to it when the draw is replaced. Waste and Wind (choices) aren't done.
+    const wordsOf = /^[Tt]he next time you would draw a card this turn, (you gain (\d+) life|create an? [^.]+? token|~ deals (\d+) damage to any target) instead$/.exec(s);
     if (wordsOf && !ctx.spell) {
       if (wordsOf[2]) effects.push({ type: "nextDrawInstead", gain: Number(wordsOf[2]) });
+      else if (wordsOf[3]) {
+        const before = ctx.targets.length;
+        const fx = parseOne(capital(wordsOf[1]!), ctx);
+        const d = fx?.length === 1 && fx[0]!.type === "damage" ? fx[0]! : undefined;
+        if (!d || !ctx.activated || ctx.targets.length !== before + 1 || d.to.ref !== "anyTarget" || d.to.index !== before || d.amount !== Number(wordsOf[3]) || Object.keys(d).some((k) => !["type", "amount", "to"].includes(k))) return null;
+        effects.push({ type: "nextDrawInstead", damage: { n: Number(wordsOf[3]), target: before } });
+      }
       else {
         const before = ctx.targets.length;
         const fx = parseOne(capital(wordsOf[1]!), ctx);

@@ -1,6 +1,6 @@
 # Roadmap
 
-30,798 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,804 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,788 of
 9,979 (98%).
 
@@ -446,7 +446,7 @@ line blocks.
    Out after round 189 (looked at, not done): Belt of Giant Strength (equip cost less by the target's power), Retribution
    of the Ancients ("remove X +1/+1 counters from among creatures you control" as a cost), Pact Weapon and Jace, Mirror
    Mage ("draw a card and reveal it", now in Lane B's round B19, to reuse), Faerie Fencing, Flame
-   Discharge, Steer Clear ("if you controlled a ... as you cast this spell"), Depth Defiler, Pyrrhic Strike and Surge
+   Discharge, Steer Clear ("if you controlled a ... as you cast this spell"), Depth Defiler (done in round B163), Pyrrhic Strike and Surge
    of Acclaim (spells with "choose both instead": only triggers do it so far), Symmetry Matrix, Mass
    Diminish, Display of Power (done in round 277), Jason Bright, Blood for Bones, Quakebringer (done in round 277),
    Lorthos, Zidane, Discerning Financier (done in round 272), Eight-and-a-Half-Tails.
@@ -2377,8 +2377,8 @@ line blocks.
    when the land made no mana, rulings); "you may remove three quest counters from among permanents you control. When you
    do, ..." (Overseer of Vault 76: exactly three, so not an option with fewer, CR 608.2d, rulings; a browser test); "put a
    number of ember counters on this creature equal to the amount of mana spent to cast that spell. Then if this creature
-   has seven or more ember counters on it, remove them and transform this creature." (Smoldering Egg). +7, 30,798 of
-   31,936 with round 322.
+   has seven or more ember counters on it, remove them and transform this creature." (Smoldering Egg). +7, 30,804 of
+   31,936 with round 322 and B163.
    Out after round 323 (looked at, not done): Last Night Together ("only the chosen creatures can attack during that
    combat phase": an attack restriction for one added combat phase), Island Sanctuary (a draw-step draw skipped for an
    attack restriction until your next turn), Filigree Vector (still out: two "any number of target" sets in one ability).
@@ -4098,7 +4098,7 @@ line blocks.
    graveyard):
    - "With power / mana value less than or equal to <amount>" works for targets, groups, searches and free casts, and
      "you may ... if that creature's power is less than or equal to" (Nimbus Champion); still out: "that damage" in other
-     trigger shapes (Broodcaller Scourge), Old Man of the Sea, Sphere of Annihilation (done in round B159), Quag Feast
+     trigger shapes (Broodcaller Scourge), Old Man of the Sea (done in round B163), Sphere of Annihilation (done in round B159), Quag Feast
      ("the chosen permanent"), Titan's Presence (a reveal cost), Vulpine Harvester (done in round 312) ("their total power"), Sundering
      Archaic (colors spent).
    - "Your team" is "you" (CR 102.4), as is Azra Bladeseeker's "each player on your team", and "Partner with" works (27
@@ -4207,7 +4207,7 @@ line blocks.
      that targets" (Danitha, Sword of Hope (done in round B109)), and "those creatures" in the effect (Storm, Windrider; Dack's emblem).
    - Crush Underfoot ("choose a Giant creature you control") is out because its Kindred type isn't parsed.
    - "Choose one that hasn't been chosen" cards still out on other lines: Breeches, Captive Audience, Gandalf, Gollum,
-     Henrika, Kargan, Parapet Thrasher, Sol'Kanar, Survivor's Med Kit, Teval's Judgment, Fantastic Four, Zuko.
+     Henrika, Kargan, Parapet Thrasher, Sol'Kanar (done in round B163), Survivor's Med Kit, Teval's Judgment, Fantastic Four, Zuko.
    Left from the round after Seasons (lists of targets, Vivid, Gates/Deserts/Caves, counts):
    - Lists of targets under one verb work for destroy, exile, tap, untap and return to hand; still out: lists returning
      to the battlefield (they enter at the same time), and "it" or
@@ -4297,7 +4297,7 @@ line blocks.
      that couldn't attack anyway, and promise a gift only when it turns on something of the spell's own.
    Left from the untap/entwine/distribute/job select/bargain round:
    - "For as long as ~ remains tapped" (27 of 40 legal supported): dynamic target filters (Vedalken Shackles' "power less
-     than or equal to the number of Islands", Old Man of the Sea, Entrancing Lyre's X, Seasinger (done in round B131)), "a creature of an
+     than or equal to the number of Islands", Old Man of the Sea (done in round B163), Entrancing Lyre's X, Seasinger (done in round B131)), "a creature of an
      opponent's choice" (Preacher (done in round B141)), "isn't of the chosen type" (Callous Oppressor), "other than ~" (Hisoka's Guard),
      attacking/blocked filters (Ice Floe, Whip Vine), "loses all abilities" (Immovable Rod), "when ~ becomes untapped
      or ..." delayed triggers from an activated ability (Coffin Queen, Tawnos's Coffin, The Pandorica), Giant Oyster's counters, Hivis's Dragon filter, Hedge
@@ -4325,7 +4325,7 @@ line blocks.
      Grift), Smuggler's Surprise.
    - Saddle: "the creature that saddled it this turn" (Giant Beaver, Rambling Possum, Calamity, Fortune, The Gitrog),
      effects that make a Mount saddled (Guidelight Matrix, Kolodin, Alacrian Armory), "is saddled" and "becomes
-     saddled for the first time each turn" (Archmage's Newt, Caustic Bronco, Stubborn Burrowfiend), "saddles a Mount
+     saddled for the first time each turn" (Archmage's Newt, Caustic Bronco, Stubborn Burrowfiend (done in round B163)), "saddles a Mount
      or crews a Vehicle" triggers (Canyon Vaulter, Reckless Velocitaur), "Mount or Vehicle" groups (Cloudspire Captain),
      Bounding Felidar, Guardian Sunmare, Lagorin, Ornery Tumblewagg. Bots only saddle Mounts that have an "attacks
      while saddled" trigger.
@@ -5687,7 +5687,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   card that shares a creature type with it from among them"), Makeshift Mannequin (a granted ability for as long as it
   has a counter), Phylactery Lich (an "as enters" counter on another permanent and a state trigger), Undiscovered
   Paradise (done in round B154), Hold for Ransom, Mercurial Transformation, Goblin Festival (done in round B158), Trench Gorger (done in round B154), Tatsumasa, Adipose Offspring,
-  Fractal Tender, Keldon Flamesage, Sporogenesis, Kentaro, Immard, Feldon, Corruption of Towashi, Donnie & April, Path of
+  Fractal Tender, Keldon Flamesage, Sporogenesis, Kentaro, Immard, Feldon, Corruption of Towashi (done in round B163), Donnie & April, Path of
   Mettle, Rise from the Wreck, plus the multi-line and new-mechanic cards in the same range (Bomb Squad, Word of Command,
   Celestial Dawn, Death or Glory (done in round B156), Selective Adaptation and the like).
 - Round B57 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 15,300): "if there is an
@@ -7403,6 +7403,31 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   off (browser tests). Myr Superion: "Spend only mana produced by creatures to cast ~" (CR 106.6, 109.2: creatures on the
   battlefield; not Elvish Spirit Guide's mana from a hand, rulings). The bot doesn't activate Bargaining Table, as with
   other "{N}, {T}: Draw a card" abilities. +7 (30,783 of 31,936 with B161 and round 321).
+- Round B163 (least played first, mechanics that could be built from the skip lists): Words of War ("The next time you
+  would draw a card this turn, ~ deals 2 damage to any target instead": the target chosen as the ability is activated and
+  checked as it resolves, CR 115.1c, 608.2b; the draw replaced even if the target is gone by then, nothing dealt to a new
+  object, CR 400.7, 614.11; the damage from the Words, as it last existed if it has left; two shields with different
+  targets are both offered, a browser test). Old Man of the Sea ("for as long as ~ remains tapped and that creature's power
+  remains less than or equal to ~'s power": both durations, CR 611.2b, checked with the state-based actions; a target with
+  greater power as it resolves is illegal, and one that stops being a creature counts as power 0, rulings). Sol'Kanar the
+  Tainted ("Exile ~, then return it to the battlefield under an opponent's control": the opponent chosen as it resolves,
+  rulings, a browser test; it's a new object whose modes start over, CR 400.7; the bot chooses that mode only when it's the
+  one left and gives it to the opponent with the least power). Stubborn Burrowfiend ("Whenever ~ becomes saddled for the
+  first time each turn": each saddle resolving makes it become saddled, rulings, CR 702.171b; only the first this turn for
+  this object). Depth Defiler ("When you cast this spell, choose one. If it was kicked, choose both instead.": the spell
+  as cast, CR 603.3c, 702.33d). Corruption of Towashi ("Whenever a permanent you control transforms or a permanent you
+  control enters transformed": either direction, an Incubator too, or a transforming double-faced card entering back face
+  up, CR 712.14a, not a modal double-faced one, rulings; "Do this only once each turn" counts only a yes, CR 603.2h). +6, 30,797 of 31,936
+  with B162 and rounds 321 and 322.
+- Out after round B163 (looked at, not done): Words of Waste and Words of Wind (an opponent's discard or each player's
+  bounce chosen in the middle of a draw: a pause the draw sequence resumes from only for some replacements), Strax,
+  Sontaran Nurse ("Choose a player at random. When you do, ~ fights another target creature that player controls": a
+  reflexive trigger's targets limited by the chosen player), Goblin Maskmaker (face-down spells as a cost reduction's
+  filter), Lantern Flare (a cleave cost with {X} on a card whose mana cost has none, X defined by its text otherwise),
+  Saproling Burst (a token's power and toughness from the counters on the permanent that made it), Mana Cache (any player
+  activating a mana ability of a permanent they don't control), Essence of the Wild (creatures entering as a copy of it,
+  a copy replacement applied before other enters replacements, rulings), Sunglasses of Urza (white mana spent as though
+  it were red).
 - Out after round B162 (looked at, not done): Synthesis Pod (reveal until a card with mana value one more than the exiled
   spell's, then cast it free: the Nivmagus cost works, the reveal-and-cast doesn't yet), Imperiosaur (mana from basic
   lands isn't told apart in the mana pool), Graceful Takedown (two groups of targets), Peace Talks (activated abilities
@@ -7490,7 +7515,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B136 (looked at, not done): Forgotten Lore (done in round B142) (an opponent chooses again each time you pay {G}),
   Infinite Authority (a delayed trigger that checks "if that creature was destroyed this way").
 - Out after round B135 (looked at, not done): Tariff (a punisher whose cost is the chosen creature's own mana cost),
-  Words of War (a target chosen as a draw is replaced), Gloom (a tax on activated abilities, mana abilities too),
+  Words of War (done in round B163; its target is chosen as it's activated, CR 115.1c), Gloom (a tax on activated abilities, mana abilities too),
   Delaying Shield (its first line compiles now; still out: "you lose 1 life unless you pay {1}{W}" for each counter removed).
 - Known gap from round B134: a splice or entwine cost that picks the same kind of thing as one of the spell's other costs
   (Torrent of Stone's Mountains onto an Arcane spell that also sacrifices a creature) isn't offered or is refused as it's
@@ -7705,7 +7730,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   by the keyword, not just a keyword to remove), Brothers Yamazaki (an exception to the legend rule), Rogue Skycaptain
   and Rohgahh of Kher Keep ("an opponent gains control of ~"), Stangg and Dance of the Many (linked tokens that leave
   with their source), Sengir Nosferatu (done in round B129) (a token's ability returns an exiled card named ~), Splintering Wind,
-  Negative Zone Portal (done in round B137), Sol'Kanar the Tainted, Mystic Barrier, Covenant of Minds (done in round B155).
+  Negative Zone Portal (done in round B137), Sol'Kanar the Tainted (done in round B163), Mystic Barrier, Covenant of Minds (done in round B155).
 - Out after round B87 (looked at, not done): Kodama of the Center Tree (soulshift X: a target bounded by a changing
   number), Hide // Seek (the mana value of a card found by the search), Revival Experiment (one card of each permanent
   type, and a battle's protector on entering is unclear), Love on the Battlefield (a combat damage trigger granted until
@@ -7809,7 +7834,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B68 (looked at, not done): Oko, Lorwyn Liege (the back face's emblem of a chosen creature type),
   Abuelo's Awakening (the returned artifact that's also a Spirit creature), Light of Judgment (done in round B156) ("up to one Equipment"
   chosen as it resolves), Chandra, Chill of Compliance (which cards surveil put into the graveyard).
-- Out after round B67 (looked at, not done): Words of War, Words of Waste and Words of Wind (a target or choices in the
+- Out after round B67 (looked at, not done): Words of War (done in round B163), Words of Waste and Words of Wind (a target or choices in the
   middle of a draw), Hedonist's Trove (lands from its exile any number of times, one spell a turn), Day of the Dragons,
   Lumbering Battlement, Wall of Mourning (cards exiled with ~ from abilities not linked yet; Kayla's Music Box and
   Serpent's Soul-Jar done in round B70), Ashes of the Fallen (creature types of cards in a graveyard: Lane A's round 227 adds those for Roshan,

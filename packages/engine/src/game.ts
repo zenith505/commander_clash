@@ -15,7 +15,7 @@ import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
-import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, withShieldAnswers, type DamageEvent } from "./damage";
+import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { canAttachTo, turnFaceDown } from "./effects/run-permanents";
@@ -1152,6 +1152,7 @@ export function moveObject(
   o.transforms = undefined; // a new object (CR 400.7)
   o.prepared = undefined; // CR 722.3a
   o.saddled = undefined; // CR 702.171b
+  o.saddledTurn = undefined; // a new object (CR 400.7)
   o.tribute = undefined; // CR 702.104
   o.hiddenExile = undefined; // a hideaway card that leaves exile is face up again
   o.encoded = undefined; // cards stay encoded only on the permanent as long as it's on the battlefield (CR 702.99c)
@@ -2399,7 +2400,18 @@ export function endWhileTapped(s: GameState): boolean {
     const kept = e.affected.filter((id) => isEnchanted(s, id));
     if (kept.length < e.affected.length) [e.affected, lost] = [kept, true];
   }
-  const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)) || ((e.whileCounter || e.whileEnchanted) && !e.affected.length));
+  // Old Man of the Sea: "and that creature's power remains less than or equal to ~'s power", the same once it's greater
+  // (a permanent that isn't a creature counts as power 0, rulings). Only while ~ is still that object: otherwise
+  // whileTapped has ended it anyway.
+  for (const e of s.effects) {
+    if (!e.powerAtMost) continue;
+    const me = s.objects[e.powerAtMost.id];
+    if (!me || me.zone !== "battlefield" || (me.zoneChanges ?? 0) !== e.powerAtMost.zc) continue;
+    const pw = (o: GameObject) => (objIsType(s, o, "Creature") ? power(s, o) : 0);
+    const kept = e.affected.filter((id) => s.objects[id]?.zone !== "battlefield" || pw(obj(s, id)) <= pw(me));
+    if (kept.length < e.affected.length) [e.affected, lost] = [kept, true];
+  }
+  const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)) || ((e.whileCounter || e.whileEnchanted || e.powerAtMost) && !e.affected.length));
   if (!ended.length) {
     if (lost) invalidateCharacteristics(s);
     return lost;
@@ -3245,10 +3257,12 @@ export function drawShields(s: GameState, pid: PlayerId): { key: string; label: 
   const seen = new Set<string>();
   (p.nextDrawInstead ?? []).forEach((w, i) => {
     if (w.turn !== s.turn) return;
-    const kind = JSON.stringify([w.source, w.gain ?? null, w.token ?? null]);
+    // Words of War's shields are told apart by their targets.
+    const kind = JSON.stringify([w.source, w.gain ?? null, w.token ?? null, w.damage ?? null]);
     if (seen.has(kind)) return;
     seen.add(kind);
-    const what = [w.token ? `create a ${w.token.power}/${w.token.toughness} ${w.token.name.replace(/ Token$/, "")} token` : "", w.gain !== undefined ? `gain ${w.gain} life` : ""].filter(Boolean).join(" and ");
+    const whom = w.damage && ("player" in w.damage.to ? player(s, w.damage.to.player).name : characteristics(s, obj(s, w.damage.to.object)).name);
+    const what = [w.token ? `create a ${w.token.power}/${w.token.toughness} ${w.token.name.replace(/ Token$/, "")} token` : "", w.gain !== undefined ? `gain ${w.gain} life` : "", w.damage ? `deal ${w.damage.n} damage to ${whom}` : ""].filter(Boolean).join(" and ");
     out.push({ key: `words:${i}`, label: `${what.charAt(0).toUpperCase()}${what.slice(1)} (${w.source})` });
   });
   return out;
@@ -3470,6 +3484,7 @@ function applyDrawShield(s: GameState, pid: PlayerId, key: string) {
     log(s, `${p.name} gains ${w.gain} life instead of drawing a card (${w.source}).`);
     gainLife(s, pid, w.gain);
   }
+  if (w.damage) wordsDamage(s, pid, w as typeof w & { damage: NonNullable<typeof w.damage> });
   if (w.token) {
     const token = w.token;
     const { same, extra } = tokenBatch(s, pid, token, 1);
@@ -3485,6 +3500,35 @@ function applyDrawShield(s: GameState, pid: PlayerId, key: string) {
     });
     log(s, `${p.name} creates ${same === 1 ? "a" : same} ${token.power}/${token.toughness} ${token.name} token${same === 1 ? "" : "s"} instead of drawing a card (${w.source}).`);
   }
+}
+
+/**
+ * Words of War: "~ deals 2 damage to any target instead", to the target chosen as the ability was activated: a player
+ * still in the game, or the permanent while it's still the object it was (CR 400.7); it isn't chosen again, so nothing
+ * checks that it's still a legal target (CR 608.2b was checked as the ability resolved). The source is the Words (CR
+ * 113.7a), as it is or as it last existed on the battlefield, controlled by the player whose draw it replaced.
+ */
+function wordsDamage(s: GameState, pid: PlayerId, w: NonNullable<Player["nextDrawInstead"]>[number] & { damage: { n: number; to: { player: PlayerId } | { object: ObjectId; zc: number } } }) {
+  const p = player(s, pid);
+  const me = w.sourceId !== undefined ? s.objects[w.sourceId] : undefined;
+  const lk = me && w.sourceZc !== undefined ? s.lastKnown?.[me.id] : undefined;
+  const src: DamageSource | undefined =
+    me && me.zone === "battlefield" && (me.zoneChanges ?? 0) === (w.sourceZc ?? 0)
+      ? { ...objectSource(s, me), controller: pid }
+      : lk?.source && lk.zc === w.sourceZc
+        ? { ...lk.source, controller: pid, ref: { object: me!.id, zc: lk.zc } }
+        : me
+          ? cardSource(defOf(s, me), pid, { object: me.id, zc: w.sourceZc ?? 0 })
+          : undefined;
+  const to = w.damage.to;
+  const target = "object" in to ? s.objects[to.object] : undefined;
+  if (!src || ("player" in to ? player(s, to.player).lost : !target || target.zone !== "battlefield" || (target.zoneChanges ?? 0) !== to.zc)) {
+    log(s, `${p.name} doesn't draw a card (${w.source}); its target is gone, so no damage is dealt.`);
+    return;
+  }
+  log(s, `${w.source} deals ${w.damage.n} damage to ${"player" in to ? player(s, to.player).name : characteristics(s, target!).name} instead of ${p.name} drawing a card.`);
+  const dealt = dealDamage(s, src, "player" in to ? { player: to.player } : { object: target! }, w.damage.n);
+  if (dealt && src.ref && me?.zone === "battlefield" && (me.zoneChanges ?? 0) === src.ref.zc) fireEvent(s, { type: "dealtDamage", id: me.id, amount: dealt, combat: false });
 }
 
 /** Answers PendingDecision "drawInstead": the shield that replaces this draw; the draws after it go on. */

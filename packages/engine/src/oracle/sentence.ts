@@ -343,6 +343,14 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const fx = parseSentence(`${thisCombat[1]} can't be blocked${thisCombat[2] ?? ""} this turn`, ctx);
     return fx?.every((e) => e.type === "continuous" && e.duration === "endOfTurn") ? fx.map((e) => ({ ...e, duration: "endOfCombat" }) as Effect) : null;
   }
+  // Old Man of the Sea: "Gain control of target creature with power less than or equal to ~'s power for as long as ~
+  // remains tapped and that creature's power remains less than or equal to ~'s power" (CR 611.2b): both, checked
+  // continuously (ContinuousEffect.powerAtMost).
+  const tappedPower = /^(Gain control of target creature with power less than or equal to ~'s power) for as long as ~ remains tapped and that creature's power remains less than or equal to ~'s power$/.exec(s);
+  if (tappedPower) {
+    const fx = parseWhileTapped(tappedPower[1]!, false, ctx);
+    return fx?.length === 1 && fx[0]!.type === "continuous" && fx[0]!.duration === "whileTapped" && fx[0]!.what.ref === "target" ? [{ ...fx[0]!, whilePowerAtMostSource: true }] : null;
+  }
   const tapped = /^(?:For as long as ~ remains tapped, (.+)|(.+?) for as long as (you control ~ and )?~ remains tapped)$/i.exec(s);
   if (tapped) return parseWhileTapped((tapped[1] ?? tapped[2])!, !!tapped[3], ctx);
   // Tadeas, Juniper Ascendant: "untap it and it can't be blocked by creatures with greater power this combat": two

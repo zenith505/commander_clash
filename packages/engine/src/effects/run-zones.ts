@@ -3972,7 +3972,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         s.resolving!.flickeredBack = back.filter((c) => c.zone === "battlefield").map((c) => c.id);
         return;
       }
-      if (returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped, e.transformed) === "paused") return "paused";
+      // Sol'Kanar the Tainted: under the opponent chosen before it (CR 110.2a); with none still in the game, its owner's.
+      const chosen = e.underPlayer ? players(s, e.underPlayer, ctx).find((pid) => !player(s, pid).lost) : undefined;
+      if (returnFromExile(s, back, (c) => (e.underPlayer ? (chosen ?? c.owner) : e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped, e.transformed) === "paused") return "paused";
       s.resolving!.flickeredBack = back.filter((c) => c.zone === "battlefield").map((c) => c.id);
       if (attack)
         for (const c of back) {

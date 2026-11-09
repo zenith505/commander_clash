@@ -1153,7 +1153,7 @@ export interface TargetSpec {
    * or color chosen for the source (see GameObject.chosen) or while the spell resolves. Before
    * `bindChosen` fills it in, a filter that needs a choice that wasn't made matches nothing.
    */
-  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "Of a type chosen this way" (Chosen.types: any of them), "that aren't ...". */ "typesChosen" | "notTypesChosen" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name" | /** "Equal to the chosen number" (Chosen.number; see equalsChosen). */ "number" | /** "With power greater than or equal to the chosen number" (Expel the Interlopers): `power.min`, once it's known. */ "powerAtLeast" | /** "With mana value of the chosen quality" (Chosen.parity): `parity.is`, once it's known. */ "parity" | /** "A card of the chosen kind" after "choose land or nonland" (Chosen.landOrNonland). */ "landOrNonland" | /** "Creatures attacking the last chosen player" (Triarch Stalker): `attackingWhom` that player (Chosen.player), none while there's none. */ "attackingPlayer" | /** "A land of the chosen type" (Roots of Life): Chosen.landType, the land type chosen as its source entered. */ "landType" | /** Rite of Ruin: "the first type", the card type at `orderIndex` of Chosen.typeOrder. */ "typeOrder" | /** "Of one of the chosen colors" (Tablet of the Guilds): any of Chosen.colors. */ "colorsChosen" | /** "Creatures controlled by players who chose war" (Archangel of Strife): controlled by a player whose Chosen.byPlayer word is `chosenWord`. */ "byPlayer";
+  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "Of a type chosen this way" (Chosen.types: any of them), "that aren't ...". */ "typesChosen" | "notTypesChosen" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name" | /** "Equal to the chosen number" (Chosen.number; see equalsChosen). */ "number" | /** "With power greater than or equal to the chosen number" (Expel the Interlopers): `power.min`, once it's known. */ "powerAtLeast" | /** "With mana value of the chosen quality" (Chosen.parity): `parity.is`, once it's known. */ "parity" | /** "A card of the chosen kind" after "choose land or nonland" (Chosen.landOrNonland). */ "landOrNonland" | /** "Creatures attacking the last chosen player" (Triarch Stalker): `attackingWhom` that player (Chosen.player), none while there's none. */ "attackingPlayer" | /** "A land of the chosen type" (Roots of Life): Chosen.landType, the land type chosen as its source entered. */ "landType" | /** Rite of Ruin: "the first type", the card type at `orderIndex` of Chosen.typeOrder. */ "typeOrder" | /** Illusionary Terrain: "of the first chosen type", the land type at `orderIndex` of Chosen.landTypes. */ "landTypeAt" | /** "Of one of the chosen colors" (Tablet of the Guilds): any of Chosen.colors. */ "colorsChosen" | /** "Creatures controlled by players who chose war" (Archangel of Strife): controlled by a player whose Chosen.byPlayer word is `chosenWord`. */ "byPlayer";
   /** The word of `chosen` "byPlayer". */
   chosenWord?: string;
   /** Controlled by one of these players (`chosen` "byPlayer" once bound; none: nothing). */
@@ -1856,7 +1856,7 @@ export type Modification =
    * Layer 4, "Nonbasic lands are Mountains", "enchanted land is an Island": the land's land types become these basic
    * ones, and it loses the abilities from its rules text, gaining each basic type's mana ability instead (CR 305.7).
    */
-  | { kind: "setLandTypes"; subtypes: string[] }
+  | { kind: "setLandTypes"; subtypes: string[]; /** Illusionary Terrain: "are the second chosen type": the land type at this index of the source's Chosen.landTypes instead of `subtypes` (none chosen, no change). */ chosenIndex?: number }
   | { kind: "loseTypes"; types: string[]; /** "That's no longer an Equipment" (Haunted Plate Mail): those subtypes go too. */ subtypes?: string[] } // layer 4, "stops being a creature": that type and its subtypes go (CR 702.151b)
   /** Layer 4, "loses all creature types" (Amoeboid Changeling): its creature types go, changeling's too; ones gained later come back (rulings, CR 613.7). */
   | { kind: "loseCreatureTypes" }
@@ -3161,6 +3161,12 @@ export type Effect =
   | { type: "handToBottomDraw"; who: PlayerRef }
   /** Crown of Convergence: "Put the top card of your library on the bottom of your library": nobody looks at it (CR 401.2). */
   | { type: "topToBottom" }
+  /**
+   * Vision Charm: "Choose a land type and a basic land type. Each land of the first chosen type becomes the second chosen
+   * type until end of turn.": both chosen as it resolves; the lands are those of that type then (CR 611.2c), each losing its
+   * land types and the abilities from its rules text for the new type and its mana ability (CR 305.7).
+   */
+  | { type: "landTypeSwap" }
   | { type: "tap"; what: ObjRef; /** "Where X is the number of Islands tapped this way" follows (Monsoon): how many it tapped (Count "tappedThisWay"). */ noteTapped?: true; /** Breaking Wave: "Simultaneously untap all tapped creatures and tap all untapped creatures": each of `what` that's tapped untaps and each untapped one taps, at once. */ swap?: true }
   /** "Turn target face-down creature face up" (CR 708.8): with no cost paid; see turnFaceUpByEffect. */
   /**
@@ -3998,6 +4004,8 @@ export type Effect =
     }
   /** "You may cast ~ for as long as it remains exiled" (Shattered Seraph): the card this activated ability's cost exiled from its owner's hand, that object only (CR 400.7). */
   | { type: "mayCastExiledSelf" }
+  /** Covenant of Minds: "put those cards into your hand / graveyard": the cards a revealTop revealed that are still on top of your library (ResolvingInfo.revealedUntil), all at once; a graveyard move this way isn't milling (CR 701.17). */
+  | { type: "revealedTo"; dest: "hand" | "graveyard" }
   | { type: "revealedUntilToBottom"; hand?: true; /** "On the bottom of your library in a random order" (Amplifire), not ordered by their owner. */ random?: true }
   | { type: "revealTop"; /** "Reveal the top ten cards of your library" (Sanity Grinding, Stomping Slabs): they stay there as "the revealed cards" (ResolvingInfo.revealedUntil). */ n?: number; look?: true; /** "Reveal a card at random from your hand" (Cursed Scroll) instead. */ randomFromHand?: true; /** Whose library: "reveals the top card of their library" (Chaos Warp: the target's owner). Yours if left out. */ who?: PlayerRef }
   /** "Return ~ to its owner's hand" as the spell resolves (Cerebral Eruption): it goes there, not to the graveyard, as it finishes resolving (GameObject.toHandOnResolve). */

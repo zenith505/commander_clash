@@ -405,6 +405,15 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       return;
     }
+    case "revealedTo": {
+      // Covenant of Minds: the revealed cards still in your library, all at once.
+      const r = s.resolving!;
+      const seen = (r.revealedUntil ?? []).filter((id) => s.objects[id]?.zone === "library" && obj(s, id).owner === ctx.controller);
+      if (!seen.length) return;
+      log(s, `${player(s, ctx.controller).name} puts ${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")} into their ${e.dest}.`);
+      for (const id of seen) moveObject(s, id, e.dest);
+      return;
+    }
     case "revealedUntilToBottom": {
       // The revealed cards still in the library go to its bottom, ordered by their owner (CR 401.4); "the nonland card"
       // goes to the hand first (Explosive Revelation).

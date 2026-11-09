@@ -2405,6 +2405,17 @@ export function compile(d: CardDef): CompiledCard {
       out.entersChoose = [{ what: "landType" }];
       continue;
     }
+    // Illusionary Terrain: "As ~ enters, choose two basic land types." then "Basic lands of the first chosen type are the
+    // second chosen type.": two different types (Chosen.landTypes, in order); basic lands of the first lose their land
+    // types and the abilities from their rules text and get the second, with its mana ability (CR 305.7). Snow stays (rulings).
+    if (line === "As ~ enters, choose two basic land types." && lines.includes("Basic lands of the first chosen type are the second chosen type.") && !out.entersChoose?.length) {
+      out.entersChoose = [{ what: "basicLandType", many: true }, { what: "basicLandType", many: true }];
+      continue;
+    }
+    if (line === "Basic lands of the first chosen type are the second chosen type." && out.entersChoose?.filter((c) => c.what === "basicLandType" && c.many).length === 2) {
+      out.statics.push({ affects: { kind: "filter", types: ["Land"], spec: { kind: "object", types: ["Land"], supertypes: ["Basic"], notTypes: [], notColors: [], chosen: "landTypeAt", orderIndex: 0, text: "basic lands of the first chosen type" } }, mods: [{ kind: "setLandTypes", subtypes: [], chosenIndex: 1 }], text: raw });
+      continue;
+    }
     // Convincing Mirage, Phantasmal Terrain: the same choice on an Aura, for "Enchanted land is the chosen type."
     if (line === "As ~ enters, choose a basic land type." && (d.types.includes("Land") || lines.includes("Lands you control are the chosen type in addition to their other types.") || (d.subtypes.includes("Aura") && lines.includes("Enchanted land is the chosen type."))) && !out.entersChoose?.length) {
       out.entersChoose = [{ what: "basicLandType" }];
@@ -5597,6 +5608,26 @@ export function compile(d: CardDef): CompiledCard {
       out.triggers.push({ event: "selfLeaves", body: { targets: [], effects: [{ type: "sacrificeAnimated" }], text: "That creature's controller sacrifices it." } });
       continue;
     }
+    // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
+    // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
+    // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
+    // CR 701.40a), and the Aura attached to it if it can be (CR 701.3b). With no card to manifest, it's an Aura attached to
+    // nothing, put into the graveyard as a state-based action (rulings, CR 704.5m).
+    if (line === "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your library and attach ~ to it." && d.types.includes("Enchantment") && !d.subtypes.includes("Aura") && !out.enchant && !d.types.includes("Creature")) {
+      out.triggers.push({
+        event: "selfEnters",
+        body: {
+          targets: [],
+          effects: [
+            { type: "continuous", what: { ref: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: ["Aura"] }, { kind: "enchantCreature" }], duration: "game" },
+            { type: "dig", n: 1, count: 1, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false },
+            { type: "attach", what: { ref: "created" } },
+          ],
+          text: "It becomes an Aura with enchant creature. Manifest the top card of your library and attach ~ to it.",
+        },
+      });
+      continue;
+    }
     // Daybreak Coronet: as a spell, any enchanted creature (no Aura of its own is attached yet); on the battlefield, one
     // with an Aura other than this one (see attachmentSBAs).
     if (line === "Enchant creature with another Aura attached to it" && !out.enchant) {
@@ -7349,10 +7380,14 @@ function checkCastingLinks(out: CompiledCard) {
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
     // "Players who chose war": one of the words each player chose as it entered.
     if (o.chosen === "byPlayer" && !out.entersEachPlayerChooses?.includes(o.chosenWord as string)) bad = true;
-    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer" && o.chosen !== "byPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : o.chosen === "landOrNonland" ? needs.add("landOrNonland") : o.chosen === "landType" ? needs.add("landType") : o.chosen === "typeOrder" ? needs.add("typeOrder") : needs.add("creatureType"));
+    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer" && o.chosen !== "byPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : o.chosen === "landOrNonland" ? needs.add("landOrNonland") : o.chosen === "landType" || o.chosen === "landTypeAt" ? needs.add("landType") : o.chosen === "typeOrder" ? needs.add("typeOrder") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen === true)) needs.add("color");
     if (o.kind === "setColors" && o.chosen === "colors") needs.add("colors");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");
+    // Illusionary Terrain: "the first/second chosen type" of the two chosen as it entered.
+    if ((o.kind === "setLandTypes" && o.chosenIndex !== undefined) || o.chosen === "landTypeAt") {
+      if ((out.entersChoose ?? []).filter((c) => c.what === "basicLandType" && c.many).length !== 2) bad = true;
+    }
     // "Landwalk of the chosen type": a land type chosen as it entered or resolved (any type, or a basic one for Giant Slug).
     if (o.kind === "addKeywords" && ((o.keywords as string[]).includes(CHOSEN_LANDWALK) || (o.keywords as string[]).includes(CHOSEN_SNOW_LANDWALK))) needs.add("landType");
     if (o.kind === "addKeywords" && ((o.keywords as string[]).includes(CHOSEN_PROTECTION) || (o.keywords as string[]).includes(CHOSEN_HEXPROOF))) needs.add("color");

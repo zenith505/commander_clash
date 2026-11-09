@@ -8,7 +8,7 @@ import { compileCard } from "../oracle";
 import type { ContinuousEffect, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { isDoubleFacedDef, setFace } from "../faces";
 import { becomePrepared, unprepare } from "../prepare";
-import { objectMatches, playerProtectedFrom } from "./targeting";
+import { choiceOptions, objectMatches, playerProtectedFrom } from "./targeting";
 import { ResolveCtx, convokedFor, objects, amountNow, fixMods, players, runEffect } from "./resolve";
 import { exiledWithCounter } from "./run-choices";
 import { voteTally } from "./run-votes";
@@ -2224,6 +2224,29 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         // Thorin: what became attached this way (one already attached there doesn't become attached, CR 701.3c).
         if (me.attachedTo === host.id && before !== host.id && s.resolving) (s.resolving.attachedThisWay ??= []).push(me.id);
       }
+      return;
+    }
+    case "landTypeSwap": {
+      // Vision Charm: a land type, then a basic land type, both chosen as it resolves (each answer lands in
+      // resolving.chosen.landType; the first is moved aside before the second is asked).
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      for (const step of ["swapFrom", "swapTo"] as const) {
+        if (sc[step] !== undefined) continue;
+        if (r.chosen?.landType === undefined) {
+          const first = step === "swapFrom";
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: first ? "landType" : "basicLandType", options: choiceOptions(first ? "landType" : "basicLandType"), prompt: first ? "choose a land type: each land of that type becomes the basic land type you choose next, until end of turn" : `choose a basic land type: each ${sc.swapFrom} becomes it until end of turn` };
+          return "paused";
+        }
+        sc[step] = r.chosen.landType;
+        r.chosen = { ...r.chosen, landType: undefined };
+      }
+      // The lands are those of the first type as it resolves (CR 611.2c); each gets the second type instead of its land
+      // types, and loses the abilities from its rules text (CR 305.7).
+      const affected = s.battlefield.filter((id) => objIsType(s, obj(s, id), "Land") && characteristics(s, obj(s, id)).subtypes.includes(sc.swapFrom!));
+      log(s, `${src}: each ${sc.swapFrom} becomes ${/^[AEIOU]/.test(sc.swapTo!) ? "an" : "a"} ${sc.swapTo} until end of turn${affected.length ? ` (${affected.length} land${affected.length === 1 ? "" : "s"})` : " (there are none)"}.`);
+      if (affected.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "endOfTurn", affected, mods: [{ kind: "setLandTypes", subtypes: [sc.swapTo!] }] });
+      invalidateCharacteristics(s);
       return;
     }
     case "becomeLicid": {

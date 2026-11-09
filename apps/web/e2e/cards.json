@@ -6239,6 +6239,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3edac7df-2a88-4718-865e-703dff9c972e",
+  "name": "Covenant of Minds",
+  "manaCost": "{4}{U}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal the top three cards of your library. Target opponent may choose to put those cards into your hand. If they don't, put those cards into your graveyard and draw five cards.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ala",
+  "releasedAt": "2008-10-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "dd69ef80-d30c-4b15-aec8-4154dc20cb25",
   "name": "Covetous Elegy",
   "manaCost": "{4}{W}{B}",
@@ -14018,6 +14044,34 @@
   "releasedAt": "2020-04-24",
   "rarity": "mythic",
   "layout": "mutate",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "17ae63fa-fd63-45e6-81c1-bf30851bf77c",
+  "name": "Illusionary Terrain",
+  "manaCost": "{U}{U}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Cumulative upkeep {2} (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nAs this enchantment enters, choose two basic land types.\nBasic lands of the first chosen type are the second chosen type.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Cumulative upkeep"
+  ],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "uncommon",
+  "layout": "normal",
   "gameChanger": false
  },
  {
@@ -32065,6 +32119,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c56d2c5b-c3e3-4236-bc38-286e250aa4f7",
+  "name": "Vision Charm",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose one —\n• Target player mills four cards.\n• Choose a land type and a basic land type. Each land of the first chosen type becomes the second chosen type until end of turn.\n• Target artifact phases out. (While it's phased out, it's treated as though it doesn't exist. It phases in before its controller untaps during their next untap step.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2025-12-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "448fa4e3-7269-446b-8089-675bc1bff5f9",
   "name": "Visions",
   "manaCost": "{W}",
@@ -33630,6 +33712,34 @@
   "commanderLegal": "legal",
   "set": "emn",
   "releasedAt": "2016-07-22",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4fc69345-4c1f-4113-8e1c-15b8e2e597fc",
+  "name": "Write into Being",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at the top two cards of your library. Manifest one of those cards, then put the other on the top or bottom of your library. (To manifest a card, put it onto the battlefield face down as a 2/2 creature. Turn it face up any time for its mana cost if it's a creature card.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Manifest"
+  ],
+  "commanderLegal": "legal",
+  "set": "frf",
+  "releasedAt": "2015-01-23",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

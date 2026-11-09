@@ -10313,6 +10313,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       const color = (Object.keys(COLOR_NAMES) as Color[]).find((c) => COLOR_NAMES[c] === choice)!;
       o.chosen = { ...o.chosen, colors: [...(o.chosen?.colors ?? []), color] };
       log(s, `${p.name} chooses ${choice.toLowerCase()} for ${pend.source}.`);
+    } else if (pend.what === "basicLandType" && entry?.many) {
+      // Illusionary Terrain: "choose two basic land types": two different ones, Chosen.landTypes in the order chosen.
+      if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(", ")}`);
+      o.chosen = { ...o.chosen, landTypes: [...(o.chosen?.landTypes ?? []), choice] };
+      invalidateCharacteristics(s);
+      log(s, `${p.name} chooses ${choice} for ${pend.source}.`);
     } else if (pend.what === "keyword" && entry?.many) {
       // Greymond: "choose two abilities from among ...": each one different (Chosen.keywords).
       if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(", ")}`);
@@ -11238,8 +11244,8 @@ function askEntersChoice(s: GameState): boolean {
       return true;
     }
     // Greymond: "choose two abilities from among ...": one not chosen already.
-    const many = c.many && c.what === "color" ? choiceOptions("color").filter((n) => !o.chosen?.colors?.some((col) => COLOR_NAMES[col] === n)) : c.many ? (c.options ?? []).filter((k) => !o.chosen?.keywords?.includes(k)) : undefined;
-    s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: many ?? c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(c.what === "cardType" ? { prompt: "choose a card type" } : c.what === "direction" ? { labels: ["Left", "Right"], prompt: "choose left or right: each player may attack only the nearest opponent that way" } : many && c.what === "color" ? { prompt: o.chosen?.colors?.length ? "choose a second color" : "choose two colors: the first" } : many ? { prompt: `choose ${o.chosen?.keywords?.length ? "another ability" : "an ability"} for ${defOf(s, o).name} to give` } : {}) };
+    const many = c.many && c.what === "color" ? choiceOptions("color").filter((n) => !o.chosen?.colors?.some((col) => COLOR_NAMES[col] === n)) : c.many && c.what === "basicLandType" ? choiceOptions("basicLandType").filter((n) => !o.chosen?.landTypes?.includes(n)) : c.many ? (c.options ?? []).filter((k) => !o.chosen?.keywords?.includes(k)) : undefined;
+    s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: many ?? c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(c.what === "cardType" ? { prompt: "choose a card type" } : c.what === "direction" ? { labels: ["Left", "Right"], prompt: "choose left or right: each player may attack only the nearest opponent that way" } : many && c.what === "color" ? { prompt: o.chosen?.colors?.length ? "choose a second color" : "choose two colors: the first" } : many && c.what === "basicLandType" ? { prompt: o.chosen?.landTypes?.length ? `choose the second basic land type: basic ${o.chosen.landTypes[0]}${o.chosen.landTypes[0] === "Plains" ? "" : "s"} become it` : "choose two basic land types: the first (basic lands of this type change)" } : many ? { prompt: `choose ${o.chosen?.keywords?.length ? "another ability" : "an ability"} for ${defOf(s, o).name} to give` } : {}) };
     return true;
   }
   return false;

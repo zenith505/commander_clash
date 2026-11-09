@@ -124,7 +124,7 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       const filter = parseSearchFilter(ofChosen ? phrase.slice(0, ofChosen.index) : phrase);
       if (!filter || (ofChosen && (!ctx || ctx.spell || !filter.types?.includes("Creature")))) return null;
       Object.assign(dig, { count: 1, upTo: true, filter: ofChosen ? { ...filter, chosen: "type", text: phrase } : filter, into: m[3] === "into your hand" ? "hand" : "libraryTop" });
-    } else if ((m = new RegExp(`^(You may put|Put) (an?|up to (?:one|two|three)|any number of|all) (.+?) from among them onto the battlefield( tapped)?(?: with an? ${COUNTER} counter on it)?(?: and the rest ${REST})?$`).exec(s.replace(/, then shuffle$/, "").replace(/^Put a random /, "Put a ")))) {
+    } else if ((m = new RegExp(`^(You may put|Put) (an?|up to (?:one|two|three|X)|any number of|all) (.+?) from among them onto the battlefield( tapped)?(?: with an? ${COUNTER} counter on it)?(?: and the rest ${REST})?$`).exec(s.replace(/, then shuffle$/, "").replace(/^Put a random /, "Put a ")))) {
       // Getaway Barrel: "Put a random creature card from among them onto the battlefield": one of those that match, chosen
       // at random (rng.ts), not by the player.
       const random = /^Put a random /.test(s);
@@ -132,7 +132,11 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       // cards with mana value 3 or less from among them onto the battlefield" (Collected Company): several enter at the
       // same time (enterTogether). "Put a land card ..." takes one if there is one; "all" every one that matches.
       const how = m[2]!;
-      const count = /^an?$/.test(how) ? 1 : /^up to /.test(how) ? num(how.slice(6)) : 99;
+      // Kayla's Reconstruction: "Put up to X artifact and/or creature cards with mana value 3 or less from among them onto the
+      // battlefield": none to the X the spell was cast with (each card's own mana value 3 or less, rulings).
+      const upToX = how === "up to X";
+      if (upToX && (!ctx?.spell || / X /.test(` ${m[3]} `))) return null;
+      const count = /^an?$/.test(how) ? 1 : upToX ? 0 : /^up to /.test(how) ? num(how.slice(6)) : 99;
       const required = how === "all" || (/^an?$/.test(how) && m[1] === "Put");
       if (/^(?:an?|up to one)$/.test(how) === /cards\b/.test(m[3]!)) return null;
       // "With mana value X or less": the X it was cast or activated with (TargetSpec.xRange), or the X the look's "where X
@@ -170,7 +174,7 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (total) Object.assign(filter, { text: `${filter.text} with total mana value ${total[1]} or less` });
       if (totalCount) Object.assign(filter, { text: `${filter.text} with total mana value less than or equal to ${totalCount[1]}` });
       if (attacking && (count !== 1 || !filter.types?.includes("Creature"))) return null;
-      Object.assign(dig, { count, upTo: !required, ...(required ? { required: true } : {}), ...(random ? { pickRandom: true } : {}), filter, ...(total ? { totalMv: Number(total[1]) } : totalAmount ? { totalMv: totalAmount } : {}), into: "battlefield", ...(m[4] ? { tapped: true } : {}), ...(attacking ? { attacking: true } : {}), ...(m[5] ? { counters: { counter: counterKind(m[5]), n: 1 } } : {}) });
+      Object.assign(dig, { count, upTo: !required, ...(upToX ? { countX: true as const } : {}), ...(required ? { required: true } : {}), ...(random ? { pickRandom: true } : {}), filter, ...(total ? { totalMv: Number(total[1]) } : totalAmount ? { totalMv: totalAmount } : {}), into: "battlefield", ...(m[4] ? { tapped: true } : {}), ...(attacking ? { attacking: true } : {}), ...(m[5] ? { counters: { counter: counterKind(m[5]), n: 1 } } : {}) });
       if (m[6]) Object.assign(dig, restOf(m[6]));
       // "Put any number of land cards from among them onto the battlefield tapped, then shuffle" (Famished Worldsire).
       else if (/, then shuffle$/.test(s)) Object.assign(dig, { rest: "shuffle" });

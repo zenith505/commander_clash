@@ -1302,14 +1302,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: bad ?? "done" }];
     }
     if (pend.kind === "chooseOption" && pend.what === "removeCounter") {
-      // Off our own permanents the harmful kinds (-1/-1, stun), off others' the helpful ones (loyalty, +1/+1, ...).
+      // Off our own permanents the harmful kinds (-1/-1, stun), off others' the helpful ones (loyalty, +1/+1, ...); a
+      // player's counters the same way (Price of Betrayal: an opponent's energy and experience).
       const o = pend.about ? s.objects[pend.about] : undefined;
-      const mine = !!o && controllerOf(s, o) === pid;
+      const mine = o ? controllerOf(s, o) === pid : pend.of === pid;
       const kinds = pend.options.filter((k) => k !== "done");
       // Moving between our own permanents (Resourceful Defense): nothing worth moving is known, so none.
       const onto = pend.onto !== undefined ? s.objects[pend.onto] : undefined;
       if (onto && mine && controllerOf(s, onto) === pid && pend.options.includes("done")) return [{ type: "chooseOption", player: pid, choice: "done" }];
-      const good = kinds.filter((k) => harmfulCounter(k) === mine).sort((a, b) => Number(b === "loyalty") - Number(a === "loyalty") || Number(b === "+1/+1") - Number(a === "+1/+1"));
+      const harmful = (k: string) => (o || pend.of === undefined ? harmfulCounter(k) : k === "poison" || k === "rad");
+      const good = kinds.filter((k) => harmful(k) === mine).sort((a, b) => Number(b === "loyalty") - Number(a === "loyalty") || Number(b === "+1/+1") - Number(a === "+1/+1"));
       return [{ type: "chooseOption", player: pid, choice: good[0] ?? (pend.options.includes("done") ? "done" : kinds[0]!) }];
     }
     // Aven Courier: a helpful kind our target doesn't have yet (+1/+1 first), never a harmful one.
@@ -1326,12 +1328,19 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles) {
       // Our own permanents to sacrifice (Liliana of the Veil): the pile worth less.
       // Boneyard Parley: creature cards to put onto the battlefield, worth their mana value.
-      const worth = pend.sacrificePile ? (id: string) => permanentWorth(s, pid, id) : pend.pileMode === "battlefield" ? (id: string) => 1 + mv(s, id) : (id: string) => handWorth(s, id);
+      // Death or Glory: the pile exiled, the other returning to the battlefield, so an opponent's bigger pile.
+      const worth = pend.sacrificePile ? (id: string) => permanentWorth(s, pid, id) : pend.pileMode === "battlefield" || pend.pileMode === "exile" ? (id: string) => 1 + mv(s, id) : (id: string) => handWorth(s, id);
       // Atris: a face-down pile is guessed at by its size alone; Truth or Tale: a pile is worth its best card.
       const [a, b] = pend.piles.map((pile, i) => (pend.pileMode === "faceDown" && i === 0 ? pile.length * 2 : pend.pileMode === "pickOne" ? Math.max(0, ...pile.map(worth)) : pile.reduce((n, id) => n + worth(id), 0)));
       // Make an Example: another player's pile for them to sacrifice, so the one worth more.
-      const mine = pend.sacrificePile ? pend.of !== pid : pend.of === pid;
+      const mine = pend.sacrificePile || pend.pileMode === "exile" ? pend.of !== pid : pend.of === pid;
       return [{ type: "chooseOption", player: pid, choice: (mine ? a! >= b! : a! <= b!) ? "0" : "1" }];
+    }
+    // Mercurial Transformation: a 4/4 Octopus for our own permanent, a 1/1 Frog for anyone else's.
+    if (pend.kind === "chooseOption" && pend.what === "either" && /^It becomes a blue Frog creature/.test(pend.labels?.[0] ?? "") && /^It becomes a blue Octopus creature/.test(pend.labels?.[1] ?? "")) {
+      const t = s.resolving?.item.targets?.[0];
+      const it = t?.kind === "object" ? s.objects[t.id] : undefined;
+      return [{ type: "chooseOption", player: pid, choice: it && controllerOf(s, it) === pid ? "1" : "0" }];
     }
     // Liliana of the Dark Realms: +X/+X for our own creature, -X/-X for anyone else's.
     if (pend.kind === "chooseOption" && pend.what === "either" && pend.labels?.[0] === "It gets +X/+X until end of turn") {
@@ -2867,7 +2876,7 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     const guard = targetGuard(s, pid, body.effects, i, sourceId);
     const holds = (t: TargetChoice) => !guard || guard(t);
     const all0 = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter(
-      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.entries(obj(s, t.id).counters).some(([k, n]) => n > 0 && (countersKind === undefined || k === countersKind) && (!chosenCounters || harmfulCounter(k) === (controllerOf(s, obj(s, t.id)) === pid)))),
+      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.entries(obj(s, t.id).counters).some(([k, n]) => n > 0 && (countersKind === undefined || k === countersKind) && (!chosenCounters || harmfulCounter(k) === (controllerOf(s, obj(s, t.id)) === pid)))) && !(countersFrom && t.kind === "player" && !playerCountersWorthRemoving(s, pid, t.id)),
     );
     // A target only the guard rules out still has to be chosen when the ability must have one (a trigger): Triumph of
     // Cruelty's opponent when we don't control the greatest power now (it's checked again as it resolves).
@@ -7058,6 +7067,12 @@ function chooseStation(s: GameState, pid: PlayerId): Action[] | null {
  * What to find in a library search: as many as allowed. Lands of a basic type we have the fewest
  * of (for the colors), otherwise the biggest spell we could cast soon.
  */
+/** Price of Betrayal, Etched Slith: whether a player has counters `pid` would take off them (an opponent's energy or experience, its own poison or rad). */
+function playerCountersWorthRemoving(s: GameState, pid: PlayerId, who: PlayerId): boolean {
+  const p = player(s, who);
+  return who === pid ? (p.poison ?? 0) > 0 || (p.rad ?? 0) > 0 : (p.energy ?? 0) > 0 || (p.experience ?? 0) > 0;
+}
+
 /** What a card is worth in a player's hand, for piles: a land a little, a spell more the more it costs. */
 function handWorth(s: GameState, id: string): number {
   return isType(defOf(s, obj(s, id)), "Land") ? 1.5 : 1 + Math.min(mv(s, id), 7) * 0.5;

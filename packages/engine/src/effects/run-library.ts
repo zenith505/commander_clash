@@ -1748,6 +1748,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const sc = (r.scratch ??= {});
       const p = player(s, ctx.controller);
       const names = (ids: ObjectId[]) => ids.map((id) => defOf(s, obj(s, id)).name).join(", ");
+      if (e.fromYourGraveyard) return graveyardPiles(s, e.fromYourGraveyard, ctx, src);
       sc.looked ??= (r.exiledCards ?? []).filter((id) => obj(s, id).zone === "exile");
       const looked = sc.looked.filter((id) => obj(s, id).zone === "exile");
       if (!looked.length) return;
@@ -2492,4 +2493,48 @@ function noteScried(s: GameState, player: PlayerId, how: "scry" | "surveil"): bo
   log.scried.push(player);
   invalidateCharacteristics(s); // "As long as you've scried or surveilled this turn" (Surveillance Phantasm)
   return first;
+}
+
+/**
+ * Death or Glory: "Separate all creature cards in your graveyard into two piles. Exile the pile of an opponent's choice
+ * and return the other to the battlefield." The cards stay in the graveyard while you separate them (CR 700.3c), every
+ * one of them in one pile or the other and a pile may be empty (CR 700.3a); an opponent chosen as it resolves (as for
+ * Split the Spoils) picks the pile exiled, and the other pile returns to the battlefield under your control, all at once.
+ */
+function graveyardPiles(s: GameState, filter: TargetSpec, ctx: ResolveCtx, src: string): "paused" | void {
+  const r = s.resolving!;
+  const sc = (r.scratch ??= {});
+  const p = player(s, ctx.controller);
+  const names = (ids: ObjectId[]) => ids.map((id) => defOf(s, obj(s, id)).name).join(", ");
+  sc.looked ??= p.graveyard.filter((id) => printedMatches(filter, defOf(s, obj(s, id))));
+  const looked = sc.looked.filter((id) => obj(s, id).zone === "graveyard" && p.graveyard.includes(id));
+  if (!looked.length) return;
+  const opp = chooseAnOpponent(s, ctx, src, "choose an opponent to choose the pile that's exiled");
+  if (opp === "paused") return "paused";
+  if (opp === undefined || player(s, opp).lost) return;
+  if (sc.separating && sc.found) {
+    sc.pileOne = sc.found;
+    sc.separating = undefined;
+    sc.found = undefined;
+  }
+  if (!sc.pileOne) {
+    sc.separating = true;
+    s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "the cards", cards: looked, min: 0, max: looked.length, yardPiles: true, dig: { looked, to: "for the first pile", rest: "form the second pile" }, piles: true };
+    return "paused";
+  }
+  const one = sc.pileOne.filter((id) => looked.includes(id));
+  const two = looked.filter((id) => !one.includes(id));
+  if (sc.pileChoice === undefined) {
+    log(s, `${p.name} separates them into two piles: ${names(one) || "no cards"}; and ${names(two) || "no cards"}.`);
+    const label = (pile: ObjectId[], i: number) => `Pile ${i + 1}: ${pile.length ? names(pile) : "no cards"}`;
+    s.pending = { kind: "chooseOption", player: opp, source: src, what: "pile", options: ["0", "1"], labels: [label(one, 0), label(two, 1)], piles: [one, two], of: p.id, pileMode: "exile", prompt: `choose the pile to exile (the other returns to the battlefield under ${p.name}'s control)` };
+    return "paused";
+  }
+  const gone = sc.pileChoice === 0 ? one : two;
+  const back = sc.pileChoice === 0 ? two : one;
+  log(s, `${player(s, opp).name} chooses to exile ${gone.length ? names(gone) : "the empty pile"}${back.length ? `; ${names(back)} return${back.length === 1 ? "s" : ""} to the battlefield` : ""}.`);
+  for (const id of gone) moveObject(s, id, "exile");
+  enterTogether(s, () => {
+    for (const id of back) moveObject(s, id, "battlefield", { controller: p.id });
+  });
 }

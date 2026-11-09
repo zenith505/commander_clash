@@ -4076,7 +4076,7 @@ export type Effect =
    * among those still legal, by their controller ("controller") or the spell's ("you"); `options[i]` is what happens
    * when target i is the one picked. `label` shows the choice, {0} the picked one's name and {1} the other's.
    */
-  | { type: "splitTargets"; chooser: "controller" | "you"; options: Effect[][]; label: string }
+  | { type: "splitTargets"; chooser: "controller" | "you"; options: Effect[][]; label: string; /** Wicked Slumber: "Put a stun counter on either of them. Then put a stun counter on either of them.": each one picked anew (the pick forgotten once it's done). */ again?: true }
   | { type: "either"; options: Effect[][]; labels: string[]; onlyDoable?: true; /** "Forage" as an instruction (CR 701.61a): exile three cards from your graveyard or sacrifice a Food; doing either is foraging ("whenever you forage"). */ forage?: true; /** Invoke the Ancients: "For each of them, put your choice of ... on it": asked once for each permanent the instruction before created (ObjRef "created" being that one as it's done), in the order they were created (rulings: a separate choice for each token, more with a token doubler). */ eachCreated?: true }
   /**
    * "Unlock a locked door of a Room you control" (Ghostly Dancers), with `what` "... of up to one target Room you control"
@@ -4745,7 +4745,7 @@ export type Effect =
    * the battlefield under your control and the rest into their owners' graveyards." The cards this resolution exiled from
    * graveyards (ResolvingInfo.exiledCards), separated by an opponent chosen as it resolves, not targeted (rulings).
    */
-  | { type: "exiledPiles"; /** Split the Spoils: "separate them into two piles. An opponent chooses one of those piles. Put that pile into your hand and the other into your graveyard": you separate, an opponent chosen as it resolves chooses (rulings). */ youSeparate?: true }
+  | { type: "exiledPiles"; /** Split the Spoils: "separate them into two piles. An opponent chooses one of those piles. Put that pile into your hand and the other into your graveyard": you separate, an opponent chosen as it resolves chooses (rulings). */ youSeparate?: true; /** Death or Glory: "Separate all creature cards in your graveyard into two piles. Exile the pile of an opponent's choice and return the other to the battlefield.": your graveyard's cards matching this, separated where they are (CR 700.3c) by you; the opponent chosen as it resolves picks the pile exiled. */ fromYourGraveyard?: TargetSpec }
   /**
    * Collision of Realms: "Each player shuffles all creatures they own into their library. Each player who shuffled a
    * nontoken creature into their library this way reveals cards from the top of their library until they reveal a

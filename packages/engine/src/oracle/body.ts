@@ -1504,6 +1504,33 @@ function wandPunisher(who: PlayerRef, landLife: number): Effect {
  * reads parseFaceDownPlay's: the last effect and the next sentence's index in parseFaceDownPlay's shape (the effects
  * before the last one already pushed), "fail" for one that can't be read, or null when it isn't one of them.
  */
+/** Lane B round B159's sentences, chained first (parseBodyText is at TS2563's limit). */
+function roundB159Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
+  const next = (k = 1) => (sentences[si + k] ?? "").replace(/\.$/, "");
+  const prev = effects[effects.length - 1];
+  // Grinning Totem: "Search target opponent's library for a card and exile it. Then that player shuffles. Until the beginning
+  // of your next upkeep, you may play that card. At the beginning of your next upkeep, if you haven't played it, put it into
+  // its owner's graveyard.": the card found and exiled face up, played with the normal timing and costs (rulings) until that
+  // upkeep begins, then a delayed trigger for it (CR 603.7) that does nothing once it was played (a new object, CR 400.7).
+  if (s === "Until the beginning of your next upkeep, you may play that card" && next() === "At the beginning of your next upkeep, if you haven't played it, put it into its owner's graveyard") {
+    if (prev?.type !== "search" || prev.dest.zone !== "exile" || prev.dest.play || prev.dest.faceDown || prev.others || prev.n !== 1 || prev.upTo || !prev.library || effects.length !== 1) return "fail";
+    effects.pop();
+    return { effect: { ...prev, dest: { ...prev.dest, play: { until: "yourNextUpkeep" }, upkeepGraveyard: true } }, next: si + 2 };
+  }
+  // Grim Reminder: "Search your library for a nonland card and reveal it. Each opponent who cast a spell this turn with the
+  // same name as that card loses 6 life. Then shuffle.": the card stays in the library (SearchDest "reveal"), and each
+  // opponent who cast a spell with a name it has this turn loses the life together (CR 201.2a); the shuffle at the end
+  // changes nothing the life loss sees.
+  const grim = s === "Search your library for a nonland card and reveal it" ? /^Each opponent who cast a spell this turn with the same name as that card loses (\d+) life$/.exec(next()) : null;
+  if (grim && next(2) === "Then shuffle" && si + 3 === sentences.length) {
+    const filter = parseSearchFilter("nonland card");
+    if (!filter) return "fail";
+    effects.push({ type: "search", filter, n: 1, upTo: false, reveal: true, dest: { zone: "reveal" } });
+    return { effect: { type: "loseLife", who: { ref: "eachOpponent" }, n: { count: { kind: "castSameNameAsFound" }, times: Number(grim[1]) } }, next: si + 3 };
+  }
+  return null;
+}
+
 /** Lane B round B158's sentences, chained first (parseBodyText is at TS2563's limit). */
 function roundB158Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): { effect: Effect; next: number } | "fail" | null {
   const out = (fx: Effect[], skip: number) => {
@@ -6948,7 +6975,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
     // rounds B158, B157, B156, B155, B154, B153, B152, B151, B148 and 311 to 317's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB158Sentence(s, sentences, si, ctx, effects) ?? roundB157Sentence(s, sentences, si, ctx, effects) ?? roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    const faceDown = roundB159Sentence(s, sentences, si, ctx, effects) ?? roundB158Sentence(s, sentences, si, ctx, effects) ?? roundB157Sentence(s, sentences, si, ctx, effects) ?? roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);
@@ -7253,12 +7280,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Shambling Swarm: "distribute three -1/-1 counters among one, two, or three target creatures. For each -1/-1 counter
     // you put on a creature this way, remove a -1/-1 counter from that creature at the beginning of the next end step.": a
     // delayed trigger for each of those creatures as it is now (CR 603.7c, 400.7), removing as many as were put on it.
-    const swarm = new RegExp(`^For each ${COUNTER} counter you put on a creature this way, remove an? ${COUNTER} counter from that creature at the beginning of the next end step$`).exec(s);
+    // Bounty of the Hunt: the same "at the beginning of the next cleanup step" (CR 514.3a: a trigger then gets priority).
+    const swarm = new RegExp(`^For each ${COUNTER} counter you put on a creature this way, remove an? ${COUNTER} counter from that creature at the beginning of the next (end|cleanup) step$`).exec(s);
     if (swarm) {
       const prev = effects[effects.length - 1];
       const counter = counterKind(swarm[1]!);
       if (prev?.type !== "counters" || !prev.divided || prev.counter !== counter || counterKind(swarm[2]!) !== counter) return null;
-      effects.push({ type: "delayed", when: "nextEndStep", of: { ref: "countersPutThisWay", kind: counter }, perCounterPut: true, effects: [{ type: "removeCounters", what: { ref: "subject" }, counter, n: 1 }], text: `remove ${counter} counters from that creature` });
+      effects.push({ type: "delayed", when: swarm[3] === "cleanup" ? "nextCleanup" : "nextEndStep", of: { ref: "countersPutThisWay", kind: counter }, perCounterPut: true, effects: [{ type: "removeCounters", what: { ref: "subject" }, counter, n: 1 }], text: `remove ${counter} counters from that creature` });
       continue;
     }
     // Errant Minion, Power Leak: "that player may pay any amount of mana. ~ deals 2 damage to that player. Prevent X of
@@ -20359,6 +20387,25 @@ function round310Rewrites(text: string): string {
   // Decree of Silence: "... put a depletion counter on ~. If there are three or more depletion counters on ~, sacrifice it.":
   // "it" is ~, checked as the ability resolves, after the counter.
   text = text.replace(/(put an? [a-z]+ counter on ~\. If there are [a-z]+ or more [a-z]+ counters on ~, sacrifice) it\./, "$1 ~.");
+  return roundB159Rewrites(text);
+}
+
+/** Lane B round B159's whole-text rewrites, run from round310Rewrites (parseBodyText is at TS2563's limit). */
+function roundB159Rewrites(text: string): string {
+  // Pollen Remedy: "Prevent the next 3 damage that would be dealt this turn to any number of targets, divided as you choose.
+  // If ~ was kicked, prevent the next 6 damage this way instead.": the kicker is chosen before the targets and the division
+  // (CR 601.2b-d), so a kicked one divides 6 among targets chosen for it, as Fight with Fire's kicked damage does.
+  text = text.replace(/^(Prevent the next \d+ damage that would be dealt this turn to (any number of targets), divided as you choose\.) If ~ was kicked, prevent the next (\d+) damage this way instead\.$/, "$1 If ~ was kicked, prevent the next $3 damage that would be dealt this turn to $2, divided as you choose instead.");
+  // Sphere of Annihilation: "exile ~, all creatures and planeswalkers with mana value less than or equal to the number of void
+  // counters on it, and all creature and planeswalker cards in graveyards with mana value less than or equal to the number of
+  // void counters on it.": one instruction, every object moving at once; nothing goes to a graveyard along the way, so the
+  // graveyards first, then the permanents, then ~ itself, each counting its counters while it's still on the battlefield
+  // (as Decree of Annihilation's parts are read one after the other).
+  text = text.replace(/^exile ~, all (creatures and planeswalkers) (with mana value less than or equal to the number of ([a-z]+) counters on) it, and all (creature and planeswalker) cards in graveyards with mana value less than or equal to the number of \3 counters on it\.$/, "exile all $4 cards $2 ~ from all graveyards. Exile all $1 $2 ~. Exile ~.");
+  // Quarantine Field: "for each isolation counter on it, exile up to one target nonland permanent an opponent controls until
+  // ~ leaves the battlefield.": as many targets as it has counters as the trigger is put on the stack (rulings), up to one
+  // for each, so up to that many targets, all exiled until it leaves.
+  text = text.replace(/^for each ([a-z]+) counter on it, exile up to one (target [a-z]+ permanent) (an opponent controls) until ~ leaves the battlefield\.$/, "exile up to X $2s $3 until ~ leaves the battlefield, where X is the number of $1 counters on ~.");
   return text;
 }
 

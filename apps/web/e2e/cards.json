@@ -13006,6 +13006,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "12684e95-2652-4c3c-b2c7-021b62344d77",
+  "name": "Grim Reminder",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Search your library for a nonland card and reveal it. Each opponent who cast a spell this turn with the same name as that card loses 6 life. Then shuffle.\n{B}{B}: Return this card from your graveyard to your hand. Activate only during your upkeep.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4afd88fa-f8bb-46d4-9ba7-09419e6f858c",
   "name": "Grimdancer",
   "manaCost": "{1}{B}{B}",
@@ -13034,6 +13060,28 @@
   "set": "iko",
   "releasedAt": "2020-04-24",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fa798a3d-7797-4795-b251-a45f0429d169",
+  "name": "Grinning Totem",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}, {T}, Sacrifice this artifact: Search target opponent's library for a card and exile it. Then that player shuffles. Until the beginning of your next upkeep, you may play that card. At the beginning of your next upkeep, if you haven't played it, put it into its owner's graveyard.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -23,7 +23,7 @@ export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade
 
 /** How the cards an exileFaceDown effect exiled may be played (see GameObject.mayPlay). */
 export interface FaceDownPlay {
-  until: "thisTurn" | "exiled" | "yourNextTurn" | "source";
+  until: "thisTurn" | "exiled" | "yourNextTurn" | "source" | /** Grinning Totem: "Until the beginning of your next upkeep" (with SearchDest.play). */ "yourNextUpkeep";
   free?: true;
   anyType?: true;
   castOnly?: true;
@@ -247,6 +247,12 @@ export type Count =
   | { kind: "putThisWay" }
   /** Jester's Mask: "Search that player's library for that many cards" after "Target opponent puts the cards from their hand on top of their library": how many cards this resolution put there from a hand (ResolvingState.handPutOnTop). */
   | { kind: "handPutOnTopThisWay" }
+  /**
+   * Grim Reminder: "Each opponent who cast a spell this turn with the same name as that card loses 6 life": 1 if the player
+   * it's worked out for (PlayerRef eachOne) cast a spell this turn sharing a name with the card this resolution's search found
+   * (CR 201.2a; a face-down spell has no name, CR 708.2a), else 0.
+   */
+  | { kind: "castSameNameAsFound" }
   /** She-Hulk, Wallbreaker: "for each creature blocking it": the creatures blocking the source (`subject`: the trigger's attacker) as it resolves. */
   | { kind: "blockingIt"; subject?: true }
   /** "For each creature it's blocking" (Guardian of the Gateless): the creatures the source is blocking as this resolves. */
@@ -1306,7 +1312,7 @@ export type SameNameRef = { target: number; card?: true } | { subject: true } | 
 /** Where a card found by a search goes. */
 export interface SearchDest {
   /** "cast": "search your library for ... and cast that card without paying its mana cost" (Sunforger): it stays in the library for `castSearched`. */
-  zone: "hand" | "battlefield" | "libraryTop" | "graveyard" | "exile" | "cast";
+  zone: "hand" | "battlefield" | "libraryTop" | "graveyard" | "exile" | "cast" | /** "Search your library for a nonland card and reveal it. ... Then shuffle." (Grim Reminder): it stays in the library, revealed (ResolvingState.searchFound). */ "reveal";
   tapped?: boolean;
   /** "Exile it face down" (Beseech the Mirror): only its owner may look at it (CR 406.3); kept in Resolving.faceDownExiled. */
   faceDown?: true;
@@ -1315,6 +1321,11 @@ export interface SearchDest {
    * searched may play the card exiled face down, and look at it (CR 406.3).
    */
   play?: FaceDownPlay;
+  /**
+   * With `play`: "At the beginning of your next upkeep, if you haven't played it, put it into its owner's graveyard"
+   * (Grinning Totem): a delayed trigger for that card in exile as it is now (CR 603.7, 400.7); once played it's a new object.
+   */
+  upkeepGraveyard?: true;
   /** "Put that card third from the top" (Long-Term Plans), for "libraryTop". */
   third?: true;
   /** With "libraryTop": "Shuffle the chosen cards into your library" (Threats Undetected): the library is shuffled after they're put into it. */

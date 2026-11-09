@@ -13,7 +13,7 @@ import type { CardDef, Color, FaceDownKind, GameObject, GameState, ManaLot, Mana
  * What a payment is for: casting a spell (as it is on the stack: face down, bestowed), activating an ability of a
  * source, or anything else (a cost paid while something resolves, a special action, another player's spell).
  */
-export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** Myr Superion's "Spend only mana produced by creatures to cast ~" (CompiledCard.creatureManaOnly). */ creatureOnly?: true; /** Whether its total cost has {X} (CR 601.2f): its mana or alternative cost, or a kicker; unset, its mana cost. */ xCost?: boolean; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject; /** Kicked as it's cast (CR 702.33d), for "only to cast kicked spells" (Throne of Makindi). */ kicked?: true; /** Cast for its disturb cost (CR 702.146a), for "only to pay a disturb cost" (Unblinking Observer). */ disturb?: true; /** Cast from its caster's hand (CR 601.2a), for "can't be spent to cast spells from your hand" (Karolina Dean). */ fromHand?: true; /** Cast from exile (CR 601.2a), for "only to cast spells from exile" (Interdimensional Web Watch). */ fromExile?: true; /** Cast from a graveyard (CR 601.2a), for "only to cast a spell from your graveyard" (Lord of the Forsaken), with `owner`. */ fromGraveyard?: true; /** The spell's owner (CR 108.3), for "only to cast spells you don't own" (Thieving Varmint). */ owner?: PlayerId; /** A spell with flashback (its own, or given to it) cast from a graveyard, however it's cast (Altar of the Lost's rulings). */ flashbackFromGraveyard?: true; /** Cast face down (CR 708.4), for "only to cast face-down spells" (Tin Street Gossip). */ faceDown?: true } | { ability: GameObject; /** Its activation cost has {X} (Elementalist's Palette's mana). */ xCost?: true; /** A Class's level ability (CR 716.2a): "to gain a Class level". */ classLevel?: true; /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): only mana of these types. */ onlyColors?: ManaType[]; /** Mana of any color pays its colored symbols (Drana and Linvala's borrowed abilities, CR 609.4b). */ anyColor?: true; /** An equip ability (CR 702.6a), for "activate an equip ability" (Freya Crescent). */ equip?: true; /** Not an ability: unlocking a door of this Room, a special action (CR 709.5e, 116.2m), for "unlock doors" (Smoky Lounge). */ unlock?: true; /** Not an ability: turning this face-down permanent face up this way, a special action (CR 116.2b), for "to turn creatures face up" (Tin Street Gossip). */ faceUp?: FaceDownKind; /** Not an ability: paying this permanent's cumulative upkeep (CR 702.24a), for "only to pay cumulative upkeep costs" (Adarkar Unicorn). */ cumulativeUpkeep?: true; /** A power-up ability (CR 702.193), for "only to activate power-up abilities" (Quinjet Technician). */ powerUp?: true; /** Not an ability: foretelling this card, a special action (CR 702.143a, 116.2h), for "to foretell cards" (Niko Defies Destiny). */ foretell?: true } | "other";
+export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** Myr Superion's "Spend only mana produced by creatures to cast ~" (CompiledCard.creatureManaOnly). */ creatureOnly?: true; /** Imperiosaur's "Spend only mana produced by basic lands to cast ~" (CompiledCard.basicLandManaOnly). */ basicLandOnly?: true; /** Whether its total cost has {X} (CR 601.2f): its mana or alternative cost, or a kicker; unset, its mana cost. */ xCost?: boolean; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject; /** Kicked as it's cast (CR 702.33d), for "only to cast kicked spells" (Throne of Makindi). */ kicked?: true; /** Cast for its disturb cost (CR 702.146a), for "only to pay a disturb cost" (Unblinking Observer). */ disturb?: true; /** Cast from its caster's hand (CR 601.2a), for "can't be spent to cast spells from your hand" (Karolina Dean). */ fromHand?: true; /** Cast from exile (CR 601.2a), for "only to cast spells from exile" (Interdimensional Web Watch). */ fromExile?: true; /** Cast from a graveyard (CR 601.2a), for "only to cast a spell from your graveyard" (Lord of the Forsaken), with `owner`. */ fromGraveyard?: true; /** The spell's owner (CR 108.3), for "only to cast spells you don't own" (Thieving Varmint). */ owner?: PlayerId; /** A spell with flashback (its own, or given to it) cast from a graveyard, however it's cast (Altar of the Lost's rulings). */ flashbackFromGraveyard?: true; /** Cast face down (CR 708.4), for "only to cast face-down spells" (Tin Street Gossip). */ faceDown?: true } | { ability: GameObject; /** Its activation cost has {X} (Elementalist's Palette's mana). */ xCost?: true; /** A Class's level ability (CR 716.2a): "to gain a Class level". */ classLevel?: true; /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): only mana of these types. */ onlyColors?: ManaType[]; /** Mana of any color pays its colored symbols (Drana and Linvala's borrowed abilities, CR 609.4b). */ anyColor?: true; /** An equip ability (CR 702.6a), for "activate an equip ability" (Freya Crescent). */ equip?: true; /** Not an ability: unlocking a door of this Room, a special action (CR 709.5e, 116.2m), for "unlock doors" (Smoky Lounge). */ unlock?: true; /** Not an ability: turning this face-down permanent face up this way, a special action (CR 116.2b), for "to turn creatures face up" (Tin Street Gossip). */ faceUp?: FaceDownKind; /** Not an ability: paying this permanent's cumulative upkeep (CR 702.24a), for "only to pay cumulative upkeep costs" (Adarkar Unicorn). */ cumulativeUpkeep?: true; /** A power-up ability (CR 702.193), for "only to activate power-up abilities" (Quinjet Technician). */ powerUp?: true; /** Not an ability: foretelling this card, a special action (CR 702.143a, 116.2h), for "to foretell cards" (Niko Defies Destiny). */ foretell?: true } | "other";
 
 /** What paying an activated ability's mana cost is for: its source, and only the chosen color's mana if it says so. */
 export function abilityUse(o: GameObject, ab: ActivatedAbility, s?: GameState): ManaUse {
@@ -64,18 +64,24 @@ export function manaOriginsOf(s: GameState, o: GameObject): ManaOrigin[] {
   if (here && c.subtypes.includes("Treasure")) out.push("treasure");
   // Cataclysmic Prospecting: "for each mana from a Desert spent to cast ~" (CR 106.3), a Desert as it made the mana.
   if (here && c.subtypes.includes("Desert")) out.push("desert");
+  // Imperiosaur: "mana produced by basic lands": a land with the basic supertype as it made the mana (CR 205.4a), not a
+  // triggered mana ability's source when a basic land is tapped (rulings).
+  if (here && c.types.includes("Land") && c.supertypes.includes("Basic")) out.push("basicLand");
   return out;
 }
 
 const treasureOnly = (use: ManaUse) => use !== "other" && "spell" in use && !!use.treasureOnly;
 /** Myr Superion: only mana a creature on the battlefield made (CR 106.3, 109.2; rulings), restricted mana too if it may be spent on it. */
-const creatureOnly = (use: ManaUse) => use !== "other" && "spell" in use && !!use.creatureOnly;
+const creatureOnly = (use: ManaUse) => use !== "other" && "spell" in use && (!!use.creatureOnly || !!use.basicLandOnly);
+/** The kind of source Myr Superion's or Imperiosaur's mana must come from. */
+const onlyOrigin = (use: ManaUse): ManaOrigin | undefined => (use !== "other" && "spell" in use ? (use.creatureOnly ? "creature" : use.basicLandOnly ? "basicLand" : undefined) : undefined);
 
 /** The lots of `pid`'s pool that can be spent on `use`. With Security Rhox's cost, only unrestricted mana from Treasures. */
 function usableLots(s: GameState, pid: PlayerId, use: ManaUse): ManaLot[] {
   const lots = s.players[pid]!.manaLots ?? [];
   if (treasureOnly(use)) return lots.filter((l) => !l.only && l.from?.includes("treasure"));
-  if (creatureOnly(use)) return lots.filter((l) => l.from?.includes("creature") && (!l.only || spendAllows(s, pid, l.only, use)));
+  const origin = onlyOrigin(use);
+  if (origin) return lots.filter((l) => l.from?.includes(origin) && (!l.only || spendAllows(s, pid, l.only, use)));
   return lots.filter((l) => !l.only || spendAllows(s, pid, l.only, use));
 }
 
@@ -173,8 +179,28 @@ export function payableCost(s: GameState, pid: PlayerId, cost: ParsedCost, use?:
     (!!use && use !== "other" && "ability" in use && !!use.anyColor) ||
     mine.some((o) => !!abilitiesOf(s, o).spendAnyColor || (creatureAbility && !!abilitiesOf(s, o).spendAnyColorCreatureAbilities) || (walkerSpell && !!abilitiesOf(s, o).spendAnyColorPlaneswalkerSpells) || (!!spellSubtypes && spellSubtypes.includes(abilitiesOf(s, o).spendAnyColorSubtypeSpells ?? "\u0000"))) ||
     s.battlefield.some((id) => !!abilitiesOf(s, s.objects[id]!).spendAnyColorAll); // Mycosynth Lattice: every player
-  const c = krrik ? blackForLife(cost) : cost;
+  const c0 = krrik ? blackForLife(cost) : cost;
+  const c = mine.some((o) => !!abilitiesOf(s, o).spendWhiteAsRed) ? whiteAsRed(c0) : c0;
   return orrery ? anyColorPays(c) : c;
+}
+
+/**
+ * Sunglasses of Urza: "You may spend white mana as though it were red mana" (CR 609.4b): white mana pays a {R} as it
+ * would a {R/W}, the red half of a hybrid symbol ({R/G} as {R/G/W}), {2/R} and {R/P} too. The cost stays what it was and
+ * the mana spent stays white, as payFromPool records it.
+ */
+function whiteAsRed(cost: ParsedCost): ParsedCost {
+  return {
+    ...cost,
+    symbols: cost.symbols.map((x): CostSymbol => {
+      if (x.kind === "colored" && x.color === "R") return { kind: "hybrid", options: ["R", "W"] };
+      if (x.kind === "hybrid" && x.options.includes("R") && !x.options.includes("W")) return { ...x, options: [...x.options, "W"] };
+      if (x.kind === "twoHybrid" && x.color === "R") return { ...x, also: "W" };
+      // {R/P}: red or white mana, or 2 life, still a Phyrexian symbol (CR 107.4f).
+      if (x.kind === "phyrexian" && x.color === "R" && !x.krrik && !x.any) return { kind: "hybrid", options: ["R", "W"], life: true, phyrexian: true };
+      return x;
+    }),
+  };
 }
 
 /**
@@ -257,7 +283,7 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, us
         if (l.creatureCounter && creatureSpell) creatureCounters += k;
         if (k && l.source) sources.add(l.source);
         if (l.spentTrigger && use !== "other" && "spell" in use) for (let j = 0; j < k; j++) spentTriggers.push(l.spentTrigger);
-        for (const f of l.from ?? []) if (f !== "snow") from[f] += k;
+        for (const f of l.from ?? []) if (f !== "snow" && f !== "basicLand") from[f] += k;
       }
     };
     // Mana that can't pay generic costs (Jegantha) paid colored symbols only, as payFromPool chose; the snow mana it spent

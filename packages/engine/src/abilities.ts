@@ -1082,6 +1082,12 @@ export interface TargetSpec {
    * is no source to choose. Bound as the choice is made (only damage sources use it).
    */
   sharesColorWithLinked?: true;
+  /**
+   * Protective Sphere: "a source of your choice that shares a color with the mana spent on this activation cost": one of
+   * the colors of the mana spent to activate it (StackItem.manaSpentTypes); colorless mana prevents nothing. Bound as the
+   * choice is made, like `sharesColorWithLinked`.
+   */
+  sharesColorWithManaSpent?: true;
   /** "A permanent ... that shares a card type with it" (Martyr's Bond): with the trigger's subject, as it last existed; bound as the pick resolves. */
   sharesTypeWithSubject?: true;
   /** "A creature of their choice that's blocking it" (Labyrinth Raptor): blocking the trigger's subject as the pick resolves (CR 509.1h); none once the subject has left combat or the battlefield (CR 506.4). Only a "pick" checks it. */
@@ -5151,6 +5157,8 @@ export type SpellCondition =
   | { kind: "youDid" }
   /** Guard Dogs: "if it shares a color with that permanent": both objects as they are now, on the battlefield, with a color in common (CR 105.2). */
   | { kind: "sharesColor"; a: ObjRef; b: ObjRef }
+  /** Musician: "If it doesn't have "...", it gains that ability": the permanent has an ability an effect gave it with this text now (layer 6, CR 613.1f), from any source. */
+  | { kind: "hasGrantedAbility"; what: ObjRef; text: string }
   /** Cait, Cage Brawler: "if you discarded the card with the greatest mana value among those cards or tied for greatest": among the cards discarded while this resolves. */
   | { kind: "youDiscardedGreatestMv" }
   /** "If this ability has been activated four or more times this turn" (Dragon Whelp): this activated ability, counted as it resolves (rulings). */
@@ -7381,6 +7389,14 @@ export interface CompiledCard {
    * on the battlefield made (CR 106.3, 109.2); not a creature card's elsewhere (Elvish Spirit Guide, rulings).
    */
   creatureManaOnly?: true;
+  /** Imperiosaur: "Spend only mana produced by basic lands to cast ~": the same with mana a basic land made (CR 106.3, 205.4a; rulings: not mana a triggered mana ability adds as one is tapped, and spending mana as though it were any type doesn't change that). */
+  basicLandManaOnly?: true;
+  /**
+   * Null Chamber: "As ~ enters, you and an opponent each choose a card name other than a basic land card name." (CR 614.12):
+   * its controller chooses the opponent (rulings: not targeted), then the two choose, the active player first and each
+   * seeing the other's choice (CR 101.4); the names are Chosen.name and Chosen.opponentName.
+   */
+  entersNamesWithOpponent?: { names?: TargetSpec };
   /** "As ~ enters, choose a player" / "an opponent" (CR 614.12): kept while it's on the battlefield, as Chosen.player. */
   entersChoosePlayer?: "player" | "opponent";
   /** "As ~ enters, choose another creature you control" (Dauntless Bodyguard, CR 614.12): one of these, not one entering with it (rulings), kept as Chosen.object. */
@@ -7759,7 +7775,7 @@ export interface CompiledCard {
    * opponents can't cast spells with the chosen name", "Activated abilities of sources with the chosen name can't be
    * activated [unless they're mana abilities]" (in every zone, rulings on Pithing Needle).
    */
-  nameBans?: ({ kind: "cast"; who: "all" | "opponents" } | { kind: "activate"; exceptMana?: true })[];
+  nameBans?: ({ kind: "cast"; who: "all" | "opponents" } | { kind: "activate"; exceptMana?: true } | /** Null Chamber: "lands with the chosen names can't be played" (CR 305.1). */ { kind: "play" })[];
   /**
    * Cornered Market: "Players can't cast spells with the same name as a nontoken permanent" (`cast`) and "Players can't play
    * nonbasic lands with the same name as a nontoken permanent" (`lands`): names on the battlefield now, a face-down permanent
@@ -8127,6 +8143,8 @@ export interface CompiledCard {
   unlockLess?: number;
   /** Chromatic Orrery: "You may spend mana as though it were mana of any color." (CR 609.4b), for its controller's costs. */
   spendAnyColor?: true;
+  /** Sunglasses of Urza: "You may spend white mana as though it were red mana." (CR 609.4b): for its controller's costs, white mana pays {R}; it stays white. */
+  spendWhiteAsRed?: true;
   /** "Players may spend mana as though it were mana of any color" (Mycosynth Lattice): every player, for every cost (CR 609.4b). */
   spendAnyColorAll?: true;
   /** Agatha's Soul Cauldron: "You may spend mana as though it were mana of any color to activate abilities of creatures you control" (CR 609.4b). */

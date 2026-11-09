@@ -1380,7 +1380,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Pyre of Heroes: "that shares a creature type with the sacrificed creature", as it last existed (rulings): a card
       // with one of its creature types (none: nothing fits).
       const filter0 = filter00?.sharesCreatureTypeWithSacrificed ? sacrificedKin(s, ctx, filter00) : filter00;
-      const filter1 = filter0?.named === "~" ? { ...filter0, named: src } : filter0?.notNamed === "~" ? { ...filter0, notNamed: src } : filter0;
+      const filter1a = filter0?.named === "~" ? { ...filter0, named: src } : filter0?.notNamed === "~" ? { ...filter0, notNamed: src } : filter0;
+      // Mishra, Artificer Prodigy: "a card with the same name as that spell": the name the cast spell had as it was cast
+      // (StackItem.castName; none face down, CR 708.2a, so nothing is found then).
+      const causeName = filter1a?.sameNameAsCause && ctx.cause !== undefined ? s.castItems?.[ctx.cause]?.castName : undefined;
+      const filter1 = filter1a?.sameNameAsCause && causeName !== undefined ? (({ sameNameAsCause: _, ...rest }) => ({ ...rest, named: causeName }))(filter1a) : filter1a;
       const filter2 = filter1?.colorOfYourLegend ? legendColors(s, filter1, ctx.controller) : filter1;
       // "With a different name than each Aura you control" (Light-Paws): the names of those you control as it resolves.
       let filter3a = filter2?.notNamedAsYours ? (({ notNamedAsYours: yours, ...rest }) => ({ ...rest, notNamedAny: s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown && controllerOf(s, o) === ctx.controller && objectMatches(s, yours!, o, ctx.controller, false)).map((o) => characteristics(s, o).name) }))(filter2) : filter2;

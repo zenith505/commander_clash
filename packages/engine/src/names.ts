@@ -42,7 +42,8 @@ function bansOn(s: GameState, name: string | undefined) {
   const out: { o: GameObject; ban: NonNullable<ReturnType<typeof abilitiesOf>["nameBans"]>[number] }[] = [];
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
-    if (o.chosen?.name === undefined || !hasName(name, o.chosen.name)) continue;
+    // Null Chamber: either of its two names (Chosen.opponentName, the opponent's).
+    if (![o.chosen?.name, o.chosen?.opponentName].some((n) => n !== undefined && hasName(name, n))) continue;
     for (const ban of abilitiesOf(s, o).nameBans ?? []) out.push({ o, ban });
   }
   return out;
@@ -116,5 +117,8 @@ export function nameLandBan(s: GameState, pid: PlayerId, d: CardDef): string | n
   const market = permanentNameBan(s, d, "lands");
   if (market) return market;
   const b = (s.namedBansUntil ?? []).find((x) => x.lands && hasName(d.name, x.name) && (!x.players || x.players.includes(pid)));
-  return b ? `${b.source}: lands named ${d.name} can't be played until ${s.players[b.controller]!.name}'s next turn` : null;
+  if (b) return `${b.source}: lands named ${d.name} can't be played until ${s.players[b.controller]!.name}'s next turn`;
+  // Null Chamber: "lands with the chosen names can't be played", anyone's (CR 305.1).
+  const chamber = bansOn(s, d.name).find(({ ban }) => ban.kind === "play");
+  return chamber ? `${characteristics(s, chamber.o).name}: lands named ${d.name} can't be played` : null;
 }

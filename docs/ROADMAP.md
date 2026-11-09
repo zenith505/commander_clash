@@ -1,6 +1,6 @@
 # Roadmap
 
-30,805 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,812 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,785 of
 9,979 (98%).
 
@@ -7413,6 +7413,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   you cast this spell": the opponent chosen as it's cast, X defined by that graveyard and paid, CR 107.3c, 601.2b; a picker
   showing each opponent's X, a browser test; the bot chooses the opponent with the most such cards). +8, 30,805 of 31,936
   with B163 and round 322.
+- Round B165 (least played first, mechanics that could be built from the skip lists): Sunglasses of Urza ("You may spend
+  white mana as though it were red mana", CR 609.4b: white pays a {R}, the red half of a hybrid symbol, {2/R} and {R/P},
+  for its controller's costs only; the cost and the mana spent stay what they were). Imperiosaur ("Spend only mana produced
+  by basic lands to cast ~": mana now records a basic land as its source, CR 106.3, 205.4a; Sol Ring's, a nonbasic land's
+  or a creature's mana can't pay, in the pool or not, nor Utopia Sprawl's extra mana as a Forest is tapped, rulings).
+  Musician (a music counter, and 'If it doesn't have "...", it gains that ability': the granted ability's text compared as
+  layer 6 has it, so a creature gains it once however many Musicians target it, kept with no duration; music counters from
+  elsewhere do nothing, rulings; "destroy ~ unless you pay {1} for each music counter on it" counted as it resolves).
+  Rohgahh of Kher Keep ("Creatures you control named Kobolds of Kher Keep get +2/+2"; unpaid, ~ and every creature with that
+  name, anyone's, tapped and then controlled by the opponent chosen as it resolves, rulings, CR 611.2c). Mishra, Artificer
+  Prodigy ("search your graveyard, hand, and/or library for a card with the same name as that spell": the name the artifact
+  spell had as it was cast, the library and its shuffle only if chosen). Null Chamber ("you and an opponent each choose a
+  card name other than a basic land card name": its controller chooses the opponent, not targeted, rulings; the two name in
+  turn order from the active player, the second seeing the first, CR 101.4; spells with either name can't be cast and lands
+  with either can't be played, by anyone; a bot opponent names a card of the Chamber's controller; a browser test).
+  Protective Sphere ("a source of your choice that shares a color with the mana spent on this activation cost": the
+  activation's mana colors as the source is chosen, CR 609.7a; colorless mana prevents nothing). The bot doesn't activate
+  Musician. +7, 30,812 of 31,936 with B164 and round 322.
+- Out after round B165 (looked at, not done): Gloom (the tax reaches mana abilities), Twinning Glass, Yixlid Jailer,
+  Decaying Soil, Nature's Wrath, Graceful Takedown, Alpine Moon, Thought Prison, Grimoire Thief and Kianne, Dean of Substance
+  stay out for the reasons in the earlier lists. Protective Sphere and Imperiosaur, out after B162 and B67, are done.
 - Out after round B163 (looked at, not done): Words of Waste and Words of Wind (an opponent's discard or each player's
   bounce chosen in the middle of a draw: a pause the draw sequence resumes from only for some replacements), Strax,
   Sontaran Nurse ("Choose a player at random. When you do, ~ fights another target creature that player controls": a

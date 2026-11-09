@@ -1139,6 +1139,7 @@ export function moveObject(
   o.targetedThisTurn = undefined;
   o.modesChosen = undefined; // "choose one that hasn't been chosen": a new object starts over (CR 400.7)
   o.skipNextUntap = undefined;
+  o.returnAtUntapOf = undefined;
   o.skipMoreUntaps = undefined;
   o.renowned = undefined;
   o.monstrous = undefined;
@@ -4173,6 +4174,12 @@ function untapStep(s: GameState, keep: ObjectId[], limited?: ObjectId[]): void {
       untapPermanent(s, o); // CR 502.3
     }
   }
+  // Undiscovered Paradise: "as you untap your permanents, return ~ to its owner's hand", whether or not it untapped
+  // (rulings); not a trigger, so nothing uses the stack (CR 502.4).
+  for (const id of s.battlefield.filter((x) => obj(s, x).returnAtUntapOf === ap)) {
+    log(s, `${nameOf(s, id)} returns to its owner's hand.`);
+    moveObject(s, id, "hand");
+  }
   // "Whenever you untap one or more permanents during your untap step" (The Millennium Calendar): put on the stack once
   // the upkeep starts (rulings, CR 503.1a).
   player(s, ap).noUntapNow = undefined;
@@ -5411,6 +5418,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     (s.nextCast ??= []).push({ controller: p.id, filter: e.filter, sourceId: o.id, sourceCardId: cardIdOf(o), body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." }, turn: s.turn, ...(e.uncounterable ? { uncounterable: true as const } : {}), ...(e.fromHand ? { fromHand: true as const } : {}) });
   }
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
+  // Undiscovered Paradise: returned during its activator's next untap step, if it's still this permanent then (rulings).
+  if (ab.returnAtNextUntap && o.zone === "battlefield") o.returnAtUntapOf = p.id;
   // Depletion lands, as the ability resolves: "Put a depletion counter on ~", "If there are no depletion counters on ~,
   // sacrifice it" (checked after the cost removed one).
   if (ab.putCounter && o.zone === "battlefield") putCounters(s, o, ab.putCounter, 1);
@@ -5418,7 +5427,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     log(s, `${p.name} sacrifices ${name}.`);
     moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
   }
-  if (ab.selfDamage && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
+  if (ab.selfDamage && (!ab.selfDamageIf || staticConditionNow(s, ab.selfDamageIf, o.id, p.id)) && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
   // Vazi: "if mana from a Treasure was spent to ... activate it" counts mana abilities too.
   fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}), ...(ab.exhaust ? { exhaust: true as const } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}) });
 }
@@ -8209,8 +8218,8 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     }
     // Kaervek's Spite: every permanent you control, so not with one that can't be sacrificed (CR 118.3).
     if (c.kind === "sacrificeAll") {
-      const stuck = s.battlefield.map((id) => obj(s, id)).find((x) => controllerOf(s, x) === pid && (!c.creatures || objIsType(s, x, "Creature")) && !canSacrificeForCost(s, x));
-      if (stuck) return `${defOf(s, stuck).name} can't be sacrificed, so you can't sacrifice all your ${c.creatures ? "creatures" : "permanents"} to ${doing}`;
+      const stuck = s.battlefield.map((id) => obj(s, id)).find((x) => controllerOf(s, x) === pid && (!c.creatures || objIsType(s, x, "Creature")) && (!c.lands || objIsType(s, x, "Land")) && !canSacrificeForCost(s, x));
+      if (stuck) return `${defOf(s, stuck).name} can't be sacrificed, so you can't sacrifice all your ${c.creatures ? "creatures" : c.lands ? "lands" : "permanents"} to ${doing}`;
       continue;
     }
     if (c.kind === "discardHand") continue; // an empty hand pays it too
@@ -8723,8 +8732,8 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
     } else if (c.kind === "sacrificeAll") {
       // Kaervek's Spite: all of them at once (CR 701.21a), as they are now. Soulblast: all creatures, each as it last
       // existed for "the total power of the sacrificed creatures" (CR 608.2h).
-      const what = c.creatures ? "creatures" : "permanents";
-      const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p.id && (!c.creatures || objIsType(s, obj(s, id), "Creature")));
+      const what = c.creatures ? "creatures" : c.lands ? "lands" : "permanents";
+      const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p.id && (!c.creatures || objIsType(s, obj(s, id), "Creature")) && (!c.lands || objIsType(s, obj(s, id), "Land")));
       log(s, ids.length ? `${p.name} sacrifices all their ${what}: ${ids.map((id) => nameOf(s, id)).join(", ")}.` : `${p.name} has no ${what} to sacrifice.`);
       if (c.creatures)
         for (const id of ids) {

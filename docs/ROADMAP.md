@@ -1,7 +1,7 @@
 # Roadmap
 
-30,634 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,733 of
+30,642 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,966 of 4,988 (99%), top 10,000: 9,737 of
 9,979 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1183,7 +1183,7 @@ line blocks.
    Out after round 222 (looked at, not done): Deconstruction Hammer and its kind (a granted ability that sacrifices
    the Equipment granting it); Subterranean Schooner (explore by the creature that crewed it); Turtle Van; Trove of
    Temptation (an attack requirement on opponents); Hedron Matrix (done in round B104) (a per-object amount in a static); Voracious Dragon
-   (types of the devoured creatures); Jurin, Leading the Charge; Incite Rebellion; Ajani Unrelenting. Sosuke, Dragon's
+   (types of the devoured creatures); Jurin, Leading the Charge; Incite Rebellion (done in round B154); Ajani Unrelenting. Sosuke, Dragon's
    Prey, Dire Downdraft and Nullmage Advocate were left to Lane B, whose templates cover them.
    Round 223 (fresh cards from rank 15,000 on): "You may reveal this card from your opening hand. If you do, at the
    beginning of the first upkeep / your first upkeep / your first main phase of the game, ..." as a delayed trigger
@@ -3517,7 +3517,7 @@ line blocks.
    - Flip: Sasaya's back face.
    - Meld: bots don't save Hanweir Battlements' mana for its meld ability (they use it for haste). "Twice this turn"
      for loyalty abilities of other permanents (Kaito, Urza Assembles the Titans) isn't supported.
-   - Preston, God-Pharaoh's Gift, Ardyn, Hour of Eternity, Dino DNA and Hashaton are blocked on other lines.
+   - Preston, God-Pharaoh's Gift, Ardyn, Hour of Eternity (done in round B154), Dino DNA and Hashaton are blocked on other lines.
    - Still out from earlier rounds: Treacherous Pit-Dweller ("enters from a graveyard, target opponent gains control
      of it"), Leyline of the Guildpact ("each nonland permanent you control is all colors"), Sphinx of the Guildpact
      ("hexproof from monocolored").
@@ -5369,7 +5369,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   fire counters on it, it's an artifact creature" (War Balloon), the evolve-like check with an oil counter (Evolving
   Adaptive), "costs {1} less to cast if it targets an attacking or tapped creature" (Dire Downdraft), "Enchanted land is
   every basic land type in addition to its other types" (Nylea's Presence). +19 (28,400 of 31,936 with round 222).
-- Out after round B54 (looked at, not done): Foraging Wickermaw (a mana ability that changes its color), Tomb of Urami
+- Out after round B54 (looked at, not done): Foraging Wickermaw (a mana ability that changes its color), Tomb of Urami (done in round B154)
   ("Sacrifice all lands you control" and a mana ability that deals damage), Ohabi Caleria and Sosuke (group "deals
   damage to a creature" triggers), Gideon, the Oathsworn (done in round B106) ("non-Gideon" becomes "non-~" in the normalized text), Garruk,
   Veiled Butcher ("If you sacrificed a creature this way", "who didn't discard two nonland cards"), Blackmail (the
@@ -5428,7 +5428,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   opponent controls with power less than ~'s power ..., untap that creature, and it gains haste"), Tajuru Paragon ("a
   card that shares a creature type with it from among them"), Makeshift Mannequin (a granted ability for as long as it
   has a counter), Phylactery Lich (an "as enters" counter on another permanent and a state trigger), Undiscovered
-  Paradise, Hold for Ransom, Mercurial Transformation, Goblin Festival, Trench Gorger, Tatsumasa, Adipose Offspring,
+  Paradise (done in round B154), Hold for Ransom, Mercurial Transformation, Goblin Festival, Trench Gorger (done in round B154), Tatsumasa, Adipose Offspring,
   Fractal Tender, Keldon Flamesage, Sporogenesis, Kentaro, Immard, Feldon, Corruption of Towashi, Donnie & April, Path of
   Mettle, Rise from the Wreck, plus the multi-line and new-mechanic cards in the same range (Bomb Squad, Word of Command,
   Celestial Dawn, Death or Glory, Selective Adaptation and the like).
@@ -5452,8 +5452,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B57 (looked at, not done): Saw ("a permanent other than that creature or ~": a pick that excludes the
   trigger's subject), Glimpse the Cosmos (a conditional cast from the graveyard for another cost), Traveler's Cloak (any
   land type, nonbasic too), Corrosive Ooze (destroying Equipment at end of combat), Trove of Temptation (an attack
-  requirement toward you or your planeswalkers), Viral Spawning (a conditional flashback), Silver Surfer, Galactus's Herald
-  ("attacks that player each combat"), Blue Dragon (three targets until your next turn), Satyr Firedancer (a spell's damage
+  requirement toward you or your planeswalkers), Viral Spawning (done in round B154) (a conditional flashback), Silver Surfer, Galactus's Herald
+  ("attacks that player each combat"), Blue Dragon (done in round B154) (three targets until your next turn), Satyr Firedancer (a spell's damage
   to an opponent), Thrill-Kill Disciple (squad with a discard), Magnigoth Treefolk and Diligent Zookeeper (counted
   landwalk and creature types), Exotic Pets and Storm of Forms (each kind of counter), Sanctifier en-Vec (a color filter on
   permanents, spells and cards going to graveyards), Greatbow Doyen, Ancestral Communion, The Book of Vile Darkness.
@@ -5582,7 +5582,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Vitu-Ghazi). +16 (28,574 of 31,936 with round 223).
 - Out after round B62 (looked at, not done): Arcus Acolyte (outlast granted to creatures without a +1/+1 counter),
   Skyclave Shade (a landfall trigger from the graveyard that lets it be cast this turn), Jocasta, Automaton Avenger
-  (returns tapped and attacking when you attack with your commander, from the graveyard), Undiscovered Paradise
+  (returns tapped and attacking when you attack with your commander, from the graveyard), Undiscovered Paradise (done in round B154)
   (returned to hand during your next untap step), Archangel of Strife (done in round B148) (each player chooses war or peace), Lumbering
   Battlement (exile any number until it leaves, +2/+2 for each), Forbidden Crypt (draws replaced, losing if you
   can't), Induced Amnesia (exiled face down, returned when it leaves), Heart of Kiran (a loyalty counter instead of
@@ -5662,7 +5662,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   trigger resolves), Rinoa, Angel Wing (returning one of the attacking creatures that died, from any owner's graveyard),
   Tide of War ("Whenever one or more creatures block" and sacrifices by each controller), Countersculpt ("behold a Jace
   or pay {1}"), Druid of the Emerald Grove (a d20 that splits the searched cards), Sphinx's Approach ("exile ~ and four
-  cards named ~"), Faces of the Past (creatures that share a creature type with it), Diaochan, Artful Beauty (done in round B141) (a target
+  cards named ~"), Faces of the Past (done in round B154) (creatures that share a creature type with it), Diaochan, Artful Beauty (done in round B141) (a target
   of an opponent's choice).
 - Round B66 (eight from the B10 list, and Stormwild Capridor, Kentaro, the Smiling Cat, Majestic Myriarch and
   Thunderous Orator from EDHREC rank about 19,700 up): "If damage would be dealt to you, prevent that damage. You gain
@@ -7008,6 +7008,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   enchant, chosen as it resolves, CR 303.4d; with none it stays, rulings). Split the Spoils (you separate the exiled cards
   into two piles, an opponent chosen as it resolves picks the pile for your hand, CR 700.3, rulings). +8 (30,634 of 31,936
   with B152 and rounds 311-313).
+- Round B154 (least played first, every remaining card already examined, so mechanics that could be built): Incite
+  Rebellion ("For each player, ~ deals damage to that player and each creature that player controls equal to the number of
+  creatures they control": each player's own count, all dealt at once, CR 120.3, rulings). Blue Dragon ("until your next
+  turn, target creature an opponent controls gets -3/-0, up to one other target creature gets -2/-0, and up to one other
+  target creature gets -1/-0": three instructions, no creature chosen twice, rulings, CR 115.3). Hour of Eternity (a token
+  copy of each card exiled this way, except a 4/4 black Zombie instead of its other colors and creature types, rulings,
+  CR 707.9b; a target gone from the graveyard isn't copied, CR 608.2b). Undiscovered Paradise ("During your next untap
+  step, as you untap your permanents, return ~ to its owner's hand": whether or not it untaps, rulings; no stack, CR
+  502.4). Viral Spawning (flashback only while an opponent has three or more poison counters, checked as it's cast, CR
+  702.34a). Trench Gorger (base power and toughness the number of lands it exiled, locked in, rulings, CR 613.4b; bots don't
+  search, as none found makes it 0/0). Faces of the Past (tap all untapped or untap all tapped creatures sharing a
+  creature type with the creature that died, as it last existed, chosen as it resolves, rulings, CR 608.2h; a browser
+  test). Tomb of Urami ("~ deals 1 damage to you if you don't control an Ogre" as the mana ability resolves; "Sacrifice
+  all lands you control", itself too, rulings). +8 (30,642 of 31,936 with B153).
+- Out after round B154 (looked at, not done): Blood Scrivener (two draws and a life loss instead of one draw: with
+  another Scrivener, Phial of Galadriel or an Archive, which replacement applies to which of the new draws isn't tracked,
+  CR 614.5, 616.1), Selective Snare and Aphetto Dredging (a creature type chosen as it's cast, before targets).
 - Out after round B152 (looked at, not done): Peace Talks ("can't be the targets of spells or activated abilities":
   a triggered source isn't told apart from an activated one when targets are checked).
 - Out after round B151 (looked at, not done): Thelon's Chant and Tourach's Chant (the player who put a land onto the

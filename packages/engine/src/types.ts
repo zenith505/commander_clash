@@ -1976,7 +1976,7 @@ export interface GameState {
    * them (603.7d-e), `sourceZc` as it was then: an ability about "~" is about that object only (603.7c, 400.7). `turn`: the
    * turn it was made, for "until the end of your next turn".
    */
-  floatingTriggers?: { id: string; controller: PlayerId; sourceId: ObjectId; sourceCardId: string; sourceZc: number; fromSpell?: true; trigger: TriggeredAbility; until: TriggerDuration; turn: number; /** What its self events are about, if not its source (Effect floatingTrigger's `about`). */ about?: { id: ObjectId; zc: number }; /** Only for combat damage dealt to this player (`aboutPlayer`). */ toPlayer?: PlayerId; /** It triggers only once ("when you next attack this turn"), then is gone. */ once?: true }[];
+  floatingTriggers?: { id: string; controller: PlayerId; sourceId: ObjectId; sourceCardId: string; sourceZc: number; fromSpell?: true; trigger: TriggeredAbility; until: TriggerDuration; turn: number; /** What its self events are about, if not its source (Effect floatingTrigger's `about`). */ about?: { id: ObjectId; zc: number }; /** Only for combat damage dealt to this player (`aboutPlayer`). */ toPlayer?: PlayerId; /** It triggers only once ("when you next attack this turn"), then is gone. */ once?: true; /** Nuka-Nuke Launcher: only this player's spells trigger it, and "endOfYourNextTurn" is the end of this player's next turn. */ forPlayer?: PlayerId }[];
   /** Spells cast this turn, by anyone (storm, CR 702.40a). */
   spellsCastThisTurn?: number;
   /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */
@@ -2574,6 +2574,8 @@ export interface Resolving {
   pilesToGraveyard?: { id: ObjectId; zc: number }[];
   /** The cards its mill instructions exiled instead (a replacement, Rest in Peace): still "the milled cards" for Gyruda's rulings. */
   milledExiled?: { id: ObjectId; zc: number }[];
+  /** Jace, Architect of Thought: the cards searchEachExile exiled, for "those cards". */
+  searchedExiled?: { id: ObjectId; zc: number }[];
   /** The cards the last "exile the top N cards of their library" exiled (Ensnared by the Mara's "those exiled cards"). */
   exiledTopCards?: ObjectId[];
   /** How many cards its exileNamed instruction exiled from the hand ("for each card exiled from their hand this way"). */
@@ -2982,6 +2984,10 @@ export interface Resolving {
     /** "Then repeat this process X more times": the passes left (this one too), the next instruction, and the scratch from before it started. */
     /** Insatiable Frugivore's repeatIfDid: the step it's at, and the scratch keys from before it began. */
     repeatDid?: { step: number; keep: string[] };
+    /** Eivor, Wolf-Kissed's putMilledPair: the cards picked so far, one per filter (null: none for that one). */
+    milledPair?: (ObjectId | null)[];
+    /** searchEachExile: the players whose libraries are still to be searched. */
+    searchEach?: PlayerId[];
     repeat?: { left: number; step?: number; keep: string[]; gathered?: ObjectId[]; order?: PlayerId[] };
     /** The commander chosen to put into the hand (Command Beacon with two commanders). */
     commander?: ObjectId;

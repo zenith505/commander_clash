@@ -4465,7 +4465,9 @@ function finishCleanup(s: GameState) {
     if (lock && ((s.activePlayer === lock.turnOf && s.turn > lock.sinceTurn) || player(s, lock.turnOf).lost)) s.objects[id]!.phased!.lock = undefined;
   }
   // Delayed triggered abilities lasting "until end of turn", or "until the end of your next turn" in that turn (CR 603.7b).
-  s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "endOfTurn" || (f.until === "endOfYourNextTurn" && s.activePlayer === f.controller && s.turn > f.turn)));
+  // Nuka-Nuke Launcher: "until the end of defending player's next turn" (`forPlayer`); once that player has left the game
+  // they cast nothing more, so it's gone then too (CR 800.4m).
+  s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "endOfTurn" || (f.until === "endOfYourNextTurn" && s.activePlayer === (f.forPlayer ?? f.controller) && s.turn > f.turn) || (f.forPlayer !== undefined && player(s, f.forPlayer).lost)));
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
   s.flashbackGrants = undefined;
   s.yardKeywordGrants = undefined; // Cursecloth Wrappings' "until end of turn" (CR 514.2)
@@ -5470,7 +5472,7 @@ export function addTriggeredMana(s: GameState, pid: PlayerId, picked: { adds: Ma
  * commanders' color identity" (War Room: set before the game, CR 903.4; none for a colorless one, rulings).
  */
 export function activatedLifeCost(s: GameState, pid: PlayerId, ab: ActivatedAbility, o?: GameObject, x?: number): number {
-  return (ab.lifeCost ?? 0) + (ab.lifeCostIdentity ? commanderIdentity(s, pid).length : 0) + (ab.lifeCostX ? (x ?? 0) : 0) + (ab.lifeCostPerCounter && o ? ab.lifeCostPerCounter.n * (o.counters[ab.lifeCostPerCounter.counter] ?? 0) : 0) + (ab.mana && o ? manaLifeTax(s, o) : 0);
+  return (ab.lifeCost ?? 0) + (ab.lifeCostIdentity ? commanderIdentity(s, pid).length : 0) + (ab.lifeCostX ? (x ?? 0) : 0) + (ab.lifeCostPerCounter && o ? ab.lifeCostPerCounter.n * (o.counters[ab.lifeCostPerCounter.counter] ?? 0) : 0) + (ab.lifeCostPerCardInHand ? ab.lifeCostPerCardInHand * (s.players[pid]?.hand.length ?? 0) : 0) + (ab.mana && o ? manaLifeTax(s, o) : 0);
 }
 
 export function commanderTax(p: Player, o: GameObject, d?: CardDef) {

@@ -6,6 +6,7 @@ import { mayPayUse } from "./spend";
 import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planIgnoreEffect, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { cantSearch } from "./effects/run-library";
 import { GUESS_PROMPT } from "./effects/run-round319";
+import { HOST_OR_NAMED_PROMPT } from "./effects/run-round321";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
 import { reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
@@ -1253,6 +1254,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Party Thrasher: the exiled card we'd rather play this turn, a land while we still have a land play, else the
     // costliest spell we can pay for, else the cheapest.
     // Lord of the Void: the costliest card to put onto the battlefield.
+    // Hand of Vecna: the bonus on the strongest of the creatures, the one most likely to make use of it.
+    if (pend.kind === "chooseOption" && pend.what === "impulseChoice" && pend.prompt === HOST_OR_NAMED_PROMPT)
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => power(s, obj(s, b)) - power(s, obj(s, a)))[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "impulseChoice" && /onto the battlefield/.test(pend.prompt ?? ""))
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => mv(s, b) - mv(s, a))[0]! }];
     // Sleight of Mind and the like (effect "changeText"): see textWordPick.

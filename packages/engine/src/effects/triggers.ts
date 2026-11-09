@@ -1027,7 +1027,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       const event = o.blocking ? "creatureBlocks" : o.attacking !== undefined && o.blockedBy?.length ? "creatureBecomesBlocked" : undefined;
       // "Defending player" in a "becomes blocked" trigger: the player it's attacking (CR 506.2), the event player.
-      if (event) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === event && fits(t, o, controllerOf(s, w)), undefined, undefined, o, undefined, undefined, undefined, event === "creatureBecomesBlocked" ? { player: o.attacking } : undefined);
+      if (event) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === event && !(t.subjectNotSelf && w.id === o.id) && fits(t, o, controllerOf(s, w)), undefined, undefined, o, undefined, undefined, undefined, event === "creatureBecomesBlocked" ? { player: o.attacking } : undefined);
       // "Whenever a creature blocks this turn, ..." (Noxious Assault): a delayed trigger (CR 603.7b).
       if (event === "creatureBlocks") fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === event && fits(t, o, ctrl), triggers, undefined, o));
       // Righteous Indignation: "Whenever a creature blocks a black or red creature": once for each one it blocks (CR 509.3b).
@@ -1121,7 +1121,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const blockedNow = ev.ids.map((id) => s.objects[id]).filter((o): o is GameObject => !!o && o.zone === "battlefield" && o.attacking !== undefined);
     for (const o of blockedNow) {
       const you = controllerOf(s, o);
-      for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBecomesBlocked" && plain(t) && (!t.subjectFilter || objectMatches(s, t.subjectFilter, o, controllerOf(s, w), false)), undefined, undefined, o, undefined, undefined, undefined, { player: o.attacking });
+      for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBecomesBlocked" && plain(t) && !(t.subjectNotSelf && w.id === o.id) && (!t.subjectFilter || objectMatches(s, t.subjectFilter, o, controllerOf(s, w), false)), undefined, undefined, o, undefined, undefined, undefined, { player: o.attacking });
       add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host !== "orSelf" && plain(t), undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
       add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host === "orSelf" && plain(t), undefined, undefined, o, undefined, undefined, undefined, { player: o.attacking });
       addHosted(o, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && plain(t), undefined, o, { player: o.attacking });

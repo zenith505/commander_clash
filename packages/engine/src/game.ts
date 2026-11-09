@@ -5099,6 +5099,8 @@ export function plottedCast(s: GameState, pid: PlayerId, o: GameObject): boolean
  */
 export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: PlayerId): boolean {
   if (o.zone !== "graveyard" || o.owner !== pid || !isType(defOf(s, o), "Land")) return false;
+  // Tomik, Distinguished Advokist: not while an opponent controls one (rulings: over any permission).
+  if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).opponentsCantPlayYardLands && controllerOf(s, obj(s, id)) !== pid)) return false;
   return ownGraveyardPlay(s, o, pid) || mayhemPlay(s, o) || landsFromGraveyardNow(s, pid, o) || !!landPermit(s, pid, o);
 }
 
@@ -5257,6 +5259,12 @@ export function handRevealed(s: GameState, pid: PlayerId, viewer: PlayerId): boo
   });
 }
 
+/** Experimental Frenzy: the name of a permanent `pid` controls that says "You can't play lands or cast spells from your hand", or undefined. */
+export function handPlayBanned(s: GameState, pid: PlayerId): string | undefined {
+  const id = s.battlefield.find((b) => abilitiesOf(s, obj(s, b)).youCantPlayFromHand && controllerOf(s, obj(s, b)) === pid);
+  return id ? characteristics(s, obj(s, id)).name : undefined;
+}
+
 /** One land a turn, plus one for each "you may play an additional land on each of your turns" (CR 305.2, 305.2a). */
 export function landsAllowed(s: GameState, pid: PlayerId): number {
   // "Can't play lands this turn" wins over anything that lets them (CR 101.2).
@@ -5291,6 +5299,7 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, fac
   }
   const d = defOf(s, o);
   if (!((o.zone === "hand" && o.owner === p.id) || mayPlayFromExile(s, o, p.id) || mayPlayLandFromGraveyard(s, o, p.id) || mayPlayFromTop(s, o, p.id))) throw new RulesError("land must be in your hand");
+  if (o.zone === "hand" && handPlayBanned(s, p.id)) throw new RulesError(`${handPlayBanned(s, p.id)}: you can't play lands from your hand`);
   if (!isType(d, "Land")) throw new RulesError(`${d.name} is not a land`);
   if (!canActAtSorcerySpeed(s, p.id)) throw new RulesError("lands can only be played at sorcery speed");
   if (p.landsPlayedThisTurn >= landsAllowed(s, p.id)) throw new RulesError("already played a land this turn"); // CR 305.2
@@ -6000,6 +6009,8 @@ export function castProblem(
   const proposedCost = parseManaCost(d.manaCost);
   const limit = castLimitProblem(s, pid, d, choices?.faceDown ? 0 : defMv(d) + (proposedCost.hasX ? (x ?? 0) * xCount(proposedCost) : 0), !!choices?.faceDown);
   if (limit) return limit;
+  // Experimental Frenzy: "You can't play lands or cast spells from your hand."
+  if (o.zone === "hand" && handPlayBanned(s, pid)) return `${handPlayBanned(s, pid)}: you can't cast spells from your hand`;
   // Grafdigger's Cage: "Players can't cast spells from graveyards or libraries" (the spell is cast from where the card is,
   // CR 601.2a; a card exiled from a library is cast from exile, rulings). Soulless Jailer: noncreature spells only.
   for (const b of s.battlefield) {
@@ -9665,10 +9676,13 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).
   if (ab.exileSelf && (ab.zone !== undefined || (o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc))) moveObject(s, id, "exile");
   if (ab.returnSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, ab.toLibraryBottom ? "library" : "hand"); // "library": to the bottom
+  // Clay Golem: "Roll a d8" as part of the cost (CR 602.2b), after the other costs; the result goes with the ability.
+  const rolledCost = ab.rollCost ? rollDice(s, p.id, ab.rollCost, 1, d.name).result : undefined;
   const stackId = `s${s.nextId++}`;
   const item: StackItem = {
     id: stackId,
     kind: "ability",
+    ...(rolledCost !== undefined ? { rolled: rolledCost } : {}),
     sourceId: id,
     sourceCardId: cardIdOf(o),
     sourceZc,
@@ -13768,15 +13782,18 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
   if (s.pending) return [];
   const p = player(s, pid);
   const out: Action[] = [{ type: "passPriority", player: pid }];
+  const handBan = !!handPlayBanned(s, pid);
   for (const id of [...p.hand, ...exilePlayable(s, pid), ...topPlayable(s, pid)]) {
     const d = defOf(s, obj(s, id));
     const o = obj(s, id);
+    // Experimental Frenzy: no land plays from the hand (casting is castProblem's).
+    const landOk = !(handBan && o.zone === "hand");
     if (isType(d, "Land")) {
-      if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid) && !nameLandBan(s, pid, d)) out.push({ type: "playLand", player: pid, objectId: id });
+      if (landOk && canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid) && !nameLandBan(s, pid, d)) out.push({ type: "playLand", player: pid, objectId: id });
     } else if (canCast(s, pid, id) && !spellTargets(s, id).length && !spellModes(s, id)) out.push({ type: "castSpell", player: pid, objectId: id });
     // A modal double-faced card's other land face (CR 712.12), and the faces it can be cast as (709.3, 712.11b, 715.3).
     for (const face of landFaces(s, o))
-      if (face !== 0 && canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid) && !asFace(s, o, face, () => nameLandBan(s, pid, defOf(s, o)))) out.push({ type: "playLand", player: pid, objectId: id, face });
+      if (face !== 0 && landOk && canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid) && !asFace(s, o, face, () => nameLandBan(s, pid, defOf(s, o)))) out.push({ type: "playLand", player: pid, objectId: id, face });
     for (const face of castableFaces(s, o))
       if (castProblem(s, pid, id, undefined, undefined, undefined, undefined, undefined, { face }) === null && asFace(s, o, face, () => !spellTargets(s, id).length && !spellModes(s, id))) out.push({ type: "castSpell", player: pid, objectId: id, face });
     if (suspendProblem(s, pid, id) === null) out.push({ type: "suspend", player: pid, objectId: id, ...(compileCard(defOf(s, o)).suspend?.x ? { x: 1 } : {}) });

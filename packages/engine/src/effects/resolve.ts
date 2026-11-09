@@ -343,6 +343,8 @@ export function blockHistoryAt(s: GameState, ref: Extract<ObjRef, { ref: "blockH
     return lk && (ctx.sourceZc === undefined || lk.zc + 1 === ctx.sourceZc) ? { id: ctx.sourceId!, zc: lk.zc } : undefined;
   }
   if (ref.of.ref === "self" && ctx.sourceId) return { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0 };
+  // Ib Halfheart: the trigger's attacker, as it was when it became blocked (even once it's gone).
+  if (ref.of.ref === "subject") return ctx.subject;
   const t = ref.of.ref === "target" ? ctx.targets[ref.of.index] : undefined;
   return t?.kind === "object" ? { id: t.id, zc: t.zc ?? s.objects[t.id]?.zoneChanges ?? 0 } : undefined;
 }
@@ -603,7 +605,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const key = `${at.id}@${at.zc}`;
     const with_ = new Set((s.turnLog?.blocks ?? []).filter((b) => !ref.thisCombat || b.combat === (s.combatsThisTurn ?? 0)).flatMap((b) => [...(ref.blockers && b.attacker === key ? [b.blocker] : []), ...(ref.blocked && b.blocker === key ? [b.attacker] : [])]));
     if (ref.andSelf) with_.add(key);
-    return s.battlefield.map((id) => obj(s, id)).filter((o) => with_.has(`${o.id}@${o.zoneChanges ?? 0}`));
+    return s.battlefield.map((id) => obj(s, id)).filter((o) => with_.has(`${o.id}@${o.zoneChanges ?? 0}`) && (!ref.stillBlocking || o.blocking !== undefined));
   }
   if (ref.ref === "blockingIt") {
     const me = ref.subject ? objects(s, { ref: "subject" }, ctx)[0] : objects(s, { ref: "self" }, ctx)[0];

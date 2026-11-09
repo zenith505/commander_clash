@@ -1,5 +1,6 @@
 // Round 320's sentences and triggers, read before round 319's (round319Sentence in oracle/round319.ts) and round 318's
 // triggers (round318Trigger in oracle/round318.ts).
+import { round325WholeText } from "./round325";
 import type { AbilityBody, Effect, TriggeredAbility } from "../abilities";
 import type { Ctx } from "./body";
 import { parseSentence } from "./sentence";
@@ -42,6 +43,9 @@ export function round320Sentence(s: string, sentences: string[], si: number, ctx
 
 /** Round 320's whole-text forms, run by wholeTextForms in body.ts: a body, the text rewritten, or null. */
 export function round320WholeText(text: string, parse: (t: string) => AbilityBody | null): AbilityBody | string | null {
+  // Round 325's whole texts first (oracle/round325.ts).
+  const r325 = round325WholeText(text, parse);
+  if (r325 !== null) return r325;
   // Myriad Construct: "When ~ becomes the target of a spell, sacrifice it and create a number of 1/1 colorless Construct
   // artifact creature tokens equal to its power.": the tokens even if it's already gone, by its power as it last existed
   // on the battlefield (rulings, CR 608.2h).

@@ -180,7 +180,9 @@ export function reselectOptions(s: GameState, o: GameObject): { key: string; lab
  * Counters that hurt the permanent they're on: -1/-1 shrinks it, stun keeps it from untapping (CR 122.1d); Mine Layer's
  * mine counters and Bomb Squad's fuse counters mark it to be destroyed.
  */
-export const harmfulCounter = (k: string) => k === "-1/-1" || k === "stun" || k === "mine" || k === "fuse";
+// A power/toughness counter that only lowers them, as -1/-1, -2/-1 (Contagion) and -0/-1 (Wall of Roots) counters do.
+const loweringPT = (k: string) => ((m) => !!m && Number(m[1]) <= 0 && Number(m[2]) <= 0 && Number(m[1]) + Number(m[2]) < 0)(/^([+-]\d+)\/([+-]\d+)$/.exec(k));
+export const harmfulCounter = (k: string) => k === "-1/-1" || k === "stun" || k === "mine" || k === "fuse" || loweringPT(k);
 
 /** Changing permanents: tap, counters, connive, explore, renown, evolve, continuous effects, attaching. */
 export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {

@@ -18720,13 +18720,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // control instead of into its owner's graveyard" (a replacement: it never goes to the graveyard, rulings).
     if (/^If an artifact or creature spell is countered this way, put that card onto the battlefield under your control instead of into its owner's graveyard$/.test(s)) {
       const last = effects[effects.length - 1];
-      if (last?.type !== "counterSpell" || last.bounce || last.exile || last.unless || last.cause || last.hand || last.top || last.n) return null;
+      if (last?.type !== "counterSpell" || last.bounce || last.exile || last.unless || last.cause || last.hand || last.top || last.bottom || last.n) return null;
       last.battlefieldIf = { kind: "spell", types: ["Artifact", "Creature"], text: "artifact or creature spell" };
       continue;
     }
     // Hinder: "put that card on your choice of the top or bottom of its owner's library instead ...".
     const lapseThen = /^(If that spell is countered this way, exile it instead of putting it into its owner's graveyard), then you may cast it without paying its mana cost$/.exec(s);
-    const lapse = /^If that spell is countered this way, (?:(exile it) instead of putting it into its owner's graveyard|put (?:it|that card) (on top of its owner's library|into its owner's hand|on your choice of the top or bottom of its owner's library) instead of into that player's graveyard)$/i.exec(lapseThen?.[1] ?? s);
+    const lapse = /^If that spell is countered this way, (?:(exile it) instead of putting it into its owner's graveyard|put (?:it|that card) (on top of its owner's library|on the bottom of its owner's library|into its owner's hand|on your choice of the top or bottom of its owner's library) instead of into that player's graveyard)$/i.exec(lapseThen?.[1] ?? s);
     if (lapse) {
       const last = effects[effects.length - 1];
       if (last?.type !== "counterSpell" || last.bounce) return null;
@@ -18751,6 +18751,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (lapse[1]) last.exile = true;
       else if (lapse[2] === "into its owner's hand") last.hand = true;
       else if (lapse[2] === "on your choice of the top or bottom of its owner's library") last.libraryChoice = true;
+      // Spell Crumple: "put it on the bottom of its owner's library instead of into that player's graveyard".
+      else if (lapse[2] === "on the bottom of its owner's library") last.bottom = true;
       else last.top = true;
       continue;
     }

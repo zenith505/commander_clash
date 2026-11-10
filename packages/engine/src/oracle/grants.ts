@@ -317,8 +317,8 @@ export function parseGrants(text0: string): Modification[] | null {
       continue;
     }
     // Outlast is an activated ability (CR 702.107a): "Other Sliver creatures you control have outlast {2}" (Enduring
-    // Sliver), one more of its own on each of them.
-    const outlast = /^outlast ((?:\{(?:\d+|[WUBRGC])\})+)$/i.exec(w);
+    // Sliver), one more of its own on each of them. A hybrid cost too: "has outlast {G/W}" (Arcus Acolyte, CR 107.4e).
+    const outlast = /^outlast ((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRG])\})+)$/i.exec(w);
     if (outlast) {
       out.push({ kind: "addAbility", text: `Outlast ${outlast[1]}` });
       continue;

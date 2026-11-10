@@ -104,6 +104,7 @@ import {
   linkedFreeGrant,
   commanderTax,
   legendBotKeep,
+  loseReplacements,
   unlockCost,
   forageWays,
   castExtraCosts,
@@ -1179,6 +1180,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // The legend rule (CR 704.5j): the one with Auras, Equipment or counters on it, else the card, else the oldest.
     if (pend.kind === "chooseOption" && pend.what === "legend") return [{ type: "chooseOption", player: pid, choice: legendBotKeep(s, pend.options) }];
+    // Which replacement of our game loss (CR 616.1): the most life after it, Stunning Reversal's seven cards only with
+    // seven to draw, and a dying Exquisite Archangel to the graveyard rather than exile.
+    if (pend.kind === "chooseOption" && pend.what === "loseReplacement") {
+      const opts = loseReplacements(s, pid, true);
+      const score = (o: (typeof opts)[number]) => o.life + (o.reversal !== undefined ? (player(s, pid).library.length >= 7 ? 15 : -1000) : 0) + (o.graveyard ? 1 : 0);
+      const best = opts.filter((o) => pend.options.includes(o.key)).sort((a, b) => score(b) - score(a))[0];
+      return [{ type: "chooseOption", player: pid, choice: best?.key ?? pend.options[0]! }];
+    }
     // A Siege's protector (CR 310.12a): the opponent least able to defend it, so we can defeat it and flip it.
     if (pend.kind === "chooseOption" && pend.what === "protector") {
       const guard = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Creature")).reduce((n, id) => n + Math.max(0, toughness(s, obj(s, id))), 0);
@@ -3370,6 +3379,10 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   }
   // Doomsday exiles all but five cards of our library and graveyard: a combo piece bots have no plan for.
   if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "search" && e.exileRest)) return null;
+  // Inverter of Truth exiles our whole library as it enters, then shuffles our graveyard in: only with a graveyard big
+  // enough to draw from for a while.
+  const exilesLibrary = compileCard(d).triggers.some((tr) => tr.event === "selfEnters" && allEffects(tr.body.effects).some((e) => e.type === "exileFaceDown" && typeof e.n === "object" && "count" in e.n && e.n.count.kind === "cardsInLibrary"));
+  if (exilesLibrary && player(s, pid).graveyard.length < 20) return null;
   // "End the turn" (CR 724.1): see endTurnCast.
   if (!endingTurn && allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endTurn")) return null;
   // Summary Dismissal: only in response to an opponent's spell (see the counterspell response).
@@ -3379,6 +3392,10 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // Mandate of Peace: "End the combat phase" (CR 724.2) only against an attack on us that hasn't dealt its damage yet.
   if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endCombatPhase") && !endCombatWorth(s, pid)) return null;
   if (lifeSwapHurts(s, pid, compileCard(d).spell?.effects ?? [])) return null;
+  // Fighting Chance: only while creatures block ours, before combat damage.
+  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "flipCoinEachWon") && !s.battlefield.some((b) => (obj(s, b).blocking ?? []).some((a) => s.objects[a] && controllerOf(s, obj(s, a)) === pid))) return null;
+  // Stunning Reversal: kept for when our life is low enough that we might lose this turn.
+  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "loseInsteadThisTurn") && player(s, pid).life > 5) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.

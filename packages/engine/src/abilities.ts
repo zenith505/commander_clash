@@ -1614,6 +1614,8 @@ export type ObjRef =
   | { ref: "countersPutThisWay"; kind?: CounterKind }
   /** "Put a +1/+1 counter on each of those Vampires" (Urge to Feed): the permanents this resolution's tapAnyNumber tapped, while each is still that object. */
   | { ref: "tappedThisWay" }
+  /** Fighting Chance: the permanents whose coin flips this resolution won (effect flipCoinEachWon), while each is still that object on the battlefield. */
+  | { ref: "wonFlipThisWay" }
   /** Swallow Whole: "the creature tapped to pay ~'s additional cost" (a spell's "tap an untapped creature you control" additional cost), while it's still that object on the battlefield (CR 400.7). */
   | { ref: "costTapped" };
 
@@ -3579,6 +3581,19 @@ export type Effect =
    * all at once; each one chosen is dealt at least 1 (CR 601.2d).
    */
   | { type: "dividedDamageBack"; from: ObjRef; among: ObjRef }
+  /**
+   * Chandra, Chill of Compliance; Enlightened Confidant: "Surveil 1. If you put a [filter] card into your graveyard this
+   * way, put that card into your hand.": a card this resolution's surveil put into the graveyard, still there, matching
+   * `filter` (its bound counted as this resolves), goes to its owner's hand.
+   */
+  | { type: "surveilledToHand"; filter: TargetSpec }
+  /** Stunning Reversal: "The next time you would lose the game this turn, instead draw seven cards and your life total becomes 1." (Player.loseInstead) */
+  | { type: "loseInsteadThisTurn" }
+  /**
+   * Fighting Chance: "For each blocking creature, flip a coin. If you win the flip, ...": one flip its controller calls for
+   * each permanent that fits as it resolves (CR 705.2), each won or lost; the ones won are ObjRef "wonFlipThisWay".
+   */
+  | { type: "flipCoinEachWon"; filter: TargetSpec }
   | { type: "impulse"; n: Amount; /** With `who` eachPlayer, Rocco, Street Chef: "each player may play the card they exiled this way": each card's own owner's permission, ending as this ability's controller's next end step begins with until "yourNextEndStep". */ ownersPlay?: true; /** With `who` eachPlayer, Triple Triad: "you may play the card you own exiled this way and each other card exiled this way with lesser mana value than it": only those, none if you exiled none (CR 202.3e: X is 0). */ ownAndLesser?: true; until: "thisTurn" | "nextTurn" | /** "Until your next turn" (Nivix, Aerie of the Firemind): over as that turn begins. */ "yourNextTurn" | "exiled" | "yourNextEndStep" | /** "Until the beginning of your next upkeep" (Elkin Bottle). */ "yourNextUpkeep" | /** "During your next turn" (Galvanic Relay). */ "duringNextTurn" | /** "For as long as you control ~" (Lightning, Security Sergeant). */ "whileControlled" | /** "Until end of combat on your next turn" (Brazen Cannonade). */ "yourNextCombat"; who?: PlayerRef; /** Elder Brain: "exile all cards from that player's hand, then they draw that many cards" (`n` unused). */ hand?: true; /** Elkin Lair: "that player exiles a card at random from their hand. The player may play that card this turn." (`n` unused): the `who` player's own card, their permission. */ randomFromHand?: true; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** With `free`: "You may cast Equipment spells this way without paying their mana costs" (Nahiri, Forged in Fury): only cards like this are free. */ freeFor?: TargetSpec; /** "During any turn you attacked with a token" (Neyali): only then. */ attackedWithToken?: true; /** "During any turn you attacked with a commander" (Neriv, Crackling Vanguard): only then. */ attackedWithCommander?: true; /** "During any turn you attacked with a Rogue" (Robber of the Rich): only in a turn its player declared a creature of this type as an attacker. */ attackedWithType?: string; /** "During any turn you attacked with ~" (Goblin Researcher): only in a turn its player declared this ability's source, as the object it is, as an attacker (GameObject.mayPlay.attackedWithSource). */ attackedWithSource?: true; /** "During any turn you attacked with three or more creatures" (Boros Strike-Captain): only in a turn its player declared at least this many creatures as attackers. */ attackedWithAtLeast?: number; /** With `graveyards` and `choose` (Author of Shadows): "Choose a nonland card exiled this way": one card like this among all those exiled, chosen as it resolves; only it gets the permission. */ chooseAmong?: TargetSpec; /** "During any turn you put a lore counter on ~" (Summon: Brynhildr): only in a turn its player put a lore counter on the source, as the object it is (GameObject.mayPlay.loreOn). */ loreOnSource?: true; /** "You may play it if you control a Kavu" (Possibility Technician): only while that player controls a permanent like this (GameObject.mayPlay.ifControl). */ ifControl?: TargetSpec; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** With `oneOf`: "You may play up to two of those cards" (March of Reckless Joy): this many of them. */ oneOfMax?: number; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true; /** With `graveyards`: "all creature cards from target player's graveyard" (Shadow of the Enemy): only these. */ graveyardFilter?: TargetSpec; /** "You may cast instant and sorcery spells from among them" (Ral, Leyline Prodigy): only cards like this get the permission. */ castFilter?: TargetSpec; /** "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): only spells like this, the face cast counting (GameObject.mayPlay.castFilter); with `oneOf`, one of them. */ spellFilter?: TargetSpec; /** "You may play it until you exile another card with ~" (Unstable Amulet, Furious Rise): until the source's next such exile (GameObject.mayPlay.untilAnother). */ untilAnother?: true; /** Casey & Raph: "Target player exiles the top card of their library. Until that player's next end step, they may play that card": the `who` player has the permission, not you. */ theyPlay?: true; /** Curse of Hospitality: "that creature's controller may play that card": this player has the permission, not you. */ player?: PlayerRef; /** Dream Harvest: "Each opponent exiles cards from the top of their library until they have exiled cards with total mana value 5 or greater this way": with an each-player `who`, down to the card that brings that library's total there (X as 0, CR 202.3e), all of it if it never does; `n` unused. */ untilTotalMv?: number }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
@@ -8203,9 +8218,10 @@ export interface CompiledCard {
   cantWin?: "you" | "opponents";
   /**
    * The Golden Throne: "If you would lose the game, instead exile ~ and your life total becomes 1." A replacement effect
-   * (CR 614.1a), for any way of losing but conceding (rulings).
+   * (CR 614.1a), for any way of losing but conceding (rulings). Exquisite Archangel ("startingLife"): "... and your life
+   * total becomes equal to your starting life total" (40, CR 903.7).
    */
-  loseGameExileSelf?: true;
+  loseGameExileSelf?: true | "startingLife";
   /**
    * "You may activate abilities of creatures you control as though those creatures had haste" (Thousand-Year Elixir,
    * CR 302.6): {T} abilities of creatures that came under your control this turn. They don't gain haste (rulings).

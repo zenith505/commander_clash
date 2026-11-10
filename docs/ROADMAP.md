@@ -1,7 +1,7 @@
 # Roadmap
 
-30,880 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,789 of
+30,887 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,793 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -290,7 +290,7 @@ line blocks.
    Lizrog, Dimir Machinations (done in round B108) (exiling some of target player's top cards), Read the Runes (done in round 320), Liege of the Tangle, Sunder
    the Gateway (transform an Incubator you control), Myriad Construct (done in round 320), Zaffai, Thunder Conductor (an opponent chosen at
    random), All-Seeing Arbiter (done in round 320), Life's Finale (an opponent's library into their graveyard), Aerith Rescue Mission (done in round 320) (a
-   stun counter on one of them), Stunning Reversal, Manabond (done in round 277), Glowcap Lantern (granting "look at
+   stun counter on one of them), Stunning Reversal (done in round 329), Manabond (done in round 277), Glowcap Lantern (granting "look at
    the top card of your library any time"), Jinxed Choker (done in round 320), Eligeth (scry replaced by draw), The Astonishing Ant-Man (done in round 315) ("remove any number of
    counters" as a cost), Power Surge (done in round 320) (untapped lands at the start of the turn), Jace, Cunning Castaway (done in round 320), Curse of
    Vengeance, Shaile ("entered under your control this turn"). Round 180
@@ -309,7 +309,7 @@ line blocks.
    Transmogrant, Auntie Blyte, Nimble Trapfinder (done in round 324), Willie Lumpkin, Ajani Unrelenting, Kitt Kanto, Ellie, Azor, Oko the
    Ringleader, Fiery Annihilation, Spell Crumple (done in round 325); past rank 12,200: Academy Loremaster (done in round 326), Cait, Celebrate the Harvest (done in round 324),
    Cephalid Constable, Choice of Damnations, Cut Propulsion and Wisecrack (done in round 276; "deals damage to itself equal to its
-   power"), Evin, Ghired (populate tapped and attacking), Last-Ditch Effort, Misfortune Teller, Peer Pressure (done in round 325), Reckless
+   power"), Evin, Ghired (populate tapped and attacking), Last-Ditch Effort, Misfortune Teller (done in round 329), Peer Pressure (done in round 325), Reckless
    Blaze, Resplendent Marshal, Sporogenic Infection, Ward of Bones. Round 181 went down from rank 11,770 to about rank
    12,330 (Ugin's Conjurant and Polukranos, Unchained (damage prevented by removing +1/+1 counters), Hinder (top or
    bottom of the library), Urge to Feed, Mogg Infestation, Toxin Sliver, Moonstone Harbinger and Wax-Wane Witness ("gain
@@ -320,13 +320,13 @@ line blocks.
    Solitude (mana abilities only on your turn), Words of Waste, Kirtar's Wrath and Cleansing Meditation (threshold
    "instead" sweepers), Chandra, Heart of Fire, Lynde, Salt Road Ambushers, Origin of the Hidden Ones, Grab the Reins (done in round 325),
    Pyromancer Ascension, Verdant Mastery, Primal Adversary, Planar Void (done in round 299), In Too Deep, Dollhouse of Horrors, Harald
-   Unites the Elves (done in round 326), Exquisite Archangel, Kellan, Planar
+   Unites the Elves (done in round 326), Exquisite Archangel (done in round 329), Kellan, Planar
    Trailblazer, Najal, Rescue from the Underworld, Seal of the Guildpact (done in round 299), Fear of Infinity, Elderscale Wurm (done in round 324), Cradle of
    Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order (done in round 324),
    Scheming Fence, Oath of Lieges (done in round B143), Helm of Obedience, Concerted Effort, Belbe's Portal (done in round 324), Edgewall Innkeeper, Simic
    Manipulator, Endless Whispers, Burn from Within (done in round 325), Skyfire Phoenix (done in round 276), Contagion (done in round 325), Gutter Grime, Coffin Queen, Genesis
    Storm, Grim Return (done in round 326), Infernal Offering, Varolz, Undercellar Sweep, Wave of Vitriol, Martyrdom, Soul-Scar Mage,
-   Remembrance, Spy Network, Dimir Doppelganger, Jailbreak, Inverter of Truth, Immovable Rod, Hypergenesis, Soul
+   Remembrance, Spy Network, Dimir Doppelganger, Jailbreak, Inverter of Truth (done in round 329), Immovable Rod, Hypergenesis, Soul
    Transfer and the rest of the 222 still unsupported in that range; past it: Phytohydra (damage replaced by +1/+1
    counters even when it can't be prevented, which needs its controller's order against prevention shields), Intimidation
    Bolt ("other creatures can't attack": other than the target), Fade Away, Viashino Heretic, Dazzling Reflection (done in round B108),
@@ -2363,6 +2363,34 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 329 took cards back off the "Out after round N" lists, most played first: "If you would lose the game, instead
+   exile this creature and your life total becomes equal to your starting life total." (Exquisite Archangel: 40) and "The
+   next time you would lose the game this turn, instead draw seven cards and your life total becomes 1." (Stunning
+   Reversal, a shield for the turn, for any way of losing but conceding; with fewer than seven cards the player loses at
+   the next check, rulings): with several replacements of one loss (these and The Golden Throne), the player chooses one
+   (CR 616.1), a new prompt with browser tests, and one replaces every reason of that check (rulings on Lich's Mirror); an
+   Archangel that dies in the same check may go to the graveyard instead of exile, the life total set either way
+   (rulings); a loss an effect causes waits for that choice until the state-based actions are next performed, and a draw
+   from an empty library during the replacement counts at the next check; "Surveil 1. If you put a noncreature, nonland
+   card into your graveyard this way, put that card into your hand." (Chandra, Chill of Compliance; Enlightened
+   Confidant's "a card with mana value less than or equal to the amount of life you gained this turn", counted as it
+   resolves, rulings); "If it was a creature card, ... If it was a land card, ... Otherwise, ..." (Misfortune Teller:
+   "otherwise" is neither, so a Dryad Arbor card gets both tokens, rulings); "exile all cards from your library face
+   down, then shuffle all cards from your graveyard into your library." (Inverter of Truth: no one may look at them,
+   rulings); "For each blocking creature, flip a coin. If you win the flip, prevent all combat damage that would be dealt
+   by that creature this turn." (Fighting Chance: a flip won or lost for each creature blocking as it resolves). +7,
+   30,881 of 31,936 with round 328 and B167.
+   Bots: a bot keeps Stunning Reversal until its life is 5 or less, casts Fighting Chance only while creatures block its
+   own, and Inverter of Truth only with 20 or more cards in its graveyard; among replacements of its loss it takes the one
+   that leaves it the most life (Stunning Reversal's seven cards only with seven to draw), and a dying Archangel goes to
+   its graveyard.
+   Not modeled: with Krark's Thumb, Fighting Chance keeps a won flip of each pair for its controller (CR 705.3 is their
+   choice); if one of Stunning Reversal's seven draws pauses for a replacement choice (dredge), the life total becomes 1
+   before the rest of the draws.
+   Out after round 329 (looked at, not done): Lich's Mirror (the loss replacement now has its choice, but a creature its
+   owner controls that dies in the same check may go to the graveyard or be shuffled in, its controller's choice for each,
+   rulings); Soul-Scar Mage (damage replaced by -1/-1 counters, in an order against prevention and other replacements the
+   creature's controller chooses, rulings); Knowledge Exploitation (still out, for the reason in its earlier list).
    Round 328 took cards back off the "Out after round N" lists, most played first: "When this artifact enters, if you
    cast it, for each player, choose a creature with power 2 or less that player controls. Then destroy all creatures
    except creatures chosen this way." (Unstable Glyphbridge: you choose for every player, not targeted, a player with no
@@ -2434,9 +2462,9 @@ line blocks.
    with round 325 and B165.
    Bots: under an opponent's Seeker of Slaanesh a bot that would stay home sends its toughest creature that can attack
    alone; Academy Loremaster's draw is taken like any "may draw". Gavi's free cycling has a browser test.
-   Out after round 326 (looked at, not done): Exquisite Archangel (when it dies by a state-based action at the same time
+   Out after round 326 (looked at, not done): Exquisite Archangel (done in round 329) (when it dies by a state-based action at the same time
    as the loss, its controller chooses exile or graveyard, rulings: a choice inside the state-based actions); Stunning
-   Reversal (a one-shot "next time you would lose the game this turn" replacement, and which of several such replacements
+   Reversal (done in round 329) (a one-shot "next time you would lose the game this turn" replacement, and which of several such replacements
    applies is the player's choice, CR 616.1); Trove of Temptation (attacking a particular player is a requirement that
    competes with goad, CR 508.1d needs them weighed together); Knowledge Exploitation (casting a card from an opponent's
    library during resolution, the card left there if not cast); Laboratory Drudge (spells cast and abilities activated
@@ -4237,7 +4265,7 @@ line blocks.
      Reunion of the House), only one such group per ability. An enters trigger's own X works (Dune Drifter, Kinetic
      Ooze). "Double the number of each kind of counter you have" (on players) is out.
    - The life you gained this turn: still out are Betor, Sproutback Trudge, Willowdusk ("whichever is greater"), Shanna
-     ("X can't be greater than"), Enlightened Confidant, Will, Scion of Peace (cost reduction by X), Tivash ("pay X
+     ("X can't be greater than"), Enlightened Confidant (done in round 329), Will, Scion of Peace (cost reduction by X), Tivash ("pay X
      life"), Astarion, Ocelot Pride (city's blessing token copies), Witch of the Moors ("and you return"), Aerith and
      Doctor Jane Foster ("return that card to the battlefield instead"), Follow the Lumarets, Lunar Convocation ("gained
      and lost").
@@ -4273,7 +4301,7 @@ line blocks.
    - Coin flips (CR 705) work for "If you win / lose the flip", "until you lose a flip" and "whenever you win a coin
      flip" (25 cards); still out: Krark's Thumb, Edgar's "come up heads" (705.3), heads or tails (Odds // Ends (done in round B129), Mana
      Clash, Two-Headed Giant, Rakdos the Showstopper, Molten Sentry (done in round B146)), a flip for each (Mutalith Vortex Beast (done in round 278), Fighting
-     Chance), Fiery Gambit, Game of Chaos (done in round 298), Squee's Revenge (done in round 298), Crooked Scales, Krark the Thumbless, and lines
+     Chance (done in round 329)), Fiery Gambit, Game of Chaos (done in round 298), Squee's Revenge (done in round 298), Crooked Scales, Krark the Thumbless, and lines
      that are out for other reasons (Goblin Bangchuckers' "itself", Chance Encounter, Okaun). Bots weigh a flip whose loss costs
      them something as the average of its two outcomes (Bottle of Suleiman), and use "phase out or bounce, else
      sacrifice it" flips (Frenetic Efreet) only to save the permanent.
@@ -7620,8 +7648,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   counter of any kind you put on this object, TurnLog.counterPutOn). Day of the Dragons ("exile all creatures you
   control. Then create that many 5/5 red Dragon creature tokens with flying", tokens counted, rulings; "return the exiled
   cards to the battlefield under your control", CR 607.2a). Exotic Pets ("for each kind of counter among creatures you
-  control, put a counter of that kind on either of those tokens": a prompt per kind, a browser test). +6, 30,880 of
-  31,936 with B167 and round 328.
+  control, put a counter of that kind on either of those tokens": a prompt per kind, a browser test). +6, 30,887 of
+  31,936 with B167 and rounds 328 and 329.
 - Out after round B168 (looked at, not done): Sudden Salvation (targets in any graveyard, and "for each opponent who
   controls one or more of those permanents"), Garruk, Curse Breaker's −4 ("whenever one or more creatures attack one of
   your opponents": how often that batched trigger fires when creatures attack two opponents isn't settled by rulings),
@@ -7968,7 +7996,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   check), Eye of Singularity (done in round B129), Cornered Market (done in round B129) and Bazaar of Wonders (name-based filters), Weight of Conscience ("share
   a creature type" tap cost), Psychic Theft (done in round B127), Last Rites (done in round B127), Thought Dissector (done in round B127), Mimeofacture, Hakim,
   Guard Dogs, Carry Away, Jandor's Ring.
-- Out after round B83 (looked at, not done): Fighting Chance (a coin flip for each blocking creature), Ersatz Gnomes (done in round B126)
+- Out after round B83 (looked at, not done): Fighting Chance (done in round 329) (a coin flip for each blocking creature), Ersatz Gnomes (done in round B126)
   (a spell becomes colorless: no rule for changing a spell's color yet), Clash of Elements (the owner's choice decides
   what happens to it and who is dealt damage), Write into Being (done in round B155) (manifest one of the top two cards), Samite Elder (done in round B117)
   (protection from each of a target permanent's colors).
@@ -8053,7 +8081,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   attack rulings), Insatiable Frugivore (done in round 320) (a repeat loop), Galloping Lizrog (done in round 315) (counters spread over creatures).
 - Out after round B68 (looked at, not done): Oko, Lorwyn Liege (the back face's emblem of a chosen creature type),
   Abuelo's Awakening (the returned artifact that's also a Spirit creature), Light of Judgment (done in round B156) ("up to one Equipment"
-  chosen as it resolves), Chandra, Chill of Compliance (which cards surveil put into the graveyard).
+  chosen as it resolves), Chandra, Chill of Compliance (done in round 329) (which cards surveil put into the graveyard).
 - Out after round B67 (looked at, not done): Words of War (done in round B163), Words of Waste and Words of Wind (a target or choices in the
   middle of a draw), Hedonist's Trove (lands from its exile any number of times, one spell a turn), Day of the Dragons,
   Lumbering Battlement, Wall of Mourning (cards exiled with ~ from abilities not linked yet; Kayla's Music Box and

@@ -10587,6 +10587,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "472efb69-47c8-4c93-b60a-f6dba4364b8c",
+  "name": "Exquisite Archangel",
+  "manaCost": "{5}{W}{W}",
+  "cmc": 7,
+  "typeLine": "Creature — Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flying\nIf you would lose the game, instead exile this creature and your life total becomes equal to your starting life total.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "aer",
+  "releasedAt": "2017-01-20",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "90b540ab-b05a-4d29-b896-7ff5da0b101d",
   "name": "Exterminate!",
   "manaCost": "{2}{B}",
@@ -31946,6 +31978,40 @@
   "releasedAt": "2018-04-27",
   "rarity": "uncommon",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a68f41a2-37ee-46e1-bf3c-164c78b003ca",
+  "name": "The Golden Throne",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Arcane Life-support — If you would lose the game, instead exile The Golden Throne and your life total becomes 1.\nA Thousand Souls Die Every Day — {T}, Sacrifice a creature: Add three mana in any combination of colors.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Arcane Life-support",
+   "A Thousand Souls Die Every Day"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
+  "rarity": "rare",
+  "layout": "normal",
   "gameChanger": false
  },
  {

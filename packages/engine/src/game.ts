@@ -1260,6 +1260,12 @@ export function moveObject(
     count[o.owner] = (count[o.owner] ?? 0) + 1;
     if (creatureCardLeavesYard && !(s.turnLog!.creatureCardLeftGraveyard ??= []).includes(o.owner)) s.turnLog!.creatureCardLeftGraveyard!.push(o.owner);
   }
+  // Dimir Strandcatcher: "if three or more cards were put into your graveyard from anywhere other than the battlefield this
+  // turn": its owner's graveyard (CR 404.2), a card, not a token or a copy of a spell (CR 111.1, 707.10a).
+  if (to === "graveyard" && fromZone !== "battlefield" && fromZone !== "graveyard" && !o.isToken && !o.spellCopy) {
+    const count = ((s.turnLog ??= {}).toGraveyardNotBattlefield ??= {});
+    count[o.owner] = (count[o.owner] ?? 0) + 1;
+  }
   // Barrin, Tolarian Archmage: "if a permanent was put into your hand from the battlefield this turn": its owner's hand
   // (CR 400.3), a token too, which is put there before it ceases to exist (rulings, CR 111.7).
   if (fromZone === "battlefield" && to === "hand") {
@@ -7556,7 +7562,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     log(s, `${p.name} casts a creature spell: the effects lasting until then end.`);
   }
   const kickedNow = !!item.kicked?.length && isRealKicker(compileCard(d).kicker);
-  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, ...(o.faceDown ? {} : { name: d.name }), colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv, ...(kickedNow ? { kicked: true as const } : {}) });
+  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, ...(o.faceDown ? {} : { name: d.name }), colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom, ...(castFrom === "graveyard" && o.owner === p.id ? { ownYard: true as const } : {}), ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv, ...(kickedNow ? { kicked: true as const } : {}) });
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv, castColors: [...characteristics(s, o).colors], ...(o.colorsSpent?.length ? { castColorsSpent: o.colorsSpent.length } : {}), ...(o.faceDown ? {} : { castName: d.name }) };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
   if (o.preparedFrom) unprepareFor(s, o);
@@ -7936,7 +7942,8 @@ function kickerExtraCosts(d: CardDef, kicks?: number[]): AdditionalCost[] {
   if (times === 1 || !k.multi) return k.extraCosts;
   // Exterminate!: "Replicate—Tap an untapped Dalek you control" paid twice taps two of them; Reiterating Bolt's
   // "Replicate—Pay {E}{E}{E}" paid twice is six energy.
-  return k.extraCosts.map((c) => (c.kind === "exileFromGraveyard" || c.kind === "tap" || c.kind === "payEnergy" ? { ...c, n: c.n * times } : c));
+  // Thrill-Kill Disciple's "Squad—{1}, Discard a card" paid twice discards two cards.
+  return k.extraCosts.map((c) => (c.kind === "exileFromGraveyard" || c.kind === "tap" || c.kind === "payEnergy" || c.kind === "discard" ? { ...c, n: c.n * times } : c));
 }
 
 /** Why these kicker choices aren't allowed (CR 702.33): each kicker cost once, multikicker's any number of times. */
@@ -9194,7 +9201,9 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     // Unearth works only while the card is in your graveyard (CR 702.84a). Mister Immortal's from exile too, face up there
     // (a face-down card in exile has no abilities, CR 406.3, 708.2).
     const exiled = !!ab.orExile && o.zone === "exile" && !o.faceDown && !o.hiddenExile;
-    if ((o.zone !== "graveyard" && !exiled) || o.owner !== pid) return `${ab.text} works only from your graveyard${ab.orExile ? " or from exile" : ""}`;
+    if ((o.zone !== "graveyard" && !exiled) || o.owner !== pid) return ab.onlyExile ? `${ab.text} works only from exile` : `${ab.text} works only from your graveyard${ab.orExile ? " or from exile" : ""}`;
+    // Torrent Elemental: only from exile (CR 113.6m).
+    if (ab.onlyExile && !exiled) return `${ab.text} works only from exile`;
     // Ashes of the Abhorrent: no activated abilities of cards in graveyards (embalm, unearth, scavenge, ...; rulings).
     const ashes = s.battlefield.find((b) => abilitiesOf(s, obj(s, b)).noGraveyardActivations);
     if (ashes) return `${characteristics(s, obj(s, ashes)).name}: players can't activate abilities of cards in graveyards`;
@@ -9764,6 +9773,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // "Whenever you activate an ability of a card in your graveyard" (Neerdiv): where it was as it was activated (CR 602.2),
   // even if a cost moves it (unearth's doesn't, embalm's does).
   const fromOwnGraveyard = o.zone === "graveyard" && o.owner === p.id ? (true as const) : undefined;
+  const inGraveyard = o.zone === "graveyard";
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
   const abCost = activationCost(s, p.id, o, ab, targets, x);
   // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
@@ -9818,6 +9828,9 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Professor Hojo: the first one this turn that targets a creature its activator controls, during their turn.
   if (!ab.mana && s.activePlayer === p.id && !s.turnLog?.ownCreatureTargeted?.includes(p.id) && targets && targetsOwnCreature(s, p.id, ab, targets)) ((s.turnLog ??= {}).ownCreatureTargeted ??= []).push(p.id);
   if (ab.equip && !s.turnLog?.equipped?.includes(p.id)) ((s.turnLog ??= {}).equipped ??= []).push(p.id);
+  // Laboratory Drudge: "if you've ... activated an ability of a card in a graveyard this turn": where it was as it was
+  // activated (CR 602.2), whoever owns it, even if a cost moves it.
+  if (inGraveyard && !s.turnLog?.activatedInGraveyard?.includes(p.id)) ((s.turnLog ??= {}).activatedInGraveyard ??= []).push(p.id);
   if (ab.onceEver) (o.activatedEver ??= []).push(index); // exhaust (CR 702.177a)
   if (ab.keyword === "Exhaust") p.exhaustTurn = s.turn; // CR 702.177b
   // "Choose one that hasn't been chosen" (Three Bowls of Porridge): chosen as it's activated.
@@ -13647,7 +13660,8 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
       if (!o || o.zone !== "battlefield") continue;
       const d = defOf(s, o);
       // A planeswalker with no loyalty goes to its owner's graveyard (704.5i, CR 306.9).
-      if (objIsType(s, o, "Planeswalker") && (o.counters.loyalty ?? 0) <= 0) {
+      // Sanctum Lurker: one under "aren't put into their owners' graveyards for having 0 loyalty" stays (rulings).
+      if (objIsType(s, o, "Planeswalker") && (o.counters.loyalty ?? 0) <= 0 && !characteristics(s, o).survivesZeroLoyalty) {
         log(s, `${characteristics(s, o).name} has no loyalty left and is put into the graveyard.`);
         moveObject(s, id, "graveyard");
         changed = true;

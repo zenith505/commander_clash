@@ -1725,6 +1725,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "628f2deb-519e-4810-a7e5-e31316e9a4e0",
+  "name": "Arcus Acolyte",
+  "manaCost": "{G}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Cleric Archer",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Cleric",
+   "Archer"
+  ],
+  "oracleText": "Reach, lifelink\nOutlast {G/W} ({G/W}, {T}: Put a +1/+1 counter on this creature. Outlast only as a sorcery.)\nEach other creature you control without a +1/+1 counter on it has outlast {G/W}.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [
+   "Lifelink",
+   "Reach",
+   "Outlast"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh2",
+  "releasedAt": "2021-06-18",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7c521612-21c6-4c4b-b10e-66e70928609b",
   "name": "Ardenn, Intrepid Archaeologist",
   "manaCost": "{2}{W}",
@@ -8005,6 +8043,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3a2a6904-219a-4d16-b11a-1e0e2826814e",
+  "name": "Deathspore Thallid",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Creature — Zombie Fungus",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Fungus"
+  ],
+  "oracleText": "At the beginning of your upkeep, put a spore counter on this creature.\nRemove three spore counters from this creature: Create a 1/1 green Saproling creature token.\nSacrifice a Saproling: Target creature gets -1/-1 until end of turn.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0c0d6c7e-a7cc-49e0-bf84-3fc33dd10b90",
   "name": "Deepfathom Echo",
   "manaCost": "{2}{G}{U}",
@@ -10013,6 +10082,37 @@
   ]
  },
  {
+  "oracleId": "99eb572b-85b1-4d78-aea8-4400a5b7e508",
+  "name": "Emrakul's Evangel",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Horror",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Horror"
+  ],
+  "oracleText": "{T}, Sacrifice this creature and any number of other non-Eldrazi creatures: Create a 3/2 colorless Eldrazi Horror creature token for each creature sacrificed this way.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "emn",
+  "releasedAt": "2016-07-22",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4e7a8817-1a66-45c3-ade9-eac79b40b89f",
   "name": "Emrakul, the Promised End",
   "manaCost": "{13}",
@@ -11189,6 +11289,34 @@
   "commanderLegal": "legal",
   "set": "drk",
   "releasedAt": "1994-08-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "202e45d6-8c7a-46db-85fb-634aa77b4097",
+  "name": "Fatal Fissure",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose target creature. When that creature dies this turn, you earthbend 4. (Target land you control becomes a 0/0 creature with haste that's still a land. Put four +1/+1 counters on it. When it dies or is exiled, return it to the battlefield tapped.)",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Earthbend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tla",
+  "releasedAt": "2025-11-21",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
@@ -32802,6 +32930,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "46abaabe-7015-4d82-a5aa-2706b1f51bed",
+  "name": "Thallid",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Creature — Fungus",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Fungus"
+  ],
+  "oracleText": "At the beginning of your upkeep, put a spore counter on this creature.\nRemove three spore counters from this creature: Create a 1/1 green Saproling creature token.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mma",
+  "releasedAt": "2013-06-07",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a02a7816-c967-4503-bb08-f8db44915250",
   "name": "The Abyss",
   "manaCost": "{3}{B}",
@@ -33551,6 +33709,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c673b7b0-c1e7-4bcd-8fe0-66d83f22ecb9",
+  "name": "Thelon of Havenwood",
+  "manaCost": "{G}{G}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Elf Druid",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Druid"
+  ],
+  "oracleText": "Each Fungus creature gets +1/+1 for each spore counter on it.\n{B}{G}, Exile a Fungus card from a graveyard: Put a spore counter on each Fungus on the battlefield.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f6880f71-a05a-4752-ba33-ffbc450606bf",
   "name": "Thelon's Curse",
   "manaCost": "{G}{G}",
@@ -33871,6 +34063,39 @@
   "set": "woe",
   "releasedAt": "2023-09-08",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7273118b-08af-41cd-a316-6bf61dc45b6c",
+  "name": "Thrill-Kill Disciple",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Mercenary",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Mercenary"
+  ],
+  "oracleText": "Squad—{1}, Discard a card. (As an additional cost to cast this spell, you may pay its squad cost any number of times. When this creature enters, create that many tokens that are copies of it.)\nWhen this creature dies, create a Junk token.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Squad"
+  ],
+  "commanderLegal": "legal",
+  "set": "pip",
+  "releasedAt": "2024-03-08",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -34359,6 +34584,40 @@
   "set": "bok",
   "releasedAt": "2005-02-04",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0335e7db-5e0e-4271-8ae7-437a1d2c16ac",
+  "name": "Torrent Elemental",
+  "manaCost": "{4}{U}",
+  "cmc": 5,
+  "typeLine": "Creature — Elemental",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "Flying\nWhenever this creature attacks, tap all creatures defending player controls.\n{3}{B/G}{B/G}: Put this card from exile onto the battlefield tapped. Activate only as a sorcery.",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "frf",
+  "releasedAt": "2015-01-23",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

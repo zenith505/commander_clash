@@ -1555,6 +1555,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // many entered; a noncreature permanent that became a creature later doesn't count, rulings).
   if (/^you had another creature enter the battlefield under your control last turn$/.test(text)) return { kind: "youEntered", types: ["Creature"], n: 1, other: true, lastTurn: true };
   if (/^a noncreature permanent under your control was destroyed this turn by a spell or ability an opponent controlled$/.test(text)) return { kind: "destroyedByOpponent" };
+  if (/^a creature spell you cast this turn was countered by a spell or ability an opponent controlled$/.test(text)) return { kind: "creatureCounteredByOpponent" };
   if ((m = new RegExp(`^you've been dealt damage by ${NUM} or more creatures this turn$`).exec(text))) return { kind: "damagedByCreatures", n: num(m[1]!) };
   if (/^an opponent gained life this turn$/.test(text)) return { kind: "opponentGainedLife" };
   if (/^you put a counter on a creature this turn$/.test(text)) return { kind: "youPutCounterOnCreature" };

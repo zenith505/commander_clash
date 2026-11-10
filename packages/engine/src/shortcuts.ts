@@ -392,6 +392,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     gainedLife: t.gainedLife,
     cardExiled: t.cardExiled,
     destroyed: [...new Set((t.destroyed ?? []).map((e) => JSON.stringify(e)))].sort(),
+    creaturesCountered: [...new Set((t.creaturesCountered ?? []).map((e) => JSON.stringify(e)))].sort(),
     entered,
     // "For the first time each turn" (Hercules): once or more.
     timesDealtDamage: Object.fromEntries(Object.entries(t.timesDealtDamage ?? {}).map(([k, v]) => [k, Math.min(v, 2)])),

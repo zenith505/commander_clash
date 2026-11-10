@@ -686,6 +686,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             if (o.zone === "exile" && untilMe) (untilMe.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, hand: true });
             // Lightstall Inquisitor: its owner may play it while it stays exiled, a spell costing more, a land entering tapped.
             if (o.zone === "exile" && e.ownerMay) o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, ...(e.ownerMay.more ? { more: e.ownerMay.more } : {}), ...(e.ownerMay.landTapped ? { landTapped: true as const } : {}) };
+            // Fiend of the Shadows: the ability's controller may play it while it stays exiled (rulings).
+            if (o.zone === "exile" && e.controllerMay) o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn };
             // The Eleventh Doctor: its mana value in time counters, and suspend; one with mana value 0 gets none, so it isn't
             // suspended (CR 702.62b, rulings on The Wedding of River Song).
             if (o.zone === "exile" && e.suspendMv) suspendExiled(s, o, defMv(defOf(s, o)));

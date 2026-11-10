@@ -187,6 +187,9 @@ export function parseManaAbility(line0: string): ManaAbility | null {
       out.insteadIf = { cond, produces };
     }
     else if (extra === "Activate only as an instant." && !out.instantOnly) out.instantOnly = true;
+    // Foraging Wickermaw: "Add one mana of any color. ~ becomes that color until end of turn." The color of the mana it
+    // added (CR 605.3b), its only color until end of turn (CR 105.3).
+    else if (extra === "~ becomes that color until end of turn." && out.produces.kind === "oneOf" && out.produces.amount === 1 && !out.becomesManaColor && !out.produces.n) out.becomesManaColor = true;
     else if ((m2 = /^Activate only ([^.]+)\.$/.exec(extra)) && !out.activateIf && !out.oncePerTurn) {
       // "Activate only if you control a Swamp", "... only once each turn", "... only during an opponent's turn" (CR 602.5b).
       const clauses = parseOnlyClauses(m2[1]!);

@@ -132,7 +132,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // resolves, whoever controls the ability.
   if (/^The player whose turn it is may end the turn$/.test(s)) return [{ type: "eachMay", who: { ref: "activePlayer" }, effects: [{ type: "endTurn" }], text: "end the turn" }];
   // Soothsaying: "Shuffle your library."
-  if (/^Shuffle your library$/.test(s)) return [{ type: "shuffle", who: { ref: "you" } }];
+  // Ancestral Knowledge: "When ~ leaves the battlefield, shuffle your library": a trigger's instruction starts lowercase.
+  if (/^[Ss]huffle your library$/.test(s)) return [{ type: "shuffle", who: { ref: "you" } }];
   // Boggart Forager, Soldier of Fortune: "Target player shuffles their library." Lantern of Insight: "Target player
   // shuffles." (a library, CR 701.24a).
   if (/^Target player shuffles(?: their library)?$/.test(s)) {

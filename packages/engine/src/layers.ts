@@ -125,6 +125,8 @@ export interface Characteristics {
   sparedBy?: Record<string, ObjectId | typeof SPARES_AURAS>;
   /** False once an effect made it lose all abilities: none of its printed abilities work. */
   hasPrintedAbilities: boolean;
+  /** Blood Sun: it lost all its printed abilities but its mana abilities (hasPrintedAbilities false), which still work (CR 605.1a). */
+  printedManaOnly?: true;
   /** "Lose ... ward" (Shay Cormac): its ward abilities, printed or gained before, don't trigger; one gained later does (CR 613.7). */
   wardLost?: true;
   /** "Loses flanking" (Barbed Foliage): its printed flanking triggers don't work, and flanking granted before is gone; flanking granted later works (CR 702.25a, 613.7). */
@@ -459,6 +461,13 @@ function printed(s: GameState, o: GameObject): Characteristics {
     extraBlocks: 0,
     blockAny: false,
   };
+}
+
+/** Whether a granted ability's text is only a mana ability (CR 605.1a): Blood Sun leaves those. */
+function isManaAbilityText(text: string): boolean {
+  const g = compileGranted(text);
+  const mana = g.mana.length + (g.manaTriggers?.length ?? 0);
+  return mana > 0 && !g.activated.some((a) => !a.mana) && !g.triggers.length && !g.statics.length && !g.unsupported.length;
 }
 
 const copyChars = (c: Characteristics): Characteristics => ({
@@ -1794,8 +1803,23 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.cantHave = [...new Set([...(c.cantHave ?? []), ...m.keywords])];
       return;
     case "loseAllAbilities":
+      // Blood Sun: all but its mana abilities (CR 605.1a), printed or granted before; its basic land types' mana
+      // abilities stay too (CR 305.6). Its keywords aren't mana abilities.
+      if (m.exceptMana) {
+        if (c.hasPrintedAbilities) c.printedManaOnly = true;
+        c.keywords = [];
+        c.sparedBy = undefined;
+        c.hasPrintedAbilities = false;
+        const keep = c.grantedAbilities.map((g) => isManaAbilityText(g));
+        if (c.grantedAt) c.grantedAt = c.grantedAt.filter((_, i) => keep[i]);
+        c.grantedAbilities = c.grantedAbilities.filter((_, i) => keep[i]);
+        c.unblockedDamage = false;
+        c.cantBlock = false;
+        return;
+      }
       // Abilities granted before this (earlier timestamps) go too; later ones stay (CR 613.7). So do the mana abilities
       // its basic land types give it (CR 305.6; Imprisoned in the Moon rulings).
+      c.printedManaOnly = undefined;
       c.landAbilitiesLost = true;
       c.keywords = [];
       c.sparedBy = undefined;

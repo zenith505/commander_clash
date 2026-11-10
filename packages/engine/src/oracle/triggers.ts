@@ -5516,6 +5516,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // Lich's Mastery: "for each 1 life you lost, exile a permanent you control or a card from your hand or graveyard": that
       // many, of that one life-losing event.
       if (event === "youLoseLife") text = text.replace(/^for each 1 life you lost, exile a permanent you control or a card from your hand or graveyard\.$/, "exile that many permanents you control and/or cards from your hand and/or graveyard.");
+      // Lich's Tomb: "sacrifice a permanent for each 1 life you lost": that many of yours, for that one life-losing event
+      // (damage to you is one, CR 120.3a), each its own trigger.
+      if (event === "youLoseLife") text = text.replace(/^sacrifice a permanent for each 1 life you lost\.$/, "sacrifice that many permanents.");
       // False Cure: "that player loses 2 life for each 1 life they gained": twice the life of that one life-gaining event.
       if (event === "playerGainsLife") text = text.replace(/^that player loses 2 life for each 1 life they gained\.$/, "that player loses twice that much life.");
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.

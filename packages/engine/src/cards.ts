@@ -366,13 +366,18 @@ export function objHasKeyword(s: GameState, o: GameObject, k: SupportedKeyword |
 
 export const NO_ABILITIES: CompiledCard = { triggers: [], activated: [], mana: [], statics: [], entersTapped: false, unsupported: [], textKeywords: [] };
 
+/** Blood Sun (Characteristics.printedManaOnly): only a card's mana abilities (CR 605.1a), activated and triggered. */
+export function printedManaAbilities(c: CompiledCard): CompiledCard {
+  return { ...NO_ABILITIES, mana: c.mana, activated: c.activated.filter((a) => a.mana), ...(c.manaTriggers ? { manaTriggers: c.manaTriggers } : {}) };
+}
+
 /**
  * The abilities an object has right now: its card's, unless an effect removed them, then the ones effects
  * gave it (CR 613.1f).
  */
 export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
   const c = characteristics(s, o);
-  let own = withGranted(c.hasPrintedAbilities ? withoutFlanking(withoutLost(compileCard(defOf(s, o)), c.lostActivated, c.lostStatics), c.flankingLost) : NO_ABILITIES, c.grantedAbilities);
+  let own = withGranted(c.hasPrintedAbilities ? withoutFlanking(withoutLost(compileCard(defOf(s, o)), c.lostActivated, c.lostStatics), c.flankingLost) : c.printedManaOnly ? printedManaAbilities(compileCard(defOf(s, o))) : NO_ABILITIES, c.grantedAbilities);
   // Decayed's triggered ability (CR 702.147a), however it got the keyword: printed, granted, or from a decayed counter.
   if (c.keywords.includes("Decayed")) own = withDecayed(own);
   // "{U}: Counter target spell with the chosen name" (Declaration of Naught): its targets are the name chosen for it.
@@ -708,6 +713,8 @@ export interface Modifications {
   /** Quoted abilities effects gave it ("~" is this permanent). */
   grantedAbilities: string[];
   lostAllAbilities: boolean;
+  /** Blood Sun: it lost all its abilities but its mana abilities (Characteristics.printedManaOnly). */
+  manaAbilitiesOnly?: true;
 }
 
 export function modifications(s: GameState, o: GameObject): Modifications {
@@ -728,7 +735,9 @@ export function modifications(s: GameState, o: GameObject): Modifications {
     grantedKeywords: c.keywords.filter((k) => !has(printedKeywords(d), k)),
     lostKeywords: printedKeywords(d).filter((k) => !!canonicalKeyword(k) && !has(c.keywords, k)),
     grantedAbilities: c.grantedAbilities,
-    lostAllAbilities: !c.hasPrintedAbilities,
+    lostAllAbilities: !c.hasPrintedAbilities && !c.printedManaOnly,
+    // Only for a card with rules text: a basic land has nothing else to lose.
+    ...(c.printedManaOnly && d.oracleText.replace(/\([^)]*\)/g, "").trim() !== "" ? { manaAbilitiesOnly: true as const } : {}),
   };
 }
 

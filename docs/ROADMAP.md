@@ -198,7 +198,7 @@ line blocks.
    linked to several cards), Tangle Wire (the upkeep player taps one permanent of their choice for each fade counter),
    Steward of the Harvest (gaining the activated abilities of exiled land cards), Agent's Toolkit (done in round 296) (moving one counter of a chosen kind), Heroes in a Half Shell ("one or more
    ... deal combat damage" with "each of those creatures"), Ran and Shaw (done in round 300) ("if you cast them and" a graveyard count),
-   Unstable Glyphbridge (a creature chosen for each player, then destroy the rest), From the Catacombs (a corpse counter, the initiative and an exile
+   Unstable Glyphbridge (done in round 328) (a creature chosen for each player, then destroy the rest), From the Catacombs (a corpse counter, the initiative and an exile
    replacement together), Loki, God of Mischief (done in round 275), Katsumasa, the
    Animator (done in round 270), Slagstone Refinery (put into a graveyard or exile from the battlefield, one
    trigger), Inalla, Archmage Ritualist (an eminence copy with haste, exiled at end step), Threats Undetected (four
@@ -584,7 +584,7 @@ line blocks.
    next end step" (Nahiri, the Lithomancer and Nahiri, the Harbinger).
    Out after round 196 (looked at, not done): Proteus Staff (done in round 272),
    Sidisi, Regent of the Mire (done in round 266), Unidentified
-   Hovership ("the exiled card's owner manifests dread"), Geth's Summons, Sphinx of Foresight (opening-hand reveal),
+   Hovership ("the exiled card's owner manifests dread"), Geth's Summons (done in round 328), Sphinx of Foresight (opening-hand reveal),
    Eruth, Tranquil Frillback (done in round 267), Yusri, Blitzball Stadium, Underdark Rift,
    Colfenor's Urn, Dragon's Fire (done in round 299), Leonin Arbiter (done in round 313), Sigurd, Protection Racket, Sin Prodder, Osgir (done in round 302), Nine-Fingers Keene (done in round 295),
    Phyrexian Processor. Smaller gap: Rakdos, the Showstopper with Krark's Thumb keeps heads for your own creatures and
@@ -1126,7 +1126,7 @@ line blocks.
    instead of its mana cost); Watcher of Hours (a trigger of a card in exile, "whenever you remove a time counter from
    this card while it's exiled"); Tarmogoyf Nest and Disa the Restless (done in round 275);
    Kethek, Crucible Goliath (done in round 311) (reveal until a nonlegendary creature card with lesser mana value than the sacrificed
-   creature); Yidris, Maelstrom Wielder (done in round 303) (cascade on spells cast from hand for the turn); Animal Friend (a quoted
+   creature); Yidris, Maelstrom Wielder (done in round 303) (cascade on spells cast from hand for the turn); Animal Friend (done in round 328) (a quoted
    ability that refers to its source); Hive Mind.
    Round 221: "put a +1/+1 counter on target creature and goad it" (Bhaal, Lord of Murder); "the number of cards you
    own in exile" (Cosmogoyf); "{C} for each artifact you control named ~" (Powerstone Shard); "enters or becomes the
@@ -1373,7 +1373,7 @@ line blocks.
    counted); a Saga's chapter III returning what its chapter I exiled (The Princess Takes Flight, the same Saga object
    only); "If he's attacking, untap ~ and there is an additional combat phase after this phase" (The Incredible Hulk). +13
    (28,787 of 31,936 with B67-B69).
-   Out after round 232 (looked at, not done): Island Sanctuary (skip the draw-step draw for "can't be attacked except by
+   Out after round 232 (looked at, not done): Island Sanctuary (done in round 328) (skip the draw-step draw for "can't be attacked except by
    creatures with flying and/or islandwalk" until your next turn; Lane B's draw replacements are moving in B68/B69);
    Cairn Wanderer (landwalk and protection as the creature cards in graveyards have them, by kind); Synthetic Destiny
    ("that many" carried into the delayed trigger at the next end step); Lorcan, Warlock Collector (pay life equal to the
@@ -2363,6 +2363,31 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 328 took cards back off the "Out after round N" lists, most played first: "When this artifact enters, if you
+   cast it, for each player, choose a creature with power 2 or less that player controls. Then destroy all creatures
+   except creatures chosen this way." (Unstable Glyphbridge: you choose for every player, not targeted, a player with no
+   such creature keeps none) and its back face's "Whenever an opponent casts a spell during their turn, they can't attack
+   you or planeswalkers you control this turn." and "Each opponent who attacked you or a planeswalker you control this
+   turn can't cast spells." (Sandswirl Wanderglyph: attacking a planeswalker counts, a battle doesn't); "Tap up to X
+   target creatures, then distribute three stun counters among any number of tapped creatures your opponents control."
+   (Crashing Wave: any of their tapped creatures, not only those it tapped); "Each Wolf tapped this way deals damage
+   equal to its power to target creature. That creature deals damage equal to its power divided as its controller
+   chooses among any number of those Wolves." (Master of the Wild Hunt: a new prompt for dividing damage among
+   creatures, with a browser test; with the target gone no Wolf is tapped, CR 608.2b); "Put a +1/+1 counter on that
+   token for each Aura and Equipment attached to this creature other than Animal Friend." (Animal Friend: other than
+   the Animal Friend that granted the ability, so two count each other); "Corrupted — For each opponent who has three or
+   more poison counters as you cast this spell, put up to one target creature card from that player's graveyard onto the
+   battlefield under your control." (Geth's Summons: counted as it's cast, CR 601.2c); "If you would draw a card during
+   your draw step, instead you may skip that draw. If you do, until your next turn, you can't be attacked except by
+   creatures with flying and/or islandwalk." (Island Sanctuary: a draw replacement, CR 614.1a, lasting after it leaves,
+   rulings; a browser test). +6, 30,868 of 31,936 with round 327 and B166.
+   Bots: dividing damage among its own creatures a bot puts it all on its least valuable one; among another player's it
+   kills as many as it can, most valuable first. A bot skips its draw for Island Sanctuary when its opponents' creatures
+   without flying or islandwalk could deal half its life.
+   Out after round 328 (looked at, not done): Omen Machine and Wild Evocation (a card cast "if able" without paying its
+   mana cost: a mandatory free cast needs every bot and UI path); Reservoir Kraken (any opponent may tap a creature, a
+   choice offered to several players in turn); Reap ("up to X targets" where X counts another target's permanents, as
+   before); Crafty Cutpurse (still out, for the reasons in its earlier list).
    Round 327 took cards back off the "Out after round N" lists, most played first: "Choose a creature at random. You
    gain control of that creature until end of turn. Untap it. It gains haste until end of turn. Then destroy all other
    creatures." (The Nipton Lottery: anyone's creature, not targeted, so hexproof and shroud don't matter, nothing in
@@ -2479,7 +2504,7 @@ line blocks.
    has seven or more ember counters on it, remove them and transform this creature." (Smoldering Egg). +7, 30,812 of
    31,936 with round 322, B163 and B164.
    Out after round 323 (looked at, not done): Last Night Together ("only the chosen creatures can attack during that
-   combat phase": an attack restriction for one added combat phase), Island Sanctuary (a draw-step draw skipped for an
+   combat phase": an attack restriction for one added combat phase), Island Sanctuary (done in round 328) (a draw-step draw skipped for an
    attack restriction until your next turn), Filigree Vector (still out: two "any number of target" sets in one ability).
    Bots: they tap lands under Overabundance and Barbflare Gremlin without weighing the damage, remove Overseer of Vault 76's
    counters whenever they can, take Night Soil's cards from an opponent's graveyard first, and don't activate Taii Wakeen's
@@ -2552,8 +2577,8 @@ line blocks.
    cards in your graveyard" (All-Seeing Arbiter: a land's 0 counts, rulings); "Return this card from your graveyard to the
    battlefield transformed" (Garland, Knight of Cornelia, CR 712.14). +10, 30,748 of 31,936 with round 319, B158 and B159.
    Out after round 320 (looked at, not done): Monstrous Emergence (an additional cost of choosing a creature you control
-   or revealing a creature card, and damage by the power of whichever it was), Geth's Summons (a target for each opponent
-   with three or more poison counters as it's cast), Crashing Wave and Reap (still out, for the reasons in their earlier
+   or revealing a creature card, and damage by the power of whichever it was), Geth's Summons (done in round 328) (a target for each opponent
+   with three or more poison counters as it's cast), Crashing Wave (done in round 328) and Reap (still out, for the reasons in their earlier
    lists), and the cards of the round 319 list (still out). Bots sacrifice for Read the Runes as for any optional
    sacrifice, and pay Sivriss's 3 life with the usual punisher weighing.
    Round 319 took cards back off the "Out after round N" lists, most played first: "look at the top two cards of your
@@ -2715,7 +2740,7 @@ line blocks.
    spell cast this way would be put into your graveyard, exile it instead" (Radiant Scrollwielder: cast paying its costs,
    rulings); "Until end of combat on your next turn, you may play that card" (Brazen Cannonade: over as that end of combat
    step ends, CR 511.3, or as that turn ends if it has no combat). +8, 30,642 of 31,936 with rounds 312, 313 and B153.
-   Out after round 314 (looked at, not done): Crashing Wave and Foggy Swamp Visions (their "waterbend {X}" now reads, but
+   Out after round 314 (looked at, not done): Crashing Wave (done in round 328) and Foggy Swamp Visions (their "waterbend {X}" now reads, but
    "distribute three stun counters among any number of tapped creatures your opponents control" and "for each creature
    card exiled this way, create a token that's a copy of it" don't yet); Professor Hojo, Disorienting Choice, Hot Pursuit,
    Karn, Living Legacy, Into the Pit, Hatchery Sliver, Abstruse Appropriation, Kusari-Gama and Urgent Necropsy (still out,
@@ -2785,7 +2810,7 @@ line blocks.
    Out after round 311 (looked at, not done): Auratouched Mage ("an Aura card that could enchant it", then "if this
    creature is still on the battlefield ... otherwise reveal the Aura card and put it into your hand": a search whose
    destination depends on the creature after the search); Retraced Image and Mitotic Manipulation ("if it has the same
-   name as a permanent": a condition on the card chosen, checked as it's put onto the battlefield); Unstable Glyphbridge
+   name as a permanent": a condition on the card chosen, checked as it's put onto the battlefield); Unstable Glyphbridge (done in round 328)
    (the back face's craft return and "for each player, choose a creature with power 2 or less that player controls"
    needs a per-player pick); Reap ("up to X targets" where X counts black permanents of another target as you cast it,
    CR 601.2c).
@@ -3369,7 +3394,7 @@ line blocks.
    and attacking, then trample and hexproof by the Dwarves and Elves you control as it resolves: putOntoBattlefield has no
    attacking option and no conditional keyword grant yet); Falco Spara, Pactweaver (casting from the top of your library
    with "remove a counter from a creature you control" as an additional cost: a cost choice for the cast, the autopay and
-   bots); Master of the Wild Hunt (each tapped Wolf deals damage, then the target's controller divides its damage among those
+   bots); Master of the Wild Hunt (done in round 328) (each tapped Wolf deals damage, then the target's controller divides its damage among those
    Wolves as it resolves); Secret of Bloodbending (controlling another player); Harold and Bob, First Numens (returns as an
    Aura with a granted mana ability). Burning-Rune Demon and Moonlit Meditation still out, as before.
    Out after round 260 (looked at, not done): Mirror-Mad Phantasm (done in round 261); Over
@@ -3399,7 +3424,7 @@ line blocks.
    Out after round 256 (looked at, not done): Scrap Welder (done in round 270); Lynde, Cheerful Tormentor (a Curse returned "attached to you", then moved to an opponent);
    Supper for Spiders (cards that become Food artifacts losing their other card types and subtypes but keeping their
    abilities); Nahiri, the Unforgiving ("attacks a player each combat if able" until your next turn); Cherished Hatchling
-   (Dinosaur spells cast this turn gain an enters-and-fight ability); Heirloom Epic (done in round 314) and Crashing Wave (tap creatures, or
+   (Dinosaur spells cast this turn gain an enters-and-fight ability); Heirloom Epic (done in round 314) and Crashing Wave (done in round 328) (tap creatures, or
    artifacts and creatures, to pay generic mana of an ability's or a waterbend cost).
    Out after round 255 (looked at, not done): Benevolent Blessing (done in round 277) (protection that doesn't remove Auras and Equipment
    already attached when the effect began: no record of what was attached then); Overgrown Zealot (mana spendable only to
@@ -3541,7 +3566,7 @@ line blocks.
    the Wild Hunt, Audacious Reshapers, Kiora, Sovereign of the Deep, Quest for
    Ula's Temple; the ones skipped in rounds 182, 181, 180, 179, 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere (done in round 277), Tangle Wire,
    Steward of the Harvest, Agent's Toolkit (done in round 296), Heroes in a Half Shell, Ran and
-   Shaw, Unstable Glyphbridge, From the Catacombs, Loki,
+   Shaw, Unstable Glyphbridge (done in round 328), From the Catacombs, Loki,
    God of Mischief, Katsumasa, the Animator, Slagstone Refinery, Inalla, Archmage Ritualist, Threats Undetected,
    Leader, Super-Genius; the ones skipped since round 173: Radagast the Brown, Quicksilver Elemental, Secret of
    Bloodbending, Chiss-Goria, Forge Tyrant, Molecule Man (done in round 274), Confiscation Coup (done in round 273), Zoyowa Lava-Tongue, Role Reversal (done in round 273), Craig Boone, Novac Guard, Spelltwine, Ultimate Magic: Meteor, Spectral Searchlight, Rat King,
@@ -7947,7 +7972,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B74 (looked at, not done): Hankyu (remove all aim counters as a cost, damage equal to the number
   removed), Fishing Pole ("Tap Fishing Pole" as a cost of the granted ability), Hold for Ransom (the Aura's controller
   as a player), Heliod's Punishment ("Then if it has no task counters on it, destroy Heliod's Punishment"), Shuriken
-  (its controller gains control of it unless it was unattached from a Ninja), Nettlevine Blight, Animal Friend and
+  (its controller gains control of it unless it was unattached from a Ninja), Nettlevine Blight, Animal Friend (done in round 328) and
   The Dominion Bracelet (granted abilities that move or recount the source), Gutter Grime and Saproling Burst (token
   abilities naming the permanent that made them), Earnest Fellowship and Pledge of Loyalty (done in round B112) (Lane A's round 236, now
   merged, changed the same keyword-binding code: next).

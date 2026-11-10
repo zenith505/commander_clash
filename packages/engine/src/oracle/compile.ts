@@ -27,6 +27,8 @@ import { draftLine } from "./draft";
 import { roundB171Line, yardEntersLinkOnly } from "./laneb171";
 import { roundB173Line } from "./laneb173";
 import { roundB174Line } from "./laneb174";
+import { roundB175Line } from "./laneb175";
+import { roundB176Line } from "./laneb176";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -2015,6 +2017,10 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB173Line(line, raw, out, isSpell)) continue;
     // Cryptid Inspector, Reckless Velocitaur, Tunnel Tipster, Veiled Ascension, Sanctifier en-Vec (round B174).
     if (roundB174Line(line, raw, out, isSpell)) continue;
+    // Seton's Desire, Grand Master of Flowers, Torrent Elemental, Sevinne, Ian the Reckless, Thrill-Kill Disciple (round B175).
+    if (roundB175Line(line, raw, out, isSpell)) continue;
+    // Aurification, Sanctum Lurker (round B176).
+    if (roundB176Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

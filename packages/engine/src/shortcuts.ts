@@ -412,6 +412,9 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     creaturesExiled: capped(t.creaturesExiled ?? {}),
     // Bonecache Overseer counts to three; Kutzil's Flanker counts as it enters, not in a loop of passing.
     leftGraveyardCount: capped((t.leftGraveyardCount ?? {}) as Record<number, number>),
+    // Dimir Strandcatcher counts to three.
+    toGraveyardNotBattlefield: capped((t.toGraveyardNotBattlefield ?? {}) as Record<number, number>),
+    activatedInGraveyard: t.activatedInGraveyard,
     creaturesLeft: capped((t.creaturesLeft ?? {}) as Record<number, number>),
     creaturesToYard: capped((t.creaturesToYard ?? []).reduce<Record<string, number>>((r, d) => ((r[`${d.owner}${d.token ? "t" : ""}`] = (r[`${d.owner}${d.token ? "t" : ""}`] ?? 0) + 1), r), {})),
     permanentTypesToYard: t.permanentTypesToYard,

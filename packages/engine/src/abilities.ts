@@ -2502,6 +2502,8 @@ export type StaticCondition =
    * (Cobra Trap): only an effect that says "destroy" (rulings), not lethal damage or sacrifice.
    */
   | { kind: "destroyedByOpponent" }
+  /** "If a creature spell you cast this turn was countered by a spell or ability an opponent controlled" (Summoning Trap): TurnLog.creaturesCountered. */
+  | { kind: "creatureCounteredByOpponent" }
   /** "If you've been dealt damage by two or more creatures this turn" (Inferno Trap): different creatures, anyone's (rulings). */
   | { kind: "damagedByCreatures"; n: number }
   /** "If an opponent gained life this turn" (Needlebite Trap): whether or not they also lost life (rulings). */
@@ -3542,6 +3544,8 @@ export type Effect =
    * counter of that kind on ~": the kinds there as it resolves, each counted once (rulings), each its own choice.
    */
   | { type: "counterKindsBribe" }
+  /** Ancestral Knowledge: "look at the top ten cards of your library, then exile any number of them and put the rest back on top of your library in any order" (no scry or surveil, CR 401.4). */
+  | { type: "exileAnyOfTop"; n: number }
   /**
    * Bazaar of Wonders: "counter it if a card with the same name is in a graveyard or a nontoken permanent with the same name
    * is on the battlefield": the spell whose cast triggered this, checked as it resolves; a face-down spell has no name
@@ -4192,7 +4196,7 @@ export type Effect =
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
   /** `exile`: "target opponent exiles a card from their hand": chosen the same way, but exiled, not discarded (no discard, CR 701.9a); `linked` as for "exile". */
-  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; /** "Discard any number of cards", "discard up to two cards": none to `n` (CR 107.1c), chosen as it resolves. */ upTo?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true; exile?: true; linked?: boolean; /** With `hand`: "all nonland cards with the same name as another card in their hand" (Hint of Insanity). */ nameTwice?: true; /** Breakthrough: "choose X cards in your hand and discard the rest": all but this many, chosen (`n` is unused). */ keep?: Amount; /** Soldevi Sage: "Draw three cards, then discard one of them": only the cards this resolution's draw just drew that are still in that hand. */ drawn?: true; /** Fall: "reveals two cards at random from their hand, then discards each nonland card revealed this way": with `random`, `n` cards revealed, only those matching this discarded. */ ofRevealed?: TargetSpec; /** With `exile`, Intellect Devourer: "each opponent exiles a card from their hand until ~ leaves the battlefield" (CR 610.3): returned to the hand then; nothing is exiled if ~ has already left (rulings). */ until?: "sourceLeaves"; /** With `exile`, Lightstall Inquisitor: "and may play that card for as long as it remains exiled. Each spell cast this way costs {1} more to cast. Each land played this way enters tapped.": its owner's permission (MayPlay `more`, `tapped`). */ ownerMay?: { more?: number; landTapped?: true }; /** With `exile`, The Eleventh Doctor: "exile a card from your hand with a number of time counters on it equal to its mana value. If it doesn't have suspend, it gains suspend." (CR 702.62). */ suspendMv?: true } // CR 701.9
+  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; /** "Discard any number of cards", "discard up to two cards": none to `n` (CR 107.1c), chosen as it resolves. */ upTo?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true; exile?: true; linked?: boolean; /** With `hand`: "all nonland cards with the same name as another card in their hand" (Hint of Insanity). */ nameTwice?: true; /** Breakthrough: "choose X cards in your hand and discard the rest": all but this many, chosen (`n` is unused). */ keep?: Amount; /** Soldevi Sage: "Draw three cards, then discard one of them": only the cards this resolution's draw just drew that are still in that hand. */ drawn?: true; /** Fall: "reveals two cards at random from their hand, then discards each nonland card revealed this way": with `random`, `n` cards revealed, only those matching this discarded. */ ofRevealed?: TargetSpec; /** With `exile`, Intellect Devourer: "each opponent exiles a card from their hand until ~ leaves the battlefield" (CR 610.3): returned to the hand then; nothing is exiled if ~ has already left (rulings). */ until?: "sourceLeaves"; /** With `exile`, Lightstall Inquisitor: "and may play that card for as long as it remains exiled. Each spell cast this way costs {1} more to cast. Each land played this way enters tapped.": its owner's permission (MayPlay `more`, `tapped`). */ ownerMay?: { more?: number; landTapped?: true }; /** With `exile`, Fiend of the Shadows: "You may play that card for as long as it remains exiled": the ability's controller may play it (MayPlay), with its usual timing and costs, even after the source has left (rulings). */ controllerMay?: true; /** With `exile`, The Eleventh Doctor: "exile a card from your hand with a number of time counters on it equal to its mana value. If it doesn't have suspend, it gains suspend." (CR 702.62). */ suspendMv?: true } // CR 701.9
   /** CR 701.22, by the controller, or `who` ("target player scries X", Kozilek's Command). */
   | { type: "scry"; n: Amount; who?: PlayerRef }
   /** "~ endures N" (CR 701.63a): N +1/+1 counters on it, or an N/N white Spirit token, its controller's choice. */
@@ -6829,6 +6833,8 @@ export interface ManaAbility {
    * counters on it", a delayed trigger the ability creates as it resolves (CR 603.7a, 605.3b), whatever the mana is spent on.
    */
   nextCast?: Extract<Effect, { type: "nextCast" }>;
+  /** Foraging Wickermaw: "~ becomes that color until end of turn." after it adds one mana of a color: its colors become that one (layer 5, CR 105.3, 613.1e) as the ability resolves (CR 605.3b). */
+  becomesManaColor?: true;
   /** Depletion lands: "Put a depletion counter on ~." after the mana is added. */
   putCounter?: CounterKind;
   /** Depletion lands: "If there are no depletion counters on ~, sacrifice it." after the mana is added. */
@@ -7463,6 +7469,8 @@ export interface CompiledCard {
   entersChoosePlayer?: "player" | "opponent";
   /** "As ~ enters, choose another creature you control" (Dauntless Bodyguard, CR 614.12): one of these, not one entering with it (rulings), kept as Chosen.object. */
   entersChooseObject?: TargetSpec;
+  /** Phylactery Lich: "As ~ enters, put a phylactery counter on an artifact you control": with `entersChooseObject`, the counter put on the permanent chosen, which isn't kept as Chosen.object (not targeted, rulings). */
+  entersChooseObjectCounter?: CounterKind;
   /** "As ~ enters, choose two players" (Sower of Discord): two different ones, you too if you like (rulings), as Chosen.players. */
   entersChooseTwoPlayers?: true;
   /** "As Arachne enters, look at an opponent's hand, then choose ...": the opponent is chosen first, then their hand is seen (CR 614.12). */

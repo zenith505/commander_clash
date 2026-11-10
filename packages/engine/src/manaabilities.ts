@@ -549,7 +549,7 @@ export function manaAbilityCost(s: GameState, pid: PlayerId, o: GameObject, mana
 export function manaPenalty(ab: ManaAbility): number {
   // A storage land's counters are saved-up mana: spent only when nothing else will do.
   const stored = ab.produces.kind === "removeX" ? 6 : 0;
-  return (ab.discardHand ? 50 : 0) + (ab.sacrificeSelf || ab.returnSelf || ab.onceEver ? 8 : 0) + (ab.returnAtNextUntap ? 3 : 0) + stored + (ab.manaCost ? 4 : 0) + (ab.selfDamage || ab.lifeCost || ab.energyCost || ab.removeCounters || ab.tapCost ? 2 : 0) + (ab.skipNextUntap || ab.putCounter ? 1 : 0);
+  return (ab.discardHand ? 50 : 0) + (ab.sacrificeSelf || ab.returnSelf || ab.onceEver ? 8 : 0) + (ab.returnAtNextUntap ? 3 : 0) + stored + (ab.manaCost ? 4 : 0) + (ab.selfDamage || ab.lifeCost || ab.energyCost || ab.removeCounters || ab.tapCost ? 2 : 0) + (ab.skipNextUntap || ab.putCounter || ab.becomesManaColor ? 1 : 0);
 }
 
 /**

@@ -1568,7 +1568,7 @@ export type PendingDecision =
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
   /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
   /** "bottom": the cards go to the bottom of the library together and their owner orders them (CR 401.4). */
-  | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil" | "order" | "bottom" | "look"; cards: ObjectId[]; source: string; owner?: PlayerId }
+  | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil" | "order" | "bottom" | "look" | /** Ancestral Knowledge (effect exileAnyOfTop): `away` is exiled. */ "exile"; cards: ObjectId[]; source: string; owner?: PlayerId }
   /** "You may ...": whether to do it, decided as the ability resolves (CR 603.5, 608.2d). */
   /**
    * "You may collect evidence N" as a spell or ability resolves (CR 701.59a): pick cards in your graveyard with total
@@ -1810,6 +1810,8 @@ export interface TurnLog {
   entered?: { controller: PlayerId; types: string[]; subtypes?: string[]; colors: Color[]; /** The permanent, for "another" (Éowyn). */ id?: ObjectId; zc?: number; /** A token (Gyome's "nontoken creatures"). */ token?: true; /** It had flying as it entered (Flying Drone's "another creature with flying entered"). */ flying?: true; /** It had every creature type as it entered (changeling, CR 702.73a). */ allCreatureTypes?: true }[];
   /** Noncreature permanents destroyed by a spell or ability: their controller and the destroying spell's or ability's (Cobra Trap). */
   destroyed?: { controller: PlayerId; by: PlayerId }[];
+  /** Creature spells countered by a spell or ability: who cast it and who controlled what countered it (Summoning Trap). */
+  creaturesCountered?: { caster: PlayerId; by: PlayerId }[];
   /** For each player, the creatures (`id@zoneChanges`) that dealt them damage (Inferno Trap). */
   damagedBy?: Record<number, string[]>;
   /** Noncombat damage each player was dealt this turn (Chandra's Incinerator), also after they lost the game (rulings). */

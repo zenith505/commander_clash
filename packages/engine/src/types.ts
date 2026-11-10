@@ -65,6 +65,11 @@ export interface DamageRule {
   millSelf?: number;
   /** Nine Lives: a counter of this kind on that permanent for each source whose damage it would prevent, even damage that can't be prevented (rulings, CR 615.12). */
   counterOn?: { id: ObjectId; kind: string };
+  /**
+   * Weeping Angel: "that creature's owner shuffles it into their library", the permanent the damage would be dealt to, right
+   * after the damage event (CR 615.5), even if the damage can't be prevented (CR 615.12).
+   */
+  shuffleIn?: true;
   /** "For each 1 damage prevented this way, put a +1/+1 counter on that creature" (Test of Faith, CR 615.5): on `to.object`, as the damage is prevented; `tally`: counted in GameState.preventedTally for a delayed trigger instead (Sacred Boon). */
   countersOn?: { counter: string; tally?: true };
   /** Vengeful Archon: "If damage is prevented this way, ~ deals that much damage to target player or planeswalker", fixed as it resolved (rulings). */

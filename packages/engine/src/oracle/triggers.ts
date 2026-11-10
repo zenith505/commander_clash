@@ -2901,6 +2901,11 @@ function parseDiscardTrigger(line0: string): TriggeredAbility | "fail" | null {
   // Hashaton: "create a tapped token that's a copy of that card": the discarded card, as it last existed in the
   // graveyard if it has left (CR 608.2h).
   const copyIt = /\bcopy of that card\b/.test(m[5]!) && !/\b(?:it|its)\b/.test(m[5]!.replace(/\bexcept it's\b/, ""));
+  // Oskar, Rubbish Reclaimer: "Whenever you discard a nonland card, you may cast it from your graveyard": the discarded
+  // card, if it's still there as the same object (CR 400.7; not one discarded to madness, CR 702.35a), cast as this
+  // resolves, paying all its costs (rulings), timing permissions ignored (CR 608.2g).
+  const castIt = m[1] === "you" && m[2] === "discard" && m[3] === "a" && /^you may cast it from your graveyard\.$/.test(m[5]!);
+  if (castIt) return { event: "playerDiscards", discards: { by: "you", ...(filter ? { filter } : {}) }, body: { targets: [], effects: [{ type: "castNow", what: { ref: "subjectCard", zone: "graveyard" } }], text: m[5]! } };
   const body = exile ? { targets: [], effects: [exileIt?.[1] ? { type: "may" as const, effects: [exile], text: m[5]!.replace(/^you may /, "").replace(/\.$/, "") } : exile], text: m[5]! } : parseBody(m[5]!, { eventPlayer: true, ...(copyIt ? { subjectIt: true, subjectLeft: true } : {}) });
   if (!body) return "fail";
   const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "any";

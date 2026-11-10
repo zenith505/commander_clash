@@ -154,9 +154,9 @@ import { prepareSpellOf } from "./prepare";
 import { castingBody, castTimeTargets, compileCard } from "./oracle";
 import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PendingDecision, type PlayerId, type StackItem, type DeferredAct } from "./types";
 import { evalAmount } from "./amounts";
-import { CHOSEN_HEXPROOF, CREATURE_TYPES, CHOSEN_PARITY_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION } from "./keywords";
+import { CHOSEN_HEXPROOF, CREATURE_TYPES, CHOSEN_PARITY_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, protectedFrom } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
-import { damageEstimate } from "./damage";
+import { damageEstimate, objectSource, protectionHolder } from "./damage";
 import { blightOptions, removableCounters } from "./counters";
 
 /**
@@ -1880,6 +1880,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const alt = extra && planCast(s, pid, id, targets, undefined, "auto", undefined, { ...extra, alt: "alternative" });
         if (alt && alt[alt.length - 1]!.type === "castSpell") return alt;
       }
+    }
+    // Spell Queller, Smirking Spelljacker: a flash creature whose enters ability exiles a spell, cast while the spell it
+    // can take is on top (its trigger then aims at it).
+    for (const id of player(s, pid).hand) {
+      const d = defOf(s, obj(s, id));
+      if (!d.keywords.includes("Flash") || !isType(d, "Creature")) continue;
+      const enters = compileCard(d).triggers.find((t) => t.event === "selfEnters" && t.body.effects.length === 1 && t.body.effects[0]!.type === "counterSpell" && !!t.body.effects[0]!.exileSpell && t.body.targets.length === 1);
+      if (!enters || !spellMatches(s, enters.body.targets[0]!, top)) continue;
+      const plan = planCast(s, pid, id, undefined, undefined, "auto");
+      if (plan && plan[plan.length - 1]!.type === "castSpell") return plan;
     }
     for (const id of s.battlefield) {
       const o = obj(s, id);
@@ -7691,6 +7701,9 @@ function combatHits(s: GameState): (from: GameObject, to: GameObject | PlayerId)
     const k = `${from.id}>${typeof to === "number" ? `p${to}` : to.id}`;
     let n = memo.get(k);
     if (n === undefined) memo.set(k, (n = damageEstimate(s, from, typeof to === "number" ? { player: to } : { object: to.id }, Math.max(0, combatDamageOf(s, from)))));
+    // Weeping Angel: its combat damage to a creature is prevented, but the creature is shuffled away, as good as lethal
+    // (unless protection from it or a shield counter is used instead, which a bot does).
+    if (typeof to !== "number" && n === 0 && abilitiesOf(s, from).combatToCreatureShuffles && combatDamageOf(s, from) > 0 && objIsType(s, to, "Creature") && !protectedFrom(characteristics(s, to).keywords, objectSource(s, from), protectionHolder(s, to)) && !(to.counters.shield ?? 0)) memo.set(k, (n = Math.max(1, lethalDamage(s, to))));
     return n;
   };
 }

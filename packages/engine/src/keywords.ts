@@ -178,6 +178,7 @@ export function canonicalKeyword(text: string): string | undefined {
   if (q === "each of that spell's colors") return CAST_SPELL_COLORS_PROTECTION;
   if (q === "each color that's not in your commander's color identity") return IDENTITY_PROTECTION;
   if (q === "each color among permanents you control") return YOURS_COLORS_PROTECTION;
+  if (q === "each mana value among artifacts you control") return YOURS_ARTIFACT_MV_PROTECTION;
   if (q === "each of its colors") return OWN_COLORS_PROTECTION;
   if (q === "everything" || q === "multicolored" || q === "monocolored" || q === "colorless" || q === "each color" || q === "all colors" || q === "the chosen color") return q === "the chosen color" ? CHOSEN_PROTECTION : `Protection from ${q}`;
   if (PROTECTION_TYPES[q]) return `Protection from ${q}`;
@@ -257,6 +258,13 @@ export const IDENTITY_PROTECTION = "Protection from each color not in your comma
  * the permanent itself counts too.
  */
 export const YOURS_COLORS_PROTECTION = "Protection from each color among permanents you control";
+/**
+ * Rebbec, Architect of Ascension: "Artifacts you control have protection from each mana value among artifacts you
+ * control": filled in as "Protection from mana value N" for each mana value among the artifacts its controller controls
+ * as layer 4 left their types (CR 613.1d, 702.16a); an {X} in a permanent's mana cost is 0 (CR 202.3e, rulings), and a
+ * token that isn't a copy has mana value 0 (CR 202.3c).
+ */
+export const YOURS_ARTIFACT_MV_PROTECTION = "Protection from each mana value among artifacts you control";
 /**
  * Magnigoth Treefolk: "For each basic land type among lands you control, ~ has landwalk of that type": filled in as the
  * layers apply it with the basic land types of the lands the effect's controller controls, as layer 4 left them
@@ -383,6 +391,9 @@ export function protectedFrom(keywords: readonly string[], src: SourceQuality, h
     if (q === "odd mana values" && (src.manaValue ?? 0) % 2 === 1) return true;
     if (q === "even mana values" && (src.manaValue ?? 0) % 2 === 0) return true;
     // Haktos's chosen number: a source whose mana value is any other (a token that isn't a copy has 0, rulings).
+    // Rebbec's "each mana value among artifacts you control", filled in: a source with exactly that mana value.
+    const exact = /^mana value (\d+)$/.exec(q);
+    if (exact && (src.manaValue ?? 0) === Number(exact[1])) return true;
     const except = /^mana values other than (\d+)$/.exec(q);
     if (except && (src.manaValue ?? 0) !== Number(except[1])) return true;
     const mv = /^mana value (\d+) or (less|greater)$/.exec(q);

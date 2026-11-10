@@ -5165,6 +5165,12 @@ export function compile(d: CardDef): CompiledCard {
       out.preventToSelfExileTop = surgeon[1] ? { combat: surgeon[1] === "combat " ? "only" : "non" } : {};
       continue;
     }
+    // Weeping Angel: "If ~ would deal combat damage to a creature, prevent that damage and that creature's owner shuffles
+    // it into their library." (CR 615.5): see staticRules in damage.ts.
+    if (line === "If ~ would deal combat damage to a creature, prevent that damage and that creature's owner shuffles it into their library.") {
+      out.combatToCreatureShuffles = true;
+      continue;
+    }
     // Treacherous Link: see staticRules in damage.ts.
     if (line === "All damage that would be dealt to enchanted creature is dealt to its controller instead.") {
       out.attachedDamageToController = true;

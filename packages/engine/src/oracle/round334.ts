@@ -1,5 +1,7 @@
-// Round 334's sentences, read before round 333's (round333Sentence in oracle/round333.ts).
+// Round 334's sentences (after round 335's, oracle/round335.ts), read before round 333's (round333Sentence in
+// oracle/round333.ts).
 import type { Effect } from "../abilities";
+import { round335Sentence } from "./round335";
 import type { Ctx } from "./body";
 import { QUOTED_SOURCE_NAME } from "./compile";
 import { pickFilter } from "./targets";
@@ -9,7 +11,9 @@ type Found = { effect: Effect; next: number } | "fail" | null;
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round334Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void effects;
+  // Round 335's sentences first (oracle/round335.ts).
+  const r335 = round335Sentence(s, sentences, si, ctx, effects);
+  if (r335) return r335;
   const line = plain(s);
   // Cosmium Catalyst: "Choose an exiled card used to craft ~ at random. You may cast that card without paying its mana
   // cost.": one of the cards its craft cost exiled, still in exile (CR 702.167c), chosen at random as this resolves; cast

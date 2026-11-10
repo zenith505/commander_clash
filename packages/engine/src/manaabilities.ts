@@ -18,6 +18,14 @@ import { COLORS, type Action, type Color, type GameObject, type GameState, type 
 /** activatedThisTurn holds activated ability indexes; mana abilities are recorded past this offset. */
 export const MANA_ABILITY_OFFSET = 1000;
 
+/**
+ * How many activated abilities `o` has now (CR 602.1): its mana abilities among them (CR 605.1a), the intrinsic one of
+ * each basic land type it has too (CR 305.6), and ones that work only from another zone, like cycling (rulings on Tazri).
+ */
+export function activatedAbilityCount(s: GameState, o: GameObject): number {
+  return abilitiesOf(s, o).activated.length + manaAbilitiesOn(s, o).length;
+}
+
 /** While adding a lender's mana abilities to a borrower's (see lendersOf). */
 let lendingMana = false;
 
@@ -445,7 +453,15 @@ export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, a
     else if (a.kind === "produced") {
       // One of the types it made, picked if it made several (rulings on Mana Flare).
       const types = [...new Set(made)];
-      picks = types.length <= 1 ? [{ extra: [], adds: types }] : types.map((m) => ({ extra: [m], adds: [m] }));
+      if (a.perOtherSameName) {
+        // Sasaya's Essence: one for each other land its controller controls with this land's name (CR 201.2), a face-down
+        // one having none (CR 708.2); each of any type it made, in any mix (rulings on Mossfire Valley).
+        const name = o.faceDown ? undefined : characteristics(s, o).name;
+        const n = !name ? 0 : s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === ctl && objIsType(s, obj(s, id), "Land") && !obj(s, id).faceDown && sameName(characteristics(s, obj(s, id)).name, name)).length;
+        let combos: ManaType[][] = [[]];
+        for (let i = 0; i < n; i++) combos = combos.flatMap((c) => types.filter((x) => !c.length || types.indexOf(x) >= types.indexOf(c[c.length - 1]!)).map((x) => [...c, x]));
+        picks = types.length <= 1 ? [{ extra: [], adds: Array<ManaType>(n).fill(types[0]!) }] : combos.map((c) => ({ extra: c, adds: c }));
+      } else picks = types.length <= 1 ? [{ extra: [], adds: types }] : types.map((m) => ({ extra: [m], adds: [m] }));
     } else {
       // n mana in any combination of colors: each combination once.
       let combos: Color[][] = [[]];

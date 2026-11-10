@@ -363,6 +363,12 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)), controller: controllerOf(s, o) };
         moveObject(s, id, "exile");
         if (s.objects[id]?.zone === "exile" && s.resolving) (s.resolving.exiled ??= []).push(before);
+        // The Master, Formed Anew: the counter goes on the card in exile (CR 122.1), not a token, which is gone (CR 111.7).
+        const exiledCard = s.objects[id];
+        if (e.exiledCounter && exiledCard?.zone === "exile" && !exiledCard.isToken) {
+          exiledCard.counters[e.exiledCounter] = (exiledCard.counters[e.exiledCounter] ?? 0) + 1;
+          log(s, `${player(s, pid).name} puts a ${e.exiledCounter} counter on ${defOf(s, exiledCard).name} in exile.`);
+        }
         // Azula, Cunning Usurper: "exiled with ~" (CR 607.2a), as the card it is in exile.
         if (e.linked && ctx.sourceId && s.objects[id]?.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: s.objects[id]!.zoneChanges ?? 0 });
         continue;
@@ -2917,6 +2923,21 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const eventFoe = e.attackingEvent ? ctx.event?.player : undefined;
       // Summoner's Grimoire: tapped and attacking only if it's an enchantment card.
       const fits = (o: GameObject) => !e.onlyIf || printedMatches(e.onlyIf, defOf(s, o));
+      // Tezzeret, Cruel Machinist: face down as 5/5 artifact creatures, all at once, whatever the cards are; which cards
+      // they are is hidden from everyone but their controller (CR 708.2a, 708.5, rulings).
+      if (e.faceDown) {
+        if (s.resolving) s.resolving.created = [];
+        enterTogether(s, () => {
+          for (const o of cards) {
+            moveObject(s, o.id, "battlefield", { controller: p.id, faceDown: e.faceDown });
+            if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
+          }
+        });
+        const n = cards.filter((o) => o.zone === "battlefield").length;
+        log(s, `${p.name} puts ${n === 1 ? "a card" : `${n} cards`} from their hand onto the battlefield face down: ${n === 1 ? "a" : "each a"} 5/5 artifact creature.`);
+        s.resolving!.did = n > 0;
+        return;
+      }
       const attackOptions = !e.attacking || !cards.some((o) => isType(defOf(s, o), "Creature") && fits(o)) ? [] : e.fromHandOf ? attackChoices(s, p.id, ctx.sourceId).filter((a) => a.player === from) : e.attackingEvent ? (eventFoe !== undefined && eventFoe !== p.id && !player(s, eventFoe).lost && attackChoices(s, p.id, ctx.sourceId).length ? [{ key: String(eventFoe), label: player(s, eventFoe).name, player: eventFoe }] : []) : attackChoices(s, p.id, ctx.sourceId);
       if (attackOptions.length > 1 && sc.attackWhom === undefined) {
         const name = defOf(s, cards[0]!).name;

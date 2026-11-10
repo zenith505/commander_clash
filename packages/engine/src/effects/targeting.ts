@@ -577,6 +577,8 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
   if (spec.noManaAbility && (compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
+  // Tazri, Stalwart Survivor: a card with an activated ability that isn't a mana ability, whatever zone it works in.
+  if (spec.nonManaActivated && !compileCard(d).activated.some((a) => !a.mana)) return false;
   if (spec.transformed || spec.faceDown || spec.powerAboveBase || spec.basePtEither !== undefined || spec.basePtEitherMax !== undefined || spec.basePT || spec.basePower !== undefined || spec.toughnessAbovePower || spec.ptUnequal || spec.ptEqual || spec.colorOfYourLegend) return false;
   return true;
 }

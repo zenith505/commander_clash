@@ -3216,6 +3216,13 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // The Master, Formed Anew: "You may have ~ enter as a copy of a creature card in exile with a takeover counter on it":
+    // any such card, whoever owns it, by its printed characteristics (CR 707.2, 707.5).
+    const fromExile = clone && !clone[2] && !clone[3] && !exileCopied && !tapCopied ? /^creature card in exile with an? ([a-z]+) counter on it$/.exec(clone[1]!) : null;
+    if (fromExile) {
+      out.entersAsCopy = { filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], exiledWithCounter: fromExile[1]!, text: clone![1]! }, ...cloneTapped };
+      continue;
+    }
     if (clone && !exileCopied && !/graveyard|\bcard\b/.test(clone[1]!) && !(clone[2] && line.startsWith("You may"))) {
       // Mockingbird: "any creature on the battlefield with mana value less than or equal to the amount of mana spent to
       // cast ~": the mana spent on the spell it was, all of it (rulings), as it enters.

@@ -21,6 +21,7 @@ import type { AbilityBody, Affects, Amount, DamageMod, Modification, MostStat, S
 import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { basePower, baseToughness, defOf, pairedWith } from "./cards";
+import { activatedAbilityCount } from "./manaabilities";
 import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
 import { liveEmblems } from "./emblems";
@@ -1448,6 +1449,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         return src.zone === "battlefield" && began !== undefined && src.controlledSinceTurn < began;
       }
       if (cond.is === "hasCounter") return Object.values(src.counters).some((n) => (n ?? 0) > 0);
+      // Tazri's granted ability: this one and at least one other (two instances of one ability are two abilities).
+      if (cond.is === "hasAnotherActivatedAbility") return src.zone === "battlefield" && activatedAbilityCount(s, src) >= 2;
       // CR 702.171b; Caustic Bronco gone before its ability resolves: saddled as it last existed (rulings, CR 608.2h).
       if (cond.is === "saddled") {
         const lk = sourceZc !== undefined && (src.zoneChanges ?? 0) !== sourceZc ? s.lastKnown?.[sourceId] : undefined;

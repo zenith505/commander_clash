@@ -865,6 +865,9 @@ export function parseActivateCondition(text: string): StaticCondition | null {
   if (/^you've controlled ~ continuously since the beginning of your most recent turn$/.test(text)) return { kind: "self", is: "controlledSinceYourTurnBegan" };
   // Idol of Oblivion: "Activate only if you created a token this turn."
   if (/^you created a token this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "tokensCreatedThisTurn" } }, min: 1 };
+  // Master's Manufactory: "Activate only if this artifact or another artifact entered the battlefield under your control
+  // this turn": any artifact did, itself included (it's an artifact as it enters).
+  if (/^~ or another artifact entered the battlefield under your control this turn$/.test(text)) return parseStaticCondition("an artifact entered the battlefield under your control this turn", self);
   // Lilypad Village: "Activate only if a Bird, Frog, Otter, or Rat entered the battlefield under your control this turn."
   const enteredAny = /^an? ((?:[A-Z][a-z]+, )+)or ([A-Z][a-z]+) entered the battlefield under your control this turn$/.exec(text);
   if (enteredAny) {

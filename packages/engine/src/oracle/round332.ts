@@ -1,12 +1,16 @@
-// Round 332's sentences, triggers and whole texts, read before round 331's (round331Sentence, round331Trigger and
-// round331WholeText in oracle/round331.ts).
+// Round 332's sentences, triggers and whole texts (after round 333's, oracle/round333.ts), read before round 331's
+// (round331Sentence, round331Trigger and round331WholeText in oracle/round331.ts).
 import type { AbilityBody, Effect, TriggeredAbility } from "../abilities";
 import type { Ctx } from "./body";
 import { parseTrigger } from "./triggers";
+import { round333Sentence, round333Trigger, round333WholeText } from "./round333";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 export function round332Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 333's sentences first (oracle/round333.ts).
+  const r333 = round333Sentence(s, sentences, si, ctx, effects);
+  if (r333 !== null) return r333;
   // Leori, Sparktouched Hunter: "choose a planeswalker type. Until end of turn, whenever you activate an ability of a
   // planeswalker of that type, copy that ability. You may choose new targets for the copies.": one of CR 205.3j's types
   // (rulings), chosen as the trigger resolves; then a delayed triggered ability for the rest of the turn (CR 603.7b) with
@@ -28,6 +32,9 @@ export function round332Sentence(s: string, sentences: string[], si: number, ctx
 }
 
 export function round332Trigger(raw: string): TriggeredAbility | "fail" | null {
+  // Round 333's triggers first (oracle/round333.ts).
+  const r333 = round333Trigger(raw);
+  if (r333 !== null) return r333;
   // Eye of the Storm: "Whenever a player casts an instant or sorcery card, exile it. Then that player copies each instant
   // or sorcery card exiled with ~. For each copy, the player may cast the copy without paying its mana cost.": a card, not
   // a copy (rulings); the spell is exiled, not countered, linked to ~ (CR 607.2a); then the caster copies every card
@@ -48,7 +55,6 @@ export function round332Trigger(raw: string): TriggeredAbility | "fail" | null {
 
 /** A whole ability's text read another way (a string), or null. */
 export function round332WholeText(text: string, parse: (t: string) => AbilityBody | null): AbilityBody | string | null {
-  void text;
-  void parse;
-  return null;
+  // Round 333's whole texts first (oracle/round333.ts).
+  return round333WholeText(text, parse);
 }

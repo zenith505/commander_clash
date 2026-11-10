@@ -128,6 +128,9 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.bound || spec.saddledSource || spec.crewedSource || spec.drafted || spec.targetsSource) return false;
   if (spec.objectId !== undefined && o.id !== spec.objectId) return false;
   if (spec.notId !== undefined && o.id === spec.notId) return false;
+  // Dire Blunderbuss's granted "sacrifice an artifact other than Dire Blunderbuss": not the permanent that gave it, while
+  // it's that object (bound as the layers give the ability, grants.ts; CR 400.7).
+  if (spec.notGrantSource && o.id === spec.notGrantSource.id && (o.zoneChanges ?? 0) === spec.notGrantSource.zc) return false;
   const c = chars ?? characteristics(s, o);
   const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
   if (spec.noAbilities && !hasNoAbilities(s, o, c)) return false;
@@ -817,6 +820,23 @@ export function targetsOnlyOne(s: GameState, targets: TargetChoice[], only: "sel
   // Ivy, Gleeful Spellthief: "a single creature other than ~".
   if (only !== "self" && only.notSource && it.id === o?.id) return undefined;
   return (only === "self" ? it.id === o?.id : objectMatches(s, only, it, you, false)) ? it.id : undefined;
+}
+
+/**
+ * Zevlor, Elturel Exile: "a spell that targets only a single opponent or a single permanent an opponent controls" (of
+ * `you`): every target it has that one opponent, or that one permanent on the battlefield, controlled by an opponent
+ * (rulings: one target chosen of several possible counts, two different targets don't). The opponent it is or whose it
+ * is, or undefined.
+ */
+export function opponentOrTheirsTarget(s: GameState, targets: TargetChoice[], you: PlayerId): { player: PlayerId; target: TargetChoice } | undefined {
+  const chosen = targets.filter((t) => t.kind !== "none");
+  const first = chosen[0];
+  if (!first || (first.kind !== "player" && first.kind !== "object") || chosen.some((t) => t.kind !== first.kind || (t as { id?: unknown }).id !== first.id)) return undefined;
+  if (first.kind === "player") return first.id !== you && !player(s, first.id).lost ? { player: first.id, target: first } : undefined;
+  const o = s.objects[first.id];
+  if (!o || o.zone !== "battlefield" || (first.zc !== undefined && (o.zoneChanges ?? 0) !== first.zc)) return undefined;
+  const by = controllerOf(s, o);
+  return by !== you ? { player: by, target: first } : undefined;
 }
 
 /**

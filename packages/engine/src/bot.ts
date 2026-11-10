@@ -61,6 +61,7 @@ import {
   tapCostCandidates,
   shareablePick,
   craftCandidates,
+  craftSlotsFit,
   untapViaMana,
   counterCostCandidates,
   counterOnCandidates,
@@ -511,6 +512,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Thelon's Curse: "pay {U} for each creature chosen this way": the best creatures we can pay for. On our own upkeep only
     // with half our lands at most, so the turn's spells still have mana; on another player's, as many as we can, to block.
+    // Feather, Radiant Arbiter: the spell aimed at our own creature helps it, so copies for our best other creatures, as
+    // many as we can pay for.
+    if (pend.kind === "pickPermanents" && pend.action === "copyFor" && pend.payEach) {
+      const ours = pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+      for (let k = ours.length; k > 0; k--) {
+        const plan = planMana(s, pid, parseManaCost(pend.payEach.repeat(k)));
+        if (plan) return [...plan, { type: "pickPermanents", player: pid, ids: ours.slice(0, k) }];
+      }
+      return [{ type: "pickPermanents", player: pid, ids: [] }];
+    }
     if (pend.kind === "pickPermanents" && pend.payEach) {
       const per = parseManaCost(pend.payEach);
       const best = [...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
@@ -1544,6 +1555,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "demonstrate") {
       const owned = (o: string) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === Number(o)).length;
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => owned(a) - owned(b))[0]! }];
+    }
+    // Zevlor, Elturel Exile: the copy is aimed like the spell, at an opponent: their most valuable permanent it can target,
+    // else that player; never no copy.
+    if (pend.kind === "chooseOption" && pend.what === "copyTargetFor") {
+      const perms = pend.options.filter((o) => o !== "none" && !/^p\d+$/.test(o)).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+      return [{ type: "chooseOption", player: pid, choice: perms[0] ?? pend.options.find((o) => o !== "none") ?? pend.options[0]! }];
     }
     // Zada's copies: the order hardly matters to a bot, so battlefield order.
     if (pend.kind === "chooseOption" && pend.what === "copyOrder") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
@@ -5657,6 +5674,8 @@ function chooseCardName(s: GameState, pid: PlayerId, pend: Extract<PendingDecisi
   const shown = opps.flatMap((x) => [...player(s, x).command, ...player(s, x).graveyard, ...player(s, x).exile.filter((id) => !obj(s, id).faceDown), ...s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x)]);
   const card = pend.objectId ? compileCard(defOf(s, obj(s, pend.objectId))) : undefined;
   const silences = !!card?.nameBans?.some((b) => b.kind === "activate") || !!card?.activationTaxes;
+  // Alhammarret, High Arbiter: the costliest card its opponents revealed (one we don't play ourselves).
+  if (card?.entersChoose?.some((c) => c.opponentHands)) return best(opps.flatMap((x) => player(s, x).hand), (o) => value(o) - (mine.has(nameOf(o)) ? 20 : 0)) ?? pend.options[0]!;
   const pick = best(shown, (o) => {
     let v = value(o) - (mine.has(nameOf(o)) ? 20 : 0);
     // A commander comes back again and again; an activated ability matters most to what stops activations.
@@ -6742,7 +6761,15 @@ export function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: Act
       const field = pool.filter((x) => obj(s, x).zone === "battlefield" && obj(s, x).isToken && worth(s, pid, obj(s, x)) <= 3).sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)));
       const picks = [...yard, ...field];
       if (picks.length < c.n) return null;
-      out.craft = picks.slice(0, c.n);
+      if (c.slots) {
+        // Throne of the Grim Captain: the first picks that give each slot its own object.
+        const fit = craftSlotPicks(s, pid, c, picks);
+        if (!fit) return null;
+        out.craft = fit;
+        continue;
+      }
+      // "One or more": every pick, the back faces counting what was used to craft them (Wretched Bonemass, Sunbird Effigy).
+      out.craft = c.orMore ? picks : picks.slice(0, c.n);
     } else if (c.kind === "tap" && c.untap) {
       // "Untap a tapped creature you control" (Halo Fountain): untapping is all gain, the most valuable first.
       // Then a mana creature, tapped for mana while paying and untapped for the cost (rulings).
@@ -8140,4 +8167,19 @@ function powerFloorSet(s: GameState, pid: PlayerId, options: ObjectId[], min: nu
     total += power(s, o);
   }
   return total >= min ? ids : null;
+}
+
+/** Throne of the Grim Captain's materials from `picks`, in order of preference: one for each slot (craftSlotsFit). */
+function craftSlotPicks(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "craft" }>, picks: ObjectId[]): ObjectId[] | null {
+  const n = c.slots!.length;
+  const go = (start: number, chosen: ObjectId[]): ObjectId[] | null => {
+    if (chosen.length === n) return craftSlotsFit(s, pid, c, chosen) ? chosen : null;
+    for (let i = start; i < picks.length; i++) {
+      const r = go(i + 1, [...chosen, picks[i]!]);
+      if (r) return r;
+    }
+    return null;
+  };
+  picks = picks.slice(0, 12); // the cheapest few: the search stays small
+  return go(0, []);
 }

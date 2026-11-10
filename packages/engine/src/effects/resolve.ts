@@ -40,6 +40,7 @@ import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
 import { runRound330Effect } from "./run-round330";
+import { runRound333Effect } from "./run-round333";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
 import { ringBearer } from "./run-ring";
@@ -1760,6 +1761,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runRound329Effect(s, e, ctx, src);
     case "controllersMayExile":
       return runRound330Effect(s, e, ctx, src);
+    case "copyPerOtherOpponent":
+    case "copyAttachedOnto":
+      return runRound333Effect(s, e, ctx, src);
     case "flipCoin":
       return runCoinEffect(s, e, ctx, src);
     case "flipCoinEach":

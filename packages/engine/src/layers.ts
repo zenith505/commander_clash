@@ -1643,6 +1643,12 @@ function linkedCardKeyword(s: GameState, sourceId: ObjectId | undefined, keyword
     const fits = (k: string) => (keyword === "Landwalk" ? isLandwalk(k) : /^Protection from /i.test(k));
     return [...new Set(cards.flatMap((o) => printedKeywords(defOf(s, o)).filter(fits)))];
   }
+  // "Hexproof from [quality]" is a hexproof ability (CR 702.11d-e): the card has hexproof, and this object gets that variant
+  // (rulings on Soulflayer and Odric, Lunarch Marshal).
+  if (keyword === "Hexproof") {
+    const kws = new Set(cards.flatMap((o) => printedKeywords(defOf(s, o)).filter((k) => /^Hexproof(?: from |$)/i.test(k)).map((k) => (/^hexproof$/i.test(k) ? "Hexproof" : k))));
+    return kws.has("Hexproof") ? ["Hexproof"] : [...kws];
+  }
   const has = cards.some((o) => printedKeywords(defOf(s, o)).some((k) => k.toLowerCase() === keyword.toLowerCase()));
   return has ? [keyword] : [];
 }

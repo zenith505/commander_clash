@@ -253,7 +253,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const dredge = dredges.length ? chooseDredge(s, pid, dredges) : undefined;
       // Pursuit of Knowledge: a counter until it has three (then seven cards); Obstinate Familiar: skip only with a short library.
       const counter = pend.options.find((k) => k.startsWith("counter:") && (s.objects[k.slice("counter:".length)]!.counters[abilitiesOf(s, s.objects[k.slice("counter:".length)]!).drawMayCounter ?? ""] ?? 0) < 3);
-      const skip = player(s, pid).library.length <= 5 ? has("mayskip") : undefined;
+      // Island Sanctuary: skip when the creatures that couldn't attack us then could deal half our life or more.
+      const sanctuary = pend.options.find((k) => k.startsWith("mayskip:") && !!s.objects[k.slice("mayskip:".length)] && !!abilitiesOf(s, s.objects[k.slice("mayskip:".length)]!).drawStepMaySkip);
+      const grounded = (only: string[]) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) !== pid && objIsType(s, obj(s, id), "Creature") && !only.some((k) => objHasKeyword(s, obj(s, id), k))).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
+      const shelter = sanctuary && !player(s, pid).attackOnlyByUntil && grounded(abilitiesOf(s, s.objects[sanctuary.slice("mayskip:".length)]!).drawStepMaySkip!.attackOnlyBy) * 2 >= player(s, pid).life ? sanctuary : undefined;
+      const skip = shelter ?? (player(s, pid).library.length <= 5 ? has("mayskip") : undefined);
       const declinable = (k: string) => k === "thief" || /^(?:dredge|mayskip|counter):/.test(k);
       const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("archive") ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? pend.options.find((k) => !declinable(k)) ?? pend.options[0]!;
       return [{ type: "drawInstead", player: pid, choice: pick }];
@@ -705,6 +709,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     if (pend.kind === "manaMix") return [{ type: "manaMix", player: pid, counts: chooseManaMix(s, pid, pend.n, pend.colors) }];
+    if (pend.kind === "divideDamage") return [{ type: "divideDamage", player: pid, parts: chooseDamageDivision(s, pid, pend.by, pend.options, pend.total) }];
     if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.remove ? chooseCounterRemoval(s, pid, pend.options, pend.total, pend.has ?? {}) : pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     // Malik, Grim Manipulator: their best creature goes; of our own, the least useful one (the other choice is hidden).
@@ -4497,6 +4502,28 @@ function chooseCounterRemoval(s: GameState, pid: PlayerId, options: ObjectId[], 
     if (k > 0) parts[id] = k;
     left -= k;
   }
+  return parts;
+}
+
+/**
+ * Master of the Wild Hunt: `by` deals `total` damage divided among `options`. Others' creatures: lethal damage to as many
+ * as it can, the most valuable first, the rest on the first of them; our own: all of it on the least valuable one.
+ */
+function chooseDamageDivision(s: GameState, pid: PlayerId, by: ObjectId, options: ObjectId[], total: number): Record<ObjectId, number> {
+  const byWorth = [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+  if (options.every((id) => controllerOf(s, obj(s, id)) === pid)) return { [byWorth[byWorth.length - 1]!]: total };
+  const theirs = byWorth.filter((id) => controllerOf(s, obj(s, id)) !== pid);
+  const deathtouch = !!s.objects[by] && objHasKeyword(s, obj(s, by), "Deathtouch");
+  const parts: Record<ObjectId, number> = {};
+  let left = total;
+  for (const id of theirs) {
+    const o = obj(s, id);
+    const need = objHasKeyword(s, o, "Indestructible") ? Infinity : deathtouch ? 1 : Math.max(1, toughness(s, o) - o.damage);
+    if (need > left) continue;
+    parts[id] = need;
+    left -= need;
+  }
+  if (left > 0) parts[theirs[0]!] = (parts[theirs[0]!] ?? 0) + left;
   return parts;
 }
 

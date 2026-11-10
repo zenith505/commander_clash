@@ -2828,6 +2828,50 @@ function ColorsPick({ pending, dispatch }: { pending: Extract<NonNullable<GameSt
 }
 
 /** Cards from your graveyard to collect evidence N with (CR 701.59a): Done once their mana values add up to N or more. */
+/** Master of the Wild Hunt: your creature's damage divided among the creatures offered, − and + for each, until all of it is given out. */
+function DivideDamageChoice({
+  s,
+  pending,
+  dispatch,
+  onHover,
+}: {
+  s: GameState;
+  pending: Extract<NonNullable<GameState["pending"]>, { kind: "divideDamage" }>;
+  dispatch: ReturnType<typeof useGame>["dispatch"];
+  onHover: (d: CardDef | null) => void;
+}) {
+  const [parts, setParts] = useState<Record<string, number>>({});
+  const given = Object.values(parts).reduce((a, n) => a + n, 0);
+  const left = pending.total - given;
+  const set = (id: string, n: number) => setParts({ ...parts, [id]: Math.max(0, n) });
+  return (
+    <div className="controls">
+      <span>
+        <strong>{pending.source}:</strong> divide {cardOf(s, pending.by).name}'s {pending.total} damage among any number of these {pending.what} ({left} left)
+      </span>
+      {pending.options.map((id) => {
+        const n = parts[id] ?? 0;
+        const d = cardOf(s, id);
+        return (
+          <span key={id} className="divide" data-divide-damage={id} onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)}>
+            {d.name}{" "}
+            <button className="ghost" disabled={n <= 0} onClick={() => set(id, n - 1)}>
+              −
+            </button>
+            <strong>{n}</strong>
+            <button className="ghost" disabled={left <= 0} onClick={() => set(id, n + 1)}>
+              +
+            </button>
+          </span>
+        );
+      })}
+      <button disabled={left !== 0} onClick={() => dispatch([{ type: "divideDamage", player: HUMAN, parts }])}>
+        Done
+      </button>
+    </div>
+  );
+}
+
 /** "Distribute X +1/+1 counters among any number of creatures you control": − and + for each, until all are given out. */
 function DistributeChoice({
   s,
@@ -5371,6 +5415,8 @@ function Controls({
   if (pending?.kind === "manaMix" && pending.player === HUMAN) return <ManaMixChoice key={`${pending.source}:${pending.n}`} pending={pending} dispatch={dispatch} />;
   if (pending?.kind === "distribute" && pending.player === HUMAN)
     return <DistributeChoice key={`${pending.source}:${pending.total}:${pending.options.join(",")}`} s={s} pending={pending} dispatch={dispatch} onHover={onHover} />;
+  if (pending?.kind === "divideDamage" && pending.player === HUMAN)
+    return <DivideDamageChoice key={`${pending.source}:${pending.by}:${pending.total}:${pending.options.join(",")}`} s={s} pending={pending} dispatch={dispatch} onHover={onHover} />;
   if (pending?.kind === "pickPermanents" && pending.player === HUMAN) {
     const theirs = pending.of !== undefined && pending.of !== HUMAN ? s.players[pending.of]!.name : undefined;
     // Drake Familiar: "return an enchantment to its owner's hand": anyone's permanents to choose from.

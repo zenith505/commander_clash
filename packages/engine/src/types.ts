@@ -895,6 +895,8 @@ export interface Player {
   attackTaxUntil?: { n: number; planeswalkers?: true; /** Sivitri, Dragon Master: life for each creature, paid as attackers are declared (CR 508.1g-h, 119.4). */ life?: number }[];
   /** "Until your next turn, creatures can't attack you" (Chronomantic Escape): this player, not their planeswalkers. */
   unattackableUntil?: true;
+  /** Island Sanctuary: "until your next turn, you can't be attacked except by creatures with flying and/or islandwalk": only creatures with one of these keywords can attack this player (not their planeswalkers or battles). */
+  attackOnlyByUntil?: string[];
   /**
    * Orzhov Advokist: the players whose creatures can't attack this player or planeswalkers they control until this
    * player's next turn begins (whatever creatures they control by then, rulings).
@@ -906,7 +908,7 @@ export interface Player {
    */
   attackBansNextTurn?: { player: PlayerId; turn?: number }[];
   /** Effect attackBanThisTurn: this player's creatures can't attack `player` (or, with `subtype`, their planeswalkers of that type) during `turn`. */
-  attackBansThisTurn?: { player: PlayerId; turn: number; subtype?: string; /** "This combat" (Champions of Minas Tirith): only in that combat phase (GameState.combatsThisTurn). */ combat?: number }[];
+  attackBansThisTurn?: { player: PlayerId; turn: number; /** "Can't attack you or planeswalkers you control" (Sandswirl Wanderglyph): that player's planeswalkers too. */ walkers?: true; subtype?: string; /** "This combat" (Champions of Minas Tirith): only in that combat phase (GameState.combatsThisTurn). */ combat?: number }[];
   /** "Until end of turn, your life total can't change" (Flare of Fortitude): the turn it's for (CR 119.7-8). */
   lifeCantChangeTurn?: number;
   /** "Until end of turn, damage that would reduce your life total to less than 1 reduces it to 1 instead" (Angel's Grace): the turn it's for. */
@@ -998,6 +1000,8 @@ export interface Player {
   attackedPlayers?: { turn: number; players: PlayerId[] };
   /** The players this player attacked with creatures in any combat of its latest turn that had one (Weathered Sentinels). */
   attackedInTurn?: { turn: number; players: PlayerId[] };
+  /** Sandswirl Wanderglyph: the players this player declared an attacker against this turn, or against a planeswalker they controlled (not a battle, rulings). */
+  attackedPlayersOrWalkers?: { turn: number; players: PlayerId[] };
   /** The latest two combat phases of this player's turns (GameState.combatsThisTurn), the latest last: Territorial Hellkite's "your last combat". */
   combatsBegun?: { turn: number; combat: number }[];
   /** The city's blessing (CR 702.131c): once a player has it, they keep it for the rest of the game. */
@@ -1694,6 +1698,11 @@ export type PendingDecision =
    * color, `n` in all, chosen as it resolves (CR 106.1b, 608.2d). `colors`: only these.
    */
   | { kind: "manaMix"; player: PlayerId; source: string; n: number; colors?: Color[] }
+  /**
+   * Master of the Wild Hunt: `by` deals `total` damage divided as `player` (its controller) chooses among any number of
+   * `options` (Effect "dividedDamageBack"): how much each gets, adding up to `total`, the ones chosen at least 1 each.
+   */
+  | { kind: "divideDamage"; player: PlayerId; source: string; by: ObjectId; total: number; options: ObjectId[]; what: string }
   /** `x`: the trigger's X (an enters trigger's is its spell's, CR 107.3m), which "up to X target ..." can't choose more than. */
   /** `controller`: the ability's controller, when `player` chooses its target for them ("target creature of their choice", TargetSpec.chosenBy). */
   | { kind: "chooseTargets"; player: PlayerId; sourceId: ObjectId; specs: TargetSpec[]; description: string; x?: number; controller?: PlayerId; /** A spell or activated ability's target of an opponent's choice, as it's cast or activated (not a trigger's). */ deferred?: DeferredAct }
@@ -2942,6 +2951,8 @@ export interface Resolving {
     gambit?: { queue: PlayerId[]; picks: Partial<Record<PlayerId, ObjectId>> };
     /** Effect "revealPutIfNamedAsPermanent" (Retraced Image): the card revealed ("" none). */
     retraced?: ObjectId | "";
+    /** Effect "dividedDamageBack" (Master of the Wild Hunt): how the damage was divided. */
+    dividedDamage?: Record<ObjectId, number>;
     faceUpPile?: number;
     /** Effect "permanentPiles": each separated player's permanents, and the pile chosen for each (Make an Example). */
     pileOf?: Record<number, ObjectId[]>;
@@ -3167,6 +3178,7 @@ export type Action =
   | { type: "searchLibrary"; player: PlayerId; found: ObjectId[] }
   /** Answer to a distribute decision: how many counters each permanent gets (left out: none). */
   | { type: "distribute"; player: PlayerId; parts: Record<ObjectId, number> }
+  | { type: "divideDamage"; player: PlayerId; parts: Record<ObjectId, number> }
   /** Answer to manaMix: how many mana of each color (left out: none), adding up to its `n`. */
   | { type: "manaMix"; player: PlayerId; counts: Partial<Record<Color, number>> }
   /** Answer to pickPermanents. */

@@ -434,7 +434,7 @@ export type Count =
    */
   | { kind: "manaSymbols"; color: Color; in?: "graveyard" | "affected" | "revealedFromHand" | "revealed"; of?: ObjRef }
   /** "For each Aura attached to it", "each Equipment attached to it". */
-  | { kind: "attachedToSelf"; subtypes: string[] }
+  | { kind: "attachedToSelf"; subtypes: string[]; /** Animal Friend's granted "... attached to this creature other than Animal Friend": not the permanent that gave the ability (bound as the layers give it, grants.ts). */ except?: { ref: "grantSource"; id?: ObjectId; zc?: number } }
   /** "Enchanted creature gets +1/+1 for each Aura and Equipment attached to it" (Mantle of the Ancients): attached to the permanent the static ability's effect is applied to. */
   | { kind: "attachedToAffected"; subtypes: string[] }
   /** "Equipped creature has double strike as long as two or more Equipment are attached to it" (Brass Knuckles): attached to the permanent the source is attached to. */
@@ -1324,6 +1324,8 @@ export interface TargetSpec {
    * "up to one", so each opponent's target must be chosen if that opponent has one to target (CR 601.2c; rulings on
    * Sylvan Primordial), and none for one who doesn't. */
   perOpponentRequired?: true;
+  /** With `perOpponent`, Geth's Summons: "for each opponent who has three or more poison counters as you cast ~": only those opponents, counted as its targets are chosen (CR 601.2c). */
+  perOpponentPoison?: number;
   /** With `perOpponentRequired` and `perPlayer`: "for each player, choose target permanent that player controls" (Vaevictis
    * Asmadi, the Dire): every player's target must be chosen, so with none for one player the ability can't be put on the
    * stack, or is removed from it (rulings, CR 603.3d). */
@@ -3564,6 +3566,13 @@ export type Effect =
    * Mitotic Manipulation, CR 201.2); it isn't played or cast.
    */
   | { type: "revealPutIfNamedAsPermanent" }
+  /**
+   * Master of the Wild Hunt: "That creature deals damage equal to its power divided as its controller chooses among any
+   * number of those Wolves.": `from` (still a creature on the battlefield) deals damage equal to its power as this resolves,
+   * divided by its controller among `among` as it resolves (they aren't targets, rulings; PendingDecision "divideDamage"),
+   * all at once; each one chosen is dealt at least 1 (CR 601.2d).
+   */
+  | { type: "dividedDamageBack"; from: ObjRef; among: ObjRef }
   | { type: "impulse"; n: Amount; /** With `who` eachPlayer, Rocco, Street Chef: "each player may play the card they exiled this way": each card's own owner's permission, ending as this ability's controller's next end step begins with until "yourNextEndStep". */ ownersPlay?: true; /** With `who` eachPlayer, Triple Triad: "you may play the card you own exiled this way and each other card exiled this way with lesser mana value than it": only those, none if you exiled none (CR 202.3e: X is 0). */ ownAndLesser?: true; until: "thisTurn" | "nextTurn" | /** "Until your next turn" (Nivix, Aerie of the Firemind): over as that turn begins. */ "yourNextTurn" | "exiled" | "yourNextEndStep" | /** "Until the beginning of your next upkeep" (Elkin Bottle). */ "yourNextUpkeep" | /** "During your next turn" (Galvanic Relay). */ "duringNextTurn" | /** "For as long as you control ~" (Lightning, Security Sergeant). */ "whileControlled" | /** "Until end of combat on your next turn" (Brazen Cannonade). */ "yourNextCombat"; who?: PlayerRef; /** Elder Brain: "exile all cards from that player's hand, then they draw that many cards" (`n` unused). */ hand?: true; /** Elkin Lair: "that player exiles a card at random from their hand. The player may play that card this turn." (`n` unused): the `who` player's own card, their permission. */ randomFromHand?: true; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** With `free`: "You may cast Equipment spells this way without paying their mana costs" (Nahiri, Forged in Fury): only cards like this are free. */ freeFor?: TargetSpec; /** "During any turn you attacked with a token" (Neyali): only then. */ attackedWithToken?: true; /** "During any turn you attacked with a commander" (Neriv, Crackling Vanguard): only then. */ attackedWithCommander?: true; /** "During any turn you attacked with a Rogue" (Robber of the Rich): only in a turn its player declared a creature of this type as an attacker. */ attackedWithType?: string; /** "During any turn you attacked with ~" (Goblin Researcher): only in a turn its player declared this ability's source, as the object it is, as an attacker (GameObject.mayPlay.attackedWithSource). */ attackedWithSource?: true; /** "During any turn you attacked with three or more creatures" (Boros Strike-Captain): only in a turn its player declared at least this many creatures as attackers. */ attackedWithAtLeast?: number; /** With `graveyards` and `choose` (Author of Shadows): "Choose a nonland card exiled this way": one card like this among all those exiled, chosen as it resolves; only it gets the permission. */ chooseAmong?: TargetSpec; /** "During any turn you put a lore counter on ~" (Summon: Brynhildr): only in a turn its player put a lore counter on the source, as the object it is (GameObject.mayPlay.loreOn). */ loreOnSource?: true; /** "You may play it if you control a Kavu" (Possibility Technician): only while that player controls a permanent like this (GameObject.mayPlay.ifControl). */ ifControl?: TargetSpec; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** With `oneOf`: "You may play up to two of those cards" (March of Reckless Joy): this many of them. */ oneOfMax?: number; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true; /** With `graveyards`: "all creature cards from target player's graveyard" (Shadow of the Enemy): only these. */ graveyardFilter?: TargetSpec; /** "You may cast instant and sorcery spells from among them" (Ral, Leyline Prodigy): only cards like this get the permission. */ castFilter?: TargetSpec; /** "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): only spells like this, the face cast counting (GameObject.mayPlay.castFilter); with `oneOf`, one of them. */ spellFilter?: TargetSpec; /** "You may play it until you exile another card with ~" (Unstable Amulet, Furious Rise): until the source's next such exile (GameObject.mayPlay.untilAnother). */ untilAnother?: true; /** Casey & Raph: "Target player exiles the top card of their library. Until that player's next end step, they may play that card": the `who` player has the permission, not you. */ theyPlay?: true; /** Curse of Hospitality: "that creature's controller may play that card": this player has the permission, not you. */ player?: PlayerRef; /** Dream Harvest: "Each opponent exiles cards from the top of their library until they have exiled cards with total mana value 5 or greater this way": with an each-player `who`, down to the card that brings that library's total there (X as 0, CR 202.3e), all of it if it never does; `n` unused. */ untilTotalMv?: number }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
@@ -5045,7 +5054,7 @@ export type Effect =
    * (Jace, Multiverse Architect): `who`'s creatures, this turn; `subtype`: only planeswalkers of that type you control
    * instead of you.
    */
-  | { type: "attackBanThisTurn"; who: PlayerRef; subtype?: string; /** "Can't attack you this combat" (Champions of Minas Tirith): this combat phase only. */ combat?: true; /** Call for Aid: "You can't attack that player this turn": the player who can't be attacked, instead of you (then `who` may be you). */ protects?: PlayerRef }
+  | { type: "attackBanThisTurn"; who: PlayerRef; subtype?: string; /** "Can't attack you this combat" (Champions of Minas Tirith): this combat phase only. */ combat?: true; /** Call for Aid: "You can't attack that player this turn": the player who can't be attacked, instead of you (then `who` may be you). */ protects?: PlayerRef; /** Sandswirl Wanderglyph: "they can't attack you or planeswalkers you control this turn": your planeswalkers too, not battles you protect (rulings). */ walkers?: true }
   /** Wall of Dust: "that creature can't attack during its controller's next turn": that player's next turn, while it's the same object (CR 400.7). */
   | { type: "cantAttackNextTurn"; what: ObjRef }
   /**
@@ -7725,6 +7734,8 @@ export interface CompiledCard {
   defendingCantCastWhileAttacking?: true;
   /** "Each opponent who attacked with a creature this turn can't cast spells" (Angelic Arbiter): one who declared an attacker this turn (rulings). */
   opponentsWhoAttackedCantCast?: true;
+  /** Sandswirl Wanderglyph: "Each opponent who attacked you or a planeswalker you control this turn can't cast spells": one who declared an attacker against its controller or their planeswalker this turn (Player.attackedPlayersOrWalkers), even before it was there; only while it's on the battlefield (rulings). */
+  opponentsWhoAttackedYouCantCast?: true;
   /** "As long as ~ is attached to a creature, your opponents can't cast spells during your turn" (Conqueror's Flail): only while this holds. */
   opponentsCantCastYourTurnIf?: StaticCondition;
   /**
@@ -7988,6 +7999,13 @@ export interface CompiledCard {
   drawRevealCreatures?: number;
   /** Obstinate Familiar: "If you would draw a card, you may skip that draw instead." (CR 614.1a): each of its controller's draws, their choice. */
   drawMaySkip?: true;
+  /**
+   * Island Sanctuary: "If you would draw a card during your draw step, instead you may skip that draw. If you do, until your
+   * next turn, you can't be attacked except by creatures with flying and/or islandwalk." (CR 614.1a): each draw during its
+   * controller's own draw step, their choice; a skip gives them Player.attackOnlyByUntil, which stays if this leaves
+   * (rulings), and skipping more than once does no more.
+   */
+  drawStepMaySkip?: { attackOnlyBy: string[] };
   /** Pursuit of Knowledge: "If you would draw a card, you may put a study counter on ~ instead." (CR 614.1a): the kind of counter, each draw their choice. */
   drawMayCounter?: CounterKind;
   /**

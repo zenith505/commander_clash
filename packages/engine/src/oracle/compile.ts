@@ -58,6 +58,8 @@ export function compileCard(card: CardDef): CompiledCard {
   if (hit) return hit;
   const doors = d.roomDoors ? roomDoorDefs(d) : undefined;
   const out = doors ? roomAbilities(doors) : compile(d);
+  // An emblem's activated abilities work in the command zone, where it is (CR 114.4): its owner activates them there.
+  if (d.typeLine === "Emblem") out.activated = out.activated.map((ab) => ({ ...ab, zone: "command" as const }));
   // A meld card's ability melds it with its counterpart into their combined back face (CR 701.42a): only if what that
   // puts onto the battlefield is supported.
   if (d.meld && !isMeldResult(d) && /\bmeld them into\b/.test(d.oracleText) && !meldResultSupported(d.meld.result)) out.unsupported.push(`(${d.meld.result}, the permanent it melds into)`);

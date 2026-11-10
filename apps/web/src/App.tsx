@@ -1453,6 +1453,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // Another player's permanent with an ability any player may activate (Feral Hydra, Quicksilver Wall).
     if (o.zone === "battlefield" && controllerOf(s, o) !== HUMAN && abilitiesOf(s, o).activated.some((ab) => ab.anyPlayer && (!ab.ownerOnly || o.owner === HUMAN) && (!ab.opponentsOnly || opponents(s, controllerOf(s, o)).includes(HUMAN)))) return setMenu(o.id);
     if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN) return;
+    // An emblem of yours with an activated ability (Karn, Living Legacy's): its menu, from the command zone (CR 114.4).
+    if (o.emblem) {
+      if (o.owner === HUMAN && abilitiesOf(s, o).activated.length) setMenu(o.id);
+      return;
+    }
     // A card with cycling, evoke or dash: choose between casting (or playing) it and the other way.
     if (o.zone === "hand" && (handAbilities(s, o.id).length || altCostsFor(s, HUMAN, o).length || compileCard(cardOf(s, o.id)).faceDownCast || compileCard(cardOf(s, o.id)).suspend || compileCard(cardOf(s, o.id)).plot || foretellCostOf(s, o) || compileCard(cardOf(s, o.id)).assist || compileCard(cardOf(s, o.id)).discardAnyTime)) return setMenu(o.id);
     // A card with several faces to cast or play it as (a split card's halves, an Adventure, a modal double-faced card's
@@ -3580,11 +3585,31 @@ function Seat({
         )}
         {(s.emblems ?? [])
           .filter((id) => s.objects[id]!.owner === pid)
-          .map((id) => (
-            <span key={id} className="monarch" data-emblem={id} title={`${cardOf(s, id).name} (in the command zone): ${cardOf(s, id).oracleText.replace(/~/g, "this emblem").replace(/\n/g, " ")}`}>
-              ✦ Emblem: {cardOf(s, id).name.replace(/ emblem$/, "").split(",")[0]}
-            </span>
-          ))}
+          .map((id) => {
+            const title = `${cardOf(s, id).name} (in the command zone): ${cardOf(s, id).oracleText.replace(/~/g, "this emblem").replace(/\n/g, " ")}`;
+            const label = <>✦ Emblem: {cardOf(s, id).name.replace(/ emblem$/, "").split(",")[0]}</>;
+            // Yours, with an activated ability (Ob Nixilis of the Black Oath's): click it for its menu (CR 114.4).
+            if (pid === HUMAN && abilitiesOf(s, s.objects[id]!).activated.length)
+              return (
+                <button
+                  key={id}
+                  className="monarch emblem-button"
+                  data-emblem={id}
+                  title={`${title} Click to activate it.`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    cardProps.onClick(s.objects[id]!);
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            return (
+              <span key={id} className="monarch" data-emblem={id} title={title}>
+                {label}
+              </span>
+            );
+          })}
         {p.gained?.length ? (
           <span className="muted" title={`Until end of turn, ${p.name} has ${p.gained.map((k) => keywordLabel(k, (x) => s.players[x]!.name).toLowerCase()).join(" and ")}.`}>
             🛡 {p.gained.map((k) => keywordLabel(k, (x) => s.players[x]!.name)).join(", ")}

@@ -1,4 +1,4 @@
-import type { TriggeredAbility, CompiledCard, Modification } from "../abilities";
+import type { ActivatedAbility, TriggeredAbility, CompiledCard, Modification } from "../abilities";
 import type { CardDef } from "../types";
 import { QUOTED_SOURCE_NAME, compile } from "./compile";
 import { textKeywords, isKeywordLine } from "./keyword-abilities";
@@ -377,8 +377,12 @@ export function emblemAbilityOk(text: string): boolean {
   // win the game", for its owner (game.ts gameEndBlocked).
   const gameLock = cantLose === "you" && cantWin === "opponents" && (!gameEndIf || gameEndIf.kind === "control");
   if ((cantLose || cantWin) && !gameLock) return false;
-  if (unsupported.length || textKeywords.length || entersTapped || activated.length || mana.length || Object.keys(rest).length) return false;
-  if (!triggers.length && !statics.length && !costMods?.length && noMaxHandSize !== true && !opponentsCantCast && !loyaltyAtInstantSpeed && !spellsHaveStorm?.length && !landsFromGraveyard && !graveyardGrants?.length && !castFromHandFree && !drawsInOpponentsDrawStep && !lifeFloor && !gameLock) return false;
+  if (unsupported.length || textKeywords.length || entersTapped || mana.length || Object.keys(rest).length) return false;
+  // Ob Nixilis of the Black Oath's, Karn, Living Legacy's: an activated ability its owner activates from the command zone
+  // (CR 114.4, 602.1), whose costs are paid with mana and with permanents they control: nothing about tapping, sacrificing
+  // or moving the emblem itself, which is no permanent (CR 114.5). compileCard gives it zone "command".
+  if (!activated.every(emblemActivatedOk)) return false;
+  if (!triggers.length && !statics.length && !activated.length && !costMods?.length && noMaxHandSize !== true && !opponentsCantCast && !loyaltyAtInstantSpeed && !spellsHaveStorm?.length && !landsFromGraveyard && !graveyardGrants?.length && !castFromHandFree && !drawsInOpponentsDrawStep && !lifeFloor && !gameLock) return false;
   // Serra the Benevolent's: a life floor for its owner (read from emblems in damage.ts), maybe while they control a creature.
   if (lifeFloorIf && lifeFloorIf.kind !== "control") return false;
   // "You may play lands and cast permanent spells from your graveyard" (Wrenn and Realmbreaker's): permissions for its
@@ -396,6 +400,14 @@ export function emblemAbilityOk(text: string): boolean {
   const damageMod = (st: (typeof statics)[number]) => st.affects.kind === "self" && !st.condition && st.mods.every((m) => m.kind === "damageMod" && !m.mod.by?.self && !m.mod.by?.other && !m.mod.to?.self && !m.mod.to?.other);
   if (!statics.every((st) => damageMod(st) || (st.affects.kind === "filter" && !st.affects.other && !st.condition && st.affects.controller !== "enchanted"))) return false;
   return (costMods ?? []).every((m) => !m.if && m.who !== "enchanted");
+}
+
+/** An emblem's activated ability (Ob Nixilis of the Black Oath's, Karn, Living Legacy's): only a mana cost and costs paid with permanents its owner controls (CR 114.5). */
+function emblemActivatedOk(ab: ActivatedAbility): boolean {
+  const allowed = new Set(["manaCost", "tap", "sacrificeSelf", "sorcerySpeed", "body", "text", "costs"]);
+  if (Object.entries(ab).some(([k, v]) => !allowed.has(k) && v !== undefined && v !== false)) return false;
+  if (ab.tap || ab.sacrificeSelf || JSON.stringify(ab.body).includes('"ref":"self"')) return false;
+  return (ab.costs ?? []).every((c) => (c.kind === "sacrifice" || c.kind === "tap") && !("other" in c && c.other) && !("untap" in c && c.untap) && !("x" in c && c.x));
 }
 
 /** A named token's whole ability text compiles fully when it's that token's own (CR 111.4: its name is its name, so "Sacrifice Rock" in an ability it gives means it, CR 201.5a). */

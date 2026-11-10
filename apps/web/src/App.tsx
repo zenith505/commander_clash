@@ -837,7 +837,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   function continueActivate(d: ActivateDraft) {
     if (!s) return;
     const ab = abilitiesOf(s, s.objects[d.objectId]!).activated[d.index]!;
-    for (const c of activatedCosts(ab, d.x, s.objects[d.objectId])) {
+    for (const c of activatedCosts(ab, d.x, s.objects[d.objectId], s, HUMAN)) {
       if (c.kind === "forage") {
         // Forage (CR 701.61a): three cards from your graveyard or a Food, whichever you can and choose.
         if (d.sacrifice !== undefined || d.exileCards !== undefined) continue;

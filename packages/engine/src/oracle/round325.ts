@@ -3,12 +3,16 @@
 import type { AbilityBody, Effect, TargetSpec, TriggeredAbility } from "../abilities";
 import type { Ctx } from "./body";
 import { CREATURE_TYPES } from "../keywords";
+import { round326Sentence, round326Trigger, round326WholeText } from "./round326";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const creature = (more: Partial<TargetSpec & { kind: "object" }> = {}): TargetSpec => ({ kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature", ...more }) as TargetSpec;
 
 export function round325Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 326's sentences first (oracle/round326.ts).
+  const r326 = round326Sentence(s, sentences, si, ctx, effects);
+  if (r326 !== null) return r326;
   // Burn from Within: "If a creature is dealt damage this way, it loses indestructible until end of turn. If that creature
   // would die this turn, exile it instead.": only a creature the damage was dealt to (none if it was prevented or X is 0,
   // rulings), losing indestructible in layer 6 (CR 613.1f) and exiled if it would die this turn for any reason (rulings).
@@ -35,6 +39,9 @@ export function round325Sentence(s: string, sentences: string[], si: number, ctx
 }
 
 export function round325Trigger(raw: string): TriggeredAbility | "fail" | null {
+  // Round 326's triggers first (oracle/round326.ts).
+  const r326 = round326Trigger(raw);
+  if (r326 !== null) return r326;
   // Ib Halfheart, Goblin Tactician: "Whenever another Goblin you control becomes blocked, sacrifice it. If you do, it deals 4
   // damage to each creature blocking it.": the Goblin deals it, as it last existed (CR 608.2h), to the creatures that were
   // declared blocking it this combat and are still blocking (CR 506.4); none if it wasn't sacrificed (rulings).
@@ -61,7 +68,9 @@ export function round325Trigger(raw: string): TriggeredAbility | "fail" | null {
 
 /** A whole ability's text read another way (a string), or null. */
 export function round325WholeText(text: string, parse: (t: string) => AbilityBody | null): AbilityBody | string | null {
-  void parse;
+  // Round 326's whole texts first (oracle/round326.ts).
+  const r326 = round326WholeText(text, parse);
+  if (r326 !== null) return r326;
   // Grab the Reins: "Until end of turn, you gain control of target creature and it gains haste.": both until end of turn,
   // no untap (CR 611.2a).
   if (text.trim() === "Until end of turn, you gain control of target creature and it gains haste.") return "Gain control of target creature until end of turn. It gains haste until end of turn.";

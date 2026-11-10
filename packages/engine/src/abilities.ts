@@ -7702,6 +7702,11 @@ export interface CompiledCard {
   /** "No more than one creature can attack each combat" (Silent Arbiter); `attackYou`: "... can attack you each combat" (Crawlspace), its controller only, not their planeswalkers (rulings). */
   /** War's Toll: "If a creature an opponent controls attacks, all creatures that opponent controls attack if able" (CR 508.1d): a requirement on each opponent's creatures once any of them is declared as an attacker. */
   opponentsAttackAll?: true;
+  /**
+   * Seeker of Slaanesh: "Each opponent must attack with at least one creature each combat if able" (CR 508.1d): a requirement
+   * on each opponent of its controller as they declare attackers, not on any one creature (rulings).
+   */
+  opponentsAttackWithOne?: true;
   /** Viashino Bey: "If ~ attacks, all creatures you control attack if able" (CR 508.1d): its controller's other creatures, once it's declared as an attacker. */
   allAttackIfSelfAttacks?: true;
   /** Cunning Giant: "If ~ is unblocked, you may have it assign its combat damage to a creature defending player controls" (game.ts askDamageToCreature). */
@@ -8311,6 +8316,12 @@ export interface CompiledCard {
   youActivateLess?: { n: number; atLeastOne?: true };
   /** Fluctuator: "Cycling abilities you activate cost {2} less to activate", from any zone (CR 702.29f: typecycling too). */
   cyclingLess?: number;
+  /**
+   * An alternative cost of {0} for its controller's cycling abilities (CR 118.9; typecycling too, CR 702.29f): Gavi, Nest
+   * Warden's "of the first card you cycle each turn" (`first`), New Perspectives' "As long as you have seven or more cards
+   * in hand" (`handAtLeast`, the card being cycled counted, rulings). The discard is still part of the cost (rulings).
+   */
+  freeCycling?: { first?: true; handAtLeast?: number }[];
   /**
    * "Players can't untap more than one nonbasic land during their untap steps" (Winter Moon), "You can't untap more than
    * one land during your untap step" (Mungha Wurm, `you`), "As long as ~ is untapped, players can't untap more than two

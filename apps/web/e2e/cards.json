@@ -27668,6 +27668,85 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f07f3bf0-e1c8-4a24-87c7-1d6d0b5bd242",
+  "name": "Sasaya, Orochi Ascendant // Sasaya's Essence",
+  "manaCost": "{1}{G}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Snake Monk // Legendary Enchantment",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Snake",
+   "Monk"
+  ],
+  "oracleText": "Reveal your hand: If you have seven or more land cards in your hand, flip Sasaya.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "sok",
+  "releasedAt": "2005-06-03",
+  "rarity": "rare",
+  "layout": "flip",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Sasaya, Orochi Ascendant",
+    "manaCost": "{1}{G}{G}",
+    "typeLine": "Legendary Creature — Snake Monk",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Snake",
+     "Monk"
+    ],
+    "oracleText": "Reveal your hand: If you have seven or more land cards in your hand, flip Sasaya.",
+    "power": "2",
+    "toughness": "3",
+    "colors": [
+     "G"
+    ]
+   },
+   {
+    "name": "Sasaya's Essence",
+    "manaCost": "{1}{G}{G}",
+    "typeLine": "Legendary Enchantment",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Enchantment"
+    ],
+    "subtypes": [],
+    "oracleText": "Whenever a land you control is tapped for mana, add an additional one mana of any type that land produced for each other land you control with the same name as it.",
+    "colors": [
+     "G"
+    ]
+   }
+  ]
+ },
+ {
   "oracleId": "ed1d21ba-ddfe-4f82-9e37-93f9e2c7ba33",
   "name": "Satoru Umezawa",
   "manaCost": "{1}{U}{B}",
@@ -32822,6 +32901,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e5a95145-dc29-4bfc-bb14-b7a269268366",
+  "name": "Tezzeret, Cruel Machinist",
+  "manaCost": "{4}{U}{U}",
+  "cmc": 6,
+  "typeLine": "Legendary Planeswalker — Tezzeret",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Tezzeret"
+  ],
+  "oracleText": "+1: Draw a card.\n0: Until your next turn, target artifact you control becomes a 5/5 creature in addition to its other types.\n−7: Put any number of cards from your hand onto the battlefield face down. They're 5/5 artifact creatures.",
+  "loyalty": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m19",
+  "releasedAt": "2018-07-13",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "46abaabe-7015-4d82-a5aa-2706b1f51bed",
   "name": "Thallid",
   "manaCost": "{G}",
@@ -33318,6 +33428,43 @@
     "artUrl": "https://cards.scryfall.io/art_crop/back/a/6/a60e8f23-90b2-4bc6-bd54-a95055556389.jpg?1783905002"
    }
   ]
+ },
+ {
+  "oracleId": "e7828284-543d-4f8b-9c5e-a8f082010398",
+  "name": "The Master, Formed Anew",
+  "manaCost": "{U}{B}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Time Lord Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Time Lord",
+   "Rogue"
+  ],
+  "oracleText": "Body Thief — When you cast this spell, you may exile a creature you control and put a takeover counter on it.\nYou may have The Master enter as a copy of a creature card in exile with a takeover counter on it.",
+  "power": "0",
+  "toughness": "1",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Body Thief"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "55123455-d435-46d4-b0cd-0c1614343be2",

@@ -1,6 +1,6 @@
 # Roadmap
 
-30,868 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,874 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,789 of
 9,979 (98%).
 
@@ -7583,6 +7583,24 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature spell you cast this turn was countered by a spell or ability an opponent controlled": a creature spell you
   cast, not a copy, countered by an opponent's spell or ability this turn, TurnLog.creaturesCountered; your own counter
   doesn't count). +6, 30,868 of 31,936 with B166 and rounds 325 to 327.
+- Round B168 (least played first, mechanics that could be built from the skip lists): Psychotic Episode ("Target player
+  reveals their hand and the top card of their library. You choose a card revealed this way. That player puts the chosen
+  card on the bottom of their library": the hand's cards and the top card in one picker, any of them, even one revealed
+  before, rulings; the top card goes to the bottom without changing zones, CR 400.7; a browser test). Novel Nunchaku
+  ("attach it to target creature you control. When you do, equipped creature fights up to one target creature an
+  opponent controls": a reflexive trigger only if it became attached, CR 603.12, 701.3c, its target chosen then, rulings).
+  Hold for Ransom ("can't attack or block and has "{7}: Hold for Ransom's controller sacrifices it and draws a card"":
+  the creature's controller activates it, the Aura's controller sacrifices the Aura and draws, as it last existed if the
+  Aura is gone, CR 608.2h; PlayerRef grantSourceController). Fractal Tender ("if you put a counter on ~ this turn": a
+  counter of any kind you put on this object, TurnLog.counterPutOn). Day of the Dragons ("exile all creatures you
+  control. Then create that many 5/5 red Dragon creature tokens with flying", tokens counted, rulings; "return the exiled
+  cards to the battlefield under your control", CR 607.2a). Exotic Pets ("for each kind of counter among creatures you
+  control, put a counter of that kind on either of those tokens": a prompt per kind, a browser test). +6, 30,874 of
+  31,936 with B167.
+- Out after round B168 (looked at, not done): Sudden Salvation (targets in any graveyard, and "for each opponent who
+  controls one or more of those permanents"), Garruk, Curse Breaker's −4 ("whenever one or more creatures attack one of
+  your opponents": how often that batched trigger fires when creatures attack two opponents isn't settled by rulings),
+  Revival Experiment (one card of each permanent type) stay out.
 - Out after round B167 (looked at, not done): Kodama of the Center Tree (soulshift X: the target's mana value is bounded
   by the Spirits you controlled just before it died, and target checks have no place to keep that number), Meandering
   Towershell (no "at the beginning of the declare attackers step on your next turn" timing yet; it returns attacking a

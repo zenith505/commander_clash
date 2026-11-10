@@ -1012,6 +1012,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const keyword = ["shield", "flying", "first strike", "double strike", "deathtouch", "hexproof", "indestructible", "lifelink", "menace", "reach", "trample", "vigilance"].includes(k);
       return [{ type: "chooseOption", player: pid, choice: keyword && pend.options.includes("kind") ? "kind" : "plus" }];
     }
+    // Exotic Pets: helpful counters stack up on the first token, harmful ones go to the second.
+    if (pend.kind === "chooseOption" && pend.what === "eitherToken") {
+      const k = pend.counterKind ?? "";
+      const harmful = ["-1/-1", "stun", "age", "time", "fade", "doom"].includes(k);
+      return [{ type: "chooseOption", player: pid, choice: (harmful ? pend.options[pend.options.length - 1] : pend.options[0])! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "addOrRemoveCounter") {
       const o = pend.about ? s.objects[pend.about] : undefined;
       const k = pend.counterKind ?? "";

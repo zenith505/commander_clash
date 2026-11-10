@@ -32,6 +32,7 @@ import { runChooseHostOrNamedEffect, runPutMilledPairEffect, runSearchEachExileE
 import { runLaneB160Effect } from "./run-laneb160";
 import { runLaneB166Effect } from "./run-laneb166";
 import { runLaneB167Effect } from "./run-laneb167";
+import { runLaneB168Effect } from "./run-laneb168";
 import { runRound327Effect } from "./run-round327";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
@@ -840,6 +841,12 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const host = attachedHost(s, ctx);
       const o = host ? s.objects[host.id] : undefined;
       return o && !player(s, o.owner).lost ? [o.owner] : [];
+    }
+    case "grantSourceController": {
+      // Hold for Ransom: the Aura that gave the ability, while it's that permanent, else as it last existed (CR 608.2h).
+      const g = ref.id ? s.objects[ref.id] : undefined;
+      const was = g?.zone === "battlefield" && (g.zoneChanges ?? 0) === ref.zc ? controllerOf(s, g) : ref.id && s.lastKnown?.[ref.id]?.zc === ref.zc ? s.lastKnown![ref.id]!.controller : undefined;
+      return was !== undefined && !player(s, was).lost ? [was] : [];
     }
     case "hostController": {
       // Gremlin Infestation: "enchanted artifact's controller", the permanent the source is attached to now.
@@ -1705,6 +1712,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB166Effect(s, e, ctx, src);
     case "exileAnyOfTop":
       return runLaneB167Effect(s, e, ctx, src);
+    case "counterKindsOnEither":
+      return runLaneB168Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "flipCoin":

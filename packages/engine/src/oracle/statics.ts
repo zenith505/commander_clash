@@ -1559,6 +1559,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^you've been dealt damage by ${NUM} or more creatures this turn$`).exec(text))) return { kind: "damagedByCreatures", n: num(m[1]!) };
   if (/^an opponent gained life this turn$/.test(text)) return { kind: "opponentGainedLife" };
   if (/^you put a counter on a creature this turn$/.test(text)) return { kind: "youPutCounterOnCreature" };
+  // Fractal Tender: "if you put a counter on ~ this turn".
+  if (/^you put a counter on ~ this turn$/.test(text)) return { kind: "youPutCounterOnSelf" };
   if (/^one or more cards were put into exile this turn$/.test(text)) return { kind: "cardExiledThisTurn" };
   if (/^you've played a land or cast a spell this turn from anywhere other than your hand$/.test(text)) return { kind: "playedOrCastNotFromHand" };
   // Visions of Phyrexia: "if you didn't play a card from exile this turn".
@@ -2427,6 +2429,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't transform$/.test(rest)) return [{ kind: "cantTransform" }];
   // Revoke Privileges: "can't attack, block, or crew Vehicles".
   if (/^can't attack, block, or crew Vehicles$/.test(rest)) return [{ kind: "cantAttack" }, { kind: "cantBlock" }, { kind: "cantCrew" }];
+  // Hold for Ransom: "can't attack or block and has "{7}: ..."": both.
+  if ((m = /^(can't attack or block) and has (".+")$/.exec(rest))) {
+    const first = parseStaticMods(m[1]!);
+    const grants = parseGrants(m[2]!);
+    return first && grants ? [...first, ...grants] : null;
+  }
   // "Can't block and can't be blocked" (Changeling Outcast).
   if ((m = /^(can't [^,]+?) and (can't .+)$/.exec(rest))) {
     const first = parseStaticMods(m[1]!);

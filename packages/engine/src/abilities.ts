@@ -1704,6 +1704,8 @@ export type PlayerRef =
   | { ref: "selfDefending" }
   /** "Enchanted artifact's controller" (Gremlin Infestation): who controls the permanent the source is attached to now. */
   | { ref: "hostController" }
+  /** Hold for Ransom's granted "Hold for Ransom's controller ...": the controller of the permanent that gave the ability (bound as ObjRef grantSource is), as it last existed if it's gone (CR 608.2h). */
+  | { ref: "grantSourceController"; id?: ObjectId; zc?: number }
   /** "Its owner" after "enchanted creature" (Enslave): whose the permanent the source is attached to is, or was as the source last existed (CR 108.3, 608.2h). */
   | { ref: "hostOwner" }
   /** "The player to your right" (Bucknard's Everfull Purse): the one before you in turn order, "to your left" the one after (CR 101.4). */
@@ -2508,6 +2510,8 @@ export type StaticCondition =
   | { kind: "opponentGainedLife" }
   /** "If you put a counter on a creature this turn" (Lasting Tarfire): of any kind, as it entered too (CR 122.6). */
   | { kind: "youPutCounterOnCreature" }
+  /** Fractal Tender: "if you put a counter on ~ this turn": on this object (CR 400.7), any kind, as it entered too (TurnLog.counterPutOn). */
+  | { kind: "youPutCounterOnSelf" }
   /** "If one or more cards were put into exile this turn" (Ennis, Debate Moderator): from anywhere, anyone's; not tokens or spell copies, which aren't cards (rulings). */
   | { kind: "cardExiledThisTurn" }
   /** Spider-Man 2099: "if you've played a land or cast a spell this turn from anywhere other than your hand" (a cast copy counts, as for "spells cast from anywhere other than your hand"). */
@@ -3544,6 +3548,8 @@ export type Effect =
   | { type: "counterKindsBribe" }
   /** Ancestral Knowledge: "look at the top ten cards of your library, then exile any number of them and put the rest back on top of your library in any order" (no scry or surveil, CR 401.4). */
   | { type: "exileAnyOfTop"; n: number }
+  /** Exotic Pets: "for each kind of counter among creatures you control, put a counter of that kind on either of those tokens": the two tokens the effect before created, the kinds counted now, each one's token chosen (ChoiceKind "eitherToken"). */
+  | { type: "counterKindsOnEither" }
   /**
    * Bazaar of Wonders: "counter it if a card with the same name is in a graveyard or a nontoken permanent with the same name
    * is on the battlefield": the spell whose cast triggered this, checked as it resolves; a face-down spell has no name
@@ -4175,6 +4181,8 @@ export type Effect =
       reveal?: Amount;
       /** Never Happened: "a nonland card from that player's graveyard or hand": one card from either zone (action "exile"). */
       orGraveyard?: true;
+      /** Psychotic Episode: "reveals their hand and the top card of their library. You choose a card revealed this way": the top card of the library too, revealed (action "libraryBottom"). */
+      orLibraryTop?: true;
       /** With `orGraveyard`: Agonizing Remorse's "a nonland card from it or a card from their graveyard": `filter` is for the hand's cards only. */
       anyFromYard?: true;
       /** Covetous Urge: "You may cast that card for as long as it remains exiled, and you may spend mana as though it were mana of any color to cast that spell": the ability's controller may (action "exile"). */

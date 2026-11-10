@@ -2363,6 +2363,34 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 327 took cards back off the "Out after round N" lists, most played first: "Choose a creature at random. You
+   gain control of that creature until end of turn. Untap it. It gains haste until end of turn. Then destroy all other
+   creatures." (The Nipton Lottery: anyone's creature, not targeted, so hexproof and shroud don't matter, nothing in
+   between, rulings); "Reveal a card in your hand, then put that card onto the battlefield if it has the same name as a
+   permanent." (Retraced Image: any card revealed, only a permanent card put there, CR 400.4a, not a land play; a browser
+   test) and "You may put one of those cards onto the battlefield if it has the same name as a permanent." (Mitotic
+   Manipulation: only one, named like anyone's permanent as it resolves, rulings; TargetSpec.sameNameAsPermanent, bound
+   as it resolves); "Whenever a creature enters, if you cast it from your hand, you may search your library for a
+   creature card with the same total power and toughness" (Wild Pair: only creatures you cast, still true once the
+   creature has left, its last known power and toughness then, rulings; a browser test); "You may cast this spell as
+   though it had flash if a creature is attacking and a creature is blocking." and "Target creature you control and
+   target creature an opponent controls each gain indestructible until end of turn. Then destroy all creatures." (Fated
+   Clash); "Ferocious — If you control a creature with power 4 or greater, you may put two creature cards onto the
+   battlefield instead of one." (See the Unwritten: checked before any is put, rulings); "Tap target creature that player
+   controls. That creature deals damage equal to its power to the player." (Delirium: the opponent whose turn it is, a
+   tapped creature too, rulings); "Return all Mount and Vehicle cards from your graveyard to the battlefield." (Push the
+   Limit). +8, 30,855 of 31,936 with rounds 325 and 326 and B165.
+   Bots: for Retraced Image a bot reveals its costliest card that would be put onto the battlefield, or else its
+   cheapest card.
+   Out after round 327 (looked at, not done): Hatchery Sliver, Djinn Illuminatus, Ian Chesterton, Threefold Signal
+   ("each ... spell you cast has replicate") and Zinnia, Valley's Voice ("gain offspring {2} as you cast them"): a card
+   has one kicker-like optional cost (CompiledCard.kicker), so a given one needs every cost, autopay, bot and UI path to
+   see it, and a spell with a kicker of its own would have two; Consume Spirit and Drain Life ("Spend only black mana on
+   X" in a spell whose mana cost is more than {X}); Invisible Woman, Sue Storm (one trigger for +1/+1 counters put on one
+   or more other Heroes at once: no batched counters event yet); Spiteful Repossession (damage to each opponent equal to
+   their own difference, then "the damage dealt this way"); Codie, Vociferous Codex (its mana ability's "when you next
+   cast a spell this turn" exile); Hellish Rebuke, Greater Gargadon and Foggy Swamp Visions (still out, for the reasons
+   in their earlier lists); Obsidian Charmaw (left for Lane B, as before).
    Round 326 took cards back off the "Out after round N" lists, most played first: "Choose target creature card in a
    graveyard that was put there from the battlefield this turn. Put that card onto the battlefield under your control."
    (Grim Return: any player's graveyard, never a discarded card or a countered creature spell, rulings); "you may attach

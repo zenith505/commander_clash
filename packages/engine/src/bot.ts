@@ -1,4 +1,4 @@
-import { cardPT, linkedCards, playerProtectedFrom, playerProtection } from "./effects/targeting";
+import { bindBound, cardPT, linkedCards, playerProtectedFrom, playerProtection } from "./effects/targeting";
 import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
@@ -584,6 +584,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.fromHand && pend.reveal && JSON.stringify(s.resolving?.body.effects ?? []).includes('"revealedSharedMv"')) {
       const same = (id: ObjectId) => pend.cards.filter((x) => mv(s, x) === mv(s, id)).length;
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => same(b) - same(a) || mv(s, a) - mv(s, b)).slice(0, pend.max) }];
+    }
+    // Retraced Image: a card that would be put onto the battlefield, the costliest; with none, the cheapest card.
+    if (pend.kind === "searchLibrary" && pend.fromHand && pend.reveal && s.resolving?.body.effects[s.resolving.next]?.type === "revealPutIfNamedAsPermanent") {
+      const named = bindBound(s, { kind: "card", sameNameAsPermanent: true, text: "card" }, { controller: pid });
+      const puts = (id: ObjectId) => (isPermanentCard(defOf(s, obj(s, id))) && printedMatches(named, defOf(s, obj(s, id))) ? 1 : 0);
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => puts(b) - puts(a) || (puts(a) ? mv(s, b) - mv(s, a) : mv(s, a) - mv(s, b))).slice(0, 1) }];
     }
     if (pend.kind === "searchLibrary" && pend.fromHand) {
       const forName = pend.reveal && /"sameName":\{"revealed":true\}/.test(JSON.stringify(s.resolving?.body.effects ?? []));

@@ -30,6 +30,7 @@ import { runAttackingNowEffect, runDiscardOrSacrificeEffect, runExileTopDamageEa
 import { runRepeatIfDidEffect } from "./run-round320";
 import { runChooseHostOrNamedEffect, runPutMilledPairEffect, runSearchEachExileEffect } from "./run-round321";
 import { runLaneB160Effect } from "./run-laneb160";
+import { runRound327Effect } from "./run-round327";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
 import { ringBearer } from "./run-ring";
@@ -1698,6 +1699,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "counterCauseIfNamed":
     case "eachChoosesFromHand":
       return runLaneB160Effect(s, e, ctx, src);
+    case "revealPutIfNamedAsPermanent":
+      return runRound327Effect(s, e, ctx, src);
     case "flipCoin":
       return runCoinEffect(s, e, ctx, src);
     case "flipCoinEach":

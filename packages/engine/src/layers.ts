@@ -1171,7 +1171,13 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "subjectCastFromHand": {
       const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
-      const cast = !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && !!sub.castFromHand;
+      const here = !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc;
+      if (cond.byYou) {
+        const lk = !here && subjectId !== undefined ? s.lastKnown?.[subjectId] : undefined;
+        const by = here ? (sub!.castFromHand ? sub!.castBy : undefined) : lk && lk.zc === subjectZc ? lk.castFromHandBy : undefined;
+        return cond.not ? by !== you : by === you;
+      }
+      const cast = here && !!sub!.castFromHand;
       return cond.not ? !cast : cast;
     }
     case "subjectFromYourGraveyard": {

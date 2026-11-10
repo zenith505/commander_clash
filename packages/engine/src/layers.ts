@@ -2085,6 +2085,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantBeEnchantedByOthers":
       if (e.sourceId !== undefined) c.enchantedOnlyBy = [...c.enchantedOnlyBy, e.sourceId];
       return;
+    case "cantBeEnchanted":
+      // No object's id is "", so no Aura can enchant it (enchantableBy).
+      c.enchantedOnlyBy = [...c.enchantedOnlyBy, ""];
+      return;
     case "cantBeBlockedByGreaterPower":
     case "cantBlockGreaterPower":
     case "cantBlockPowerAtLeastToughness":

@@ -3,6 +3,7 @@
 import type { AbilityBody, Effect, TargetSpec } from "../abilities";
 import { parseOne, type Ctx } from "./body";
 import { parseStaticCondition } from "./statics";
+import { roundB171Sentence } from "./laneb171";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -60,7 +61,7 @@ export function roundB170Sentence(s: string, sentences: string[], si: number, ct
     if (!fx?.length || ctx.targets.length !== before) return "fail";
     return { effect: { type: "delayed", when: "nextMainThisTurn", effects: fx, text: nextMain[1]! }, next: si + 1 };
   }
-  return null;
+  return roundB171Sentence(s, sentences, si, ctx, effects);
 }
 
 export function roundB170WholeText(text: string, parse: (t: string) => AbilityBody | null): AbilityBody | null {

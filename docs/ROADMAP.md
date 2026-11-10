@@ -2412,9 +2412,9 @@ line blocks.
    player casts an instant or sorcery card, exile it. Then that player copies each instant or sorcery card exiled with
    ~. For each copy, the player may cast the copy without paying its mana cost." (Eye of the Storm: a card, not a copy,
    rulings; exiled, not countered, linked to it, CR 607.2a; the caster picks the copies one at a time, in the order
-   they choose, whoever owns the cards). Browser tests for Leori's picker and Guile's free cast. +5, 30,918 of 31,936.
-   Bots: a bot picks the planeswalker type most of its planeswalkers have (on the battlefield, then in hand); it casts
-   what Guile or Eye of the Storm offers when it can, as any free cast.
+   they choose, whoever owns the cards). Browser tests for Leori's picker and Guile's free cast. +5, 30,922 of 31,936
+   with B171. Bots: a bot picks the planeswalker type most of its planeswalkers have (on the battlefield, then in
+   hand); it casts what Guile or Eye of the Storm offers when it can, as any free cast.
    Not looked at yet (no list names them; next in popularity after these): Zevlor, Elturel Exile (done in round 333);
    Ore-Rich Stalactite // Cosmium Catalyst; Rosheen, Roaring Prophet (done in round 333); Feather, Radiant Arbiter (done
    in round 333); Nathan Drake, Treasure Hunter; Stangg, Echo Warrior (done in round 333).

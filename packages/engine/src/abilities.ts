@@ -2140,6 +2140,8 @@ export type Modification =
   | { kind: "cantTransform" }
   /** "Until your next upkeep, ~ can't phase out" (Ertai's Familiar, Spatial Binding): it doesn't phase out, directly or indirectly, for any reason (rulings; layers.ts phaseOut). */
   | { kind: "cantPhaseOut" }
+  /** Sanctum Lurker: "aren't put into their owners' graveyards for having 0 loyalty": the state-based action of CR 704.5i doesn't apply to it (rulings: it stays with no loyalty counters). */
+  | { kind: "survivesZeroLoyalty" }
   /** "Can't crew Vehicles" (Revoke Privileges): it can't be tapped to pay a crew cost (CR 702.122a). */
   | { kind: "cantCrew" }
   /** "~ can't be equipped" (Goblin Brawler): Equipment can't become attached to it (CR 701.3b) and becomes unattached (704.5n). */
@@ -2649,6 +2651,10 @@ export type StaticCondition =
   | { kind: "youMostLife" }
   /** "~ costs {2} less to cast if you've cast another spell this turn": checked as it's cast, before it counts itself (CR 601.2f). */
   /** "If a card left your graveyard this turn" (Gau, Feral Youth). */
+  /** Dimir Strandcatcher: "if three or more cards were put into your graveyard from anywhere other than the battlefield this turn" (TurnLog.toGraveyardNotBattlefield). */
+  | { kind: "cardsToYourGraveyardNotBattlefield"; n: number }
+  /** Laboratory Drudge: "if you've cast a spell from a graveyard or activated an ability of a card in a graveyard this turn" (castThisTurn's `from`, TurnLog.activatedInGraveyard). */
+  | { kind: "usedGraveyardThisTurn" }
   | { kind: "cardLeftYourGraveyard"; /** "If three or more cards left your graveyard this turn" (Bonecache Overseer). */ n?: number; /** "If a creature card left your graveyard this turn" (Syrix, Carrier of the Flame). */ creature?: true }
   /** "If a permanent was put into your hand from the battlefield this turn" (Barrin, Tolarian Archmage): the whole turn, a token too (rulings). */
   | { kind: "permanentToYourHand" }

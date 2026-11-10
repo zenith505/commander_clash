@@ -284,6 +284,8 @@ export interface Characteristics {
   cantTransform: boolean;
   /** "Can't phase out" (Ertai's Familiar, Spatial Binding). */
   cantPhaseOut: boolean;
+  /** Sanctum Lurker: not put into its owner's graveyard for having 0 loyalty (CR 704.5i doesn't apply). */
+  survivesZeroLoyalty?: boolean;
   /** "Can't crew Vehicles" (Revoke Privileges). */
   cantCrew: boolean;
   /** "Can't be equipped" (Goblin Brawler). */
@@ -1046,6 +1048,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "permanentToYourHand":
       return (s.turnLog?.permanentToHand ?? []).includes(you);
+    case "cardsToYourGraveyardNotBattlefield":
+      return (s.turnLog?.toGraveyardNotBattlefield?.[you] ?? 0) >= cond.n;
+    case "usedGraveyardThisTurn":
+      return (s.castThisTurn ?? []).some((c) => c.player === you && c.from === "graveyard") || !!s.turnLog?.activatedInGraveyard?.includes(you);
     case "cardLeftYourGraveyard":
       if (cond.creature) return (s.turnLog?.creatureCardLeftGraveyard ?? []).includes(you);
       return cond.n ? (s.turnLog?.leftGraveyardCount?.[you] ?? 0) >= cond.n : (s.turnLog?.leftGraveyard ?? []).includes(you);
@@ -2137,6 +2143,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantTurnFaceUp":
     case "cantTransform":
     case "cantPhaseOut":
+    case "survivesZeroLoyalty":
     case "cantCrew":
     case "cantBeEquipped":
     case "attackAsThoughHaste":

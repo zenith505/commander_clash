@@ -1,6 +1,6 @@
 # Roadmap
 
-30,971 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,978 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,805 of
 9,979 (98%).
 
@@ -2396,7 +2396,7 @@ line blocks.
    111.7) and "enter as a copy of a creature card in exile with a takeover counter on it" (CR 707.5, any player's
    exile), with a browser test; Tezzeret's "Put any number of cards from your hand onto the battlefield face down.
    They're 5/5 artifact creatures." (CR 708.2, a face-down instant or sorcery stays face down), with a browser test.
-   +4, 30,971 of 31,936 with B173, B174 and B175. Bots activate Sasaya only when the flip happens, cast The Master with an exile only when one of
+   +4, 30,978 of 31,936 with B173 through B176. Bots activate Sasaya only when the flip happens, cast The Master with an exile only when one of
    their creatures has an enters trigger worth copying, and put all of their hand onto the battlefield with Tezzeret.
    Round 333 took the most played cards round 332 left for later and three no list named: "Reveal any number of cards
    with {X} in their mana cost in your hand. Add {C}{C} for each card revealed this way. Spend this mana only on costs that
@@ -7905,6 +7905,21 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   discarded for each time it's paid; a browser test). Fatal Fissure ("When that creature dies this turn, you earthbend 4":
   earthbend's land is the delayed trigger's own target, CR 603.3d; a browser test). Outpace Oblivion ("each player who
   doesn't have max speed"). +8, 30,967 of 31,936 with B174 and rounds 333 and 334.
+- Round B176 (least played first, single-line blockers from the skip lists): Aurification ("Each creature with a gold counter
+  on it is a Wall in addition to its other creature types and has defender": layers 4 and 6, rulings). Sanctum Lurker
+  ("Planeswalkers you control aren't put into their owners' graveyards for having 0 loyalty": CR 704.5i doesn't apply to
+  them; abilities that cost [0] or add loyalty still work, rulings, CR 606.6). Arcus Acolyte ("has outlast {G/W}": a granted
+  hybrid outlast; a browser test). Dimir Strandcatcher ("if three or more cards were put into your graveyard from anywhere
+  other than the battlefield this turn": TurnLog.toGraveyardNotBattlefield, cards only, CR 111.1, 707.10a). Laboratory
+  Drudge ("draw a card if you've cast a spell from a graveyard or activated an ability of a card in a graveyard this turn":
+  checked as it resolves, any graveyard, TurnLog.activatedInGraveyard, rulings). Thelon of Havenwood ("Exile a Fungus card
+  from a graveyard" as a cost, from any player's graveyard; "each Fungus on the battlefield"; a browser test). Emrakul's
+  Evangel ("Sacrifice this creature and any number of other non-Eldrazi creatures": how many announced like an X, a token
+  for each and one for itself, rulings; a browser test). +7, 30,974 of 31,936 with B175.
+- Out after round B176 (looked at, not done): Battlefield Thaumaturge ("{1} less for each creature it targets": whether a
+  creature targeted twice counts twice isn't settled by its rulings' wording), Kodama of the Center Tree (soulshift X counted
+  from the Spirits as they last existed), Barbed Wire (a "prevent the next damage dealt by ~" shield), Spiteful Repossession
+  (each opponent's own difference, then "the damage dealt this way") stay out for these reasons.
 - Out after round B175 (looked at, not done): Chong and Lily, Threefold Signal, Hankyu and Time Reaper stay out for the
   reasons in the earlier lists.
 - Out after round B174 (looked at, not done): Demilich, Arcane Proxy and Roving Actuator (a copy of a graveyard card cast

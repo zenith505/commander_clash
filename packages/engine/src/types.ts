@@ -1804,6 +1804,10 @@ export interface TurnLog {
   creatureCardLeftGraveyard?: PlayerId[];
   /** How many cards left each player's graveyard this turn (Bonecache Overseer's "three or more cards"). */
   leftGraveyardCount?: Partial<Record<PlayerId, number>>;
+  /** How many cards were put into each player's graveyard this turn from anywhere other than the battlefield (Dimir Strandcatcher): cards, not tokens or copies of spells (CR 111.1, 707.10a). */
+  toGraveyardNotBattlefield?: Partial<Record<PlayerId, number>>;
+  /** The players who activated an ability of a card while it was in a graveyard this turn (Laboratory Drudge). */
+  activatedInGraveyard?: PlayerId[];
   /** The players a permanent was put into the hand of from the battlefield this turn, its owner's (CR 400.3), a token too (Barrin, Tolarian Archmage). */
   permanentToHand?: PlayerId[];
   /** Each creature put into a graveyard from the battlefield this turn: its owner's graveyard, and whether it was a token (Caller of the Claw, Fresh Meat). */

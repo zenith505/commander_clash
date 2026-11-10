@@ -1185,7 +1185,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
         return !!o && !o.spellCopy && !item!.copy && characteristics(s, o).types.some((ty) => e.battlefieldIf!.types!.includes(ty));
       })();
-      const done = counterOnStack(s, ctx, t.id, src, e.unless, toField ? "battlefield" : exileIt ? "exile" : e.librarySecond ? "librarySecond" : e.libraryChoice ? "libraryChoice" : e.top ? "libraryTop" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
+      const done = counterOnStack(s, ctx, t.id, src, e.unless, toField ? "battlefield" : exileIt ? "exile" : e.librarySecond ? "librarySecond" : e.libraryChoice ? "libraryChoice" : e.top ? "libraryTop" : e.bottom ? "libraryBottom" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
       if (done === "paused") return done;
       // Spelljack, Kheru Spellsnatcher: the card countered and exiled this way, while it stays exiled (CR 400.7).
       const ex = e.youMayFree && s.resolving?.counteredExiled ? s.objects[s.resolving.counteredExiled.id] : undefined;
@@ -1327,8 +1327,8 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
     if (paid) return;
   }
   // Hinder: "put that card on your choice of the top or bottom of its owner's library": the countering spell's controller
-  // chooses as it resolves (rulings); a copy just ceases to exist (CR 707.10a).
-  let bottom = false;
+  // chooses as it resolves (rulings); a copy just ceases to exist (CR 707.10a). Spell Crumple: the bottom.
+  let bottom = instead === "libraryBottom";
   if (instead === "libraryChoice") {
     const o = item.objectId ? s.objects[item.objectId] : undefined;
     const sc = (s.resolving!.scratch ??= {});

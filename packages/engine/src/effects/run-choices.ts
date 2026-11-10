@@ -859,7 +859,9 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // draw can change "if you have no cards in hand").
       const held = s.resolving!.scratch?.ifs?.[ifDepth];
       const holds = held ? held.holds :
-        e.cond.kind === "youDid"
+        e.cond.kind === "youControlMost"
+          ? youControlMost(s, bindChosen(e.cond.filter, ctx.chosen), ctx.controller)
+          : e.cond.kind === "youDid"
           ? !!s.resolving!.did
           : e.cond.kind === "theyChose"
           ? !!s.resolving!.choseThisWay?.length !== !!e.cond.not
@@ -1762,4 +1764,11 @@ function echoZeroFor(s: GameState, ctx: ResolveCtx): boolean {
   if (me?.zone !== "battlefield") return false;
   const you = controllerOf(s, me);
   return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === you && !!abilitiesOf(s, obj(s, id)).echoZero);
+}
+
+/** Peer Pressure (SpellCondition youControlMost): `you` control more permanents matching `filter` than each other player in the game. */
+function youControlMost(s: GameState, filter: TargetSpec, you: PlayerId): boolean {
+  const count = (p: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p && objectMatches(s, filter, obj(s, id), you, false)).length;
+  const mine = count(you);
+  return s.turnOrder.every((p) => p === you || s.players[p]!.lost || count(p) < mine);
 }

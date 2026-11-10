@@ -1007,6 +1007,14 @@ export function compile(d: CardDef): CompiledCard {
       out.drawTwoIf = { kind: "maxSpeed" };
       continue;
     }
+    // Lightwheel Enhancements: "Max speed — You may cast this card from your graveyard.": a permission that works in the
+    // graveyard while its owner has max speed (rulings: the max speed ability works in the zone the granted one does).
+    if (maxSpeed && /^You may cast (?:~|this card) from your graveyard\.$/.test(maxSpeed[1]!)) {
+      const yard = parseGraveyardKeyword("You may cast this card from your graveyard as long as you have max speed.", d);
+      if (yard && yard !== "fail" && "fromGraveyard" in yard && !("fromExile" in yard) && yard.fromGraveyard?.if?.kind === "maxSpeed") (out.fromGraveyard ??= []).push(yard.fromGraveyard);
+      else out.unsupported.push(raw);
+      continue;
+    }
     if (maxSpeed) {
       if (!conditionalAbility(d, maxSpeed[1]!, out, { kind: "maxSpeed" })) out.unsupported.push(raw);
       continue;
@@ -5235,6 +5243,29 @@ export function compile(d: CardDef): CompiledCard {
       out.graveyardUntargetable = true;
       continue;
     }
+    // Tomik, Distinguished Advokist: "Lands on the battlefield and land cards in graveyards can't be the targets of spells
+    // or abilities your opponents control.": every land, whoever controls it, and land cards in any graveyard; like
+    // hexproof but not hexproof (rulings).
+    if (line === "Lands on the battlefield and land cards in graveyards can't be the targets of spells or abilities your opponents control.") {
+      const st = compile({ ...d, oracleText: "Lands can't be the targets of spells or abilities your opponents control." }).statics;
+      if (st.length !== 1 || st[0]!.mods.length !== 1 || st[0]!.mods[0]!.kind !== "untargetable") out.unsupported.push(raw);
+      else {
+        out.statics.push({ ...st[0]!, text: line });
+        out.yardLandsUntargetableByOpponents = true;
+      }
+      continue;
+    }
+    // Experimental Frenzy: "You can't play lands or cast spells from your hand.": other things with those cards still work
+    // (cycling, rulings).
+    if (line === "You can't play lands or cast spells from your hand.") {
+      out.youCantPlayFromHand = true;
+      continue;
+    }
+    // Tomik: "Your opponents can't play land cards from graveyards.": over any permission to (rulings).
+    if (line === "Your opponents can't play land cards from graveyards.") {
+      out.opponentsCantPlayYardLands = true;
+      continue;
+    }
     const noCasting = /^Players can't cast (spells|noncreature spells) from (graveyards|graveyards or libraries|graveyards or exile)\.$/.exec(line);
     if (noCasting) {
       out.cantCastFrom = { zones: noCasting[2]!.split(" or ").map((z) => (z === "graveyards" ? "graveyard" : z === "libraries" ? "library" : "exile")), ...(noCasting[1] === "noncreature spells" ? { noncreature: true as const } : {}) };
@@ -6668,6 +6699,16 @@ export function compile(d: CardDef): CompiledCard {
       const acts = [orCost[1]!, orCost[2]!].map((c) => parseActivated(`${c}: ${orCost[3]!}`));
       if (acts.some((a) => !a || a === "fail")) out.unsupported.push(raw);
       else for (const a of acts) out.activated.push(bindThisAbility(a as ActivatedAbility, line));
+      continue;
+    }
+    // Clay Golem: "{6}, Roll a d8: Monstrosity X, where X is the result.": the die is rolled as the cost is paid (CR 601.2h,
+    // 602.2b), so the result is known before it resolves (rulings: you may respond by activating it again); "the result"
+    // is that roll's (StackItem.rolled).
+    const rollCost = /^((?:\{[0-9WUBRGC]\})+), Roll a d(\d+): (.+, where X is the result\.)$/.exec(line);
+    if (rollCost) {
+      const a = parseActivated(`${rollCost[1]!}: ${rollCost[3]!}`);
+      if (!a || a === "fail" || a.costs?.length || a.tap || !JSON.stringify(a.body).includes('"rollResult"') || JSON.stringify(a.body).includes('"type":"roll"')) out.unsupported.push(raw);
+      else out.activated.push(bindThisAbility({ ...a, rollCost: Number(rollCost[2]), text: line }, line));
       continue;
     }
     const act = parseActivated(line);

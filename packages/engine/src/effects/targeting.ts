@@ -762,6 +762,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (spec.inExile && (o.foretold || o.hiddenExile || o.faceDown)) return false;
     // Ground Seal: "Cards in graveyards can't be the targets of spells or abilities."
     if (o.zone === "graveyard" && s.battlefield.some((b) => abilitiesOf(s, obj(s, b)).graveyardUntargetable)) return false;
+    // Tomik, Distinguished Advokist: not a land card, by an opponent of its controller.
+    if (o.zone === "graveyard" && isType(defOf(s, o), "Land") && s.battlefield.some((b) => abilitiesOf(s, obj(s, b)).yardLandsUntargetableByOpponents && controllerOf(s, obj(s, b)) !== controller)) return false;
     if (spec.owner === "you" && o.owner !== controller) return false;
     if (spec.owner === "opponent" && o.owner === controller) return false;
     // One opponent's slot of "for each opponent, ... from that player's graveyard" (TargetSpec.perOpponent): their card.

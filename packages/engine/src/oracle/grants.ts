@@ -41,7 +41,7 @@ function bindRefs<T>(x: T, id: string, zc: number, name: string, key?: string): 
   if (!x || typeof x !== "object") return x;
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(x)) out[k] = bindRefs(v, id, zc, name, k);
-  if (out.ref === "grantSource") Object.assign(out, { id, zc });
+  if (out.ref === "grantSource" || out.ref === "grantSourceController") Object.assign(out, { id, zc });
   return out as T;
 }
 /** The compiled form of an ability an effect gave an object (`addAbility`): "~" in it is that object. */

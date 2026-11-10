@@ -254,6 +254,11 @@ export function putCounters(s: GameState, o: GameObject, kind: string, n: number
       ((s.turnLog ??= {}).creatureCounterPutters ??= []).push(by);
       invalidateCharacteristics(s);
     }
+    // Fractal Tender: "if you put a counter on ~ this turn", any kind, on which object.
+    if (o.zone === "battlefield") {
+      const key = `${by}:${o.id}@${o.zoneChanges ?? 0}`;
+      if (!(s.turnLog?.counterPutOn ?? []).includes(key)) ((s.turnLog ??= {}).counterPutOn ??= []).push(key);
+    }
     // "During any turn you put a lore counter on ~" (Summon: Brynhildr): who put one on which object.
     if (kind === "lore" && o.zone === "battlefield") {
       const key = `${by}:${o.id}@${o.zoneChanges ?? 0}`;

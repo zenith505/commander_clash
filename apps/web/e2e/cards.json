@@ -10456,6 +10456,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "497cb281-e057-42fc-937d-512855b74159",
+  "name": "Exotic Pets",
+  "manaCost": "{1}{W}{U}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Create two 1/1 blue Fish creature tokens with \"This token can't be blocked.\" Then for each kind of counter among creatures you control, put a counter of that kind on either of those tokens.",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "744b7e93-c893-4770-a3bb-6a45b7f8e4f7",
   "name": "Expel the Interlopers",
   "manaCost": "{3}{W}{W}",
@@ -20771,6 +20799,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "444dea65-9be7-4b64-afd1-eebe44b285be",
+  "name": "Moonlight Bargain",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at the top five cards of your library. For each card, put that card into your graveyard unless you pay 2 life. Then put the rest into your hand.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rav",
+  "releasedAt": "2005-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5783facf-d26e-4aae-a753-b9dc553361c1",
   "name": "Mosswood Dreadknight // Dread Whispers",
   "manaCost": "{1}{G} // {1}{B}",
@@ -24708,6 +24762,34 @@
   "set": "pcy",
   "releasedAt": "2000-06-05",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0ac7bacd-944d-44f4-927b-28e8c0a4371d",
+  "name": "Psychotic Episode",
+  "manaCost": "{1}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target player reveals their hand and the top card of their library. You choose a card revealed this way. That player puts the chosen card on the bottom of their library.\nMadness {1}{B} (If you discard this card, discard it into exile. When you do, cast it for its madness cost or put it into your graveyard.)",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Madness"
+  ],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

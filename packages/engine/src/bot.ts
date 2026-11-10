@@ -695,6 +695,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Wand of Denial: pay life to mill an opponent's nonland card, keeping 10 life; never its own.
     if (pend.kind === "searchLibrary" && pend.dig?.payLife) {
       const theirs = pend.cards.filter((id) => obj(s, id).owner !== pid);
+      // Moonlight Bargain: its own cards into its hand, life paid for each: the best ones, keeping 10 life.
+      if (pend.cards.every((id) => obj(s, id).owner === pid) && pend.dig.to.startsWith("into your hand")) return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, Math.max(0, Math.min(pend.max, Math.floor((player(s, pid).life - 10) / pend.dig.payLife)))) }];
       return [{ type: "searchLibrary", player: pid, found: player(s, pid).life - pend.dig.payLife >= 10 ? theirs.slice(0, pend.max) : [] }];
     }
     // Dubious Challenge: the exiled cards come back onto the battlefield (one maybe for the opponent): our two best.
@@ -1024,6 +1026,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const k = pend.counterKind ?? "";
       const keyword = ["shield", "flying", "first strike", "double strike", "deathtouch", "hexproof", "indestructible", "lifelink", "menace", "reach", "trample", "vigilance"].includes(k);
       return [{ type: "chooseOption", player: pid, choice: keyword && pend.options.includes("kind") ? "kind" : "plus" }];
+    }
+    // Exotic Pets: helpful counters stack up on the first token, harmful ones go to the second.
+    if (pend.kind === "chooseOption" && pend.what === "eitherToken") {
+      const k = pend.counterKind ?? "";
+      const harmful = ["-1/-1", "stun", "age", "time", "fade", "doom"].includes(k);
+      return [{ type: "chooseOption", player: pid, choice: (harmful ? pend.options[pend.options.length - 1] : pend.options[0])! }];
     }
     if (pend.kind === "chooseOption" && pend.what === "addOrRemoveCounter") {
       const o = pend.about ? s.objects[pend.about] : undefined;

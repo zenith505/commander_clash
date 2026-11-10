@@ -33,6 +33,7 @@ import { runLaneB160Effect } from "./run-laneb160";
 import { runLaneB166Effect } from "./run-laneb166";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
+import { runRound329Effect } from "./run-round329";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
 import { ringBearer } from "./run-ring";
@@ -1707,6 +1708,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":
       return runRound328Effect(s, e, ctx, src);
+    case "surveilledToHand":
+    case "loseInsteadThisTurn":
+      return runRound329Effect(s, e, ctx, src);
     case "flipCoin":
       return runCoinEffect(s, e, ctx, src);
     case "flipCoinEach":

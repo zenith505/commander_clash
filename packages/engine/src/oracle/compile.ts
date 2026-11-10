@@ -4110,6 +4110,11 @@ export function compile(d: CardDef): CompiledCard {
       out.loseGameExileSelf = true;
       continue;
     }
+    // Exquisite Archangel: the same, with your starting life total (CR 103.4, 903.7: 40).
+    if (line === "If you would lose the game, instead exile ~ and your life total becomes equal to your starting life total.") {
+      out.loseGameExileSelf = "startingLife";
+      continue;
+    }
     // Gideon of the Trials' emblem: "As long as you control a Gideon planeswalker, you can't lose the game and your
     // opponents can't win the game": only while that's true.
     const lockIf = /^As long as (.+), you can't lose the game and your opponents can't win the game\.$/.exec(line);

@@ -1494,6 +1494,13 @@ export function parseTargetPhrase(
     const rest = parseTargetPhrase(greater[1]!, opts);
     return rest?.kind === "object" && !rest.power && !rest.many ? { ...rest, greaterPowerThanSource: true, text: `${rest.text} with greater power` } : null;
   }
+  // Rangers of Ithilien: "up to one target creature with lesser power": than the source's, checked as the target is chosen
+  // and as the ability resolves (rulings), its last known power if it has left (as mentor's, CR 702.134a).
+  const lesser = opts.target && /^((?:.+ )?creature) with lesser power$/i.exec(phrase.trim());
+  if (lesser) {
+    const rest = parseTargetPhrase(lesser[1]!, opts);
+    return rest?.kind === "object" && !rest.power && !rest.many && !rest.greaterPowerThanSource ? { ...rest, lesserPowerThanSource: true, text: `${rest.text} with lesser power` } : null;
+  }
   // Gyrus, Waker of Corpses: "target creature card with lesser power from your graveyard": than the source's power, or
   // its last known power if it has left (as mentor's, CR 702.134a), against the card's power in the graveyard. Only a
   // target: it's checked as targets are chosen and as the ability resolves (CR 608.2b).

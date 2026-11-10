@@ -70,6 +70,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     // same costs as "Sacrifice ~ and two lands", "Exile two cards from your graveyard, Exile ~" (paid in any order, CR 601.2h).
     .replace(/(^|, )Sacrifice (an?|two|three) ([a-z]+) and ~(?=[,:])/, "$1Sacrifice ~ and $2 $3")
     .replace(/(^|, )(Exile (?:a|one|two|three) cards? from your graveyard) and ~(?=[,:])/, "$1$2, Exile ~")
+    // Magus of the Order: "Sacrifice ~ and another green creature": both at once (CR 601.2h), the same as "Sacrifice ~,
+    // Sacrifice another green creature"; another than ~, even once ~ isn't green (rulings).
+    .replace(/(^|, )Sacrifice ~ and (another [a-z]+ creature)(?=[,:])/, "$1Sacrifice ~, Sacrifice $2")
     // The Heralds: "Sacrifice a white creature, a blue creature, and a black creature": one cost, three different creatures
     // (rulings); Urborg Panther: "Sacrifice a creature named Feral Shadow, a creature named Breathstealer, and ~": the
     // permanent itself and one of each of the others.

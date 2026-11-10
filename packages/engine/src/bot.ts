@@ -49,6 +49,7 @@ import {
   blockProblem,
   blockRequirementProblem,
   cantBlockNow,
+  untappedForBlocking,
   cantBeBlockedNow,
   provokerOf,
   lureBinds,
@@ -5830,6 +5831,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (o.attachedTo && ab.body.effects.some((e) => e.type === "attach")) continue; // already equipped
       // Aura swap (CR 702.65a): only with an Aura card in hand that could take its place.
       if (ab.body.effects.some((e) => e.type === "putFromHand" && e.auraSwap) && !(o.attachedTo && player(s, pid).hand.some((h) => defOf(s, obj(s, h)).subtypes.includes("Aura") && auraHostOptions(s, obj(s, h), pid).some((x) => "attachTo" in x && x.attachTo === o.attachedTo)))) continue;
+      // Belbe's Portal: only with a creature card of the chosen type in hand to put.
+      if (ab.body.effects.some((e) => e.type === "putFromHand" && e.filter?.chosen === "type" && !player(s, pid).hand.some((h) => printedMatches(bindChosen(e.filter!, o.chosen), defOf(s, obj(s, h)))))) continue;
       // "Equip—Sacrifice a creature": bots don't give up a permanent to move an Equipment.
       if (ab.equip && ab.costs?.some((c) => c.kind === "sacrifice")) continue;
       // "Equip planeswalker" (Luxior): bots keep their planeswalkers planeswalkers.
@@ -7475,7 +7478,7 @@ function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: O
   for (const pw of walkers) {
     const owner = controllerOf(s, pw);
     if (atPlayer(owner) >= player(s, owner).life) continue;
-    const blockers = s.battlefield.map((id) => obj(s, id)).filter((b) => controllerOf(s, b) === owner && !b.tapped && objIsType(s, b, "Creature"));
+    const blockers = s.battlefield.map((id) => obj(s, id)).filter((b) => controllerOf(s, b) === owner && untappedForBlocking(s, b) && objIsType(s, b, "Creature"));
     const free = attacks
       .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !mustAttackPlayers(s, obj(s, a.attacker)).length && !attackProblem(s, obj(s, a.attacker), owner))
       .filter((a) => blockers.every((b) => blockProblem(s, b, obj(s, a.attacker), owner)))
@@ -7510,7 +7513,7 @@ function attackBattles(s: GameState, pid: PlayerId, attacks: { attacker: ObjectI
     .sort((a, b) => (a.counters.defense ?? 0) - (b.counters.defense ?? 0));
   for (const b of battles) {
     const guard = b.protector!;
-    const blockers = s.battlefield.map((id) => obj(s, id)).filter((x) => controllerOf(s, x) === guard && !x.tapped && objIsType(s, x, "Creature"));
+    const blockers = s.battlefield.map((id) => obj(s, id)).filter((x) => controllerOf(s, x) === guard && untappedForBlocking(s, x) && objIsType(s, x, "Creature"));
     const free = attacks
       .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !mustAttackPlayers(s, obj(s, a.attacker)).length && !attackProblem(s, obj(s, a.attacker), guard))
       .filter((a) => atPlayer(a.defender) < player(s, a.defender).life)
@@ -7547,7 +7550,7 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   const target = s.monarch !== undefined && opps.includes(s.monarch) && player(s, lowest).life > reach ? s.monarch : lowest;
   const theirBlockers = s.battlefield
     .map((id) => obj(s, id))
-    .filter((o) => controllerOf(s, o) === target && !o.tapped && objIsType(s, o, "Creature"));
+    .filter((o) => controllerOf(s, o) === target && untappedForBlocking(s, o) && objIsType(s, o, "Creature"));
   const ready = potentialAttackers(s, pid).filter((o) => hit(o, target) > 0 && !attackProblem(s, o, target));
   const survivesBlocks = (o: GameObject) => theirBlockers.every((b) => blockProblem(s, b, o, target) || hit(b, o) < toughness(s, o));
   // Swing with everything when we outnumber their untapped blockers; otherwise only with creatures that survive a block.
@@ -7712,7 +7715,7 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   const incoming = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking === pid);
   const mine = s.battlefield
     .map((id) => obj(s, id))
-    .filter((o) => controllerOf(s, o) === pid && !o.tapped && objIsType(s, o, "Creature") && !cantBlockNow(s, o));
+    .filter((o) => controllerOf(s, o) === pid && untappedForBlocking(s, o) && objIsType(s, o, "Creature") && !cantBlockNow(s, o));
   const used = new Set<string>();
   const blocks: { blocker: string; attacker: string }[] = [];
   // Only damage to us counts toward our life; attackers of our planeswalkers are blocked when that's a good trade.

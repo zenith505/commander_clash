@@ -1,4 +1,4 @@
-import type { AbilityBody, GraveCastRider, Affects, FromTop, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, CountMod, ManaTrigger, TriggeredAbility, TriggerDuration, SpentFor } from "./abilities";
+import type { AbilityBody, AdditionalCost, GraveCastRider, Affects, FromTop, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, CountMod, ManaTrigger, TriggeredAbility, TriggerDuration, SpentFor } from "./abilities";
 import type { DamageEvent } from "./damage";
 import type { Characteristics } from "./layers";
 
@@ -2217,7 +2217,7 @@ export interface GameState {
    * exileReturnThisTurn): for `player`'s permanents during `turn`, each with its own delayed trigger (rulings).
    */
   exileReturnTurn?: { player: PlayerId; turn: number; source: string; sourceCardId: string }[];
-  graveyardTurn?: { player: PlayerId; turn: number; cast?: TargetSpec; lands?: true; exileInstead?: true; /** From any graveyard, not only `player`'s (The Great Work). */ anyGraveyard?: true; exileCast?: true; source: string }[];
+  graveyardTurn?: { player: PlayerId; turn: number; cast?: TargetSpec; lands?: true; exileInstead?: true; /** From any graveyard, not only `player`'s (The Great Work). */ anyGraveyard?: true; /** Osteomancer Adept: the costs and counter of a spell cast this way (Effect graveyardTurn). */ costs?: AdditionalCost[]; entersWith?: { counter: CounterKind; n: number }; exileCast?: true; source: string }[];
   /**
    * "Until end of turn, you may look at the top card of your library any time and you may play cards from the top of
    * your library" (Gwenom, Remorseless; Effect topTurn): `player` may, during `turn`, as a permanent's FromTop lets them.

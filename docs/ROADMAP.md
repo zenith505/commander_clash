@@ -1,7 +1,7 @@
 # Roadmap
 
-30,919 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,799 of
+30,924 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,804 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2363,6 +2363,32 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 331 took cards back off the "Out after round N" lists, most played first: "You may cast noncreature spells from
+   the top of your library. If you cast a spell this way, you may cast it as though it had flash." (Elsha of the
+   Infinite, CR 702.8a: any time it could cast an instant, its costs paid as usual, rulings; not with Bolas's Citadel's
+   permission for life); "You may cast spells from the top of your library by sacrificing a nonland permanent in addition
+   to paying their other costs." (Into the Pit: a cost of each spell cast with that permission, CR 601.2f-h, Into the Pit
+   itself one of the permanents; with another permission that applies, such as Elsha's, nothing is sacrificed);
+   "You may cast Dinosaur creature spells from among cards you own exiled with ~. If you cast a spell this way, that
+   creature enters with a finality counter on it." (Intrepid Paleontologist: the cards its "{2}: Exile target card from a
+   graveyard" exiled, CR 607.2a, under your control as the cast begins, with the usual timing, rulings); "Until end of
+   turn, you may cast creature spells from your graveyard by foraging in addition to paying their other costs. If you
+   cast a spell this way, that creature enters with a finality counter on it." (Osteomancer Adept: any number of them,
+   forage paid as each is cast, CR 701.61a, the card itself not one of the three); "The top card of your library has
+   plot. The plot cost is equal to its mana cost." with "You may plot nonland cards from the top of your library."
+   (Fblthp, Lost on the Range: a Plot button in the top card's menu, at sorcery speed, for its own plot cost or its mana
+   cost, the one with the lower mana value; no mana cost or an {X} in it can't be plotted this way). Browser tests for
+   each cast path. +5, 30,913 of 31,936 with B168, B169 and B170.
+   Bots: a bot casts from the top with Into the Pit, sacrificing a nonland permanent worth little (never Into the Pit or
+   its commander); it taps Osteomancer Adept in its first main phase when a creature card costing 2 or more in its
+   graveyard is affordable and it can forage, then casts it; it plots the top card with Fblthp in its second main phase,
+   after the plot cards in its hand. It uses Intrepid Paleontologist's exile as any graveyard exile (not on purpose for
+   its own Dinosaurs).
+   Out after round 331 (looked at, not done): Abstruse Appropriation (still out: "spend colorless mana as though it were
+   mana of any color" needs a hybrid symbol with {C} as a half, and hybrid halves are colors only); Anrakyr the Traveller
+   (casting an artifact spell from the hand or graveyard for life as its trigger resolves: a new way to pay for a spell
+   cast during a resolution); Bre of Clan Stoutarm (as after round 321); Greater Gargadon (an ability activated from
+   exile while suspended).
    Round 330 took cards back off the "Out after round N" lists, most played first: "The first activated ability you
    activate during your turn that targets a creature you control costs {2} less to activate." and "Whenever one or
    more creatures you control become the target of an activated ability, draw a card. This ability triggers only once
@@ -4529,7 +4555,7 @@ line blocks.
    Éomer), Raphael's "deals combat damage to a player for the first time each turn", "untap it and all Samurai you
    control" (Godo), Moraug's "for each time it has attacked this turn"; "it can't be blocked this combat" (Ma Chao),
    "whenever ~ or a commander you control attacks alone"; play-from-top riders: Bolas's Citadel's life payment,
-   Elsha's flash, Thundermane Dragon's haste, Mikey & Don's counter, Galea's attach, Falco Spara's and Into the Pit's
+   Elsha's flash (done in round 331), Thundermane Dragon's haste, Mikey & Don's counter, Galea's attach, Falco Spara's and Into the Pit's (done in round 331)
    extra costs, historic and snow filters (Crystal Skull, The Fourth Doctor, Isu), "spells with flash or flying"
    (Errant and Giada), Vizier of the Menagerie's "spend mana of any type", Experimental Frenzy's (done in round 325) "can't play cards from
    your hand", granted look-at-top (Glowcap Lantern), "until end of turn, you may look at the top card" (Gwenom, The
@@ -7728,8 +7754,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   number of its +1/+1 counters made into Tetravite tokens at your upkeep, and any number of the tokens created with it
   exiled for counters back, rulings: only this object's tokens, whoever controls them; browser test; "This token can't be
   enchanted": no Aura can be attached, so an Aura spell aimed at it goes to the graveyard, CR 303.4i). The exiled P/T of
-  Phyrexian Ingester now applies the cards' characteristic-defining abilities in exile too (rulings). +4, 30,912 of 31,936
-  with B170.
+  Phyrexian Ingester now applies the cards' characteristic-defining abilities in exile too (rulings). +4, 30,917 of 31,936
+  with B170 and round 331.
 - Round B172 (least played first, mechanics that could be built from the skip lists): Goblin Plate Mail ("amass Goblins 1,
   then attach ~ to the amassed Army": the Army chosen for the counter, CR 701.47c, rulings; a new 0/0 token if you control
   none). Lich's Tomb ("Whenever you lose life, sacrifice a permanent for each 1 life you lost": that many, chosen by you, for
@@ -7744,8 +7770,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   303.4f; the existing hand picker, browser tests). Blood Sun ("All lands lose all abilities except mana abilities": layer 6,
   CR 613.1f; their mana abilities, activated and triggered, printed or granted before, stay, CR 605.1a, and so do their
   basic land types'; a land's enters-tapped and enters triggers are gone as it enters, CR 614.12, rulings; Urborg-style
-  type changes still apply, layer 4 first, rulings; the card shows "Only mana abilities", a browser test). +7, 30,919 of
-  31,936 with B171.
+  type changes still apply, layer 4 first, rulings; the card shows "Only mana abilities", a browser test). +7, 30,924 of
+  31,936 with B171 and round 331.
 - Out after round B172 (looked at, not done): Titania's Song (its effect "continues until end of turn" once it leaves: whether
   that locks in the artifacts it applied to isn't settled by the rules or rulings), Swans of Bryn Argoll (see round B66).
   Eureka's cards make their "as it enters" choices (Clone's copy, a chosen creature type) once Eureka has resolved, as the

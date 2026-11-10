@@ -1,6 +1,6 @@
 # Roadmap
 
-30,950 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,959 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,805 of
 9,979 (98%).
 
@@ -1158,7 +1158,7 @@ line blocks.
    Lecturer (granted demonstrate); Cosi's Trickster (whenever an opponent shuffles, done in round B71); Ib Halfheart, Goblin Tactician
    ("becomes blocked, sacrifice it. If you do, it deals 4 damage to each creature blocking it", done in round 325); Vivien's Stampede
    (each player dealt combat damage this turn); Armored Kincaller (done in round B106) ("If you do or if you control another Dinosaur");
-   Tunnel Tipster and Veiled Ascension (face-down creatures entering); Embodiment of Agonies (done in round B106) (different mana costs
+   Tunnel Tipster (done in round B174) and Veiled Ascension (done in round B174) (face-down creatures entering); Embodiment of Agonies (done in round B106) (different mana costs
    among cards).
    Round 222 (fresh cards from rank 16,000 on): "It gains ..."/"It gets ..." in an activated ability means the source
    (Migloz, Maze Crusher); "for each attacking creature other than ~" (Márton Stromgald); "deals X plus 2 damage
@@ -4519,7 +4519,7 @@ line blocks.
      Treasure Nabber; the Offerings with two "choose an opponent" choices in one ability.
    - "For as long as you control ~" still out: "can't become untapped" (Spider-Woman), "you may play that card for
      as long as you control ~" (Lightning, Victor Mancha, Taster of Wares), "with lesser power" / "power less than
-     ~'s power" targets (Rangers of Ithilien, Vodalian Mindsinger), Willbreaker, The Wretched, Pyreswipe Hawk
+     ~'s power" targets (Rangers of Ithilien (done in round B174), Vodalian Mindsinger), Willbreaker, The Wretched, Pyreswipe Hawk
      (expend), Seasinger (done in round B131).
    - "Exiles a creature or planeswalker they control with the greatest mana value" (Blot Out, End of the Hunt): the
      sacrifice version works; exiling needs an "exile" pick action and prompt. "The greatest mana value among" cards
@@ -4616,7 +4616,7 @@ line blocks.
    - Saddle: "the creature that saddled it this turn" (Giant Beaver, Rambling Possum, Calamity, Fortune, The Gitrog),
      effects that make a Mount saddled (Guidelight Matrix, Kolodin, Alacrian Armory), "is saddled" and "becomes
      saddled for the first time each turn" (Archmage's Newt, Caustic Bronco, Stubborn Burrowfiend (done in round B163)), "saddles a Mount
-     or crews a Vehicle" triggers (Canyon Vaulter, Reckless Velocitaur), "Mount or Vehicle" groups (Cloudspire Captain),
+     or crews a Vehicle" triggers (Canyon Vaulter (done in round B174), Reckless Velocitaur (done in round B174)), "Mount or Vehicle" groups (Cloudspire Captain),
      Bounding Felidar, Guardian Sunmare, Lagorin, Ornery Tumblewagg. Bots only saddle Mounts that have an "attacks
      while saddled" trigger.
    - Station and levelers: a striation is all or nothing, so cards with one unparsed line there stay out (Entropic
@@ -5042,7 +5042,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Tahngarth's Rage, Even the Odds, Time of Heroes, Make a Wish, Rats' Feast, Vitalizing Cascade, An-Havva Inn and
   others. +76 (26,545 with round 185).
 - Skipped there, with reasons: Dragon Whelp, Farrelite Priest, Initiates of the Ebon Hand and Nalathni Dragon (how
-  many times it was activated this turn, counted as the delayed trigger resolves); Pure Intentions' first line; Cryptid Inspector ("a face-down permanent enters"); Friendly
+  many times it was activated this turn, counted as the delayed trigger resolves); Pure Intentions' first line; Cryptid Inspector (done in round B174) ("a face-down permanent enters"); Friendly
   Fire (damage to two recipients from a revealed card); Toil to Renown (whether an artifact creature counts once or
   twice: no ruling); Gideon's Triumph (done in round B109) and Inferno Hellion (done in round B106) ("attacked or blocked this turn", and Gideon's "two of
   those creatures instead"); Perilous Predicament (two sacrifices of different
@@ -6003,7 +6003,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   requirement toward you or your planeswalkers), Viral Spawning (done in round B154) (a conditional flashback), Silver Surfer, Galactus's Herald
   ("attacks that player each combat"), Blue Dragon (done in round B154) (three targets until your next turn), Satyr Firedancer (a spell's damage
   to an opponent), Thrill-Kill Disciple (squad with a discard), Magnigoth Treefolk and Diligent Zookeeper (both done in round B164) (counted
-  landwalk and creature types), Exotic Pets and Storm of Forms (each kind of counter), Sanctifier en-Vec (a color filter on
+  landwalk and creature types), Exotic Pets and Storm of Forms (each kind of counter), Sanctifier en-Vec (done in round B174) (a color filter on
   permanents, spells and cards going to graveyards), Greatbow Doyen, Ancestral Communion, The Book of Vile Darkness.
 - Round B58 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 15,000): "If that player
   can't, they discard a card, they lose 2 life, you draw a card, ..., then you sacrifice ~" (Doom Foretold: the whole list
@@ -6185,7 +6185,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   same number and kind of counters"), Storyweave (lore counters and the next enchantment creatures entering), Lodestone
   Bauble (cards from one player's graveyard on top in any order), Ellywick Tumblestrum ("If it's legendary" in a dig,
   and her emblem), Scythe Specter (the greatest mana value among the discarded cards), Moorland Rescuer (total power X
-  or less), Nazahn, Revered Bladesmith, Liliana, the Necromancer (creature cards from graveyards onto the battlefield).
+  or less), Nazahn, Revered Bladesmith, Liliana, the Necromancer (done in round B174) (creature cards from graveyards onto the battlefield).
 - Round B65 (the unlisted ones from EDHREC rank about 19,700 up, and Hollow One and Take Out the Trash from the B10 and
   B11 lists): "Whenever ~ is dealt damage, exile that many cards from the top of your library. Choose one of them. Until
   the end of your next turn, you may play that card" (Feldon, Ronom Excavator) and the same "exile that many cards" after
@@ -7864,6 +7864,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   returned, rulings; a browser test from the graveyard). Glimpse the Cosmos (from your graveyard for {U} while you control
   a Giant, at its usual timing; exiled only instead of going to the graveyard, not flashback, CR 614.1a; cast another way,
   neither applies, rulings; a browser test). +8, 30,950 of 31,936 with B172 and rounds 332, 333 and 334.
+- Round B174 (least played first, single-line blockers that existing pieces nearly covered): Cryptid Inspector ("Whenever a
+  face-down permanent you control enters and whenever ~ or another permanent you control is turned face up": two events of
+  one ability; turning face up isn't entering, CR 708.8). Tunnel Tipster ("if a face-down creature entered the battlefield
+  under your control this turn": face down as it entered, even if turned face up or gone since; one turned face down later
+  doesn't count, rulings). Veiled Ascension ("Face-down creatures you control enter with a flying counter on them", judged
+  as each would exist face down, CR 614.12). Sanctifier en-Vec ("exile all cards that are black or red from all
+  graveyards"; "If a black or red permanent, spell, or card not on the battlefield would be put into a graveyard, exile it
+  instead": its colors in the zone it's leaving, a permanent's from the layers, so a Clone of a red creature is exiled,
+  rulings; tokens too; one dying with ~ is exiled, rulings). Predatory Focus (chosen as it resolves: every creature you
+  control this turn, later ones too, assigns its combat damage as though it weren't blocked, CR 510.1c, rulings; a browser
+  test). Reckless Velocitaur and Canyon Vaulter ("Whenever ~ saddles a Mount or crews a Vehicle during your main phase":
+  tapped for a saddle cost, CR 702.171c, or a crew cost, CR 702.122d, in a main phase of your turn). Rangers of Ithilien
+  ("up to one target creature with lesser power": than ~'s, as the target is chosen and as it resolves; an illegal target
+  means the Ring doesn't tempt you, rulings). Liliana, the Necromancer's −7 ("Put up to two creature cards from graveyards
+  onto the battlefield under your control": chosen after the destruction, the destroyed creatures among them, rulings;
+  they enter at once; a browser test for the two-card graveyard picker). +9, 30,959 of 31,936 with B173 and rounds 333 and 334.
+- Out after round B174 (looked at, not done): Demilich, Arcane Proxy and Roving Actuator (a copy of a graveyard card cast
+  while the ability resolves), Sproutback Trudge (cast from the graveyard as its end step trigger resolves), Outmaneuver and
+  Long Rest (X targets), Pulsemage Advocate (three targets from one opponent's graveyard).
 - Out after round B173 (looked at, not done): Corrosive Ooze (the Equipment attached to the creature just before it left the
   battlefield is destroyed at end of combat, rulings: attachments as they last existed aren't kept), Oppressive Rays and
   Gloom (the tax reaches mana abilities), Murktide Regent and Soulflayer (which cards delve exiled aren't kept with the
@@ -8440,7 +8459,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Hazoret's "unless you have max speed", max speed replacement effects and cost reductions (Vnwxt, Far Fortune,
   Racers' Scoreboard, Lightwheel Enhancements, done in round 325), "where X is your speed" in The Speed Demon, Samut and Point the Way,
   Outpace Oblivion.
-- "As though it weren't blocked" from an effect rather than an ability (Predatory Focus, Outmaneuver), Ruxa,
+- "As though it weren't blocked" from an effect rather than an ability (Predatory Focus (done in round B174), Outmaneuver), Ruxa,
   Gurzigost (done in round B126). "At the beginning of the next cleanup step" for counters (Bounty of the Hunt (done in round B159)), Cunning, Necromancy.
 - Damage shields: outside combat damage the choices of which damage a prevention or redirection shield takes, and
   which shield applies first (CR 615.7, 616.1), are made for the player (bots' heuristic); so is splitting a shared

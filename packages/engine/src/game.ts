@@ -2224,8 +2224,11 @@ function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName): { s
   // Who controlled it: as a permanent or spell, its controller; anywhere else, its owner (CR 108.4a).
   const item = fromZone === "stack" ? s.stack.find((x) => x.objectId === o.id) : undefined;
   const controlled = fromZone === "battlefield" ? controllerOf(s, o) : fromZone === "stack" ? (item?.controller ?? o.controller) : o.owner;
+  // Sanctifier en-Vec: its colors in the zone it's leaving (rulings: a Clone copying a red creature is red; Order, cast, is
+  // white), a permanent's from the layers (CR 613.1e), a spell's or card's as defOf gives them (CR 105.2).
+  const colorsNow = fromZone === "battlefield" ? characteristics(s, o).colors : defOf(s, o).colors;
   const applies = (x: CompiledCard["graveyardExile"], controller: PlayerId) =>
-    !!x && (!o.isToken || !!x.tokens) && (!x.permanents || fromZone === "battlefield") && (x.whose === "any" || (x.whose === "yours") === (o.owner === controller)) && (!x.filter || printedMatches(x.filter, defOf(s, o))) && !(x.notYours && controlled === controller);
+    !!x && (!o.isToken || !!x.tokens) && (!x.permanents || fromZone === "battlefield") && (x.whose === "any" || (x.whose === "yours") === (o.owner === controller)) && (!x.filter || printedMatches(x.filter, defOf(s, o))) && !(x.notYours && controlled === controller) && (!x.colorsNow || colorsNow.some((c) => x.colorsNow!.includes(c)));
   for (const id of s.battlefield) {
     const p = obj(s, id);
     const x = abilitiesOf(s, p).graveyardExile;
@@ -9934,7 +9937,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     log(s, `${p.name} activates ${d.name} (${what.replace(/~/g, d.name).replace(/\.$/, "")})${abCost.hasX ? ` with X=${x ?? 0}` : ""}${describeTargets(s, targets)}.`);
   }
   // Each creature tapped for a crew cost crewed the Vehicle (CR 702.122d), whether or not the ability resolves.
-  if (ab.crew !== undefined && !ab.saddle) for (const c of tapCreatures ?? []) fireEvent(s, { type: "crews", id: c, vehicle: o.id });
+  // Each creature tapped for a saddle cost saddled the Mount (CR 702.171c): "Whenever ~ saddles a Mount" (Reckless Velocitaur).
+  if (ab.crew !== undefined) for (const c of tapCreatures ?? []) fireEvent(s, { type: "crews", id: c, vehicle: o.id, ...(ab.saddle ? { saddle: true as const } : {}) });
   // Once it's activated (CR 602.2i), abilities that trigger on that do.
   // As it was activated, for "copy that ability" once it has left the stack (rulings on Rings of Brighthearth).
   (s.castItems ??= {})[stackId] = structuredClone(item);
@@ -13264,12 +13268,21 @@ export function unblockedCandidates(s: GameState): Map<PlayerId, ObjectId[]> {
   const out = new Map<PlayerId, ObjectId[]>();
   const fs = s.step === "firstStrikeDamage";
   for (const at of attackers(s)) {
-    if (!at.blockedBy || at.attacking === undefined || !characteristics(s, at).unblockedDamage || at.unblockedDamageTurn === s.turn || !dealsDamageThisStep(s, at, fs) || combatDamageOf(s, at) <= 0) continue;
+    if (!at.blockedBy || at.attacking === undefined || !characteristics(s, at).unblockedDamage || at.unblockedDamageTurn === s.turn || unblockedByTurnChoice(s, at) || !dealsDamageThisStep(s, at, fs) || combatDamageOf(s, at) <= 0) continue;
     const banded = bandingAmong(s, at.blockedBy.flatMap((id) => s.objects[id] ?? []));
     const who = banded ? at.attacking : controllerOf(s, at);
     out.set(who, [...(out.get(who) ?? []), at.id]);
   }
   return out;
+}
+
+/**
+ * Predatory Focus: its controller chose, as it resolved, that the creatures they control assign their combat damage this
+ * turn as though they weren't blocked (CR 510.1c): every one they control as the damage is assigned, ones that came later
+ * too, so no choice is left for the damage step (rulings).
+ */
+function unblockedByTurnChoice(s: GameState, at: GameObject): boolean {
+  return !!s.turnLog?.unblockedDamage?.includes(controllerOf(s, at));
 }
 
 /** Ask the next player who decides whether blocked creatures assign combat damage as though unblocked; true if asked. */
@@ -13372,7 +13385,7 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
     let dmg = combatDamageOf(s, at);
     if (dmg <= 0) continue;
     // "As though it weren't blocked": all of it to the player it's attacking, none to blockers (CR 510.1b; rulings).
-    const unblocked = (s.unblockedChoice?.turn === s.turn && s.unblockedChoice.step === s.step && s.unblockedChoice.ids.includes(at.id)) || at.unblockedDamageTurn === s.turn;
+    const unblocked = (s.unblockedChoice?.turn === s.turn && s.unblockedChoice.step === s.step && s.unblockedChoice.ids.includes(at.id)) || at.unblockedDamageTurn === s.turn || unblockedByTurnChoice(s, at);
     // To the player or planeswalker it attacks; nothing if that planeswalker has left combat (CR 506.4c).
     const target = attackedRecipient(s, at);
     // Cunning Giant: all of it to the creature its controller chose (askDamageToCreature).

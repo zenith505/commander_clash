@@ -35,6 +35,8 @@ import { runLaneB167Effect } from "./run-laneb167";
 import { runLaneB168Effect } from "./run-laneb168";
 import { runLaneB169Effect } from "./run-laneb169";
 import { runRound327Effect } from "./run-round327";
+import { runRound328Effect } from "./run-round328";
+import { runRound329Effect } from "./run-round329";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
 import { ringBearer } from "./run-ring";
@@ -443,6 +445,11 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const o = st && s.objects[st.id];
     return o?.zone === "battlefield" && (o.zoneChanges ?? 0) === st!.zc ? [o] : [];
   }
+  if (ref.ref === "wonFlipThisWay")
+    return (s.resolving?.wonFlipIds ?? []).flatMap((c) => {
+      const o = s.objects[c.id];
+      return o?.zone === "battlefield" && (o.zoneChanges ?? 0) === c.zc ? [o] : [];
+    });
   if (ref.ref === "tappedThisWay")
     return (s.resolving?.tappedIds ?? []).flatMap((c) => {
       const o = s.objects[c.id];
@@ -1734,6 +1741,12 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB169Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
+    case "dividedDamageBack":
+      return runRound328Effect(s, e, ctx, src);
+    case "surveilledToHand":
+    case "loseInsteadThisTurn":
+    case "flipCoinEachWon":
+      return runRound329Effect(s, e, ctx, src);
     case "flipCoin":
       return runCoinEffect(s, e, ctx, src);
     case "flipCoinEach":

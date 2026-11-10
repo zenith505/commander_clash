@@ -10587,6 +10587,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "472efb69-47c8-4c93-b60a-f6dba4364b8c",
+  "name": "Exquisite Archangel",
+  "manaCost": "{5}{W}{W}",
+  "cmc": 7,
+  "typeLine": "Creature — Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flying\nIf you would lose the game, instead exile this creature and your life total becomes equal to your starting life total.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "aer",
+  "releasedAt": "2017-01-20",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "90b540ab-b05a-4d29-b896-7ff5da0b101d",
   "name": "Exterminate!",
   "manaCost": "{2}{B}",
@@ -15992,6 +16024,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7d1769d0-d942-45b3-a31c-2bbe45e68661",
+  "name": "Island Sanctuary",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If you would draw a card during your draw step, instead you may skip that draw. If you do, until your next turn, you can't be attacked except by creatures with flying and/or islandwalk.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ddd649f4-dbaf-48ec-8ff7-95581257772d",
   "name": "Isochron Scepter",
   "manaCost": "{2}",
@@ -19369,6 +19427,37 @@
   "set": "m15",
   "releasedAt": "2014-07-18",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "dd25cab9-15cc-40f5-9b68-8f345dd7e952",
+  "name": "Master of the Wild Hunt",
+  "manaCost": "{2}{G}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Human Shaman",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Shaman"
+  ],
+  "oracleText": "At the beginning of your upkeep, create a 2/2 green Wolf creature token.\n{T}: Tap all untapped Wolf creatures you control. Each Wolf tapped this way deals damage equal to its power to target creature. That creature deals damage equal to its power divided as its controller chooses among any number of those Wolves.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2023-04-14",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -26307,6 +26396,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e788e9dd-449d-495b-adad-6d49e408b003",
+  "name": "Russet Wolves",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Creature — Wolf",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wolf"
+  ],
+  "oracleText": "",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dka",
+  "releasedAt": "2012-02-03",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "344671d1-8abf-4be1-93c9-ef917e88e6c9",
   "name": "Ruthless Radrat",
   "manaCost": "{1}{B}{B}",
@@ -31888,6 +32007,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a68f41a2-37ee-46e1-bf3c-164c78b003ca",
+  "name": "The Golden Throne",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Arcane Life-support — If you would lose the game, instead exile The Golden Throne and your life total becomes 1.\nA Thousand Souls Die Every Day — {T}, Sacrifice a creature: Add three mana in any combination of colors.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Arcane Life-support",
+   "A Thousand Souls Die Every Day"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "fc315174-d063-41dd-9379-11d95c5fd4ed",
   "name": "The Horus Heresy",
   "manaCost": "{3}{U}{B}{R}",
@@ -35256,6 +35409,38 @@
   "commanderLegal": "legal",
   "set": "akh",
   "releasedAt": "2017-04-28",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a35c2e20-eb90-4132-b65f-be1fcb569819",
+  "name": "Watchwolf",
+  "manaCost": "{G}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Wolf",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wolf"
+  ],
+  "oracleText": "",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rav",
+  "releasedAt": "2005-10-07",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

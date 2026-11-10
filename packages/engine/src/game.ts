@@ -412,6 +412,9 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "distribute":
       distributeChosen(s, p, action.parts);
       break;
+    case "divideDamage":
+      divideDamageChosen(s, p, action.parts);
+      break;
     case "manaMix":
       manaMixChosen(s, p, action.counts);
       break;
@@ -3301,6 +3304,8 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   // Obstinate Familiar, Pursuit of Knowledge: optional, one of each name.
   const skippers: ObjectId[] = [];
   for (const id of mine((a) => a.drawMaySkip || a.drawMayCounter)) if (!skippers.some((d) => nameOf(s, d) === nameOf(s, id))) skippers.push(id);
+  // Island Sanctuary: only during that player's own draw step; one of each name.
+  if (s.step === "draw" && s.activePlayer === pid) for (const id of mine((a) => a.drawStepMaySkip)) if (!skippers.some((d) => nameOf(s, d) === nameOf(s, id))) skippers.push(id);
   if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length) return undefined;
   const out = [...shields];
   for (const id of sages) out.push({ key: `sages:${id}`, label: `Reveal the top ${abilitiesOf(s, obj(s, id)).drawRevealCreatures} cards instead, the creature cards into your hand, the rest on the bottom of your library (${nameOf(s, id)})` });
@@ -3324,7 +3329,8 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   for (const id of tutors) out.push({ key: `tutor:${id}`, label: `Search your library for a card and put it into your hand instead, then shuffle (${nameOf(s, id)})` });
   for (const id of skippers) {
     const kind = abilitiesOf(s, obj(s, id)).drawMayCounter;
-    out.push({ key: `${kind ? "counter" : "mayskip"}:${id}`, label: kind ? `Put a ${kind} counter on ${nameOf(s, id)} instead` : `Skip this draw (${nameOf(s, id)})` });
+    const only = abilitiesOf(s, obj(s, id)).drawStepMaySkip?.attackOnlyBy;
+    out.push({ key: `${kind ? "counter" : "mayskip"}:${id}`, label: kind ? `Put a ${kind} counter on ${nameOf(s, id)} instead` : only ? `Skip this draw; until your next turn you can't be attacked except by creatures with ${only.map((k) => k.toLowerCase()).join(" and/or ")} (${nameOf(s, id)})` : `Skip this draw (${nameOf(s, id)})` });
   }
   // A Notion Thief with nothing else to choose from goes on as before.
   if (!shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && digs.length < 2 && out.length < 2) return undefined;
@@ -3412,6 +3418,12 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
       const put = putCounters(s, obj(s, src), kind, 1);
       log(s, `${p.name} puts ${put ? `a ${kind} counter` : `no ${kind} counter`} on ${nameOf(s, src)} instead of drawing.`);
     } else log(s, `${p.name} skips that draw (${nameOf(s, src)}).`);
+    // Island Sanctuary: until their next turn, even if it leaves (rulings).
+    const only = abilitiesOf(s, obj(s, src)).drawStepMaySkip?.attackOnlyBy;
+    if (only && !kind) {
+      p.attackOnlyByUntil = [...only];
+      log(s, `Until ${p.name}'s next turn, ${p.name} can't be attacked except by creatures with ${only.map((k) => k.toLowerCase()).join(" and/or ")}.`);
+    }
     return;
   }
   if (key.startsWith("sages:")) {
@@ -3982,6 +3994,7 @@ function startNextTurn(s: GameState, skipping = false) {
       p.noMaxHandSizeUntilNextTurn = undefined;
       p.attackTaxUntil = undefined;
       p.unattackableUntil = undefined;
+      p.attackOnlyByUntil = undefined;
       p.attackBansUntil = undefined;
     }
   if (s.namedBansUntil) s.namedBansUntil = s.namedBansUntil.filter((r) => !began.has(r.controller));
@@ -7565,6 +7578,9 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number, 
     // Angelic Arbiter: an opponent who declared an attacking creature this turn (rulings).
     if (abilitiesOf(s, o).opponentsWhoAttackedCantCast && o.zone === "battlefield" && controllerOf(s, o) !== pid && player(s, pid).attackedTurn === s.turn)
       return `${characteristics(s, o).name}: opponents who attacked with a creature this turn can't cast spells`;
+    // Sandswirl Wanderglyph: an opponent who attacked its controller or a planeswalker they controlled this turn.
+    if (abilitiesOf(s, o).opponentsWhoAttackedYouCantCast && o.zone === "battlefield" && controllerOf(s, o) !== pid && ((a) => a?.turn === s.turn && a.players.includes(controllerOf(s, o)))(player(s, pid).attackedPlayersOrWalkers))
+      return `${characteristics(s, o).name}: opponents who attacked ${player(s, controllerOf(s, o)).name} or their planeswalkers this turn can't cast spells`;
     // "Your opponents can't cast spells with mana value 3 or less" (Brisela, Voice of Nightmares).
     const most = abilitiesOf(s, o).opponentsCantCastMvAtMost;
     const value = mv ?? (parseManaCost(d.manaCost).hasX ? undefined : defMv(d));
@@ -10093,6 +10109,24 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   continueResolution(s);
 }
 
+/**
+ * Master of the Wild Hunt (PendingDecision "divideDamage"): all of the damage, divided among any number of the creatures
+ * offered, each chosen one dealt at least 1 (CR 601.2d); chosen as it resolves (CR 608.2d).
+ */
+function divideDamageChosen(s: GameState, p: Player, parts: Record<ObjectId, number>) {
+  const pend = s.pending;
+  const r = s.resolving;
+  if (pend?.kind !== "divideDamage" || pend.player !== p.id || !r) throw new RulesError("no damage to divide");
+  const given = Object.entries(parts).filter(([, n]) => n !== 0);
+  if (given.some(([id, n]) => !pend.options.includes(id) || !Number.isInteger(n) || n < 0)) throw new RulesError(`divide the damage among the ${pend.what}`);
+  const sum = given.reduce((a, [, n]) => a + n, 0);
+  if (sum !== pend.total) throw new RulesError(`divide all ${pend.total} damage`);
+  r.scratch = { ...r.scratch, dividedDamage: Object.fromEntries(given) };
+  s.pending = null;
+  log(s, `${p.name} divides ${nameOf(s, pend.by)}'s ${pend.total} damage: ${given.map(([id, n]) => `${n} to ${nameOf(s, id)}`).join(", ")}.`);
+  continueResolution(s);
+}
+
 /** How a "distribute" effect's counters are divided (CR 608.2d): all of them, among the permanents offered. */
 function distributeChosen(s: GameState, p: Player, parts: Record<ObjectId, number>) {
   const pend = s.pending;
@@ -10347,6 +10381,11 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const host = obj(s, m.host);
     log(s, `${p.name} puts ${defOf(s, spell).name} ${choice === "top" ? "on top of" : "under"} ${nameOf(s, host.id)}: it mutates.`);
     mergeSpell(s, spell, host, choice === "top");
+    return;
+  }
+  if (pend.what === "loseReplacement") {
+    // Kept for the game loss about to happen as the state-based actions are performed (playerLoses).
+    s.loseChoice = { player: p.id, choice };
     return;
   }
   if (pend.what === "legend") {
@@ -12073,11 +12112,16 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   for (const b of player(s, c.controller).attackBansThisTurn ?? []) {
     if (b.turn !== s.turn || b.player !== hit || (b.combat !== undefined && b.combat !== (s.combatsThisTurn ?? 0))) continue;
     if (!b.subtype && !planeswalker && attacked === undefined) return `${c.name} can't attack ${player(s, hit).name} this ${b.combat !== undefined ? "combat" : "turn"}`;
+    // Sandswirl Wanderglyph: that player's planeswalkers too, not a battle they protect (rulings).
+    if (b.walkers && attacked !== undefined && s.objects[attacked] && objIsType(s, obj(s, attacked), "Planeswalker")) return `${c.name} can't attack ${player(s, hit).name} or planeswalkers they control this turn`;
     if (b.subtype && attacked !== undefined && s.objects[attacked] && objIsType(s, obj(s, attacked), "Planeswalker") && characteristics(s, obj(s, attacked)).subtypes.includes(b.subtype)) return `${c.name} can't attack ${b.subtype}s ${player(s, hit).name} controls this turn`;
   }
   if (player(s, c.controller).attackBansNextTurn?.some((b) => b.turn === s.turn && b.player === hit)) return `${c.name} can't attack ${player(s, hit).name}${attacked !== undefined || planeswalker ? "'s permanents" : ""} this turn`;
   // Chronomantic Escape: that player, not their planeswalkers or battles.
   if (player(s, defender).unattackableUntil && !planeswalker && attacked === undefined) return `${c.name} can't attack ${player(s, defender).name} until their next turn`;
+  // Island Sanctuary: that player, only by a creature with flying or islandwalk.
+  const onlyBy = player(s, defender).attackOnlyByUntil;
+  if (onlyBy && !planeswalker && attacked === undefined && !onlyBy.some((k) => objHasKeyword(s, o, k))) return `${c.name} can't attack ${player(s, defender).name} until their next turn (only creatures with ${onlyBy.map((k) => k.toLowerCase()).join(" or ")} can)`;
   if (player(s, defender).attackBansUntil?.includes(c.controller) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""} until their next turn`;
   if (c.cantAttackPlayers.includes(defender) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""}`;
   if (c.cantAttackPlayersOnly.includes(defender) && !planeswalker && attacked === undefined) return `${c.name} can't attack ${player(s, defender).name}`;
@@ -12480,6 +12524,9 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   p.attackPower = { turn: s.turn, n: attacks.reduce((n, a) => n + Math.max(0, power(s, obj(s, a.attacker))), 0) };
   // Melee counts the opponents attacked, not their planeswalkers (rulings).
   p.attackedPlayers = { turn: s.turn, players: [...new Set(attacks.filter((a) => a.planeswalker === undefined).map((a) => a.defender))] };
+  // Sandswirl Wanderglyph: a player attacked, or the controller of a planeswalker attacked (not a battle's protector).
+  const hitWalkers = attacks.filter((a) => a.planeswalker === undefined || (!!s.objects[a.planeswalker] && objIsType(s, obj(s, a.planeswalker), "Planeswalker"))).map((a) => (a.planeswalker !== undefined && s.objects[a.planeswalker] ? controllerOf(s, obj(s, a.planeswalker)) : a.defender));
+  if (hitWalkers.length) p.attackedPlayersOrWalkers = { turn: s.turn, players: [...new Set([...(p.attackedPlayersOrWalkers?.turn === s.turn ? p.attackedPlayersOrWalkers.players : []), ...hitWalkers])] };
   if (p.attackedPlayers.players.length) p.attackedInTurn = { turn: s.turn, players: [...new Set([...(p.attackedInTurn?.turn === s.turn ? p.attackedInTurn.players : []), ...p.attackedPlayers.players])] };
   s.pending = null;
   if (attacks.length === 0) {
@@ -13377,19 +13424,19 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     checkPrepared(s); // the copies of prepare spells last as long as their permanents stay prepared (CR 722.3c)
     // The legend rule's choices come first, so this pass's actions all happen at once (CR 704.3).
     if (!s.pending && askLegendRule(s)) return;
+    // Which replacement of a game loss applies, when there are several (CR 616.1).
+    if (!s.pending && askLoseReplacement(s)) return;
     let changed = auras === "moved";
     for (const p of s.players) {
       if (p.lost) continue;
-      if (p.life <= 0 && !zeroLifeOk(s, p.id)) changed = playerLoses(s, p.id, "life total reached 0") || changed; // 704.5a
-      else if (p.drewFromEmptyLibrary) changed = playerLoses(s, p.id, "drew from an empty library") || changed; // 704.5b
-      else if ((p.poison ?? 0) >= 10) changed = playerLoses(s, p.id, "ten poison counters") || changed; // 704.5c
-      else {
-        const fatal = Object.entries(p.commanderDamage).find(([, n]) => n >= COMMANDER_DAMAGE_LIMIT);
-        if (fatal) changed = playerLoses(s, p.id, `took 21 combat damage from ${nameOf(s, fatal[0])}`) || changed; // 704.5u
-      }
-      // 704.5b is about draws since state-based actions were last checked: one that didn't lose (Platinum Angel) is past.
-      if (!p.lost) p.drewFromEmptyLibrary = false;
+      // 704.5a, 704.5b, 704.5c, 704.5u, in that order; or a loss an effect caused that waited for a replacement choice.
+      const reason = lossReasonNow(s, p);
+      // 704.5b is about draws since state-based actions were last checked: one that didn't lose (Platinum Angel) is past,
+      // and draws a replacement makes now (Stunning Reversal) count at the next check (rulings).
+      p.drewFromEmptyLibrary = false;
+      if (reason) changed = playerLoses(s, p.id, reason, false, true) || changed;
     }
+    s.loseChoice = undefined;
     // Start your engines!: a player with no speed who controls a permanent with it gets speed 1 (704.5aa).
     for (const p of s.players)
       if (!p.lost && p.speed === undefined && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === p.id && abilitiesOf(s, obj(s, id)).startYourEngines)) {
@@ -13763,20 +13810,104 @@ export function drawGame(s: GameState, reason: string) {
   log(s, `The game is a draw (${reason}).`);
 }
 
-/** `conceded`: leaving the game this way can't be stopped (CR 104.3a; rulings on Platinum Angel). */
-export function playerLoses(s: GameState, pid: PlayerId, reason: string, conceded = false): boolean {
+/** A replacement of `pid`'s game loss (CR 614.1a): `key` is the chooseOption answer, "loseReplacement". */
+type LoseOption = { key: string; label: string; life: number; id?: ObjectId; /** It stays, to die as the same state-based actions are performed. */ graveyard?: true; reversal?: number };
+
+/**
+ * Whether a permanent dies as the state-based actions now being performed are (CR 704.5f-h): zero toughness, lethal or
+ * deathtouch damage and not indestructible.
+ */
+function diesThisCheck(s: GameState, o: GameObject): boolean {
+  if (!objIsType(s, o, "Creature")) return false;
+  if (toughness(s, o) <= 0) return true;
+  return ((o.damage > 0 && lethalLeft(s, o) === 0) || !!o.deathtouchDamage) && !objHasKeyword(s, o, "Indestructible");
+}
+
+/**
+ * The replacements that could apply to `pid` losing the game, one option each (CR 616.1: the player chooses one): each
+ * permanent they control with "If you would lose the game, instead exile ~ and your life total becomes ..." (The Golden
+ * Throne, Exquisite Archangel), and the oldest of their Stunning Reversal shields this turn (all alike). In the
+ * state-based actions (`sba`), such a permanent that dies in the same check may go to the graveyard instead of exile,
+ * its controller's choice, and the life total still changes (Exquisite Archangel rulings).
+ */
+export function loseReplacements(s: GameState, pid: PlayerId, sba = false): LoseOption[] {
+  const p = player(s, pid);
+  const out: LoseOption[] = [];
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const how = controllerOf(s, o) === pid ? abilitiesOf(s, o).loseGameExileSelf : undefined;
+    if (!how) continue;
+    const life = how === "startingLife" ? STARTING_LIFE : 1;
+    out.push({ key: id, id, life, label: `Exile ${nameOf(s, id)}: your life total becomes ${life}` });
+    if (sba && diesThisCheck(s, o)) out.push({ key: `${id}:graveyard`, id, life, graveyard: true, label: `Put ${nameOf(s, id)} into your graveyard (it dies): your life total becomes ${life}` });
+  }
+  const i = (p.loseInstead ?? []).findIndex((x) => x.turn === s.turn);
+  if (i >= 0) out.push({ key: `reversal:${i}`, reversal: i, life: 1, label: `${p.loseInstead![i]!.source}: draw seven cards and your life total becomes 1` });
+  return out;
+}
+
+/** The reason `pid` loses the game in this check of the state-based actions (CR 704.5a-c, 704.5u), or a loss waiting on a replacement choice. */
+function lossReasonNow(s: GameState, p: Player): string | undefined {
+  if (p.life <= 0 && !zeroLifeOk(s, p.id)) return "life total reached 0";
+  if (p.drewFromEmptyLibrary) return "drew from an empty library";
+  if ((p.poison ?? 0) >= 10) return "ten poison counters";
+  const fatal = Object.entries(p.commanderDamage).find(([, n]) => n >= COMMANDER_DAMAGE_LIMIT);
+  if (fatal) return `took 21 combat damage from ${nameOf(s, fatal[0])}`;
+  return p.loseDeferred;
+}
+
+/** Ask a player who would lose the game now which of several replacements applies (CR 616.1), before the state-based actions are performed. */
+function askLoseReplacement(s: GameState): boolean {
+  for (const p of s.players) {
+    if (p.lost || s.loseChoice?.player === p.id) continue;
+    const reason = lossReasonNow(s, p);
+    if (!reason || gameEndBlocked(s, p.id, "lose")) continue;
+    const opts = loseReplacements(s, p.id, true);
+    if (opts.length < 2) continue;
+    s.pending = { kind: "chooseOption", player: p.id, source: "Losing the game", what: "loseReplacement", options: opts.map((o) => o.key), labels: opts.map((o) => o.label), prompt: `you would lose the game (${reason}). Which replacement applies?` };
+    return true;
+  }
+  return false;
+}
+
+/**
+ * `conceded`: leaving the game this way can't be stopped (CR 104.3a; rulings on Platinum Angel). `sba`: a loss as the
+ * state-based actions are performed (CR 704.5), whose replacement choice was asked first (askLoseReplacement).
+ */
+export function playerLoses(s: GameState, pid: PlayerId, reason: string, conceded = false, sba = false): boolean {
   const p = player(s, pid);
   if (p.lost) return false;
+  p.loseDeferred = undefined;
   if (!conceded && gameEndBlocked(s, pid, "lose")) return false;
-  // The Golden Throne: "If you would lose the game, instead exile ~ and your life total becomes 1" (CR 614.1a). Several:
-  // one applies, its controller's choice, and they're all the same (CR 616.1). The life it takes is gained or lost
-  // (CR 119.5), so a player who can't might still be at 0 and lose at the next check (rulings).
-  const throne = conceded ? undefined : s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).loseGameExileSelf);
-  if (throne) {
-    log(s, `${p.name} would lose the game (${reason}), but exiles ${nameOf(s, throne)} instead and their life total becomes 1.`);
-    moveObject(s, throne, "exile");
-    if (p.life < 1 && canGainLife(s, pid)) gainLife(s, pid, 1 - p.life);
-    else if (p.life > 1 && canLoseLife(s, pid)) loseLife(s, pid, p.life - 1);
+  // A replacement of losing (CR 614.1a): The Golden Throne, Exquisite Archangel, Stunning Reversal. With several, the
+  // player chooses one (CR 616.1); one replaces however many reasons this check has (rulings on Lich's Mirror). A loss an
+  // effect causes with several waits for that choice until the state-based actions are next performed. The life is
+  // gained or lost (CR 119.5), so a player who can't might still be at 0 and lose at the next check (rulings).
+  const opts = conceded ? [] : loseReplacements(s, pid, sba);
+  const chosen = s.loseChoice?.player === pid ? s.loseChoice.choice : undefined;
+  if (s.loseChoice?.player === pid) s.loseChoice = undefined;
+  const pick = opts.length === 1 ? opts[0] : opts.find((o) => o.key === chosen);
+  if (opts.length > 1 && !pick) {
+    // Asked at the next pass of these state-based actions, or as they're next performed.
+    p.loseDeferred = reason;
+    return sba && !s.pending;
+  }
+  if (pick) {
+    const src = pick.reversal !== undefined ? p.loseInstead![pick.reversal]!.source : nameOf(s, pick.id!);
+    if (pick.reversal !== undefined) {
+      // Stunning Reversal: one shield used up; the seven draws, then the life total (with fewer than seven cards, the
+      // player loses at the next check, rulings). A draw that pauses for a replacement choice finishes after it.
+      p.loseInstead = p.loseInstead!.filter((_, i) => i !== pick.reversal);
+      if (!p.loseInstead.length) p.loseInstead = undefined;
+      log(s, `${p.name} would lose the game (${reason}), but draws seven cards instead and their life total becomes 1 (${src}).`);
+      draw(s, pid, 7);
+    } else if (pick.graveyard) log(s, `${p.name} would lose the game (${reason}), but their life total becomes ${pick.life} instead (${src}, which goes to the graveyard).`);
+    else {
+      log(s, `${p.name} would lose the game (${reason}), but exiles ${src} instead and their life total becomes ${pick.life}.`);
+      moveObject(s, pick.id!, "exile");
+    }
+    if (p.life < pick.life && canGainLife(s, pid)) gainLife(s, pid, pick.life - p.life);
+    else if (p.life > pick.life && canLoseLife(s, pid)) loseLife(s, pid, p.life - pick.life);
     invalidateCharacteristics(s);
     return true;
   }

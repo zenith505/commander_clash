@@ -3525,6 +3525,11 @@ export function compile(d: CardDef): CompiledCard {
       out.drawMaySkip = true;
       continue;
     }
+    // Island Sanctuary (CR 614.1a): only draws during its controller's own draw step.
+    if (line === "If you would draw a card during your draw step, instead you may skip that draw. If you do, until your next turn, you can't be attacked except by creatures with flying and/or islandwalk.") {
+      out.drawStepMaySkip = { attackOnlyBy: ["Flying", "Islandwalk"] };
+      continue;
+    }
     const mayCounter = new RegExp(`^If you would draw a card, you may put an? ${COUNTER} counter on ~ instead\\.$`).exec(line);
     if (mayCounter) {
       out.drawMayCounter = counterKind(mayCounter[1]!);
@@ -4111,6 +4116,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "If you would lose the game, instead exile ~ and your life total becomes 1.") {
       out.loseGameExileSelf = true;
+      continue;
+    }
+    // Exquisite Archangel: the same, with your starting life total (CR 103.4, 903.7: 40).
+    if (line === "If you would lose the game, instead exile ~ and your life total becomes equal to your starting life total.") {
+      out.loseGameExileSelf = "startingLife";
       continue;
     }
     // Gideon of the Trials' emblem: "As long as you control a Gideon planeswalker, you can't lose the game and your
@@ -5432,6 +5442,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Each opponent who attacked with a creature this turn can't cast spells.") {
       out.opponentsWhoAttackedCantCast = true;
+      continue;
+    }
+    // Sandswirl Wanderglyph: who they attacked earlier in the turn counts, even before it was there (rulings).
+    if (line === "Each opponent who attacked you or a planeswalker you control this turn can't cast spells.") {
+      out.opponentsWhoAttackedYouCantCast = true;
       continue;
     }
     if (line === "As long as ~ is attacking, defending player can't cast spells.") {

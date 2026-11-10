@@ -3084,6 +3084,8 @@ export interface Resolving {
     faceDownBottom?: ObjectId[];
     /** moveLinked with `one`: the card is being chosen. */
     linkedPick?: true;
+    /** The Grim Captain: the linked card picked (moveLinked `one`), kept while what it attacks is chosen. */
+    linkedTaken?: ObjectId[];
     /** Phyrexian Grimoire: the opponent's pick of the top two cards has been asked (answer in `found`). */
     yardSplit?: true;
     linkedCopyPick?: true;

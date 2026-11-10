@@ -685,6 +685,54 @@ export function parseCostKeyword(
   // aren't modeled.
   if ((m = /^Craft with (.+?) ((?:\{[^}]+\})+)$/.exec(line))) {
     const cost = m[2]!;
+    const craftAbility = (c: Extract<AdditionalCost, { kind: "craft" }>): { activated: ActivatedAbility } => ({
+      activated: {
+        manaCost: cost,
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: true,
+        exileSelf: true,
+        keyword: "Craft",
+        costs: [c],
+        body: {
+          targets: [],
+          effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard", exiledAsCost: true }, transformed: true, owner: true, linkCostExiled: true }],
+          text: "Return ~ to the battlefield transformed under its owner's control.",
+        },
+        text: `Craft with ${m![1]} ${cost}`,
+      },
+    });
+    // "Craft with one or more creatures" (Altar of the Wretched), "one or more Dinosaurs" (Saheeli's Lattice): that many or
+    // more, any mix of permanents and graveyard cards (CR 702.167a-b). "Craft with one or more" alone (Sunbird Standard):
+    // any other permanents you control and/or cards in your graveyard (its reminder text). "Four or more red instant
+    // and/or sorcery cards" (Ore-Rich Stalactite): the word "card" makes them cards in your graveyard only (CR 702.167b is
+    // for a type without "card"; 109.2).
+    const more = /^(one|two|three|four|five|six) or more(?: (.+))?$/.exec(m[1]!);
+    if (more) {
+      if (!plainMana(cost)) return "fail";
+      const n = num(more[1]!);
+      if (more[2] === undefined) return craftAbility({ kind: "craft", n, orMore: true, filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanents and/or cards" } });
+      const cards = /^(?:(white|blue|black|red|green) )?(\w+) and\/or (\w+) cards$/.exec(more[2]);
+      if (cards) {
+        const filter = parseSearchFilter(`${cards[1] ? `${cards[1]} ` : ""}${cards[2]} or ${cards[3]} card`);
+        if (filter?.kind !== "card" || filter.types?.length !== 2) return "fail";
+        return craftAbility({ kind: "craft", n, orMore: true, cardsOnly: true, filter: { ...filter, text: more[2] } });
+      }
+      if (!/^[A-Za-z]+s$/.test(more[2])) return "fail";
+      const filter = pickFilter(singular(more[2]));
+      if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.length || filter.subtypes?.length)) return "fail";
+      return craftAbility({ kind: "craft", n, orMore: true, filter: { ...filter, text: more[2] } });
+    }
+    // "Craft with a Dinosaur, a Merfolk, a Pirate, and a Vampire" (Throne of the Grim Captain): one object for each, four
+    // separate objects (rulings: one changeling isn't enough).
+    const list = /^an? ([A-Z][a-z]+), an? ([A-Z][a-z]+), an? ([A-Z][a-z]+), and an? ([A-Z][a-z]+)$/.exec(m[1]!);
+    if (list) {
+      if (!plainMana(cost)) return "fail";
+      const slots = list.slice(1, 5).map((w) => pickFilter(w!));
+      if (slots.some((f) => !f || f.kind !== "object" || f.controller || f.types?.length || f.subtypes?.length !== 1)) return "fail";
+      const subtypes = slots.map((f) => f!.subtypes![0]!);
+      return craftAbility({ kind: "craft", n: 4, slots: slots.map((f) => ({ ...f!, text: f!.subtypes![0]! })), filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes, text: `${subtypes.slice(0, -1).join(", ")} and ${subtypes[subtypes.length - 1]}` } });
+    }
     const mat = /^(?:(two|three|four|five|six) )?([A-Za-z]+)$/.exec(m[1]!);
     if (!plainMana(cost) || !mat) return "fail";
     const n = mat[1] ? num(mat[1]) : 1;

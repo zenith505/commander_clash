@@ -167,6 +167,8 @@ import {
   counterCostCandidates,
   counterCostKinds,
   craftCandidates,
+  craftSlotsFit,
+  craftWhat,
   ringBearer,
   power,
   toughness,
@@ -492,6 +494,8 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; fac
   exile?: true;
   /** Night Soil: "from a single graveyard": the cards picked all have the same owner. */
   singleYard?: true;
+  /** Throne of the Grim Captain: one of the picks for each of the craft cost's slots (craftSlotsFit). */
+  craftSlots?: Extract<AdditionalCost, { kind: "craft" }>;
   what: string;
   n: number;
   candidates: string[];
@@ -856,8 +860,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (c.kind === "craft") {
         // Craft's materials (CR 702.167a): click permanents you control and/or cards in your graveyard that fit.
         if (d.craft !== undefined) continue;
-        const what = c.n === 1 ? `${/^[aeiou]/i.test(c.filter.text) ? "an" : "a"} ${c.filter.text}` : `${c.n} ${c.filter.text}`;
-        return setCostPick({ activate: d, kind: "craft", label: cardOf(s, d.objectId).name, what: `craft: exile ${what} you control or from your graveyard`, n: c.n, candidates: craftCandidates(s, HUMAN, s.objects[d.objectId]!, c), chosen: [] });
+        // "One or more" (CR 702.167a): any number from `n` up, so every candidate may be picked.
+        const candidates = craftCandidates(s, HUMAN, s.objects[d.objectId]!, c);
+        return setCostPick({ activate: d, kind: "craft", label: cardOf(s, d.objectId).name, what: `craft: exile ${craftWhat(c)} ${c.cardsOnly ? "from your graveyard" : "you control or from your graveyard"}`, n: c.orMore ? Math.max(c.n, candidates.length) : c.n, ...(c.orMore ? { min: c.n } : {}), ...(c.slots ? { craftSlots: c } : {}), candidates, chosen: [] });
       }
       if (c.kind === "removeCounters") {
         // "Remove three counters from among other artifacts, creatures, and planeswalkers you control": pick them (CR 602.2b).
@@ -2180,7 +2185,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               n={costPick.n}
               {...(costPick.min !== undefined ? { min: costPick.min } : {})}
               owners={!!costPick.singleYard}
-              valid={(!costPick.oneOf || costPick.chosen.some((id) => printedMatches(costPick.oneOf!, cardOf(s, id)))) && (!costPick.differentNames || namesDiffer(s, costPick.chosen)) && (!costPick.sameName || costPick.chosen.every((id) => sameName(cardOf(s, id).name, cardOf(s, costPick.chosen[0]!).name))) && (!costPick.share || costChoiceShares(s, costPick.share, costPick.chosen)) && (!costPick.singleYard || costPick.chosen.every((id) => s.objects[id]!.owner === s.objects[costPick.chosen[0]!]!.owner))}
+              valid={(!costPick.oneOf || costPick.chosen.some((id) => printedMatches(costPick.oneOf!, cardOf(s, id)))) && (!costPick.differentNames || namesDiffer(s, costPick.chosen)) && (!costPick.sameName || costPick.chosen.every((id) => sameName(cardOf(s, id).name, cardOf(s, costPick.chosen[0]!).name))) && (!costPick.share || costChoiceShares(s, costPick.share, costPick.chosen)) && (!costPick.singleYard || costPick.chosen.every((id) => s.objects[id]!.owner === s.objects[costPick.chosen[0]!]!.owner)) && (!costPick.craftSlots || craftSlotsFit(s, HUMAN, costPick.craftSlots, costPick.chosen))}
               onHover={setHover}
               onToggle={(id) =>
                 setCostPick({ ...costPick, chosen: costPick.chosen.includes(id) ? costPick.chosen.filter((x) => x !== id) : [...costPick.chosen, id].slice(-costPick.n) })

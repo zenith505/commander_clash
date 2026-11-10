@@ -1,14 +1,16 @@
-// Round 333's sentences, triggers and whole texts, read before round 332's (round332Sentence, round332Trigger and
-// round332WholeText in oracle/round332.ts).
+// Round 333's sentences, triggers and whole texts (after round 334's sentences, oracle/round334.ts), read before
+// round 332's (round332Sentence, round332Trigger and round332WholeText in oracle/round332.ts).
 import type { AbilityBody, Effect, TriggeredAbility } from "../abilities";
 import type { Ctx } from "./body";
 import { parseTargetPhrase } from "./targets";
+import { round334Sentence } from "./round334";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 export function round333Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void sentences;
-  void effects;
+  // Round 334's sentences first (oracle/round334.ts).
+  const r334 = round334Sentence(s, sentences, si, ctx, effects);
+  if (r334 !== null) return r334;
   // Zevlor, Elturel Exile: "When you next cast an instant or sorcery spell that targets only a single opponent or a single
   // permanent an opponent controls this turn, for each other opponent, choose that player or a permanent they control, copy
   // that spell, and the copy targets the chosen player or permanent.": a delayed trigger (CR 603.7), used up by the first

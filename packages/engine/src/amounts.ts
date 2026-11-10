@@ -358,6 +358,15 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.ever) return linked.length;
       // Keen-Eyed Curator: the card types among them (CR 205.2a: `types` has no supertypes or subtypes), the cards' own in exile; a
       // face-down card has none (CR 708.2a).
+      // Sunbird Effigy: the colors among them, as cards in exile (CR 105.2).
+      if (c.colors) {
+        const colors = new Set<string>();
+        for (const l of linked) {
+          const o = s.objects[l.id];
+          if (o?.zone === "exile" && (o.zoneChanges ?? 0) === l.zc && !o.faceDown) for (const x of characteristics(s, o).colors) colors.add(x);
+        }
+        return colors.size;
+      }
       if (c.cardTypes) {
         const types = new Set<string>();
         for (const l of linked) {
@@ -1509,7 +1518,7 @@ function describeCount(c: Count): string {
     case "countersRemovedThisWay":
       return "#counters removed";
     case "linkedExiled":
-      return c.cardTypes ? "#card types among cards exiled with it" : "#cards exiled with it";
+      return c.colors ? "#colors among the exiled cards used to craft it" : c.cardTypes ? "#card types among cards exiled with it" : "#cards exiled with it";
     case "linkedExiledPT":
       return `the exiled creature card's ${c.stat}`;
     case "linkedExiledMv":

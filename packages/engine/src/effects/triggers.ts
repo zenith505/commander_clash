@@ -222,7 +222,7 @@ export type TriggerSourceEvent =
   | { type: "phases"; ids: ObjectId[]; how: "in" | "out" }
   /** A crew ability of this Vehicle resolved (CR 702.122e). */
   | { type: "crewed"; id: ObjectId; /** Its first time this turn (TurnLog.timesCrewed). */ first?: true; /** How many creatures were tapped for the crew cost of the ability that crewed it. */ by?: number }
-  | { type: "crews"; id: ObjectId; vehicle: ObjectId }
+  | { type: "crews"; id: ObjectId; vehicle: ObjectId; /** It saddled a Mount (CR 702.171c) rather than crewing a Vehicle. */ saddle?: true }
   /** A permanent explored (CR 701.44b), `controller` controlling it then or as it last existed (701.44c). */
   | { type: "connived"; id: ObjectId; controller: PlayerId }
   /** It became renowned (CR 702.112b). */
@@ -472,7 +472,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   // The Traps look back at what entered this turn, as it entered (after "as it enters" choices, CR 614.12).
   if (ev.type === "enters" && s.objects[ev.id]) {
     const c = characteristics(s, s.objects[ev.id]!);
-    ((s.turnLog ??= {}).entered ??= []).push({ controller: c.controller, types: [...c.types], subtypes: [...c.subtypes], colors: [...c.colors], id: ev.id, zc: s.objects[ev.id]!.zoneChanges ?? 0, ...(s.objects[ev.id]!.isToken ? { token: true as const } : {}), ...(c.keywords.some((k) => k.toLowerCase() === "flying") ? { flying: true as const } : {}), ...(c.allCreatureTypes ? { allCreatureTypes: true as const } : {}) });
+    ((s.turnLog ??= {}).entered ??= []).push({ controller: c.controller, types: [...c.types], subtypes: [...c.subtypes], colors: [...c.colors], id: ev.id, zc: s.objects[ev.id]!.zoneChanges ?? 0, ...(s.objects[ev.id]!.faceDown ? { faceDown: true as const } : {}), ...(s.objects[ev.id]!.isToken ? { token: true as const } : {}), ...(c.keywords.some((k) => k.toLowerCase() === "flying") ? { flying: true as const } : {}), ...(c.allCreatureTypes ? { allCreatureTypes: true as const } : {}) });
   }
   // While set, `add` is looking at an Aura's or Equipment's abilities about this creature it's attached to.
   let hosting: GameObject | null = null;
@@ -1530,7 +1530,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever ~ crews a Vehicle" (CR 702.122d): the creature tapped for the cost, "that Vehicle" the one it crewed.
     const o = s.objects[ev.id];
     const vehicle = s.objects[ev.vehicle];
-    if (o?.zone === "battlefield" && vehicle) add(o, controllerOf(s, o), (e) => e === "selfCrewsVehicle", undefined, undefined, vehicle);
+    // Reckless Velocitaur: "saddles a Mount or crews a Vehicle during your main phase": saddling too, only in a main phase
+    // of its controller's turn (CR 505.1).
+    const inYourMain = (pid: PlayerId) => s.activePlayer === pid && (s.step === "main1" || s.step === "main2");
+    if (o?.zone === "battlefield" && vehicle) add(o, controllerOf(s, o), (e, t) => e === "selfCrewsVehicle" && (!ev.saddle || !!t.orSaddles) && (!t.yourMainPhase || inYourMain(controllerOf(s, o))), undefined, undefined, vehicle);
   } else if (ev.type === "phases") {
     for (const id of ev.ids) {
       const o = obj(s, id);
@@ -2292,6 +2295,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Its caster's spells this turn, this one included (it was counted as it was cast).
         if (t.cast.notFirst && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, s.cards[c.card]!)))).length < 2) return false;
         if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, s.cards[c.card]!)))).length !== t.cast.nth) return false;
+        // Nullstone Gargoyle: "the first noncreature spell of a turn", by any player (its card types as each was cast).
+        if (t.cast.nth && t.cast.ofTurn && (ev.copy || (s.castThisTurn ?? []).filter((c) => !!s.cards[c.card] && (c.types ? printedMatches(t.cast!.spell, { ...s.cards[c.card]!, types: c.types }) : printedMatches(t.cast!.spell, s.cards[c.card]!))).length !== t.cast.nth)) return false;
         // Alania: the first spell of one of these kinds its caster has cast this turn, this one (a copy wasn't cast).
         if (t.cast.firstOfKinds) {
           const mine = (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && !!s.cards[c.card]);

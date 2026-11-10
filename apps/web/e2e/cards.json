@@ -13182,6 +13182,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "27065d34-b22a-47af-aea2-980f47bafcea",
+  "name": "Glimpse the Cosmos",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at the top three cards of your library. Put one of them into your hand and the rest on the bottom of your library in any order.\nAs long as you control a Giant, you may cast this card from your graveyard by paying {U} rather than paying its mana cost. If you cast this card this way and it would be put into your graveyard, exile it instead.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "549e6de7-56e9-4f5c-8c88-30e446bc53bb",
   "name": "Glittering Lion",
   "manaCost": "{2}{W}",
@@ -17650,6 +17676,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "76c036df-44f5-4021-b7fc-656147351341",
+  "name": "Key to the Side-Door",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}, {T}: Target creature can't be blocked this turn.\n{1}, {T}, Discard a legendary card with the same name as a legendary permanent you control: Draw two cards.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "hob",
+  "releasedAt": "2026-08-14",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b96b1341-0c15-4816-be2d-5cc98b2afb63",
   "name": "Khorvath Brightflame",
   "manaCost": "{5}{R}",
@@ -19145,6 +19193,37 @@
   "commanderLegal": "legal",
   "set": "dmu",
   "releasedAt": "2022-09-09",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f3ad60a6-05d0-48a1-a804-7900d306d613",
+  "name": "Liliana, the Necromancer",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Planeswalker — Liliana",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Liliana"
+  ],
+  "oracleText": "+1: Target player loses 2 life.\n−1: Return target creature card from your graveyard to your hand.\n−7: Destroy up to two target creatures. Put up to two creature cards from graveyards onto the battlefield under your control.",
+  "loyalty": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m19",
+  "releasedAt": "2018-07-13",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
@@ -24683,6 +24762,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c5866507-ef3b-446a-99ea-d31d974bdb01",
+  "name": "Predatory Focus",
+  "manaCost": "{3}{G}{G}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "You may have creatures you control assign their combat damage this turn as though they weren't blocked.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "gpt",
+  "releasedAt": "2006-02-03",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ac641490-ca14-48d7-8cc4-b69ce984befa",
   "name": "Preordain",
   "manaCost": "{U}",
@@ -29332,6 +29437,36 @@
   "commanderLegal": "legal",
   "set": "m3c",
   "releasedAt": "2024-06-14",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a03a9ddb-595a-4dff-b7cb-7ad60655f1ee",
+  "name": "Skyblade's Boon",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature gets +1/+1 and has flying.\n{2}{W}: Return Skyblade's Boon to its owner's hand. Activate only if Skyblade's Boon is on the battlefield or in your graveyard.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh2",
+  "releasedAt": "2021-06-18",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

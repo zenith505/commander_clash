@@ -874,6 +874,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max) && (cond.moreThan === undefined || n > evalAmount(s, cond.moreThan, ctx)) && (cond.parity === undefined || Math.abs(n % 2) === (cond.parity === "odd" ? 1 : 0));
     }
     case "eventPlayerAttackedYou": {
+      // Avenge: "if a player attacked you during their last turn": any player still in the game, each in their own most
+      // recent turn (this one if it's theirs).
+      if (cond.anyPlayer)
+        return s.players.some((p) => p.id !== you && !p.lost && ((last) => last !== undefined && p.attackedInTurn?.turn === last && p.attackedInTurn.players.includes(you))(s.activePlayer === p.id ? p.lastTurnBegan : p.turnBegan));
       // O-Kagachi: the trigger's player attacked you during their most recent turn (this one if it's theirs).
       const p = eventPlayer !== undefined ? s.players[eventPlayer] : undefined;
       const last = p && (s.activePlayer === eventPlayer ? p.lastTurnBegan : p.turnBegan);
@@ -1132,7 +1136,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // A creature type as it entered, a changeling having all of them (CR 702.73a; Nimble Trapfinder's rulings: as it entered).
       const has = (e: { subtypes?: string[]; allCreatureTypes?: true }, t: string) => !!e.subtypes?.includes(t) || (!!e.allCreatureTypes && CREATURE_TYPES.has(t));
       if (cond.lastTurn) return (s.lastTurn?.creaturesEntered ?? []).filter((e) => e.controller === you && !(cond.other && e.id === sourceId && e.zc === selfZc)).length >= cond.n;
-      return (s.turnLog?.entered ?? []).filter((e) => e.controller === you && !(cond.other && e.id === sourceId && e.zc === selfZc) && cond.types.every((ty) => e.types.includes(ty)) && !cond.notTypes?.some((ty) => e.types.includes(ty)) && (!cond.flying || !!e.flying) && (!cond.subtype || has(e, cond.subtype) || (!!cond.orSubtype && has(e, cond.orSubtype))) && (!cond.anySubtype || cond.anySubtype.some((t) => has(e, t)))).length >= cond.n;
+      return (s.turnLog?.entered ?? []).filter((e) => e.controller === you && !(cond.other && e.id === sourceId && e.zc === selfZc) && cond.types.every((ty) => e.types.includes(ty)) && !cond.notTypes?.some((ty) => e.types.includes(ty)) && (!cond.flying || !!e.flying) && (!cond.faceDown || !!e.faceDown) && (!cond.subtype || has(e, cond.subtype) || (!!cond.orSubtype && has(e, cond.orSubtype))) && (!cond.anySubtype || cond.anySubtype.some((t) => has(e, t)))).length >= cond.n;
     }
     case "destroyedByOpponent":
       return (s.turnLog?.destroyed ?? []).some((e) => e.controller === you && e.by !== you);

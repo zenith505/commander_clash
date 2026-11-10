@@ -153,6 +153,13 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const types = (ctx.sacrificed?.[0] ?? r.sacrificedThisWay?.at(-1))?.types ?? [];
     e = { ...e, filter: { ...e.filter, sharesTypeWithSacrificed: undefined, types: types.length ? [...types] : ["(none)"] } };
   }
+  // Saw: "a permanent other than that creature or ~": not the trigger's subject while it's still that object (CR 400.7).
+  if (e.filter.notSubject) {
+    const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+    const here = o?.zone === "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc;
+    const { notSubject: _, ...rest } = e.filter;
+    e = { ...e, filter: { ...rest, ...(here ? { notId: o!.id } : {}) } };
+  }
   const sc = (r.scratch ??= {});
   let who = players(s, e.who, ctx);
   // Each player's own number when it's "half the creatures they control" (CR 107.1a), all worked out before anyone picks.
@@ -3335,21 +3342,32 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (!sc.found) {
           const cards = yards();
           if (!cards.length) return;
-          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: e.filter?.text ? `a ${e.filter.text}` : "a card", cards, min: e.upTo ? 0 : 1, max: 1, fromGraveyard: toField ? "battlefield" : "exile", anyGraveyard: true, ...(cards.some((id) => obj(s, id).zone === "exile") ? { exiled: true as const } : {}) };
+          // Liliana, the Necromancer: "Put up to two creature cards from graveyards onto the battlefield under your control":
+          // up to that many, from one graveyard or several.
+          const most = Math.min(e.n, cards.length);
+          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: e.n > 1 ? `${e.upTo ? "up to " : ""}${e.n} ${e.filter?.text ?? "card"}s` : e.filter?.text ? `a ${e.filter.text}` : "a card", cards, min: e.upTo ? 0 : most, max: most, fromGraveyard: toField ? "battlefield" : "exile", anyGraveyard: true, ...(cards.some((id) => obj(s, id).zone === "exile") ? { exiled: true as const } : {}) };
           return "paused";
         }
-        const found = sc.found.filter((id) => yards().includes(id));
+        const found = sc.found.filter((id) => yards().includes(id)).slice(0, e.n);
         sc.found = undefined;
         // "When that creature dies, ..." (The Deck of Many Things): the permanent it became (CR 400.7).
         if (toField && s.resolving) s.resolving.created = [];
+        if (toField) {
+          // Several enter at once (CR 614.12, 603.6a: each sees the others enter).
+          const putAll = () => {
+            for (const id of found) {
+              const o = obj(s, id);
+              log(s, `${player(s, ctx.controller).name} puts ${defOf(s, o).name} from ${o.zone === "exile" ? "exile" : `${o.owner === ctx.controller ? "their" : `${player(s, o.owner).name}'s`} graveyard`} onto the battlefield.`);
+              moveObject(s, id, "battlefield", { controller: ctx.controller, ...(e.tapped ? { tapped: true } : {}), ...(e.alsoMods ? { entersAs: e.alsoMods, entersAsBy: { controller: ctx.controller, source: src } } : {}) }); // CR 614.12
+              if (o.zone === "battlefield" && s.resolving) s.resolving.created!.push(id);
+            }
+          };
+          if (found.length > 1) enterTogether(s, putAll);
+          else putAll();
+          return;
+        }
         for (const id of found) {
           const o = obj(s, id);
-          if (toField) {
-            log(s, `${player(s, ctx.controller).name} puts ${defOf(s, o).name} from ${o.zone === "exile" ? "exile" : `${o.owner === ctx.controller ? "their" : `${player(s, o.owner).name}'s`} graveyard`} onto the battlefield.`);
-            moveObject(s, id, "battlefield", { controller: ctx.controller, ...(e.tapped ? { tapped: true } : {}), ...(e.alsoMods ? { entersAs: e.alsoMods, entersAsBy: { controller: ctx.controller, source: src } } : {}) }); // CR 614.12
-            if (o.zone === "battlefield" && s.resolving) s.resolving.created!.push(id);
-            continue;
-          }
           log(s, `${player(s, ctx.controller).name} exiles ${defOf(s, o).name} from ${o.owner === ctx.controller ? "their" : `${player(s, o.owner).name}'s`} graveyard.`);
           moveObject(s, id, "exile");
           if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: obj(s, id).zoneChanges ?? 0 });

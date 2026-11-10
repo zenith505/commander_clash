@@ -487,6 +487,8 @@ export interface GameObject {
     cost?: string;
     /** "A spell cast this way costs {2} more to cast" (Soul Partition, Elite Spellbinder). */
     more?: number;
+    /** Mavinda, Students' Advocate: "If that spell doesn't target a creature you control, it costs {8} more to cast this way" (a graveyard permission; CastFromGraveyard.moreUnlessTargets). */
+    moreUnlessTargets?: { n: number; filter: TargetSpec };
     /** "You may play one of those cards" (Nashi): the cards of one group, of which only one may be played (GameState.oneOfUsed). */
     oneOf?: string;
     /** With `oneOf`: "up to two of those cards" (March of Reckless Joy): this many of the group may be played. */
@@ -2393,6 +2395,8 @@ export interface MulliganState {
 /** A creature type and/or color chosen for an object or a resolving spell. */
 export interface Chosen {
   type?: string;
+  /** "Choose a planeswalker type" (Leori, Sparktouched Hunter, CR 205.3j). */
+  planeswalkerType?: string;
   color?: Color;
   /** "The basic land type of your choice" (Reef Shaman). */
   landType?: string;
@@ -3011,6 +3015,10 @@ export interface Resolving {
     /** returnHeld paused for an Aura's host: the cards it returns. */
     returningHeld?: { id: ObjectId; zc: number }[];
     playLinked?: true; // "you may play the exiled card" (or cast the cipher copy) was asked
+    /** Guile: the spells exiled instead of countered, each card its controller may cast now (counterOnStack in run-spells.ts). */
+    guileCasts?: { id: ObjectId; zc: number; player: PlayerId }[];
+    /** Guile: a counter effect over several spells already went through them, and only the casts are left. */
+    guileLoop?: true;
     playLinkedPick?: true;
     /** Fiery Gambit: the flips won so far in a run one may stop, and whether "flip again?" was asked. */
     flipRun?: { wins: number; asked?: true };

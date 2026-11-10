@@ -1,6 +1,7 @@
 import { ANY_COUNTER, isRealKicker, NON_AURA_ENCHANTMENT } from "../abilities";
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, PickAction, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
 import { compileCard, compileGranted } from "../oracle";
+import { PLANESWALKER_TYPES } from "../oracle/targets";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, printedManaAbilities, basicLandManaAbility, basePower, basePowerNow, baseToughness, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, toughness, wasCastThisTurn, withCastThisTurn } from "../cards";
 import { attackedDuringLastTurn, attackedPlaneswalker, creatureTypesOf, inCombatPhase, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
@@ -416,6 +417,7 @@ export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): Target
   if ((kind === "color" || kind === "notColor") && chosen?.color)
     return kind === "color" ? { ...rest, colors: [chosen.color] } : { ...rest, notColors: [...(rest.notColors ?? []), chosen.color] };
   if (kind === "colorsChosen" && chosen?.colors?.length) return { ...rest, colors: [...chosen.colors] };
+  if (kind === "planeswalkerType" && chosen?.planeswalkerType) return { ...rest, subtypes: [...(rest.subtypes ?? []), chosen.planeswalkerType] };
   if (kind === "landType" && chosen?.landType) return { ...rest, subtypes: [...(rest.subtypes ?? []), chosen.landType] };
   // Illusionary Terrain: "of the first chosen type", of the two basic land types chosen.
   if (kind === "landTypeAt" && chosen?.landTypes?.[rest.orderIndex ?? 0]) return (({ orderIndex: _, ...r }) => ({ ...r, subtypes: [...(r.subtypes ?? []), chosen.landTypes![rest.orderIndex ?? 0]!] }))(rest);
@@ -444,6 +446,7 @@ export function choiceOptions(what: ChoiceKind | EntersOption, except?: string):
   if (what === "direction") return ["left", "right"];
   if (what === "landOrNonland") return ["land", "nonland"];
   if (what === "typeOrder") return TYPE_ORDERS;
+  if (what === "planeswalkerType") return [...PLANESWALKER_TYPES].sort().filter((x) => x.toLowerCase() !== except?.toLowerCase());
   if (what === "riot") return [ENTERS_COUNTER, "Haste"];
   if (what === "unleash") return [ENTERS_COUNTER, "No counter"];
   const all = what === "color" || what === "colors" ? Object.values(COLOR_NAMES) : what === "basicLandType" ? ["Plains", "Island", "Swamp", "Mountain", "Forest"] : what === "landType" ? [...LAND_TYPE_LIST] : [...CREATURE_TYPES].sort();
@@ -453,6 +456,7 @@ export function choiceOptions(what: ChoiceKind | EntersOption, except?: string):
 /** Record a choice by name: a creature type, or a color ("Blue" is U). */
 export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice: string): Chosen {
   if (what === "creatureType") return { ...chosen, type: choice };
+  if (what === "planeswalkerType") return { ...chosen, planeswalkerType: choice };
   if (what === "basicLandType" || what === "landType") return { ...chosen, landType: choice };
   if (what === "keyword") return { ...chosen, keyword: choice };
   if (what === "cardType") return { ...chosen, cardType: choice };

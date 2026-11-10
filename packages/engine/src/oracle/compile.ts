@@ -5234,6 +5234,11 @@ export function compile(d: CardDef): CompiledCard {
       out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "modifyPT", power: { count: { kind: "linkedExiledPT", stat: "power" } }, toughness: { count: { kind: "linkedExiledPT", stat: "toughness" } } }], text: line });
       continue;
     }
+    // Guile (see CompiledCard.counterExilesFree; effects/run-spells.ts counterOnStack).
+    if (line === "If a spell or ability you control would counter a spell, instead exile that spell and you may play that card without paying its mana cost." && !isSpell) {
+      out.counterExilesFree = true;
+      continue;
+    }
     // Spider-Punk: "Spells and abilities can't be countered." (CR 101.2): any player's.
     if (line === "Spells and abilities can't be countered.") {
       (out.uncounterable ??= []).push({ filter: { kind: "spell", text: "spells" }, anyone: true });
@@ -7659,7 +7664,7 @@ function checkCastingLinks(out: CompiledCard) {
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
     // "Players who chose war": one of the words each player chose as it entered.
     if (o.chosen === "byPlayer" && !out.entersEachPlayerChooses?.includes(o.chosenWord as string)) bad = true;
-    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer" && o.chosen !== "byPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : o.chosen === "landOrNonland" ? needs.add("landOrNonland") : o.chosen === "landType" || o.chosen === "landTypeAt" ? needs.add("landType") : o.chosen === "typeOrder" ? needs.add("typeOrder") : needs.add("creatureType"));
+    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer" && o.chosen !== "byPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : o.chosen === "landOrNonland" ? needs.add("landOrNonland") : o.chosen === "landType" || o.chosen === "landTypeAt" ? needs.add("landType") : o.chosen === "typeOrder" ? needs.add("typeOrder") : o.chosen === "planeswalkerType" ? needs.add("planeswalkerType") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen === true)) needs.add("color");
     if (o.kind === "setColors" && o.chosen === "colors") needs.add("colors");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");

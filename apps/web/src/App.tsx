@@ -5544,7 +5544,8 @@ function Controls({
       </div>
     );
   }
-  if (pending?.kind === "chooseOption" && (pending.what === "copy" || pending.what === "copyOther") && pending.player === HUMAN)
+  // Sutured Ghoul, Living Lore, Frankenstein's Monster: a card of your graveyard to exile as it enters, one at a time.
+  if (pending?.kind === "chooseOption" && (pending.what === "copy" || pending.what === "copyOther" || pending.what === "exileFromYard") && pending.player === HUMAN)
     return (
       <div className="controls copy-pick">
         <span>
@@ -5553,8 +5554,8 @@ function Controls({
         {pending.options.map((o, i) => (
           <button
             key={o}
-            className={o === "none" ? "ghost" : ""}
-            onMouseEnter={() => o !== "none" && s.objects[o] && onHover(cardOf(s, o))}
+            className={o === "none" || o === "done" ? "ghost" : ""}
+            onMouseEnter={() => o !== "none" && o !== "done" && s.objects[o] && onHover(cardOf(s, o))}
             onMouseLeave={() => onHover(null)}
             onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}
           >

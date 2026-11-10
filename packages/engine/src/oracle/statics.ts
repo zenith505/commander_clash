@@ -2547,6 +2547,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   // Anti-Magic Aura, Consecrate Land: "can't be enchanted by other Auras": by any Aura but the one this effect is from (CR
   // 303.4); ones already attached go to the graveyard as it applies (704.5m, rulings).
   if (/^can't be enchanted by other Auras$/.test(rest)) return [{ kind: "cantBeEnchantedByOthers" }];
+  // Tetravus's Tetravites: "This token can't be enchanted": by any Aura (CR 303.4; ones attached go to the graveyard, 704.5m).
+  if (/^can't be enchanted$/.test(rest)) return [{ kind: "cantBeEnchanted" }];
   if (/^can't be turned face up$/.test(rest)) return [{ kind: "cantTurnFaceUp" }];
   // Alexios: "attacks each combat if able, can't be sacrificed, and can't attack its owner".
   if ((m = /^((?:attacks each combat if able|can't [^,]+)), ((?:attacks each combat if able|can't [^,]+)),? and (attacks each combat if able|can't [^,]+)$/.exec(rest))) {

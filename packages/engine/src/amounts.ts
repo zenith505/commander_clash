@@ -383,7 +383,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         const o = s.objects[l.id];
         if (!o || o.zone !== "exile" || (o.zoneChanges ?? 0) !== l.zc || o.faceDown) return n;
         const ch = characteristics(s, o);
-        return ch.types.includes("Creature") ? n + Math.max(0, ch[c.stat]) : n;
+        // A characteristic-defining ability of the card's own applies in exile (CR 604.3; rulings on Phyrexian Ingester and
+        // Sutured Ghoul: Dungrove Elder counts its owner's Forests there).
+        const v = exiledCardPT(s, o, c.stat, ctx.view);
+        return ch.types.includes("Creature") ? n + (c.signed ? v : Math.max(0, v)) : n;
       }, 0);
     }
     case "movedLinkedThisWay":
@@ -1797,4 +1800,18 @@ function manaCostKey(cost: string): string[] {
   const generic = syms.filter((x) => /^\d+$/.test(x));
   const total = generic.reduce((n, x) => n + Number(x), 0);
   return [`${generic.length ? total : ""}|${syms.filter((x) => !/^\d+$/.test(x)).sort().join(",")}`];
+}
+
+/**
+ * A card's power or toughness in exile, for "the exiled card's power" (Phyrexian Ingester, Sutured Ghoul): its printed
+ * number, or its characteristic-defining ability's (CR 604.3), counted with `view` while the layers are being applied.
+ */
+function exiledCardPT(s: GameState, o: GameObject, key: "power" | "toughness", view: AmountCtx["view"]): number {
+  const d = defOf(s, o);
+  const printed = d[key] ?? "0";
+  if (/^-?\d+$/.test(printed)) return Number.parseInt(printed, 10);
+  const cda = compileCard(d).statics.find((st) => st.affects.kind === "self" && !st.condition && st.mods.some((m) => m.kind === "definePT"));
+  const def = cda?.mods.find((m) => m.kind === "definePT");
+  const amount = def?.kind === "definePT" ? def[key] : undefined;
+  return amount === undefined ? 0 : evalAmount(s, amount, { controller: o.owner, sourceId: o.id, ...(view ? { view } : {}) });
 }

@@ -179,7 +179,7 @@ describe("Torrent Elemental", () => {
     const theirs = into(s1, opp, torrent(), "exile");
     expect(planActivate(s1, ap, theirs, 0)).toBeNull();
     const hidden = into(s1, ap, torrent(), "exile");
-    s1.objects[hidden]!.faceDown = true;
+    s1.objects[hidden]!.hiddenExile = { by: hidden, seen: [] };
     invalidateCharacteristics(s1);
     expect(planActivate(s1, ap, hidden, 0)).toBeNull();
   });

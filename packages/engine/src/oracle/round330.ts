@@ -1,12 +1,16 @@
-// Round 330's sentences, triggers and whole texts, read before round 329's (round329Sentence, round329Trigger and
-// round329WholeText in oracle/round329.ts).
+// Round 330's sentences, triggers and whole texts (after round 331's, oracle/round331.ts), read before round 329's
+// (round329Sentence, round329Trigger and round329WholeText in oracle/round329.ts).
 import type { AbilityBody, Effect, TriggeredAbility } from "../abilities";
 import { parseOne, replaceX, type Ctx } from "./body";
 import { parseTrigger } from "./triggers";
+import { round331Sentence, round331Trigger, round331WholeText } from "./round331";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 export function round330Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 331's sentences first (oracle/round331.ts).
+  const r331 = round331Sentence(s, sentences, si, ctx, effects);
+  if (r331 !== null) return r331;
   // Karn, Living Legacy: "Pay any amount of mana. Look at that many cards from the top of your library, then put one of
   // those cards into your hand and the rest on the bottom of your library in a random order.": how much is chosen as it
   // resolves, then paid (rulings); with none paid, no card is looked at, and one looked at must go to the hand (rulings).
@@ -46,6 +50,9 @@ export function round330Sentence(s: string, sentences: string[], si: number, ctx
 }
 
 export function round330Trigger(raw: string): TriggeredAbility | "fail" | null {
+  // Round 331's triggers first (oracle/round331.ts).
+  const r331 = round331Trigger(raw);
+  if (r331 !== null) return r331;
   // Tyvar the Bellicose's granted "Whenever a mana ability of this creature resolves, put a number of +1/+1 counters on it
   // equal to the amount of mana this creature produced.": not a mana ability itself (it adds no mana, CR 605.1b), so it
   // goes on the stack, before the spell the mana paid for resolves (rulings); "This ability triggers only once each
@@ -66,7 +73,6 @@ export function round330Trigger(raw: string): TriggeredAbility | "fail" | null {
 
 /** A whole ability's text read another way (a string), or null. */
 export function round330WholeText(text: string, parse: (t: string) => AbilityBody | null): AbilityBody | string | null {
-  void text;
-  void parse;
-  return null;
+  // Round 331's whole texts first (oracle/round331.ts).
+  return round331WholeText(text, parse);
 }

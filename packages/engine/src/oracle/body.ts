@@ -18,6 +18,7 @@ import { X_MODES_MAX } from "../modes";
 import { round318Sentence } from "./round318";
 import { roundB166Sentence } from "./laneb166";
 import { roundB167Sentence } from "./laneb167";
+import { roundB170WholeText } from "./laneb170";
 import { round319WholeText } from "./round319";
 import { round320WholeText } from "./round320";
 
@@ -19273,6 +19274,15 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     if (/^X plus/.test(more[1]!) && !ctx.spell) return null;
     return { effects: [{ ...prev, amount: /^X plus/.test(more[1]!) ? { count: { kind: "x" as const }, plus: Number(more[1]!.slice(7)) } : amt(more[1]!) }], instead };
   }
+  // Torch the Tower: "If this spell was bargained, instead it deals 3 damage to that permanent and you scry 1": the same
+  // damage, more of it, then the scry (CR 702.166b).
+  const moreThen = instead ? /^(?:It|~) deals (\d+) damage to that permanent and (you scry \d+)$/.exec(t) : null;
+  if (moreThen) {
+    const prev = previous[0];
+    const then = parseOne(capital(moreThen[2]!), ctx);
+    if (previous.length !== 1 || prev?.type !== "damage" || then?.length !== 1 || then[0]!.type !== "scry") return null;
+    return { effects: [{ ...prev, amount: Number(moreThen[1]) }, then[0]!], instead };
+  }
   // Dragon's Fire: "If you revealed a Dragon card or chose a Dragon as you cast this spell, ~ deals damage equal to the
   // power of that card or creature instead" (read as kicked): the same damage, the beheld card's or creature's power
   // (Amount beheldPower; compile checks the spell's behold cost).
@@ -20344,6 +20354,8 @@ function roundB155WholeText(text: string): AbilityBody | null {
 function wholeTextForms(text: string, selfEntered: boolean, opts: Parameters<typeof parseBody>[1] = {}): AbilityBody | string {
   const b155 = roundB155WholeText(text);
   if (b155) return b155;
+  const b170 = roundB170WholeText(text, (t) => parseBody(t, opts));
+  if (b170) return b170;
   const r319 = round319WholeText(text, (t) => parseBody(t, opts));
   if (r319) return r319;
   const r320 = round320WholeText(text, (t) => parseBody(t, opts));

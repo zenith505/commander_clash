@@ -7,7 +7,7 @@ import { card, modal, resolveUntil } from "./ui";
 test("Moonlight Bargain: keep two of the top five for 4 life; the other three go to the graveyard", async ({ page }) => {
   const top = ["Shock", "Opt", "Grizzly Bears", "Hill Giant", "Lightning Bolt"];
   const s = scene({ hand: ["Moonlight Bargain"], board: LANDS, library: top });
-  const [shock, opt, bears, giant, bolt] = top.map((n) => one(s, n));
+  const [shock, opt, bears, giant, bolt] = top.map((n) => one(s, n)) as [string, string, string, string, string];
   await open(page, s);
   await card(page, "Moonlight Bargain", s).click();
   const asked = await resolveUntil(page, (st) => st.pending?.kind === "searchLibrary" && st.pending.player === 0);

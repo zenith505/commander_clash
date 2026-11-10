@@ -7556,7 +7556,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     log(s, `${p.name} casts a creature spell: the effects lasting until then end.`);
   }
   const kickedNow = !!item.kicked?.length && isRealKicker(compileCard(d).kicker);
-  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, ...(o.faceDown ? {} : { name: d.name }), colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv, ...(kickedNow ? { kicked: true as const } : {}) });
+  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, ...(o.faceDown ? {} : { name: d.name }), colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom, ...(castFrom === "graveyard" && o.owner === p.id ? { ownYard: true as const } : {}), ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv, ...(kickedNow ? { kicked: true as const } : {}) });
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv, castColors: [...characteristics(s, o).colors], ...(o.colorsSpent?.length ? { castColorsSpent: o.colorsSpent.length } : {}), ...(o.faceDown ? {} : { castName: d.name }) };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
   if (o.preparedFrom) unprepareFor(s, o);
@@ -7936,7 +7936,8 @@ function kickerExtraCosts(d: CardDef, kicks?: number[]): AdditionalCost[] {
   if (times === 1 || !k.multi) return k.extraCosts;
   // Exterminate!: "Replicate—Tap an untapped Dalek you control" paid twice taps two of them; Reiterating Bolt's
   // "Replicate—Pay {E}{E}{E}" paid twice is six energy.
-  return k.extraCosts.map((c) => (c.kind === "exileFromGraveyard" || c.kind === "tap" || c.kind === "payEnergy" ? { ...c, n: c.n * times } : c));
+  // Thrill-Kill Disciple's "Squad—{1}, Discard a card" paid twice discards two cards.
+  return k.extraCosts.map((c) => (c.kind === "exileFromGraveyard" || c.kind === "tap" || c.kind === "payEnergy" || c.kind === "discard" ? { ...c, n: c.n * times } : c));
 }
 
 /** Why these kicker choices aren't allowed (CR 702.33): each kicker cost once, multikicker's any number of times. */
@@ -9194,7 +9195,9 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     // Unearth works only while the card is in your graveyard (CR 702.84a). Mister Immortal's from exile too, face up there
     // (a face-down card in exile has no abilities, CR 406.3, 708.2).
     const exiled = !!ab.orExile && o.zone === "exile" && !o.faceDown && !o.hiddenExile;
-    if ((o.zone !== "graveyard" && !exiled) || o.owner !== pid) return `${ab.text} works only from your graveyard${ab.orExile ? " or from exile" : ""}`;
+    if ((o.zone !== "graveyard" && !exiled) || o.owner !== pid) return ab.onlyExile ? `${ab.text} works only from exile` : `${ab.text} works only from your graveyard${ab.orExile ? " or from exile" : ""}`;
+    // Torrent Elemental: only from exile (CR 113.6m).
+    if (ab.onlyExile && !exiled) return `${ab.text} works only from exile`;
     // Ashes of the Abhorrent: no activated abilities of cards in graveyards (embalm, unearth, scavenge, ...; rulings).
     const ashes = s.battlefield.find((b) => abilitiesOf(s, obj(s, b)).noGraveyardActivations);
     if (ashes) return `${characteristics(s, obj(s, ashes)).name}: players can't activate abilities of cards in graveyards`;

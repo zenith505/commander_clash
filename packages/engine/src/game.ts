@@ -6080,6 +6080,9 @@ export function castProblem(
   if (pendTypes && (choices?.faceDown || !pendTypes.some((t) => isType(d, t)))) return `the spell must be ${pendTypes.map((t) => `${/^[AEIOU]/.test(t) ? "an" : "a"} ${t.toLowerCase()}`).join(" or ")} spell`;
   const pendSuper = s.pending?.kind === "castFree" && s.pending.objectId === id ? s.pending.supertypes : undefined;
   if (pendSuper && (choices?.faceDown || !pendSuper.every((t) => d.supertypes.includes(t)))) return `the spell must be ${pendSuper.join(" ").toLowerCase()}`;
+  // Twinning Glass: the spell as it's cast has a name of a spell cast this turn (a fused split spell has both, CR 709.4d).
+  const pendNames = s.pending?.kind === "castFree" && s.pending.objectId === id ? s.pending.names : undefined;
+  if (pendNames && (choices?.faceDown || !d.name.split(" // ").some((n) => pendNames.includes(n)))) return `the spell must have the same name as a spell cast this turn (${pendNames.join(", ")})`;
   const pendFilter = s.pending?.kind === "castFree" && s.pending.objectId === id ? s.pending.spellFilter : undefined;
   if (pendFilter && (choices?.faceDown || !printedMatches(pendFilter, d))) return `the spell must be a ${pendFilter.text.replace(/ card$/, "")} spell`;
   // Its mana value as proposed (CR 601.2e): a face-down spell's is 0 (CR 708.2), X is the X chosen (202.3e).
@@ -9292,7 +9295,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.removeCounters && removableCounters(s, o, ab.removeCounters.counter) < toRemove) return `${d.name} doesn't have ${toRemove} ${ab.removeCounters.counter} counter${toRemove === 1 ? "" : "s"} to remove`;
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.crew !== undefined) {
-    const cp = crewProblem(s, pid, o, ab.crew, tapCreatures, ab.saddle);
+    const cp = crewProblem(s, pid, o, ab.crew, tapCreatures, ab.saddle, ab.tapPower);
     if (cp) return cp;
   } else if (ab.station) {
     // Station (CR 702.184a): tap another untapped creature you control, whatever its power.
@@ -9715,17 +9718,20 @@ export function crewPower(s: GameState, c: GameObject, saddle = false): number {
  * Crew N's cost (CR 702.122a): tap any number of other untapped creatures you control with total
  * power N or greater. Without a choice, whether some choice would do.
  */
-function crewProblem(s: GameState, pid: PlayerId, vehicle: GameObject, n: number, chosen?: ObjectId[], saddle = false): string | null {
-  const what = saddle ? "saddle" : "crew";
+function crewProblem(s: GameState, pid: PlayerId, vehicle: GameObject, n: number, chosen?: ObjectId[], saddle = false, plain = false): string | null {
+  // Mossbridge Troll (ActivatedAbility.tapPower): not crewing, so each creature counts its power (rulings: checked only
+  // as the cost is paid), and one that "can't crew" may be tapped.
+  const what = plain ? "pay that cost" : saddle ? "saddle" : "crew";
+  const counts = (c: GameObject) => (plain ? Math.max(0, power(s, c)) : crewPower(s, c, saddle));
   if (chosen === undefined) {
-    const total = crewCandidates(s, pid, vehicle.id, !saddle).reduce((x, c) => x + crewPower(s, c, saddle), 0);
-    return total >= n ? null : `not enough untapped creatures to ${what} ${n}`;
+    const total = crewCandidates(s, pid, vehicle.id, !saddle && !plain).reduce((x, c) => x + counts(c), 0);
+    return total >= n ? null : plain ? `not enough untapped creatures with total power ${n}` : `not enough untapped creatures to ${what} ${n}`;
   }
-  if (chosen.includes(vehicle.id)) return saddle ? "a Mount can't saddle itself" : "a Vehicle can't crew itself";
-  const problem = tapCreaturesProblem(s, pid, chosen, what);
+  if (chosen.includes(vehicle.id)) return plain ? `${nameOf(s, vehicle.id)} can't be tapped for its own cost` : saddle ? "a Mount can't saddle itself" : "a Vehicle can't crew itself";
+  const problem = tapCreaturesProblem(s, pid, chosen, plain ? "be tapped" : what);
   if (problem) return problem;
-  const total = chosen.reduce((x, id) => x + crewPower(s, obj(s, id), saddle), 0);
-  return total >= n ? null : `those creatures have total power ${total}; ${what} ${n} needs ${n} or more`;
+  const total = chosen.reduce((x, id) => x + counts(obj(s, id)), 0);
+  return total >= n ? null : `those creatures have total power ${total}; ${plain ? "the cost" : `${what} ${n}`} needs ${n} or more`;
 }
 
 /**
@@ -9741,7 +9747,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab?.xIs && typeof ab.xIs === "object" && "opponentHand" in ab.xIs && costs?.xOpponent === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose an opponent: X is the number of cards in their hand");
   if (ab?.body.modal && modes === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose ${describeCount(ab.body.modal.min, ab.body.modal.max)} for ${d.name}'s ability`);
   if (ab?.station && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose a creature to tap for station");
-  if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.saddle ? "saddle" : "crew"} with`);
+  if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.tapPower ? "tap" : ab.saddle ? "saddle" : "crew"} with`);
   // What pays each cost beyond mana is chosen as it's activated (CR 602.2b, 601.2h): an activation that doesn't say,
   // or says for one cost and not another, can't skip it. As for spells (castSpell).
   if (ab && activatedCosts(ab, x, o, s, p.id).some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
@@ -9917,7 +9923,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(JSON.stringify(body.effects).includes('"kind":"activatedTimes"') ? { activatedIndex: index } : {}),
     ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(manaFrom.length ? { from: manaFrom } : {}) } } : {}),
     ...(paid.treasure ? { treasureSpent: paid.treasure } : {}),
-    ...(ab.crew !== undefined && !ab.saddle && tapCreatures?.length ? { crewers: tapCreatures.length } : {}),
+    ...(ab.crew !== undefined && !ab.saddle && !ab.tapPower && tapCreatures?.length ? { crewers: tapCreatures.length } : {}),
     ...(paid.spent && Object.values(paid.spent).some((n) => n > 0) ? { manaSpentTypes: (Object.keys(paid.spent) as ManaType[]).flatMap((m) => Array<ManaType>(paid.spent[m]).fill(m)) } : {}),
   };
   if (manaPick) {
@@ -9930,7 +9936,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   s.stack.push(item);
   // The creatures tapped for a saddle cost saddled it (CR 702.171c), whether or not the ability resolves.
   // The creatures tapped for a crew cost crewed it (CR 702.122d), the same way.
-  if (ab.crew !== undefined && tapCreatures?.length) {
+  if (ab.crew !== undefined && !ab.tapPower && tapCreatures?.length) {
     const list = (((s.turnLog ??= {})[ab.saddle ? "saddledBy" : "crewedBy"] ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []);
     for (const c of tapCreatures) if (!list.includes(`${c}@${obj(s, c).zoneChanges ?? 0}`)) list.push(`${c}@${obj(s, c).zoneChanges ?? 0}`);
     // Adrestia: what the crewing creatures were as they were tapped (rulings).
@@ -9941,6 +9947,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   }
   if (ab.cycling) log(s, `${p.name} cycles ${d.name} (${ab.text}).`);
   else if (ab.discardSelf) log(s, `${p.name} discards ${d.name} (${ab.text}).`);
+  else if (ab.crew !== undefined && ab.tapPower) log(s, `${p.name} activates ${d.name} (${ab.text.replace(/~/g, d.name).replace(/\.$/, "")}), tapping ${tapCreatures!.map((c) => nameOf(s, c)).join(", ")}.`);
   else if (ab.crew !== undefined) log(s, `${p.name} ${ab.saddle ? "saddles" : "crews"} ${d.name} with ${tapCreatures!.map((c) => nameOf(s, c)).join(", ")}.`);
   else if (ab.station) log(s, `${p.name} stations ${d.name} with ${nameOf(s, tapCreatures![0]!)}.`);
   else {
@@ -9951,7 +9958,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   }
   // Each creature tapped for a crew cost crewed the Vehicle (CR 702.122d), whether or not the ability resolves.
   // Each creature tapped for a saddle cost saddled the Mount (CR 702.171c): "Whenever ~ saddles a Mount" (Reckless Velocitaur).
-  if (ab.crew !== undefined) for (const c of tapCreatures ?? []) fireEvent(s, { type: "crews", id: c, vehicle: o.id, ...(ab.saddle ? { saddle: true as const } : {}) });
+  if (ab.crew !== undefined && !ab.tapPower) for (const c of tapCreatures ?? []) fireEvent(s, { type: "crews", id: c, vehicle: o.id, ...(ab.saddle ? { saddle: true as const } : {}) });
   // Once it's activated (CR 602.2i), abilities that trigger on that do.
   // As it was activated, for "copy that ability" once it has left the stack (rulings on Rings of Brighthearth).
   (s.castItems ??= {})[stackId] = structuredClone(item);

@@ -1,6 +1,6 @@
 # Roadmap
 
-30,974 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,982 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,805 of
 9,979 (98%).
 
@@ -7904,6 +7904,21 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   from a graveyard" as a cost, from any player's graveyard; "each Fungus on the battlefield"; a browser test). Emrakul's
   Evangel ("Sacrifice this creature and any number of other non-Eldrazi creatures": how many announced like an X, a token
   for each and one for itself, rulings; a browser test). +7, 30,974 of 31,936 with B175.
+- Round B177 (least played first, single-line blockers from the skip lists): Blossombind ("can't have counters put on it"
+  from the layers, checked wherever counters are put: no wither counters or damage, the old counters stay, rulings).
+  Twinning Glass (a free cast of a card named like a spell cast this turn by anyone, rulings: the spell as it's cast has the
+  name, so a split card's half, an Adventure or a fused spell's names, CR 709.3b, 709.4d, 715.3). Eternal Dominion ("Search
+  target opponent's library for an artifact, creature, enchantment, or land card. Put that card onto the battlefield under
+  your control."). Head Games (Jester's Mask's text with "The player"). Creeping Dread (each opponent whose discarded card
+  shares a card type with yours loses 3 life; none if you discarded nothing, rulings). Scythe Specter (each player who
+  discarded a card with the greatest mana value loses that much, ties included, rulings). Quag Feast ("Choose target
+  creature, planeswalker, or Vehicle", destroyed if its mana value fits after the mill). Mossbridge Troll ("Tap any number of
+  untapped creatures you control other than ~ with total power 10 or greater": paid like crew but not crewing,
+  ActivatedAbility.tapPower; a browser test; bots don't use it yet). +8, 30,982 of 31,936.
+- Out after round B177 (looked at, not done): Divine Intervention (only its controller removing the last counter triggers it,
+  rulings: who removes counters isn't tracked), Rain of Gore (whether lifelink damage from a spell is that spell causing its
+  controller to gain life isn't settled by its rulings), Lich's Mirror, Blood Scrivener, Snowblind and Garruk, Curse Breaker
+  stay out for the reasons in the earlier lists.
 - Out after round B176 (looked at, not done): Battlefield Thaumaturge ("{1} less for each creature it targets": whether a
   creature targeted twice counts twice isn't settled by its rulings' wording), Kodama of the Center Tree (soulshift X counted
   from the Spirits as they last existed), Barbed Wire (a "prevent the next damage dealt by ~" shield), Spiteful Repossession

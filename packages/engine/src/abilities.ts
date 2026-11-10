@@ -2008,6 +2008,8 @@ export type Modification =
   | { kind: "doesntUntap"; /** Fall from Favor: "unless that player is the monarch": not while its controller is (CR 725). */ unlessMonarch?: true }
   /** "Can't become untapped" (Frozen in Ice): it doesn't untap in its untap step or from any effect (see untapPermanent). */
   | { kind: "cantBecomeUntapped" }
+  /** "Can't have counters put on it" (Blossombind): none of any kind, by an effect, a cost or a replacement (countersBanned; rulings). */
+  | { kind: "cantHaveCounters" }
   /** "Can't become suspected" (Airtight Alibi, CR 701.60): suspect effects don't apply to it. */
   | { kind: "cantBeSuspected" }
   /**
@@ -3517,7 +3519,7 @@ export type Effect =
    * "You may cast a spell with mana value 3 or less from your hand without paying its mana cost" (the Expertises,
    * Electrodominance's "X or less"): one card, picked and cast as this resolves (rulings).
    */
-  | { type: "castFromHand"; filter: TargetSpec; /** "If you don't, scry 1" after it (In Search of Greatness): whether a spell was cast this way is what "if you do" asks. */ setsDid?: true; /** "Draw three cards and reveal them. You may cast one of them ...": only those, revealed. */ drawn?: true; /** "... from your graveyard without paying its mana cost. If that spell would be put into your graveyard, exile it instead." (Sword of Once and Future): a card there, and the spell is exiled instead of going back. */ fromGraveyard?: true; /** With `fromGraveyard`: no "exile it instead" (Counterpoint). */ yardNoExile?: true; /** Jace's Mindseeker: "target opponent mills five cards. You may cast an instant or sorcery spell from among them": one of the cards this resolution milled, where they went (exile too, rulings). */ milled?: true }
+  | { type: "castFromHand"; filter: TargetSpec; /** "If you don't, scry 1" after it (In Search of Greatness): whether a spell was cast this way is what "if you do" asks. */ setsDid?: true; /** "Draw three cards and reveal them. You may cast one of them ...": only those, revealed. */ drawn?: true; /** "... from your graveyard without paying its mana cost. If that spell would be put into your graveyard, exile it instead." (Sword of Once and Future): a card there, and the spell is exiled instead of going back. */ fromGraveyard?: true; /** With `fromGraveyard`: no "exile it instead" (Counterpoint). */ yardNoExile?: true; /** Jace's Mindseeker: "target opponent mills five cards. You may cast an instant or sorcery spell from among them": one of the cards this resolution milled, where they went (exile too, rulings). */ milled?: true; /** Twinning Glass: "if it has the same name as a spell that was cast this turn": by anyone, as it resolves (rulings), the spell as it's cast (see castFree's names). */ sameNameCastThisTurn?: true }
   /** Suspend's upkeep trigger (CR 702.62a): if the card (the subject) is still suspended, remove a time counter from it. */
   | { type: "suspendTick" }
   /** Suspend's last-counter trigger (CR 702.62a): its owner may cast the exiled card without paying its mana cost. */
@@ -4886,6 +4888,17 @@ export type Effect =
    * combat damage this turn, ones that came later too (rulings; TurnLog.unblockedDamage, CR 510.1c).
    */
   | { type: "yourCreaturesUnblockedThisTurn" }
+  /**
+   * After "each player discards a card" (Creeping Dread): "Each opponent who discarded a card that shares a card type with
+   * the card you discarded loses 3 life": the cards this resolution discarded (wherever they went), their owners the players
+   * who discarded them; card types only, once each opponent however many they share (rulings, CR 205.2a).
+   */
+  | { type: "discardSharesTypeLoss"; n: number }
+  /**
+   * After "each opponent discards a card" (Scythe Specter): "Each player who discarded a card with the greatest mana value
+   * among cards discarded this way loses life equal to that mana value": every player tied for it (rulings).
+   */
+  | { type: "discardGreatestMvLoss" }
   /** Stromgald Spy: "defending player plays with their hand revealed for as long as ~ remains on the battlefield" (CR 402.3, 611.2b; Player.handRevealedWhile). */
   | { type: "revealHandWhile"; who: PlayerRef }
   /**
@@ -6661,6 +6674,12 @@ export interface ActivatedAbility {
   cycling?: boolean;
   /** Crew N (CR 702.122a): the cost is tapping other untapped creatures you control with total power N or more. */
   crew?: number;
+  /**
+   * Mossbridge Troll: "Tap any number of untapped creatures you control other than ~ with total power 10 or greater": `crew`
+   * is that total, paid like crew's cost (CR 702.122a) but it isn't crewing: no "crews" events, no crewed Vehicle, and each
+   * creature counts its own power.
+   */
+  tapPower?: true;
   /** Saddle N (CR 702.171a): `crew` is N, and the creatures tapped saddle this permanent (CR 702.171c). */
   saddle?: true;
   /** Station (CR 702.184a): the cost is tapping one other untapped creature you control (`tapCreatures`). */

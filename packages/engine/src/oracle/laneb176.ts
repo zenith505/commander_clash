@@ -4,6 +4,7 @@ import type { CompiledCard, Effect } from "../abilities";
 import { parseOne, type Ctx } from "./body";
 import { CREATURE_TYPES } from "../keywords";
 import { parseAffected, parseStatic } from "./statics";
+import { roundB177Sentence } from "./laneb177";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -33,7 +34,7 @@ export function roundB176Line(line: string, raw: string, out: CompiledCard, isSp
   return false;
 }
 
-export function roundB176Sentence(s: string, _sentences: string[], si: number, ctx: Ctx, _effects: Effect[]): Found {
+export function roundB176Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
   // Thelon of Havenwood: "Put a spore counter on each Fungus on the battlefield": every permanent with the subtype, whoever
   // controls it, the same as "each Fungus" (CR 109.2).
   const onField = /^(Put an? [a-z]+ counter on each [A-Z][a-z]+) on the battlefield$/.exec(s);
@@ -43,5 +44,5 @@ export function roundB176Sentence(s: string, _sentences: string[], si: number, c
     if (one?.type !== "counters" || one.what.ref !== "each" || one.what.filter.controller) return "fail";
     return { effect: one, next: si + 1 };
   }
-  return null;
+  return roundB177Sentence(s, sentences, si, ctx, effects);
 }

@@ -326,6 +326,8 @@ export function countersBanned(s: GameState, o: GameObject, kind?: string): bool
   if (s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).noCountersOn?.some((t) => types.includes(t)))) return true;
   // Tatterkite: "~ can't have counters put on it": none of any kind, by an effect, as a cost or as it enters (rulings).
   if (abilitiesOf(s, o).selfNoCounters) return true;
+  // Blossombind: "Enchanted creature ... can't have counters put on it", from the layers (CR 613.1f).
+  if (characteristics(s, o).cantHaveCounters) return true;
   // Suncleanser: "It can't have counters put on it for as long as ~ remains on the battlefield".
   if (counterBans(s).some((b) => b.id === o.id && b.objZc === (o.zoneChanges ?? 0))) return true;
   // Blightbeetle: "Creatures your opponents control can't have +1/+1 counters put on them." The ones already there stay;

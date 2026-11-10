@@ -2630,6 +2630,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't become suspected$/.test(rest)) return [{ kind: "cantBeSuspected" }];
   // Frozen in Ice, Blossombind: "can't become untapped": no effect or rule untaps it (see untapPermanent).
   if (/^can't become untapped$/.test(rest)) return [{ kind: "cantBecomeUntapped" }];
+  // Blossombind: "can't have counters put on it": none from then on, the ones already there stay (rulings).
+  if (/^can't have counters put on (?:it|them)$/.test(rest)) return [{ kind: "cantHaveCounters" }];
   if (/^loses? all abilities$/.test(rest)) return [{ kind: "loseAllAbilities" }];
   // Blood Sun: "All lands lose all abilities except mana abilities": the rest go in layer 6 (CR 613.1f); its mana abilities
   // (CR 605.1a) stay, and so do those of its basic land types (CR 305.6).

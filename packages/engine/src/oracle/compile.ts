@@ -29,6 +29,7 @@ import { roundB173Line } from "./laneb173";
 import { roundB174Line } from "./laneb174";
 import { roundB175Line } from "./laneb175";
 import { roundB176Line } from "./laneb176";
+import { roundB177Line } from "./laneb177";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -2018,6 +2019,7 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB175Line(line, raw, out, isSpell)) continue;
     // Aurification, Sanctum Lurker (round B176).
     if (roundB176Line(line, raw, out, isSpell)) continue;
+    if (roundB177Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

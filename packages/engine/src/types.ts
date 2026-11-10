@@ -1812,6 +1812,8 @@ export interface TurnLog {
   oilRemoved?: PlayerId[];
   /** Churning Reservoir: a permanent with an oil counter on it was put into a graveyard from the battlefield this turn (a token too, CR 111.7). */
   oilPermanentToGraveyard?: true;
+  /** Melira, the Living Cure: the players who can't get additional poison counters this turn. */
+  noMorePoison?: PlayerId[];
   /** The players a permanent was put into the hand of from the battlefield this turn, its owner's (CR 400.3), a token too (Barrin, Tolarian Archmage). */
   permanentToHand?: PlayerId[];
   /** Each creature put into a graveyard from the battlefield this turn: its owner's graveyard, and whether it was a token (Caller of the Claw, Fresh Meat). */

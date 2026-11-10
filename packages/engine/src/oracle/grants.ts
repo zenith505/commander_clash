@@ -18,6 +18,10 @@ export const innerQuotes = (text: string) => text.replace(/ (with|and) '(.+?\.)'
 export function compileQuoted(text: string): boolean {
   // A token's ability naming the permanent that made it (Gutter Grime's Ooze: "slime counters on Gutter Grime"): nothing
   // binds that name to it here, unlike an ability an Equipment or Aura gives (bindGrantSource).
+  // Gutter Grime's and Saproling Burst's tokens: "This token's power and toughness are each equal to the number of slime
+  // counters on Gutter Grime": the name is filled in as the token is created (createToken), then read as a
+  // characteristic-defining ability about its creator (laneb178.ts).
+  if (new RegExp(`^~'s power and toughness are each equal to the number of [a-z]+ counters on ${QUOTED_SOURCE_NAME}\\.$`).test(text)) return true;
   if (text.includes(QUOTED_SOURCE_NAME)) return false;
   const c = compile({ name: "Quoted Ability Source", oracleText: text, types: [], subtypes: [], supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", oracleId: "" } as unknown as CardDef);
   return c.unsupported.length === 0;

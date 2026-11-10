@@ -417,6 +417,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     activatedInGraveyard: t.activatedInGraveyard,
     oilRemoved: t.oilRemoved ? [...t.oilRemoved].sort() : undefined,
     oilPermanentToGraveyard: t.oilPermanentToGraveyard,
+    noMorePoison: t.noMorePoison ? [...t.noMorePoison].sort() : undefined,
     creaturesLeft: capped((t.creaturesLeft ?? {}) as Record<number, number>),
     creaturesToYard: capped((t.creaturesToYard ?? []).reduce<Record<string, number>>((r, d) => ((r[`${d.owner}${d.token ? "t" : ""}`] = (r[`${d.owner}${d.token ? "t" : ""}`] ?? 0) + 1), r), {})),
     permanentTypesToYard: t.permanentTypesToYard,

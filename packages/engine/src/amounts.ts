@@ -1087,6 +1087,16 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const ch = o.zone === "battlefield" ? view(o) : characteristics(s, o);
       return ch?.[c.kind] ?? 0;
     }
+    case "countersOnCreator": {
+      // Gutter Grime: each Ooze counts the counters on the one that created it; once that one has left the battlefield,
+      // 0 (rulings). A copy of the token wasn't created by it, so it counts none.
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const cw = me?.createdWith;
+      const by = cw ? s.objects[cw.id] : undefined;
+      if (!by || !cw || by.zone !== "battlefield" || (by.zoneChanges ?? 0) !== cw.zc) return 0;
+      const name = ctx.view?.(by)?.name ?? characteristics(s, by).name;
+      return name === c.name ? Math.max(0, by.counters[c.counter] ?? 0) : 0;
+    }
     case "counters": {
       // "For each counter on ~" (Twitching Doll): of every kind.
       const of = (counters: Record<string, number> | undefined) => (c.kinds ? Object.values(counters ?? {}).filter((v) => (v ?? 0) > 0).length : c.counter === ANY_COUNTER ? Object.values(counters ?? {}).reduce((a, b) => a + Math.max(0, b ?? 0), 0) : (counters?.[c.counter] ?? 0));

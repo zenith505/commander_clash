@@ -8,10 +8,10 @@ import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { inCombat, attackDefault, fireEvent } from "./triggers";
 import { attackChoices } from "./run-zones";
 import { copiedValues } from "./run-copies";
-import { controllerOf, invalidateCharacteristics } from "../layers";
+import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { objectMatches } from "./targeting";
 import { defMv } from "../faces";
-import { compileCard } from "../oracle";
+import { compileCard, QUOTED_SOURCE_NAME } from "../oracle";
 import { manaValue, parseManaCost } from "../mana";
 
 /**
@@ -550,7 +550,13 @@ export function tokenDef(t: TokenSpec): CardDef {
   };
 }
 
-export function createToken(s: GameState, pid: PlayerId, t: TokenSpec, opts: { tapped?: boolean; attacking?: PlayerId; counters?: Record<string, number>; blocking?: GameObject } = {}): GameObject {
+export function createToken(s: GameState, pid: PlayerId, t0: TokenSpec, opts: { tapped?: boolean; attacking?: PlayerId; counters?: Record<string, number>; blocking?: GameObject } = {}): GameObject {
+  // Gutter Grime's Ooze: "... slime counters on Gutter Grime": the name of the permanent whose ability creates it, as it is
+  // now or as it last existed (CR 608.2h), so the token's ability reads it (grants.ts compileQuoted).
+  const it = s.resolving?.item;
+  const by = t0.abilities?.includes(QUOTED_SOURCE_NAME) && it?.kind === "ability" && it.sourceId ? s.objects[it.sourceId] : undefined;
+  const byName = by ? (by.zone === "battlefield" ? characteristics(s, by).name : (s.lastKnown?.[by.id]?.source?.name ?? defOf(s, by).name)) : undefined;
+  const t = byName ? { ...t0, abilities: t0.abilities!.replaceAll(QUOTED_SOURCE_NAME, byName) } : t0;
   const o = newObject(s, tokenDef(t), pid, "exile");
   o.isToken = true;
   // It enters like any permanent, so ETB triggers see it, with any counters it's created with (CR 122.6, 614.1c).
@@ -583,7 +589,10 @@ export function createExtraTokens(s: GameState, pid: PlayerId, extra: TokenBatch
 /** A token `pid` created (CR 111.2), for "the number of Treasure tokens you created this turn". */
 function noteCreated(s: GameState, pid: PlayerId, o: GameObject) {
   const it = s.resolving?.item;
-  if (it?.kind === "ability" && it.sourceId !== undefined && it.sourceZc !== undefined) o.createdWith = { id: it.sourceId, zc: it.sourceZc };
+  if (it?.kind === "ability" && it.sourceId !== undefined && it.sourceZc !== undefined) {
+    o.createdWith = { id: it.sourceId, zc: it.sourceZc };
+    invalidateCharacteristics(s); // a characteristic-defining ability about its creator (Gutter Grime's Ooze)
+  }
   ((s.turnLog ??= {}).tokensCreated ??= []).push({ player: pid, subtypes: [...defOf(s, o).subtypes] });
   // Not if it was put into exile instead (Hallowed Moonlight): it never entered.
   if (o.zone === "battlefield") (s.zoneBatch ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, to: "battlefield", owner: o.owner, notCard: true, card: o.cardId, createdBy: pid });

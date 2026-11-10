@@ -1,13 +1,16 @@
-// Round 331's sentences, triggers and whole texts, read before round 330's (round330Sentence, round330Trigger and
-// round330WholeText in oracle/round330.ts).
+// Round 331's sentences, triggers and whole texts (after round 332's, oracle/round332.ts), read before round 330's
+// (round330Sentence, round330Trigger and round330WholeText in oracle/round330.ts).
 import type { AbilityBody, Effect, TriggeredAbility } from "../abilities";
 import type { Ctx } from "./body";
 import { parseTargetPhrase } from "./targets";
+import { round332Sentence, round332Trigger, round332WholeText } from "./round332";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 export function round331Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void effects;
+  // Round 332's sentences first (oracle/round332.ts).
+  const r332 = round332Sentence(s, sentences, si, ctx, effects);
+  if (r332 !== null) return r332;
   // Osteomancer Adept: "Until end of turn, you may cast creature spells from your graveyard by foraging in addition to
   // paying their other costs. If you cast a spell this way, that creature enters with a finality counter on it.": any
   // number of them this turn, each paying all its costs and forage (CR 701.61a) and following the timing rules (rulings),
@@ -24,13 +27,12 @@ export function round331Sentence(s: string, sentences: string[], si: number, ctx
 }
 
 export function round331Trigger(raw: string): TriggeredAbility | "fail" | null {
-  void raw;
-  return null;
+  // Round 332's triggers first (oracle/round332.ts).
+  return round332Trigger(raw);
 }
 
 /** A whole ability's text read another way (a string), or null. */
 export function round331WholeText(text: string, parse: (t: string) => AbilityBody | null): AbilityBody | string | null {
-  void text;
-  void parse;
-  return null;
+  // Round 332's whole texts first (oracle/round332.ts).
+  return round332WholeText(text, parse);
 }

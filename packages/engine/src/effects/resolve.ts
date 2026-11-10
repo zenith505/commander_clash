@@ -32,6 +32,8 @@ import { runChooseHostOrNamedEffect, runPutMilledPairEffect, runSearchEachExileE
 import { runLaneB160Effect } from "./run-laneb160";
 import { runLaneB166Effect } from "./run-laneb166";
 import { runLaneB167Effect } from "./run-laneb167";
+import { runLaneB168Effect } from "./run-laneb168";
+import { runLaneB169Effect } from "./run-laneb169";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -395,6 +397,17 @@ export function subjectCreatureTypes(s: GameState, ctx: ResolveCtx): Set<string>
   return lk.creatureTypes === "all" ? "all" : new Set(lk.creatureTypes);
 }
 
+/** The trigger subject's colors as it is on the battlefield, or as it last existed there (CR 608.2h); undefined if neither. */
+export function subjectColors(s: GameState, ctx: ResolveCtx): Color[] | undefined {
+  const sub = ctx.subject;
+  const o = sub ? s.objects[sub.id] : undefined;
+  if (!sub || !o) return undefined;
+  if (o.zone === "battlefield" && (o.zoneChanges ?? 0) === sub.zc) return characteristics(s, o).colors;
+  const lk = s.lastKnown?.[o.id];
+  if (!lk?.source || (lk.zc !== sub.zc && lk.zc !== sub.zc - 1)) return undefined;
+  return lk.source.colors;
+}
+
 export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
   if (ref.ref === "castSpell") return []; // only counted (amounts.ts)
   if (ref.ref === "ringBearer") {
@@ -732,10 +745,13 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const whose = ref.of && players(s, ref.of, ctx);
     const mine = ref.sharesTypeWithSelf ? sourceCreatureTypes(s, ctx) : ref.sharesTypeWithSubject ? subjectCreatureTypes(s, ctx) : undefined;
     if (ref.sharesTypeWithSubject && !mine) return [];
+    // Spreading Plague: sharing a color with the subject (CR 105.2); a colorless one, or one not known, shares none.
+    const hues = ref.sharesColorWithSubject ? subjectColors(s, ctx) : undefined;
+    if (ref.sharesColorWithSubject && !hues?.length) return [];
     const made = ref.notCreated ? (s.resolving?.created ?? []) : [];
     const spared = ref.spareConvokerTypes ? convokerTypes(s, ctx) : [];
     const spare = (o: GameObject) => spared.length > 0 && objIsType(s, o, "Creature") && !objIsType(s, o, "Artifact") && !objIsType(s, o, "Enchantment") && spared.some((t) => shareCreatureType(t, creatureTypesOf(s, o)));
-    const others = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && !made.includes(o.id) && (!whose || whose.includes(ref.ofOwner ? o.owner : controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false) && (!mine || shareCreatureType(mine, creatureTypesOf(s, o))) && (!sackedTypes || shareCreatureType(sackedTypes, creatureTypesOf(s, o))) && !spare(o) && (!crewedSource || saddledSource(s, o.id, ctx.sourceId, ctx.sourceZc, "crewedBy")));
+    const others = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && !made.includes(o.id) && (!whose || whose.includes(ref.ofOwner ? o.owner : controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false) && (!mine || shareCreatureType(mine, creatureTypesOf(s, o))) && (!hues || characteristics(s, o).colors.some((c) => hues.includes(c))) && (!sackedTypes || shareCreatureType(sackedTypes, creatureTypesOf(s, o))) && !spare(o) && (!crewedSource || saddledSource(s, o.id, ctx.sourceId, ctx.sourceZc, "crewedBy")));
     if (!ref.andSelf) return others;
     const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     const here = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);
@@ -850,6 +866,12 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const host = attachedHost(s, ctx);
       const o = host ? s.objects[host.id] : undefined;
       return o && !player(s, o.owner).lost ? [o.owner] : [];
+    }
+    case "grantSourceController": {
+      // Hold for Ransom: the Aura that gave the ability, while it's that permanent, else as it last existed (CR 608.2h).
+      const g = ref.id ? s.objects[ref.id] : undefined;
+      const was = g?.zone === "battlefield" && (g.zoneChanges ?? 0) === ref.zc ? controllerOf(s, g) : ref.id && s.lastKnown?.[ref.id]?.zc === ref.zc ? s.lastKnown![ref.id]!.controller : undefined;
+      return was !== undefined && !player(s, was).lost ? [was] : [];
     }
     case "hostController": {
       // Gremlin Infestation: "enchanted artifact's controller", the permanent the source is attached to now.
@@ -1715,6 +1737,11 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB166Effect(s, e, ctx, src);
     case "exileAnyOfTop":
       return runLaneB167Effect(s, e, ctx, src);
+    case "counterKindsOnEither":
+      return runLaneB168Effect(s, e, ctx, src);
+    case "loseAllBut":
+    case "gainLinkedLifeLost":
+      return runLaneB169Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

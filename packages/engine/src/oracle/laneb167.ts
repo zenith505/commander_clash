@@ -2,6 +2,7 @@
 import type { Effect } from "../abilities";
 import { parseOne, type Ctx } from "./body";
 import { NUM, num } from "./words";
+import { roundB168Sentence } from "./laneb168";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -31,5 +32,5 @@ export function roundB167Sentence(s: string, sentences: string[], si: number, ct
   const exileTop = new RegExp(`^[Ll]ook at the top ${NUM} cards of your library$`).exec(s);
   if (exileTop && (sentences[si + 1] ?? "").replace(/\.$/, "") === "Exile any number of them and put the rest back on top of your library in any order")
     return Number.isInteger(num(exileTop[1]!)) ? { effect: { type: "exileAnyOfTop", n: num(exileTop[1]!) }, next: si + 2 } : "fail";
-  return null;
+  return roundB168Sentence(s, sentences, si, ctx, effects);
 }

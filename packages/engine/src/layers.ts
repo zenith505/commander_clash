@@ -1235,6 +1235,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.turnLog?.landPlayedNotFromHand ?? []).includes(you) || (s.castThisTurn ?? []).some((x) => x.player === you && x.from !== "hand");
     case "youPutCounterOnCreature":
       return (s.turnLog?.creatureCounterPutters ?? []).includes(you);
+    case "youPutCounterOnSelf": {
+      // Fractal Tender: this object, while it's the one on the battlefield (CR 400.7).
+      const me = s.objects[sourceId];
+      return !!me && (sourceZc === undefined || (me.zoneChanges ?? 0) === sourceZc) && (s.turnLog?.counterPutOn ?? []).includes(`${you}:${sourceId}@${me.zoneChanges ?? 0}`);
+    }
     case "opponentCardsToGraveyard":
       return Object.entries(s.turnLog?.toGraveyard ?? {}).some(([p, k]) => Number(p) !== you && k >= cond.n);
     case "opponentCastCount":

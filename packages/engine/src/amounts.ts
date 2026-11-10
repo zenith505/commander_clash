@@ -210,6 +210,13 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
       return o ? (s.players[controllerOf(s, o)]?.poison ?? 0) : 0;
     }
+    case "affectedDefenderPermanents": {
+      // CR 802.2a: each attacking creature's own defending player.
+      const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      const d = o?.zone === "battlefield" ? o.attacking : undefined;
+      if (d === undefined || s.players[d]?.lost) return 0;
+      return s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === d && objectMatches(s, c.filter, s.objects[id]!, ctx.controller, false)).length;
+    }
     case "affectedControllerHand": {
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
       const who = o && view(o)?.controller;
@@ -1383,6 +1390,8 @@ function describeCount(c: Count): string {
       return "cards in its controller's hand";
     case "affectedControllerPoison":
       return "#poison counters its controller has";
+    case "affectedDefenderPermanents":
+      return `#${c.filter.text} its defending player controls`;
     case "cardsInLibrary":
       return "#cards in library";
     case "opponentsVotedOtherwise":

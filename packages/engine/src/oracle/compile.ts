@@ -24,6 +24,7 @@ import { parseCountMod, parseCopyExcept, parseToken, PREDEFINED_TOKENS } from ".
 import { parseCardNameChoice, parseSearchFilter } from "./search";
 import { addStriation, simpleKeywords, striations } from "./striations";
 import { draftLine } from "./draft";
+import { roundB171Line, yardEntersLinkOnly } from "./laneb171";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -1989,6 +1990,9 @@ export function compile(d: CardDef): CompiledCard {
       out.entersDiscardHand = true;
       continue;
     }
+    // Sutured Ghoul, Living Lore, Frankenstein's Monster: "As ~ enters, exile ... from your graveyard" and the abilities
+    // reading the cards it exiled.
+    if (roundB171Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -7165,7 +7169,10 @@ function linkExile(out: CompiledCard) {
   if ([...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].some((b) => allEffects(b.effects).some((e) => e.type === "playLinked" && e.castOnly))) {
     const spells = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "counterSpell" }> => e.type === "counterSpell" && !!e.exileSpell && !e.cause && !e.plot && !e.ownerMayCost && !e.n);
     const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "exileTop" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "counterSpell");
-    if (spells.length !== 1 || others.length !== 1 || out.spell) out.unsupported.push("(casts an exiled card it can't link to one exile ability)");
+    // Living Lore: "you may cast the exiled card" is the card its "As ~ enters, exile ..." exiled (CR 607.2b).
+    if (yardEntersLinkOnly(out, [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)])) {
+      /* linked by the enters replacement */
+    } else if (spells.length !== 1 || others.length !== 1 || out.spell) out.unsupported.push("(casts an exiled card it can't link to one exile ability)");
     else spells[0]!.linked = true;
   }
   // Muse Vessel: "a card exiled with ~" is one its "target player exiles a card from their hand" ability exiled (CR
@@ -7299,7 +7306,9 @@ function linkExile(out: CompiledCard) {
   // Phyrexian Ingester: "the exiled creature card's power" is about what its one exile ability (imprint) exiled.
   // Colfenor's Urn: "if three or more cards have been exiled with ~", in its trigger's intervening "if".
   // The Kenriths' Royal Funeral: a cost reduction "for each card exiled with ~", the same.
-  if ((out.statics.some((st) => /"linkedExiled(?:PT)?"/.test(JSON.stringify(st.mods)) || JSON.stringify(st.condition ?? null).includes('"linkedExiled"')) || (out.costMods ?? []).some((cm) => JSON.stringify(cm.times ?? null).includes('"linkedExiled"')) || bodies.some((b) => JSON.stringify(b).includes('"linkedExiled"')) || out.triggers.some((t) => JSON.stringify(t.ifCond ?? null).includes('{"kind":"linkedExiled","ever":true}'))) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
+  // Sutured Ghoul: "the exiled cards" are what its "As ~ enters, exile ..." exiled (CR 607.2b), when nothing else exiles.
+  if (out.entersExileFromYard && !yardEntersLinkOnly(out, bodies)) out.unsupported.push("(counts cards exiled with it that it can't link to one exile ability)");
+  else if (!out.entersExileFromYard && (out.statics.some((st) => /"linkedExiled(?:PT)?"/.test(JSON.stringify(st.mods)) || JSON.stringify(st.condition ?? null).includes('"linkedExiled"')) || (out.costMods ?? []).some((cm) => JSON.stringify(cm.times ?? null).includes('"linkedExiled"')) || bodies.some((b) => JSON.stringify(b).includes('"linkedExiled"')) || out.triggers.some((t) => JSON.stringify(t.ifCond ?? null).includes('{"kind":"linkedExiled","ever":true}'))) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const others = all.some((e) => e.type === "exileGraveyard" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));

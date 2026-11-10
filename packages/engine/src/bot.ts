@@ -1229,6 +1229,20 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = (theirs.length ? theirs : ok).sort((a, b) => value(b) - value(a))[0];
       return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
     }
+    // Sutured Ghoul: every creature card that adds to its power or toughness. Living Lore: the instant or sorcery with the
+    // greatest mana value (its power and toughness, and the spell it may cast later). Frankenstein's Monster: the creature
+    // cards worth least to keep, the lowest mana value first.
+    if (pend.kind === "chooseOption" && pend.what === "exileFromYard") {
+      const how = pend.objectId && s.objects[pend.objectId] ? compileCard(defOf(s, obj(s, pend.objectId))).entersExileFromYard : undefined;
+      const cards = pend.options.filter((x) => x !== "done");
+      if (how?.n === "any") {
+        const add = (x: string) => characteristics(s, obj(s, x)).power + characteristics(s, obj(s, x)).toughness;
+        const best = cards.filter((x) => add(x) > 0).sort((a, b) => add(b) - add(a))[0];
+        return [{ type: "chooseOption", player: pid, choice: best ?? "done" }];
+      }
+      const order = [...cards].sort((a, b) => (how?.n === "one" ? mv(s, b) - mv(s, a) : mv(s, a) - mv(s, b)));
+      return [{ type: "chooseOption", player: pid, choice: order[0] ?? pend.options[0]! }];
+    }
     // The Mimeoplasm: the other card exiled gives +1/+1 counters equal to its power, so the one with the greatest power.
     if (pend.kind === "chooseOption" && pend.what === "copyOther") {
       const pw = (x: string) => characteristics(s, obj(s, x)).power;
@@ -3367,6 +3381,13 @@ function targetIndexOf(e: Effect): number | undefined {
  */
 function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: CastFromGraveyardKind, alt?: AltCostKind): Action[] | null {
   const d = defOf(s, obj(s, id));
+  // Sutured Ghoul and Living Lore with nothing to exile that gives them toughness would die at once (CR 704.5f);
+  // Frankenstein's Monster's X is capped below by our creature cards in the graveyard (see the X choices).
+  const yard = compileCard(d).entersExileFromYard;
+  if (yard && yard.n !== "x") {
+    const cards = player(s, pid).graveyard.filter((c) => c !== id && printedMatches(yard.filter, defOf(s, obj(s, c))));
+    if (!cards.some((c) => (yard.n === "one" ? mv(s, c) : characteristics(s, obj(s, c)).toughness) > 0)) return null;
+  }
   // Mox Diamond with no other land card to discard would only go to the graveyard.
   const discard = compileCard(d).entersDiscardInstead;
   if (discard && !player(s, pid).hand.some((c) => c !== id && printedMatches(discard, defOf(s, obj(s, c))))) return null;
@@ -3450,6 +3471,12 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   if (cost.hasX && effects.some((e) => e.type === "pick" && e.action === "sacrifice" && e.filter.types?.includes("Land") && typeof e.n === "object" && "count" in e.n && e.n.count.kind === "x")) {
     const lands = player(s, pid).hand.filter((h) => h !== id && isType(defOf(s, obj(s, h)), "Land")).length;
     xs = xs.filter((x) => x !== undefined && x >= 1 && x <= lands);
+  }
+  // Frankenstein's Monster: no more X than our creature cards in the graveyard (or it never enters), and at least 1.
+  if (cost.hasX && yard?.n === "x") {
+    const cards = player(s, pid).graveyard.filter((c) => c !== id && printedMatches(yard.filter, defOf(s, obj(s, c)))).length;
+    const top = Math.min(cards, Math.max(0, ...xs.filter((x): x is number => x !== undefined)));
+    xs = Array.from({ length: top }, (_, i) => top - i);
   }
   // Nissa, Steward of Elements: X loyalty, so X 0 would put it straight into the graveyard (CR 306.5b, 704.5i).
   if (cost.hasX && d.loyalty === "X") xs = xs.filter((x) => x !== undefined && x >= 1);

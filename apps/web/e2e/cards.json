@@ -11835,6 +11835,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "100218ce-1572-4bce-bb00-d2df5f68705c",
+  "name": "Frankenstein's Monster",
+  "manaCost": "{X}{B}{B}",
+  "cmc": 2,
+  "typeLine": "Creature — Zombie",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie"
+  ],
+  "oracleText": "As this creature enters, exile X creature cards from your graveyard. If you can't, put this creature into its owner's graveyard instead of onto the battlefield. For each creature card exiled this way, this creature enters with a +2/+0, +1/+1, or +0/+2 counter on it.",
+  "power": "0",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "drk",
+  "releasedAt": "1994-08-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a1fc4269-f3e4-4a59-849d-aa1727eef23a",
   "name": "From Under the Floorboards",
   "manaCost": "{3}{B}{B}",
@@ -30917,6 +30947,38 @@
   ]
  },
  {
+  "oracleId": "8b4715b0-63d9-4ff8-a667-21a762518687",
+  "name": "Sutured Ghoul",
+  "manaCost": "{4}{B}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Creature — Zombie",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie"
+  ],
+  "oracleText": "Trample\nAs this creature enters, exile any number of creature cards from your graveyard.\nSutured Ghoul's power is equal to the total power of the exiled cards and its toughness is equal to their total toughness.",
+  "power": "*",
+  "toughness": "*",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "jud",
+  "releasedAt": "2002-05-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "56719f6a-1a6c-4c0a-8d21-18f7d7350b68",
   "name": "Swamp",
   "manaCost": "",
@@ -31775,6 +31837,35 @@
   "commanderLegal": "legal",
   "set": "dsc",
   "releasedAt": "2024-09-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "85255c26-4e74-4cf0-91a6-78ddba5abdc6",
+  "name": "Tetravus",
+  "manaCost": "{6}",
+  "cmc": 6,
+  "typeLine": "Artifact Creature — Construct",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Construct"
+  ],
+  "oracleText": "Flying\nThis creature enters with three +1/+1 counters on it.\nAt the beginning of your upkeep, you may remove any number of +1/+1 counters from this creature. If you do, create that many 1/1 colorless Tetravite artifact creature tokens. They each have flying and \"This token can't be enchanted.\"\nAt the beginning of your upkeep, you may exile any number of tokens created with this creature. If you do, put that many +1/+1 counters on this creature.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "atq",
+  "releasedAt": "1994-03-04",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

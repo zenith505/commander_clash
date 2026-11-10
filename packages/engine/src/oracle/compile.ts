@@ -4054,6 +4054,13 @@ export function compile(d: CardDef): CompiledCard {
       else out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "addKeywords", keywords: kws.map((k) => `${LINKED_CARD_KEYWORD}${k}`) }], text: line });
       continue;
     }
+    // Professor Hojo: "The first activated ability you activate during your turn that targets a creature you control
+    // costs {2} less to activate." (game.ts activationCost).
+    const hojo = /^The first activated ability you activate during your turn that targets a creature you control costs \{(\d+)\} less to activate\.$/.exec(line);
+    if (hojo) {
+      out.firstOwnCreatureTargetLess = (out.firstOwnCreatureTargetLess ?? 0) + Number(hojo[1]);
+      continue;
+    }
     const firstArtifactLess = /^The first activated ability of an artifact you activate each turn costs \{(\d+)\} less to activate\.$/.exec(line);
     if (firstArtifactLess) {
       out.firstArtifactAbilityLess = (out.firstArtifactAbilityLess ?? 0) + Number(firstArtifactLess[1]);

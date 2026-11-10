@@ -5502,6 +5502,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const source = abilitiesOf(s, o).triggers.some((t) => t.cast?.manaFromSelf) ? `${o.id}#${o.zoneChanges ?? 0}` : undefined;
   if (getter !== p.id) log(s, `${p.name} taps ${name}: ${player(s, getter).name} adds ${adds.map((m) => `{${m}}`).join("")}.`);
   addMana(s, getter, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: ab.spentCreatureCounter } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
+  // Tyvar the Bellicose: "Whenever a mana ability of this creature resolves" (CR 605.3b), the mana it made.
+  if (o.zone === "battlefield") fireEvent(s, { type: "manaAbilityResolved", id: o.id, amount: adds.length });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
   // Winter's Night: the land tapped for mana doesn't untap during its controller's next untap step.
@@ -9311,6 +9313,7 @@ export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: A
       if (g.atLeastOne) atLeastOne = true;
     }
   less += firstArtifactLess(s, pid, o, !!ab.mana);
+  if (!ab.mana) less += firstOwnCreatureTargetLess(s, pid, ab, targets);
   return activationLessCost(s, o, activationCostBefore(s, pid, o, ab, targets, x), x, less ? { n: less, atLeastOne } : undefined);
 }
 
@@ -9326,6 +9329,28 @@ export function firstArtifactLess(s: GameState, pid: PlayerId, o: GameObject, ma
   for (const id of s.battlefield) {
     const src = obj(s, id);
     if (controllerOf(s, src) === pid) less += abilitiesOf(s, src).firstArtifactAbilityLess ?? 0;
+  }
+  return less;
+}
+
+/** Does this ability, with these targets, target a creature `pid` controls (Professor Hojo)? Without targets chosen yet, whether it could. */
+function targetsOwnCreature(s: GameState, pid: PlayerId, ab: ActivatedAbility, targets?: TargetChoice[]): boolean {
+  if (!targets) return ab.body.targets.some((t) => (t.kind === "object" && (!t.types?.length || t.types.includes("Creature")) && t.controller !== "opponent") || t.kind === "any");
+  return targets.some((t) => t.kind === "object" && !!s.objects[t.id] && s.objects[t.id]!.zone === "battlefield" && controllerOf(s, s.objects[t.id]!) === pid && objIsType(s, s.objects[t.id]!, "Creature"));
+}
+
+/**
+ * Professor Hojo: what "The first activated ability you activate during your turn that targets a creature you control
+ * costs {2} less to activate" takes off this ability if `pid` activates it now with these targets (chosen before costs
+ * are worked out, CR 602.2b, 601.2c, 601.2f): only during their own turn, only the first such ability that turn, whether
+ * or not Hojo was there for an earlier one (TurnLog.ownCreatureTargeted).
+ */
+function firstOwnCreatureTargetLess(s: GameState, pid: PlayerId, ab: ActivatedAbility, targets?: TargetChoice[]): number {
+  if (s.activePlayer !== pid || s.turnLog?.ownCreatureTargeted?.includes(pid) || !targetsOwnCreature(s, pid, ab, targets)) return 0;
+  let less = 0;
+  for (const id of s.battlefield) {
+    const src = obj(s, id);
+    if (controllerOf(s, src) === pid) less += abilitiesOf(s, src).firstOwnCreatureTargetLess ?? 0;
   }
   return less;
 }
@@ -9677,6 +9702,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     if (change < 0) countersRemoved(s, o, "loyalty", -change);
   }
   (o.activatedThisTurn ??= []).push(index); // "once each turn" (CR 602.5b); bots also count repeats (bot.ts)
+  // Professor Hojo: the first one this turn that targets a creature its activator controls, during their turn.
+  if (!ab.mana && s.activePlayer === p.id && !s.turnLog?.ownCreatureTargeted?.includes(p.id) && targets && targetsOwnCreature(s, p.id, ab, targets)) ((s.turnLog ??= {}).ownCreatureTargeted ??= []).push(p.id);
   if (ab.equip && !s.turnLog?.equipped?.includes(p.id)) ((s.turnLog ??= {}).equipped ??= []).push(p.id);
   if (ab.onceEver) (o.activatedEver ??= []).push(index); // exhaust (CR 702.177a)
   if (ab.keyword === "Exhaust") p.exhaustTurn = s.turn; // CR 702.177b

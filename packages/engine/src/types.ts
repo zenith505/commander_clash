@@ -1865,6 +1865,8 @@ export interface TurnLog {
    * artifact's, it's still the first. See CompiledCard.firstArtifactAbilityLess.
    */
   artifactAbility?: Record<number, "mana" | "used">;
+  /** Professor Hojo: the players who have activated an ability during their own turn that targets a creature they control (CompiledCard.firstOwnCreatureTargetLess). */
+  ownCreatureTargeted?: PlayerId[];
   /** A card was put into exile this turn, from anywhere (Ennis, Debate Moderator); tokens and copies of spells aren't cards. */
   cardExiled?: true;
   /** Players who gained life (Needlebite Trap). */

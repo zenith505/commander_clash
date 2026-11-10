@@ -5,9 +5,10 @@
 // of those cards into your hand and the rest on the bottom of your library in a random order." (Karn's −1).
 
 import { describe, expect, it } from "vitest";
-import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { abilityProblem, applyAction, botActions, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
+import { abilitiesOf, abilityProblem, activationCost, applyAction, botActions, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { faceDef, restingDef } from "../src/faces";
+import { manaValue, parseManaCost } from "../src/mana";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -136,7 +137,7 @@ describe("round 330: emblems with activated abilities", () => {
     let plan = botActions(s, ap);
     const use = plan.find((a) => a.type === "activateAbility" && a.objectId === em);
     expect(use).toBeDefined();
-    const t = (use as { targets?: { kind: string; id: string }[] }).targets?.[0];
+    const t = (use as { targets?: { kind: string; id: string | number }[] }).targets?.[0];
     expect(t && (t.kind === "object" || t.id !== ap)).toBe(true);
     s = settle(run(s, plan));
     // With its only artifact tapped, nothing more.
@@ -282,5 +283,142 @@ describe("round 330: Disorienting Choice", () => {
     for (const c of s0.players[ap]!.command) s0.players[ap]!.commanderCasts[c] = 20;
     const castIt = botActions(s0, ap).find((a) => a.type === "castSpell" && a.objectId === d) as { targets?: { kind: string }[] } | undefined;
     expect(castIt?.targets?.filter((t) => t.kind === "object")).toHaveLength(1);
+  });
+});
+
+const tyvar = (): CardDef => ({"oracleId":"a21d321b-2172-4577-a05b-399a019e3448","name":"Tyvar the Bellicose","manaCost":"{2}{B}{G}","cmc":4,"typeLine":"Legendary Creature — Elf Warrior","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Elf","Warrior"],"oracleText":"Whenever one or more Elves you control attack, they gain deathtouch until end of turn.\nEach creature you control has \"Whenever a mana ability of this creature resolves, put a number of +1/+1 counters on it equal to the amount of mana this creature produced. This ability triggers only once each turn.\"","power":"5","toughness":"4","colors":["B","G"],"colorIdentity":["B","G"],"keywords":[],"commanderLegal":"legal","set":"mat","releasedAt":"2023-05-12","rarity":"mythic","layout":"normal","gameChanger":false} as CardDef);
+const dork = card("Test Dork", "Creature — Elf Druid", "{G}", { power: "1", toughness: "1", oracleText: "{T}: Add {G}." });
+const twoDork = card("Test Twin Dork", "Creature — Elf Druid", "{2}{G}", { power: "1", toughness: "1", oracleText: "{T}: Add {G}{G}." });
+const sacDork = card("Test Sac Dork", "Creature — Eldrazi Spawn", "", { power: "0", toughness: "1", oracleText: "Sacrifice this creature: Add {C}." });
+const elfSpell = card("Test Growth", "Instant", "{G}", { oracleText: "Target creature gets +3/+3 until end of turn." });
+
+describe("round 330: Tyvar the Bellicose", () => {
+  const tapFor = (s: GameState, pid: PlayerId, id: string, mana: "G" | "C" = "G") => {
+    const plan = planManaAbilityPlan(s, pid, id, mana);
+    for (const a of plan) s = act(s, a);
+    return s;
+  };
+  const planManaAbilityPlan = (s: GameState, pid: PlayerId, id: string, mana: "G" | "C"): Action[] => [{ type: "activateMana", player: pid, objectId: id, mana, ability: 0 }];
+
+  it("is fully supported", () => {
+    supported(tyvar());
+  });
+
+  it("each creature's mana ability resolving puts that much +1/+1 counters on it, once each turn for each creature", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, tyvar());
+    const a = putOnBattlefield(s0, ap, dork);
+    const b = putOnBattlefield(s0, ap, twoDork);
+    let s = tapFor(s0, ap, a);
+    // A triggered ability that isn't a mana ability: on the stack once a player would get priority.
+    expect(s.players[ap]!.manaPool.G).toBe(1);
+    s = tapFor(s, ap, b);
+    s = resolveAll(s);
+    expect(s.objects[a]!.counters["+1/+1"]).toBe(1);
+    expect(s.objects[b]!.counters["+1/+1"]).toBe(2);
+    // Once each turn for each of them.
+    s.objects[a]!.tapped = false;
+    s = resolveAll(tapFor(s, ap, a));
+    expect(s.objects[a]!.counters["+1/+1"]).toBe(1);
+  });
+
+  it("paying for a spell: the counters come before the spell resolves (rulings)", () => {
+    const { s: s0, ap, ids } = setup([elfSpell]);
+    putOnBattlefield(s0, ap, tyvar());
+    const a = putOnBattlefield(s0, ap, dork);
+    for (const id of s0.battlefield) if (s0.objects[id]!.controller === ap && s0.cards[s0.objects[id]!.cardId]!.types.includes("Land")) s0.objects[id]!.tapped = true;
+    let s = tapFor(s0, ap, a);
+    s = run(s, planCast(s, ap, ids[0]!, [tgt(a)]));
+    // The trigger is on top of the spell.
+    expect(s.stack.length).toBe(2);
+    expect(s.stack.at(-1)!.kind).toBe("ability");
+    s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = resolveAll(s);
+    expect(s.objects[a]!.counters["+1/+1"]).toBe(1);
+  });
+
+  it("an opponent's creatures don't have it; a creature sacrificed for its own mana doesn't trigger it", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, tyvar());
+    const theirs = putOnBattlefield(s0, opp, dork);
+    const spawn = putOnBattlefield(s0, ap, sacDork);
+    let s = tapFor(s0, ap, spawn, "C");
+    expect(s.triggerQueue.length + s.stack.length).toBe(0);
+    s = resolveAll(s);
+    expect(s.objects[spawn]?.zone).not.toBe("battlefield");
+    expect(abilitiesOf(s, s.objects[theirs]!).triggers.some((t) => t.event === "selfManaAbilityResolves")).toBe(false);
+    const mine = putOnBattlefield(s, ap, dork);
+    expect(abilitiesOf(s, s.objects[mine]!).triggers.some((t) => t.event === "selfManaAbilityResolves")).toBe(true);
+  });
+});
+
+const hojo = (): CardDef => ({"oracleId":"4ca66b33-28c2-4d0d-8a44-9d891ab13e18","name":"Professor Hojo","manaCost":"{1}{G}","cmc":2,"typeLine":"Legendary Creature — Human Scientist","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Scientist"],"oracleText":"The first activated ability you activate during your turn that targets a creature you control costs {2} less to activate.\nWhenever one or more creatures you control become the target of an activated ability, draw a card. This ability triggers only once each turn.","power":"2","toughness":"2","colors":["G"],"colorIdentity":["G"],"keywords":[],"commanderLegal":"legal","set":"fic","releasedAt":"2025-06-13","rarity":"rare","layout":"normal","gameChanger":false} as CardDef);
+const pump = card("Test Pump Rod", "Artifact", "{1}", { oracleText: "{3}: Put a +1/+1 counter on target creature." });
+const greenPump = card("Test Green Rod", "Artifact", "{1}", { oracleText: "{G}: Target creature gets +1/+1 until end of turn." });
+const pinger2 = bear({ name: "Test Pinger", power: "1", toughness: "1", oracleText: "When this creature enters, put a +1/+1 counter on target creature." });
+
+describe("round 330: Professor Hojo", () => {
+  const noLands = (s: GameState, pid: PlayerId) => {
+    for (const id of s.battlefield) if (s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]!.types.includes("Land")) s.objects[id]!.tapped = true;
+  };
+
+  it("is fully supported", () => {
+    supported(hojo());
+  });
+
+  it("the first activated ability you activate during your turn that targets a creature you control costs {2} less; generic mana only", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, hojo());
+    const rod = putOnBattlefield(s0, ap, pump);
+    const mine = putOnBattlefield(s0, ap, ogre);
+    const theirs = putOnBattlefield(s0, opp, ogre);
+    const rodAb = abilitiesOf(s0, s0.objects[rod]!).activated[0]!;
+    // Targeting an opponent's creature: the full {3}.
+    expect(manaValue(activationCost(s0, ap, s0.objects[rod]!, rodAb, [tgt(theirs)]))).toBe(3);
+    expect(manaValue(activationCost(s0, ap, s0.objects[rod]!, rodAb, [tgt(mine)]))).toBe(1);
+    noLands(s0, ap);
+    s0.players[ap]!.manaPool.C = 1;
+    let s = run(s0, planActivate(s0, ap, rod, 0, [tgt(mine)]));
+    expect(s.players[ap]!.manaPool.C ?? 0).toBe(0);
+    s = resolveAll(s);
+    expect(s.objects[mine]!.counters["+1/+1"]).toBe(1);
+    // The second one this turn: the full cost.
+    expect(manaValue(activationCost(s, ap, s.objects[rod]!, rodAb, [tgt(mine)]))).toBe(3);
+  });
+
+  it("not during an opponent's turn", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, opp, hojo());
+    const rod = putOnBattlefield(s0, opp, pump);
+    const theirs = putOnBattlefield(s0, opp, ogre);
+    expect(s0.activePlayer).toBe(ap);
+    const rodAb = abilitiesOf(s0, s0.objects[rod]!).activated[0]!;
+    expect(manaValue(activationCost(s0, opp, s0.objects[rod]!, rodAb, [tgt(theirs)]))).toBe(3);
+  });
+
+  it("only generic mana comes off (rulings)", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, hojo());
+    const rod = putOnBattlefield(s0, ap, greenPump);
+    const mine = putOnBattlefield(s0, ap, ogre);
+    const c = activationCost(s0, ap, s0.objects[rod]!, abilitiesOf(s0, s0.objects[rod]!).activated[0]!, [tgt(mine)]);
+    expect(c.symbols).toEqual(parseManaCost("{G}").symbols);
+  });
+
+  it("draws a card when an activated ability, anyone's, targets one or more of your creatures, once each turn; not a triggered ability", () => {
+    const { s: s0, ap, opp, ids } = setup([pinger2]);
+    putOnBattlefield(s0, ap, hojo());
+    const rod = putOnBattlefield(s0, ap, greenPump);
+    const mine = putOnBattlefield(s0, ap, ogre);
+    const hand = s0.players[ap]!.hand.length;
+    // A triggered ability targeting it: nothing.
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    if (s.pending?.kind === "chooseTargets") s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(mine)] }));
+    expect(s.players[ap]!.hand.length).toBe(hand - 1);
+    s = resolveAll(run(s, planActivate(s, ap, rod, 0, [tgt(mine)])));
+    expect(s.players[ap]!.hand.length).toBe(hand);
+    s = resolveAll(run(s, planActivate(s, ap, rod, 0, [tgt(mine)])));
+    expect(s.players[ap]!.hand.length).toBe(hand);
+    void opp;
   });
 });

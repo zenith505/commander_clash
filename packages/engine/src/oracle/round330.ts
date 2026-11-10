@@ -2,6 +2,7 @@
 // round329WholeText in oracle/round329.ts).
 import type { AbilityBody, Effect, TriggeredAbility } from "../abilities";
 import { parseOne, replaceX, type Ctx } from "./body";
+import { parseTrigger } from "./triggers";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -45,7 +46,21 @@ export function round330Sentence(s: string, sentences: string[], si: number, ctx
 }
 
 export function round330Trigger(raw: string): TriggeredAbility | "fail" | null {
-  void raw;
+  // Tyvar the Bellicose's granted "Whenever a mana ability of this creature resolves, put a number of +1/+1 counters on it
+  // equal to the amount of mana this creature produced.": not a mana ability itself (it adds no mana, CR 605.1b), so it
+  // goes on the stack, before the spell the mana paid for resolves (rulings); "This ability triggers only once each
+  // turn" is read around it (parseTrigger).
+  // Professor Hojo: "Whenever one or more creatures you control become the target of an activated ability, draw a card."
+  // (with "This ability triggers only once each turn" read around it): anyone's activated ability, not a triggered one;
+  // it resolves first, even if that ability is countered (rulings).
+  const hojo = /^Whenever one or more creatures you control become the target of an activated ability, (.+)$/.exec(raw);
+  if (hojo) {
+    const t = parseTrigger(`Whenever a creature you control becomes the target of a spell or ability, ${hojo[1]!}`);
+    if (!t || t === "fail" || t.event !== "permanentBecomesTarget" || t.targeted?.by || t.targeted?.spell || t.targeted?.first || t.subjectFilter?.kind !== "object" || !t.subjectFilter.types?.includes("Creature")) return "fail";
+    return { ...t, targeted: { ...t.targeted, ability: true, activatedOnly: true } };
+  }
+  if (raw === "Whenever a mana ability of ~ resolves, put a number of +1/+1 counters on it equal to the amount of mana ~ produced.")
+    return { event: "selfManaAbilityResolves", body: { targets: [], effects: [{ type: "counters", what: { ref: "self" }, counter: "+1/+1", n: { count: { kind: "eventAmount" } } }], text: "put a number of +1/+1 counters on it equal to the amount of mana it produced." } };
   return null;
 }
 

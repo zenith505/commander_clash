@@ -404,6 +404,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     playedFromExile: t.playedFromExile,
     lorePut: t.lorePut ? [...t.lorePut].sort() : undefined,
     permanentToHand: t.permanentToHand,
+    ownCreatureTargeted: t.ownCreatureTargeted,
     creatureCardLeftGraveyard: t.creatureCardLeftGraveyard,
     descended: capped(t.descended ?? {}),
     creaturesExiled: capped(t.creaturesExiled ?? {}),

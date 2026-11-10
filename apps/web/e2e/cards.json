@@ -11194,6 +11194,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "202e45d6-8c7a-46db-85fb-634aa77b4097",
+  "name": "Fatal Fissure",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose target creature. When that creature dies this turn, you earthbend 4. (Target land you control becomes a 0/0 creature with haste that's still a land. Put four +1/+1 counters on it. When it dies or is exiled, return it to the battlefield tapped.)",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Earthbend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tla",
+  "releasedAt": "2025-11-21",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "aeb85786-16fc-45d8-9383-60054a878c40",
   "name": "Fatal Lore",
   "manaCost": "{2}{B}{B}",
@@ -33698,6 +33726,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7273118b-08af-41cd-a316-6bf61dc45b6c",
+  "name": "Thrill-Kill Disciple",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Mercenary",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Mercenary"
+  ],
+  "oracleText": "Squad—{1}, Discard a card. (As an additional cost to cast this spell, you may pay its squad cost any number of times. When this creature enters, create that many tokens that are copies of it.)\nWhen this creature dies, create a Junk token.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Squad"
+  ],
+  "commanderLegal": "legal",
+  "set": "pip",
+  "releasedAt": "2024-03-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a7c96442-706b-4fd8-9b38-052872dafe58",
   "name": "Throne of the Grim Captain // The Grim Captain",
   "manaCost": "{2}",
@@ -34182,6 +34243,40 @@
   "set": "bok",
   "releasedAt": "2005-02-04",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0335e7db-5e0e-4271-8ae7-437a1d2c16ac",
+  "name": "Torrent Elemental",
+  "manaCost": "{4}{U}",
+  "cmc": 5,
+  "typeLine": "Creature — Elemental",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "Flying\nWhenever this creature attacks, tap all creatures defending player controls.\n{3}{B/G}{B/G}: Put this card from exile onto the battlefield tapped. Activate only as a sorcery.",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "frf",
+  "releasedAt": "2015-01-23",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

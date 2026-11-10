@@ -1,6 +1,6 @@
 # Roadmap
 
-30,908 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,919 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,799 of
 9,979 (98%).
 
@@ -7730,6 +7730,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   enchanted": no Aura can be attached, so an Aura spell aimed at it goes to the graveyard, CR 303.4i). The exiled P/T of
   Phyrexian Ingester now applies the cards' characteristic-defining abilities in exile too (rulings). +4, 30,912 of 31,936
   with B170.
+- Round B172 (least played first, mechanics that could be built from the skip lists): Goblin Plate Mail ("amass Goblins 1,
+  then attach ~ to the amassed Army": the Army chosen for the counter, CR 701.47c, rulings; a new 0/0 token if you control
+  none). Lich's Tomb ("Whenever you lose life, sacrifice a permanent for each 1 life you lost": that many, chosen by you, for
+  each life-losing event; damage is one, CR 120.3a; sacrificing the Tomb at 0 or less life loses the game, CR 704.5a).
+  Recross the Paths (the revealed cards "on the bottom of your library in any order", ordered by their owner, CR 401.4,
+  before the clash, rulings; a win returns it to its owner's hand). War Tax ("This turn, creatures can't attack unless their
+  controller pays {X} for each attacking creature they control": a cost to attack anything, CR 508.1g-h, for attacks
+  declared the rest of the turn, as War Cadence's for blocks; bots don't activate it). Awe Strike (the next time target
+  creature would deal damage this turn, prevented, CR 615.8, and you gain that much life, CR 615.5). Eureka (starting with
+  you, in turn order, each player may put a permanent card from their hand onto the battlefield, each one entering as it's
+  chosen; over once every player in the game in a row has put none, rulings; an Aura's host chosen as it enters, CR
+  303.4f; the existing hand picker, browser tests). Blood Sun ("All lands lose all abilities except mana abilities": layer 6,
+  CR 613.1f; their mana abilities, activated and triggered, printed or granted before, stay, CR 605.1a, and so do their
+  basic land types'; a land's enters-tapped and enters triggers are gone as it enters, CR 614.12, rulings; Urborg-style
+  type changes still apply, layer 4 first, rulings; the card shows "Only mana abilities", a browser test). +7, 30,919 of
+  31,936 with B171.
+- Out after round B172 (looked at, not done): Titania's Song (its effect "continues until end of turn" once it leaves: whether
+  that locks in the artifacts it applied to isn't settled by the rules or rulings), Swans of Bryn Argoll (see round B66).
+  Eureka's cards make their "as it enters" choices (Clone's copy, a chosen creature type) once Eureka has resolved, as the
+  engine does for every effect; a copy can't be of a card put after it, but a chosen type doesn't yet affect the cards put
+  after it during the same Eureka.
 - Out after round B171 (looked at, not done): Yannik, Scavenging Sentinel (an exile until it leaves, then a reflexive
   trigger dividing counters by the exiled creature's power), Arcane Artisan (a token copy of a card exiled from hand, and
   every token created with it exiled when it leaves, including later ones) stay out.

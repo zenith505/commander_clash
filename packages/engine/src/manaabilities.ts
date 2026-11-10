@@ -28,7 +28,8 @@ let lendingMana = false;
 export function manaAbilitiesOn(s: GameState, o: GameObject): ManaAbility[] {
   const c = characteristics(s, o);
   const out = c.landAbilitiesLost ? [] : c.subtypes.map(basicLandManaAbility).filter((x): x is ManaAbility => x !== null);
-  if (c.hasPrintedAbilities) out.push(...compileCard(defOf(s, o)).mana);
+  // Blood Sun: its printed mana abilities stay when it loses the rest (CR 605.1a).
+  if (c.hasPrintedAbilities || c.printedManaOnly) out.push(...compileCard(defOf(s, o)).mana);
   for (const t of c.grantedAbilities) out.push(...compileGranted(t).mana); // 'Enchanted land has "{T}: Add ..."'
   // "~ has all activated abilities of ...": the lenders' mana abilities too, a land's basic land types' among them
   // (rulings on Mirran Safehouse).

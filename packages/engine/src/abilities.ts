@@ -1955,7 +1955,7 @@ export type Modification =
    */
   | { kind: "addKeywords"; keywords: string[]; /** "auras": "This effect doesn't remove Auras" (Spectra Ward): no Aura, the source or another. "attached": "This effect doesn't remove Auras and Equipment you control that are already attached to it" (Benevolent Blessing, CR 702.16p): those attached as the effect began (GameObject.sparesAttached). */ spares?: true | "auras" | "attached"; sharedAmongYours?: true | "graveyard" }
   | { kind: "removeKeywords"; keywords: string[] } // layer 6
-  | { kind: "loseAllAbilities" } // layer 6
+  | { kind: "loseAllAbilities"; /** Blood Sun: "lose all abilities except mana abilities" (CR 605.1a): its mana abilities, printed or granted before, stay. */ exceptMana?: true } // layer 6
   /**
    * Layer 6: 'has "{T}: Add one mana of any color."', 'gains "When ~ dies, ..." until end of turn'. The text
    * is a triggered, activated or mana ability in which "~" ("this creature") is the object that has it.
@@ -4848,6 +4848,14 @@ export type Effect =
   | { type: "cantPlayLands"; who: PlayerRef }
   /** War Cadence: "This turn, creatures can't block unless their controller pays {X} for each blocking creature they control" (GameState.blockTaxes). */
   | { type: "blockTaxThisTurn"; n: Amount }
+  /** War Tax: "This turn, creatures can't attack unless their controller pays {X} for each attacking creature they control" (GameState.attackTaxes). */
+  | { type: "attackTaxThisTurn"; n: Amount }
+  /**
+   * Eureka: "Starting with you, each player may put a permanent card from their hand onto the battlefield. Repeat this
+   * process until no one puts a card onto the battlefield.": in turn order from you, each card entering as it's chosen;
+   * over once every player in the game in a row has put none (rulings).
+   */
+  | { type: "putFromHandRounds" }
   /** Stromgald Spy: "defending player plays with their hand revealed for as long as ~ remains on the battlefield" (CR 402.3, 611.2b; Player.handRevealedWhile). */
   | { type: "revealHandWhile"; who: PlayerRef }
   /**

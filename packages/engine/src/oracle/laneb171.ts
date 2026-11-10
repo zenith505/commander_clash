@@ -2,6 +2,7 @@
 // compileCard before its other "As ~ enters" lines; and its sentences, read at the end of round B170's.
 import { allEffects, type AbilityBody, type CompiledCard, type Effect, type TargetSpec } from "../abilities";
 import { parseOne, type Ctx } from "./body";
+import { roundB172Sentence } from "./laneb172";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
@@ -85,5 +86,5 @@ export function roundB171Sentence(s: string, sentences: string[], si: number, ct
     effects.push({ type: "pick", who: { ref: "you" }, filter: token, n: 1, action: "exile", anyNumber: true, createdWithSelf: true, prompt: "click any number of tokens created with ~ to exile (a +1/+1 counter on ~ for each), then exile them." });
     return { effect: { type: "if", cond: { kind: "amountNow", amount: exiled, min: 1 }, effects: [{ type: "counters", what: { ref: "self" }, counter: "+1/+1", n: exiled }] }, next: si + 2 };
   }
-  return null;
+  return roundB172Sentence(s, sentences, si, ctx, effects);
 }

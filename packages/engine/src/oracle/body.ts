@@ -17996,7 +17996,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Avenging Druid: "you may reveal cards ... until you reveal a land card. If you do, put that card onto the battlefield
     // and put all other cards revealed this way into your graveyard": the whole process, if you choose.
     // Sacred Guide: "Put that card into your hand and exile all other cards revealed this way" (as Demonic Consultation).
-    const untilPut = /^Put that card (into your hand|onto the battlefield( tapped(?: and attacking)?)?) and (the rest on the bottom of your library in a random order|(?:put )?all other cards revealed this way into your graveyard|the rest into your graveyard|exile all other cards revealed this way)$/.exec((mayUntil ? sentences[si + 1]?.replace(/^If you do, put /, "Put ") : sentences[si + 1])?.replace(/\.$/, "") ?? "");
+    // Recross the Paths: "Put that card onto the battlefield and the rest on the bottom of your library in any order": their
+    // owner orders them (CR 401.4), as Fathom Trawl's.
+    const untilPut = /^Put that card (into your hand|onto the battlefield( tapped(?: and attacking)?)?) and (the rest on the bottom of your library in (?:a random|any) order|(?:put )?all other cards revealed this way into your graveyard|the rest into your graveyard|exile all other cards revealed this way)$/.exec((mayUntil ? sentences[si + 1]?.replace(/^If you do, put /, "Put ") : sentences[si + 1])?.replace(/\.$/, "") ?? "");
     // Bag of Tricks: "Roll a d8. Reveal cards ... until you reveal a creature card with mana value equal to the result.":
     // that roll's result, as the reveal begins (TargetSpec.bound).
     const rollMv = !until && !mayUntil && effects.at(-1)?.type === "roll" ? /^Reveal cards from the top of your library until you reveal a (creature card) with mana value equal to the result$/.exec(s) : null;
@@ -18013,7 +18015,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const saga = !filter.types?.length && filter.subtypes?.length === 1 && filter.subtypes[0] === "Saga";
       if (onto && !safe && !tribal && !saga) return null;
       if (sharesM && (onto || filter.types?.length !== 1 || filter.types[0] !== "Creature")) return null;
-      const reveal: Effect = { type: "revealUntil", filter, found: onto ? "battlefield" : "hand", rest: /graveyard$/.test(untilPut[3]!) ? "graveyard" : /^exile/.test(untilPut[3]!) ? "exile" : "bottom", ...(untilPut[2] ? { tapped: true as const } : {}), ...(untilPut[2] === " tapped and attacking" ? { attacking: true as const } : {}), ...(sharesM ? { sharesCreatureTypeWithSubject: true as const } : {}) };
+      const reveal: Effect = { type: "revealUntil", filter, found: onto ? "battlefield" : "hand", rest: /graveyard$/.test(untilPut[3]!) ? "graveyard" : /^exile/.test(untilPut[3]!) ? "exile" : / any order$/.test(untilPut[3]!) ? "bottomOrder" : "bottom", ...(untilPut[2] ? { tapped: true as const } : {}), ...(untilPut[2] === " tapped and attacking" ? { attacking: true as const } : {}), ...(sharesM ? { sharesCreatureTypeWithSubject: true as const } : {}) };
       effects.push(mayUntil ? { type: "may", effects: [reveal], text: `reveal cards from the top of your library until ${/^[aeiou]/.test(untilOrRoll[1]!) ? "an" : "a"} ${untilOrRoll[1]!}${sharesM ? " that shares a creature type with it" : ""} is revealed` } : reveal);
       si++;
       continue;

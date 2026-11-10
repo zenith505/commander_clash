@@ -387,6 +387,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       return;
     }
+    case "attackTaxThisTurn": {
+      const n = Math.max(0, evalAmount(s, e.n, amountCtx(s, ctx)));
+      s.attackTaxes = [...(s.attackTaxes ?? []).filter((b) => b.turn === s.turn), { turn: s.turn, n }];
+      log(s, `This turn, creatures can't attack unless their controller pays {${n}} for each attacking creature they control (${src}).`);
+      return;
+    }
     case "blockTaxThisTurn": {
       const n = Math.max(0, evalAmount(s, e.n, amountCtx(s, ctx)));
       s.blockTaxes = [...(s.blockTaxes ?? []).filter((b) => b.turn === s.turn), { turn: s.turn, n }];

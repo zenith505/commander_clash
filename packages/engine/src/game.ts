@@ -11970,7 +11970,12 @@ function attackTaxParts(s: GameState, defender: PlayerId, planeswalker: boolean,
   }
   // "Until your next turn, creatures can't attack you unless ..." (Summon: Yojimbo): the defender's own effects.
   for (const t of s.players[defender]?.attackTaxUntil ?? []) if (!planeswalker || t.planeswalkers) generic += t.n;
-  return { generic: generic + ownAttackTax(s, attacker), mana };
+  return { generic: generic + ownAttackTax(s, attacker) + turnAttackTax(s), mana };
+}
+
+/** War Tax: what attacking costs for each creature this turn, whatever it attacks (GameState.attackTaxes). */
+function turnAttackTax(s: GameState): number {
+  return (s.attackTaxes ?? []).reduce((n, t) => n + (t.turn === s.turn ? t.n : 0), 0);
 }
 
 /** Brainwash, Phyrexian Marauder: what attacking with this creature costs, whatever it attacks. */
@@ -11983,7 +11988,7 @@ function ownAttackTax(s: GameState, attacker?: ObjectId): number {
 export function attackTaxOf(s: GameState, a: { attacker?: ObjectId; defender: PlayerId; planeswalker?: ObjectId }): number {
   if (a.planeswalker === undefined) return attackTaxPer(s, a.defender, false, a.attacker);
   const pw = s.objects[a.planeswalker];
-  return pw && objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === a.defender ? attackTaxPer(s, a.defender, true, a.attacker) : ownAttackTax(s, a.attacker);
+  return pw && objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === a.defender ? attackTaxPer(s, a.defender, true, a.attacker) : ownAttackTax(s, a.attacker) + turnAttackTax(s);
 }
 
 /**

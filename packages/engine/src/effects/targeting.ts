@@ -2,7 +2,7 @@ import { ANY_COUNTER, isRealKicker, NON_AURA_ENCHANTMENT } from "../abilities";
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, PickAction, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
 import { compileCard, compileGranted } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
-import { abilitiesOf, basicLandManaAbility, basePower, basePowerNow, baseToughness, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, toughness, wasCastThisTurn, withCastThisTurn } from "../cards";
+import { abilitiesOf, printedManaAbilities, basicLandManaAbility, basePower, basePowerNow, baseToughness, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, toughness, wasCastThisTurn, withCastThisTurn } from "../cards";
 import { attackedDuringLastTurn, attackedPlaneswalker, creatureTypesOf, inCombatPhase, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, mostCommonColors, staticConditionNow, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem, withModes } from "../modes";
@@ -110,6 +110,11 @@ const BASIC_LAND_TYPES = ["Plains", "Island", "Swamp", "Mountain", "Forest"];
 export function hasNoAbilities(s: GameState, o: GameObject, c: Characteristics): boolean {
   if (c.keywords.length || c.grantedAbilities.length || c.enchantCreature) return false;
   if (c.subtypes.some((t) => BASIC_LAND_TYPES.includes(t))) return false;
+  // Blood Sun: what's left is its mana abilities, if it has any (CR 605.1a).
+  if (c.printedManaOnly && !o.faceDown) {
+    const left = printedManaAbilities(compileCard(defOf(s, o)));
+    return !left.mana.length && !left.activated.length && !left.manaTriggers?.length;
+  }
   if (!c.hasPrintedAbilities || o.faceDown) return true;
   const d = defOf(s, o);
   return !d.faces?.length && d.oracleText.replace(/\([^)]*\)/g, "").trim() === "";
@@ -1580,8 +1585,8 @@ function hasNonManaActivated(s: GameState, o: GameObject, c: Characteristics): b
 function hasManaAbility(s: GameState, o: GameObject, c: Characteristics): boolean {
   if (o.zone !== "battlefield") return !!(abilitiesOf(s, o).mana.length || abilitiesOf(s, o).manaTriggers?.length);
   if (!c.landAbilitiesLost && c.subtypes.some((st) => basicLandManaAbility(st))) return true;
-  const own = c.hasPrintedAbilities ? compileCard(defOf(s, o)) : undefined;
-  if (own && (own.mana.length || own.manaTriggers?.length)) return true;
+  const own = c.hasPrintedAbilities || c.printedManaOnly ? compileCard(defOf(s, o)) : undefined;
+  if (own && (own.mana.length || own.manaTriggers?.length || (c.printedManaOnly && own.activated.some((a) => a.mana)))) return true;
   return c.grantedAbilities.some((t) => compileGranted(t).mana.length || compileGranted(t).manaTriggers?.length);
 }
 

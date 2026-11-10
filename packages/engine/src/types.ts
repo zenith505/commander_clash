@@ -2162,6 +2162,8 @@ export interface GameState {
   cantPlayLandsThisTurn?: { player: PlayerId; turn: number; source: string }[];
   /** War Cadence: generic mana to pay for each blocking creature, for blocks declared the rest of turn `turn` (CR 509.1d). */
   blockTaxes?: { turn: number; n: number }[];
+  /** War Tax: generic mana to pay for each attacking creature, for attacks declared the rest of turn `turn` (CR 508.1g-h). */
+  attackTaxes?: { turn: number; n: number }[];
   /** "Players can't gain life this turn" effects from resolved spells and abilities, by the turn they were made (CR 119.7). */
   noLifeGain?: { turn: number; controller: PlayerId; who: "all" | "opponents" | "player"; /** With "player": the one player. */ player?: PlayerId }[];
   /** "Until end of turn, if one or more tokens would be created under your control, twice that many ..." (Kaya, Geist Hunter): replacements made by a resolved ability, for the turn they were made in (CR 614.1a). */
@@ -2976,6 +2978,11 @@ export interface Resolving {
     /** Kamahl's Summons (Effect eachRevealFromHand): who is still to choose, in turn order, and how many cards each revealed. */
     revealEach?: { queue: PlayerId[]; counts: Partial<Record<PlayerId, number>> };
     revealEachStep?: number;
+    /**
+     * Eureka (Effect putFromHandRounds): the player choosing next, how many players in a row have put no card, the card
+     * chosen (waiting for its Aura host), the player asked, and the cards put so far in order.
+     */
+    handRounds?: { next: PlayerId; passes: number; picked?: ObjectId; asked?: PlayerId; entered: ObjectId[] };
     /** Effect "revealPutIfNamedAsPermanent" (Retraced Image): the card revealed ("" none). */
     retraced?: ObjectId | "";
     /** Effect "dividedDamageBack" (Master of the Wild Hunt): how the damage was divided. */

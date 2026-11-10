@@ -21,6 +21,7 @@ import { characteristics, controllerOf, invalidateCharacteristics, staticConditi
 import type { CardDef, Color, DamageRule, GameObject, GameState, ObjectId, PlayerId, RedirectShield } from "./types";
 import type { AbilityBody, DamageMod, TargetSpec } from "./abilities";
 import { defMv, hasName } from "./faces";
+import { shuffleLibrary } from "./rng";
 
 /** What a damage source looks like as it deals damage. */
 export interface DamageSource {
@@ -507,6 +508,8 @@ type ShieldOp =
   | { kind: "betrayer"; id: ObjectId; to: PlayerId; prevented: boolean; toName: string }
   /** Nine Lives' counter (`counter` of it) for one source's damage to its controller, prevented or not (CR 615.5, 615.12). */
   | { kind: "counterOn"; id: ObjectId; counter: string; by: PlayerId; card: string }
+  /** Weeping Angel's additional effect: the permanent `id` (as object `zc`) is shuffled into its owner's library after the damage (CR 615.5). */
+  | { kind: "shuffleIn"; id: ObjectId; zc: number; card: string; by: PlayerId }
   /** Anti-Venom's counters for damage that can't be prevented, which is dealt too (CR 615.12). */
   | { kind: "plusOnes"; id: ObjectId; n: number; by: PlayerId; card: string };
 
@@ -520,6 +523,8 @@ interface ShieldPlan {
   rules?: DamageRule[];
   /** Kill-Suit Cultist: the creatures destroyed instead of being dealt the damage, filled in as the plan is committed. */
   destroyed?: ObjectId[];
+  /** Weeping Angel: the permanents shuffled into their owners' libraries once the damage is dealt, filled in as the plan is committed. */
+  shuffled?: { id: ObjectId; zc: number; card: string; by: PlayerId }[];
 }
 
 /** One of the shields around a permanent or player, as the planner sees it. */
@@ -595,6 +600,10 @@ function staticRules(s: GameState, events: DamageEvent[]): DamageRule[] {
     // even if the damage can't be prevented, and all of it is prevented however many cards there are (rulings, CR 615.12).
     const surgeon = abilitiesOf(s, cover).preventToSelfExileTop;
     if (surgeon) out.push({ id: `static-exiletop:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, ...(surgeon.combat ? { combat: surgeon.combat } : {}), to: { object: { id, zc: cover.zoneChanges ?? 0 } }, mill: true, millSelf: 1, exileTop: true });
+    // Weeping Angel: its own combat damage to a creature (as the same object, CR 400.7), prevented, and that creature's owner
+    // shuffles it into their library right after (CR 615.5); even when the damage can't be prevented (CR 615.12).
+    if (abilitiesOf(s, cover).combatToCreatureShuffles)
+      out.push({ id: `static-shuffle:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, combat: "only", to: { objects: { kind: "object", types: ["Creature"], text: "creature" } }, by: { chosen: { id, zc: cover.zoneChanges ?? 0 } }, shuffleIn: true });
     // Treacherous Link: all damage that would be dealt to the enchanted creature is dealt to the player who controls it as
     // the damage would be dealt instead (CR 614.9), from every source, combat or not.
     const att = abilitiesOf(s, cover).attachedDamageToController && cover.attachedTo ? s.objects[cover.attachedTo] : undefined;
@@ -996,6 +1005,8 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
       // happens, once for each such effect (CR 615.12, 615.12a); the damage is dealt.
       if (!prev(e)) for (const r of allRules.filter((r) => r.mill && ruleCovers(s, r, to) && ruleTakes(s, r, e))) ops.push({ kind: "mill", by: r.controller, n: e.n * (r.millSelf ?? 1), card: cardName(s, r), ...(r.millSelf ? { self: true as const } : {}), ...(r.exileTop ? { exile: true as const } : {}) });
       if (!prev(e)) for (const r of allRules.filter((r) => r.counterOn && ruleCovers(s, r, to) && ruleTakes(s, r, e))) ops.push({ kind: "counterOn", id: r.counterOn!.id, counter: r.counterOn!.kind, by: r.controller, card: cardName(s, r) });
+      // Weeping Angel: the creature is shuffled in even when the damage can't be prevented (CR 615.12).
+      if (!prev(e) && "object" in to) for (const r of allRules.filter((r) => r.shuffleIn && ruleCovers(s, r, to) && ruleTakes(s, r, e))) ops.push({ kind: "shuffleIn", id: to.object, zc: obj(s, to.object).zoneChanges ?? 0, card: cardName(s, r), by: r.controller });
       // Anti-Venom: "prevent that damage and put that many +1/+1 counters on ~": the counters even so (CR 615.12).
       // Ironscale Hydra: "prevent that damage and put a +1/+1 counter on ~": one counter for this source's damage, even so
       // (rulings).
@@ -1008,7 +1019,20 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
       // "Prevent all damage that would be dealt to / by ~" uses up no shield, so it's applied first (CR 615.1, 616.1).
       // One with an additional effect ("you gain life equal to the damage prevented this way") is the one picked.
       const rules = prev(e) ? allRules.filter((r) => preventsAll(r) && !(e.applied ?? []).includes(r.id) && ruleCovers(s, r, to) && ruleTakes(s, r, e)) : [];
-      const rule = rules.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src)) || r.tokens || r.mill || r.counterOn || r.countersOn || r.dealTo) ?? (preventedAll(s, e) ? undefined : rules[0]);
+      let rule = rules.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src)) || r.tokens || r.mill || r.counterOn || r.countersOn || r.dealTo || r.shuffleIn) ?? (preventedAll(s, e) ? undefined : rules[0]);
+      // Weeping Angel's prevention shuffles the creature away: when another prevention effect, protection or a shield
+      // counter would apply to the damage too, the creature's controller chooses which applies (CR 616.1); a bot (and the
+      // default) takes the other one.
+      if (rule?.shuffleIn && "object" in to) {
+        const o = obj(s, to.object);
+        const others = rules.filter((r) => !r.shuffleIn);
+        const other = others.length > 0 || preventedAll(s, e) || protectedFrom(characteristics(s, o).keywords, e.src, protectionHolder(s, o)) || (counters.get(o.id) ?? o.counters.shield ?? 0) > 0;
+        if (other) {
+          const i = choose({ player: chooserOf(to), prompt: `Damage from ${e.src.name} to ${toName}: which applies?`, labels: ["Prevent the damage another way", `${cardName(s, rule)}: prevent it and shuffle ${toName} into its owner's library`] });
+          if (i === null) return { ask, ops, final, used: next };
+          if (i === 0) rule = others.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src)) || r.tokens || r.mill || r.counterOn || r.countersOn || r.dealTo) ?? (preventedAll(s, e) ? undefined : others[0]);
+        }
+      }
       if (rule) {
         // The player being dealt it may apply amount replacements first (CR 616.1): when the prevention gains its
         // controller life or deals that much back, they're applied first when that's who chooses, as the most it can be.
@@ -1019,6 +1043,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         ops.push({ kind: "preventAll", srcName: e.src.name, toName, rule: rule.id, n, src: e.src, ...(rule.mill ? { card: cardName(s, rule) } : {}), ...toPlayer(to) });
         if (rule.mill) ops.push({ kind: "mill", by: rule.controller, n: n * (rule.millSelf ?? 1), card: cardName(s, rule), ...(rule.millSelf ? { self: true as const } : {}), ...(rule.exileTop ? { exile: true as const } : {}) });
         if (rule.counterOn) ops.push({ kind: "counterOn", id: rule.counterOn.id, counter: rule.counterOn.kind, by: rule.controller, card: cardName(s, rule) });
+        if (rule.shuffleIn && "object" in to) ops.push({ kind: "shuffleIn", id: to.object, zc: obj(s, to.object).zoneChanges ?? 0, card: cardName(s, rule), by: rule.controller });
         continue;
       }
       if (prev(e) && preventedAll(s, e)) {
@@ -1466,6 +1491,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
         log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"} (${op.card}).`);
       }
     } else if (op.kind === "counterOn") countersLater.push(op);
+    else if (op.kind === "shuffleIn") (plan.shuffled ??= []).push({ id: op.id, zc: op.zc, card: op.card, by: op.by });
     else if (op.kind === "plusOnes") {
       log(s, `${op.card}: damage that can't be prevented is dealt, and the +1/+1 counters are put on it too.`);
       plusOnesLater.push(op);
@@ -1600,7 +1626,7 @@ export function shieldChoicesPossible(s: GameState): boolean {
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     const a = abilitiesOf(s, o);
-    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.attachedDamageToController || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills || a.spellDamageToOpponentsTokens || a.damageToYouMillsTwice || a.preventToYou || a.preventToYouCounter || a.preventToSelfCounters || a.spellDamageToYouToController || a.preventToSelfExileTop);
+    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.attachedDamageToController || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills || a.spellDamageToOpponentsTokens || a.damageToYouMillsTwice || a.preventToYou || a.preventToYouCounter || a.preventToSelfCounters || a.spellDamageToYouToController || a.preventToSelfExileTop || a.combatToCreatureShuffles);
   });
 }
 
@@ -1667,6 +1693,17 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
     if (o?.zone === "battlefield") destroyPermanent(s, o, `${characteristics(s, o).name} is destroyed.`);
   }
   if (plan.destroyed?.length) invalidateCharacteristics(s);
+  // Weeping Angel: "that creature's owner shuffles it into their library", immediately after the damage event (CR 615.5),
+  // only while it's still that permanent (CR 400.7). A token goes there and ceases to exist (CR 111.7).
+  for (const sh of plan.shuffled ?? []) {
+    const o = s.objects[sh.id];
+    if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== sh.zc) continue;
+    log(s, `${sh.card}: ${characteristics(s, o).name} is shuffled into its owner's library.`);
+    moveObject(s, o.id, "library");
+    const p = player(s, o.owner);
+    if (!p.lost) shuffleLibrary(s, p, sh.by);
+  }
+  if (plan.shuffled?.length) invalidateCharacteristics(s);
   for (const [key, n] of witherCounters) {
     const [id, by] = key.split("|") as [ObjectId, PlayerId];
     const o = obj(s, id);

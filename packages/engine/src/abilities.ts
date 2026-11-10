@@ -357,6 +357,11 @@ export type Count =
   | { kind: "cardsInGraveyard"; who: PlayerRef; filter?: TargetSpec; /** "The greatest power among creature cards in your graveyard" (Carrion Grub): the greatest power of those cards, 0 with none, instead of how many. */ greatestPower?: true; /** "The greatest mana value among cards in your graveyard" (Hapatra, the Desert Fang): the greatest mana value of those cards, 0 with none. */ greatestMv?: true; /** "The total mana value of instant and sorcery cards in your graveyard" (Inferno Project): their mana values added up. */ totalMv?: true; /** "For each different mana cost among nonland cards in your graveyard" (Embodiment of Agonies): each mana cost once, compared symbol by symbol (a split card's halves combined; cards with no mana cost not counted, rulings). */ differentManaCosts?: true; /** "In its controller's graveyard" (Death's Approach): the graveyard of the affected permanent's controller, instead of `who`'s. */ affectedController?: true; /** "With the same name as that spell" in a cast trigger (the Shrines): only cards with the spell's name as it was cast (StackItem.castName). */ sameNameAsCast?: true }
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
   | { kind: "power" | "toughness" | "manaValue"; of: ObjRef; /** With "manaValue": "the total mana value of those cards" (Command the Dreadhorde): every one of them added up, as each card is where it is (X counting 0, CR 107.3). */ total?: true }
+  /**
+   * Curie, Emergent Intelligence: "its base power", the ability's source's: as it is now (see basePowerNow), or as it last
+   * existed on the battlefield (rulings, CR 608.2h).
+   */
+  | { kind: "basePower"; of: { ref: "self" } }
   /** Goliath Hatchery: "its total toxic value": the sum of the N of its toxic abilities (CR 702.164b), 0 if it's gone. */
   | { kind: "toxicValue"; of: ObjRef }
   /** "For each of its colors" (Breathe Your Last): its colors now, or as it last existed on the battlefield (CR 608.2h). */
@@ -2987,7 +2992,7 @@ export type Effect =
   | { type: "takeOneExiled"; who: PlayerRef }
   /** Muse Vessel: "Choose a card exiled with ~. You may play that card this turn.": one of the cards its exile ability exiled (CR 607.2a), chosen as this resolves; playing it follows the normal rules (timing, mana, a land drop). */
   | { type: "mayPlayLinked"; /** King Narfi's Betrayal: "Until end of turn, you may cast spells from among cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells": every one of them, not one chosen, spells only, mana of any type (CR 609.4b). */ all?: true; castOnly?: true; anyType?: true }
-  | { type: "playLinked"; /** "Play one of them" (Evercoat Ursine): of the cards exiled with it, the one its controller chooses. */ one?: true; /** Kinship's "you may play that card without paying its mana cost" (Leaf-Crowned Elder): the revealed card, from the library. */ revealed?: true; /** "You may cast the exiled card" (Smirking Spelljacker): cast only, never played as a land. */ castOnly?: true }
+  | { type: "playLinked"; /** "Play one of them" (Evercoat Ursine): of the cards exiled with it, the one its controller chooses. */ one?: true; /** Kinship's "you may play that card without paying its mana cost" (Leaf-Crowned Elder): the revealed card, from the library. */ revealed?: true; /** "You may cast the exiled card" (Smirking Spelljacker): cast only, never played as a land. */ castOnly?: true; /** "The exiled card's owner may cast that card" (Spell Queller): its owner casts it, not this ability's controller. */ byOwner?: true }
   /** Cipher's spell ability (CR 702.99a): if this spell is a card, you may exile it encoded on a creature you control. */
   | { type: "cipher" }
   /**
@@ -7796,6 +7801,11 @@ export interface CompiledCard {
   spellDamageToYouToController?: TargetSpec;
   /** Gloom Surgeon: "If combat damage would be dealt to ~, prevent that damage and exile that many cards from the top of your library" (CR 615.5). */
   preventToSelfExileTop?: { combat?: "only" | "non" };
+  /**
+   * Weeping Angel: "If ~ would deal combat damage to a creature, prevent that damage and that creature's owner shuffles it
+   * into their library" (CR 615.5): see staticRules in damage.ts.
+   */
+  combatToCreatureShuffles?: true;
   /** "All damage that would be dealt to enchanted creature is dealt to its controller instead" (Treacherous Link, CR 614.9). */
   attachedDamageToController?: true;
   /** "Damage isn't removed from ~ during cleanup steps" (Ancient Adamantoise, CR 514.2). */

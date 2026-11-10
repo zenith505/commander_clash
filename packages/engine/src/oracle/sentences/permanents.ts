@@ -2102,10 +2102,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what && mods ? [{ type: "continuous", what, mods, duration: "controllersNextUntap" }] : null;
   }
   // Thermal Flux: "Target snow permanent isn't snow until end of turn" (parseChanges).
+  // Weeping Angel: "~ isn't a creature until end of turn" (parseChanges).
   // Erhnam Djinn: "... gains forestwalk until your next upkeep": it ends as your next upkeep begins.
   // Stilt-Man, Towering Terror: "It gains "This permanent can't be sacrificed" until the end of your next turn": through
   // your next turn's cleanup (CR 514.2).
-  if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+|isn't snow) until (end of turn|your next turn|your next upkeep|the end of your next turn)$/i.exec(s))) {
+  if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+|isn't snow|isn't a creature) until (end of turn|your next turn|your next upkeep|the end of your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what && parseChanges(m[2]!);
     return what && mods ? [{ type: "continuous", what, mods, duration: m[3] === "end of turn" ? "endOfTurn" : m[3] === "your next upkeep" ? "yourNextUpkeep" : m[3] === "the end of your next turn" ? "endOfYourNextTurn" : "yourNextTurn" }] : null;

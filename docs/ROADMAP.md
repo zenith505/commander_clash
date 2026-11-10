@@ -1,7 +1,7 @@
 # Roadmap
 
-30,984 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,808 of
+30,990 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,812 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -203,7 +203,7 @@ line blocks.
    Animator (done in round 270), Slagstone Refinery (put into a graveyard or exile from the battlefield, one
    trigger), Inalla, Archmage Ritualist (an eminence copy with haste, exiled at end step), Threats Undetected (four
    creature cards with different powers, an opponent chooses two), Leader, Super-Genius (a connive replacement), This
-   Is How It Ends (villainous choice after a shuffle), Azor's Gateway (counting mana values among cards exiled with
+   Is How It Ends (villainous choice after a shuffle), Azor's Gateway (done in round 337) (counting mana values among cards exiled with
    it), Tamiyo, Collector of Tales, Anchor to Reality (done in round 270), Detective's
    Phoenix (bestow with collect evidence, cast from the graveyard), Visions of Ruin (flashback cheaper by a
    commander's mana value), Strata Scythe (done in round 275), Printlifter Ooze (turned face up), Adrestia ("if an Assassin crewed it"),
@@ -2398,6 +2398,23 @@ line blocks.
    They're 5/5 artifact creatures." (CR 708.2, a face-down instant or sorcery stays face down), with a browser test.
    +4, 30,978 of 31,936 with B173 through B176. Bots activate Sasaya only when the flip happens, cast The Master with an exile only when one of
    their creatures has an enters trigger worth copying, and put all of their hand onto the battlefield with Tezzeret.
+   Round 337 went on down the "Out after round N" lists, taking the ones a piece or two away: "{1}, {T}: Draw a card,
+   then exile a card from your hand. If cards with five or more different mana values are exiled with ~, you gain 5 life,
+   untap ~, and transform it." (Azor's Gateway: the cards its one exile instruction took, linked to it, CR 607.2a; an
+   {X} as 0, a split card's halves together, no mana cost 0, rulings, CR 202.3); "except its name is Mishra's Warform and
+   it's a 4/4 Construct artifact creature in addition to its other types" (Mishra, Eminent One: a name of its own, CR
+   707.9b); "Choose up to four target creatures you don't control. For each of them, that creature's controller faces a
+   villainous choice — That creature becomes a 1/1 white Human creature and loses all abilities, or you create a token
+   that's a copy of it." (Hunted by The Family: one choice for each, about it, in APNAP order, CR 701.55d; no duration,
+   its colors, card and creature types replaced, CR 205.1a, 611.2a; with a browser test); "Whenever you cast a spell that
+   targets only a single creature you control, create a 1/1 red Soldier creature token with haste, then copy that spell.
+   The copy targets that token." (Frontline Heroism: every target that creature; the copy made even if the spell is gone;
+   with a token doubler its controller picks the token, CR 707.10e, with a browser test); "copy it, except the copy is a
+   1/1 Spirit in addition to its other types" once each turn (Donal, Herald of Wings, CR 707.9b, 608.3f); "Whenever an
+   instant or sorcery spell you control that targets only a single creature deals damage to that creature, ~ deals that
+   much damage to each opponent." (Imodane, the Pyrohammer: every target of the spell that creature, CR 115.1). +6, 30,990
+   of 31,936 with B175-B176. Bots facing Hunted by The Family make their creature the 1/1 rather than hand over a copy of it (a rough
+   count of its worth), and pick the first token for Frontline Heroism's copy.
    Round 336 took cards back off the "Out after round N" lists, most played first: "Artifacts you control have protection
    from each mana value among artifacts you control." (Rebbec, Architect of Ascension: the mana values as layer 4 leaves
    the types, CR 613.1d, 702.16a, an {X} as 0, rulings; an Equipment with one of them falls off, 702.16c); "Whenever an
@@ -3629,11 +3646,11 @@ line blocks.
    turn permanents face up: no ManaUse for a turn-face-up cost).
    Out after round 253 (looked at, not done): Altaïr Ibn-La'Ahad (tokens entering attacking that copy each exiled card with
    a memory counter); Arna Kennerüd, Skycaptain (token copies of the Auras and Equipment attached to a creature, entering
-   attached to it); Imodane, the Pyrohammer ("an instant or sorcery spell you control that targets only a single creature
+   attached to it); Imodane, the Pyrohammer (done in round 337) ("an instant or sorcery spell you control that targets only a single creature
    deals damage to that creature": no damage event tells a spell's single target yet); Ziatora's Envoy ("You may play a
    land from the top of your library" as the trigger resolves, a land play of its own, or a free spell with mana value up
    to the damage dealt); Mizzix, Replica Rider (a copy of a permanent spell that gains haste and an end-step sacrifice);
-   Donal, Herald of Wings (a copy of a creature spell "except the copy is a 1/1 Spirit", once each turn); Leonardo da Vinci
+   Donal, Herald of Wings (done in round 337) (a copy of a creature spell "except the copy is a 1/1 Spirit", once each turn); Leonardo da Vinci
    (a token copy of the discarded card "except it's a 0/2 Thopter artifact creature with flying"); Optimus Prime, Hero //
    Autobot Leader ("The chosen creature" after bolster, and a delayed convert when it deals combat damage).
    Out after round 252 (looked at, not done): Cybership (the top two cards of a library, lands included, put onto the
@@ -3692,14 +3709,14 @@ line blocks.
    272); Silverquill, the Disputant (done in round 299) (granted casualty 1: with a spell's printed casualty that's
    two instances, each paid separately, CR 702.153b, and one payment per spell is all there is); Blood for Bones (a
    battlefield return then "another" to the hand, as before).
-   Out after round 242 (looked at, not done): Frontline Heroism (the copy must target the token it created; with a
+   Out after round 242 (looked at, not done): Frontline Heroism (done in round 337) (the copy must target the token it created; with a
    token doubler its controller picks which, CR 707.10e); Optimus Prime, Autobot Leader ("the chosen creature" after
    bolster, and a floating "when that creature deals combat damage this turn"); The War Doctor (phasing out and exile
    batch triggers); Saving Grace (done in round 311) (redirecting damage to itself); Volcanic Offering (done in round B141) (a target an opponent chooses);
    Riftmarked Knight (the token its suspend makes, with flanking and protection from white); Roiling Horror (done in round B111) (its
    characteristic-defining P/T counts a life difference); Watcher of Hours ("you remove a time counter", a choice of
    which); Jaya's Phoenix and Repeated Reverberation (copy the next loyalty ability); Coveted Falcon, Shadow Kin, Arna
-   Kennerüd, Confusion in the Ranks, Imodane, Mavinda, Manascape Refractor, Cass, Bronzehide Lion, Ria Ivor and
+   Kennerüd, Confusion in the Ranks, Imodane (done in round 337), Mavinda, Manascape Refractor, Cass, Bronzehide Lion, Ria Ivor and
    Fabrication Foundry (looked at, not done this round).
    Out after round 241 (looked at, not done): Nuka-Nuke Launcher (done in round 321) ("until the end of defending player's next turn, that
    player gets two rad counters whenever they cast a spell": a floating trigger lasting until another player's turn
@@ -3757,7 +3774,7 @@ line blocks.
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
    10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator (done in round 314), The Foretold Soldier, Radiant Scrollwielder (done in round 314), Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
    7, Grappling Hook (done in round 278), Otrimi, Zhao, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained (done in round 278), Identity
-   Thief, Mishra, Eminent One, Spell Queller (done in round 336), Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon, Grub, Storied Matriarch,
+   Thief, Mishra, Eminent One (done in round 337), Spell Queller (done in round 336), Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon, Grub, Storied Matriarch,
    Taskmaster, Mercenary Mimic, Gideon Blackblade (done in round 296), Kolvori, God of Kinship, Fisher's Talent (done in round 318), Niko, Light of Hope,
    Stick Together (done in round 302), Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
    Augurelt, Quintorius, Loremaster, Quantum Riddler (done in round 296), Model of Unity (done in round 302), The Flood of Mars, Sigarda's Vanguard (done in round 302), Master of
@@ -3931,7 +3948,7 @@ line blocks.
    ("whenever you surveil, if ~ is in your graveyard") are out; bots answer Zada's copy order with the first creature
    offered. Smaller gaps from round 130: Laboratory Maniac is taken over Out of the Tombs when both would replace a draw
    (no choice between the two, CR 616.1), and bots return the creature card with the highest mana value;
-   Thought-String Analyst (face down), This Is How It Ends, Hunted by The Family, Missy, Midnight Crusader Shuttle,
+   Thought-String Analyst (face down), This Is How It Ends, Hunted by The Family (done in round 337), Missy, Midnight Crusader Shuttle,
    Genesis of the Daleks and Danse Macabre are still out. Smaller gaps from round 129: Zirda's companion condition is still
    ignored (companions play as normal cards); bots pick the villainous option that looks cheaper to them by a rough
    count, never cast Doomsday, and take the costliest card for Lord of the Void and Necromantic Selection. Smaller gaps from round 128: bots take

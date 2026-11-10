@@ -67,9 +67,9 @@ export function objectSource(s: GameState, o: GameObject): DamageSource {
 }
 
 /** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix). */
-function spellDealt(s: GameState, src: DamageSource, to: { player?: PlayerId; battle?: ObjectId }, amount: number) {
+function spellDealt(s: GameState, src: DamageSource, to: { player?: PlayerId; battle?: ObjectId; creature?: ObjectId }, amount: number) {
   const o = src.spell && src.ref ? s.objects[src.ref.object] : undefined;
-  if (o) fireEvent(s, { type: "spellDealtDamage", by: src.controller, card: defOf(s, o), ...to, amount });
+  if (o) fireEvent(s, { type: "spellDealtDamage", by: src.controller, card: defOf(s, o), spellObject: o.id, ...to, amount });
 }
 
 /** A spell, or an ability whose source is gone: the card's printed characteristics. */
@@ -366,6 +366,9 @@ export function dealDamage(
       }
     }
     fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, id: o.id, amount: n, ...(opts.combat ? { combat: true } : {}), ...(c.types.includes("Creature") ? { toughness: c.toughness } : {}) });
+    // Imodane, the Pyrohammer: "an instant or sorcery spell you control that targets only a single creature deals damage to
+    // that creature".
+    if (c.types.includes("Creature")) spellDealt(s, src, { creature: o.id }, n);
     noteDealt(s, src, opts.combat, { object: o }, n);
   } else {
     const p = player(s, to.player);

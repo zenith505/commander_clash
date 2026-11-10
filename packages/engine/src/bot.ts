@@ -1479,7 +1479,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // A villainous choice (CR 701.55): the option that costs us less, as roughly guessed.
     if (pend.kind === "chooseOption" && pend.what === "villainous") {
       const v = s.resolving ? allEffects(s.resolving.body.effects).find((e) => e.type === "villainous") : undefined;
-      const costs = v?.type === "villainous" ? v.options.map((fx) => villainCost(s, pid, fx)) : [0, 0];
+      const costs = v?.type === "villainous" ? v.options.map((fx) => villainCost(s, pid, fx, pend.about)) : [0, 0];
       return [{ type: "chooseOption", player: pid, choice: costs[1]! < costs[0]! ? "1" : "0" }];
     }
     // "Unlock a locked door" for free: the door that would cost the most to unlock (CR 709.5f).
@@ -2048,8 +2048,11 @@ function countersTheirStack(body: AbilityBody): boolean {
  * What one option of a villainous choice we face would cost us, roughly, in life points: what we'd lose (life, cards,
  * permanents) plus what its controller would gain (cards, tokens, a free spell). "eventPlayer" in it is us.
  */
-function villainCost(s: GameState, pid: PlayerId, fx: Effect[]): number {
+function villainCost(s: GameState, pid: PlayerId, fx: Effect[], about?: ObjectId): number {
   const me = player(s, pid);
+  // Hunted by The Family: what the creature the choice is about is worth, by its stats and abilities.
+  const it = about && s.objects[about]?.zone === "battlefield" ? s.objects[about]! : undefined;
+  const worth = it ? Math.max(0, power(s, it)) + Math.max(0, toughness(s, it)) + 2 * (characteristics(s, it).keywords.length + abilitiesOf(s, it).triggers.length + abilitiesOf(s, it).activated.length + abilitiesOf(s, it).statics.length) : 3;
   const n = (a: unknown, guess: number) => (typeof a === "number" ? a : guess);
   const us = (w: { ref: string } | undefined) => w?.ref === "eventPlayer";
   return fx.reduce((sum, e) => {
@@ -2095,6 +2098,12 @@ function villainCost(s: GameState, pid: PlayerId, fx: Effect[]): number {
         return sum + 5;
       case "createToken":
         return sum + 3 * n(e.n, 1);
+      // Hunted by The Family: our creature made a vanilla 1/1 loses what it's worth beyond that; a copy of it for the
+      // player making us choose is worth all of it to them.
+      case "continuous":
+        return sum + (e.what.ref === "subject" && it && e.mods.some((m) => m.kind === "loseAllAbilities") ? Math.max(0, worth - 2) : 3);
+      case "createTokenCopy":
+        return sum + (e.what.ref === "subject" && e.who.ref === "you" ? worth + 1 : 3);
       default:
         return sum + 3;
     }

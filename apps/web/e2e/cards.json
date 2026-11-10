@@ -1209,6 +1209,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7246d45b-2185-4cdd-981b-5419b7d52bce",
+  "name": "Anointed Procession",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If an effect would create one or more tokens under your control, it creates twice that many of those tokens instead.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "akh",
+  "releasedAt": "2017-04-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8095ca78-db19-4724-a6ff-eacc85fa2274",
   "name": "Another Round",
   "manaCost": "{X}{X}{2}{W}",
@@ -12349,6 +12375,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4c340b82-22e1-445a-b236-82471b442031",
+  "name": "Frontline Heroism",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, create a 1/1 red Soldier creature token with haste.\nWhenever you cast a spell that targets only a single creature you control, create a 1/1 red Soldier creature token with haste, then copy that spell. The copy targets that token.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "j25",
+  "releasedAt": "2024-11-15",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cacda1c2-2fe8-40a3-89f3-38a835f10af3",
   "name": "Fugitive of the Judoon",
   "manaCost": "{4}{G}",
@@ -15628,6 +15680,32 @@
   "set": "por",
   "releasedAt": "1997-05-01",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7d178f1c-faf7-4efd-87a6-201a40c55ec8",
+  "name": "Hunted by The Family",
+  "manaCost": "{5}{U}{U}",
+  "cmc": 7,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose up to four target creatures you don't control. For each of them, that creature's controller faces a villainous choice — That creature becomes a 1/1 white Human creature and loses all abilities, or you create a token that's a copy of it.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

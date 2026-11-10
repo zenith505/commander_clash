@@ -4118,6 +4118,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = filter?.kind === "spell" && !filter.controller ? parseBody(`${selfOrSpell[2]![0]!.toUpperCase()}${selfOrSpell[2]!.slice(1)}`) : null;
     return body ? { event: "spellYouControlDealsDamage", spellDamage: { filter: filter!, anyPlayer: true, orSelf: true }, body } : "fail";
   }
+  // Imodane, the Pyrohammer: "Whenever an instant or sorcery spell you control that targets only a single creature deals
+  // damage to that creature, ~ deals that much damage to each opponent.": once for each time it deals damage to it, "that
+  // much" the damage dealt to that creature then (CR 603.2c, 120.3); every target of the spell that creature (CR 115.1).
+  const imodane = /^Whenever an? (.+? spell) you control that targets only a single creature deals damage to that creature, (.+)$/.exec(line);
+  if (imodane) {
+    const filter = parseTargetPhrase(imodane[1]!);
+    const body = filter?.kind === "spell" && !filter.controller ? thatMuchBody(imodane[2]!, {}) : null;
+    return body ? { event: "spellYouControlDealsDamage", spellDamage: { filter: filter!, onlyTargetCreature: true }, body } : "fail";
+  }
   // "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix).
   const spellDmg = /^Whenever an? (.+? spell) you control deals damage to an opponent( or battle)?, (.+)$/.exec(line);
   if (spellDmg) {

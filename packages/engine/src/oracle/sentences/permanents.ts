@@ -728,8 +728,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (/^(?:you )?recruit$/i.test(s)) return [{ type: "recruit" }];
   // "If that creature would die this turn, exile it instead" (CR 614.1a), for what an earlier sentence targeted
   // or damaged: "If a creature dealt damage this way would die this turn, exile it instead".
-  if ((m = /^If (that creature|that permanent|that creature or planeswalker|that planeswalker|an? (?:creature|permanent) dealt damage this way) would die this turn, exile it instead$/i.exec(s))) {
-    const what: ObjRef | null = / this way$/.test(m[1]!) ? { ref: "damagedThisWay" } : parseObject(m[1]!.startsWith("that creature") ? "that creature" : "that permanent", ctx);
+  // Torch the Tower: "If a permanent dealt damage by ~ would die this turn": the one this spell dealt damage to (none if it
+  // was all prevented), for any reason it would die this turn (rulings).
+  if ((m = /^If (that creature|that permanent|that creature or planeswalker|that planeswalker|an? (?:creature|permanent) dealt damage this way|a permanent dealt damage by ~) would die this turn, exile it instead$/i.exec(s))) {
+    const what: ObjRef | null = / this way$/.test(m[1]!) || (m[1] === "a permanent dealt damage by ~" && ctx.spell) ? { ref: "damagedThisWay" } : m[1] === "a permanent dealt damage by ~" ? null : parseObject(m[1]!.startsWith("that creature") ? "that creature" : "that permanent", ctx);
     return what ? [{ type: "exileIfDies", what }] : null;
   }
   // Unnatural Aggression: "If the creature an opponent controls would die this turn, exile it instead": the one target an

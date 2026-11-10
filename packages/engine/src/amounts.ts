@@ -1236,6 +1236,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         const ch = view(s.objects[id]!);
         if (ch && ch.controller === ctx.controller && (!c.filter || objectMatches(s, c.filter, s.objects[id]!, ctx.controller, false, undefined, ch, ctx.view))) for (const col of ch.colors) colors.add(col);
       }
+      if (c.andSpellsCast) for (const x of s.castThisTurn ?? []) if (x.player === ctx.controller) for (const col of x.colors ?? []) colors.add(col);
       return colors.size;
     }
     case "cardTypesAmongPermanents": {
@@ -1659,7 +1660,7 @@ function describeCount(c: Count): string {
     case "cardTypesAmongPermanents":
       return `#card types among ${c.other ? "other " : ""}${c.nonland ? "nonland " : ""}permanents you control`;
     case "colorsAmongPermanents":
-      return c.filter ? `#colors among ${c.other ? "other " : ""}${c.filter.text}` : "#colors among your permanents";
+      return c.filter ? `#colors among ${c.other ? "other " : ""}${c.filter.text}` : c.andSpellsCast ? "#colors among your permanents and spells you've cast this turn" : "#colors among your permanents";
     case "spellsCastThisTurn":
       if (c.cardTypes) return "#card types among spells you've cast this turn";
       return `#${c.other || c.notSource ? "other " : ""}${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells ${c.anyone ? "" : c.opponents ? "your opponents have " : c.eventPlayer ? "they've " : "you've "}cast this turn${c.notFromHand ? " from anywhere other than your hand" : ""}${c.beyondFirst ? " other than the first" : ""}`;

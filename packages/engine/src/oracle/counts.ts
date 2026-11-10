@@ -630,6 +630,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^creature you controlled that dealt combat damage to a player this turn$/i.test(p)) return count({ kind: "yourCombatDamagers" });
   // Tymna the Weaver: "the number of opponents that were dealt combat damage this turn", those who've lost since too (rulings).
   if (each && /^opponents? (?:that|who) (?:were|was) dealt combat damage this turn$/i.test(p)) return count({ kind: "players", opponents: true, combatDamaged: true });
+  // Vivien's Stampede: "for each player who was dealt combat damage this turn": you too, counted as Tymna's opponents are.
+  if (each && /^players? (?:that|who) (?:were|was) dealt combat damage this turn$/i.test(p)) return count({ kind: "players", combatDamaged: true });
   // Estinien Varlineau: "the number of your opponents who were dealt combat damage by ~ or a Dragon this turn".
   const bySelfOr = each ? /^(?:your )?opponents (?:that|who) were dealt combat damage by ~ or an? ([A-Z][a-z]+) this turn$/.exec(p) : null;
   if (bySelfOr && CREATURE_TYPES.has(bySelfOr[1]!)) return count({ kind: "players", opponents: true, combatDamagedBySelfOr: bySelfOr[1]! });
@@ -887,6 +889,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^different color pairs among permanents you control that are exactly two colors$/i.test(p)) return count({ kind: "colorPairs" });
   // Vivid: "the number of colors among permanents you control".
   if (/^colou?rs? among permanents you control$/i.test(p)) return count({ kind: "colorsAmongPermanents" });
+  // First Family: "the number of colors among permanents you control and spells you've cast this turn": each color once,
+  // from either (this spell is one you've cast this turn).
+  if (/^colou?rs among permanents you control and spells you've cast this turn$/i.test(p)) return count({ kind: "colorsAmongPermanents", andSpellsCast: true });
   // Loot, the Key to Everything: "the number of card types among other nonland permanents you control" (CR 205.2a; a
   // land's other card types don't count, rulings).
   if ((m = /^(?:the number of )?card types among (other )?(nonland )?permanents you control$/i.exec(p)))

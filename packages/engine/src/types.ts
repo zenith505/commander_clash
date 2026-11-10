@@ -1189,7 +1189,7 @@ export interface DelayedTrigger {
   /** `thatCombat`: at the beginning of the added combat phase `combat` (GameState.addedPhases), this turn only. */
   /** `playersNextEndStep`: at the beginning of `player`'s next end step (The Eternal Wanderer: the exiled card's owner's). */
   /** `playersNextUpkeep`: at the beginning of `player`'s next upkeep (Phytotitan: the card's owner's). */
-  when: "nextEndStep" | "yourNextEndStep" | "yourNextTurnEndStep" | "playersNextEndStep" | /** Suppress: the end step of `player`'s next turn, a later turn. */ "playersNextTurnEndStep" | "playersNextUpkeep" | /** "At the beginning of the next combat" (Legion's Initiative): the next beginning of combat step, any player's. */ "nextBeginCombat" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat" | /** With `thisTurn`: each time the subject becomes blocked this turn (Barreling Attack, CR 603.7b). */ "becomesBlocked";
+  when: /** Vivien's Stampede: a later main phase of the turn it was made, never one on a later turn. */ "nextMainThisTurn" | "nextEndStep" | "yourNextEndStep" | "yourNextTurnEndStep" | "playersNextEndStep" | /** Suppress: the end step of `player`'s next turn, a later turn. */ "playersNextTurnEndStep" | "playersNextUpkeep" | /** "At the beginning of the next combat" (Legion's Initiative): the next beginning of combat step, any player's. */ "nextBeginCombat" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat" | /** With `thisTurn`: each time the subject becomes blocked this turn (Barreling Attack, CR 603.7b). */ "becomesBlocked";
   player?: PlayerId;
   combat?: number;
   /** What it remembers as its trigger event: the player "its controller" was, the amount "that spell's mana value" was (see the delayed effect). */
@@ -2969,6 +2969,9 @@ export interface Resolving {
     discardOrSac?: { queue: PlayerId[]; keep: string[]; before: ObjectId[]; pick?: number };
     /** Effect "eachChoosesFromHand" (Stronghold Gambit): the players still to choose, in turn order, and each one's card. */
     gambit?: { queue: PlayerId[]; picks: Partial<Record<PlayerId, ObjectId>> };
+    /** Kamahl's Summons (Effect eachRevealFromHand): who is still to choose, in turn order, and how many cards each revealed. */
+    revealEach?: { queue: PlayerId[]; counts: Partial<Record<PlayerId, number>> };
+    revealEachStep?: number;
     /** Effect "revealPutIfNamedAsPermanent" (Retraced Image): the card revealed ("" none). */
     retraced?: ObjectId | "";
     /** Effect "dividedDamageBack" (Master of the Wild Hunt): how the damage was divided. */

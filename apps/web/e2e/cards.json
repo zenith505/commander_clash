@@ -14462,6 +14462,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "20418984-bc6d-42e5-ada6-30b5281925c0",
+  "name": "Heart-Shaped Herb",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "If a source an opponent controls would deal damage to you, prevent 1 of that damage.\n{2}, {T}, Sacrifice this artifact: You may sacrifice a creature. If you do, return that card to the battlefield under its owner's control with three +1/+1 counters on it and you become the monarch.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d8f08699-6210-41c3-bfa0-c4b3bcbbaf1c",
   "name": "Heat Wave",
   "manaCost": "{2}{R}",
@@ -16774,6 +16796,32 @@
   "set": "one",
   "releasedAt": "2023-02-10",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8b6ef0a2-cd90-44c8-8f11-e1983f2b1dfd",
+  "name": "Kamahl's Summons",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player may reveal any number of creature cards from their hand. Then each player creates a 2/2 green Bear creature token for each card they revealed this way.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

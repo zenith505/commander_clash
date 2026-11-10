@@ -4835,7 +4835,7 @@ export type Effect =
    */
   /** "Until end of turn, you may look at the top card of your library any time and you may play ... from the top of your library" (Gwenom): GameState.topTurn. */
   | { type: "topTurn"; top: FromTop }
-  | { type: "graveyardTurn"; cast?: TargetSpec; lands?: true; exileInstead?: true; /** "From any graveyard" (The Great Work). */ anyGraveyard?: true; /** "If a spell cast this way would be put into a graveyard, exile it instead." */ exileCast?: true }
+  | { type: "graveyardTurn"; cast?: TargetSpec; lands?: true; exileInstead?: true; /** "From any graveyard" (The Great Work). */ anyGraveyard?: true; /** Osteomancer Adept: "by foraging in addition to paying their other costs" (CR 601.2f-h): the costs of a spell cast this way. */ costs?: AdditionalCost[]; /** Osteomancer Adept: "If you cast a spell this way, that creature enters with a finality counter on it" (CR 614.1c). */ entersWith?: { counter: CounterKind; n: number }; /** "If a spell cast this way would be put into a graveyard, exile it instead." */ exileCast?: true }
   /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
   | { type: "costModThisTurn"; mod: CostMod; /** "... until your next turn" (Elspeth Conquers Death): as that turn begins (CR 611.2b). */ untilYourNextTurn?: true; /** "The next spell you cast this turn costs {1} less to cast" (Hardened Berserker): only the next such spell its controller casts this turn, used up as it becomes cast (CR 601.2f, 601.2i). */ next?: true; /** "Costs {X} less ..., where X is ~'s power as this ability resolves" (Maelstrom Muse): generic mana `mod.n` times this, counted as it resolves. */ times?: Amount; /** Cheering Fanatic: "spells with the chosen name": the card name chosen as it resolves, locked into `mod.filter.named`. */ chosenName?: true }
   /**
@@ -8276,6 +8276,11 @@ export interface CompiledCard {
   lifeForBlack?: true;
   /** Doc Aurlock: "Plotting cards from your hand costs {2} less" (CR 702.170a, 601.2f): less generic mana, for its controller. */
   plotLess?: number;
+  /**
+   * Fblthp, Lost on the Range: "The top card of your library has plot. The plot cost is equal to its mana cost." and "You
+   * may plot nonland cards from the top of your library." (`granted`, `fromTop`: each line, both needed to plot from there).
+   */
+  plotTop?: { granted?: true; fromTop?: true };
   /** Exiled Doomsayer: "All morph costs cost {2} more" (CR 118.7, 702.37b): more generic mana to turn any face-down permanent face up with its morph or megamorph cost, not a disguise cost or a manifested card's mana cost, nor casting it face down. */
   morphTax?: number;
   /** Embalmer's Tools: "Activated abilities of creature cards in your graveyard cost {1} less to activate" (CR 601.2f). */
@@ -8711,6 +8716,12 @@ export interface CompiledCard {
   /** With `playLinkedWhile`: "Mana of any type can be spent to cast those spells" (Azula, Cunning Usurper, CR 609.4b). */
   playLinkedAnyType?: true;
   /**
+   * With `playLinkedWhile`: "You may cast Dinosaur creature spells from among cards you own exiled with ~. If you cast a
+   * spell this way, that creature enters with a finality counter on it." (Intrepid Paleontologist): only cards that match
+   * `filter` and that its controller owns, the creature entering with `entersWith` (CR 614.1c).
+   */
+  playLinkedOnly?: { filter: TargetSpec; own: true; entersWith: { counter: CounterKind; n: number } };
+  /**
    * "During your turn, you may play cards you don't own with stash counters on them from exile, and mana of any type can
    * be spent to cast those spells" (Tinybones, Bauble Burglar): any such card, whoever exiled it (rulings), with the usual
    * timing (rulings), mana of any type (CR 609.4b).
@@ -8989,4 +9000,11 @@ export interface FromTop {
    * counter on it": the spell cast with this permission (CR 614.1c).
    */
   creatureCounter?: true;
+  /** Elsha of the Infinite: "If you cast a spell this way, you may cast it as though it had flash" (CR 702.8a). */
+  flash?: true;
+  /**
+   * Into the Pit: "by sacrificing a nonland permanent in addition to paying their other costs": costs of a spell cast
+   * with this permission (CR 601.2f-h).
+   */
+  costs?: AdditionalCost[];
 }

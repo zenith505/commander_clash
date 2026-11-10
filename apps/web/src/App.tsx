@@ -1469,6 +1469,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // A commander with an alternative cost (sneak): choose how to cast it.
     if (o.zone === "command" && o.owner === HUMAN && (altCostsFor(s, HUMAN, o).length || handAbilities(s, o.id).length)) return setMenu(o.id);
     if (o.zone === "hand" || o.zone === "command") return startCast(o.id);
+    // Fblthp, Lost on the Range: the top card of your library may be plotted (and maybe cast too): choose in the menu.
+    if (o.zone === "library" && plotCost(s, HUMAN, cardOf(s, o.id), o) !== undefined) return setMenu(o.id);
     // Courser of Kruphix, Future Sight: play the top card of your library.
     if (o.zone === "library" && mayPlayFromTop(s, o, HUMAN)) {
       // Bolas's Citadel: for life instead of its mana cost, a choice in the menu.
@@ -4707,7 +4709,8 @@ function AbilityMenu({
   const inHand = o.zone === "hand" || o.zone === "command" || mayPlayFromExile(s, o, HUMAN) || mayPlayLandFromGraveyard(s, o, HUMAN) || mayPlayFromTop(s, o, HUMAN);
   const faceDownCast = inHand ? compileCard(d).faceDownCast : undefined;
   const suspend = o.zone === "hand" ? compileCard(d).suspend : undefined;
-  const plot = o.zone === "hand" ? plotCost(s, HUMAN, d) : undefined;
+  // Fblthp, Lost on the Range: the top card of your library too.
+  const plot = o.zone === "hand" || o.zone === "library" ? plotCost(s, HUMAN, d, o) : undefined;
   const foretell = o.zone === "hand" ? foretellCostOf(s, o, d) : undefined;
   const discardAnyTime = o.zone === "hand" && !!compileCard(d).discardAnyTime;
   // A foretold card: cast only for its foretell cost (CR 702.143a).

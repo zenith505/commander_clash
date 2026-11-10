@@ -893,7 +893,7 @@ export function planIgnoreEffect(s: GameState, pid: PlayerId, id: ObjectId, cost
 /** Tap mana for a card's plot cost, then plot it (CR 702.170a), or null if that can't be done now. */
 export function planPlot(s: GameState, pid: PlayerId, id: ObjectId): Action[] | null {
   const o = s.objects[id];
-  const cost = o && plotCost(s, pid, defOf(s, o));
+  const cost = o && plotCost(s, pid, defOf(s, o), o);
   if (!cost) return null;
   const problem = plotProblem(s, pid, id);
   if (problem && !/not enough mana/.test(problem)) return null;

@@ -25517,6 +25517,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a97f2f2a-5a8c-4f8a-99d1-83ebc4b0bdba",
+  "name": "Retraced Image",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal a card in your hand, then put that card onto the battlefield if it has the same name as a permanent.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tor",
+  "releasedAt": "2002-02-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "550b8bee-1773-427b-b300-aaceff243e11",
   "name": "Retribution of the Ancients",
   "manaCost": "{B}",
@@ -35586,6 +35612,32 @@
   "set": "mom",
   "releasedAt": "2023-04-21",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4fdde84f-4103-4209-a296-60d1bf94af65",
+  "name": "Wild Pair",
+  "manaCost": "{4}{G}{G}",
+  "cmc": 6,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever a creature enters, if you cast it from your hand, you may search your library for a creature card with the same total power and toughness, put it onto the battlefield, then shuffle.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cn2",
+  "releasedAt": "2016-08-26",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

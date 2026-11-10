@@ -2513,7 +2513,7 @@ export type StaticCondition =
    * entered under your control this turn, as they entered, even if they've left since; with all of `types`, none of
    * `notTypes`, and `subtype`.
    */
-  | { kind: "youEntered"; types: string[]; notTypes?: string[]; subtype?: string; /** "An Angel or Berserker" (Cleaving Reaper): either subtype. */ orSubtype?: string; /** "Another Cleric, Rogue, Warrior, or Wizard" (Nimble Trapfinder): any of these creature types. */ anySubtype?: string[]; n: number; /** "another": not the source itself (Éowyn, Shieldmaiden). */ other?: true; /** "Another creature with flying" (Flying Drone): it had flying as it entered (TurnLog.entered). */ flying?: true; /** "Last turn" (Ephara, God of the Polis): during the turn before this one (GameState.lastTurn.creaturesEntered; creatures only). */ lastTurn?: true }
+  | { kind: "youEntered"; types: string[]; notTypes?: string[]; subtype?: string; /** "An Angel or Berserker" (Cleaving Reaper): either subtype. */ orSubtype?: string; /** "Another Cleric, Rogue, Warrior, or Wizard" (Nimble Trapfinder): any of these creature types. */ anySubtype?: string[]; n: number; /** "another": not the source itself (Éowyn, Shieldmaiden). */ other?: true; /** "Another creature with flying" (Flying Drone): it had flying as it entered (TurnLog.entered). */ flying?: true; /** "Last turn" (Ephara, God of the Polis): during the turn before this one (GameState.lastTurn.creaturesEntered; creatures only). */ lastTurn?: true; /** "A face-down creature entered" (Tunnel Tipster): it was face down as it entered (TurnLog.entered). */ faceDown?: true }
   /**
    * "If a noncreature permanent under your control was destroyed this turn by a spell or ability an opponent controlled"
    * (Cobra Trap): only an effect that says "destroy" (rulings), not lethal damage or sacrifice.
@@ -4861,6 +4861,12 @@ export type Effect =
    * over once every player in the game in a row has put none (rulings).
    */
   | { type: "putFromHandRounds" }
+  /**
+   * Predatory Focus: "You may have creatures you control assign their combat damage this turn as though they weren't
+   * blocked": chosen as it resolves (rulings), for every creature this ability's controller controls as it assigns its
+   * combat damage this turn, ones that came later too (rulings; TurnLog.unblockedDamage, CR 510.1c).
+   */
+  | { type: "yourCreaturesUnblockedThisTurn" }
   /** Stromgald Spy: "defending player plays with their hand revealed for as long as ~ remains on the battlefield" (CR 402.3, 611.2b; Player.handRevealedWhile). */
   | { type: "revealHandWhile"; who: PlayerRef }
   /**
@@ -6064,6 +6070,10 @@ export interface TriggeredAbility {
   inYourUntapStep?: true;
   /** For "selfBecomesCrewed": "if it was crewed by exactly two creatures" (an intervening if about the crewing, CR 603.4). */
   crewedBy?: number;
+  /** For "selfCrewsVehicle": "Whenever ~ saddles a Mount or crews a Vehicle" (Reckless Velocitaur): saddling one triggers it too (CR 702.171c). */
+  orSaddles?: true;
+  /** For "selfCrewsVehicle": "... during your main phase": only while its controller is the active player, in a main phase (CR 505.1). */
+  yourMainPhase?: true;
   /** For "youGainLife": "Whenever you gain or lose life during your turn" (Moonstone Harbinger): a life loss too, and only on your turn. */
   orLoseLife?: true;
   /** For "youGainLife" and "youLoseLife": "Whenever you gain life during your turn" (Vampire Scrivener): only while you're the active player. */
@@ -7436,7 +7446,7 @@ export interface CompiledCard {
    * (not tokens or copies of spells, rulings) going to the graveyard of the player it enchants, its owner's (CR 404.2).
    */
   graveyardToLibraryBottom?: true;
-  graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind; notYours?: true; linked?: true; permanents?: true };
+  graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind; notYours?: true; linked?: true; permanents?: true; /** Sanctifier en-Vec: "a black or red permanent, spell, or card not on the battlefield": any one of these colors, as it is in the zone it's leaving (rulings), a permanent's from the layers. */ colorsNow?: Color[] };
   /** "This creature enters prepared" (CR 722.3a): it becomes prepared as it enters. */
   entersPrepared?: boolean;
   /** "As ~ enters, discard your hand" (Heightened Awareness): its controller discards their hand as it enters (CR 614.1c). */

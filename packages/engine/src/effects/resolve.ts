@@ -36,6 +36,7 @@ import { runLaneB168Effect } from "./run-laneb168";
 import { runLaneB169Effect } from "./run-laneb169";
 import { runLaneB170Effect } from "./run-laneb170";
 import { runLaneB172Effect } from "./run-laneb172";
+import { runLaneB174Effect } from "./run-laneb174";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -1750,6 +1751,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB170Effect(s, e, ctx, src);
     case "putFromHandRounds":
       return runLaneB172Effect(s, e, ctx, src);
+    case "yourCreaturesUnblockedThisTurn":
+      return runLaneB174Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

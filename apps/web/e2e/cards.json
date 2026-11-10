@@ -19022,6 +19022,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f3ad60a6-05d0-48a1-a804-7900d306d613",
+  "name": "Liliana, the Necromancer",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Planeswalker — Liliana",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Liliana"
+  ],
+  "oracleText": "+1: Target player loses 2 life.\n−1: Return target creature card from your graveyard to your hand.\n−7: Destroy up to two target creatures. Put up to two creature cards from graveyards onto the battlefield under your control.",
+  "loyalty": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m19",
+  "releasedAt": "2018-07-13",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3f8e7a45-4c6e-4ee6-93d0-b7de9715ec97",
   "name": "Lim-Dûl's Vault",
   "manaCost": "{U}{B}",
@@ -24551,6 +24582,32 @@
   "set": "c19",
   "releasedAt": "2019-08-23",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c5866507-ef3b-446a-99ea-d31d974bdb01",
+  "name": "Predatory Focus",
+  "manaCost": "{3}{G}{G}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "You may have creatures you control assign their combat damage this turn as though they weren't blocked.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "gpt",
+  "releasedAt": "2006-02-03",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

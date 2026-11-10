@@ -3,6 +3,7 @@
 import type { AdditionalCost, CompiledCard, Effect, TriggeredAbility } from "../abilities";
 import type { Ctx } from "./body";
 import { parseActivated } from "./activated";
+import { roundB174Sentence } from "./laneb174";
 import { parseTrigger } from "./triggers";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
@@ -61,7 +62,7 @@ export function roundB173Line(line: string, raw: string, out: CompiledCard, isSp
   return false;
 }
 
-export function roundB173Sentence(s: string, _sentences: string[], si: number, ctx: Ctx, _effects: Effect[]): Found {
+export function roundB173Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
   // Saw: "Whenever equipped creature attacks, you may sacrifice a permanent other than that creature or ~. If you do, draw a
   // card.": any permanent you control but the attacker (the trigger's subject, while it's still that object) and the
   // Equipment itself, chosen as it resolves (not targeted).
@@ -69,5 +70,5 @@ export function roundB173Sentence(s: string, _sentences: string[], si: number, c
     const pick: Effect = { type: "pick", who: { ref: "you" }, filter: { kind: "object", types: [], notTypes: [], notColors: [], notSource: true, notSubject: true, text: "permanent other than that creature or ~" }, n: 1, action: "sacrifice" };
     return { effect: { type: "may", effects: [pick], text: "sacrifice a permanent other than that creature or ~" }, next: si + 1 };
   }
-  return null;
+  return roundB174Sentence(s, sentences, si, ctx, effects);
 }

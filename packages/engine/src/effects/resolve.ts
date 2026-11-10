@@ -35,6 +35,7 @@ import { runLaneB167Effect } from "./run-laneb167";
 import { runLaneB168Effect } from "./run-laneb168";
 import { runLaneB169Effect } from "./run-laneb169";
 import { runLaneB170Effect } from "./run-laneb170";
+import { runLaneB172Effect } from "./run-laneb172";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -1285,6 +1286,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "turnRules":
     case "landManaUntilEndOfTurn":
     case "blockTaxThisTurn":
+    case "attackTaxThisTurn":
     case "revealHandWhile":
     case "flashUntilNextTurn":
     case "opponentsHandOnlyUntilNextTurn":
@@ -1747,6 +1749,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB169Effect(s, e, ctx, src);
     case "eachRevealFromHand":
       return runLaneB170Effect(s, e, ctx, src);
+    case "putFromHandRounds":
+      return runLaneB172Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

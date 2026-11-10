@@ -3580,6 +3580,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1534d90f-fc88-42dc-bf01-8b0986485e78",
+  "name": "Blood Sun",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, draw a card.\nAll lands lose all abilities except mana abilities.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rix",
+  "releasedAt": "2018-01-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "64e29bfc-9313-4e8c-808c-bc27f6b018a6",
   "name": "Bloodfell Caves",
   "manaCost": "",
@@ -10255,6 +10281,32 @@
   "commanderLegal": "legal",
   "set": "eoc",
   "releasedAt": "2025-08-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "917f2b4b-79ec-4ded-b4c8-cbcf363cb23b",
+  "name": "Eureka",
+  "manaCost": "{2}{G}{G}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Starting with you, each player may put a permanent card from their hand onto the battlefield. Repeat this process until no one puts a card onto the battlefield.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

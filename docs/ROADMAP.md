@@ -1,6 +1,6 @@
 # Roadmap
 
-30,874 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,881 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,789 of
 9,979 (98%).
 
@@ -7597,6 +7597,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cards to the battlefield under your control", CR 607.2a). Exotic Pets ("for each kind of counter among creatures you
   control, put a counter of that kind on either of those tokens": a prompt per kind, a browser test). +6, 30,874 of
   31,936 with B167.
+- Round B169 (least played first, mechanics that could be built from the skip lists): Culmination of Studies ("For each
+  land card exiled this way, create a Treasure token. For each blue card exiled this way, draw a card. For each red card
+  exiled this way, ~ deals 1 damage to each opponent": every sentence counts the one exile of the top X cards, all exiled
+  first; a blue and red card counts for both, and the damage to each opponent is one event, rulings). Wild Research ("Put
+  it into your hand, then discard a card at random. Then shuffle": the card found can be the one discarded, CR 701.9b;
+  finding nothing is allowed, rulings; one shuffle at the end). Moonlight Bargain ("For each card, put that card into your
+  graveyard unless you pay 2 life": a picker of the cards kept, each paid as a payment of its own, CR 119.4, so "whenever
+  you lose life" triggers once for each; no more than the life can pay, none if you can't lose life, CR 119.8; the picker
+  says how much life that pays; a browser test). Spreading Plague ("destroy all other creatures that share a color with
+  it. They can't be regenerated": the entering creature's colors as it is or last was, CR 608.2h; a colorless one shares
+  none, CR 105.2). Soulgorger Orgg ("you lose all but 1 life" / "you gain life equal to the life you lost when it
+  entered": noted for that object, CR 607.1, 607.2e; none if it left before its enters ability resolved). Mercadia's
+  Downfall and Jurin, Leading the Charge ("for each nonbasic land defending player controls", "each creature you control
+  attacking a player gets +1/+0 ... for each creature that player controls": each attacker's own defending player, CR
+  802.2a, counted once as it resolves, CR 608.2h; an attacker of a planeswalker counts its controller for Mercadia's
+  Downfall and gets nothing from Jurin). +7, 30,881 of 31,936 with B168.
+- Out after round B169 (looked at, not done): Dimir Strandcatcher (an intervening "if three or more cards were put into
+  your graveyard from anywhere other than the battlefield this turn": no turn count of those yet), Emrakul's Evangel
+  (sacrificing any number of creatures as a cost) stay out.
 - Out after round B168 (looked at, not done): Sudden Salvation (targets in any graveyard, and "for each opponent who
   controls one or more of those permanents"), Garruk, Curse Breaker's −4 ("whenever one or more creatures attack one of
   your opponents": how often that batched trigger fires when creatures attack two opponents isn't settled by rulings),

@@ -2,6 +2,7 @@
 import type { Effect } from "../abilities";
 import { parseOne, reflexiveBody, type Ctx } from "./body";
 import { QUOTED_SOURCE_NAME } from "./compile";
+import { roundB169Sentence } from "./laneb169";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -63,5 +64,5 @@ export function roundB168Sentence(s: string, sentences: string[], si: number, ct
     if (prev?.type !== "createToken" || prev.n !== 2 || prev.who.ref !== "you") return "fail";
     return { effect: { type: "counterKindsOnEither" }, next: si + 1 };
   }
-  return null;
+  return roundB169Sentence(s, sentences, si, ctx, effects);
 }

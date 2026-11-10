@@ -4320,7 +4320,7 @@ function LibrarySearch({
               : dig && (pending.hand !== undefined || pending.forPlayer !== undefined || pending.exiled)
               ? `The rest ${dig.rest}.`
               : dig
-              ? `The rest go ${dig.rest}.${pending.distinctPowers ? " Each must have a different power." : ""}${pending.totalMv !== undefined ? ` Total mana value ${found.reduce((n, x) => n + mvOf(x), 0)} of at most ${pending.totalMv}.` : ""}${dig.lifeEach ? ` You'll lose ${found.length * dig.lifeEach} life.` : ""}`
+              ? `The rest go ${dig.rest}.${pending.distinctPowers ? " Each must have a different power." : ""}${pending.totalMv !== undefined ? ` Total mana value ${found.reduce((n, x) => n + mvOf(x), 0)} of at most ${pending.totalMv}.` : ""}${dig.lifeEach ? ` You'll lose ${found.length * dig.lifeEach} life.` : ""}${dig.payLife ? ` You'll pay ${found.length * dig.payLife} life.` : ""}`
               : pending.firstTo
                 ? pending.firstN && pending.firstN > 1 ? `The first ${pending.firstN} you find go ${pending.firstTo}, the other ${pending.othersTo}.` : `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.`
                 : pending.reveal

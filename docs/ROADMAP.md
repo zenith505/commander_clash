@@ -1,7 +1,7 @@
 # Roadmap
 
-30,881 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,793 of
+30,887 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,799 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -88,7 +88,7 @@ line blocks.
    Nahiri's Resolve (done in round 266),
    Omo, Queen of Vesuva (done in round 265), Shelob, Child of Ungoliant
    (creatures dealt damage this turn by a Spider you controlled; a copy that's a Food artifact and loses its other
-   card types), Professor Hojo (a cost reduction for the first activated ability that targets a creature you control;
+   card types), Professor Hojo (done in round 330) (a cost reduction for the first activated ability that targets a creature you control;
    "become the target of an activated ability"), Squee, Dubious Monarch (an alternative cost from the graveyard that
    exiles four other cards, not escape), Moxite Refinery ("remove X counters" of any kinds as a cost), Reverse the
    Polarity ("counter all other spells"; "creatures can't be blocked this turn" means the creatures there as it
@@ -124,7 +124,7 @@ line blocks.
    of All (Shrine triggers that trigger an additional time), Master Warcraft (you declare everyone's attackers and
    blockers), Chef's Kiss (gaining control of a spell, then targets chosen at random), Make an Example (each opponent
    separates their creatures into piles: a pile prompt per opponent), Perplexing Chimera (exchanging control of a
-   permanent and a spell), Karn, Living Legacy ("pay any amount of mana" as an effect), Benevolent Blessing (done in round 277) (protection
+   permanent and a spell), Karn, Living Legacy (done in round 330) ("pay any amount of mana" as an effect), Benevolent Blessing (done in round 277) (protection
    that doesn't remove your Auras and Equipment already attached), Ashling, the Limitless (spells that gain evoke as
    they're cast), Omnath, Locus of All (done in round 277) ("three mana in any combination of its colors" from a trigger), Crypt Rats
    ("spend only black mana on X": a spend rule for part of a cost). Round 168 went down the list to Glen Elendra Guardian (rank 5,741), skipping over the cards still listed by
@@ -469,7 +469,7 @@ line blocks.
    Appropriation, Ixhel (done in round 273), Cybership, Intrepid Paleontologist, Ravenloft Adventurer, Kagha, Obeka, Tale of
    Katara and Toph, Ramses, Shuri, Wall of Stolen Identity, Scion of the Ur-Dragon (done in round 304), Hourglass of the Lost, Kaya the
    Inexorable, Summon: Kujata, Soul Immolation, Ruxa, Omenpath Journey, Havengul Lich, Out of Time, Breath of
-   Fury, Firkraag, Tam, Ivy, Disorienting Choice, Endless Sands, Tyvar the Bellicose, Sidisi, Pir's Whim, Eruth,
+   Fury, Firkraag, Tam, Ivy, Disorienting Choice (done in round 330), Endless Sands, Tyvar the Bellicose (done in round 330), Sidisi, Pir's Whim, Eruth,
    Command the Dreadhorde.
    Round 191 went on from the top: base power and toughness "and are Juggernauts in addition to their other creature
    types" (Graaz, Unstoppable Juggernaut), "the exiled card's power/toughness" (Lobelia Sackville-Baggins, with "that was
@@ -2363,6 +2363,40 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 330 took cards back off the "Out after round N" lists, most played first: "The first activated ability you
+   activate during your turn that targets a creature you control costs {2} less to activate." and "Whenever one or
+   more creatures you control become the target of an activated ability, draw a card. This ability triggers only once
+   each turn." (Professor Hojo: generic mana only, rulings; in its controller's own turn, the first such ability
+   whether or not the discount was used; anyone's activated ability triggers the draw, a triggered ability doesn't);
+   "Pay any amount of mana. Look at that many cards from the top of your library, then put one of those cards into
+   your hand and the rest on the bottom of your library in a random order." (Karn, Living Legacy's −1, paid as it
+   resolves, nothing looked at with 0 paid, rulings) and emblems with activated abilities, activated by their owner
+   from the command zone (CR 114.4) with a button on the emblem in the seat header and browser tests: Karn's "Tap an
+   untapped artifact you control: This emblem deals 1 damage to any target." (any untapped artifact, an artifact
+   creature that just entered too, CR 302.6 is only about {T}, rulings) and Ob Nixilis of the Black Oath's "{1},
+   Sacrifice a creature: You gain X life and draw X cards, where X is the sacrificed creature's power."; "For each
+   opponent, choose up to one target artifact or enchantment that player controls. For each permanent chosen this way,
+   its controller may exile it. Then if one or more of the chosen permanents are still on the battlefield, you search
+   your library for up to that many land cards, ..." (Disorienting Choice: the next opponent in turn order decides
+   first, each seeing the earlier answers, then those are exiled at once, a new prompt with browser tests, rulings);
+   "Each creature you control has 'Whenever a mana ability of this creature resolves, put a number of +1/+1 counters
+   on it equal to the amount of mana this creature produced. This ability triggers only once each turn.'" (Tyvar the
+   Bellicose: the counters come before the spell being paid for resolves, once each turn for each creature, rulings; a
+   creature sacrificed for its own mana no longer has the ability as it resolves); "Whenever you or another permanent
+   you control becomes the target of a spell or ability an opponent controls, counter that spell or ability unless its
+   controller pays {1}." (Valkmira, Protector's Shield, Reidane's back face). +6, 30,887 of 31,936.
+   Bots: a bot uses Karn's emblem in its second main phase with an artifact that has only mana abilities (no
+   creature), at an opponent or something of theirs, and Ob Nixilis's emblem only on a creature token with power 2 or
+   more, keeping at least two cards in its library; it pays at most half of its mana for Karn's −1; asked by
+   Disorienting Choice, it exiles a token and keeps anything else.
+   Out after round 330 (looked at, not done): Moxite Refinery (removing X counters of any kinds from one permanent as
+   a cost); Hot Pursuit (a creature suspected and goaded for as long as the enchantment stays, then control of every
+   goaded or suspected creature once two players have lost); Master Warcraft (choosing which creatures other players
+   attack and block with, and how they block); Coram, the Undertaker (cards put into graveyards from libraries this
+   turn, played from any graveyard); Shadow Kin (becoming a copy of a milled card "except it has this ability");
+   Curie, Emergent Intelligence (becoming a copy of the exiled creature with a gained ability, and its base power);
+   Timothar, Baron of Bats (a token that returns the exiled card when it deals combat damage); Spell Queller (the
+   exiled spell's owner casting it for free once Spell Queller leaves).
    Round 329 took cards back off the "Out after round N" lists, most played first: "If you would lose the game, instead
    exile this creature and your life total becomes equal to your starting life total." (Exquisite Archangel: 40) and "The
    next time you would lose the game this turn, instead draw seven cards and your life total becomes 1." (Stunning
@@ -2582,8 +2616,8 @@ line blocks.
    never the enchanted player, CR 115.1). +8, 30,776 of 31,936 with round 320, B160 and B161.
    Out after round 321 (looked at, not done): Brimaz, Blight of Oreskos (which spells "Phyrexian creature or artifact
    creature spell" covers), Bre of Clan Stoutarm (whether "Otherwise" applies when you decline to cast), Desert Warfare
-   (one ability with two trigger conditions, and "from your hand or library"), Karn, Living Legacy and Ob Nixilis of the
-   Black Oath (emblems with activated abilities; "Pay any amount of mana"), Bilbo, Thief in the Night (a paid cast from
+   (one ability with two trigger conditions, and "from your hand or library"), Karn, Living Legacy and Ob Nixilis of the Black Oath (done in round 330)
+   (emblems with activated abilities; "Pay any amount of mana"), Bilbo, Thief in the Night (a paid cast from
    the graveyard during resolution). Bots give Hand of Vecna's bonus to the creature with the greatest power.
    Round 320 took cards back off the "Out after round N" lists, most played first: "Tap up to three target creatures. Put
    a stun counter on one of them." (Aerith Rescue Mission: the one chosen as it resolves among the targets still legal,
@@ -2770,8 +2804,8 @@ line blocks.
    step ends, CR 511.3, or as that turn ends if it has no combat). +8, 30,642 of 31,936 with rounds 312, 313 and B153.
    Out after round 314 (looked at, not done): Crashing Wave (done in round 328) and Foggy Swamp Visions (their "waterbend {X}" now reads, but
    "distribute three stun counters among any number of tapped creatures your opponents control" and "for each creature
-   card exiled this way, create a token that's a copy of it" don't yet); Professor Hojo, Disorienting Choice, Hot Pursuit,
-   Karn, Living Legacy, Into the Pit, Hatchery Sliver, Abstruse Appropriation, Kusari-Gama and Urgent Necropsy (still out,
+   card exiled this way, create a token that's a copy of it" don't yet); Professor Hojo (done in round 330), Disorienting Choice (done in round 330), Hot Pursuit,
+   Karn, Living Legacy (done in round 330), Into the Pit, Hatchery Sliver, Abstruse Appropriation, Kusari-Gama and Urgent Necropsy (still out,
    for the reasons in their earlier lists).
    Round 313 took cards back off the "Out after round N" lists, most played first: paying to ignore a permanent's effect
    until end of turn, a special action (CR 116.2d) offered from that permanent's menu, with nothing on the stack:
@@ -3000,7 +3034,7 @@ line blocks.
    (Exterminate!, a different one each time, summoning sick ones too, CR 302.6; a browser test), "Tap an untapped Horror
    you control" (Psionic Ritual) and "Pay {E}{E}{E}" (Reiterating Bolt). +10, 30,461 of 31,936 (30,468 with B142).
    Out after round 304 (looked at, not done): Night Soil ("Exile two creature cards from a single graveyard" as a cost:
-   the cost picker only offers your own graveyard); Karn, Living Legacy ("Pay any amount of mana" as an effect, and an
+   the cost picker only offers your own graveyard); Karn, Living Legacy (done in round 330) ("Pay any amount of mana" as an effect, and an
    emblem whose ability's cost taps an artifact); Moxite Refinery, Abstruse Appropriation, Oskar, Araumi, Ride the
    Avalanche, Panoptic Projektor, Read the Runes (done in round 320), Draco, Azra Oddsmaker, Leonin Arbiter (done in round 313), Incinerator of the Guilty (done in round 313), Baba
    Lysaga, Archelos and Hatchery Sliver (still out, for the reasons in their earlier notes).
@@ -3216,7 +3250,7 @@ line blocks.
    cost isn't recorded on the spell, for its power as it resolves or its last known power, rulings); Incinerator of the
    Guilty ("collect evidence X", X chosen as the trigger resolves: no prompt for it); Spectral Searchlight (another player
    chooses the color of the mana); Undead Alchemist and Szadek, Lord of Secrets (done in round 297) (left while Lane B's round B125 changes the
-   damage replacements); Canoptek Wraith, Professor Hojo, Karn, Living Legacy, Tegwyll's Scouring and Eumidian Wastewaker
+   damage replacements); Canoptek Wraith, Professor Hojo (done in round 330), Karn, Living Legacy (done in round 330), Tegwyll's Scouring and Eumidian Wastewaker
    (still out, for the reasons in their earlier notes).
    Round 294 took the last names from the top no earlier round looked at (rank 24,900 to 31,400): "As long as the top card
    of your library is an artifact or creature card, ~ has all activated abilities of that card" (Skill Borrower); "the base
@@ -3356,7 +3390,7 @@ line blocks.
    draw it is in the draw step).
    Out after round 279 (looked at, not done): Game of Chaos (done in round 298) (each next flip's stakes double and the winner or loser
    decides whether to flip again); Grothama, All-Devouring (done in round 295) (damage dealt to it by each player's sources this turn);
-   Lich's Mastery (done in round 302) (exile a permanent or a card from hand or graveyard for each 1 life lost); Karn, Living Legacy ("pay
+   Lich's Mastery (done in round 302) (exile a permanent or a card from hand or graveyard for each 1 life lost); Karn, Living Legacy (done in round 330) ("pay
    any amount of mana" plus its emblem); Deathmist Raptor (return it face up or face down).
    Out after round 278 (looked at, not done): Enchanter's Bane (the target enchantment deals the damage, and its
    controller's punisher option is sacrificing that one target); Squee's Revenge (done in round 298) ("choose a number" with no upper bound);
@@ -3479,7 +3513,7 @@ line blocks.
    target); Olivia, Crimson Bride (done in round 267);
    Horrid Shadowspinner (done in round B105) (discard "that many", its power when you chose to draw, rulings); Rampaging War Mammoth (done in round 277) (the X
    from the cycling cost, as before); Soul Diviner (a counter of any kind removed as a cost); Ironscale Hydra (done in round 278) (a
-   prevention that puts a counter for each creature's damage prevented); Professor Hojo (the first activated ability that
+   prevention that puts a counter for each creature's damage prevented); Professor Hojo (done in round 330) (the first activated ability that
    targets a creature you control).
    Out after round 249 (looked at, not done): The Eleventh Hour (a copy with a new name: the copied text's self-references
    and the rulings' loss of non-Alien subtypes); Stitcher Geralf ("exile up to two creature cards put into graveyards
@@ -3600,7 +3634,7 @@ line blocks.
    Bloodbending, Chiss-Goria, Forge Tyrant, Molecule Man (done in round 274), Confiscation Coup (done in round 273), Zoyowa Lava-Tongue, Role Reversal (done in round 273), Craig Boone, Novac Guard, Spelltwine, Ultimate Magic: Meteor, Spectral Searchlight, Rat King,
    Verminister; and from before round 172: Grindstone, Moritte of the
    Frost, Reyhan, Last of the Abzan, Herigast, Erupting Nullkite (done in round 274), Mazemind Tome, Asmodeus the Archfiend (done in round 297), Temporal
-   Extortion, Hot Pursuit, Reidane, God of the Worthy, Long River Lurker, Psychic Paper,
+   Extortion, Hot Pursuit, Reidane, God of the Worthy (done in round 330), Long River Lurker, Psychic Paper,
    Dream-Thief's Bandana (done in round 273), Chandra, Legacy of Fire (done in round 267), Theoretical Duplication,
    Calamity, Galloping Inferno, Sam, Loyal Attendant, Crystalline Giant,
    Kaervek, the Punisher (done in round 267), Obsessive Pursuit,
@@ -3901,8 +3935,8 @@ line blocks.
    Elenda, Volatile Stormdrake, Tam, Mondo Gecko, Skrelv, Sungold Sentinel (done in round B164) stay out); "Tribal" cards still out (the
    data calls them all Kindred now). Bots never cast Donate, Harmless Offering or Bazaar Trader's ability (they would
    only give away their own permanents), never use Lion's Eye Diamond (automatic payment doesn't either), and cast from
-   Bolas's Citadel only while their life stays 15 or more. Round 88 leftovers still out: Ob Nixilis of the Black Oath
-   and Karn, Living Legacy emblems, Karn, Scion of Urza, Toralf (done in round 266), Death Kiss, Burning-Rune Demon, Emergent Ultimatum,
+   Bolas's Citadel only while their life stays 15 or more. Round 88 leftovers still out: Ob Nixilis of the Black Oath (done in round 330)
+   and Karn, Living Legacy (done in round 330) emblems, Karn, Scion of Urza, Toralf (done in round 266), Death Kiss, Burning-Rune Demon, Emergent Ultimatum,
    Ecological Appreciation. Bots never exile a Spirit Guide from their hand for mana (the player can, from the
    hand-card menu; autopay doesn't use it either). Bots don't hold Teferi's Protection for anything but lethal combat
    damage or a board wipe of their own permanents worth 12+ mana value; bots only animate the biggest creature card
@@ -3938,9 +3972,9 @@ line blocks.
      Valakut Awakening only when they have five or more lands out, and spells that cost more than their lands plus two.
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
    Left from rounds 87 and 88 (emblems, tap any number, excess damage, different names):
-   - Emblems still out: emblems with activated abilities (Ob Nixilis of the Black Oath, Karn, Living Legacy: they need
+   - Emblems still out: emblems with activated abilities (Ob Nixilis of the Black Oath, Karn, Living Legacy, done in round 330: they need
      activating from the command zone and a button for it), Ral's storm on spells. Karn, Scion of Urza (an opponent
-     chooses, then silver counters in exile) and Karn, Living Legacy's "pay any amount of mana".
+     chooses, then silver counters in exile) and Karn, Living Legacy's "pay any amount of mana" (done in round 330).
    - Excess damage still out: Vikya ({Q} costs); Toralf done in round 266.
    - "It" in a cast trigger is the spell only as the first instruction ("Whenever you cast an Elf spell, it gains
      haste"); "untap ~. It gains ..." (Pristine Skywise, Bloodsky Berserker) is about the permanent and isn't parsed.

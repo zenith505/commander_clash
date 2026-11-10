@@ -1934,7 +1934,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Crew Vehicles and saddle Mounts before combat; make Mechtitan (it has haste).
     if (s.step === "main1") {
-      const crew = chooseActivation(s, pid, makesTitan) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
+      // Osteomancer Adept: before combat, so the creature cast from our graveyard comes in this main phase (and Adept
+      // isn't tapped by attacking first).
+      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => e.type === "graveyardTurn" && !!e.costs)) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
       if (crew) return crew;
     }
     // Use activated abilities once we're done casting spells, then cycle what we can't use.
@@ -5991,6 +5993,21 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         const mana = availableMana(s, pid) - manaValue(parseManaCost(ab.manaCost)) - (ab.tap ? 1 : 0);
         const worth = player(s, pid).graveyard.some((c) => { const d = defOf(s, obj(s, c)); return !!d.manaCost && printedMatches(yardCast.filter, d) && mv(s, c) >= 2 && mv(s, c) <= mana; });
         if (unused || !worth || s.activePlayer !== pid || (s.step !== "main1" && s.step !== "main2") || s.stack.length) continue;
+      }
+      // Osteomancer Adept: casting creature spells from our graveyard this turn by foraging, only in our main phase with
+      // the stack empty, not already allowed this turn, with a creature card there costing 2 or more that we could pay
+      // for afterwards and a way to forage for it.
+      const yardTurn = ab.body.effects.find((e) => e.type === "graveyardTurn" && !!e.costs);
+      if (yardTurn?.type === "graveyardTurn" && yardTurn.cast) {
+        const already = (s.graveyardTurn ?? []).some((g) => g.player === pid && g.turn === s.turn && !!g.costs);
+        const mana = availableMana(s, pid) - manaValue(parseManaCost(ab.manaCost));
+        const worth = player(s, pid).graveyard.some((c) => {
+          const d = defOf(s, obj(s, c));
+          if (!d.manaCost || !printedMatches(yardTurn.cast!, d) || mv(s, c) < 2 || mv(s, c) > mana) return false;
+          const ways = forageWays(s, pid, obj(s, c));
+          return !yardTurn.costs!.some((k) => k.kind === "forage") || ways.foods.length > 0 || ways.cards.length >= 3;
+        });
+        if (already || !worth || s.activePlayer !== pid || (s.step !== "main1" && s.step !== "main2") || s.stack.length) continue;
       }
       // "~ becomes a Kithkin Spirit with base power and toughness 2/2" when it's that big already, or bigger (Figure of
       // Destiny after its later steps): it would only shrink.

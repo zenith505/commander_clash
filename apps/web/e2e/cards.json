@@ -9472,6 +9472,45 @@
   "gameChanger": false
  },
  {
+  "oracleId": "da339200-ed26-42e4-b24f-b96bc4daef7c",
+  "name": "Elsha of the Infinite",
+  "manaCost": "{2}{U}{R}{W}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Djinn Monk",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Djinn",
+   "Monk"
+  ],
+  "oracleText": "Prowess (Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn.)\nYou may look at the top card of your library any time.\nYou may cast noncreature spells from the top of your library. If you cast a spell this way, you may cast it as though it had flash.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Prowess"
+  ],
+  "commanderLegal": "legal",
+  "set": "c19",
+  "releasedAt": "2019-08-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "40c88392-2aa7-4e12-86a4-8d680219e670",
   "name": "Elspeth Conquers Death",
   "manaCost": "{3}{W}{W}",
@@ -15587,6 +15626,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e330412f-46a1-4e7c-8766-f644606049e0",
+  "name": "Into the Pit",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "You may look at the top card of your library any time.\nYou may cast spells from the top of your library by sacrificing a nonland permanent in addition to paying their other costs.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dsc",
+  "releasedAt": "2024-09-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b72fde5e-862a-45e8-9880-f2c16975a9ac",
   "name": "Intrepid Adversary",
   "manaCost": "{1}{W}",
@@ -15616,6 +15681,44 @@
   "set": "dbl",
   "releasedAt": "2022-01-28",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d6026309-aae9-43e7-938b-69db7af7139c",
+  "name": "Intrepid Paleontologist",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Druid",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Druid"
+  ],
+  "oracleText": "{T}: Add one mana of any color.\n{2}: Exile target card from a graveyard.\nYou may cast Dinosaur creature spells from among cards you own exiled with this creature. If you cast a spell this way, that creature enters with a finality counter on it. (If a creature with a finality counter on it would die, exile it instead.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "lci",
+  "releasedAt": "2023-11-17",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -22695,6 +22798,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "791cbb7c-7935-4902-b050-9ea9d030e9fa",
+  "name": "Osteomancer Adept",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Creature — Squirrel Warlock",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Squirrel",
+   "Warlock"
+  ],
+  "oracleText": "Deathtouch\n{T}: Until end of turn, you may cast creature spells from your graveyard by foraging in addition to paying their other costs. If you cast a spell this way, that creature enters with a finality counter on it. (To forage, exile three cards from your graveyard or sacrifice a Food. If a creature with a finality counter on it would die, exile it instead.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "blb",
+  "releasedAt": "2024-08-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "473a7998-669d-4181-83fe-f178a2e781f0",
   "name": "Out of the Tombs",
   "manaCost": "{2}{B}",
@@ -26016,6 +26152,38 @@
   "commanderLegal": "legal",
   "set": "dsk",
   "releasedAt": "2024-09-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "80bb9ce4-1f3c-42ca-b75f-9a6b2f42073b",
+  "name": "Ripjaw Raptor",
+  "manaCost": "{2}{G}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Dinosaur",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dinosaur"
+  ],
+  "oracleText": "Enrage — Whenever this creature is dealt damage, draw a card.",
+  "power": "4",
+  "toughness": "5",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Enrage"
+  ],
+  "commanderLegal": "legal",
+  "set": "xln",
+  "releasedAt": "2017-09-29",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

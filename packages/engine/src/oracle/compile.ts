@@ -3010,6 +3010,17 @@ export function compile(d: CardDef): CompiledCard {
       else (out.playLinkedWhile = { kind: "allOf", conds: [] }), (out.playLinkedCastOnly = true);
       continue;
     }
+    // Intrepid Paleontologist: "You may cast Dinosaur creature spells from among cards you own exiled with ~. If you cast a
+    // spell this way, that creature enters with a finality counter on it.": only those cards, the usual costs and timing
+    // (rulings), while it's under your control as the casting begins (rulings); the creature enters with the counter (CR
+    // 614.1c).
+    const ownLinked = /^You may cast ([A-Za-z ]+?) spells from among cards you own exiled with ~\. If you cast a spell this way, that creature enters with an? (finality|\+1\/\+1) counter on it\.$/.exec(line);
+    if (ownLinked) {
+      const f = parseSearchFilter(`${ownLinked[1]!} card`);
+      if (!f || !f.types?.includes("Creature") || out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
+      else (out.playLinkedWhile = { kind: "allOf", conds: [] }), (out.playLinkedCastOnly = true), (out.playLinkedOnly = { filter: f, own: true, entersWith: { counter: ownLinked[2]!, n: 1 } });
+      continue;
+    }
     // Azula, Cunning Usurper: "During your turn, you may cast cards exiled with ~ and you may cast them as though they had
     // flash. Mana of any type can be spent to cast those spells." Spells only, during your turn, at instant speed (CR
     // 702.8a), any type of mana (CR 609.4b), its other costs paid as usual (rulings).
@@ -3087,13 +3098,25 @@ export function compile(d: CardDef): CompiledCard {
     // Mikey & Don, Party Planners: "... If you cast a creature spell this way, that creature enters with an additional
     // +1/+1 counter on it."
     const counterTop = !lifeTop && !hasteTop && /^(.+?)\. If you cast a creature spell this way, that creature enters with an additional \+1\/\+1 counter on it\.$/.exec(line);
+    // Elsha of the Infinite: "... If you cast a spell this way, you may cast it as though it had flash." (CR 702.8a): any
+    // time it could cast an instant, cast with this permission, paying all its costs (rulings).
+    const flashTop = !lifeTop && !hasteTop && !counterTop && /^(.+?)\. If you cast a spell this way, you may cast it as though it had flash\.$/.exec(line);
+    // Into the Pit: "You may cast spells from the top of your library by sacrificing a nonland permanent in addition to
+    // paying their other costs.": a cost of each spell cast with this permission (CR 601.2f-h), any nonland permanent you
+    // control, Into the Pit too; the usual timing (rulings).
+    const sacTop = !lifeTop && !hasteTop && !counterTop && !flashTop && /^(You may cast (?:.+?) from the top of your library) by sacrificing an? ([a-z ]+?) in addition to paying their other costs\.$/.exec(line);
+    const sacFilter = sacTop ? parseTargetPhrase(`${sacTop[2]!} you control`) : undefined;
     const top = lifeTop
       ? ((t) => (t?.spells ? { ...t, payLife: true as const } : t && null))(parseFromTop(lifeTop[1]!))
       : hasteTop
         ? ((t) => (t?.spells && !t.lands && !t.once ? { ...t, haste: "endOfTurn" as const } : t && null))(parseFromTop(hasteTop[1]!))
         : counterTop
           ? ((t) => (t?.spells && !t.once ? { ...t, creatureCounter: true as const } : t && null))(parseFromTop(counterTop[1]!))
-          : parseFromTop(line.replace(/\.$/, ""));
+          : flashTop
+            ? ((t) => (t?.spells && !t.lands && !t.once ? { ...t, flash: true as const } : t && null))(parseFromTop(flashTop[1]!))
+            : sacTop
+              ? ((t) => (t?.spells && !t.lands && !t.once && sacFilter?.kind === "object" ? { ...t, costs: [{ kind: "sacrifice" as const, filter: sacFilter, n: 1 }] } : t && null))(parseFromTop(sacTop[1]!))
+              : parseFromTop(line.replace(/\.$/, ""));
     if (top !== undefined) {
       if (top === null) out.unsupported.push(raw);
       else (out.fromTop ??= []).push(top);

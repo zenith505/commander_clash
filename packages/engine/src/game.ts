@@ -4905,7 +4905,8 @@ function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false
     const life = !!a.playLinkedForLife && s.activePlayer === pid;
     // Evendo Brushrazer's: while its condition holds, paying as usual.
     // Rona, Disciple of Gix: spells only, so not a land card.
-    const plain = !!a.playLinkedWhile && !(a.playLinkedCastOnly && isType(defOf(s, o), "Land")) && staticConditionNow(s, a.playLinkedWhile, id, pid);
+    // Intrepid Paleontologist: only cards of its kind that `pid` owns.
+    const plain = !!a.playLinkedWhile && !(a.playLinkedCastOnly && isType(defOf(s, o), "Land")) && !(a.playLinkedOnly && (o.owner !== pid || o.faceDown || !printedMatches(a.playLinkedOnly.filter, defOf(s, o)))) && staticConditionNow(s, a.playLinkedWhile, id, pid);
     if (!life && !plain && !a.playLinked && !(a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) continue;
     if (!(s.linkedExile[`${id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0))) continue;
     if (a.playLinked || (a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) return "anyType";
@@ -4915,6 +4916,24 @@ function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false
     else if (!how) how = "plain";
   }
   return how;
+}
+
+/**
+ * Intrepid Paleontologist: the counter a creature spell cast with its permission enters with (CR 614.1c), when that's the
+ * only way `pid` may cast this exiled card now (with another one, its caster would take that one).
+ */
+function linkedEntersWith(s: GameState, o: GameObject, pid: PlayerId): { counter: CounterKind; n: number } | undefined {
+  if (o.zone !== "exile" || !s.linkedExile || ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || linkedPlayGrant(s, o, pid) >= 0) return undefined;
+  let rider: { counter: CounterKind; n: number } | undefined;
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== pid) continue;
+    const a = abilitiesOf(s, p);
+    if (a.playCountered || a.playOwnCountered) return undefined;
+    if (!a.playLinkedOnly || !(s.linkedExile[`${id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0))) continue;
+    rider = a.playLinkedOnly.entersWith;
+  }
+  return rider;
 }
 
 /**
@@ -5193,7 +5212,7 @@ export function mayPlayFromTop(s: GameState, o: GameObject, pid: PlayerId, way?:
  * The permanent whose permission lets `pid` play `o` from the top of their library: one without "once each turn" if
  * there is one, so a once-a-turn permission is kept for later (Johann). "Of the chosen type" is the permanent's choice.
  */
-function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" | "life"): { by?: GameObject; once?: true; haste?: "endOfTurn"; creatureCounter?: true } | undefined {
+function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" | "life"): { by?: GameObject; once?: true; haste?: "endOfTurn"; creatureCounter?: true; costs?: AdditionalCost[] } | undefined {
   if (o.zone !== "library" || o.owner !== pid || player(s, pid).library[0] !== o.id) return undefined;
   const d = defOf(s, o);
   const land = isType(d, "Land");
@@ -5207,6 +5226,8 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" 
   // A permission that also gives haste (Thundermane Dragon) or a +1/+1 counter (Mikey & Don) is the one used when several
   // apply: its controller's pick.
   let plain: GameObject | undefined;
+  // Into the Pit: a permission with a cost of its own is the one used only when no other applies (its caster's pick).
+  let costly: { by: GameObject; costs: AdditionalCost[] } | undefined;
   for (const id of s.battlefield) {
     const src = obj(s, id);
     if (controllerOf(s, src) !== pid) continue;
@@ -5214,6 +5235,10 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" 
       // Bolas's Citadel's spells are cast for life (`way` "life"); the other permissions' for their mana costs.
       if (!land && way && !!top.payLife !== (way === "life")) continue;
       if ((top.if && !staticConditionNow(s, top.if, src.id, pid)) || !(land ? top.lands && (!top.landFilter || printedMatches(top.landFilter, d)) : top.spells === "any" || !!top.spells?.some((f) => printedMatches(bindChosen(f, src.chosen), d)))) continue;
+      if (top.costs?.length) {
+        costly ??= { by: src, costs: top.costs };
+        continue;
+      }
       if (!top.once && top.haste) return { by: src, haste: top.haste };
       if (!top.once && top.creatureCounter && isType(d, "Creature")) return { by: src, creatureCounter: true };
       if (!top.once) plain ??= src;
@@ -5221,7 +5246,22 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" 
     }
   }
   if (plain) return { by: plain };
-  return once && { by: once, once: true };
+  if (once) return { by: once, once: true };
+  return costly;
+}
+
+/**
+ * Elsha of the Infinite: "If you cast a spell this way, you may cast it as though it had flash" (CR 702.8a): `pid`'s top
+ * card, which a permission of a permanent they control with that rider lets them cast (not Bolas's Citadel's for life,
+ * `way`).
+ */
+function topFlash(s: GameState, o: GameObject, pid: PlayerId, way: "mana" | "life"): boolean {
+  if (o.zone !== "library" || o.owner !== pid || player(s, pid).library[0] !== o.id || isType(defOf(s, o), "Land")) return false;
+  const d = defOf(s, o);
+  return s.battlefield.some((id) => {
+    const src = obj(s, id);
+    return controllerOf(s, src) === pid && (abilitiesOf(s, src).fromTop ?? []).some((top) => !!top.flash && !!top.payLife === (way === "life") && !(top.if && !staticConditionNow(s, top.if, src.id, pid)) && (top.spells === "any" || !!top.spells?.some((f) => printedMatches(bindChosen(f, src.chosen), d))));
+  });
 }
 
 /** "You may look at the top card of your library any time" (Vizier of the Menagerie): whether `viewer` may see `pid`'s top card. */
@@ -6079,7 +6119,7 @@ export function castProblem(
   // Tegwyll's Scouring: begun as though it had flash when there are enough creatures to tap (CR 601.3c), then only with them
   // tapped (castSpell treats kicks left out as none).
   const tapFlash = beholdFlashCost?.kind === "tap" && (!!choices?.kicks?.includes(0) || (choices?.kicks === undefined && !!s.objects[id] && tapCostCandidates(s, pid, s.objects[id]!, beholdFlashCost).length >= beholdFlashCost.n));
-  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || beholdFlash || tapFlash || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid));
+  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || beholdFlash || tapFlash || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid)) || (!via && !!s.objects[id] && topFlash(s, s.objects[id]!, pid, choices?.alt === "citadel" ? "life" : "mana"));
   // Offering (CR 702.48a): with a permanent sacrificed for it; before its costs are chosen, when there's one to sacrifice.
   const offered = !!compileCard(d).offering && (choices ? choices.offering !== undefined : offeringCandidates(s, pid, id).length > 0);
   if (!free && !instantSpeed && !offered && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
@@ -7252,13 +7292,19 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
   const castFrom = o.zone;
+  // Intrepid Paleontologist: "If you cast a spell this way, that creature enters with a finality counter on it": the
+  // spell, and the permanent it becomes (CR 614.1c, 400.7a).
+  const linkedRider = castFrom === "exile" && choices.alt !== "linkedFree" && isType(d, "Creature") ? linkedEntersWith(s, o, p.id) : undefined;
+  if (linkedRider) o.extraCounters = { ...o.extraCounters, [linkedRider.counter]: (o.extraCounters?.[linkedRider.counter] ?? 0) + linkedRider.n };
   if (choices.alt !== "linkedFree") useLinkedPlay(s, o, p.id);
   useOneOf(s, o, p.id, choices.asType);
   // Court of Locthwain: one spell for each time its ability resolved.
   if (choices.alt === "linkedFree") s.linkedFreeCasts!.splice(linkedFreeGrant(s, o, p.id), 1);
   // A once-a-turn permission to cast from the top is used up (Johann).
+  let topCosts: AdditionalCost[] = [];
   if (castFrom === "library") {
-    const how = topPermission(s, o, p.id);
+    const how = topPermission(s, o, p.id, choices.alt === "citadel" ? "life" : "mana");
+    topCosts = how?.costs ?? [];
     if (how?.once && how.by) how.by.topUsedTurn = s.turn;
     // "If you cast a creature spell this way, it gains haste until end of turn": the spell and the creature it becomes.
     if (how?.haste && isType(d, "Creature") && o.hasteCast !== "game") o.hasteCast = how.haste;
@@ -7393,7 +7439,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const returned: LastKnown = {};
   const discarded: string[] = [];
   const costExiled: { id: ObjectId; zc: number }[] = [];
-  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}), ...(via ? { viaWay: via } : {}), taxLife }, x ?? 0, s, p.id), choices, returned, undefined, discarded, costExiled, !!compileCard(d).altCosts?.some((a) => a.kind === "emerge") || isEmerge(choices.alt) || !!grantedEmerge(s, p.id, d));
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}), ...(via ? { viaWay: via } : {}), taxLife, topCosts }, x ?? 0, s, p.id), choices, returned, undefined, discarded, costExiled, !!compileCard(d).altCosts?.some((a) => a.kind === "emerge") || isEmerge(choices.alt) || !!grantedEmerge(s, p.id, d));
   // "Behold a Kithkin and exile it": linked to the permanent this spell becomes, one zone change from now (CR 607.2q).
   // "Exile a creature you control" (Fear of Abduction): the same (CompiledCard.costExileLinked).
   if (costExiled.length && (compileCard(d).additionalCosts?.some((c) => c.kind === "reveal" && c.exile) || compileCard(d).costExileLinked)) (s.linkedExile ??= {})[`${o.id}@${(o.zoneChanges ?? 0) + 1}`] = costExiled;
@@ -7735,11 +7781,16 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
   // "You may cast spells from your graveyard this turn" (Forgotten Cellar, Yawgmoth's Will): any number of them, paying
   // their mana costs (rulings), for the rest of the turn.
   // Its caster would choose it over a permission that exiles the spell afterwards (Vohar's).
-  if (d.manaCost && s.graveyardTurn?.some((g) => !g.anyGraveyard && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission" && !permissionBurden(w))) {
+  if (d.manaCost && s.graveyardTurn?.some((g) => !g.anyGraveyard && !g.costs && !g.entersWith && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission" && !permissionBurden(w))) {
     const i = out.findIndex((w) => w.kind === "permission");
     if (i >= 0) out.splice(i, 1);
     out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false });
   }
+  // Osteomancer Adept: "Until end of turn, you may cast creature spells from your graveyard by foraging in addition to
+  // paying their other costs. If you cast a spell this way, that creature enters with a finality counter on it.": when no
+  // other permission lets it be cast from there (its caster would pick one without the cost).
+  const costly = d.manaCost ? s.graveyardTurn?.find((g) => !g.anyGraveyard && (!!g.costs || !!g.entersWith) && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) : undefined;
+  if (costly && !out.some((w) => w.kind === "permission")) out.push({ kind: "permission", mana: d.manaCost, costs: costly.costs ?? [], exile: false, ...(costly.entersWith ? { entersWith: costly.entersWith } : {}) });
   // "Until end of turn, you may cast instant and sorcery spells from any graveyard" (The Great Work): for the player it
   // gave the permission, whoever owns the card; "if a spell cast this way would be put into a graveyard, exile it instead".
   const any = d.manaCost ? s.graveyardTurn?.find((g) => g.anyGraveyard && g.player === caster && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) : undefined;
@@ -8183,7 +8234,7 @@ function viaCosts(d: CardDef, choices: { via?: CastFromGraveyardKind; objectId?:
   return graveyardCast(d, choices?.via)?.costs;
 }
 
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks" | "splice"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use (and Liesa's commander tax in life, from the command zone). */ objectId?: ObjectId; /** Liesa's commander tax in life, worked out before the card left the command zone (castSpell). */ taxLife?: number; /** The way to cast it from a graveyard, found as it was cast (it's on the stack now). */ viaWay?: CastFromGraveyard }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks" | "splice"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use (and Liesa's commander tax in life, from the command zone). */ /** Into the Pit: the costs of the permission it was cast from the top of a library with, kept as it moved to the stack. */ topCosts?: AdditionalCost[]; objectId?: ObjectId; /** Liesa's commander tax in life, worked out before the card left the command zone (castSpell). */ taxLife?: number; /** The way to cast it from a graveyard, found as it was cast (it's on the stack now). */ viaWay?: CastFromGraveyard }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
   // "Escalate—Discard a card": that cost once for each mode beyond the first (CR 702.120a).
   const esc = compileCard(d).spell?.modal?.escalate?.cost;
@@ -8207,7 +8258,10 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   // Liesa, Shroud of Dusk: the commander tax as life, cast from the command zone (commanderTaxLife).
   const taxObj = s && choices?.objectId !== undefined ? s.objects[choices.objectId] : undefined;
   const taxLife = choices?.taxLife ?? (s && pid !== undefined && taxObj?.zone === "command" ? commanderTaxLife(player(s, pid), taxObj, d) : 0);
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : []), ...entwineExtraCosts(d, choices?.modes), ...(s ? spliceExtraCosts(s, choices?.splice) : [])];
+  // Into the Pit: the cost of the permission it's cast from the top of a library with (once it's on the stack, the
+  // costs castSpell kept, `topCosts`).
+  const topCosts = choices?.topCosts ?? (s && pid !== undefined && taxObj?.zone === "library" ? (topPermission(s, taxObj, pid, choices?.alt === "citadel" ? "life" : "mana")?.costs ?? []) : []);
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...topCosts, ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : []), ...entwineExtraCosts(d, choices?.modes), ...(s ? spliceExtraCosts(s, choices?.splice) : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   // Phyrexian Purge: so much life for each target chosen (CR 601.2c before 601.2f).

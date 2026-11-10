@@ -3929,7 +3929,7 @@ function ArrangeTop({
   onDone,
 }: {
   s: GameState;
-  how: "scry" | "surveil" | "order" | "bottom" | "look" | "graveyard" | "wholeGraveyard" | "libraryTop";
+  how: "scry" | "surveil" | "order" | "bottom" | "look" | "graveyard" | "wholeGraveyard" | "libraryTop" | "exile";
   /** Whose library, when it isn't yours. */
   owner?: string;
   source: string;
@@ -3939,8 +3939,8 @@ function ArrangeTop({
 }) {
   const [top, setTop] = useState<string[]>(cards);
   const [away, setAway] = useState<string[]>([]);
-  const awayName = how === "scry" ? "Bottom of library" : "Graveyard";
-  const together = how !== "scry" && how !== "surveil"; // they all go back together
+  const awayName = how === "scry" ? "Bottom of library" : how === "exile" ? "Exile" : "Graveyard";
+  const together = how !== "scry" && how !== "surveil" && how !== "exile"; // they all go back together
   const toggle = (id: string) => {
     if (together) return;
     if (top.includes(id)) {
@@ -4002,6 +4002,8 @@ function ArrangeTop({
                   ? `put these ${cards.length} cards into your graveyard in any order`
                   : how === "wholeGraveyard"
                     ? "reorder your graveyard as you choose"
+                    : how === "exile"
+                    ? `the top ${cards.length} cards of your library: exile any number of them and put the rest back on top in any order`
                     : how === "scry" && owner
                       ? cards.length === 1
                         ? `the top card of ${owner}'s library: leave it on top or put it on the bottom`

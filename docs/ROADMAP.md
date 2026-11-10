@@ -1,6 +1,6 @@
 # Roadmap
 
-30,875 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,881 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,793 of
 9,979 (98%).
 
@@ -2379,7 +2379,7 @@ line blocks.
    down, then shuffle all cards from your graveyard into your library." (Inverter of Truth: no one may look at them,
    rulings); "For each blocking creature, flip a coin. If you win the flip, prevent all combat damage that would be dealt
    by that creature this turn." (Fighting Chance: a flip won or lost for each creature blocking as it resolves). +7,
-   30,875 of 31,936 with round 328.
+   30,881 of 31,936 with round 328 and B167.
    Bots: a bot keeps Stunning Reversal until its life is 5 or less, casts Fighting Chance only while creatures block its
    own, and Inverter of Truth only with 20 or more cards in its graveyard; among replacements of its loss it takes the one
    that leaves it the most life (Stunning Reversal's seven cards only with seven to draw), and a dying Archangel goes to
@@ -2408,7 +2408,7 @@ line blocks.
    battlefield under your control." (Geth's Summons: counted as it's cast, CR 601.2c); "If you would draw a card during
    your draw step, instead you may skip that draw. If you do, until your next turn, you can't be attacked except by
    creatures with flying and/or islandwalk." (Island Sanctuary: a draw replacement, CR 614.1a, lasting after it leaves,
-   rulings; a browser test). +6, 30,868 of 31,936 with round 327 and B166.
+   rulings; a browser test). +6, 30,874 of 31,936 with round 327, B166 and B167.
    Bots: dividing damage among its own creatures a bot puts it all on its least valuable one; among another player's it
    kills as many as it can, most valuable first. A bot skips its draw for Island Sanctuary when its opponents' creatures
    without flying or islandwalk could deal half its life.
@@ -7620,6 +7620,28 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   damage prevented this way": a spell only, CR 112.1, not a permanent's ability; an opponent, not their permanents; no
   tokens for damage that can't be prevented, CR 615.5). Rogues' Gallery (one optional target for each color, all one
   instance of the word "target", so a multicolored card fills only one, CR 601.2c). +7, 30,854 of 31,936 with round 326.
+- Round B167 (least played first, mechanics that could be built from the skip lists): Phylactery Lich ("As ~ enters, put a
+  phylactery counter on an artifact you control": not targeted, one already on the battlefield and not one entering with
+  it, chosen as it enters, CR 614.12; with none, nothing gets the counter and the state trigger sacrifices it, rulings;
+  "When you control no permanents with phylactery counters on them" counts any of yours with one, rulings, CR 603.8; a
+  browser test). Tatsumasa, the Dragon's Fang ("Return ~ to the battlefield under its owner's control when that token
+  dies": a delayed trigger for that token, CR 603.7c, about the card the cost exiled, CR 400.7j, only while it's still
+  that card in exile; under its owner's control; exiled rather than dying, nothing). Fiend of the Shadows ("that player
+  exiles a card from their hand. You may play that card for as long as it remains exiled": that player chooses; you may
+  cast it or play it as your land with its usual timing and costs, even once the Fiend has left, rulings; a browser test).
+  Foraging Wickermaw ("Add one mana of any color. ~ becomes that color until end of turn": the color of the mana it
+  added, its only color, layer 5, CR 105.3, 605.3b). Ancestral Knowledge ("look at the top ten cards of your library,
+  then exile any number of them and put the rest back on top of your library in any order": no surveil; a picker with an
+  Exile row, a browser test; "When ~ leaves the battlefield, shuffle your library" reads now). Summoning Trap ("If a
+  creature spell you cast this turn was countered by a spell or ability an opponent controlled": a creature spell you
+  cast, not a copy, countered by an opponent's spell or ability this turn, TurnLog.creaturesCountered; your own counter
+  doesn't count). +6, 30,868 of 31,936 with B166 and rounds 325 to 327.
+- Out after round B167 (looked at, not done): Kodama of the Center Tree (soulshift X: the target's mana value is bounded
+  by the Spirits you controlled just before it died, and target checks have no place to keep that number), Meandering
+  Towershell (no "at the beginning of the declare attackers step on your next turn" timing yet; it returns attacking a
+  player or planeswalker chosen then, rulings), Rain of Gore (whether a spell or ability causes the life gain), Churning
+  Reservoir (oil counters removed this turn aren't tracked), Cherished Hatchling (flash for Dinosaur spells this turn and
+  a trigger granted to each one cast) stay out.
 - Out after round B166 (looked at, not done): Sutured Ghoul and Living Lore (an "As ~ enters, exile ... from your
   graveyard" choice: the enters choices pick permanents, and graveyard cards aren't offered there yet), Elemental Resonance
   (what a {2/W} symbol adds isn't settled by its rulings), Charmed Pendant (a hybrid symbol's color chosen inside a mana

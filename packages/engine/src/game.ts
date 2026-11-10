@@ -5517,6 +5517,11 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Depletion lands, as the ability resolves: "Put a depletion counter on ~", "If there are no depletion counters on ~,
   // sacrifice it" (checked after the cost removed one).
   if (ab.putCounter && o.zone === "battlefield") putCounters(s, o, ab.putCounter, 1);
+  // Foraging Wickermaw: "~ becomes that color until end of turn": the color of the mana it added (CR 605.3b), in layer 5.
+  if (ab.becomesManaColor && o.zone === "battlefield" && adds[0] && adds[0] !== "C") {
+    s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: name, duration: "endOfTurn", affected: [o.id], mods: [{ kind: "setColors", colors: [adds[0]] }] });
+    invalidateCharacteristics(s);
+  }
   if (ab.sacrificeIfNo && o.zone === "battlefield" && !(o.counters[ab.sacrificeIfNo] ?? 0)) {
     log(s, `${p.name} sacrifices ${name}.`);
     moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
@@ -10170,7 +10175,7 @@ function arrangeTop(s: GameState, p: Player, top: ObjectId[], away: ObjectId[]) 
   const all = [...top, ...away];
   if ((pend.how === "order" || pend.how === "bottom" || pend.how === "look") && away.length) throw new RulesError(pend.how === "bottom" ? "put them all on the bottom" : "put them all back on top");
   if (all.length !== pend.cards.length || new Set(all).size !== all.length || all.some((id) => !pend.cards.includes(id)))
-    throw new RulesError("put each card on top or " + (pend.how === "scry" ? "on the bottom" : "into your graveyard"));
+    throw new RulesError("put each card on top or " + (pend.how === "scry" ? "on the bottom" : pend.how === "exile" ? "into exile" : "into your graveyard"));
   // Visions: "Look at the top five cards": only looked at, so they stay in the order they were in.
   if (pend.how === "look" && top.some((id, i) => id !== pend.cards[i])) throw new RulesError("leave them in the order they were in");
   r.scratch = { ...r.scratch, arranged: { top, away } };
@@ -10515,6 +10520,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       // Dauntless Bodyguard: that creature, as the object it is now (CR 400.7); no new one later (rulings).
       if (!pend.options.includes(choice)) throw new RulesError("choose one of the creatures offered");
       const c = obj(s, choice);
+      // Phylactery Lich: the counter goes on it as ~ enters (CR 614.12); nothing is remembered (rulings).
+      const counter = compileCard(defOf(s, o)).entersChooseObjectCounter;
+      if (counter) {
+        withPutter(p.id, () => putCounters(s, c, counter, 1));
+        log(s, `${p.name} puts a ${counter} counter on ${characteristics(s, c).name} for ${pend.source}.`);
+        invalidateCharacteristics(s);
+        return;
+      }
       o.chosen = { ...o.chosen, object: { id: c.id, zc: c.zoneChanges ?? 0 } };
       log(s, `${p.name} chooses ${characteristics(s, c).name} for ${pend.source}.`);
       invalidateCharacteristics(s);

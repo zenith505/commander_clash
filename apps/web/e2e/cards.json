@@ -867,6 +867,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2786f210-ec64-46ea-9a7f-b03759fb1dae",
+  "name": "Ancestral Knowledge",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Cumulative upkeep {1} (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nWhen this enchantment enters, look at the top ten cards of your library, then exile any number of them and put the rest back on top of your library in any order.\nWhen this enchantment leaves the battlefield, shuffle your library.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Cumulative upkeep"
+  ],
+  "commanderLegal": "legal",
+  "set": "wth",
+  "releasedAt": "1997-06-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "db5380ed-ba28-4ea2-abc3-4998e2022903",
   "name": "Ancestral Mask",
   "manaCost": "{2}{G}",
@@ -11110,6 +11138,40 @@
   "set": "dbl",
   "releasedAt": "2022-01-28",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3891a3b6-d8ac-4cd3-b2f6-d6d786e89a67",
+  "name": "Fiend of the Shadows",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Creature — Vampire Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vampire",
+   "Wizard"
+  ],
+  "oracleText": "Flying\nWhenever this creature deals combat damage to a player, that player exiles a card from their hand. You may play that card for as long as it remains exiled.\nSacrifice a Human: Regenerate this creature.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying",
+   "Regenerate"
+  ],
+  "commanderLegal": "legal",
+  "set": "dka",
+  "releasedAt": "2012-02-03",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -23227,6 +23289,38 @@
     "artUrl": "https://cards.scryfall.io/art_crop/back/3/c/3ce33422-5dba-4a42-8375-dd8ccc692a7b.jpg?1783905367"
    }
   ]
+ },
+ {
+  "oracleId": "520c4d88-34b6-4a26-81ca-65eb8b10461c",
+  "name": "Phylactery Lich",
+  "manaCost": "{B}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Creature — Zombie",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie"
+  ],
+  "oracleText": "Indestructible\nAs this creature enters, put a phylactery counter on an artifact you control.\nWhen you control no permanents with phylactery counters on them, sacrifice this creature.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Indestructible"
+  ],
+  "commanderLegal": "legal",
+  "set": "m11",
+  "releasedAt": "2010-07-16",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "8d02b297-97c4-4379-9862-0a462400f66f",

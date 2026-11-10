@@ -1339,6 +1339,9 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
     bottom = sc.topOrBottom === "bottom";
     sc.topOrBottom = undefined;
   }
+  // Summoning Trap: a creature spell someone cast (not a copy, which isn't cast, CR 707.10), countered by this spell's or
+  // ability's controller, its types as it was on the stack.
+  if (item.kind === "spell" && !item.copy && item.objectId && s.objects[item.objectId] && objIsType(s, s.objects[item.objectId]!, "Creature")) ((s.turnLog ??= {}).creaturesCountered ??= []).push({ caster: item.controller, by: ctx.controller });
   s.stack.splice(i, 1);
   const spent = item.objectId ? s.objects[item.objectId]?.manaSpent : undefined;
   // Desertion: onto the battlefield under the countering spell's controller's control, never cast (rulings).

@@ -48,7 +48,8 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     // Phasing out removes a permanent until its controller's next turn: used against opponents' things.
     // Quarum Trench Gnomes: a Plains that makes colorless mana instead of white is worse for its controller.
     // "Target unblocked attacking creature becomes blocked" (Curtain of Light): against an opponent's attacker.
-    if (["destroy", "destroyRandomTarget", "exile", "bounce", "tap", "tapOrUntap", "skipUntap", "phaseOut", "replaceLandMana", "turnFaceDown", "becomeBlocked"].includes(e.type) && "what" in e && e.what?.ref === "target") mark(e.what.index, e.what.n);
+    // Disorienting Choice ("controllersMayExile"): their permanent exiled, or lands for us.
+    if (["destroy", "destroyRandomTarget", "exile", "bounce", "tap", "tapOrUntap", "skipUntap", "phaseOut", "replaceLandMana", "turnFaceDown", "becomeBlocked", "controllersMayExile"].includes(e.type) && "what" in e && e.what?.ref === "target") mark(e.what.index, e.what.n);
     // "Destroy target blocking creature at end of combat" (Silent Assassin): later, but aimed at an opponent's creature.
     if (e.type === "delayed" && e.when === "endOfCombat" && e.of?.ref === "target" && e.effects.length === 1 && e.effects[0]!.type === "destroy") mark(e.of.index, e.of.n);
     // A suspected creature can't block (CR 701.60c): aimed at opponents unless the card says "you control".

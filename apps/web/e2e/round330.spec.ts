@@ -3,8 +3,8 @@
 // zone (CR 114.4), its costs paid with permanents you control.
 import { expect, test } from "@playwright/test";
 import { applyAction, planActivate, waitingOn, type GameState } from "@cc/engine";
-import { LANDS, one, open, pageErrors, scene } from "./scene";
-import { menu, resolveUntil } from "./ui";
+import { LANDS, one, open, pageErrors, playWithBots, scene } from "./scene";
+import { controls, menu, resolveUntil } from "./ui";
 
 /** Activate the planeswalker's ultimate in the engine and let it resolve, before the page opens. */
 function ultimate(s: GameState, walker: string, index: number): GameState {
@@ -49,5 +49,33 @@ test("Ob Nixilis of the Black Oath's emblem: click it, sacrifice a 3-power creat
   await bar.getByRole("button", { name: "Sacrifice and activate" }).click();
   const after = await resolveUntil(page, (x) => !x.stack.length && !x.pending && x.objects[giant]!.zone === "graveyard" && x.players[0]!.life === life + 3);
   expect(after.players[0]!.hand.length).toBe(hand + 3);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Disorienting Choice cast by Ana at your artifact: you choose to keep it, and Ana searches for a land", async ({ page }) => {
+  let s: GameState = scene({ board: ["Sol Ring"] }, [{ hand: ["Disorienting Choice"], board: LANDS }]);
+  const ring = one(s, "Sol Ring");
+  s = playWithBots(s, (x) => x.pending?.kind === "chooseMay" && x.pending.player === 0);
+  const lands = (x: GameState) => x.battlefield.filter((id) => x.objects[id]!.controller === 1 && x.cards[x.objects[id]!.cardId]!.types.includes("Land")).length;
+  const before = lands(s);
+  await open(page, s);
+  const bar = controls(page);
+  await expect(bar).toContainText("Disorienting Choice: Exile Sol Ring?");
+  await expect(bar).toContainText("If you don't, Ana may search for a land card for it.");
+  await bar.getByRole("button", { name: "No" }).click();
+  const after = await resolveUntil(page, (x) => !x.stack.length && !x.pending && x.players[1]!.graveyard.some((id) => x.cards[x.objects[id]!.cardId]!.name === "Disorienting Choice"));
+  expect(after.objects[ring]!.zone).toBe("battlefield");
+  expect(lands(after)).toBe(before + 1);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Disorienting Choice cast by Ana at your artifact: you choose to exile it", async ({ page }) => {
+  let s: GameState = scene({ board: ["Sol Ring"] }, [{ hand: ["Disorienting Choice"], board: LANDS }]);
+  const ring = one(s, "Sol Ring");
+  s = playWithBots(s, (x) => x.pending?.kind === "chooseMay" && x.pending.player === 0);
+  await open(page, s);
+  await controls(page).getByRole("button", { name: "Yes" }).click();
+  const after = await resolveUntil(page, (x) => !x.stack.length && !x.pending && x.objects[ring]!.zone === "exile");
+  expect(after.objects[ring]!.zone).toBe("exile");
   expect(pageErrors(page)).toEqual([]);
 });

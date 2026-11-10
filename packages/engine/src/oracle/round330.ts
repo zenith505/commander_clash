@@ -1,7 +1,7 @@
 // Round 330's sentences, triggers and whole texts, read before round 329's (round329Sentence, round329Trigger and
 // round329WholeText in oracle/round329.ts).
 import type { AbilityBody, Effect, TriggeredAbility } from "../abilities";
-import type { Ctx } from "./body";
+import { parseOne, replaceX, type Ctx } from "./body";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -9,6 +9,30 @@ export function round330Sentence(s: string, sentences: string[], si: number, ctx
   // Karn, Living Legacy: "Pay any amount of mana. Look at that many cards from the top of your library, then put one of
   // those cards into your hand and the rest on the bottom of your library in a random order.": how much is chosen as it
   // resolves, then paid (rulings); with none paid, no card is looked at, and one looked at must go to the hand (rulings).
+  // Disorienting Choice: "For each opponent, choose up to one target artifact or enchantment that player controls. For
+  // each permanent chosen this way, its controller may exile it. Then if one or more of the chosen permanents are still
+  // on the battlefield, you search your library for up to that many land cards, put them onto the battlefield tapped,
+  // then shuffle.": one "up to one" target for each opponent (CR 601.2c); each one's controller decides in turn order
+  // from the next opponent on, seeing the earlier answers, then those chosen are exiled at once (rulings); then the
+  // chosen ones still there count.
+  const each = /^For each opponent, choose up to one target (.+?) that player controls$/.exec(s);
+  const mayExile = /^For each permanent chosen this way, its controller may exile it$/.test(sentences[si + 1] ?? "");
+  const then = /^Then if one or more of the chosen permanents are still on the battlefield, you (search your library for up to) that many (.+)$/.exec((sentences[si + 2] ?? "").replace(/\.$/, ""));
+  if (each && mayExile && then && ctx.spell) {
+    const before = ctx.targets.length;
+    const fx = parseOne(`For each opponent, destroy up to one target ${each[1]!} that player controls`, ctx);
+    const d = fx?.length === 1 ? fx[0] : undefined;
+    if (d?.type !== "destroy" || d.what.ref !== "target" || d.what.index !== before || ctx.targets.length !== before + 1 || !ctx.targets[before]!.perOpponent) return "fail";
+    ctx.whereX = true;
+    const search = parseOne(`Search your library for up to X ${then[2]!}`, ctx);
+    ctx.whereX = false;
+    const sr = search?.length === 1 ? search[0] : undefined;
+    if (sr?.type !== "search" || !sr.upTo || ctx.targets.length !== before + 1) return "fail";
+    const what = { ref: "target" as const, index: before };
+    const still = { count: { kind: "onBattlefieldOf" as const, of: what } };
+    effects.push({ type: "controllersMayExile", what });
+    return { effect: { type: "if", cond: { kind: "amountNow", amount: still, min: 1 }, effects: replaceX([sr], still) }, next: si + 3 };
+  }
   if (/^Pay any amount of mana\.?$/.test(s)) {
     // The sentence list splits ", then" into its own sentence.
     const joined = [sentences[si + 1], sentences[si + 2]].join(" | ");

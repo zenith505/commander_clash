@@ -2770,6 +2770,8 @@ export interface Resolving {
   /** Jester's Mask: how many cards this resolution put on top of a library from a hand (Count handPutOnTopThisWay). */
   handPutOnTop?: number;
   scratch?: {
+    /** Effect "controllersMayExile" (Disorienting Choice): the permanents still to ask about, in order, and those whose controllers chose to exile them. */
+    mayExile?: { queue: { id: ObjectId; zc: number }[]; yes: { id: ObjectId; zc: number }[] };
     /** Effect "landTypeSwap" (Vision Charm): the land type chosen first, then the basic land type chosen second. */
     swapFrom?: string;
     swapTo?: string;

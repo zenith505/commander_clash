@@ -310,6 +310,8 @@ export type Count =
   | { kind: "eventGroupGreatestMv" }
   /** "The total power of creatures goaded this way" (Havoc Eater): the targets `of` names still on the battlefield as it resolves (illegal ones weren't goaded, CR 608.2b), a negative power taking some off. */
   | { kind: "totalPowerOf"; of: ObjRef }
+  /** Disorienting Choice: "if one or more of the chosen permanents are still on the battlefield, ... up to that many": those of them on the battlefield now (the same objects, CR 400.7). */
+  | { kind: "onBattlefieldOf"; of: ObjRef }
   /** Sword of the Ages: "the total power of the creatures sacrificed this way": its sacrifice cost's, as they last existed (CR 608.2h). */
   | { kind: "sacrificedTotalPower" }
   /** How many cards the last "put all cards exiled with ~ into their owners' graveyards" moved (Valakut Exploration). */
@@ -4571,6 +4573,12 @@ export type Effect =
    * received none may put a permanent card from their hand onto the battlefield, each in turn order (rulings).
    */
   | { type: "playerVotes"; then: "mobVerdict" | "cirdan" }
+  /**
+   * Disorienting Choice: "For each permanent chosen this way, its controller may exile it.": each of these objects'
+   * controller decides, in turn order from the player after this one's controller on, seeing the earlier answers; then
+   * those chosen are exiled at once (rulings).
+   */
+  | { type: "controllersMayExile"; what: ObjRef }
   | { type: "joinForces"; activeFirst?: true; /** Errant Minion: "that player may pay any amount of mana": that player only. */ who?: PlayerRef }
   | { type: "eachMay"; who: PlayerRef; effects: Effect[]; text: string; wheel?: Amount; each?: true; chain?: true; need?: { zone: "battlefield" | "graveyard" | "hand"; filter: TargetSpec }; untappedSubject?: true; perAccepted?: { effects: Effect[]; opponents?: true }; pay?: PayCost }
   /**

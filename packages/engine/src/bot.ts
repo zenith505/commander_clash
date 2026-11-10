@@ -282,6 +282,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.blockTax) return [{ type: "chooseMay", player: pid, yes: false }];
     // Pardic Dragon: "that player may put a time counter on ~": an opponent's suspended card, kept from being cast longer.
     const theirMay = pend.kind === "chooseMay" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    // Disorienting Choice: our permanent exiled, or a land for its caster: only a token goes (a Treasure, a Clue).
+    if (pend.kind === "chooseMay" && theirMay?.type === "controllersMayExile") {
+      const asked = s.resolving!.scratch?.mayExile?.queue[0];
+      const o = asked ? s.objects[asked.id] : undefined;
+      return [{ type: "chooseMay", player: pid, yes: !!o?.isToken }];
+    }
     // Covenant of Minds: the three cards seen rather than five unseen, unless five more draws would empty that library.
     if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && s.resolving!.item.controller !== pid && theirMay.effects.length === 1 && theirMay.effects[0]!.type === "revealedTo") {
       const lib = player(s, s.resolving!.item.controller).library.length - (s.resolving!.revealedUntil?.length ?? 0);

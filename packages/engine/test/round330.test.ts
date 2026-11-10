@@ -6,7 +6,8 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { abilityProblem, applyAction, botActions, isFullySupported, planActivate, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilityProblem, applyAction, botActions, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { faceDef, restingDef } from "../src/faces";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -27,6 +28,8 @@ const settle = (s: GameState, me?: PlayerId) => {
 const tgt = (id: string) => ({ kind: "object" as const, id });
 
 // Real oracle text (Scryfall).
+const reidane = (): CardDef => ({"oracleId":"35ae7b25-6d0f-49f8-a40d-dd2cf88e6f44","name":"Reidane, God of the Worthy // Valkmira, Protector's Shield","manaCost":"{2}{W}","cmc":3,"typeLine":"Legendary Creature — God // Legendary Artifact","supertypes":["Legendary"],"types":["Creature"],"subtypes":["God"],"oracleText":"Flying, vigilance\nSnow lands your opponents control enter tapped.\nNoncreature spells your opponents cast with mana value 4 or greater cost {2} more to cast.","power":"2","toughness":"3","colors":["W"],"colorIdentity":["W"],"keywords":["Flying","Vigilance"],"commanderLegal":"legal","set":"khm","releasedAt":"2021-02-05","rarity":"rare","layout":"modal_dfc","gameChanger":false,"faces":[{"name":"Reidane, God of the Worthy","manaCost":"{2}{W}","typeLine":"Legendary Creature — God","supertypes":["Legendary"],"types":["Creature"],"subtypes":["God"],"oracleText":"Flying, vigilance\nSnow lands your opponents control enter tapped.\nNoncreature spells your opponents cast with mana value 4 or greater cost {2} more to cast.","power":"2","toughness":"3","colors":["W"]},{"name":"Valkmira, Protector's Shield","manaCost":"{3}{W}","typeLine":"Legendary Artifact","supertypes":["Legendary"],"types":["Artifact"],"subtypes":[],"oracleText":"If a source an opponent controls would deal damage to you or a permanent you control, prevent 1 of that damage.\nWhenever you or another permanent you control becomes the target of a spell or ability an opponent controls, counter that spell or ability unless its controller pays {1}.","colors":["W"]}]} as CardDef);
+const valkmira = () => faceDef(restingDef(reidane()), 1);
 const karn = (): CardDef => ({"oracleId":"09ab1278-811f-4b97-bd34-7493d6e081e9","name":"Karn, Living Legacy","manaCost":"{4}","cmc":4,"typeLine":"Legendary Planeswalker — Karn","supertypes":["Legendary"],"types":["Planeswalker"],"subtypes":["Karn"],"oracleText":"+1: Create a tapped Powerstone token. (It's an artifact with \"{T}: Add {C}. This mana can't be spent to cast a nonartifact spell.\")\n−1: Pay any amount of mana. Look at that many cards from the top of your library, then put one of those cards into your hand and the rest on the bottom of your library in a random order.\n−7: You get an emblem with \"Tap an untapped artifact you control: This emblem deals 1 damage to any target.\"","loyalty":"4","colors":[],"colorIdentity":[],"keywords":[],"producedMana":["C"],"commanderLegal":"legal","set":"dmu","releasedAt":"2022-09-09","rarity":"mythic","layout":"normal","gameChanger":false} as CardDef);
 const obNix = (): CardDef => ({"oracleId":"cfc9a2f9-92fa-4608-b98d-f9763c89fc40","name":"Ob Nixilis of the Black Oath","manaCost":"{3}{B}{B}","cmc":5,"typeLine":"Legendary Planeswalker — Nixilis","supertypes":["Legendary"],"types":["Planeswalker"],"subtypes":["Nixilis"],"oracleText":"+2: Each opponent loses 1 life. You gain life equal to the life lost this way.\n−2: Create a 5/5 black Demon creature token with flying. You lose 2 life.\n−8: You get an emblem with \"{1}{B}, Sacrifice a creature: You gain X life and draw X cards, where X is the sacrificed creature's power.\"\nOb Nixilis of the Black Oath can be your commander.","loyalty":"3","colors":["B"],"colorIdentity":["B"],"keywords":[],"commanderLegal":"legal","set":"c14","releasedAt":"2014-11-07","rarity":"mythic","layout":"normal","gameChanger":false} as CardDef);
 const golem = card("Test Golem", "Artifact Creature — Golem", "{3}", { power: "3", toughness: "3" });
@@ -157,5 +160,127 @@ describe("round 330: emblems with activated abilities", () => {
     const plan = botActions(s, ap);
     const use = plan.find((a) => a.type === "activateAbility" && a.objectId === em) as { costs?: { sacrifice?: string[] } } | undefined;
     expect(use?.costs?.sacrifice).toEqual([token]);
+  });
+});
+
+const shock = card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to any target." });
+const shatter = card("Test Shatter", "Instant", "{1}{R}", { oracleText: "Destroy target artifact." });
+const resolveAll = (s: GameState) => {
+  for (let i = 0; i < 60 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return s;
+};
+
+describe("round 330: Valkmira, Protector's Shield", () => {
+  it("is fully supported, both faces", () => {
+    supported(reidane());
+    expect(isFullySupported(valkmira())).toBe(true);
+  });
+
+  it("an opponent's spell targeting you is countered unless they pay {1}; paid, its damage to you is 1 less", () => {
+    const { s: s0, ap, opp, ids } = setup([shock, shock]);
+    putOnBattlefield(s0, opp, valkmira());
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }])));
+    expect(s.pending).toMatchObject({ kind: "payUnless", player: ap, cost: "{1}" });
+    s = resolveAll(act(s, { type: "payUnless", player: ap, pay: false }));
+    expect(s.players[opp]!.life).toBe(40);
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!, [{ kind: "player", id: opp }])));
+    expect(s.pending).toMatchObject({ kind: "payUnless", player: ap });
+    s.players[ap]!.manaPool.R += 1;
+    s = resolveAll(act(s, { type: "payUnless", player: ap, pay: true }));
+    // 2 damage, 1 prevented.
+    expect(s.players[opp]!.life).toBe(39);
+  });
+
+  it("another permanent you control triggers it; Valkmira itself doesn't (\"another\")", () => {
+    const { s: s0, ap, opp, ids } = setup([shock, shatter]);
+    const v = putOnBattlefield(s0, opp, valkmira());
+    const b = putOnBattlefield(s0, opp, ogre);
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: b }])));
+    expect(s.pending).toMatchObject({ kind: "payUnless", player: ap });
+    s = resolveAll(act(s, { type: "payUnless", player: ap, pay: false }));
+    expect(s.objects[b]!.zone).toBe("battlefield");
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!, [{ kind: "object", id: v }])));
+    expect(s.pending).toBeFalsy();
+    expect(s.objects[v]!.zone).toBe("graveyard");
+  });
+
+  it("its controller's own spells don't trigger it", () => {
+    const { s: s0, ap, ids } = setup([shock]);
+    putOnBattlefield(s0, ap, valkmira());
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: ap }])));
+    expect(s.pending).toBeFalsy();
+    expect(s.players[ap]!.life).toBe(38);
+  });
+});
+
+const disorienting = (): CardDef => ({"oracleId":"7aa34ef4-5e11-491b-8dbe-6ef80e0ad26c","name":"Disorienting Choice","manaCost":"{3}{G}","cmc":4,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"For each opponent, choose up to one target artifact or enchantment that player controls. For each permanent chosen this way, its controller may exile it. Then if one or more of the chosen permanents are still on the battlefield, you search your library for up to that many land cards, put them onto the battlefield tapped, then shuffle.","colors":["G"],"colorIdentity":["G"],"keywords":[],"commanderLegal":"legal","set":"dsc","releasedAt":"2024-09-27","rarity":"rare","layout":"normal","gameChanger":false} as CardDef);
+const charm = card("Test Charm", "Enchantment", "{1}{W}");
+const treasure = card("Treasure", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this artifact: Add one mana of any color." });
+
+describe("round 330: Disorienting Choice", () => {
+  it("is fully supported", () => {
+    supported(disorienting());
+  });
+
+  it("each controller chooses in turn order from the next player; exiled ones go at once; you search for as many lands as stayed", () => {
+    const { s: s0, ap, ids } = setup([disorienting()]);
+    const [o1, o2, o3] = [1, 2, 3].map((k) => s0.turnOrder[(s0.turnOrder.indexOf(ap) + k) % 4]!);
+    const a = putOnBattlefield(s0, o1!, rock);
+    const b = putOnBattlefield(s0, o2!, charm);
+    const c = putOnBattlefield(s0, o3!, rock);
+    let s = run(s0, planCast(s0, ap, ids[0]!, [tgt(a), tgt(b), tgt(c)]));
+    s = resolveAll(s);
+    // The next opponent first, and so on.
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: o1 });
+    s = act(s, { type: "chooseMay", player: o1!, yes: true });
+    // Still on the battlefield until everyone has answered.
+    expect(s.objects[a]!.zone).toBe("battlefield");
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: o2 });
+    s = act(s, { type: "chooseMay", player: o2!, yes: false });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: o3 });
+    s = act(s, { type: "chooseMay", player: o3!, yes: false });
+    expect(s.objects[a]!.zone).toBe("exile");
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, max: 2 });
+    const lands = (s.pending as { cards: string[] }).cards.slice(0, 2);
+    s = resolveAll(act(s, { type: "searchLibrary", player: ap, found: lands }));
+    for (const l of lands) expect(s.objects[l]).toMatchObject({ zone: "battlefield", tapped: true });
+    expect(s.objects[b]!.zone).toBe("battlefield");
+  });
+
+  it("all exiled: no search", () => {
+    const { s: s0, ap, ids } = setup([disorienting()]);
+    const o1 = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 1) % 4]!;
+    const a = putOnBattlefield(s0, o1, rock);
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [tgt(a), { kind: "none" }, { kind: "none" }])));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: o1 });
+    s = resolveAll(act(s, { type: "chooseMay", player: o1, yes: true }));
+    expect(s.pending).toBeFalsy();
+    expect(s.objects[a]!.zone).toBe("exile");
+    expect(s.stack).toHaveLength(0);
+  });
+
+  it("bots exile a token and keep anything else", () => {
+    const { s: s0, ap, ids } = setup([disorienting()]);
+    const [o1, o2] = [1, 2].map((k) => s0.turnOrder[(s0.turnOrder.indexOf(ap) + k) % 4]!);
+    const tr = putOnBattlefield(s0, o1!, treasure);
+    s0.objects[tr]!.isToken = true;
+    const r = putOnBattlefield(s0, o2!, rock);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(tr), tgt(r), { kind: "none" }])), ap);
+    expect(s.objects[tr]?.zone).not.toBe("battlefield");
+    expect(s.objects[r]!.zone).toBe("battlefield");
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, max: 1 });
+  });
+
+  it("a bot casts it at its opponents' artifacts and enchantments", () => {
+    const { s: s0, ap } = setup([disorienting()]);
+    const o1 = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 1) % 4]!;
+    putOnBattlefield(s0, o1, rock);
+    s0.players[ap]!.hand = s0.players[ap]!.hand.filter((id) => s0.cards[s0.objects[id]!.cardId]!.name === "Disorienting Choice");
+    const d = s0.players[ap]!.hand[0]!;
+    // Its commander out of reach.
+    for (const c of s0.players[ap]!.command) s0.players[ap]!.commanderCasts[c] = 20;
+    const castIt = botActions(s0, ap).find((a) => a.type === "castSpell" && a.objectId === d) as { targets?: { kind: string }[] } | undefined;
+    expect(castIt?.targets?.filter((t) => t.kind === "object")).toHaveLength(1);
   });
 });

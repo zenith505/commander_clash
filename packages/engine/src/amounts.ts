@@ -411,6 +411,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (ctx.sacrificed ?? []).reduce((n, l) => n + (l.power ?? 0), 0);
     case "totalPowerOf":
       return refObjects(s, c.of, ctx).filter((o) => o.zone === "battlefield").reduce((n, o) => n + (view(o)?.power ?? 0), 0);
+    case "onBattlefieldOf":
+      return refObjects(s, c.of, ctx).filter((o) => o.zone === "battlefield").length;
     case "lifeLostThisWay":
       return c.byLoss ? (s.resolving?.lifeLost ?? 0) : (s.resolving?.exchanged?.lost[ctx.controller] ?? 0);
     case "exchangedLifeDifference": {
@@ -1523,6 +1525,8 @@ function describeCount(c: Count): string {
       return "the greatest mana value among those cards";
     case "totalPowerOf":
       return "the total power of those creatures";
+    case "onBattlefieldOf":
+      return "the number of those permanents still on the battlefield";
     case "lifeLostThisWay":
       return c.byLoss ? "the life lost this way" : "the life you lost";
     case "exchangedLifeDifference":

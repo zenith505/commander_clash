@@ -1865,6 +1865,8 @@ export interface TurnLog {
    * artifact's, it's still the first. See CompiledCard.firstArtifactAbilityLess.
    */
   artifactAbility?: Record<number, "mana" | "used">;
+  /** Professor Hojo: the players who have activated an ability during their own turn that targets a creature they control (CompiledCard.firstOwnCreatureTargetLess). */
+  ownCreatureTargeted?: PlayerId[];
   /** A card was put into exile this turn, from anywhere (Ennis, Debate Moderator); tokens and copies of spells aren't cards. */
   cardExiled?: true;
   /** Players who gained life (Needlebite Trap). */
@@ -2774,6 +2776,8 @@ export interface Resolving {
   /** Jester's Mask: how many cards this resolution put on top of a library from a hand (Count handPutOnTopThisWay). */
   handPutOnTop?: number;
   scratch?: {
+    /** Effect "controllersMayExile" (Disorienting Choice): the permanents still to ask about, in order, and those whose controllers chose to exile them. */
+    mayExile?: { queue: { id: ObjectId; zc: number }[]; yes: { id: ObjectId; zc: number }[] };
     /** Effect "landTypeSwap" (Vision Charm): the land type chosen first, then the basic land type chosen second. */
     swapFrom?: string;
     swapTo?: string;

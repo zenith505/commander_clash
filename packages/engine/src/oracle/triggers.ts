@@ -805,11 +805,13 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
   // controls, counter that spell or ability unless its controller pays {1}." Once for you and once for each permanent it
   // targets, however many times (rulings).
   // Amulet of Safekeeping: "Whenever you become the target of ...": you only.
-  const mariner = /^Whenever you (or a permanent you control becomes|become) the target of a spell or ability an opponent controls, counter that spell or ability unless its controller pays (\{\d+\})\.$/.exec(line);
+  // Valkmira, Protector's Shield: "Whenever you or another permanent you control becomes the target ...": not itself.
+  const mariner = /^Whenever you (or a permanent you control becomes|or another permanent you control becomes|become) the target of a spell or ability an opponent controls, counter that spell or ability unless its controller pays (\{\d+\})\.$/.exec(line);
   if (mariner) {
     const unless = { cost: mariner[2]! };
     const onlyYou = mariner[1] === "become";
-    return { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true, ...(onlyYou ? { onlyYou: true as const } : {}) }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body: { targets: [], effects: [{ type: "counterUnlessPays", unless }], text: `counter that spell or ability unless its controller pays ${mariner[2]}.` } };
+    const other = mariner[1]!.includes("another");
+    return { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true, ...(onlyYou ? { onlyYou: true as const } : {}), ...(other ? { other: true } : {}) }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body: { targets: [], effects: [{ type: "counterUnlessPays", unless }], text: `counter that spell or ability unless its controller pays ${mariner[2]}.` } };
   }
   // Rayne, Academy Chancellor: "Whenever you or a permanent you control becomes the target of a spell or ability an
   // opponent controls, you may draw a card. You may draw an additional card if ~ is enchanted.": once for you and once for

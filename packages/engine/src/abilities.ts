@@ -312,6 +312,8 @@ export type Count =
   | { kind: "eventGroupGreatestMv" }
   /** "The total power of creatures goaded this way" (Havoc Eater): the targets `of` names still on the battlefield as it resolves (illegal ones weren't goaded, CR 608.2b), a negative power taking some off. */
   | { kind: "totalPowerOf"; of: ObjRef }
+  /** Disorienting Choice: "if one or more of the chosen permanents are still on the battlefield, ... up to that many": those of them on the battlefield now (the same objects, CR 400.7). */
+  | { kind: "onBattlefieldOf"; of: ObjRef }
   /** Sword of the Ages: "the total power of the creatures sacrificed this way": its sacrifice cost's, as they last existed (CR 608.2h). */
   | { kind: "sacrificedTotalPower" }
   /** How many cards the last "put all cards exiled with ~ into their owners' graveyards" moved (Valakut Exploration). */
@@ -4589,6 +4591,12 @@ export type Effect =
    * received none may put a permanent card from their hand onto the battlefield, each in turn order (rulings).
    */
   | { type: "playerVotes"; then: "mobVerdict" | "cirdan" }
+  /**
+   * Disorienting Choice: "For each permanent chosen this way, its controller may exile it.": each of these objects'
+   * controller decides, in turn order from the player after this one's controller on, seeing the earlier answers; then
+   * those chosen are exiled at once (rulings).
+   */
+  | { type: "controllersMayExile"; what: ObjRef }
   | { type: "joinForces"; activeFirst?: true; /** Errant Minion: "that player may pay any amount of mana": that player only. */ who?: PlayerRef }
   | { type: "eachMay"; who: PlayerRef; effects: Effect[]; text: string; wheel?: Amount; each?: true; chain?: true; need?: { zone: "battlefield" | "graveyard" | "hand"; filter: TargetSpec }; untappedSubject?: true; perAccepted?: { effects: Effect[]; opponents?: true }; pay?: PayCost }
   /**
@@ -5570,6 +5578,8 @@ export interface AbilityBody {
 }
 
 export type TriggerEvent =
+  /** "Whenever a mana ability of ~ resolves" (Tyvar the Bellicose's): one of its mana abilities resolved (CR 605.3b), `eventAmount` the mana it made. */
+  | "selfManaAbilityResolves"
   /** A state trigger (CR 603.8): "When you control no Islands, sacrifice ~", see TriggeredAbility.state. */
   | "state"
   /** A Saga's chapter ability (CR 714.2b), see TriggeredAbility.chapter. */
@@ -6057,7 +6067,7 @@ export interface TriggeredAbility {
    * For "selfBecomesTarget" / "permanentBecomesTarget": `spell`, "of a spell" (not an ability); `by`, "a spell or ability
    * you control / an opponent controls"; `first`, "for the first time each turn" (counting only those `by` names, as valiant does).
    */
-  targeted?: { spell?: true; /** "Of an instant or sorcery spell" (Silverfur Partisan): a spell with one of these card types. */ spellTypes?: string[]; /** "Of an Aura spell" (Fugitive Druid): a spell with one of these subtypes. */ spellSubtypes?: string[]; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean; /** Skophos Maze-Warden: "of an ability of a land you control named Labyrinth of Skophos": an ability (not a spell) whose source matches this, from the trigger's controller's view. */ abilityOf?: TargetSpec; /** "Whenever you or a permanent you control becomes the target ..." (Unsettled Mariner): this ability's controller as a target too, once for each spell or ability (rulings). */ orYou?: true; /** With `orYou`: "Whenever you become the target ..." (Amulet of Safekeeping): you only, no permanent. */ onlyYou?: true; /** With `orYou`: "Whenever a player or permanent becomes the target ..." (Loki, God of Mischief): any player, not only this ability's controller. */ anyPlayer?: true; /** "Of an ability" (Loki, God of Mischief): an activated or triggered ability, not a spell. */ ability?: true; /** With `orYou`: "Whenever you and/or at least one permanent you control becomes the target ..." (Leyline of Combustion): once for each spell or ability that targets any of them, however many (rulings). */ once?: true; /** "Whenever a creature you control or a creature spell you control becomes the target ..." (Surrak, Elusive Hunter): a spell of yours this matches (TargetSpec kind "spell") too, once for each spell or ability. */ orSpell?: TargetSpec };
+  targeted?: { spell?: true; /** "Of an instant or sorcery spell" (Silverfur Partisan): a spell with one of these card types. */ spellTypes?: string[]; /** "Of an Aura spell" (Fugitive Druid): a spell with one of these subtypes. */ spellSubtypes?: string[]; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean; /** Skophos Maze-Warden: "of an ability of a land you control named Labyrinth of Skophos": an ability (not a spell) whose source matches this, from the trigger's controller's view. */ abilityOf?: TargetSpec; /** "Whenever you or a permanent you control becomes the target ..." (Unsettled Mariner): this ability's controller as a target too, once for each spell or ability (rulings). */ orYou?: true; /** With `orYou`: "Whenever you become the target ..." (Amulet of Safekeeping): you only, no permanent. */ onlyYou?: true; /** With `orYou`: "Whenever a player or permanent becomes the target ..." (Loki, God of Mischief): any player, not only this ability's controller. */ anyPlayer?: true; /** "Of an ability" (Loki, God of Mischief): an activated or triggered ability, not a spell. */ ability?: true; /** With `ability`, Professor Hojo: "of an activated ability", not a triggered one. */ activatedOnly?: true; /** With `orYou`: "Whenever you and/or at least one permanent you control becomes the target ..." (Leyline of Combustion): once for each spell or ability that targets any of them, however many (rulings). */ once?: true; /** "Whenever a creature you control or a creature spell you control becomes the target ..." (Surrak, Elusive Hunter): a spell of yours this matches (TargetSpec kind "spell") too, once for each spell or ability. */ orSpell?: TargetSpec };
   /**
    * For "tappedForMana": who taps it (`by`, relative to this ability's controller; "that player") and which permanent
    * (`filter`, the subject: "that land"); without a filter, ~ itself.
@@ -8461,6 +8471,8 @@ export interface CompiledCard {
    * Flesh; CR 602.2b applies 601.2f): mana abilities count as that first ability too (rulings). See TurnLog.artifactAbility.
    */
   firstArtifactAbilityLess?: number;
+  /** Professor Hojo: "The first activated ability you activate during your turn that targets a creature you control costs {2} less to activate." (generic mana only, rulings; TurnLog.ownCreatureTargeted) */
+  firstOwnCreatureTargetLess?: number;
   equipLess?: { n: number; targetSelf?: true; /** Bladegraft Aspirant: "Activated abilities of Equipment you control that target ~": any activated ability of an Equipment its controller controls, not only equip. */ anyAbility?: true; otherEquipment?: true; /** "~'s equip abilities" (Firion's token copies): only this Equipment's own. */ self?: true; /** "That target enchanted creature" (Strong Back): the creature this Aura is attached to. */ targetEnchanted?: true; /** "If it targets a colorless creature" (Ghostfire Blade): its target has no color as the cost is set. */ targetColorless?: true; /** Only while this holds (a Class level's). */ if?: StaticCondition }[];
   /** "Aura spells you cast that target enchanted creature cost {3} less to cast" (Strong Back, CR 601.2f). */
   auraLessEnchanted?: number;

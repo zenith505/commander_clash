@@ -5955,10 +5955,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         if (tapped) si++;
         continue;
       }
+      // Mavinda, Students' Advocate: "If that spell doesn't target a creature you control, it costs {8} more to cast this
+      // way.": an increase decided by the targets chosen as it's cast (CR 601.2c before 601.2f); "you" is the caster, the
+      // ability's controller.
+      const taxed = !sins ? /^If that spell doesn't target a creature you control, it costs \{(\d+)\} more to cast this way$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+      if (taxed) si++;
       // Vohar, Vodalian Desecrator: "... this turn. If that spell would be put into your graveyard, exile it instead."
       const rider = sentences[si + 1]?.replace(/\.$/, "") === "If that spell would be put into your graveyard, exile it instead";
-      if (sins && !rider) return null;
-      effects.push({ type: "mayCastFromGraveyard", what, ...(rider ? { exileAfter: true as const } : {}), ...(sins ? { free: true as const } : {}) });
+      if ((sins || taxed) && !rider) return null;
+      const unlessFilter = taxed ? parseTargetPhrase("creature you control") : undefined;
+      if (taxed && !unlessFilter) return null;
+      effects.push({ type: "mayCastFromGraveyard", what, ...(rider ? { exileAfter: true as const } : {}), ...(sins ? { free: true as const } : {}), ...(taxed ? { moreUnlessTargets: { n: Number(taxed[1]), filter: unlessFilter! } } : {}) });
       if (rider) si++;
       continue;
     }

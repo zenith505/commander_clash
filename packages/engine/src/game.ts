@@ -6447,7 +6447,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   for (const a of compileCard(d).costLess ?? []) less += Math.max(0, evalAmount(s, a, { controller: pid, sourceId: o.id }));
   if (way?.less !== undefined && wayMana !== undefined) less += Math.max(0, evalAmount(s, way.less, { controller: pid, sourceId: o.id }));
   // Risen Executioner: more generic mana when cast this way (CR 601.2f).
-  const wayMore = way?.more !== undefined ? Math.max(0, evalAmount(s, way.more, { controller: pid, sourceId: o.id })) : 0;
+  const wayMore = (way?.more !== undefined ? Math.max(0, evalAmount(s, way.more, { controller: pid, sourceId: o.id })) : 0) + (way?.moreUnlessTargets && !targetsLike(s, how.targets, way.moreUnlessTargets.filter, pid) ? way.moreUnlessTargets.n : 0);
   // Catalyst Stone: "Flashback costs you pay cost {2} less. Flashback costs your opponents pay cost {2} more.": the flashback
   // cost, a card's own or one an effect gave it (CR 702.34a, 601.2f).
   let flashbackMore = 0;
@@ -7722,6 +7722,11 @@ export function graveyardWays(s: GameState, o: GameObject, caster?: PlayerId): C
  * How much a permission to cast from a graveyard asks beyond the card's mana cost, for picking among several: costs on
  * top or a counter as it enters (Noctis, Prince of Lucis), then exile afterwards (Jaya Ballard's emblem). 0: nothing.
  */
+/** Mavinda, Students' Advocate: whether one of a spell's targets, as chosen while casting it, is a permanent like this (for its caster). */
+function targetsLike(s: GameState, targets: TargetChoice[] | undefined, filter: TargetSpec, pid: PlayerId): boolean {
+  return (targets ?? []).some((t) => t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objectMatches(s, filter, s.objects[t.id]!, pid, false));
+}
+
 const permissionBurden = (w: CastFromGraveyard) => (w.costs.length || w.entersWith || w.entersTapped ? 2 : 0) + (w.exileIfToGraveyard ? 1 : 0);
 
 /**
@@ -7739,7 +7744,7 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
     // Vohar, Vodalian Desecrator: "If that spell would be put into your graveyard, exile it instead".
     // Sins of the Past: "without paying its mana cost" (CR 118.9): a {0} cost, so X is 0 (CR 107.3b) and no alternative
     // cost can be paid (rulings).
-    out.push({ kind: "permission", mana: m.free ? "{0}" : d.manaCost, costs: [], exile: false, ...(m.exileAfter ? { exileIfToGraveyard: true as const } : {}), ...(m.free ? { free: true as const } : {}), ...(m.tapped ? { entersTapped: true as const } : {}) });
+    out.push({ kind: "permission", mana: m.free ? "{0}" : d.manaCost, costs: [], exile: false, ...(m.exileAfter ? { exileIfToGraveyard: true as const } : {}), ...(m.free ? { free: true as const } : {}), ...(m.tapped ? { entersTapped: true as const } : {}), ...(m.moreUnlessTargets ? { moreUnlessTargets: m.moreUnlessTargets } : {}) });
   // Permanents, and emblems in the command zone (Wrenn and Realmbreaker's, CR 114.4).
   for (const p of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
     if (controllerOf(s, p) !== o.owner) continue;

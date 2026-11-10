@@ -5432,6 +5432,13 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
     const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length + player(s, pid).hand.filter((id) => isType(defOf(s, obj(s, id)), "Land")).length;
     return lands < 5 ? "land" : "nonland";
   }
+  // Leori, Sparktouched Hunter: the planeswalker type most of its planeswalkers have, on the battlefield then in hand (whose
+  // abilities it'll copy this turn), else the first.
+  if (what === "planeswalkerType") {
+    const walkers = [...s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid && objIsType(s, o, "Planeswalker")).map((o) => characteristics(s, o).subtypes), ...player(s, pid).hand.map((id) => defOf(s, obj(s, id))).filter((d) => isType(d, "Planeswalker")).map((d) => d.subtypes.map((x) => `hand:${x}`))];
+    const score = (opt: string) => walkers.reduce((n, subs) => n + (subs.includes(opt) ? 10 : subs.includes(`hand:${opt}`) ? 1 : 0), 0);
+    return [...options].sort((a, b) => score(b) - score(a))[0]!;
+  }
   // Sarpadian Empires, Vol. VII: the creature type most of its creatures have (a tribal payoff), else the first pair.
   if (what === "colorAndType") {
     const mine = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid && objIsType(s, o, "Creature"));

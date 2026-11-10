@@ -10,6 +10,7 @@ import { parseAffected, parseExtraBlocks, parseIsA, parseMostStat, parseStaticMo
 import type { Ctx } from "../body";
 import { canonicalKeyword, CREATURE_TYPES, SACRIFICED_LANDWALK } from "../../keywords";
 import { parseGrants } from "../grants";
+import { QUOTED_SOURCE_NAME } from "../compile";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -2345,7 +2346,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Elder Land Wurm: "When ~ blocks, it loses defender." (rulings: indefinitely) likewise, "it" being ~.
   if ((m = /^(~|[Ii]t) ((?:becomes?|gains?|loses?) .+)$/.exec(s)) && !ctx.spell) {
     const what = parseObject(m[1] === "~" ? "~" : "it", ctx);
-    const mods = what?.ref === "self" ? parseChanges(m[2]!) : null;
+    // Kellan, Planar Trailblazer: 'it becomes a Human Faerie Detective and gains "Whenever Kellan deals combat damage to a
+    // player, ..."': the permanent giving the ability is the one getting it, so its name there is "this creature" (CR
+    // 201.5a), in an event only a creature has (combat damage, attacking, blocking).
+    const own = what?.ref === "self" ? m[2]!.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(`${QUOTED_SOURCE_NAME}(?= (?:deals combat damage|attacks|blocks)\\b)`, "g"), "this creature")) : m[2]!;
+    const mods = what?.ref === "self" ? parseChanges(own) : null;
     if (what && mods) return [{ type: "continuous", what, mods, duration: "game" }];
   }
   // Wall of Dust: "Whenever ~ blocks a creature, that creature can't attack during its controller's next turn."

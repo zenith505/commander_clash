@@ -14021,6 +14021,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "591bbf84-259d-4885-8b5f-b29c04222d41",
+  "name": "Guile",
+  "manaCost": "{3}{U}{U}{U}",
+  "cmc": 6,
+  "typeLine": "Creature — Elemental Incarnation",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental",
+   "Incarnation"
+  ],
+  "oracleText": "This creature can't be blocked except by three or more creatures.\nIf a spell or ability you control would counter a spell, instead exile that spell and you may play that card without paying its mana cost.\nWhen Guile is put into a graveyard from anywhere, shuffle it into its owner's library.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lrw",
+  "releasedAt": "2007-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "835733a2-3738-4fc0-97d5-33156b711ba4",
   "name": "Gurzigost",
   "manaCost": "{3}{G}{G}",
@@ -18329,6 +18360,46 @@
   "set": "j25",
   "releasedAt": "2024-11-15",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ff94e2d5-8ba1-4f6c-916d-58235a60743e",
+  "name": "Leori, Sparktouched Hunter",
+  "manaCost": "{U}{R}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Elemental Cat",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental",
+   "Cat"
+  ],
+  "oracleText": "Flying, vigilance\nWhenever Leori deals combat damage to a player, choose a planeswalker type. Until end of turn, whenever you activate an ability of a planeswalker of that type, copy that ability. You may choose new targets for the copies.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmm",
+  "releasedAt": "2023-08-04",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

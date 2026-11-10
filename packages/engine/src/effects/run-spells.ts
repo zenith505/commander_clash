@@ -626,7 +626,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           // The Clone Saga: "a creature with the chosen name" is the name chosen as this resolved, kept with the delayed
           // trigger (its source may be gone by the time it triggers).
           // Zombie Boa: "a creature of that color", the color chosen as this resolved, likewise.
-          trigger: e.bound ? bindMilledCounts(s, ctx.chosen?.name !== undefined || ctx.chosen?.color !== undefined ? bindChosenName(e.trigger, ctx.chosen) : e.trigger, ctx) : ctx.chosen?.name !== undefined || ctx.chosen?.color !== undefined ? bindChosenName(e.trigger, ctx.chosen) : e.trigger,
+          trigger: e.bound ? bindMilledCounts(s, ctx.chosen?.name !== undefined || ctx.chosen?.color !== undefined || ctx.chosen?.planeswalkerType !== undefined ? bindChosenName(e.trigger, ctx.chosen) : e.trigger, ctx) : ctx.chosen?.name !== undefined || ctx.chosen?.color !== undefined || ctx.chosen?.planeswalkerType !== undefined ? bindChosenName(e.trigger, ctx.chosen) : e.trigger,
           until: e.until,
           turn: s.turn,
           ...(e.once ? { once: true as const } : {}),
@@ -886,10 +886,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "counterUnlessPays": {
       // Ward (CR 702.21a) and "counter it unless that player pays": the spell or ability that triggered this.
-      return counterOnStack(s, ctx, ctx.cause, e.ward ? `${src}'s ward` : src, e.unless);
+      return counterOnStack(s, ctx, ctx.cause, e.ward ? `${src}'s ward` : src, e.unless) ?? offerGuileCasts(s, src);
     }
     case "counterCause":
-      return counterOnStack(s, ctx, ctx.cause, src);
+      return counterOnStack(s, ctx, ctx.cause, src) ?? offerGuileCasts(s, src);
     case "causeToBottom":
       return counterOnStack(s, ctx, ctx.cause, src, undefined, "libraryBottom", true);
     case "changeTarget": {
@@ -934,10 +934,16 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "counterEach": {
       // Each spell on the stack it matches as it resolves, one at a time (CR 701.6a); this spell itself is excluded
       // since it isn't one it can counter (CR 608.2: it's resolving).
-      for (const item of [...s.stack]) {
-        if (item.kind !== "spell" || item.id === s.resolving?.item.id || !isLegalTarget(s, e.filter, { kind: "stack", id: item.id }, ctx.controller)) continue;
-        counterOnStack(s, ctx, item.id, src);
-      }
+      // Guile: once through them, only the casts are left (a spell cast that way isn't countered too).
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.guileLoop)
+        for (const item of [...s.stack]) {
+          if (item.kind !== "spell" || item.id === s.resolving?.item.id || !isLegalTarget(s, e.filter, { kind: "stack", id: item.id }, ctx.controller)) continue;
+          counterOnStack(s, ctx, item.id, src);
+        }
+      sc.guileLoop = true;
+      if (offerGuileCasts(s, src)) return "paused";
+      sc.guileLoop = undefined;
       return;
     }
     case "dismissStack": {
@@ -952,10 +958,15 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "counterOpponentsStack": {
       // Glen Elendra's Answer: each spell and ability an opponent controls, from the top down; one that can't be countered
       // stays and isn't counted (CR 101.2), and only those really countered count for its tokens.
-      for (const item of [...s.stack].reverse()) {
-        if (item.id === s.resolving?.item.id || item.controller === ctx.controller || !s.stack.includes(item)) continue;
-        counterOnStack(s, ctx, item.id, src);
-      }
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.guileLoop)
+        for (const item of [...s.stack].reverse()) {
+          if (item.id === s.resolving?.item.id || item.controller === ctx.controller || !s.stack.includes(item)) continue;
+          counterOnStack(s, ctx, item.id, src);
+        }
+      sc.guileLoop = true;
+      if (offerGuileCasts(s, src)) return "paused";
+      sc.guileLoop = undefined;
       return;
     }
     case "counterOpponentsStackUnless": {
@@ -963,6 +974,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // turn), each asked about each of theirs from the top of the stack down, paying as they choose; then those not paid
       // for are countered, all at the same time (rulings). One that has left the stack meanwhile isn't asked about.
       const sc = (s.resolving!.scratch ??= {});
+      // Guile: the counters are done, only the casts are left.
+      if (sc.guileLoop) {
+        if (offerGuileCasts(s, src)) return "paused";
+        sc.guileLoop = undefined;
+        return;
+      }
       if (!sc.denial) {
         const order = s.turnOrder;
         const start = order.indexOf(s.activePlayer);
@@ -987,6 +1004,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       sc.denial = undefined;
       for (const id of st.unpaid) if (s.stack.some((x) => x.id === id)) counterOnStack(s, ctx, id, src);
+      sc.guileLoop = true;
+      if (offerGuileCasts(s, src)) return "paused";
+      sc.guileLoop = undefined;
       return;
     }
     case "bounceEachUnless": {
@@ -1102,7 +1122,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (e.suspend && o && s.objects[o.id] === o && o.zone === "exile" && !o.isToken && !s.stack.some((x) => x.id === item.id)) suspendExiled(s, o, e.suspend);
         return;
       }
-      if (e.cause) return ctx.cause && s.stack.some((x) => x.id === ctx.cause) ? counterOnStack(s, ctx, ctx.cause, src, undefined, e.bounce ? "hand" : undefined, e.bounce) : undefined;
+      if (e.cause) return (ctx.cause && s.stack.some((x) => x.id === ctx.cause) ? counterOnStack(s, ctx, ctx.cause, src, undefined, e.bounce ? "hand" : undefined, e.bounce) : undefined) ?? offerGuileCasts(s, src);
       // "Exile any number of target spells" (Mindbreak Trap): each target still legal.
       if (e.exileSpell) {
         for (let k = e.index; k < e.index + (e.n ?? 1); k++) {
@@ -1187,6 +1207,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       })();
       const done = counterOnStack(s, ctx, t.id, src, e.unless, toField ? "battlefield" : exileIt ? "exile" : e.librarySecond ? "librarySecond" : e.libraryChoice ? "libraryChoice" : e.top ? "libraryTop" : e.bottom ? "libraryBottom" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
       if (done === "paused") return done;
+      if (offerGuileCasts(s, src)) return "paused";
       // Spelljack, Kheru Spellsnatcher: the card countered and exiled this way, while it stays exiled (CR 400.7).
       const ex = e.youMayFree && s.resolving?.counteredExiled ? s.objects[s.resolving.counteredExiled.id] : undefined;
       if (ex && ex.zone === "exile" && (ex.zoneChanges ?? 0) === s.resolving!.counteredExiled!.zc && !ex.isToken) {
@@ -1207,7 +1228,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       // Delay: the card it was, countered and exiled this way (a copy has ceased to exist, CR 707.10a).
       const o = spellObj ? s.objects[spellObj] : undefined;
-      if (e.suspend && o?.zone === "exile" && !s.stack.some((x) => x.id === t.id)) suspendExiled(s, o, e.suspend);
+      // Only one countered and exiled this way, not one Guile exiled instead (never countered).
+      if (e.suspend && o?.zone === "exile" && !s.stack.some((x) => x.id === t.id) && s.resolving?.counteredExiled?.id === o.id) suspendExiled(s, o, e.suspend);
       return;
     }
   }
@@ -1251,6 +1273,24 @@ function spellNameOf(s: GameState, ctx: ResolveCtx, index: number): string | und
   const id = t?.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.objectId ?? ctx.spellObjects?.[index]) : undefined;
   const o = id ? s.objects[id] : undefined;
   return o && !o.faceDown ? defOf(s, o).name : undefined;
+}
+
+/**
+ * Guile: each card exiled instead of being countered (counterOnStack), which the counter effect's controller may cast now
+ * without paying its mana cost, timing ignored (CR 608.2g), or never (rulings). "paused" while one is offered.
+ */
+function offerGuileCasts(s: GameState, src: string): "paused" | void {
+  const sc = s.resolving?.scratch;
+  while (sc?.guileCasts?.length) {
+    const next = sc.guileCasts.shift()!;
+    const o = s.objects[next.id];
+    if (!o || o.zone !== "exile" || (o.zoneChanges ?? 0) !== next.zc) continue;
+    s.pending = { kind: "castFree", player: next.player, objectId: o.id, source: src };
+    if (freeCastable(s, next.player, o.id)) return "paused";
+    s.pending = null;
+    log(s, `${defOf(s, o).name} can't be cast.`);
+  }
+  if (sc) sc.guileCasts = undefined;
 }
 
 function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop" | "hand" | "librarySecond" | "libraryChoice" | "battlefield" | "libraryBottom", bounce?: true): "paused" | void {
@@ -1325,6 +1365,19 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
     if (paid === "paused") return paid;
     if (s.resolving) s.resolving.unlessPaid = paid;
     if (paid) return;
+  }
+  // Guile: "If a spell or ability you control would counter a spell, instead exile that spell and you may play that card
+  // without paying its mana cost." The counter is replaced whatever it would have done with the spell (CR 614.1a, 614.6);
+  // the spell is never countered (rulings), so nothing about countering it happens. A copy ceases to exist (CR 707.10a).
+  // The card may be cast right away, as the counter effect carries on (rulings; offerGuileCasts).
+  const guile = item.kind === "spell" ? s.battlefield.find((id) => controllerOf(s, obj(s, id)) === ctx.controller && abilitiesOf(s, obj(s, id)).counterExilesFree) : undefined;
+  if (guile) {
+    s.stack.splice(i, 1);
+    if (item.objectId) moveObject(s, item.objectId, "exile");
+    const ex = item.objectId ? s.objects[item.objectId] : undefined;
+    log(s, `${defOf(s, obj(s, guile)).name}: instead of being countered by ${by}, ${what} is exiled.`);
+    if (ex && ex.zone === "exile" && !ex.spellCopy && !ex.isToken && !item.copy && s.resolving) ((s.resolving.scratch ??= {}).guileCasts ??= []).push({ id: ex.id, zc: ex.zoneChanges ?? 0, player: ctx.controller });
+    return;
   }
   // Hinder: "put that card on your choice of the top or bottom of its owner's library": the countering spell's controller
   // chooses as it resolves (rulings); a copy just ceases to exist (CR 707.10a). Spell Crumple: the bottom.
@@ -1674,7 +1727,7 @@ function bindChosenName<T>(t: T, chosen: Chosen): T {
     if (!v || typeof v !== "object") return v;
     const o = v as Record<string, unknown>;
     const out = Object.fromEntries(Object.entries(o).map(([k, x]) => [k, walk(x)]));
-    return ((o.chosen === "name" && chosen.name !== undefined) || (o.chosen === "color" && chosen.color !== undefined)) && typeof o.kind === "string" ? bindChosen(out as unknown as TargetSpec, chosen) : out;
+    return ((o.chosen === "name" && chosen.name !== undefined) || (o.chosen === "color" && chosen.color !== undefined) || (o.chosen === "planeswalkerType" && chosen.planeswalkerType !== undefined)) && typeof o.kind === "string" ? bindChosen(out as unknown as TargetSpec, chosen) : out;
   };
   return walk(t) as T;
 }

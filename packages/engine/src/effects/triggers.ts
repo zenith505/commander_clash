@@ -2314,6 +2314,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Where it was cast from (CR 601.2a); a copy wasn't cast from anywhere.
         if (t.cast.from && !castFromMatches(t.cast.from, ev.copy ? undefined : spell, ev.controller)) return false;
         if (t.cast.notOwned && !(spell && !ev.copy && spell.owner !== ev.controller)) return false;
+        // Eye of the Storm: "casts an instant or sorcery card": a card, not a copy of one cast (CR 707.12, rulings).
+        if (t.cast.cardOnly && !(spell && !ev.copy && !spell.spellCopy && !item?.copy)) return false;
         if (t.cast.nameInCasterYard) {
           const name = spell && !ev.copy && !spell.faceDown ? characteristics(s, spell).name : undefined;
           if (!name || !player(s, ev.controller).graveyard.some((g) => sameName(defOf(s, obj(s, g)).name, name))) return false;
@@ -2537,10 +2539,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(card, card.owner, (e, t) => e === "selfDiscarded" && (!t.discardedByOpponent || byOpp), compileCard(defOf(s, card)).triggers, undefined, undefined, undefined, undefined, undefined, byOpp ? { player: ev.cause! } : undefined);
   } else if (ev.type === "activated") {
     // "Whenever an opponent activates an ability of a creature that isn't a mana ability" (its source as it was activated).
-    for (const id of s.battlefield) {
-      const o = obj(s, id);
-      const you = controllerOf(s, o);
-      add(o, you, (e, t) => {
+    // `o` the object with the trigger, `you` its controller.
+    const activatedMatch = (o: GameObject, you: PlayerId) => (e: string, t: TriggeredAbility): boolean => {
         // Vazi: "Whenever an opponent casts a spell or activates an ability, if mana from a Treasure was spent to ...".
         if (e === "castSpell" && t.cast?.orActivates) return !!ev.treasure && (t.cast.by !== "opponent" || ev.player !== you) && (t.cast.by !== "you" || ev.player === you);
         const a = t.activates;
@@ -2560,7 +2560,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           if (!ev.source || !host || host.id !== ev.source.snapshot.id || host.zone !== "battlefield" || (host.zoneChanges ?? 0) !== (ev.source.snapshot.zoneChanges ?? 0)) return false;
         }
         return !a.of || (!!ev.source && objectMatches(s, a.of, ev.source.snapshot, a.ofActivators ? ev.player : you, false, undefined, ev.source.chars));
-      }, undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player });
+      };
+    // Leori, Sparktouched Hunter: "Until end of turn, whenever you activate an ability of a planeswalker of that type" (a
+    // delayed triggered ability, CR 603.7b), matched the same way.
+    fromFloating((src, ctrl, triggers) => add(src, ctrl, activatedMatch(src, ctrl), triggers, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player }));
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      add(o, you, activatedMatch(o, you), undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player });
       // Haunting Wind: "Whenever ... a player activates an artifact's ability without {T} in its activation cost, ~ deals 1
       // damage to that artifact's controller": the artifact as it was activated is the subject, its controller then too
       // if it's gone (a Clue sacrificed to pay for it, CR 608.2h). Mana abilities too, as nothing says otherwise.

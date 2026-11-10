@@ -1717,7 +1717,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={pending?.kind === "chooseModes" ? undefined : () => setModePick(null)}
             />
           )}
-          {pending?.kind === "chooseOption" && (pending.what === "creatureType" || ((pending.what === "textFrom" || pending.what === "textTo") && pending.options.length > 10)) && pending.player === HUMAN && (
+          {pending?.kind === "chooseOption" && (pending.what === "creatureType" || pending.what === "planeswalkerType" || ((pending.what === "textFrom" || pending.what === "textTo") && pending.options.length > 10)) && pending.player === HUMAN && (
             <TypePicker key={pending.source} s={s} pending={pending} onDone={(choice) => dispatch([{ type: "chooseOption", player: HUMAN, choice }])} />
           )}
           {pending?.kind === "chooseOption" && pending.what === "cardName" && pending.player === HUMAN && (
@@ -4091,20 +4091,23 @@ function TypePicker({
       c[whose]++;
       counts.set(t, c);
     });
+  // Leori, Sparktouched Hunter: planeswalker types, counted the same way.
+  const kind = pending.what === "planeswalkerType" ? "Planeswalker" : "Creature";
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     const ch = characteristics(s, o);
-    if (ch.types.includes("Creature")) tally(ch.subtypes, ch.controller === HUMAN ? "yours" : "theirs");
+    if (ch.types.includes(kind)) tally(ch.subtypes, ch.controller === HUMAN ? "yours" : "theirs");
   }
   for (const id of s.players[HUMAN]!.hand) {
     const d = cardOf(s, id);
-    if (d.types.includes("Creature")) tally(d.subtypes, "yours");
+    if (d.types.includes(kind)) tally(d.subtypes, "yours");
   }
   // Haunting Voyage: "return up to two creature cards of that type from your graveyard".
   for (const id of s.players[HUMAN]!.graveyard) {
     const d = cardOf(s, id);
-    if (d.types.includes("Creature")) tally(d.subtypes, "yard");
+    if (d.types.includes(kind)) tally(d.subtypes, "yard");
   }
+  const noun = kind === "Planeswalker" ? "planeswalker" : "creature";
   const total = (c: { yours: number; theirs: number; yard: number }) => c.yours + c.theirs + c.yard;
   const seen = [...counts].sort((a, b) => total(b[1]) - total(a[1]) || a[0].localeCompare(b[0]));
   const q = query.trim().toLowerCase();
@@ -4116,7 +4119,7 @@ function TypePicker({
       <div className="modal type-pick">
         <header>
           <strong>
-            {pending.source}: {pending.what === "creatureType" ? "choose a creature type" : pending.prompt}
+            {pending.source}: {pending.what === "creatureType" ? "choose a creature type" : pending.what === "planeswalkerType" ? "choose a planeswalker type" : pending.prompt}
           </strong>
           <input
             autoFocus
@@ -4148,9 +4151,9 @@ function TypePicker({
             </>
           )}
           {/* Eclipsed Realms: only the eight types it names. */}
-          <h4>{q ? `Types matching “${query.trim()}”` : pending.options.length <= 20 ? "The creature types it offers" : "All creature types"}</h4>
+          <h4>{q ? `Types matching “${query.trim()}”` : pending.options.length <= 20 ? `The ${noun} types it offers` : `All ${noun} types`}</h4>
           <div className="type-list">
-            {matches.length === 0 && <span className="muted">No creature type matches.</span>}
+            {matches.length === 0 && <span className="muted">No {noun} type matches.</span>}
             {matches.map((t) => (
               <button key={t} className="ghost" data-type={t} onClick={() => onDone(t)}>
                 {t}
@@ -5824,7 +5827,7 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}:</strong> {pending.what === "cardName" ? `${pending.prompt ?? "choose a card name"}.` : "choose a creature type."}
+          <strong>{pending.source}:</strong> {pending.what === "cardName" ? `${pending.prompt ?? "choose a card name"}.` : pending.what === "planeswalkerType" ? "choose a planeswalker type." : "choose a creature type."}
         </span>
       </div>
     );

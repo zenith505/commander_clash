@@ -17441,6 +17441,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         inner[0] = { ...inner[0]!, noRegen: true };
         si++;
       }
+      // Faith's Shield: "Target permanent you control gains protection from the color of your choice until end of turn. ...
+      // If you have 5 or less life, instead you and each permanent you control gain protection from the color of your
+      // choice until end of turn.": one color, chosen as it resolves (rulings), before what it's given to.
+      const colorFirst = (fx: Effect[] | null | undefined) => !!fx && fx.length > 1 && fx[0]!.type === "choose" && fx[0]!.choice === "color" && !fx.slice(1).some((e) => pauses(e));
+      const sameColor = !inner && colorFirst(previous) && / the color of your choice /.test(` ${t} `) ? parseOne(capital(t.replace(/\bthe color of your choice\b/g, "the chosen color")), ctx) : null;
+      if (sameColor && colorFirst(previous) && sameColor.length && !sameColor.some((e) => pauses(e)) && ctx.targets.length === before) {
+        const done = insteadOfAffected(sameColor, previous.slice(1));
+        if (!done) return null;
+        effects.splice(from, effects.length - from, previous[0]!, { type: "if", cond: { kind: "state", cond: insteadOf, ...insteadSubject }, effects: done, otherwise: previous.slice(1) });
+        continue;
+      }
       if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e !== prevCounter && e.type !== "punisher" && !(e.type === "pick" && e.action === "sacrifice") && e.type !== "sacrificeEach" && e.type !== "discard" && e.type !== "search" && e.type !== "untapUpTo" && e.type !== "revealFromHand")) return null;
       const done = insteadOfAffected(inner, previous);
       if (!done) return null;

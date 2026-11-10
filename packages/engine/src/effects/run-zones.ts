@@ -153,6 +153,13 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const types = (ctx.sacrificed?.[0] ?? r.sacrificedThisWay?.at(-1))?.types ?? [];
     e = { ...e, filter: { ...e.filter, sharesTypeWithSacrificed: undefined, types: types.length ? [...types] : ["(none)"] } };
   }
+  // Saw: "a permanent other than that creature or ~": not the trigger's subject while it's still that object (CR 400.7).
+  if (e.filter.notSubject) {
+    const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+    const here = o?.zone === "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc;
+    const { notSubject: _, ...rest } = e.filter;
+    e = { ...e, filter: { ...rest, ...(here ? { notId: o!.id } : {}) } };
+  }
   const sc = (r.scratch ??= {});
   let who = players(s, e.who, ctx);
   // Each player's own number when it's "half the creatures they control" (CR 107.1a), all worked out before anyone picks.

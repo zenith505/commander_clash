@@ -142,6 +142,7 @@ import {
   discardKeywordKinds,
   auraHostOptions,
   lastDrawnInHand,
+  bindLegendaryNames,
   deferredChoice,
   ignorableBy,
   plotCost,
@@ -6723,7 +6724,9 @@ export function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: Act
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the source's chosen type.
     const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, o.chosen) } : c0;
     // Ronin, Shadow Stalker: "an Equipment attached to ~", this permanent.
-    const c = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, o.id, o.attachedTo) } : c1;
+    const c2 = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, o.id, o.attachedTo) } : c1;
+    // Key to the Side-Door: the names of our legendary permanents now.
+    const c = bindLegendaryNames(s, pid, c2);
     if (c.kind === "forage") {
       const f = forageChoice(s, pid, o, [...[...targeted].map(String), ...(keep ? [keep] : [])]);
       if (!f) return null;

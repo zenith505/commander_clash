@@ -13182,6 +13182,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "27065d34-b22a-47af-aea2-980f47bafcea",
+  "name": "Glimpse the Cosmos",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at the top three cards of your library. Put one of them into your hand and the rest on the bottom of your library in any order.\nAs long as you control a Giant, you may cast this card from your graveyard by paying {U} rather than paying its mana cost. If you cast this card this way and it would be put into your graveyard, exile it instead.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "549e6de7-56e9-4f5c-8c88-30e446bc53bb",
   "name": "Glittering Lion",
   "manaCost": "{2}{W}",
@@ -17646,6 +17672,28 @@
   "set": "bok",
   "releasedAt": "2005-02-04",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "76c036df-44f5-4021-b7fc-656147351341",
+  "name": "Key to the Side-Door",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}, {T}: Target creature can't be blocked this turn.\n{1}, {T}, Discard a legendary card with the same name as a legendary permanent you control: Draw two cards.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "hob",
+  "releasedAt": "2026-08-14",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -29253,6 +29301,36 @@
   "commanderLegal": "legal",
   "set": "m3c",
   "releasedAt": "2024-06-14",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a03a9ddb-595a-4dff-b7cb-7ad60655f1ee",
+  "name": "Skyblade's Boon",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature gets +1/+1 and has flying.\n{2}{W}: Return Skyblade's Boon to its owner's hand. Activate only if Skyblade's Boon is on the battlefield or in your graveyard.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh2",
+  "releasedAt": "2021-06-18",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

@@ -873,6 +873,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max) && (cond.moreThan === undefined || n > evalAmount(s, cond.moreThan, ctx)) && (cond.parity === undefined || Math.abs(n % 2) === (cond.parity === "odd" ? 1 : 0));
     }
     case "eventPlayerAttackedYou": {
+      // Avenge: "if a player attacked you during their last turn": any player still in the game, each in their own most
+      // recent turn (this one if it's theirs).
+      if (cond.anyPlayer)
+        return s.players.some((p) => p.id !== you && !p.lost && ((last) => last !== undefined && p.attackedInTurn?.turn === last && p.attackedInTurn.players.includes(you))(s.activePlayer === p.id ? p.lastTurnBegan : p.turnBegan));
       // O-Kagachi: the trigger's player attacked you during their most recent turn (this one if it's theirs).
       const p = eventPlayer !== undefined ? s.players[eventPlayer] : undefined;
       const last = p && (s.activePlayer === eventPlayer ? p.lastTurnBegan : p.turnBegan);

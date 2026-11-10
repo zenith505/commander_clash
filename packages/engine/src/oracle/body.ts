@@ -19572,7 +19572,9 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
     return first && second ? [...first, ...second] : null;
   }
   // "You may put a land card from your graveyard onto the battlefield tapped" (Wreck and Rebuild): the same as returning it.
-  const put = fx ? null : /^(You may p|P)ut (an? [a-z]+ card) from your graveyard onto the battlefield( tapped)?$/.exec(s);
+  // Harald Unites the Elves: "You may put an Elf or Tyvar card from your graveyard onto the battlefield": a card with
+  // either subtype (a changeling is an Elf, CR 702.73a).
+  const put = fx ? null : /^(You may p|P)ut (an? (?:[a-z]+|[A-Z][a-z]+(?: or [A-Z][a-z]+)?) card) from your graveyard onto the battlefield( tapped)?$/.exec(s);
   if (put) return parseOne(`${put[1] === "P" ? "R" : "You may r"}eturn ${put[2]} from your graveyard to the battlefield${put[3] ?? ""}`, ctx);
   return fx;
 }

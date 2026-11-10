@@ -2091,9 +2091,9 @@ export function parseTargetPhrase(
       extra[key] = m[3] === "greater" ? { min: n } : m[3] === "less" ? { max: n } : { min: n, max: n };
     }
     p = p.slice(0, m.index);
-  } else if ((m = / with mana value (\d+), (\d+), or (\d+)$/.exec(p) ?? / with mana value (\d+) through (\d+)$/.exec(p)) && (m[3] === undefined || (Number(m[2]) === Number(m[1]) + 1 && Number(m[3]) === Number(m[2]) + 1))) {
+  } else if ((m = / with mana value (\d+), (\d+), or (\d+)$/.exec(p) ?? / with mana value (\d+) through (\d+)$/.exec(p) ?? / with mana value (\d+) or (\d+)$/.exec(p)) && (m[3] === undefined ? !/ or \d+$/.test(m[0]) || Number(m[2]) === Number(m[1]) + 1 : Number(m[2]) === Number(m[1]) + 1 && Number(m[3]) === Number(m[2]) + 1)) {
     // "A creature spell with mana value 4, 5, or 6" (Kozilek's Unsealing): one in that range ("4 through 6" once a cast
-    // trigger's commas are taken out).
+    // trigger's commas are taken out). "Equipment you control with mana value 2 or 3" (Frodo, Determined Hero): either.
     extra.manaValue = { min: Number(m[1]), max: Number(m[3] ?? m[2]) };
     p = p.slice(0, m.index);
   } else if ((m = / with mana cost ((?:\{[0-9WUBRGC]+\})+)(?: or ((?:\{[0-9WUBRGC]+\})+))?$/.exec(p))) {

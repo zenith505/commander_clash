@@ -3467,6 +3467,11 @@ export function compile(d: CardDef): CompiledCard {
       out.firstDrawLook = true;
       continue;
     }
+    // Seeker of Slaanesh: a requirement (CR 508.1d) on each opponent as they declare attackers (game.ts declareAttackers).
+    if (line === "Each opponent must attack with at least one creature each combat if able.") {
+      out.opponentsAttackWithOne = true;
+      continue;
+    }
     // War's Toll: a requirement (CR 508.1d) once an opponent declares any attacker (game.ts declareAttackers).
     if (line === "If a creature an opponent controls attacks, all creatures that opponent controls attack if able.") {
       out.opponentsAttackAll = true;
@@ -3898,6 +3903,14 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Each power-up ability of permanents you control can be activated an additional time.") {
       out.powerUpAgain = true;
+      continue;
+    }
+    // Gavi, Nest Warden: "You may pay {0} rather than pay the cycling cost of the first card you cycle each turn."; New
+    // Perspectives: "As long as you have seven or more cards in hand, you may pay {0} rather than pay cycling costs." An
+    // alternative cost for the activation (CR 118.9, 602.2b), checked as it's activated (game.ts freeCycling).
+    const freeCyc = new RegExp(`^(?:As long as you have ${NUM} or more cards in hand, y|Y)ou may pay \\{0\\} rather than pay (the cycling cost of the first card you cycle each turn|cycling costs)\\.$`).exec(line);
+    if (freeCyc && (freeCyc[2] === "cycling costs") === !!freeCyc[1]) {
+      (out.freeCycling ??= []).push(freeCyc[1] ? { handAtLeast: num(freeCyc[1]) } : { first: true });
       continue;
     }
     // Fluctuator: "Cycling abilities you activate cost {2} less to activate": typecycling too (CR 702.29f), generic mana

@@ -5543,6 +5543,7 @@ export function addTriggeredMana(s: GameState, pid: PlayerId, picked: { adds: Ma
  * commanders' color identity" (War Room: set before the game, CR 903.4; none for a colorless one, rulings).
  */
 export function activatedLifeCost(s: GameState, pid: PlayerId, ab: ActivatedAbility, o?: GameObject, x?: number): number {
+  if (o && freeCycling(s, pid, o, ab, x)) return 0; // Street Wraith under Gavi, Nest Warden: {0} rather than 2 life
   return (ab.lifeCost ?? 0) + (ab.lifeCostIdentity ? commanderIdentity(s, pid).length : 0) + (ab.lifeCostX ? (x ?? 0) : 0) + (ab.lifeCostPerCounter && o ? ab.lifeCostPerCounter.n * (o.counters[ab.lifeCostPerCounter.counter] ?? 0) : 0) + (ab.lifeCostPerCardInHand ? ab.lifeCostPerCardInHand * (s.players[pid]?.hand.length ?? 0) : 0) + (ab.mana && o ? manaLifeTax(s, o) : 0);
 }
 
@@ -8208,8 +8209,13 @@ export function clashingCosts(costs: AdditionalCost[]): boolean {
   return new Set(keys).size !== keys.length;
 }
 
-/** An activated ability's costs beyond mana with its X announced: "Sacrifice X Squirrels" is X of them (CR 107.3a, 602.2b). */
-export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?: GameObject): AdditionalCost[] {
+/**
+ * An activated ability's costs beyond mana with its X announced: "Sacrifice X Squirrels" is X of them (CR 107.3a, 602.2b).
+ * With `s` and the player `pid` activating it: none when {0} is paid rather than its cycling cost (Edge of Autumn's
+ * "Cycling—Sacrifice a land" under Gavi, Nest Warden: freeCycling).
+ */
+export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?: GameObject, s?: GameState, pid?: PlayerId): AdditionalCost[] {
+  if (s && pid !== undefined && src && freeCycling(s, pid, src, ab, x)) return [];
   return (ab.costs ?? []).map((c0) => {
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the type chosen for the source (linked, CR 607.2d).
     const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, src?.chosen) } : c0;
@@ -9197,7 +9203,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (tp) return tp;
   }
   if (ab.costs?.length || costs?.sacrifice?.length || costs?.discard?.length || costs?.returnToHand?.length || costs?.tap?.length) {
-    const cp = extraCostProblem(s, pid, o, activatedCosts(ab, x, o), costs, `activate ${d.name}'s ability`, ab.mana ? "mana" : "costs");
+    const cp = extraCostProblem(s, pid, o, activatedCosts(ab, x, o, s, pid), costs, `activate ${d.name}'s ability`, ab.mana ? "mana" : "costs");
     if (cp) return cp;
   }
   const cost = activationCost(s, pid, o, ab, targets, x);
@@ -9278,7 +9284,7 @@ export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: A
       if (g.atLeastOne) atLeastOne = true;
     }
   less += firstArtifactLess(s, pid, o, !!ab.mana);
-  return activationLessCost(s, o, activationCostBefore(s, pid, o, ab, targets), x, less ? { n: less, atLeastOne } : undefined);
+  return activationLessCost(s, o, activationCostBefore(s, pid, o, ab, targets, x), x, less ? { n: less, atLeastOne } : undefined);
 }
 
 /**
@@ -9358,8 +9364,24 @@ export function freeEquip(s: GameState, pid: PlayerId, ab: ActivatedAbility): bo
   });
 }
 
-function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[]): ParsedCost {
-  const cost0 = parseManaCost(freeEquip(s, pid, ab) ? "{0}" : ab.manaCost);
+/**
+ * Gavi, Nest Warden ("the first card you cycle each turn": none cycled yet this turn, whoever controlled Gavi then,
+ * rulings) and New Perspectives ("seven or more cards in hand", the card being cycled counted, rulings): {0} rather than
+ * the cycling cost of `o` (CR 118.9; increases still apply, 601.2f), mana, life (Street Wraith) or a sacrifice (Edge of
+ * Autumn) alike, its discard still paid (rulings). Taken whenever it applies, as with freeEquip: with {X} in the cost,
+ * only when X is 0 (X is 0 paying {0}, rulings), so it's never worse than the cost itself.
+ */
+export function freeCycling(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, x = 0): boolean {
+  if (!ab.cycling || ab.tap || o.zone !== "hand" || o.owner !== pid || (x && /\{X\}/.test(ab.manaCost))) return false;
+  return s.battlefield.some((id) => {
+    const src = obj(s, id);
+    if (controllerOf(s, src) !== pid) return false;
+    return (abilitiesOf(s, src).freeCycling ?? []).some((f) => (!f.first || !s.turnLog?.cycled?.[pid]) && (f.handAtLeast === undefined || player(s, pid).hand.length >= f.handAtLeast));
+  });
+}
+
+function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[], x = 0): ParsedCost {
+  const cost0 = parseManaCost(freeEquip(s, pid, ab) || freeCycling(s, pid, o, ab, x) ? "{0}" : ab.manaCost);
   // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
   // (CR 602.2b applies 601.2f).
   const more = (ab.mana ? 0 : activationTax(s, o, pid, ab) + opponentsTargetTax(s, pid, targets)) + (ab.costMore ? Math.max(0, evalAmount(s, ab.costMore, { controller: pid, sourceId: o.id })) : 0);
@@ -9550,7 +9572,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.saddle ? "saddle" : "crew"} with`);
   // What pays each cost beyond mana is chosen as it's activated (CR 602.2b, 601.2h): an activation that doesn't say,
   // or says for one cost and not another, can't skip it. As for spells (castSpell).
-  if (ab && activatedCosts(ab, x, o).some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
+  if (ab && activatedCosts(ab, x, o, s, p.id).some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
   if (ab?.costs?.some((c) => c.kind === "forage") && !costs?.sacrifice?.length && !costs?.exileCards?.length) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose how to forage: three cards in your graveyard to exile, or a Food to sacrifice");
   if (ab?.costs?.some((c) => c.kind === "exileSpell") && !costs?.exileSpell?.length) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose a spell you control to exile");
   let body = ab ? settleDivided(s, withModes(ab.body, modes), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
@@ -9669,7 +9691,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const costCardNames: string[] = [];
   const costDiscarded: string[] = [];
   const costExiled: { id: ObjectId; zc: number }[] = [];
-  const sacrificed = ab.costs?.length ? payExtraCosts(s, p, activatedCosts(ab, x, o), costs ?? {}, lki, costCardNames, costDiscarded, costExiled) : [];
+  const extraCosts = activatedCosts(ab, x, o, s, p.id);
+  const sacrificed = extraCosts.length ? payExtraCosts(s, p, extraCosts, costs ?? {}, lki, costCardNames, costDiscarded, costExiled) : [];
   const tappedOne = ab.costs?.some((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x) && costs?.tap?.length === 1 ? costs.tap[0] : undefined;
   // Cryptic Gateway: the creatures its cost tapped, for "each creature tapped this way".
   const tappedKin = JSON.stringify(body.effects).includes('"kinOfCostTapped":true') ? (costs?.tap ?? []).flatMap((t) => (s.objects[t] ? [{ id: t, zc: s.objects[t]!.zoneChanges ?? 0, types: typesList(creatureTypesOf(s, s.objects[t]!)) }] : [])) : [];
@@ -12192,6 +12215,33 @@ export function playerBlockLimit(s: GameState, pid: PlayerId): number {
 }
 
 /** Crawlspace: the most creatures that can attack this player (not their planeswalkers) each combat; Infinity with no such rule. */
+/** Seeker of Slaanesh: a permanent an opponent of `pid` controls that says `pid` must attack with at least one creature if able. */
+export function attackWithOneRequired(s: GameState, pid: PlayerId): ObjectId | undefined {
+  return s.battlefield.find((id) => controllerOf(s, obj(s, id)) !== pid && opponents(s, controllerOf(s, obj(s, id))).includes(pid) && abilitiesOf(s, obj(s, id)).opponentsAttackWithOne);
+}
+
+/**
+ * Seeker of Slaanesh: creatures `pid` could declare as the only attacker, or failing that a group of them that could all
+ * attack together (each one's "can't attack alone" and "unless another ... attacks" met by the others, CR 506.5, 508.1c),
+ * each able to attack some opponent without a cost (CR 508.1d: nothing obliges paying one). Empty: the requirement asks
+ * nothing this combat (rulings).
+ */
+export function attackWithOneOptions(s: GameState, pid: PlayerId): ObjectId[] {
+  const opps = opponents(s, pid);
+  if (!opps.length || combatLimit(s, "attack") < 1) return [];
+  const free = potentialAttackers(s, pid).filter((o) => opps.some((d) => !attackProblem(s, o, d) && !attackTaxPer(s, d, false, o.id) && attackYouLimit(s, d) > 0) && !characteristics(s, o).ownAttackCosts.length);
+  const alone = free.filter((o) => !characteristics(s, o).cantAttackAlone && !withoutCompany(s, o.id, [{ attacker: o.id }]));
+  if (alone.length) return alone.map((o) => o.id);
+  // Together: drop the ones whose company isn't there until what's left all can attack (company only gets easier with more).
+  let group = free.filter((o) => !characteristics(s, o).onlyAttacksAlone).map((o) => ({ attacker: o.id }));
+  for (;;) {
+    const kept = group.filter((a) => !withoutCompany(s, a.attacker, group) && !(group.length < 2 && characteristics(s, obj(s, a.attacker)).cantAttackAlone));
+    if (kept.length === group.length) break;
+    group = kept;
+  }
+  return group.length > 1 || (group.length === 1 && !characteristics(s, obj(s, group[0]!.attacker)).cantAttackAlone) ? group.map((a) => a.attacker) : [];
+}
+
 /** War's Toll: a permanent an opponent of `pid` controls that makes all of `pid`'s creatures attack if able once one does. */
 export function attackAllIfOne(s: GameState, pid: PlayerId): ObjectId | undefined {
   return s.battlefield.find((id) => controllerOf(s, obj(s, id)) !== pid && abilitiesOf(s, obj(s, id)).opponentsAttackAll);
@@ -12262,6 +12312,10 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   if (attacks.length >= limit) {
     if (attacks.filter((a) => required.some((o) => o.id === a.attacker)).length < Math.min(limit, required.length)) throw new RulesError(shirks(shirking!));
   } else if (shirking && opps.length) throw new RulesError(shirks(shirking));
+  // Seeker of Slaanesh: with no attackers declared, the requirement that at least one creature attack is obeyed by none,
+  // and declaring one that could attack without a cost would obey it without breaking a restriction (CR 508.1c-d).
+  const seeker = attacks.length ? undefined : attackWithOneRequired(s, p.id);
+  if (seeker && opps.length && attackWithOneOptions(s, p.id).length) throw new RulesError(`${p.name} must attack with at least one creature this combat if able (${nameOf(s, seeker)})`);
   // War's Toll: once one of its controller's opponent's creatures attacks, all of that player's creatures attack if able
   // (CR 508.1d), up to a limit on attackers (CR 508.1c); none attacking obeys it too. A creature that would need a cost
   // paid to attack needn't (CR 508.1d).

@@ -376,6 +376,9 @@ export function normalizeSelf(d: CardDef): string {
   // Stangg: "create Stangg Twin, a legendary 3/4 red and green Human Warrior creature token": the token's name, the card's
   // name and one more word.
   if (full) t = t.replace(new RegExp(`(\\b[Cc]reate )(${esc(full)} [A-Z][\\w'-]*)(?=, a legendary )`, "g"), (_, a: string, n: string) => `${a}\u0001${tokenNames.push(n) - 1}\u0001`);
+  // Stangg, Echo Warrior: "create Stangg Twin, a legendary ...": the card's short name (CR 201.5c) and one more word.
+  const shortName = full.split(",")[0]!;
+  if (full && shortName !== full) t = t.replace(new RegExp(`(\\b[Cc]reate )(${esc(shortName)} [A-Z][\\w'-]*)(?=, a legendary )`, "g"), (_, a: string, n: string) => `${a}\u0001${tokenNames.push(n) - 1}\u0001`);
   // Icingdeath, Frost Tyrant: "create Icingdeath, Frost Tongue, a legendary white Equipment artifact token": the token's
   // name, the card's short name (CR 201.5c) and other words after a comma, a name of its own (CR 111.4), not the card.
   const commaName = full.split(",")[0]!;
@@ -1835,6 +1838,14 @@ export function compile(d: CardDef): CompiledCard {
     if (asName) {
       if (!nameChoice || out.entersChoose?.some((c) => c.what === "cardName")) out.unsupported.push(raw);
       else (out.entersChoose ??= []).push({ what: "cardName", ...nameChoice });
+      continue;
+    }
+    // Alhammarret, High Arbiter: "As ~ enters, each opponent reveals their hand. You choose the name of a nonland card
+    // revealed this way.": one name, not one for each opponent, from among the cards revealed; none if no opponent has a
+    // nonland card in hand (rulings; CR 614.12).
+    if (line === "As ~ enters, each opponent reveals their hand. You choose the name of a nonland card revealed this way.") {
+      if (out.entersChoose?.some((c) => c.what === "cardName")) out.unsupported.push(raw);
+      else (out.entersChoose ??= []).push({ what: "cardName", names: { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "nonland card" }, opponentHands: true });
       continue;
     }
     // Null Chamber (CompiledCard.entersNamesWithOpponent).
@@ -6210,6 +6221,22 @@ export function compile(d: CardDef): CompiledCard {
         });
       continue;
     }
+    // Feather, Radiant Arbiter: "Whenever you cast a noncreature spell that targets only ~, you may choose any number of
+    // other creatures that spell could target and pay {2} for each of those creatures. If you do, for each of those
+    // creatures, copy that spell. The copy targets that creature." Every target of the spell ~ (rulings), chosen and paid
+    // for as the trigger resolves; each copy targets that creature with all its targets (CR 707.10d, rulings), its modes
+    // and X kept and no costs paid for it (rulings); a copy of a permanent spell becomes a token (CR 707.10f).
+    if (line === "Whenever you cast a noncreature spell that targets only ~, you may choose any number of other creatures that spell could target and pay {2} for each of those creatures. If you do, for each of those creatures, copy that spell. The copy targets that creature.") {
+      const creature = parseTargetPhrase("creature");
+      if (creature?.kind !== "object") out.unsupported.push(raw);
+      else
+        out.triggers.push({
+          event: "castSpell",
+          cast: { by: "you", spell: { kind: "spell", types: [], notTypes: ["Creature"], notColors: [], text: "noncreature spell" }, targetsOnly: "self" },
+          body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "eachOther", newTargets: false, eachOther: { among: creature, self: true, choosePay: "{2}" } }], text: "you may choose any number of other creatures that spell could target and pay {2} for each of those creatures. If you do, for each of those creatures, copy that spell. The copy targets that creature." },
+        });
+      continue;
+    }
     // Thrumming Stone: "Spells you cast have ripple 4." Each spell's granted ripple triggers as it's cast (CR 702.60a),
     // like a "whenever you cast a spell" ability; spells cast by ripple trigger it too (rulings).
     const grantedRipple = /^Spells you cast have ripple (\d+)\.$/.exec(line);
@@ -7564,6 +7591,13 @@ function linkExile(out: CompiledCard) {
   // Fear of Abduction: "As an additional cost to cast this spell, exile a creature you control" with an enters ability that
   // exiles: both are linked to the leaves ability (CR 607.2a, 607.2q).
   if (out.additionalCosts?.filter((c) => c.kind === "sacrifice" && c.exile).length === 1 && !out.costOr && exiles.length === 1 && returns.length === 1 && returns[0]!.event === "selfLeaves" && allEffects(returns[0]!.body.effects).every((e) => e.type !== "linkedExileToken")) out.costExileLinked = true;
+  // Helvault: "{1}, {T}: Exile target creature you control." and "{7}, {T}: Exile target creature you don't control." are
+  // each linked to "When Helvault is put into a graveyard from the battlefield, return all cards exiled with it to the
+  // battlefield under their owners' control" (CR 607.2a, rulings): the cards either of its two exile abilities exiled.
+  if (exiles.length === 2 && returns.length === 1 && returns[0]!.event === "selfToGraveyard" && !out.spell && exiles.every((e) => e.type === "exile" && e.what.ref === "target" && out.activated.some((a) => a.body.effects.includes(e))) && allEffects(returns[0]!.body.effects).every((e) => e.type === "returnLinked" && e.dest === "battlefield")) {
+    for (const e of exiles) (e as Extract<Effect, { type: "exile" }>).linked = true;
+    return;
+  }
   // "When this creature dies, you may put the exiled card into its owner's hand" (Hoarding Dragon): a leaves ability too.
   if (exiles.length !== 1 || returns.length !== 1 || (returns[0]!.event !== "selfLeaves" && !(returns[0]!.event === "selfDies" && exiles[0]!.type === "search"))) {
     out.unsupported.push("(returns exiled cards it can't link to one exile ability)");

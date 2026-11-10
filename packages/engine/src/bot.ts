@@ -510,6 +510,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Thelon's Curse: "pay {U} for each creature chosen this way": the best creatures we can pay for. On our own upkeep only
     // with half our lands at most, so the turn's spells still have mana; on another player's, as many as we can, to block.
+    // Feather, Radiant Arbiter: the spell aimed at our own creature helps it, so copies for our best other creatures, as
+    // many as we can pay for.
+    if (pend.kind === "pickPermanents" && pend.action === "copyFor" && pend.payEach) {
+      const ours = pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+      for (let k = ours.length; k > 0; k--) {
+        const plan = planMana(s, pid, parseManaCost(pend.payEach.repeat(k)));
+        if (plan) return [...plan, { type: "pickPermanents", player: pid, ids: ours.slice(0, k) }];
+      }
+      return [{ type: "pickPermanents", player: pid, ids: [] }];
+    }
     if (pend.kind === "pickPermanents" && pend.payEach) {
       const per = parseManaCost(pend.payEach);
       const best = [...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
@@ -1543,6 +1553,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "demonstrate") {
       const owned = (o: string) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === Number(o)).length;
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => owned(a) - owned(b))[0]! }];
+    }
+    // Zevlor, Elturel Exile: the copy is aimed like the spell, at an opponent: their most valuable permanent it can target,
+    // else that player; never no copy.
+    if (pend.kind === "chooseOption" && pend.what === "copyTargetFor") {
+      const perms = pend.options.filter((o) => o !== "none" && !/^p\d+$/.test(o)).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+      return [{ type: "chooseOption", player: pid, choice: perms[0] ?? pend.options.find((o) => o !== "none") ?? pend.options[0]! }];
     }
     // Zada's copies: the order hardly matters to a bot, so battlefield order.
     if (pend.kind === "chooseOption" && pend.what === "copyOrder") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
@@ -5656,6 +5672,8 @@ function chooseCardName(s: GameState, pid: PlayerId, pend: Extract<PendingDecisi
   const shown = opps.flatMap((x) => [...player(s, x).command, ...player(s, x).graveyard, ...player(s, x).exile.filter((id) => !obj(s, id).faceDown), ...s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x)]);
   const card = pend.objectId ? compileCard(defOf(s, obj(s, pend.objectId))) : undefined;
   const silences = !!card?.nameBans?.some((b) => b.kind === "activate") || !!card?.activationTaxes;
+  // Alhammarret, High Arbiter: the costliest card its opponents revealed (one we don't play ourselves).
+  if (card?.entersChoose?.some((c) => c.opponentHands)) return best(opps.flatMap((x) => player(s, x).hand), (o) => value(o) - (mine.has(nameOf(o)) ? 20 : 0)) ?? pend.options[0]!;
   const pick = best(shown, (o) => {
     let v = value(o) - (mine.has(nameOf(o)) ? 20 : 0);
     // A commander comes back again and again; an activated ability matters most to what stops activations.

@@ -10690,6 +10690,11 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(", ")}`);
       o.chosen = { ...o.chosen, keywords: [...(o.chosen?.keywords ?? []), choice] };
       log(s, `${p.name} chooses ${choice.toLowerCase()} for ${pend.source}.`);
+    } else if (pend.what === "cardName" && entry?.opponentHands) {
+      // Alhammarret, High Arbiter: one of the names revealed.
+      if (!pend.options.includes(choice)) throw new RulesError("choose one of the revealed cards' names");
+      o.chosen = { ...o.chosen, name: choice };
+      log(s, `${p.name} chooses ${choice} for ${pend.source}.`);
     } else if (pend.what === "cardName" && entry?.pairName !== undefined) {
       // Null Chamber: its controller's name, or the chosen opponent's (Chosen.opponentName).
       if (!pend.options.includes(choice)) throw new RulesError("choose one of the offered card names");
@@ -11023,6 +11028,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const st = r.scratch?.eachRevealed;
     if (!st) throw new RulesError("no revealed cards to order");
     st.next = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "copyTargetFor") {
+    // Zevlor, Elturel Exile: the player or permanent this opponent's copy targets (Effect copyPerOtherOpponent).
+    const z = r.scratch?.zevlor;
+    if (!z) throw new RulesError("no copy to aim");
+    z.answer = choice;
+    log(s, `${p.name} chooses ${pend.labels?.[pend.options.indexOf(choice)] ?? choice} for ${pend.source}.`);
     continueResolution(s);
     return;
   }
@@ -11566,7 +11580,26 @@ function askEntersChoice(s: GameState): boolean {
     }
     if (c.what === "cardName") {
       // "As ~ enters, choose a nonland card name" (CR 614.12, 201.4).
-      const options = cardNameOptions(s, c.names);
+      // Alhammarret, High Arbiter: each opponent reveals their hand; only the names of the nonland cards revealed. In a
+      // hand a card has only its front face's name, except a split card, which has both (CR 709.4, 712.8a, 715.4).
+      if (c.opponentHands && !c.revealedHands) {
+        for (const pid of opponents(s, controllerOf(s, o))) {
+          const hand = player(s, pid).hand;
+          log(s, hand.length ? `${player(s, pid).name} reveals their hand for ${defOf(s, o).name}: ${hand.map((h) => nameOf(s, h)).join(", ")}.` : `${player(s, pid).name} reveals an empty hand for ${defOf(s, o).name}.`);
+        }
+        c.revealedHands = true;
+      }
+      const revealedNames = (): string[] => {
+        const names = new Set<string>();
+        for (const pid of opponents(s, controllerOf(s, o)))
+          for (const h of player(s, pid).hand) {
+            const d = s.cards[obj(s, h).cardId];
+            if (!d) continue;
+            for (const f of d.faces?.length ? (d.layout === "split" ? d.faces.map((_, i) => faceDef(d, i)) : [faceDef(d, 0)]) : [d]) if (!c.names || printedMatches(c.names, f)) names.add(f.name);
+          }
+        return [...names].sort((a, b) => a.localeCompare(b));
+      };
+      const options = c.opponentHands ? revealedNames() : cardNameOptions(s, c.names);
       // Null Chamber: its controller and the chosen opponent, the active player first (CR 101.4); with that opponent gone
       // from the game, only its controller.
       const you = controllerOf(s, o);
@@ -11582,7 +11615,7 @@ function askEntersChoice(s: GameState): boolean {
         s.pending = { kind: "chooseOption", player: pairBy, source: defOf(s, o).name, what: "cardName", options, objectId: o.id, prompt: `choose ${c.names ? `a ${c.names.text} name` : "a card name"}: spells with it can't be cast and lands with it can't be played${first ? ` (${player(s, pairBy === you ? opp! : you).name} chose ${first})` : ""}`, purpose: "deny" };
         return true;
       }
-      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "cardName", options, objectId: o.id, prompt: `choose ${c.names ? `a ${c.names.text} name` : "a card name"}`, purpose: c.purpose ?? "deny" };
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "cardName", options, objectId: o.id, prompt: c.opponentHands ? "choose the name of a nonland card your opponents revealed: they can't cast spells with that name" : `choose ${c.names ? `a ${c.names.text} name` : "a card name"}`, purpose: c.purpose ?? "deny" };
       return true;
     }
     if (c.what === "form") {

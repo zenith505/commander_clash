@@ -24956,6 +24956,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "766787ef-654a-4544-b5d7-d2f96949edf1",
+  "name": "Prized Unicorn",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Unicorn",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Unicorn"
+  ],
+  "oracleText": "All creatures able to block this creature do so.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m20",
+  "releasedAt": "2019-07-12",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "29b3cb3e-aeb1-43eb-8095-9f7881aa34bd",
   "name": "Prodigal Pyromancer",
   "manaCost": "{2}{R}",
@@ -36668,6 +36698,44 @@
   "commanderLegal": "legal",
   "set": "lgn",
   "releasedAt": "2003-02-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1a89c623-c9c3-443c-bbd3-834767b6bdb8",
+  "name": "Weeping Angel",
+  "manaCost": "{1}{U}{B}",
+  "cmc": 3,
+  "typeLine": "Artifact Creature — Alien Angel",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Alien",
+   "Angel"
+  ],
+  "oracleText": "Flash\nFirst strike, vigilance\nWhenever an opponent casts a creature spell, this creature isn't a creature until end of turn.\nIf this creature would deal combat damage to a creature, prevent that damage and that creature's owner shuffles it into their library.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Vigilance",
+   "First strike",
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

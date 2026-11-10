@@ -3,10 +3,11 @@
 // shuffled into its owner's library), Spell Queller (exiling a spell with mana value 4 or less, which its owner may cast
 // for free once the Queller leaves) and Curie, Emergent Intelligence ("its base power", and becoming a copy of the
 // creature exiled to pay for it, with a gained ability) and Oskar, Rubbish Reclaimer (a cost cut for each different mana
-// value among cards in your graveyard, and casting a discarded card from the graveyard).
+// value among cards in your graveyard, and casting a discarded card from the graveyard); Blink (its owner shuffles it in,
+// then investigates, and Weeping Angel's ability on a token).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, forest, island, passAll, plainsCard, putOnBattlefield, setup } from "./helpers";
+import { act, bear, card, forest, island, passAll, passUntil, plainsCard, putOnBattlefield, setup } from "./helpers";
 import { applyAction, botActions, spellCost, characteristics, invalidateCharacteristics, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type PendingDecision, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -64,9 +65,10 @@ const fog = (): CardDef => ({"oracleId":"27e9db49-7af7-4bef-ad4c-bf5dfb92030d","
 const searing = (): CardDef => ({"oracleId":"aafd44c1-74a9-4aa7-a4a2-67eb39a07478","name":"Searing Spear","manaCost":"{1}{R}","cmc":2,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Searing Spear deals 3 damage to any target.","colors":["R"],"colorIdentity":["R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/1/1/11a94b7c-0216-473c-87a6-71e5a64d7799.jpg?1783940479","artUrl":"https://cards.scryfall.io/art_crop/front/1/1/11a94b7c-0216-473c-87a6-71e5a64d7799.jpg?1783940479","commanderLegal":"legal","set":"m13","releasedAt":"2012-07-13","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
 const viper = (): CardDef => ({"oracleId":"8957f7c2-040c-4048-9f21-efa7c97682b7","name":"Ambush Viper","manaCost":"{1}{G}","cmc":2,"typeLine":"Creature — Snake","supertypes":[],"types":["Creature"],"subtypes":["Snake"],"oracleText":"Flash\nDeathtouch","power":"2","toughness":"1","colors":["G"],"colorIdentity":["G"],"keywords":["Flash","Deathtouch"],"imageUrl":"https://cards.scryfall.io/normal/front/0/c/0c082aa8-bf7f-47f2-baf8-43ad253fd7d7.jpg?1783940925","artUrl":"https://cards.scryfall.io/art_crop/front/0/c/0c082aa8-bf7f-47f2-baf8-43ad253fd7d7.jpg?1783940925","commanderLegal":"legal","set":"isd","releasedAt":"2011-09-30","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
 const oskar = (): CardDef => ({"oracleId":"14c2c818-0ce2-4809-a5ff-ee4a6253defa","name":"Oskar, Rubbish Reclaimer","manaCost":"{3}{U}{B}","cmc":5,"typeLine":"Legendary Creature — Human Wizard","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Wizard"],"oracleText":"This spell costs {1} less to cast for each different mana value among cards in your graveyard.\nWhenever you discard a nonland card, you may cast it from your graveyard.","power":"3","toughness":"3","colors":["B","U"],"colorIdentity":["B","U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/7/9/7943423b-52aa-46f1-a44d-e284375f23c0.jpg?1783923302","artUrl":"https://cards.scryfall.io/art_crop/front/7/9/7943423b-52aa-46f1-a44d-e284375f23c0.jpg?1783923302","commanderLegal":"legal","set":"ncc","releasedAt":"2022-04-29","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const blink = (): CardDef => ({"oracleId":"f5fba11b-7669-40a0-97c7-6cb7c13acedd","name":"Blink","manaCost":"{2}{U}{B}","cmc":4,"typeLine":"Enchantment — Saga","supertypes":[],"types":["Enchantment"],"subtypes":["Saga"],"oracleText":"(As this Saga enters and after your draw step, add a lore counter. Sacrifice after IV.)\nI, III — Choose target creature. Its owner shuffles it into their library, then investigates. (They create a Clue token.)\nII, IV — Create a 2/2 black Alien Angel artifact creature token with first strike, vigilance, and \"Whenever an opponent casts a creature spell, this token isn't a creature until end of turn.\"","colors":["B","U"],"colorIdentity":["B","U"],"keywords":["Investigate","Vigilance"],"imageUrl":"https://cards.scryfall.io/normal/front/f/7/f73a2404-9400-4628-a799-23b48026f27d.jpg?1783914399","artUrl":"https://cards.scryfall.io/art_crop/front/f/7/f73a2404-9400-4628-a799-23b48026f27d.jpg?1783914399","commanderLegal":"legal","set":"who","releasedAt":"2023-10-13","rarity":"rare","layout":"saga","gameChanger":false}) as CardDef;
 
 describe("round 336: compiles", () => {
-  it("every card of the round", () => supported(rebbec(), angel(), queller(), curie(), oskar()));
+  it("every card of the round", () => supported(rebbec(), angel(), queller(), curie(), oskar(), blink()));
 });
 
 describe("round 336: Rebbec, Architect of Ascension", () => {
@@ -381,5 +383,42 @@ describe("round 336: Oskar, Rubbish Reclaimer", () => {
     s = settle(s, ap);
     expect(s.players[opp]!.life).toBe(life - 3);
     expect(s.objects[ids[1]!]!.zone).toBe("graveyard");
+  });
+});
+
+describe("round 336: Blink", () => {
+  const clues = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && name(s, id) === "Clue Token");
+  it("I: the target creature's owner shuffles it into their library, then investigates", () => {
+    const { s: s0, ap, opp, ids } = setup([blink()]);
+    let s = s0;
+    const g = putOnBattlefield(s, opp, hillGiant());
+    s = settle(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.objects[g]!.zone).toBe("library");
+    expect(clues(s, opp)).toHaveLength(1);
+    expect(clues(s, ap)).toHaveLength(0);
+  });
+
+  it("I on a token: it ceases to exist, and its owner still investigates", () => {
+    const { s: s0, ap, opp, ids } = setup([blink()]);
+    let s = s0;
+    const t = putOnBattlefield(s, opp, bear({ name: "Bear Token" }));
+    s.objects[t]!.isToken = true;
+    s = settle(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.battlefield).not.toContain(t);
+    expect(s.players[opp]!.library).not.toContain(t);
+    expect(clues(s, opp)).toHaveLength(1);
+  });
+
+  it("II: an Alien Angel token that isn't a creature until end of turn when an opponent casts a creature spell", () => {
+    const { s: s0, ap, opp, ids } = setup([blink()]);
+    let s = s0;
+    putOnBattlefield(s, opp, hillGiant());
+    s = settle(run(s, planCast(s, ap, ids[0]!)));
+    s = settle(passUntil(passUntil(s, "end", ap), "main1", ap));
+    const tok = s.battlefield.find((id) => name(s, id) === "Alien Angel Token")!;
+    expect(tok).toBeDefined();
+    expect(pt(s, tok)).toBe("2/2");
+    expect(kw(s, tok)).toEqual(expect.arrayContaining(["First strike", "Vigilance"]));
+    void opp;
   });
 });

@@ -20605,6 +20605,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "444dea65-9be7-4b64-afd1-eebe44b285be",
+  "name": "Moonlight Bargain",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at the top five cards of your library. For each card, put that card into your graveyard unless you pay 2 life. Then put the rest into your hand.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rav",
+  "releasedAt": "2005-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5783facf-d26e-4aae-a753-b9dc553361c1",
   "name": "Mosswood Dreadknight // Dread Whispers",
   "manaCost": "{1}{G} // {1}{B}",

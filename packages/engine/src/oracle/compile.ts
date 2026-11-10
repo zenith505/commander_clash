@@ -6305,6 +6305,13 @@ export function compile(d: CardDef): CompiledCard {
       out.triggers.push({ event: "selfLeaves", body: { targets: [], effects: [{ type: "gainLife", who: { ref: "linkedPlayer" }, n: Number(thatPlayerLeaves[1]) }], text: `That player gains ${thatPlayerLeaves[1]} life.` } });
       continue;
     }
+    // Soulgorger Orgg: "When ~ leaves the battlefield, you gain life equal to the life you lost when it entered.": the life
+    // its own enters ability made you lose, as that object (CR 607.1, 607.2e); none if that ability hadn't resolved yet.
+    const lostEntering = out.triggers.filter((t) => t.event === "selfEnters" && t.body.effects.length === 1 && t.body.effects[0]!.type === "loseAllBut");
+    if (line === "When ~ leaves the battlefield, you gain life equal to the life you lost when it entered." && lostEntering.length === 1) {
+      out.triggers.push({ event: "selfLeaves", body: { targets: [], effects: [{ type: "gainLinkedLifeLost" }], text: "you gain life equal to the life you lost when it entered." } });
+      continue;
+    }
     // Loot, the Anomaly: how much combat damage it assigns, not its power (rulings; CR 510.1a).
     if (line === "If ~'s power is negative, ~ assigns combat damage as though ~'s power were positive.") {
       out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "assignsAbsPower" }], text: line });

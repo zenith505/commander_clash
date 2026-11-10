@@ -2003,6 +2003,8 @@ export interface GameState {
   linkedExile?: Record<string, { id: ObjectId; zc: number }[]>;
   /** Soul Scourge, Laquatus's Champion: the player its enters ability targeted, by "sourceId@zc", for "that player" in its leaves ability (rulings). */
   linkedPlayer?: Record<string, PlayerId>;
+  /** Soulgorger Orgg: the life its enters ability made its controller lose, by "sourceId@zc", for its leaves ability (CR 607.2e). */
+  linkedLifeLost?: Record<string, number>;
   /**
    * Animate Dead: the creature an Aura with "enchant creature card in a graveyard" put onto the battlefield, by
    * `${Aura id}@${its zone changes}` (its "enchant creature put onto the battlefield with ~", and "that creature" of its

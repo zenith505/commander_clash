@@ -2164,7 +2164,9 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         sc.digPaidLife = true;
         if (found.length) {
           log(s, `${p.name} pays ${e.payLife * found.length} life.`);
-          payLife(s, pid, e.payLife * found.length);
+          // Moonlight Bargain: one payment for each card (CR 119.4), so one life-loss event each.
+          if (e.payLifeEach) for (let i = 0; i < found.length; i++) payLife(s, pid, e.payLife);
+          else payLife(s, pid, e.payLife * found.length);
         }
       }
       const names = (ids: ObjectId[]) => ids.map((id) => defOf(s, obj(s, id)).name).join(", ");

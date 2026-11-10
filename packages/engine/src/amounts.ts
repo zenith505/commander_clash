@@ -367,6 +367,16 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         }
         return colors.size;
       }
+      // Azor's Gateway: the different mana values among them, each card face up in exile (an {X} as 0, a split card's
+      // two halves together, a card with no mana cost 0: rulings, CR 202.3).
+      if (c.manaValues) {
+        const mvs = new Set<number>();
+        for (const l of linked) {
+          const o = s.objects[l.id];
+          if (o?.zone === "exile" && (o.zoneChanges ?? 0) === l.zc && !o.faceDown) mvs.add(defMv(defOf(s, o)));
+        }
+        return mvs.size;
+      }
       if (c.cardTypes) {
         const types = new Set<string>();
         for (const l of linked) {

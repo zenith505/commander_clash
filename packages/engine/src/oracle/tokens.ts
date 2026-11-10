@@ -347,6 +347,8 @@ export function parseCopyExcept(text: string, round?: "up" | "down"): CopyExcept
         }
       }
     } else if (/^(?:its|his|her) name is ~$/.test(p)) out.name = "~";
+    // Mishra, Eminent One: "except its name is Mishra's Warform", a name of its own (kept as written by compile.ts).
+    else if ((m = /^its name is ([A-Z][\w'-]*'s [A-Z][\w'-]*)$/.exec(p))) out.name = m[1]!;
     else return null;
   }
   return out;

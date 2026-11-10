@@ -180,7 +180,7 @@ describe("Living Lore: exile an instant or sorcery card from your graveyard as i
     const d = into(s0, ap, divination(), "graveyard");
     let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
     expect(pt(s, ids[0]!)).toBe("3/3");
-    s.objects[ids[0]!]!.summoningSick = false;
+    s.objects[ids[0]!]!.controlledSinceTurn = -1;
     const opp = s.turnOrder.find((p) => p !== ap)!;
     s = passUntil(s, "declareAttackers");
     s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: ids[0]!, defender: opp }] });
@@ -200,7 +200,7 @@ describe("Living Lore: exile an instant or sorcery card from your graveyard as i
     const { s: s0, ap, ids } = setup([livingLore()]);
     const d = into(s0, ap, divination(), "graveyard");
     let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
-    s.objects[ids[0]!]!.summoningSick = false;
+    s.objects[ids[0]!]!.controlledSinceTurn = -1;
     const opp = s.turnOrder.find((p) => p !== ap)!;
     s = passUntil(s, "declareAttackers");
     s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: ids[0]!, defender: opp }] });

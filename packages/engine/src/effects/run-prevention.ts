@@ -129,12 +129,14 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
   if (spec.by?.choose) {
     // Mourner's Shield: the colors of the card its imprint ability exiled, as the source is chosen; once chosen, it's that
     // source whose damage is prevented (CR 609.7a), as Guard Dogs' rulings have its color checked only as it resolves.
-    const linkedColors = spec.by.choose.sharesColorWithLinked ? colorsOfLinkedExile(s, ctx) : undefined;
+    // Protective Sphere: the colors of the mana spent to activate it (CR 105.1: colorless isn't a color).
+    const spentColors = spec.by.choose.sharesColorWithManaSpent ? [...new Set((s.resolving?.item.manaSpentTypes ?? []).filter((m): m is Color => m !== "C"))] : undefined;
+    const linkedColors = spec.by.choose.sharesColorWithLinked ? colorsOfLinkedExile(s, ctx) : spentColors;
     if (linkedColors && !linkedColors.length) {
-      log(s, `${src}: no source shares a color with the exiled card.`);
+      log(s, `${src}: no source shares a color with ${spentColors ? "the mana spent on it" : "the exiled card"}.`);
       return;
     }
-    const { sharesColorWithLinked: _, ...plain } = spec.by.choose;
+    const { sharesColorWithLinked: _, sharesColorWithManaSpent: __, ...plain } = spec.by.choose;
     const filter = bindChosen(linkedColors ? { ...plain, colors: linkedColors } : spec.by.choose, ctx.chosen);
     const chosen = chooseDamageSource(s, ctx, filter, src, spec.by.permanent);
     if (chosen === "paused") return "paused";

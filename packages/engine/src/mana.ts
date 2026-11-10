@@ -6,7 +6,7 @@ export type CostSymbol =
   | { kind: "colored"; color: ManaType } // includes {C}
   /** `life`: may be paid with 2 life instead, as {B} may with K'rrik (paying it as its black half). */
   | { kind: "hybrid"; options: Color[]; life?: true; /** A hybrid Phyrexian symbol, {G/W/P} (CR 107.4f). */ phyrexian?: true } // {W/U}
-  | { kind: "twoHybrid"; color: Color; life?: true } // {2/W}
+  | { kind: "twoHybrid"; color: Color; life?: true; /** Sunglasses of Urza: one mana of this color pays it too, as though it were `color` (CR 609.4b). */ also?: Color } // {2/W}
   /**
    * {W/P}. `krrik`: a {B} that K'rrik lets be paid with 2 life, not a Phyrexian symbol (compleated doesn't count it).
    * `any`: any type of mana pays it (Chromatic Orrery's "as though it were mana of any color", CR 609.4b).
@@ -152,7 +152,7 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
   let generic = extraGeneric;
   let lifePaid = 0;
   const hybrids: { options: Color[]; life?: true; phyrexian?: true }[] = [];
-  const twoHybrids: Color[] = [];
+  const twoHybrids: Extract<CostSymbol, { kind: "twoHybrid" }>[] = [];
   const phyrexian: Extract<CostSymbol, { kind: "phyrexian" }>[] = [];
   let phyrexianLife = 0;
   // {S} first, each from the snow mana the rest of the cost needs least: restricted mana that may be spent on this, {C},
@@ -173,7 +173,7 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
       if (p[s.color] <= 0) return null;
       spend(s.color, true);
     } else if (s.kind === "hybrid") hybrids.push(s);
-    else if (s.kind === "twoHybrid") twoHybrids.push(s.color);
+    else if (s.kind === "twoHybrid") twoHybrids.push(s);
     else if (s.kind === "phyrexian") phyrexian.push(s);
     // X is chosen as 0 for now.
   }
@@ -203,8 +203,9 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
       if (!krrik) phyrexianLife++;
     } else return null;
   }
-  for (const c of twoHybrids) {
+  for (const { color: c, also } of twoHybrids) {
     if (p[c] > 0) spend(c, true);
+    else if (also && p[also] > 0) spend(also, true);
     else generic += 2;
   }
   // Generic: spend colorless first, then whichever color we have most of. With `spreadColors` (sunburst, which counts

@@ -52,6 +52,8 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
   const onlyTreasures = use !== "other" && "spell" in use && !!use.treasureOnly;
   // Myr Superion: only creatures' mana abilities help (CR 106.3; rulings).
   const onlyCreatures = use !== "other" && "spell" in use && !!use.creatureOnly;
+  // Imperiosaur: only basic lands' mana abilities help, the same way.
+  const onlyBasicLands = use !== "other" && "spell" in use && !!use.basicLandOnly;
   // "Spend only mana of the chosen color to activate this ability": only sources of that mana help.
   const only = usableTypes(use);
   // Current controller, types and mana abilities, after continuous effects (CR 613).
@@ -59,7 +61,7 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
   return s.battlefield
     .filter((id) => !exclude.includes(id))
     .map((id) => obj(s, id))
-    .filter((o) => controllerOf(s, o) === pid && (!onlyCreatures || objIsType(s, o, "Creature")))
+    .filter((o) => controllerOf(s, o) === pid && (!onlyCreatures || objIsType(s, o, "Creature")) && (!onlyBasicLands || (objIsType(s, o, "Land") && characteristics(s, o).supertypes.includes("Basic"))))
     .map((o) => {
       const abs = manaAbilitiesOn(s, o);
       const treasure = isTreasure(s, o);
@@ -300,7 +302,7 @@ export function planCast(
   if (choices.face !== undefined && o.face !== choices.face) return asFace(s, o, choices.face, () => planCast(s, pid, objectId, targets, modes, convoke, x, choices));
   const d = choices.faceDown ? FACE_DOWN : defOf(s, o);
   // The spell as it will be on the stack, for mana that can only be spent on some spells (CR 106.6).
-  const use: ManaUse = { spell: choices.alt === "bestow" ? bestowedDef(d) : choices.alt === "prototype" || choices.prototyped ? prototypedDef(d) : d, ...(altCost(d, choices.alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(compileCard(d).creatureManaOnly ? { creatureOnly: true as const } : {}), ...spellHow(d, choices, o) };
+  const use: ManaUse = { spell: choices.alt === "bestow" ? bestowedDef(d) : choices.alt === "prototype" || choices.prototyped ? prototypedDef(d) : d, ...(altCost(d, choices.alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(compileCard(d).creatureManaOnly ? { creatureOnly: true as const } : {}), ...(compileCard(d).basicLandManaOnly ? { basicLandOnly: true as const } : {}), ...spellHow(d, choices, o) };
   // Spoils of War: the X its text sets as it's cast (CR 107.3c), from the chosen opponent's graveyard.
   x ??= definedCastX(s, pid, o, choices);
   const problem = castProblem(s, pid, objectId, targets, modes, undefined, undefined, x, choices);
@@ -700,7 +702,7 @@ export function planCubeMana(s: GameState, pid: PlayerId, cost0: ParsedCost, ext
  * first, as for other tap costs), the colors the cost still asks for, the rest of its mana for generic.
  */
 function planXMana(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGeneric: number, excluded: ObjectId[], use: ManaUse, harm?: Partial<Record<Color, number>>, wantSnow = false): Action[] | null {
-  if (use !== "other" && "spell" in use && use.spell && (use.treasureOnly || use.creatureOnly)) return null;
+  if (use !== "other" && "spell" in use && use.spell && (use.treasureOnly || use.creatureOnly || use.basicLandOnly)) return null;
   const only = usableTypes(use);
   const need = new Map<Color, number>();
   for (const sym of cost0.symbols) {

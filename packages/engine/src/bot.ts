@@ -1005,6 +1005,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // stays as it is.
     // Quarry Hauler: on our own permanent, more of what helps it and less of what doesn't (proliferate's sense); on an
     // opponent's, the other way round.
+    // Bribe Taker: a counter that grants a keyword or shields it (CR 122.1b-c) over a +1/+1 counter; a +1/+1 counter
+    // otherwise, never none.
+    if (pend.kind === "chooseOption" && pend.what === "bribeCounter") {
+      const k = pend.counterKind ?? "";
+      const keyword = ["shield", "flying", "first strike", "double strike", "deathtouch", "hexproof", "indestructible", "lifelink", "menace", "reach", "trample", "vigilance"].includes(k);
+      return [{ type: "chooseOption", player: pid, choice: keyword && pend.options.includes("kind") ? "kind" : "plus" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "addOrRemoveCounter") {
       const o = pend.about ? s.objects[pend.about] : undefined;
       const k = pend.counterKind ?? "";
@@ -4044,7 +4051,9 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   // own cards to return), chosen before the targets.
   const castType = compileCard(castDef(s, id, alt)).castChooseType && printed ? botCastType(s, pid, id, printed) : undefined;
   if (compileCard(castDef(s, id, alt)).castChooseType && !castType) return null;
-  const how: CastHow = { ...(gate?.paid ? { kicks: [0, 1], bargained: true, teamwork: true, gift: true, evidence: true } : {}), ...(alt ? { alt } : {}), ...(castType ? { castType } : {}) };
+  // Avacyn's Judgment: cast for its madness cost as the madness ability resolves, its targets as that cost has them.
+  const madnessNow = s.pending?.kind === "castFree" && s.pending.how === "madness" && s.pending.objectId === id && s.pending.player === pid;
+  const how: CastHow = { ...(gate?.paid ? { kicks: [0, 1], bargained: true, teamwork: true, gift: true, evidence: true } : {}), ...(alt ? { alt } : madnessNow ? { alt: "madness" as const } : {}), ...(castType ? { castType } : {}) };
   const gated = printed && gateBody(withModes(printed, modes), how);
   // Rules about choosing its targets as it's cast (Dream Leash: a tapped permanent only).
   const body = gated && { ...gated, targets: castTimeTargets(castDef(s, id, alt), gated.targets) };

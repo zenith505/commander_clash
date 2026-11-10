@@ -4304,6 +4304,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "482889f4-6cf5-457f-9f52-a3f841e038b5",
+  "name": "Bribe Taker",
+  "manaCost": "{5}{G}",
+  "cmc": 6,
+  "typeLine": "Creature — Rhino Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Rhino",
+   "Warrior"
+  ],
+  "oracleText": "Trample\nWhen this creature enters, for each kind of counter on permanents you control, you may put your choice of a +1/+1 counter or a counter of that kind on this creature.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6d194882-ca37-49bb-ac9f-a751c53850a8",
   "name": "Bribery",
   "manaCost": "{3}{U}{U}",

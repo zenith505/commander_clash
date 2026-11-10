@@ -1640,6 +1640,14 @@ export function compile(d: CardDef): CompiledCard {
       out.entersChooseObject = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "another creature you control" };
       continue;
     }
+    // Phylactery Lich: "As ~ enters, put a phylactery counter on an artifact you control." (CR 614.12): not targeted, one
+    // already on the battlefield, not one entering with it; with none, nothing gets the counter (rulings).
+    const entersCounterOn = /^As ~ enters, put an? ([a-z]+) counter on an? (artifact|creature|enchantment|land) you control\.$/.exec(line);
+    if (entersCounterOn && !out.entersChooseObject) {
+      out.entersChooseObject = { kind: "object", types: [capital(entersCounterOn[2]!)], notTypes: [], notColors: [], controller: "you", text: `${/^[aeiou]/.test(entersCounterOn[2]!) ? "an" : "a"} ${entersCounterOn[2]} you control to put a ${entersCounterOn[1]} counter on` };
+      out.entersChooseObjectCounter = entersCounterOn[1]!;
+      continue;
+    }
     const choosePlayer = /^As (?:~|it) enters, (secretly )?choose (a player|an opponent)\.$/.exec(line);
     if (choosePlayer && !out.entersChoosePlayer) {
       out.entersChoosePlayer = choosePlayer[2] === "a player" ? "player" : "opponent";

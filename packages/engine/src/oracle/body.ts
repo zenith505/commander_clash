@@ -17,6 +17,7 @@ import { parsePunisherOptions } from "./sentences/basics";
 import { X_MODES_MAX } from "../modes";
 import { round318Sentence } from "./round318";
 import { roundB166Sentence } from "./laneb166";
+import { roundB167Sentence } from "./laneb167";
 import { round319WholeText } from "./round319";
 import { round320WholeText } from "./round320";
 
@@ -7130,7 +7131,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
     // rounds B158, B157, B156, B155, B154, B153, B152, B151, B148 and 311 to 317's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB166Sentence(s, sentences, si, ctx) ?? roundB165Sentence(s, sentences, si, ctx) ?? roundB164Sentence(s, sentences, si, ctx) ?? roundB160Sentence(s, sentences, si, ctx, effects) ?? roundB159Sentence(s, sentences, si, ctx, effects) ?? roundB158Sentence(s, sentences, si, ctx, effects) ?? roundB157Sentence(s, sentences, si, ctx, effects) ?? roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    const faceDown = roundB167Sentence(s, sentences, si, ctx, effects) ?? roundB166Sentence(s, sentences, si, ctx) ?? roundB165Sentence(s, sentences, si, ctx) ?? roundB164Sentence(s, sentences, si, ctx) ?? roundB160Sentence(s, sentences, si, ctx, effects) ?? roundB159Sentence(s, sentences, si, ctx, effects) ?? roundB158Sentence(s, sentences, si, ctx, effects) ?? roundB157Sentence(s, sentences, si, ctx, effects) ?? roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);

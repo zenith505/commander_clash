@@ -2655,6 +2655,8 @@ export type StaticCondition =
   /** "If a card left your graveyard this turn" (Gau, Feral Youth). */
   /** Dimir Strandcatcher: "if three or more cards were put into your graveyard from anywhere other than the battlefield this turn" (TurnLog.toGraveyardNotBattlefield). */
   | { kind: "cardsToYourGraveyardNotBattlefield"; n: number }
+  /** Churning Reservoir: "if an oil counter was removed from a permanent you controlled this turn or a permanent with an oil counter on it was put into a graveyard this turn" (TurnLog.oilRemoved, oilPermanentToGraveyard). */
+  | { kind: "oilRemovedOrOilPermanentToGraveyard" }
   /** Laboratory Drudge: "if you've cast a spell from a graveyard or activated an ability of a card in a graveyard this turn" (castThisTurn's `from`, TurnLog.activatedInGraveyard). */
   | { kind: "usedGraveyardThisTurn" }
   | { kind: "cardLeftYourGraveyard"; /** "If three or more cards left your graveyard this turn" (Bonecache Overseer). */ n?: number; /** "If a creature card left your graveyard this turn" (Syrix, Carrier of the Flame). */ creature?: true }
@@ -3659,7 +3661,7 @@ export type Effect =
    */
   /** `epic`: the spell with epic as it resolved, by its stack id in `GameState.epics` (CR 702.50a). */
   /** `self`: the spell that's resolving ("you may copy this spell", Sevinne's Reclamation), as it is on the stack. */
-  | { type: "copySpell"; spell: "cause" | "self" | { target: number; /** "Copy any number of target instant and/or sorcery spells" (Display of Power): the targets from `target` on, `n` of them once cast (expandMany), each copied in turn. */ many?: true; n?: number } | { epic: string }; /** "stormInstantSorcery": the instant and sorcery spells its controller cast before it this turn (Thousand-Year Storm). "otherInstantSorcery": all the others its controller has cast this turn, counted as this resolves (Show of Confidence). "eachOther": see `eachOther`. */ n: Amount | "storm" | "kicked" | "stormInstantSorcery" | "otherInstantSorcery" | "eachOther"; newTargets: boolean;
+  | { type: "copySpell"; spell: "cause" | "self" | /** Psychic Rebuttal: "copy the spell countered this way", as it last was on the stack (ResolvingState.counteredCopy, CR 707.10). */ "countered" | { target: number; /** "Copy any number of target instant and/or sorcery spells" (Display of Power): the targets from `target` on, `n` of them once cast (expandMany), each copied in turn. */ many?: true; n?: number } | { epic: string }; /** "stormInstantSorcery": the instant and sorcery spells its controller cast before it this turn (Thousand-Year Storm). "otherInstantSorcery": all the others its controller has cast this turn, counted as this resolves (Show of Confidence). "eachOther": see `eachOther`. */ n: Amount | "storm" | "kicked" | "stormInstantSorcery" | "otherInstantSorcery" | "eachOther"; newTargets: boolean;
     /**
      * Zada, Ink-Treader Nephilim, Precursor Golem: "copy that spell for each other creature (you control) that the spell
      * could target. Each copy targets a different one of those creatures": one copy for each permanent matching `among`
@@ -4461,6 +4463,8 @@ export type Effect =
       type: "counterSpell";
       index: number;
       unless?: UnlessPays;
+      /** Psychic Rebuttal: note the spell as it was on the stack, if it's countered this way (ResolvingState.counteredCopy), for "copy the spell countered this way" after it. */
+      copyCountered?: true;
       exile?: boolean;
       /** Spell Crumple: "put it on the bottom of its owner's library instead of into that player's graveyard". */
       bottom?: true;

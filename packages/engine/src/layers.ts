@@ -1052,6 +1052,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.turnLog?.permanentToHand ?? []).includes(you);
     case "cardsToYourGraveyardNotBattlefield":
       return (s.turnLog?.toGraveyardNotBattlefield?.[you] ?? 0) >= cond.n;
+    case "oilRemovedOrOilPermanentToGraveyard":
+      return !!s.turnLog?.oilRemoved?.includes(you) || !!s.turnLog?.oilPermanentToGraveyard;
     case "usedGraveyardThisTurn":
       return (s.castThisTurn ?? []).some((c) => c.player === you && c.from === "graveyard") || !!s.turnLog?.activatedInGraveyard?.includes(you);
     case "cardLeftYourGraveyard":

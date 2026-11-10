@@ -285,6 +285,12 @@ let removedBatch: { id: ObjectId; counter: string; n: number }[] | null = null;
  */
 export function countersRemoved(s: GameState, o: GameObject, counter: string, n: number): void {
   if (n <= 0) return;
+  // Churning Reservoir: "if an oil counter was removed from a permanent you controlled this turn": its controller then.
+  if (counter === "oil" && o.zone === "battlefield") {
+    const by = controllerOf(s, o);
+    const list = ((s.turnLog ??= {}).oilRemoved ??= []);
+    if (!list.includes(by)) list.push(by);
+  }
   if (removedBatch) {
     const x = removedBatch.find((r) => r.id === o.id && r.counter === counter);
     if (x) x.n += n;

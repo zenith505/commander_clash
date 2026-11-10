@@ -1260,6 +1260,9 @@ export function moveObject(
     count[o.owner] = (count[o.owner] ?? 0) + 1;
     if (creatureCardLeavesYard && !(s.turnLog!.creatureCardLeftGraveyard ??= []).includes(o.owner)) s.turnLog!.creatureCardLeftGraveyard!.push(o.owner);
   }
+  // Churning Reservoir: "a permanent with an oil counter on it was put into a graveyard this turn": as it last existed on
+  // the battlefield (CR 603.10a), any player's, a token too (CR 111.7).
+  if (to === "graveyard" && fromZone === "battlefield" && (lastCounters.oil ?? 0) > 0) (s.turnLog ??= {}).oilPermanentToGraveyard = true;
   // Dimir Strandcatcher: "if three or more cards were put into your graveyard from anywhere other than the battlefield this
   // turn": its owner's graveyard (CR 404.2), a card, not a token or a copy of a spell (CR 111.1, 707.10a).
   if (to === "graveyard" && fromZone !== "battlefield" && fromZone !== "graveyard" && !o.isToken && !o.spellCopy) {
@@ -10029,8 +10032,10 @@ function chooseTriggerModes(s: GameState, p: Player, modes: number[]) {
  */
 export function copyTargetQuality(s: GameState): SourceQuality | undefined {
   const sc = s.resolving?.scratch?.copies;
-  const orig = sc ? (s.stack.find((x) => x.id === sc.of) ?? s.castItems?.[sc.of] ?? s.epics?.[sc.of]) : undefined;
-  const card = orig?.objectId ? s.objects[orig.objectId] : undefined;
+  // Psychic Rebuttal: the countered spell as it last was on the stack.
+  const countered = sc && s.resolving?.counteredCopy?.item.id === sc.of ? s.resolving.counteredCopy : undefined;
+  const orig = countered?.item ?? (sc ? (s.stack.find((x) => x.id === sc.of) ?? s.castItems?.[sc.of] ?? s.epics?.[sc.of]) : undefined);
+  const card = countered?.card ?? (orig?.objectId ? s.objects[orig.objectId] : undefined);
   return card ? spellQuality(s, cardIdOf(card), orig) : undefined;
 }
 

@@ -5561,6 +5561,13 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Fated Clash: "You may cast this spell as though it had flash if a creature is attacking and a creature is blocking":
+    // anyone's, both true as you'd begin to cast it (CR 601.3), the same with the card in hand.
+    if (line === "You may cast ~ as though it had flash if a creature is attacking and a creature is blocking." && !out.flashIf) {
+      const inCombat = (combat: "attacking" | "blocking"): StaticCondition => ({ kind: "amount", amount: { count: { kind: "permanents", filter: { kind: "object", types: ["Creature"], combat, text: `${combat} creatures` } } }, min: 1 });
+      out.flashIf = { kind: "allOf", conds: [inCombat("attacking"), inCombat("blocking")] };
+      continue;
+    }
     // Timely Ward: "You may cast ~ as though it had flash if it targets a commander": one of its targets, as it's cast, is
     // a commander (CR 903.3); starting to cast it then needs a commander on the battlefield.
     if (line === "You may cast ~ as though it had flash if it targets a commander.") {

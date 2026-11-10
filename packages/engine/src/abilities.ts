@@ -810,7 +810,7 @@ export interface TargetSpec {
    * it resolves (CR 601.2c, 608.2b; rulings on Beguiler of Wills and Earthshaker Khenra), for a group or a search as it
    * resolves (`bindBound`). Until then, any value.
    */
-  bound?: { key: "power" | "toughness" | "manaValue"; at: "most" | "least" | "exact"; amount: AmountExpr };
+  bound?: { key: "power" | "toughness" | "manaValue" | /** Wild Pair: "with the same total power and toughness". */ "totalPT"; at: "most" | "least" | "exact"; amount: AmountExpr };
   /**
    * Chosen or noted as you drafted cards (Conspiracy, CR 905.2b): "a card with a name you noted for cards named ~",
    * "one or more of the colors chosen as you drafted cards named Regicide". No draft comes before a game here, so
@@ -966,6 +966,12 @@ export interface TargetSpec {
    * put on the stack (triggerBodyAsIs makes it `named`). Unfixed, nothing matches.
    */
   sameNameAsCause?: true;
+  /**
+   * "If it has the same name as a permanent" (Mitotic Manipulation, Retraced Image): a card named like a permanent on the
+   * battlefield as it resolves, anyone's (rulings); a face-down permanent has no name (CR 708.2). `bindBound` makes it
+   * `namedAny`; unbound, nothing matches.
+   */
+  sameNameAsPermanent?: true;
   notPlayer?: PlayerId;
   /** "Target player other than ~'s owner" (Crown of Doom): `notPlayer` set to that owner as targets are chosen and checked. */
   notSourceOwner?: true;
@@ -2266,7 +2272,12 @@ export type StaticCondition =
   /** "If it wasn't put onto the battlefield with this ability" (Kodama of the East Tree): the entering permanent (GameObject.putBy). */
   | { kind: "subjectPutBySelf"; not?: true }
   /** Chainer: "if you didn't cast it from your hand", about the entering permanent (GameObject.castFromHand). */
-  | { kind: "subjectCastFromHand"; not?: true }
+  /**
+   * Wild Pair: "Whenever a creature enters, if you cast it from your hand": with `byYou`, only one this ability's controller
+   * cast (GameObject.castBy), still true as it resolves after it left the battlefield (LastKnown.castFromHandBy; rulings:
+   * then its last known power and toughness are used).
+   */
+  | { kind: "subjectCastFromHand"; not?: true; byYou?: true }
   /** Preston, the Vanisher: "if it wasn't cast", about the entering permanent (GameObject.wasCast). */
   | { kind: "subjectWasCast"; not?: true }
   /** Prized Amalgam: "if it entered from your graveyard or you cast it from your graveyard", about the entering permanent (GameObject.enteredFromGraveyard, castFromGraveyard): one you own. */
@@ -3542,6 +3553,13 @@ export type Effect =
    * mana value (a split card's combined, CR 709.4b) enters at once under its owner's control, the rest stay in hand (rulings).
    */
   | { type: "eachChoosesFromHand" }
+  /**
+   * Retraced Image: "Reveal a card in your hand, then put that card onto the battlefield if it has the same name as a
+   * permanent.": any card of the hand, chosen as it resolves (one with none left: nothing happens), put onto the
+   * battlefield only if it's a permanent card (CR 400.4a) named like a permanent on the battlefield then (rulings of
+   * Mitotic Manipulation, CR 201.2); it isn't played or cast.
+   */
+  | { type: "revealPutIfNamedAsPermanent" }
   | { type: "impulse"; n: Amount; /** With `who` eachPlayer, Rocco, Street Chef: "each player may play the card they exiled this way": each card's own owner's permission, ending as this ability's controller's next end step begins with until "yourNextEndStep". */ ownersPlay?: true; /** With `who` eachPlayer, Triple Triad: "you may play the card you own exiled this way and each other card exiled this way with lesser mana value than it": only those, none if you exiled none (CR 202.3e: X is 0). */ ownAndLesser?: true; until: "thisTurn" | "nextTurn" | /** "Until your next turn" (Nivix, Aerie of the Firemind): over as that turn begins. */ "yourNextTurn" | "exiled" | "yourNextEndStep" | /** "Until the beginning of your next upkeep" (Elkin Bottle). */ "yourNextUpkeep" | /** "During your next turn" (Galvanic Relay). */ "duringNextTurn" | /** "For as long as you control ~" (Lightning, Security Sergeant). */ "whileControlled" | /** "Until end of combat on your next turn" (Brazen Cannonade). */ "yourNextCombat"; who?: PlayerRef; /** Elder Brain: "exile all cards from that player's hand, then they draw that many cards" (`n` unused). */ hand?: true; /** Elkin Lair: "that player exiles a card at random from their hand. The player may play that card this turn." (`n` unused): the `who` player's own card, their permission. */ randomFromHand?: true; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** With `free`: "You may cast Equipment spells this way without paying their mana costs" (Nahiri, Forged in Fury): only cards like this are free. */ freeFor?: TargetSpec; /** "During any turn you attacked with a token" (Neyali): only then. */ attackedWithToken?: true; /** "During any turn you attacked with a commander" (Neriv, Crackling Vanguard): only then. */ attackedWithCommander?: true; /** "During any turn you attacked with a Rogue" (Robber of the Rich): only in a turn its player declared a creature of this type as an attacker. */ attackedWithType?: string; /** "During any turn you attacked with ~" (Goblin Researcher): only in a turn its player declared this ability's source, as the object it is, as an attacker (GameObject.mayPlay.attackedWithSource). */ attackedWithSource?: true; /** "During any turn you attacked with three or more creatures" (Boros Strike-Captain): only in a turn its player declared at least this many creatures as attackers. */ attackedWithAtLeast?: number; /** With `graveyards` and `choose` (Author of Shadows): "Choose a nonland card exiled this way": one card like this among all those exiled, chosen as it resolves; only it gets the permission. */ chooseAmong?: TargetSpec; /** "During any turn you put a lore counter on ~" (Summon: Brynhildr): only in a turn its player put a lore counter on the source, as the object it is (GameObject.mayPlay.loreOn). */ loreOnSource?: true; /** "You may play it if you control a Kavu" (Possibility Technician): only while that player controls a permanent like this (GameObject.mayPlay.ifControl). */ ifControl?: TargetSpec; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** With `oneOf`: "You may play up to two of those cards" (March of Reckless Joy): this many of them. */ oneOfMax?: number; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true; /** With `graveyards`: "all creature cards from target player's graveyard" (Shadow of the Enemy): only these. */ graveyardFilter?: TargetSpec; /** "You may cast instant and sorcery spells from among them" (Ral, Leyline Prodigy): only cards like this get the permission. */ castFilter?: TargetSpec; /** "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): only spells like this, the face cast counting (GameObject.mayPlay.castFilter); with `oneOf`, one of them. */ spellFilter?: TargetSpec; /** "You may play it until you exile another card with ~" (Unstable Amulet, Furious Rise): until the source's next such exile (GameObject.mayPlay.untilAnother). */ untilAnother?: true; /** Casey & Raph: "Target player exiles the top card of their library. Until that player's next end step, they may play that card": the `who` player has the permission, not you. */ theyPlay?: true; /** Curse of Hospitality: "that creature's controller may play that card": this player has the permission, not you. */ player?: PlayerRef; /** Dream Harvest: "Each opponent exiles cards from the top of their library until they have exiled cards with total mana value 5 or greater this way": with an each-player `who`, down to the card that brings that library's total there (X as 0, CR 202.3e), all of it if it never does; `n` unused. */ untilTotalMv?: number }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */

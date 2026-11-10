@@ -162,7 +162,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.counter && !(spec.counter === ANY_COUNTER ? Object.values(o.counters).some((n) => (n ?? 0) > 0) : (o.counters[spec.counter] ?? 0))) return false;
   if (spec.counterMin && (o.counters[spec.counter!] ?? 0) < spec.counterMin) return false;
   // "With the chosen name": its name now (a copy's is what it copies); a face-down one has none (CR 201.2a, 708.2a).
-  if (spec.sameNameAsCause || spec.namedAsSource || (spec.named !== undefined && (o.faceDown || !hasName(c.name, spec.named)))) return false;
+  if (spec.sameNameAsCause || spec.sameNameAsPermanent || spec.namedAsSource || (spec.named !== undefined && (o.faceDown || !hasName(c.name, spec.named)))) return false;
   if (spec.notNamed !== undefined && !o.faceDown && hasName(c.name, spec.notNamed)) return false;
   if (spec.uniqueNameAmongYours && !o.faceDown && s.battlefield.some((id) => id !== o.id && !s.objects[id]!.faceDown && (spec.uniqueNameAmongYours !== "tokens" || !!s.objects[id]!.isToken) && controllerOf(s, s.objects[id]!) === controller && sameName((view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!)).name, c.name))) return false;
   const hasKw = (k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
@@ -560,7 +560,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.notNamed !== undefined && hasName(d.name, spec.notNamed)) return false;
   if (spec.notNamedAny?.some((n) => sameName(d.name, n))) return false;
   if (spec.namedAny && !spec.namedAny.some((n) => sameName(d.name, n))) return false;
-  if (spec.notNamedAsYours || spec.namedAsSource || spec.sameNameAsCause) return false; // not worked out yet
+  if (spec.notNamedAsYours || spec.namedAsSource || spec.sameNameAsCause || spec.sameNameAsPermanent) return false; // not worked out yet (sameNameAsPermanent: bindBound)
   if (spec.sharesTypeWithAttached || spec.sharesTypeWithSubjectCreature || spec.sharesTypeWithSelf || spec.notKinOfYourCreatures) return false; // bound where it's used (dig)
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
@@ -855,7 +855,10 @@ export function bindBound(s: GameState, spec0: TargetSpec, ctx: AmountCtx): Targ
   // Groffskithur: "target card named ~": the source's name now, or as it last existed on the battlefield (CR 201.2, 608.2h).
   const me = spec4.namedAsSource && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
   const myName = me ? (me.zone === "battlefield" ? (me.faceDown ? undefined : characteristics(s, me).name) : (s.lastKnown?.[me.id]?.source?.name ?? (ctx.lki?.copyKey ? s.cards[ctx.lki.copyKey]?.name : undefined) ?? defOf(s, me).name)) : undefined;
-  const spec: TargetSpec = spec4.namedAsSource && myName !== undefined ? (({ namedAsSource: _, ...r }) => ({ ...r, named: myName }))(spec4) : spec4;
+  const spec5: TargetSpec = spec4.namedAsSource && myName !== undefined ? (({ namedAsSource: _, ...r }) => ({ ...r, named: myName }))(spec4) : spec4;
+  // Mitotic Manipulation: "if it has the same name as a permanent": the names of the permanents on the battlefield now,
+  // anyone's (rulings); a face-down one has none (CR 708.2). With none, nothing matches.
+  const spec: TargetSpec = spec5.sameNameAsPermanent ? (({ sameNameAsPermanent: _, ...r }) => ({ ...r, namedAny: [...new Set(s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown).map((o) => characteristics(s, o).name))].filter((n) => !r.namedAny || r.namedAny.some((m) => sameName(m, n))) }))(spec5) : spec5;
   if (!spec.bound) return spec;
   const { bound, ...rest } = spec;
   // Power and toughness may be below 0 (CR 107.1b): "power greater than target creature's power" with that at -2 takes a 0.
@@ -872,6 +875,11 @@ export function bindBound(s: GameState, spec0: TargetSpec, ctx: AmountCtx): Targ
  * or less", not "... less than or equal to that Aura"), for prompts.
  */
 export function sayBound(s: GameState, text: string, spec: TargetSpec | undefined, ctx: AmountCtx): string {
+  // Wild Pair: "with the same total power and toughness": the number it is now.
+  if (spec?.bound?.key === "totalPT" && spec.bound.at === "exact") {
+    const n = bindBound(s, spec, ctx).totalPT?.min;
+    return n === undefined ? text : text.replace(/ with the same total power and toughness$/, ` with total power and toughness ${n}`);
+  }
   if (spec?.bound?.key !== "manaValue" || spec.bound.at !== "most") return text;
   const most = bindBound(s, spec, ctx).manaValue?.max;
   return most === undefined || most < 0 ? text : text.replace(/ with mana value less than (?:or equal to )?(?:that|its|the|this|~'s) [^,]+?(?= and |,|$)/, ` with mana value ${most} or less`);

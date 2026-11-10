@@ -1,18 +1,22 @@
-// Round 326's sentences, triggers and whole texts, read before round 325's (round325Sentence and round325Trigger in
+// Round 326's sentences, triggers and whole texts (after round 327's, oracle/round327.ts), read before round 325's (round325Sentence and round325Trigger in
 // oracle/round325.ts; round325WholeText in oracle/round325.ts).
 import type { AbilityBody, Effect, TriggeredAbility } from "../abilities";
 import type { Ctx } from "./body";
 import { parseCostChange } from "./statics";
 import { parseTrigger } from "./triggers";
+import { round327Sentence, round327Trigger, round327WholeText } from "./round327";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 export function round326Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void s, sentences, si, ctx, effects;
-  return null;
+  // Round 327's sentences first (oracle/round327.ts).
+  return round327Sentence(s, sentences, si, ctx, effects);
 }
 
 export function round326Trigger(raw: string): TriggeredAbility | "fail" | null {
+  // Round 327's triggers first (oracle/round327.ts).
+  const r327 = round327Trigger(raw);
+  if (r327 !== null) return r327;
   // Academy Loremaster: "At the beginning of each player's draw step, that player may draw an additional card. If they do,
   // spells they cast this turn cost {2} more to cast.": that player's choice, and only if they drew a card; then every
   // spell they cast this turn, alternative costs and spells cast without paying their mana costs too, costs {2} more
@@ -34,7 +38,9 @@ export function round326Trigger(raw: string): TriggeredAbility | "fail" | null {
 
 /** A whole ability's text read another way (a string), or null. */
 export function round326WholeText(text: string, parse: (t: string) => AbilityBody | null): AbilityBody | string | null {
-  void parse;
+  // Round 327's whole texts first (oracle/round327.ts).
+  const r327 = round327WholeText(text, parse);
+  if (r327 !== null) return r327;
   // Grim Return: "Choose target creature card in a graveyard that was put there from the battlefield this turn. Put that
   // card onto the battlefield under your control.": any graveyard's, put there from the battlefield this turn (not a
   // discarded card or a countered creature spell, rulings).

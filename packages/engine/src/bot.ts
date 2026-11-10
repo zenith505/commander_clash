@@ -282,6 +282,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.blockTax) return [{ type: "chooseMay", player: pid, yes: false }];
     // Pardic Dragon: "that player may put a time counter on ~": an opponent's suspended card, kept from being cast longer.
     const theirMay = pend.kind === "chooseMay" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    // Disorienting Choice: our permanent exiled, or a land for its caster: only a token goes (a Treasure, a Clue).
+    if (pend.kind === "chooseMay" && theirMay?.type === "controllersMayExile") {
+      const asked = s.resolving!.scratch?.mayExile?.queue[0];
+      const o = asked ? s.objects[asked.id] : undefined;
+      return [{ type: "chooseMay", player: pid, yes: !!o?.isToken }];
+    }
     // Covenant of Minds: the three cards seen rather than five unseen, unless five more draws would empty that library.
     if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && s.resolving!.item.controller !== pid && theirMay.effects.length === 1 && theirMay.effects[0]!.type === "revealedTo") {
       const lib = player(s, s.resolving!.item.controller).library.length - (s.resolving!.revealedUntil?.length ?? 0);
@@ -1955,7 +1961,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Use activated abilities once we're done casting spells, then cycle what we can't use.
     if (s.step === "main2") {
-      const act = chooseStation(s, pid) ?? chooseActivation(s, pid) ?? chooseCycling(s, pid);
+      const act = chooseStation(s, pid) ?? chooseActivation(s, pid) ?? chooseEmblemActivation(s, pid) ?? chooseCycling(s, pid);
       if (act) return cubeInstead(s, pid, act) ?? act;
       // Then a spell that ends the turn (Ultima, Day's Undoing): the last thing we do this turn.
       const end = endTurnCast(s, pid);
@@ -2265,6 +2271,8 @@ function joinForcesAmount(s: GameState, pid: PlayerId, max: number): number {
     if (e.type === "draw" || (e.type === "mill" && mine)) room = Math.min(room, me.library.length - 1 - paid);
     else if (e.type === "mill") room = 0;
     else if (e.type === "search") room = Math.min(room, me.library.filter((id) => (e.filter ? printedMatches(e.filter, defOf(s, obj(s, id))) : true)).length - paid);
+    // Karn, Living Legacy: "Look at that many cards ...": half the mana we have, rounded up, to keep some for the card.
+    else if (e.type === "dig" && mine) room = Math.min(room, me.library.length, Math.ceil(max / 2));
   }
   const instants = mine ? [] : me.hand.map((id) => defOf(s, obj(s, id))).filter((d) => isType(d, "Instant") || d.keywords.includes("Flash"));
   const keep = Math.max(0, ...instants.map((d) => manaValue(parseManaCost(d.manaCost))));
@@ -7468,6 +7476,50 @@ function chooseForecast(s: GameState, pid: PlayerId): Action[] | null {
       const costs = abilityCosts(s, pid, obj(s, id), ab, targets ?? []);
       if (costs === null) continue;
       const plan = planActivate(s, pid, id, i, targets ?? undefined, undefined, undefined, undefined, costs);
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
+ * An emblem's activated ability (CR 114.4), after our spells in our second main phase: Karn, Living Legacy's "Tap an
+ * untapped artifact you control: This emblem deals 1 damage to any target." with an artifact that has no other use left
+ * this turn (no ability but mana), at the target chooseTargets picks; Ob Nixilis of the Black Oath's "{1}{B}, Sacrifice a
+ * creature: You gain X life and draw X cards, where X is the sacrificed creature's power." with a creature token of power
+ * 2 or more, never drawing our library down to two cards.
+ */
+function chooseEmblemActivation(s: GameState, pid: PlayerId): Action[] | null {
+  for (const id of s.emblems ?? []) {
+    const o = obj(s, id);
+    if (o.owner !== pid || o.zone !== "command") continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      if (ab.zone !== "command" || ab.body.modal || (o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= BOT_LOOP_LIMIT) continue;
+      const costs = ab.costs ?? [];
+      const tap = costs.find((c) => c.kind === "tap");
+      const sac = costs.find((c) => c.kind === "sacrifice");
+      if (costs.length !== 1 || (!tap && !sac)) continue;
+      let choice: CostChoices | undefined;
+      if (tap?.kind === "tap") {
+        const idle = tapCostCandidates(s, pid, o, tap).filter((x) => abilitiesOf(s, obj(s, x)).activated.every((a) => a.mana) && !(objIsType(s, obj(s, x), "Creature") && s.step !== "main2"));
+        if (!idle.length) continue;
+        choice = { tap: [idle.sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0]!] };
+      } else if (sac?.kind === "sacrifice") {
+        const p = player(s, pid);
+        const fodder = s.battlefield
+          .map((x) => obj(s, x))
+          .filter((x) => x.isToken && controllerOf(s, x) === pid && objIsType(s, x, "Creature") && objectMatches(s, sac.filter, x, pid, false) && power(s, x) >= 2 && power(s, x) <= p.library.length - 2 && canSacrificeForCost(s, x))
+          .sort((a, b) => power(s, b) - power(s, a));
+        if (!fodder.length) continue;
+        choice = { sacrifice: [fodder[0]!.id] };
+      }
+      const targets = ab.body.targets.length ? chooseTargets(s, pid, ab.body, false, id) : [];
+      if (!targets || !choice) continue;
+      // "Any target": damage only for something that hurts an opponent (a creature it kills, or a player).
+      if (ab.body.targets.length && targets.some((t) => (t.kind === "player" && (t.id === pid || !opponents(s, pid).includes(t.id))) || (t.kind === "object" && s.objects[t.id] && controllerOf(s, obj(s, t.id)) === pid))) continue;
+      const plan = planActivate(s, pid, id, i, targets.length ? targets : undefined, undefined, undefined, undefined, choice);
       if (plan) return plan;
     }
   }

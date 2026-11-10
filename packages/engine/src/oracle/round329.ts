@@ -1,13 +1,17 @@
-// Round 329's sentences, triggers and whole texts, read before round 328's (round328Sentence, round328Trigger and
-// round328WholeText in oracle/round328.ts).
+// Round 329's sentences, triggers and whole texts (after round 330's, oracle/round330.ts), read before round 328's
+// (round328Sentence, round328Trigger and round328WholeText in oracle/round328.ts).
 import type { AbilityBody, Effect, TriggeredAbility } from "../abilities";
 import { parseOne, type Ctx } from "./body";
 import { parseBoundCount } from "./counts";
 import { parseSearchFilter } from "./search";
+import { round330Sentence, round330Trigger, round330WholeText } from "./round330";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 export function round329Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 330's sentences first (oracle/round330.ts).
+  const r330 = round330Sentence(s, sentences, si, ctx, effects);
+  if (r330 !== null) return r330;
   // Stunning Reversal: "The next time you would lose the game this turn, instead draw seven cards and your life total
   // becomes 1.": a one-shot replacement for the turn (CR 614.1a), for any way of losing but conceding (rulings).
   if (ctx.spell && /^The next time you would lose the game this turn, instead draw seven cards and your life total becomes 1\.?$/.test(s)) return { effect: { type: "loseInsteadThisTurn" }, next: si + 1 };
@@ -58,12 +62,16 @@ export function round329Sentence(s: string, sentences: string[], si: number, ctx
 }
 
 export function round329Trigger(raw: string): TriggeredAbility | "fail" | null {
-  void raw;
-  return null;
+  // Round 330's triggers first (oracle/round330.ts).
+  return round330Trigger(raw);
 }
 
 /** A whole ability's text read another way (a string), or null. */
 export function round329WholeText(text: string, parse: (t: string) => AbilityBody | null): AbilityBody | string | null {
+  // Round 330's whole texts first (oracle/round330.ts).
+  const r330 = round330WholeText(text, parse);
+  if (r330 && typeof r330 !== "string") return r330;
+  if (typeof r330 === "string") text = r330;
   const t = text.trim();
   // Fighting Chance: "For each blocking creature, flip a coin. If you win the flip, prevent all combat damage that would be
   // dealt by that creature this turn.": the creatures blocking as it resolves, each with a flip of its own, won or lost

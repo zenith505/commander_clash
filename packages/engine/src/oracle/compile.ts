@@ -59,6 +59,8 @@ export function compileCard(card: CardDef): CompiledCard {
   if (hit) return hit;
   const doors = d.roomDoors ? roomDoorDefs(d) : undefined;
   const out = doors ? roomAbilities(doors) : compile(d);
+  // An emblem's activated abilities work in the command zone, where it is (CR 114.4): its owner activates them there.
+  if (d.typeLine === "Emblem") out.activated = out.activated.map((ab) => ({ ...ab, zone: "command" as const }));
   // A meld card's ability melds it with its counterpart into their combined back face (CR 701.42a): only if what that
   // puts onto the battlefield is supported.
   if (d.meld && !isMeldResult(d) && /\bmeld them into\b/.test(d.oracleText) && !meldResultSupported(d.meld.result)) out.unsupported.push(`(${d.meld.result}, the permanent it melds into)`);
@@ -4054,6 +4056,13 @@ export function compile(d: CardDef): CompiledCard {
       const kws = [linkedKw[1]!, ...linkedKw[2]!.split(", ").filter(Boolean), linkedKw[3]!].map((k) => (k === "landwalk" ? "Landwalk" : k === "protection" ? "Protection" : canonicalKeyword(k)));
       if (kws.some((k) => !k || !/^[A-Z][a-z]+(?: [a-z]+)?$/.test(k))) out.unsupported.push(raw);
       else out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "addKeywords", keywords: kws.map((k) => `${LINKED_CARD_KEYWORD}${k}`) }], text: line });
+      continue;
+    }
+    // Professor Hojo: "The first activated ability you activate during your turn that targets a creature you control
+    // costs {2} less to activate." (game.ts activationCost).
+    const hojo = /^The first activated ability you activate during your turn that targets a creature you control costs \{(\d+)\} less to activate\.$/.exec(line);
+    if (hojo) {
+      out.firstOwnCreatureTargetLess = (out.firstOwnCreatureTargetLess ?? 0) + Number(hojo[1]);
       continue;
     }
     const firstArtifactLess = /^The first activated ability of an artifact you activate each turn costs \{(\d+)\} less to activate\.$/.exec(line);

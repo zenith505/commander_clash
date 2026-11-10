@@ -38,6 +38,7 @@ import { runLaneB170Effect } from "./run-laneb170";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
+import { runRound330Effect } from "./run-round330";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
 import { ringBearer } from "./run-ring";
@@ -286,6 +287,8 @@ function manaAbilityResolved(s: GameState, item: StackItem, made: ManaType[]): v
   const o = item.sourceId ? s.objects[item.sourceId] : undefined;
   if (!o) return;
   if (m.tapped && o.zone === "battlefield") fireEvent(s, { type: "tappedForMana", id: o.id, player: item.controller });
+  // Tyvar the Bellicose: "Whenever a mana ability of this creature resolves", while it's still that permanent.
+  if (o.zone === "battlefield" && (o.zoneChanges ?? 0) === (item.sourceZc ?? o.zoneChanges ?? 0)) fireEvent(s, { type: "manaAbilityResolved", id: o.id, amount: made.length });
   const results = manaTriggerResults(s, item.controller, o, { tap: !!m.tapped } as ManaAbility, made);
   const extra = m.extra ?? [];
   const picked = results.length === 1 ? results[0]! : results.find((r) => r.extra.length === extra.length && r.extra.every((x, i) => x === extra[i]));
@@ -1751,6 +1754,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "loseInsteadThisTurn":
     case "flipCoinEachWon":
       return runRound329Effect(s, e, ctx, src);
+    case "controllersMayExile":
+      return runRound330Effect(s, e, ctx, src);
     case "flipCoin":
       return runCoinEffect(s, e, ctx, src);
     case "flipCoinEach":

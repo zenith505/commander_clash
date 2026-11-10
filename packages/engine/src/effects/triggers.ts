@@ -328,6 +328,8 @@ export type TriggerSourceEvent =
   | { type: "draw"; player: PlayerId; nth: number; /** The first card they draw in their draw step. */ firstInDrawStep?: true; /** The card drawn, in their hand. */ card?: ObjectId }
   /** A player tapped this permanent for mana: activated its mana ability with {T} in the cost (CR 106.12). */
   | { type: "tappedForMana"; id: ObjectId; player: PlayerId }
+  /** One of this permanent's mana abilities resolved (CR 605.3b), making this much mana (Tyvar the Bellicose). */
+  | { type: "manaAbilityResolved"; id: ObjectId; amount: number }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
   | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Its activation cost has the tap symbol {T} (Haunting Wind). */ tapSymbol?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true; /** A boast ability (CR 702.142a). */ boast?: true; /** An embalm or eternalize ability (CR 702.128a, 702.129a). */ embalm?: true; /** An exhaust ability (CR 702.177a), a mana ability too. */ exhaust?: true; /** A power-up ability (CR 702.193a). */ powerUp?: true; /** An outlast ability (CR 702.107a). */ outlast?: true; /** An ability of a card in its activator's own graveyard (Neerdiv, Devious Diver). */ fromOwnGraveyard?: true; /** A loyalty ability (CR 606.3): how many loyalty counters its cost removed (0 for a + one, CR 606.4). */ loyalty?: { removed: number } }
   /**
@@ -1395,6 +1397,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const ctrl = controllerOf(s, w);
       add(w, ctrl, (e, t) => e === "permanentBecomesUntapped" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
     }
+  } else if (ev.type === "manaAbilityResolved") {
+    // "Whenever a mana ability of ~ resolves": ~ on the battlefield as it does (an ability whose cost sacrificed it can't).
+    const o = s.objects[ev.id];
+    if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfManaAbilityResolves", undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount });
   } else if (ev.type === "tappedForMana") {
     // "Whenever you tap ~ for mana", "whenever an opponent taps a Mountain for mana" (the land is the subject, "that
     // land"; "that player" is who tapped it).
@@ -2401,6 +2407,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (!w) return true;
         if (w.spell && item!.kind !== "spell") return false;
         if (w.ability && item!.kind !== "ability") return false;
+        if (w.activatedOnly && (item!.kind !== "ability" || !!item!.triggered)) return false;
         if (w.spellTypes && !(item!.objectId && s.objects[item!.objectId] && w.spellTypes.some((t) => objIsType(s, s.objects[item!.objectId!]!, t)))) return false;
         if (w.spellSubtypes && !(item!.kind === "spell" && item!.objectId && s.objects[item!.objectId] && w.spellSubtypes.some((t) => characteristics(s, s.objects[item!.objectId!]!).subtypes.includes(t)))) return false;
         // Skophos Maze-Warden: an ability whose source is a land you control named Labyrinth of Skophos.

@@ -8535,6 +8535,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7aa34ef4-5e11-491b-8dbe-6ef80e0ad26c",
+  "name": "Disorienting Choice",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "For each opponent, choose up to one target artifact or enchantment that player controls. For each permanent chosen this way, its controller may exile it. Then if one or more of the chosen permanents are still on the battlefield, you search your library for up to that many land cards, put them onto the battlefield tapped, then shuffle.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dsc",
+  "releasedAt": "2024-09-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "99140891-face-4015-aacd-1309e87d8f9f",
   "name": "Display of Power",
   "manaCost": "{1}{R}{R}",
@@ -16925,6 +16951,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "09ab1278-811f-4b97-bd34-7493d6e081e9",
+  "name": "Karn, Living Legacy",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Karn",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Karn"
+  ],
+  "oracleText": "+1: Create a tapped Powerstone token. (It's an artifact with \"{T}: Add {C}. This mana can't be spent to cast a nonartifact spell.\")\n−1: Pay any amount of mana. Look at that many cards from the top of your library, then put one of those cards into your hand and the rest on the bottom of your library in a random order.\n−7: You get an emblem with \"Tap an untapped artifact you control: This emblem deals 1 damage to any target.\"",
+  "loyalty": "4",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "dmu",
+  "releasedAt": "2022-09-09",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a20dd48d-d344-4db1-b0e9-a2b71c3cc9d1",
   "name": "Karn, the Great Creator",
   "manaCost": "{4}",
@@ -22088,6 +22144,37 @@
   "set": "exo",
   "releasedAt": "1998-06-15",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cfc9a2f9-92fa-4608-b98d-f9763c89fc40",
+  "name": "Ob Nixilis of the Black Oath",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Planeswalker — Nixilis",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Nixilis"
+  ],
+  "oracleText": "+2: Each opponent loses 1 life. You gain life equal to the life lost this way.\n−2: Create a 5/5 black Demon creature token with flying. You lose 2 life.\n−8: You get an emblem with \"{1}{B}, Sacrifice a creature: You gain X life and draw X cards, where X is the sacrificed creature's power.\"\nOb Nixilis of the Black Oath can be your commander.",
+  "loyalty": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c14",
+  "releasedAt": "2014-11-07",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

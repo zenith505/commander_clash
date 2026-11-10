@@ -2172,8 +2172,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const you = player(s, ctx.controller).name;
       for (const pid of players(s, e.who, ctx)) {
         if (pid === ctx.controller) continue;
-        (player(s, pid).attackBansThisTurn ??= []).push({ player: ctx.controller, turn: s.turn, ...(e.subtype ? { subtype: e.subtype } : {}), ...(e.combat ? { combat: s.combatsThisTurn ?? 0 } : {}) });
-        log(s, `Creatures ${player(s, pid).name} controls can't attack ${e.subtype ? `${e.subtype}s ${you} controls` : you} this ${e.combat ? "combat" : "turn"}.`);
+        (player(s, pid).attackBansThisTurn ??= []).push({ player: ctx.controller, turn: s.turn, ...(e.subtype ? { subtype: e.subtype } : {}), ...(e.combat ? { combat: s.combatsThisTurn ?? 0 } : {}), ...(e.walkers ? { walkers: true as const } : {}) });
+        log(s, `Creatures ${player(s, pid).name} controls can't attack ${e.subtype ? `${e.subtype}s ${you} controls` : e.walkers ? `${you} or planeswalkers ${you} controls` : you} this ${e.combat ? "combat" : "turn"}.`);
       }
       return;
     }

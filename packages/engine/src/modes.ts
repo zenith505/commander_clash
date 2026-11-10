@@ -237,7 +237,7 @@ export function expandPerOpponent(body: AbilityBody, opponents: PlayerId[], able
     ...(t.differentManaValueFrom ? { differentManaValueFrom: t.differentManaValueFrom.map(shift) } : {}),
     ...(t.divided ? { divided: { ...t.divided, first: shift(t.divided.first) } } : {}),
   });
-  const { perOpponent: _p, perPlayer: _e, controller: _c, perOpponentRequired: required, perPlayerAll: all, ...spec } = body.targets[i]!;
+  const { perOpponent: _p, perPlayer: _e, controller: _c, perOpponentRequired: required, perPlayerAll: all, perOpponentPoison: _poison, ...spec } = body.targets[i]!;
   // Not "up to one" (Blatant Thievery, Sylvan Primordial): one must be chosen for each opponent who has one (rulings),
   // none for an opponent who doesn't.
   // Vaevictis Asmadi, the Dire (perPlayerAll): every player's, so none for one leaves no legal choice (rulings).

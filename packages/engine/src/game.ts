@@ -10762,6 +10762,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "eitherToken") {
+    // Exotic Pets: the token that gets the counter of this kind.
+    const st = r.scratch?.pets;
+    if (!st || !pend.counterKind || !pend.options.includes(choice)) throw new RulesError("choose one of the tokens");
+    st.picks[pend.counterKind] = choice;
+    log(s, `${p.name} chooses ${pend.labels?.[pend.options.indexOf(choice)] ?? "a token"} for a ${pend.counterKind} counter (${pend.source}).`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "addOrRemoveCounter") {
     const st = r.scratch?.addOrRemove;
     if (!st || !pend.counterKind || !pend.options.includes(choice)) throw new RulesError("put another counter of that kind on it or remove one");

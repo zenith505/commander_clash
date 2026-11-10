@@ -764,7 +764,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (chosenF?.chosen) return;
         const filter = chosenF && bindBound(s, chosenF, amountCtx(s, ctx));
         // Never Happened: the graveyard's cards too, after the hand's.
-        const pool = e.reveal !== undefined ? sc.handRevealed!.filter((id) => p.hand.includes(id)) : e.orGraveyard ? [...p.hand, ...p.graveyard] : p.hand;
+        // Psychotic Episode: the top card of the library too, revealed with the hand (CR 701.20a).
+        const top = e.orLibraryTop ? p.library[0] : undefined;
+        if (top !== undefined) log(s, `${p.name} reveals ${defOf(s, obj(s, top)).name} from the top of their library.`);
+        const pool = e.reveal !== undefined ? sc.handRevealed!.filter((id) => p.hand.includes(id)) : e.orGraveyard ? [...p.hand, ...p.graveyard] : top !== undefined ? [...p.hand, top] : p.hand;
         const cards = pool.filter((id) => !filter || (e.anyFromYard && obj(s, id).zone === "graveyard") || printedMatches(filter, defOf(s, obj(s, id))));
         s.resolving!.tookFromHand = 0;
         s.resolving!.exiledFromHandCards = [];
@@ -776,10 +779,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const to = e.action === "name" ? "whose name is chosen: all cards with that name are exiled" : e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : e.action === "shuffleIn" ? `for ${p.name} to shuffle into their library` : e.action === "libraryTop" ? `to put on top of ${p.name}'s library` : e.action === "libraryBottom" ? `for ${p.name} to reveal and put on the bottom of their library` : "to exile";
         const by = e.by ? players(s, e.by, ctx)[0] : ctx.controller;
         if (by === undefined) return;
-        s.pending = { kind: "searchLibrary", player: by, source: src, what, cards, min: e.optional || e.upTo ? 0 : Math.min(n, cards.length), max: Math.min(n, cards.length), dig: { looked: [...pool], to, rest: `stay in ${p.name}'s hand${e.orGraveyard ? " and graveyard" : ""}` }, hand: pid, ...(e.orGraveyard ? { handYard: true as const } : {}) };
+        s.pending = { kind: "searchLibrary", player: by, source: src, what, cards, min: e.optional || e.upTo ? 0 : Math.min(n, cards.length), max: Math.min(n, cards.length), dig: { looked: [...pool], to, rest: e.orLibraryTop ? "stay where they are" : `stay in ${p.name}'s hand${e.orGraveyard ? " and graveyard" : ""}` }, hand: pid, ...(e.orGraveyard ? { handYard: true as const } : {}) };
         return "paused";
       }
-      const ids = sc.found.filter((id) => (obj(s, id).zone === "hand" || (e.orGraveyard && obj(s, id).zone === "graveyard")) && obj(s, id).owner === pid);
+      const ids = sc.found.filter((id) => (obj(s, id).zone === "hand" || (e.orGraveyard && obj(s, id).zone === "graveyard") || (e.orLibraryTop && p.library[0] === id)) && obj(s, id).owner === pid);
       s.resolving!.tookFromHand = ids.length;
       if (e.action === "name") {
         // Lobotomy: "you choose a card other than a basic land card from it. Search ... for all cards with the same name as
@@ -810,8 +813,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
       else if (e.action === "libraryBottom")
         for (const id of ids) {
-          log(s, `${p.name} reveals ${defOf(s, obj(s, id)).name} and puts it on the bottom of their library.`);
-          moveObject(s, id, "library");
+          log(s, `${p.name} ${e.orLibraryTop ? "puts" : "reveals"} ${defOf(s, obj(s, id)).name} ${e.orLibraryTop ? "" : "and puts it "}on the bottom of their library.`);
+          // Psychotic Episode's top card: from the top to the bottom, in the same zone (no new object, CR 400.7).
+          if (obj(s, id).zone === "library") p.library = [...p.library.filter((x) => x !== id), id];
+          else moveObject(s, id, "library");
         }
       else if (e.action === "libraryThird")
         for (const id of ids) {

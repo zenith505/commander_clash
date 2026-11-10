@@ -19597,7 +19597,7 @@ function parseAndYouMay(s: string, ctx: Ctx): Effect[] | null {
  * The body of a reflexive trigger, "When you do, [text]" (CR 603.12): its own targets, chosen as it's put on the stack,
  * and the same meaning of ~, "it" and the trigger's subject as the ability that creates it.
  */
-function reflexiveBody(text: string, ctx: Ctx, sacrificed = false, about = false, ownX = false): AbilityBody | null {
+export function reflexiveBody(text: string, ctx: Ctx, sacrificed = false, about = false, ownX = false): AbilityBody | null {
   // After "you may sacrifice another creature", "that creature" is only ever its power or toughness (Heart-Piercer
   // Manticore, Ziatora): the sacrificed creature as it last existed (CR 608.2h; rulings).
   const sac = sacrificed && /\b(?:that|the sacrificed) creature's (?:power|toughness)\b/.test(text);

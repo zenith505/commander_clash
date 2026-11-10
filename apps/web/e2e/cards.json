@@ -10391,6 +10391,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "497cb281-e057-42fc-937d-512855b74159",
+  "name": "Exotic Pets",
+  "manaCost": "{1}{W}{U}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Create two 1/1 blue Fish creature tokens with \"This token can't be blocked.\" Then for each kind of counter among creatures you control, put a counter of that kind on either of those tokens.",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "744b7e93-c893-4770-a3bb-6a45b7f8e4f7",
   "name": "Expel the Interlopers",
   "manaCost": "{3}{W}{W}",
@@ -24450,6 +24478,34 @@
   "set": "pcy",
   "releasedAt": "2000-06-05",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0ac7bacd-944d-44f4-927b-28e8c0a4371d",
+  "name": "Psychotic Episode",
+  "manaCost": "{1}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target player reveals their hand and the top card of their library. You choose a card revealed this way. That player puts the chosen card on the bottom of their library.\nMadness {1}{B} (If you discard this card, discard it into exile. When you do, cast it for its madness cost or put it into your graveyard.)",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Madness"
+  ],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

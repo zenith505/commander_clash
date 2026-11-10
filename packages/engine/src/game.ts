@@ -412,6 +412,9 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "distribute":
       distributeChosen(s, p, action.parts);
       break;
+    case "divideDamage":
+      divideDamageChosen(s, p, action.parts);
+      break;
     case "manaMix":
       manaMixChosen(s, p, action.counts);
       break;
@@ -3301,6 +3304,8 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   // Obstinate Familiar, Pursuit of Knowledge: optional, one of each name.
   const skippers: ObjectId[] = [];
   for (const id of mine((a) => a.drawMaySkip || a.drawMayCounter)) if (!skippers.some((d) => nameOf(s, d) === nameOf(s, id))) skippers.push(id);
+  // Island Sanctuary: only during that player's own draw step; one of each name.
+  if (s.step === "draw" && s.activePlayer === pid) for (const id of mine((a) => a.drawStepMaySkip)) if (!skippers.some((d) => nameOf(s, d) === nameOf(s, id))) skippers.push(id);
   if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length) return undefined;
   const out = [...shields];
   for (const id of sages) out.push({ key: `sages:${id}`, label: `Reveal the top ${abilitiesOf(s, obj(s, id)).drawRevealCreatures} cards instead, the creature cards into your hand, the rest on the bottom of your library (${nameOf(s, id)})` });
@@ -3324,7 +3329,8 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   for (const id of tutors) out.push({ key: `tutor:${id}`, label: `Search your library for a card and put it into your hand instead, then shuffle (${nameOf(s, id)})` });
   for (const id of skippers) {
     const kind = abilitiesOf(s, obj(s, id)).drawMayCounter;
-    out.push({ key: `${kind ? "counter" : "mayskip"}:${id}`, label: kind ? `Put a ${kind} counter on ${nameOf(s, id)} instead` : `Skip this draw (${nameOf(s, id)})` });
+    const only = abilitiesOf(s, obj(s, id)).drawStepMaySkip?.attackOnlyBy;
+    out.push({ key: `${kind ? "counter" : "mayskip"}:${id}`, label: kind ? `Put a ${kind} counter on ${nameOf(s, id)} instead` : only ? `Skip this draw; until your next turn you can't be attacked except by creatures with ${only.map((k) => k.toLowerCase()).join(" and/or ")} (${nameOf(s, id)})` : `Skip this draw (${nameOf(s, id)})` });
   }
   // A Notion Thief with nothing else to choose from goes on as before.
   if (!shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && digs.length < 2 && out.length < 2) return undefined;
@@ -3412,6 +3418,12 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
       const put = putCounters(s, obj(s, src), kind, 1);
       log(s, `${p.name} puts ${put ? `a ${kind} counter` : `no ${kind} counter`} on ${nameOf(s, src)} instead of drawing.`);
     } else log(s, `${p.name} skips that draw (${nameOf(s, src)}).`);
+    // Island Sanctuary: until their next turn, even if it leaves (rulings).
+    const only = abilitiesOf(s, obj(s, src)).drawStepMaySkip?.attackOnlyBy;
+    if (only && !kind) {
+      p.attackOnlyByUntil = [...only];
+      log(s, `Until ${p.name}'s next turn, ${p.name} can't be attacked except by creatures with ${only.map((k) => k.toLowerCase()).join(" and/or ")}.`);
+    }
     return;
   }
   if (key.startsWith("sages:")) {
@@ -3982,6 +3994,7 @@ function startNextTurn(s: GameState, skipping = false) {
       p.noMaxHandSizeUntilNextTurn = undefined;
       p.attackTaxUntil = undefined;
       p.unattackableUntil = undefined;
+      p.attackOnlyByUntil = undefined;
       p.attackBansUntil = undefined;
     }
   if (s.namedBansUntil) s.namedBansUntil = s.namedBansUntil.filter((r) => !began.has(r.controller));
@@ -7565,6 +7578,9 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number, 
     // Angelic Arbiter: an opponent who declared an attacking creature this turn (rulings).
     if (abilitiesOf(s, o).opponentsWhoAttackedCantCast && o.zone === "battlefield" && controllerOf(s, o) !== pid && player(s, pid).attackedTurn === s.turn)
       return `${characteristics(s, o).name}: opponents who attacked with a creature this turn can't cast spells`;
+    // Sandswirl Wanderglyph: an opponent who attacked its controller or a planeswalker they controlled this turn.
+    if (abilitiesOf(s, o).opponentsWhoAttackedYouCantCast && o.zone === "battlefield" && controllerOf(s, o) !== pid && ((a) => a?.turn === s.turn && a.players.includes(controllerOf(s, o)))(player(s, pid).attackedPlayersOrWalkers))
+      return `${characteristics(s, o).name}: opponents who attacked ${player(s, controllerOf(s, o)).name} or their planeswalkers this turn can't cast spells`;
     // "Your opponents can't cast spells with mana value 3 or less" (Brisela, Voice of Nightmares).
     const most = abilitiesOf(s, o).opponentsCantCastMvAtMost;
     const value = mv ?? (parseManaCost(d.manaCost).hasX ? undefined : defMv(d));
@@ -10093,6 +10109,24 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   continueResolution(s);
 }
 
+/**
+ * Master of the Wild Hunt (PendingDecision "divideDamage"): all of the damage, divided among any number of the creatures
+ * offered, each chosen one dealt at least 1 (CR 601.2d); chosen as it resolves (CR 608.2d).
+ */
+function divideDamageChosen(s: GameState, p: Player, parts: Record<ObjectId, number>) {
+  const pend = s.pending;
+  const r = s.resolving;
+  if (pend?.kind !== "divideDamage" || pend.player !== p.id || !r) throw new RulesError("no damage to divide");
+  const given = Object.entries(parts).filter(([, n]) => n !== 0);
+  if (given.some(([id, n]) => !pend.options.includes(id) || !Number.isInteger(n) || n < 0)) throw new RulesError(`divide the damage among the ${pend.what}`);
+  const sum = given.reduce((a, [, n]) => a + n, 0);
+  if (sum !== pend.total) throw new RulesError(`divide all ${pend.total} damage`);
+  r.scratch = { ...r.scratch, dividedDamage: Object.fromEntries(given) };
+  s.pending = null;
+  log(s, `${p.name} divides ${nameOf(s, pend.by)}'s ${pend.total} damage: ${given.map(([id, n]) => `${n} to ${nameOf(s, id)}`).join(", ")}.`);
+  continueResolution(s);
+}
+
 /** How a "distribute" effect's counters are divided (CR 608.2d): all of them, among the permanents offered. */
 function distributeChosen(s: GameState, p: Player, parts: Record<ObjectId, number>) {
   const pend = s.pending;
@@ -12073,11 +12107,16 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   for (const b of player(s, c.controller).attackBansThisTurn ?? []) {
     if (b.turn !== s.turn || b.player !== hit || (b.combat !== undefined && b.combat !== (s.combatsThisTurn ?? 0))) continue;
     if (!b.subtype && !planeswalker && attacked === undefined) return `${c.name} can't attack ${player(s, hit).name} this ${b.combat !== undefined ? "combat" : "turn"}`;
+    // Sandswirl Wanderglyph: that player's planeswalkers too, not a battle they protect (rulings).
+    if (b.walkers && attacked !== undefined && s.objects[attacked] && objIsType(s, obj(s, attacked), "Planeswalker")) return `${c.name} can't attack ${player(s, hit).name} or planeswalkers they control this turn`;
     if (b.subtype && attacked !== undefined && s.objects[attacked] && objIsType(s, obj(s, attacked), "Planeswalker") && characteristics(s, obj(s, attacked)).subtypes.includes(b.subtype)) return `${c.name} can't attack ${b.subtype}s ${player(s, hit).name} controls this turn`;
   }
   if (player(s, c.controller).attackBansNextTurn?.some((b) => b.turn === s.turn && b.player === hit)) return `${c.name} can't attack ${player(s, hit).name}${attacked !== undefined || planeswalker ? "'s permanents" : ""} this turn`;
   // Chronomantic Escape: that player, not their planeswalkers or battles.
   if (player(s, defender).unattackableUntil && !planeswalker && attacked === undefined) return `${c.name} can't attack ${player(s, defender).name} until their next turn`;
+  // Island Sanctuary: that player, only by a creature with flying or islandwalk.
+  const onlyBy = player(s, defender).attackOnlyByUntil;
+  if (onlyBy && !planeswalker && attacked === undefined && !onlyBy.some((k) => objHasKeyword(s, o, k))) return `${c.name} can't attack ${player(s, defender).name} until their next turn (only creatures with ${onlyBy.map((k) => k.toLowerCase()).join(" or ")} can)`;
   if (player(s, defender).attackBansUntil?.includes(c.controller) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""} until their next turn`;
   if (c.cantAttackPlayers.includes(defender) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""}`;
   if (c.cantAttackPlayersOnly.includes(defender) && !planeswalker && attacked === undefined) return `${c.name} can't attack ${player(s, defender).name}`;
@@ -12480,6 +12519,9 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   p.attackPower = { turn: s.turn, n: attacks.reduce((n, a) => n + Math.max(0, power(s, obj(s, a.attacker))), 0) };
   // Melee counts the opponents attacked, not their planeswalkers (rulings).
   p.attackedPlayers = { turn: s.turn, players: [...new Set(attacks.filter((a) => a.planeswalker === undefined).map((a) => a.defender))] };
+  // Sandswirl Wanderglyph: a player attacked, or the controller of a planeswalker attacked (not a battle's protector).
+  const hitWalkers = attacks.filter((a) => a.planeswalker === undefined || (!!s.objects[a.planeswalker] && objIsType(s, obj(s, a.planeswalker), "Planeswalker"))).map((a) => (a.planeswalker !== undefined && s.objects[a.planeswalker] ? controllerOf(s, obj(s, a.planeswalker)) : a.defender));
+  if (hitWalkers.length) p.attackedPlayersOrWalkers = { turn: s.turn, players: [...new Set([...(p.attackedPlayersOrWalkers?.turn === s.turn ? p.attackedPlayersOrWalkers.players : []), ...hitWalkers])] };
   if (p.attackedPlayers.players.length) p.attackedInTurn = { turn: s.turn, players: [...new Set([...(p.attackedInTurn?.turn === s.turn ? p.attackedInTurn.players : []), ...p.attackedPlayers.players])] };
   s.pending = null;
   if (attacks.length === 0) {

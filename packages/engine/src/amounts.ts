@@ -1113,8 +1113,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "attachedToSelf": {
       const me = selfObject(s, ctx);
       if (!me) return 0;
+      // Animal Friend: not the one that gave this ability, while it's still that object (CR 400.7).
+      const ex = c.except;
       return s.battlefield.filter((id) => {
         const o = s.objects[id]!;
+        if (ex && o.id === ex.id && (o.zoneChanges ?? 0) === ex.zc) return false;
         return o.attachedTo === me.id && (view(o)?.subtypes ?? []).some((st) => c.subtypes.includes(st));
       }).length;
     }

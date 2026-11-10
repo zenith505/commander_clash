@@ -1,18 +1,22 @@
-// Round 327's sentences, triggers and whole texts, read before round 326's (round326Sentence, round326Trigger and
+// Round 327's sentences, triggers and whole texts (after round 328's, oracle/round328.ts), read before round 326's (round326Sentence, round326Trigger and
 // round326WholeText in oracle/round326.ts).
 import type { AbilityBody, AmountExpr, Effect, TargetSpec, TriggeredAbility } from "../abilities";
 import { parseStaticCondition } from "./statics";
 import { parseTrigger } from "./triggers";
 import type { Ctx } from "./body";
+import { round328Sentence, round328Trigger, round328WholeText } from "./round328";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 export function round327Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void s, sentences, si, ctx, effects;
-  return null;
+  // Round 328's sentences first (oracle/round328.ts).
+  return round328Sentence(s, sentences, si, ctx, effects);
 }
 
 export function round327Trigger(raw: string): TriggeredAbility | "fail" | null {
+  // Round 328's triggers first (oracle/round328.ts).
+  const r328 = round328Trigger(raw);
+  if (r328 !== null) return r328;
   // Wild Pair: "Whenever a creature enters, if you cast it from your hand, you may search your library for a creature card
   // with the same total power and toughness, put it onto the battlefield, then shuffle.": anyone's creature you cast
   // from your hand (CR 603.4, checked again as it resolves); its power plus toughness as it is on the battlefield as this
@@ -34,7 +38,10 @@ const creature = (text: string): TargetSpec => ({ kind: "object", types: ["Creat
 
 /** A whole ability's text read another way (a string), or null. */
 export function round327WholeText(text: string, parse: (t: string) => AbilityBody | null): AbilityBody | string | null {
-  void parse;
+  // Round 328's whole texts first (oracle/round328.ts).
+  const r328 = round328WholeText(text, parse);
+  if (r328 && typeof r328 !== "string") return r328;
+  if (typeof r328 === "string") text = r328;
   const t = text.trim();
   // The Nipton Lottery: "Choose a creature at random. You gain control of that creature until end of turn. Untap it. It
   // gains haste until end of turn. Then destroy all other creatures.": any player's creature, not targeted (hexproof and
@@ -113,5 +120,5 @@ export function round327WholeText(text: string, parse: (t: string) => AbilityBod
     if (!first || !then || first.targets.length || then.targets.length || first.effects.length !== 2 || then.effects.length !== 2 || back?.type !== "returnAllFromGraveyard" || back.toHand || back.who.ref !== "you" || back.filter.types?.join() !== "Creature") return null;
     return { targets: [], effects: [{ ...back, filter: { kind: "card", subtypes: ["Mount", "Vehicle"], text: "Mount and Vehicle cards" } }, ...first.effects.slice(1), ...then.effects], text: t };
   }
-  return null;
+  return typeof r328 === "string" ? r328 : null;
 }

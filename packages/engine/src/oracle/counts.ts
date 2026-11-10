@@ -1136,8 +1136,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return count({ kind: "cardsToGraveyardThisTurn", whose: { ref: "you" }, fromHandOrLibrary: true });
   // "Aura attached to it", "Equipment attached to ~": only the permanent's own.
   // "Aura and Equipment attached to it" (Champion of the Flame): one of either.
-  if ((m = /^(Aura|Equipment|Aura and Equipment)s? attached to (it|~)$/i.exec(p)) && (ctx === null || ctx.selfIt || /~/.test(m[2]!)))
-    return count({ kind: "attachedToSelf", subtypes: /and/.test(m[1]!) ? ["Aura", "Equipment"] : [capital(m[1]!.toLowerCase()) === "Aura" ? "Aura" : "Equipment"] });
+  // Animal Friend's granted "... attached to this creature other than Animal Friend": every one but that Aura itself.
+  if ((m = /^(Aura|Equipment|Aura and Equipment)s? attached to (it|~)( other than \u27easource\u27eb)?$/i.exec(p)) && (ctx === null || ctx.selfIt || /~/.test(m[2]!)))
+    return count({ kind: "attachedToSelf", subtypes: /and/.test(m[1]!) ? ["Aura", "Equipment"] : [capital(m[1]!.toLowerCase()) === "Aura" ? "Aura" : "Equipment"], ...(m[3] ? { except: { ref: "grantSource" as const } } : {}) });
   // Lunar Insight: "for each different mana value among nonland permanents you control".
   if (each && (m = /^different mana value among (.+?) you control$/i.exec(p))) {
     const c = parseCount(`${m[1]} you control`, ctx);

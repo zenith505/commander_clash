@@ -298,7 +298,7 @@ describe("Mossbridge Troll", () => {
     let s = run(s0, planActivate(s0, ap, t, 0, undefined, undefined, [...gs, b]));
     expect([...gs, b].every((id) => s.objects[id]!.tapped)).toBe(true);
     expect(s.objects[t]!.tapped).toBe(false);
-    expect(s.log.some((l) => / crews /.test(l))).toBe(false);
+    expect(s.log.some((l) => / crews /.test(l.text))).toBe(false);
     expect(s.turnLog?.crewedBy).toBeUndefined();
     s = settle(s);
     expect(pt(s, t)).toBe("25/25");

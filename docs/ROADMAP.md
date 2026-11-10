@@ -1,6 +1,6 @@
 # Roadmap
 
-30,974 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,978 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,805 of
 9,979 (98%).
 
@@ -2384,8 +2384,20 @@ line blocks.
    Out after round 334 (looked at, not done): Paleontologist's Pick-Axe (its craft works now; Dinosaur Headdress makes the
    equipped creature a copy of a card chosen as it becomes attached); The Enigma Jewel ("four or more nonlands with
    activated abilities", and Locus of Enlightenment has the exiled cards' activated abilities).
-   Not looked at yet (no list names them; next in popularity): Sasaya, Orochi Ascendant; Tazri, Stalwart Survivor; The
-   Master, Formed Anew; Tezzeret, Cruel Machinist.
+   Round 335 took the four cards no list named (Sasaya, Tazri, The Master, Tezzeret), so every ranked unsupported card is
+   now in an "Out after round N" list: "Reveal your hand: If you have seven or more land cards in your hand, flip Sasaya."
+   (a reveal-your-hand cost, CR 602.2b and 701.20a, an empty hand revealed too; the flip, CR 710) and its back face's
+   "Whenever a land you control is tapped for mana, add an additional one mana of any type that land produced for each
+   other land you control with the same name as it" (a triggered mana ability, CR 605.1b; face-down lands have no name);
+   Tazri's granted "{T}: Add one mana of any of this creature's colors. Spend this mana only to activate an ability of a
+   creature. Activate only if this creature has another activated ability." (mana abilities count, rulings) and "Put
+   all creature cards with activated abilities that aren't mana abilities from among the milled cards into your hand";
+   The Master's cast trigger exiling a creature you control with a takeover counter (CR 122.1, a token ceases to exist,
+   111.7) and "enter as a copy of a creature card in exile with a takeover counter on it" (CR 707.5, any player's
+   exile), with a browser test; Tezzeret's "Put any number of cards from your hand onto the battlefield face down.
+   They're 5/5 artifact creatures." (CR 708.2, a face-down instant or sorcery stays face down), with a browser test.
+   +4, 30,978 of 31,936 with B173 through B176. Bots activate Sasaya only when the flip happens, cast The Master with an exile only when one of
+   their creatures has an enters trigger worth copying, and put all of their hand onto the battlefield with Tezzeret.
    Round 333 took the most played cards round 332 left for later and three no list named: "Reveal any number of cards
    with {X} in their mana cost in your hand. Add {C}{C} for each card revealed this way. Spend this mana only on costs that
    contain {X}." (Rosheen, Roaring Prophet: the reveal a mana ability's choice, CR 605.1a, its mana restricted, CR 106.6,

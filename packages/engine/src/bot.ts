@@ -413,6 +413,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const lands = hand.filter((d) => isType(d, "Land")).length;
       return [{ type: "chooseMay", player: pid, yes: lands >= 1 && hand.length - lands <= 1 }];
     }
+    // The Master, Formed Anew: a creature of ours exiled only for one with an enters trigger, which the copy gets again.
+    if (pend.kind === "chooseMay" && mayFx.some((x) => x.type === "pick" && x.action === "exile" && !!x.exiledCounter)) return [{ type: "chooseMay", player: pid, yes: !!takeoverPick(s, pid) }];
     // Stromgald Spy: a revealed hand tells a bot nothing it uses; the combat damage is worth more.
     if (pend.kind === "chooseMay" && mayFx.some((x) => x.type === "revealHandWhile")) return [{ type: "chooseMay", player: pid, yes: false }];
     // Retriever Phoenix back on the battlefield rather than learning (discarding a card to draw one): always.
@@ -537,6 +539,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         }
       }
       return [...taps, { type: "pickPermanents", player: pid, ids }];
+    }
+    if (pend.kind === "pickPermanents" && pend.action === "exile" && allEffects(s.resolving?.body.effects ?? []).some((e) => e.type === "pick" && !!e.exiledCounter)) {
+      const pick = takeoverPick(s, pid, pend.options);
+      return [{ type: "pickPermanents", player: pid, ids: [pick ?? pend.options[0]!].slice(0, pend.count) }];
     }
     if (pend.kind === "pickPermanents" && pend.action === "pile") return [{ type: "pickPermanents", player: pid, ids: evenPiles(s, pid, pend.options, (id) => permanentWorth(s, pid, id)) }];
     // Choosing among an opponent's revealed cards (Gifts Ungiven, Intuition): the ones they'd least like where the chosen
@@ -5689,6 +5695,18 @@ function chooseCardName(s: GameState, pid: PlayerId, pend: Extract<PendingDecisi
   return pick ?? pend.options.find((n) => !mine.has(n)) ?? pend.options[0]!;
 }
 
+/**
+ * The Master, Formed Anew's Body Thief: the most valuable creature we control with an enters trigger (not a token, which
+ * would be gone), for The Master to enter as a copy of; none without one.
+ */
+function takeoverPick(s: GameState, pid: PlayerId, options?: ObjectId[]): ObjectId | undefined {
+  const pool = (options ?? s.battlefield).filter((id) => {
+    const o = obj(s, id);
+    return controllerOf(s, o) === pid && !o.isToken && objIsType(s, o, "Creature") && abilitiesOf(s, o).triggers.some((t) => t.event === "selfEnters");
+  });
+  return pool.sort((a, b) => permanentWorth(s, pid, b) - permanentWorth(s, pid, a))[0];
+}
+
 /** Rough value of one mode for a bot: removal and card advantage first. */
 function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: TargetChoice[]): number {
   const harm = harmfulTargets(body);
@@ -5922,7 +5940,12 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // A cost of nothing, "{0}" included, could be paid over and over.
       // Removing named counters (spore, charge) runs out; removing +1/+1 counters shrinks the creature, so not for free.
       // Removing all of them (Sage of Hours) can't loop either: it's weighed below.
-      const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.length && !(ab.removeCounters && (ab.removeCounters.all || !/^[+-]1\/[+-]1$/.test(ab.removeCounters.counter)));
+      // Revealing a hand costs nothing either (Sasaya, Orochi Ascendant).
+      const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.some((c) => c.kind !== "revealHand") && !(ab.removeCounters && (ab.removeCounters.all || !/^[+-]1\/[+-]1$/.test(ab.removeCounters.counter)));
+      // Sasaya, Orochi Ascendant: "Reveal your hand: If you have seven or more land cards in your hand, flip ~": only once
+      // it would flip now.
+      const only0 = ab.body.effects.length === 1 ? ab.body.effects[0] : undefined;
+      const flipNow = only0?.type === "if" && only0.cond.kind === "state" && !only0.otherwise && only0.effects.length > 0 && only0.effects.every((e) => e.type === "flip") && staticConditionNow(s, only0.cond.cond, id, pid);
       // A coin flip's own cost is weighed with what winning and losing do (flipWorth).
       const flips = flipBranches(ab.body);
       // Necropotence's "Pay 1 life: ... into your hand at your next end step": a few cards a turn while life is plentiful.
@@ -5943,7 +5966,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const titan = makesTitan(ab) && s.activePlayer === pid && (s.step === "main1" || s.step === "main2") && !s.stack.length;
       // Craft: in our main phase with the stack empty, the back face being the point of it (materials: abilityCosts).
       const craft = ab.keyword === "Craft" && s.activePlayer === pid && (s.step === "main1" || s.step === "main2") && !s.stack.length;
-      if ((ab.exileSelf && !titan && !craft) || (freeCost && !necro) || ab.station) continue;
+      if ((ab.exileSelf && !titan && !craft) || (freeCost && !necro && !flipNow) || ab.station) continue;
       // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
       if (halfLifeCost(s, pid, ab) > 3) continue;
       if (lifeSwapHurts(s, pid, ab.body.effects)) continue;
@@ -6888,7 +6911,8 @@ export function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: Act
       const pick = spareCounterHost(s, pid, c, targeted);
       if (!pick) return null;
       out.counterOn = [pick];
-    } else return null;
+    } else if (c.kind === "revealHand") continue; // nothing to choose (Sasaya, Orochi Ascendant)
+    else return null;
   }
   return out;
 }

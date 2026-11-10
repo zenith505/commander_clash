@@ -57,8 +57,13 @@ export const FACE_DOWN_FOREST: CardDef = { oracleId: "face-down-forest", name: "
 export const FACE_DOWN_CYBERMAN: CardDef = { oracleId: "face-down-cyberman", name: "Face-down Cyberman", manaCost: "", cmc: 0, typeLine: "Artifact Creature — Cyberman", supertypes: [], types: ["Artifact", "Creature"], subtypes: ["Cyberman"], oracleText: "", power: "2", toughness: "2", colors: [], colorIdentity: [], keywords: [] };
 /** Illithid Harvester's: "They're 2/2 Horror creatures" (CR 708.2a): no name or color, Horror its only subtype. */
 export const FACE_DOWN_HORROR: CardDef = { oracleId: "face-down-horror", name: "Face-down Horror", manaCost: "", cmc: 0, typeLine: "Creature — Horror", supertypes: [], types: ["Creature"], subtypes: ["Horror"], oracleText: "", power: "2", toughness: "2", colors: [], colorIdentity: [], keywords: [] };
+/**
+ * Tezzeret, Cruel Machinist's: "They're 5/5 artifact creatures" (CR 708.2a): no name, color or subtype, and entering as
+ * that, not becoming it (rulings); a copy of one is the same (rulings).
+ */
+export const FACE_DOWN_ARTIFACT_55: CardDef = { oracleId: "face-down-artifact-55", name: "Face-down artifact creature", manaCost: "", cmc: 0, typeLine: "Artifact Creature", supertypes: [], types: ["Artifact", "Creature"], subtypes: [], oracleText: "", power: "5", toughness: "5", colors: [], colorIdentity: [], keywords: [] };
 /** The copiable values a face-down permanent has (CR 708.2). */
-const faceDownDef = (o: GameObject): CardDef => (o.faceDown === "forest" ? FACE_DOWN_FOREST : o.faceDown === "cyberman" ? FACE_DOWN_CYBERMAN : o.faceDown === "horror" ? FACE_DOWN_HORROR : withWard(o) ? FACE_DOWN_WARD : FACE_DOWN);
+const faceDownDef = (o: GameObject): CardDef => (o.faceDown === "forest" ? FACE_DOWN_FOREST : o.faceDown === "cyberman" ? FACE_DOWN_CYBERMAN : o.faceDown === "horror" ? FACE_DOWN_HORROR : o.faceDown === "artifact55" ? FACE_DOWN_ARTIFACT_55 : withWard(o) ? FACE_DOWN_WARD : FACE_DOWN);
 
 /**
  * Its copiable values before face-down status (CR 613.2a): the latest copy effect that began after it entered

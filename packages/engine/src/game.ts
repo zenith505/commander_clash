@@ -10,7 +10,7 @@ import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layo
 import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
-import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
+import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
@@ -97,7 +97,7 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
     turnOrder: setup.map((_, i) => i),
     players: [],
     objects: {},
-    cards: { [FACE_DOWN.oracleId]: FACE_DOWN, [FACE_DOWN_WARD.oracleId]: FACE_DOWN_WARD, [FACE_DOWN_FOREST.oracleId]: FACE_DOWN_FOREST, [FACE_DOWN_CYBERMAN.oracleId]: FACE_DOWN_CYBERMAN, [FACE_DOWN_HORROR.oracleId]: FACE_DOWN_HORROR },
+    cards: { [FACE_DOWN.oracleId]: FACE_DOWN, [FACE_DOWN_WARD.oracleId]: FACE_DOWN_WARD, [FACE_DOWN_FOREST.oracleId]: FACE_DOWN_FOREST, [FACE_DOWN_CYBERMAN.oracleId]: FACE_DOWN_CYBERMAN, [FACE_DOWN_HORROR.oracleId]: FACE_DOWN_HORROR, [FACE_DOWN_ARTIFACT_55.oracleId]: FACE_DOWN_ARTIFACT_55 },
     battlefield: [],
     stack: [],
     triggerQueue: [],
@@ -1611,6 +1611,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
 export function copyCandidates(s: GameState, o: GameObject, filter: TargetSpec): ObjectId[] {
   // A card in a graveyard (Lazotep Convert): by its printed characteristics there.
   // Activated Sleeper: only one put there from the battlefield this turn.
+  // The Master, Formed Anew: a face-up card in exile with that kind of counter on it, by its printed characteristics.
+  if (filter.kind === "card" && filter.exiledWithCounter) return s.players.flatMap((p) => p.exile).filter((id) => id !== o.id && !obj(s, id).faceDown && !obj(s, id).isToken && (obj(s, id).counters[filter.exiledWithCounter!] ?? 0) > 0 && printedMatches(filter, defOf(s, obj(s, id))));
   if (filter.kind === "card") return livingPlayers(s).flatMap((pid) => player(s, pid).graveyard.filter((id) => id !== o.id && printedMatches(filter, defOf(s, obj(s, id))) && (!filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn)));
   // Mockingbird's "with mana value less than or equal to the amount of mana spent to cast ~": the spell it was.
   const bound = filter.bound ? bindBound(s, filter, { controller: controllerOf(s, o), sourceId: o.id, manaSpent: o.manaSpent ?? 0 }) : filter;
@@ -11479,7 +11481,7 @@ function askEntersChoice(s: GameState): boolean {
       // Not one that entered at the same time (CR 614.12, rulings on Clone).
       const own = compileCard(defOf(s, o)).entersAsCopy!;
       const ids = copyCandidates(s, o, own.filter).filter((id) => !c.together?.includes(id));
-      const labels = ids.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name}${obj(s, id).zone === "graveyard" ? "'s graveyard" : ""})`);
+      const labels = ids.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name}${obj(s, id).zone === "graveyard" ? "'s graveyard" : obj(s, id).zone === "exile" ? ", in exile" : ""})`);
       // The Mimeoplasm: two cards to exile, so none if there aren't two (rulings).
       const offered = own.exileTwo && ids.length < 2 ? [] : ids;
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "copy", options: [...offered, "none"], labels: [...labels.slice(0, offered.length), own.exileTwo ? "Don't exile" : "Don't copy"], objectId: o.id, ...(own.exileTwo ? { prompt: "you may exile two creature cards from graveyards: first the one it enters as a copy of" } : {}) };
@@ -14820,7 +14822,8 @@ export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string, by?
     return false;
   }
   const card = realDefOf(s, o);
-  if ((o.faceDown === "manifest" || o.faceDown === "cloak") && (isType(card, "Instant") || isType(card, "Sorcery"))) {
+  // Tezzeret, Cruel Machinist's too: such a card is revealed and stays face down (rulings).
+  if ((o.faceDown === "manifest" || o.faceDown === "cloak" || o.faceDown === "artifact55") && (isType(card, "Instant") || isType(card, "Sorcery"))) {
     log(s, `${src}: ${player(s, controllerOf(s, o)).name} reveals the face-down permanent, ${card.name}, an ${isType(card, "Instant") ? "instant" : "sorcery"} card; it stays face down.`);
     return false;
   }

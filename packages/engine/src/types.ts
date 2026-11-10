@@ -183,7 +183,7 @@ export interface CardFace {
  * "cyberman": face down as "2/2 Cyberman artifact creatures" (The Cyber-Controller, Death in Heaven), with no name or
  * color (rulings).
  */
-export type FaceDownKind = "morph" | "megamorph" | "disguise" | "manifest" | "cloak" | "forest" | "cyberman" | /** Illithid Harvester: "They're 2/2 Horror creatures", with no name, color or other text. */ "horror";
+export type FaceDownKind = "morph" | "megamorph" | "disguise" | "manifest" | "cloak" | "forest" | "cyberman" | /** Illithid Harvester: "They're 2/2 Horror creatures", with no name, color or other text. */ "horror" | /** Tezzeret, Cruel Machinist: "They're 5/5 artifact creatures", with no name, color, subtype or other text (rulings). */ "artifact55";
 
 /**
  * "merged": a card or token that's a component of a merged permanent other than the permanent's own object (CR 730.2):

@@ -256,6 +256,7 @@ export function parseManaTrigger(line: string): ManaTrigger | "fail" | null {
   let what: string;
   const out: Partial<ManaTrigger> = { text: line };
   let adds: string;
+  let perOtherSameName = false;
   // Winter's Night: "... That land doesn't untap during its controller's next untap step.": the land tapped for mana, as
   // the triggered mana ability resolves (rulings: whoever controls it at that untap step).
   const noUntap = /^(Whenever a player taps an? .+? for mana, that player adds .+?\.) That land doesn't untap during its controller's next untap step\.$/.exec(line);
@@ -299,6 +300,13 @@ export function parseManaTrigger(line: string): ManaTrigger | "fail" | null {
     if (m[3] !== "mana") out.madeType = m[3]![1] as ManaType;
     what = m[2]!;
     adds = m[5]!;
+  } else if (/^Whenever a land you control is tapped for mana, add an additional one mana of any type that land produced for each other land you control with the same name as it\.$/.test(line)) {
+    // Sasaya's Essence: lands its controller controls, who is the one tapping them for mana (CR 106.12a), with one more
+    // mana of a type the land made for each other land they control with its name, counted as it resolves (rulings).
+    out.you = true;
+    what = "land";
+    adds = "one mana of any type that land produced";
+    perOtherSameName = true;
   } else if ((m = /^Whenever a land's ability causes you to add one or more mana of the chosen color, (add an additional one mana of that color)\.$/.exec(line))) {
     // Caged Sun: any ability of a land, {T} in its cost or not (rulings), and only for its controller.
     out.you = true;
@@ -327,7 +335,7 @@ export function parseManaTrigger(line: string): ManaTrigger | "fail" | null {
   else if (adds === "one mana of the chosen color" || (adds === "one mana of that color" && out.ofChosen)) out.adds = { kind: "chosenColor" };
   // Keeper of Progenitus: "Whenever a player taps a Mountain, Forest, or Plains for mana, that player adds one mana of any
   // type that land produced": a land with one of those types.
-  else if ((m = /^one mana of any type that (.+) produced$/.exec(adds)) && (what.endsWith(m[1]!) || (named && m[1] === "land" && what === "land") || (m[1] === "land" && !!filter.subtypes?.length && filter.subtypes.every((t) => ["Plains", "Island", "Swamp", "Mountain", "Forest"].includes(t)) && !filter.types?.length))) out.adds = { kind: "produced" };
+  else if ((m = /^one mana of any type that (.+) produced$/.exec(adds)) && (what.endsWith(m[1]!) || (named && m[1] === "land" && what === "land") || (m[1] === "land" && !!filter.subtypes?.length && filter.subtypes.every((t) => ["Plains", "Island", "Swamp", "Mountain", "Forest"].includes(t)) && !filter.types?.length))) out.adds = { kind: "produced", ...(perOtherSameName ? { perOtherSameName: true as const } : {}) };
   else return "fail";
   return out as ManaTrigger;
 }

@@ -853,6 +853,9 @@ export function parseActivateCondition(text: string): StaticCondition | null {
     return conds.every((c): c is StaticCondition => !!c) ? { kind: "anyOf", conds } : null;
   }
   if (/^~ entered (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn" };
+  // Tazri, Stalwart Survivor's granted ability: "Activate only if this creature has another activated ability": any other
+  // one, even one that can't be activated now or on the battlefield (cycling, rulings), mana abilities too (CR 605.1a).
+  if (/^~ has another activated ability$/.test(text)) return { kind: "self", is: "hasAnotherActivatedAbility" };
   // Nemesis Phoenix: "only if you're attacking two or more opponents": opponents creatures you control are attacking
   // (CR 802.2, 506.3), as Astral Confrontation counts them: a creature attacking a planeswalker or battle isn't attacking
   // its controller or protector (rulings on Tahngarth, First Mate).
@@ -1225,6 +1228,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return amount && typeof amount === "object" ? { kind: "amount", amount, min: num(m[1]!) } : null;
   }
   if ((m = new RegExp(`^you have ${NUM} or more cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) };
+  // Sasaya, Orochi Ascendant: "If you have seven or more land cards in your hand": those cards only, counted when it's
+  // checked (as the ability resolves, rulings).
+  if ((m = new RegExp(`^you have ${NUM} or more ([a-z]+) cards in your hand$`).exec(text))) {
+    const amount = parseCount(`the number of ${m[2]} cards in your hand`, null);
+    return amount && typeof amount === "object" ? { kind: "amount", amount, min: num(m[1]!) } : null;
+  }
   // Imaginary Pet: "if you have a card in hand": one or more.
   if (text === "you have a card in hand") return { kind: "handAtLeast", n: 1 };
   if ((m = new RegExp(`^you have fewer than ${NUM} cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!), fewer: true };

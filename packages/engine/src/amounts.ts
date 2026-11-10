@@ -823,7 +823,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "spentFrom": {
       const item = s.resolving?.item;
       const spell = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
-      return spell?.spent?.from?.[c.origin] ?? 0;
+      return spell?.spent?.from?.[c.origin] ?? (spell ? 0 : (ctx.spent?.from?.[c.origin] ?? 0));
     }
     case "rollResult":
       return s.resolving?.rolled?.result ?? s.resolving?.item.rolled ?? ctx.event?.amount ?? 0;
@@ -1717,7 +1717,7 @@ function describeCount(c: Count): string {
     case "treasureSpent":
       return "mana from Treasures spent";
     case "spentFrom":
-      return `mana from ${c.origin === "desert" ? "Deserts" : c.origin} spent`;
+      return `mana from ${c.origin === "desert" ? "Deserts" : "Caves"} spent`;
     case "snowSpent":
       return "{S} spent";
     case "rollResult":

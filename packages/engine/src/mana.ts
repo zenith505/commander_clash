@@ -327,6 +327,7 @@ export type ManaSpent = SpentMana;
 
 /** Does the mana spent to cast a spell meet "if {U} was spent", adamant's "at least three ...", "no mana was spent", "if {S} was spent"? */
 export function spentMeets(spent: ManaSpent | undefined, req: import("./abilities").SpentReq, spellColors?: readonly Color[]): boolean {
+  if (req.not) return !spentMeets(spent, { ...req, not: undefined }, spellColors);
   const of = (m: ManaType) => spent?.[m] ?? 0;
   const colored = COLORS.reduce((n, c) => n + of(c), 0);
   const total = colored + of("C");

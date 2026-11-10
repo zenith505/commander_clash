@@ -41,6 +41,7 @@ function manaSourceOrigins(s: GameState, ctx: ResolveCtx): ManaOrigin[] {
   if (d.supertypes?.includes("Snow")) out.push("snow");
   if (d.subtypes?.includes("Treasure")) out.push("treasure");
   if (d.subtypes?.includes("Desert")) out.push("desert");
+  if (d.subtypes?.includes("Cave")) out.push("cave");
   if (d.types.includes("Land") && d.supertypes?.includes("Basic")) out.push("basicLand");
   return out;
 }

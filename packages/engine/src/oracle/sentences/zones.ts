@@ -1211,7 +1211,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Braids, Conjurer Adept: "At the beginning of each player's upkeep, that player may put an artifact, creature, or land
   // card from their hand onto the battlefield": the player whose upkeep it is, under their control.
   // Fold into Aether: "its controller may put a creature card from their hand onto the battlefield": the countered spell's.
-  if ((m = /^(~'s owner|[Tt]hat player|That opponent|[Ii]ts controller) may put (a|an) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
+  // Wumpus Aberration: "target opponent may put a creature card from their hand onto the battlefield": that player.
+  if ((m = /^(~'s owner|[Tt]hat player|That opponent|[Ii]ts controller|[Tt]arget opponent) may put (a|an) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
     // Divine Gambit: "Exile target artifact, creature, or enchantment an opponent controls. That player may put ...": the
     // target's controller, as it last existed (CR 608.2h). Metamorphose: "Put target permanent an opponent controls on top
     // of its owner's library. That opponent may put ...": the same.

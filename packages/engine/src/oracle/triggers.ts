@@ -5307,13 +5307,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "When ~ enters, if {R} was spent to cast it, ...", adamant's "if at least three mana of the same color was spent to
       // cast it": an intervening if (CR 603.4) on the mana spent to cast it (CR 601.2h), which can't change.
       let ifSpent: SpentReq | undefined;
-      const spentIf = new RegExp(`^if ${SPENT} was spent to cast it, (.+)$`, "i").exec(body0);
+      // Wumpus Aberration: "When you cast ~, if {C} wasn't spent to cast it, ...": the opposite (CR 603.4).
+      const spentIf = new RegExp(`^if ${SPENT} (was|wasn't) spent to cast it, (.+)$`, "i").exec(body0);
       if (spentIf) {
-        const req = parseSpentReq(spentIf[1]!);
+        const req0 = parseSpentReq(spentIf[1]!);
+        const req = req0 && spentIf[2] === "wasn't" ? (req0.colorless && Object.keys(req0).length === 1 ? { ...req0, not: true as const } : null) : req0;
         // Drowner of Truth: "When you cast ~, if {C} was spent to cast it, ...": the same, as the spell is cast.
         if ((event !== "selfEnters" && event !== "selfCast") || !req) return "fail" as const;
         ifSpent = req;
-        body0 = spentIf[2]!;
+        body0 = spentIf[3]!;
       }
       // "When ~ enters, if you cast it from your hand, ..." (a commander cast from the command zone wasn't, rulings on
       // Phage the Untouchable): an intervening if (CR 603.4) on how it got there, which can't change.

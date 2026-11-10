@@ -10383,6 +10383,11 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     mergeSpell(s, spell, host, choice === "top");
     return;
   }
+  if (pend.what === "loseReplacement") {
+    // Kept for the game loss about to happen as the state-based actions are performed (playerLoses).
+    s.loseChoice = { player: p.id, choice };
+    return;
+  }
   if (pend.what === "legend") {
     // The legend rule (CR 704.5j): kept as the state-based actions are performed, after any other group is asked about.
     (s.legendKeep ??= []).push(choice);
@@ -13410,19 +13415,19 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     checkPrepared(s); // the copies of prepare spells last as long as their permanents stay prepared (CR 722.3c)
     // The legend rule's choices come first, so this pass's actions all happen at once (CR 704.3).
     if (!s.pending && askLegendRule(s)) return;
+    // Which replacement of a game loss applies, when there are several (CR 616.1).
+    if (!s.pending && askLoseReplacement(s)) return;
     let changed = auras === "moved";
     for (const p of s.players) {
       if (p.lost) continue;
-      if (p.life <= 0 && !zeroLifeOk(s, p.id)) changed = playerLoses(s, p.id, "life total reached 0") || changed; // 704.5a
-      else if (p.drewFromEmptyLibrary) changed = playerLoses(s, p.id, "drew from an empty library") || changed; // 704.5b
-      else if ((p.poison ?? 0) >= 10) changed = playerLoses(s, p.id, "ten poison counters") || changed; // 704.5c
-      else {
-        const fatal = Object.entries(p.commanderDamage).find(([, n]) => n >= COMMANDER_DAMAGE_LIMIT);
-        if (fatal) changed = playerLoses(s, p.id, `took 21 combat damage from ${nameOf(s, fatal[0])}`) || changed; // 704.5u
-      }
-      // 704.5b is about draws since state-based actions were last checked: one that didn't lose (Platinum Angel) is past.
-      if (!p.lost) p.drewFromEmptyLibrary = false;
+      // 704.5a, 704.5b, 704.5c, 704.5u, in that order; or a loss an effect caused that waited for a replacement choice.
+      const reason = lossReasonNow(s, p);
+      // 704.5b is about draws since state-based actions were last checked: one that didn't lose (Platinum Angel) is past,
+      // and draws a replacement makes now (Stunning Reversal) count at the next check (rulings).
+      p.drewFromEmptyLibrary = false;
+      if (reason) changed = playerLoses(s, p.id, reason, false, true) || changed;
     }
+    s.loseChoice = undefined;
     // Start your engines!: a player with no speed who controls a permanent with it gets speed 1 (704.5aa).
     for (const p of s.players)
       if (!p.lost && p.speed === undefined && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === p.id && abilitiesOf(s, obj(s, id)).startYourEngines)) {
@@ -13796,20 +13801,104 @@ export function drawGame(s: GameState, reason: string) {
   log(s, `The game is a draw (${reason}).`);
 }
 
-/** `conceded`: leaving the game this way can't be stopped (CR 104.3a; rulings on Platinum Angel). */
-export function playerLoses(s: GameState, pid: PlayerId, reason: string, conceded = false): boolean {
+/** A replacement of `pid`'s game loss (CR 614.1a): `key` is the chooseOption answer, "loseReplacement". */
+type LoseOption = { key: string; label: string; life: number; id?: ObjectId; /** It stays, to die as the same state-based actions are performed. */ graveyard?: true; reversal?: number };
+
+/**
+ * Whether a permanent dies as the state-based actions now being performed are (CR 704.5f-h): zero toughness, lethal or
+ * deathtouch damage and not indestructible.
+ */
+function diesThisCheck(s: GameState, o: GameObject): boolean {
+  if (!objIsType(s, o, "Creature")) return false;
+  if (toughness(s, o) <= 0) return true;
+  return ((o.damage > 0 && lethalLeft(s, o) === 0) || !!o.deathtouchDamage) && !objHasKeyword(s, o, "Indestructible");
+}
+
+/**
+ * The replacements that could apply to `pid` losing the game, one option each (CR 616.1: the player chooses one): each
+ * permanent they control with "If you would lose the game, instead exile ~ and your life total becomes ..." (The Golden
+ * Throne, Exquisite Archangel), and the oldest of their Stunning Reversal shields this turn (all alike). In the
+ * state-based actions (`sba`), such a permanent that dies in the same check may go to the graveyard instead of exile,
+ * its controller's choice, and the life total still changes (Exquisite Archangel rulings).
+ */
+export function loseReplacements(s: GameState, pid: PlayerId, sba = false): LoseOption[] {
+  const p = player(s, pid);
+  const out: LoseOption[] = [];
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const how = controllerOf(s, o) === pid ? abilitiesOf(s, o).loseGameExileSelf : undefined;
+    if (!how) continue;
+    const life = how === "startingLife" ? STARTING_LIFE : 1;
+    out.push({ key: id, id, life, label: `Exile ${nameOf(s, id)}: your life total becomes ${life}` });
+    if (sba && diesThisCheck(s, o)) out.push({ key: `${id}:graveyard`, id, life, graveyard: true, label: `Put ${nameOf(s, id)} into your graveyard (it dies): your life total becomes ${life}` });
+  }
+  const i = (p.loseInstead ?? []).findIndex((x) => x.turn === s.turn);
+  if (i >= 0) out.push({ key: `reversal:${i}`, reversal: i, life: 1, label: `${p.loseInstead![i]!.source}: draw seven cards and your life total becomes 1` });
+  return out;
+}
+
+/** The reason `pid` loses the game in this check of the state-based actions (CR 704.5a-c, 704.5u), or a loss waiting on a replacement choice. */
+function lossReasonNow(s: GameState, p: Player): string | undefined {
+  if (p.life <= 0 && !zeroLifeOk(s, p.id)) return "life total reached 0";
+  if (p.drewFromEmptyLibrary) return "drew from an empty library";
+  if ((p.poison ?? 0) >= 10) return "ten poison counters";
+  const fatal = Object.entries(p.commanderDamage).find(([, n]) => n >= COMMANDER_DAMAGE_LIMIT);
+  if (fatal) return `took 21 combat damage from ${nameOf(s, fatal[0])}`;
+  return p.loseDeferred;
+}
+
+/** Ask a player who would lose the game now which of several replacements applies (CR 616.1), before the state-based actions are performed. */
+function askLoseReplacement(s: GameState): boolean {
+  for (const p of s.players) {
+    if (p.lost || s.loseChoice?.player === p.id) continue;
+    const reason = lossReasonNow(s, p);
+    if (!reason || gameEndBlocked(s, p.id, "lose")) continue;
+    const opts = loseReplacements(s, p.id, true);
+    if (opts.length < 2) continue;
+    s.pending = { kind: "chooseOption", player: p.id, source: "Losing the game", what: "loseReplacement", options: opts.map((o) => o.key), labels: opts.map((o) => o.label), prompt: `you would lose the game (${reason}). Which replacement applies?` };
+    return true;
+  }
+  return false;
+}
+
+/**
+ * `conceded`: leaving the game this way can't be stopped (CR 104.3a; rulings on Platinum Angel). `sba`: a loss as the
+ * state-based actions are performed (CR 704.5), whose replacement choice was asked first (askLoseReplacement).
+ */
+export function playerLoses(s: GameState, pid: PlayerId, reason: string, conceded = false, sba = false): boolean {
   const p = player(s, pid);
   if (p.lost) return false;
+  p.loseDeferred = undefined;
   if (!conceded && gameEndBlocked(s, pid, "lose")) return false;
-  // The Golden Throne: "If you would lose the game, instead exile ~ and your life total becomes 1" (CR 614.1a). Several:
-  // one applies, its controller's choice, and they're all the same (CR 616.1). The life it takes is gained or lost
-  // (CR 119.5), so a player who can't might still be at 0 and lose at the next check (rulings).
-  const throne = conceded ? undefined : s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).loseGameExileSelf);
-  if (throne) {
-    log(s, `${p.name} would lose the game (${reason}), but exiles ${nameOf(s, throne)} instead and their life total becomes 1.`);
-    moveObject(s, throne, "exile");
-    if (p.life < 1 && canGainLife(s, pid)) gainLife(s, pid, 1 - p.life);
-    else if (p.life > 1 && canLoseLife(s, pid)) loseLife(s, pid, p.life - 1);
+  // A replacement of losing (CR 614.1a): The Golden Throne, Exquisite Archangel, Stunning Reversal. With several, the
+  // player chooses one (CR 616.1); one replaces however many reasons this check has (rulings on Lich's Mirror). A loss an
+  // effect causes with several waits for that choice until the state-based actions are next performed. The life is
+  // gained or lost (CR 119.5), so a player who can't might still be at 0 and lose at the next check (rulings).
+  const opts = conceded ? [] : loseReplacements(s, pid, sba);
+  const chosen = s.loseChoice?.player === pid ? s.loseChoice.choice : undefined;
+  if (s.loseChoice?.player === pid) s.loseChoice = undefined;
+  const pick = opts.length === 1 ? opts[0] : opts.find((o) => o.key === chosen);
+  if (opts.length > 1 && !pick) {
+    // Asked at the next pass of these state-based actions, or as they're next performed.
+    p.loseDeferred = reason;
+    return sba && !s.pending;
+  }
+  if (pick) {
+    const src = pick.reversal !== undefined ? p.loseInstead![pick.reversal]!.source : nameOf(s, pick.id!);
+    if (pick.reversal !== undefined) {
+      // Stunning Reversal: one shield used up; the seven draws, then the life total (with fewer than seven cards, the
+      // player loses at the next check, rulings). A draw that pauses for a replacement choice finishes after it.
+      p.loseInstead = p.loseInstead!.filter((_, i) => i !== pick.reversal);
+      if (!p.loseInstead.length) p.loseInstead = undefined;
+      log(s, `${p.name} would lose the game (${reason}), but draws seven cards instead and their life total becomes 1 (${src}).`);
+      draw(s, pid, 7);
+    } else if (pick.graveyard) log(s, `${p.name} would lose the game (${reason}), but their life total becomes ${pick.life} instead (${src}, which goes to the graveyard).`);
+    else {
+      log(s, `${p.name} would lose the game (${reason}), but exiles ${src} instead and their life total becomes ${pick.life}.`);
+      moveObject(s, pick.id!, "exile");
+    }
+    if (p.life < pick.life && canGainLife(s, pid)) gainLife(s, pid, pick.life - p.life);
+    else if (p.life > pick.life && canLoseLife(s, pid)) loseLife(s, pid, p.life - pick.life);
     invalidateCharacteristics(s);
     return true;
   }

@@ -952,6 +952,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         p.library = [...arranged.top, ...rest, ...arranged.away];
         r.surveilTop = arranged.top.length;
         for (const id of arranged.away) moveObject(s, id, "graveyard");
+        r.surveilYard = arranged.away.flatMap((id) => (s.objects[id]?.zone === "graveyard" ? [{ id, zc: s.objects[id]!.zoneChanges ?? 0 }] : []));
         const names = arranged.away.map((id) => defOf(s, obj(s, id)).name);
         log(s, `${p.name} surveils ${looked.size}${names.length ? `, putting ${names.join(" and ")} into their graveyard` : ""}.`);
       }

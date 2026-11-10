@@ -1,14 +1,18 @@
-// Round 328's sentences, triggers and whole texts, read before round 327's (round327Sentence, round327Trigger and
-// round327WholeText in oracle/round327.ts).
+// Round 328's sentences, triggers and whole texts (after round 329's, oracle/round329.ts), read before round 327's
+// (round327Sentence, round327Trigger and round327WholeText in oracle/round327.ts).
 import type { AbilityBody, Effect, TargetSpec, TriggeredAbility } from "../abilities";
 import type { Ctx } from "./body";
 import { pickFilter } from "./targets";
 import { parseTrigger } from "./triggers";
 import { counterKind, num } from "./words";
+import { round329Sentence, round329Trigger, round329WholeText } from "./round329";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 export function round328Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 329's sentences first (oracle/round329.ts).
+  const r329 = round329Sentence(s, sentences, si, ctx, effects);
+  if (r329 !== null) return r329;
   // Crashing Wave: "Tap up to X target creatures, then distribute three stun counters among any number of tapped creatures
   // your opponents control." (after the tap, its own sentence by now): the counters are divided as it resolves (CR
   // 608.2d), among every tapped creature an opponent controls then, those it just tapped or any other (rulings),
@@ -33,6 +37,9 @@ export function round328Sentence(s: string, sentences: string[], si: number, ctx
 }
 
 export function round328Trigger(raw: string): TriggeredAbility | "fail" | null {
+  // Round 329's triggers first (oracle/round329.ts).
+  const r329 = round329Trigger(raw);
+  if (r329 !== null) return r329;
   // Sandswirl Wanderglyph: "Whenever an opponent casts a spell during their turn, they can't attack you or planeswalkers you
   // control this turn.": only while the caster is the active player; once it resolves, that holds for the turn even if
   // this leaves the battlefield, and battles you protect aren't covered (rulings).
@@ -47,6 +54,10 @@ export function round328Trigger(raw: string): TriggeredAbility | "fail" | null {
 
 /** A whole ability's text read another way (a string), or null. */
 export function round328WholeText(text: string, parse: (t: string) => AbilityBody | null): AbilityBody | string | null {
+  // Round 329's whole texts first (oracle/round329.ts).
+  const r329 = round329WholeText(text, parse);
+  if (r329 && typeof r329 !== "string") return r329;
+  if (typeof r329 === "string") text = r329;
   const t = text.trim();
   // Geth's Summons: "Corrupted — For each opponent who has three or more poison counters as you cast ~, put up to one target
   // creature card from that player's graveyard onto the battlefield under your control." (the ability word gone by now):

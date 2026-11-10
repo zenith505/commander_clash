@@ -815,6 +815,23 @@ export function targetsOnlyOne(s: GameState, targets: TargetChoice[], only: "sel
 }
 
 /**
+ * Zevlor, Elturel Exile: "a spell that targets only a single opponent or a single permanent an opponent controls" (of
+ * `you`): every target it has that one opponent, or that one permanent on the battlefield, controlled by an opponent
+ * (rulings: one target chosen of several possible counts, two different targets don't). The opponent it is or whose it
+ * is, or undefined.
+ */
+export function opponentOrTheirsTarget(s: GameState, targets: TargetChoice[], you: PlayerId): { player: PlayerId; target: TargetChoice } | undefined {
+  const chosen = targets.filter((t) => t.kind !== "none");
+  const first = chosen[0];
+  if (!first || (first.kind !== "player" && first.kind !== "object") || chosen.some((t) => t.kind !== first.kind || (t as { id?: unknown }).id !== first.id)) return undefined;
+  if (first.kind === "player") return first.id !== you && !player(s, first.id).lost ? { player: first.id, target: first } : undefined;
+  const o = s.objects[first.id];
+  if (!o || o.zone !== "battlefield" || (first.zc !== undefined && (o.zoneChanges ?? 0) !== first.zc)) return undefined;
+  const by = controllerOf(s, o);
+  return by !== you ? { player: by, target: first } : undefined;
+}
+
+/**
  * "A spell that targets a permanent you control": one of its targets is still that object on the battlefield and matches
  * (it needn't still be a legal target for that spell), or "you" (rulings on Rebuff the Wicked).
  */

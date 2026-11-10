@@ -1,6 +1,6 @@
 # Roadmap
 
-30,918 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,924 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,804 of
 9,979 (98%).
 
@@ -2363,6 +2363,38 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 333 took the most played cards round 332 left for later and three no list named: "Reveal any number of cards
+   with {X} in their mana cost in your hand. Add {C}{C} for each card revealed this way. Spend this mana only on costs that
+   contain {X}." (Rosheen, Roaring Prophet: the reveal a mana ability's choice, CR 605.1a, its mana restricted, CR 106.6,
+   any cost with {X}, all of it, rulings); "{1}, {T}: Exile target creature you control." and "{7}, {T}: Exile target
+   creature you don't control." both linked to "When Helvault is put into a graveyard from the battlefield, return all
+   cards exiled with it to the battlefield under their owners' control" (Helvault, CR 607.2a, rulings); "As ~ enters, each
+   opponent reveals their hand. You choose the name of a nonland card revealed this way." (Alhammarret, High Arbiter: one
+   name, from the cards revealed only, a split card's two names, other cards' front face, CR 709.4, 712.8a; none if
+   there's none, rulings; a browser test of the name picker); "Whenever you cast a noncreature spell that targets only ~,
+   you may choose any number of other creatures that spell could target and pay {2} for each of those creatures. If you
+   do, for each of those creatures, copy that spell. The copy targets that creature." (Feather, Radiant Arbiter: every
+   target of the spell Feather, rulings; picked and paid for as it resolves, a copy made even if the spell has left the
+   stack, CR 608.2h, 707.10d; a browser test of the pick); "{2}, {T}: When you next cast an instant or sorcery spell that
+   targets only a single opponent or a single permanent an opponent controls this turn, for each other opponent, choose
+   that player or a permanent they control, copy that spell, and the copy targets the chosen player or permanent."
+   (Zevlor, Elturel Exile: a spell with two different targets doesn't use it up, rulings; the copies made even if the
+   spell was countered, rulings; each only if what was chosen is a legal target, CR 707.10e; a browser test of the
+   choice); "Whenever ~ attacks, create Stangg Twin, a legendary 3/4 red and green Human Warrior creature token. It
+   enters tapped and attacking. For each Aura and Equipment attached to ~, create a token that's a copy of it attached
+   to Stangg Twin. Sacrifice all tokens created this way at the beginning of the next end step." (Stangg, Echo Warrior:
+   the token attacks the player its controller chooses, CR 508.4; an Aura copy that couldn't enchant it isn't created,
+   an Equipment copy that couldn't be attached enters unattached, rulings; the token name, the card's short name and one
+   word, CR 201.5c). +6, 30,924 of 31,936.
+   Bots: a bot names the costliest card its opponents revealed (not one it plays itself); it pays for Feather's copies
+   for its own other creatures, as many as it can; it aims each Zevlor copy at that opponent's most valuable permanent
+   it can target, else the player.
+   Out after round 333 (looked at, not done): Nathan Drake, Treasure Hunter (spending mana as though it were any color
+   on "spells you don't own" needs the spell's owner wherever mana is checked and paid, as Thieving Varmint); Equinox
+   ("counter target spell if it would destroy a land you control": whether a spell would destroy a land is decided as
+   the ability resolves, rulings, which needs a look ahead into what the spell would do).
+   Not looked at yet (no list names them; next in popularity): Ore-Rich Stalactite // Cosmium Catalyst; Sasaya, Orochi
+   Ascendant; Tazri, Stalwart Survivor; The Master, Formed Anew; Tezzeret, Cruel Machinist.
    Round 332 took the most played cards no list named yet: '{1}{R}: If ~ is a Scout, it becomes a Human Faerie
    Detective and gains "Whenever ~ deals combat damage to a player, exile the top card of your library. You may play
    that card this turn."' (Kellan, Planar Trailblazer: its name in an ability it gives itself is "this creature", CR
@@ -2383,9 +2415,9 @@ line blocks.
    they choose, whoever owns the cards). Browser tests for Leori's picker and Guile's free cast. +5, 30,918 of 31,936.
    Bots: a bot picks the planeswalker type most of its planeswalkers have (on the battlefield, then in hand); it casts
    what Guile or Eye of the Storm offers when it can, as any free cast.
-   Not looked at yet (no list names them; next in popularity after these): Zevlor, Elturel Exile; Ore-Rich Stalactite
-   // Cosmium Catalyst; Rosheen, Roaring Prophet; Feather, Radiant Arbiter; Nathan Drake, Treasure Hunter; Stangg, Echo
-   Warrior.
+   Not looked at yet (no list names them; next in popularity after these): Zevlor, Elturel Exile (done in round 333);
+   Ore-Rich Stalactite // Cosmium Catalyst; Rosheen, Roaring Prophet (done in round 333); Feather, Radiant Arbiter (done
+   in round 333); Nathan Drake, Treasure Hunter; Stangg, Echo Warrior (done in round 333).
    Round 331 took cards back off the "Out after round N" lists, most played first: "You may cast noncreature spells from
    the top of your library. If you cast a spell this way, you may cast it as though it had flash." (Elsha of the
    Infinite, CR 702.8a: any time it could cast an instant, its costs paid as usual, rulings; not with Bolas's Citadel's

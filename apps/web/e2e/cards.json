@@ -708,6 +708,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c2531360-61f8-4edc-886b-408811a0639d",
+  "name": "Alhammarret, High Arbiter",
+  "manaCost": "{5}{U}{U}",
+  "cmc": 7,
+  "typeLine": "Legendary Creature — Sphinx",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx"
+  ],
+  "oracleText": "Flying\nAs Alhammarret enters, each opponent reveals their hand. You choose the name of a nonland card revealed this way.\nYour opponents can't cast spells with the chosen name (as long as this creature is on the battlefield).",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "ori",
+  "releasedAt": "2015-07-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ed43f1f9-ef96-47bc-8a54-e59154319f9d",
   "name": "Alpharael, Stonechosen",
   "manaCost": "{3}{B}{B}",
@@ -11176,6 +11210,43 @@
   "set": "otj",
   "releasedAt": "2024-04-19",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "957413ae-e756-4afe-886a-b57bf59d5f8d",
+  "name": "Feather, Radiant Arbiter",
+  "manaCost": "{R}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Angel",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flying, lifelink\nWhenever you cast a noncreature spell that targets only Feather, you may choose any number of other creatures that spell could target and pay {2} for each of those creatures. If you do, for each of those creatures, copy that spell. The copy targets that creature. (Copies of permanent spells become tokens.)",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkc",
+  "releasedAt": "2024-02-09",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -37423,5 +37494,44 @@
     "artUrl": "https://cards.scryfall.io/art_crop/back/b/6/b65ffce4-bb58-418a-9bad-81533a5f2ba2.jpg?1783906617"
    }
   ]
+ },
+ {
+  "oracleId": "0c85a577-db82-4a36-bc42-49644eba1cf2",
+  "name": "Zevlor, Elturel Exile",
+  "manaCost": "{1}{U}{B}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Tiefling Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Tiefling",
+   "Warrior"
+  ],
+  "oracleText": "Haste\n{2}, {T}: When you next cast an instant or sorcery spell that targets only a single opponent or a single permanent an opponent controls this turn, for each other opponent, choose that player or a permanent they control, copy that spell, and the copy targets the chosen player or permanent.",
+  "power": "4",
+  "toughness": "2",
+  "colors": [
+   "B",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  }
 ]

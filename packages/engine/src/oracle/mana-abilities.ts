@@ -28,11 +28,14 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   // mana ability (rulings): how many is chosen as it's activated.
   // Sacellum Godspeaker: "Reveal any number of creature cards with power 5 or greater from your hand. Add {G} for each
   // card revealed this way." The same (rulings: a mana ability, none revealed adds nothing).
-  const reveal = /^(.+): Reveal any number of ([a-z]+) cards( with power \d+ or greater)? (?:in|from) your hand\. Add ((?:\{[WUBRGC]\})+) for each card revealed this way\.$/.exec(line0);
+  // Rosheen, Roaring Prophet: "Reveal any number of cards with {X} in their mana cost in your hand. Add {C}{C} for each
+  // card revealed this way. Spend this mana only on costs that contain {X}.": the same, its mana restricted (CR 106.6;
+  // rulings: any cost that contains {X}, all of it, not only the {X} part).
+  const reveal = /^(.+): Reveal any number of ([a-z]+ cards|cards with \{X\} in their mana cost)( with power \d+ or greater)? (?:in|from) your hand\. Add ((?:\{[WUBRGC]\})+) for each card revealed this way\.( Spend this mana only [^.]+\.)?$/.exec(line0);
   if (reveal) {
-    const ab = parseManaAbility(`${reveal[1]}: Add ${reveal[4]}.`);
-    const filter = parseSearchFilter(`${reveal[2]} card${reveal[3] ?? ""}`);
-    if (!ab || !filter || ab.produces.kind !== "fixed") return null;
+    const ab = parseManaAbility(`${reveal[1]}: Add ${reveal[4]}.${reveal[5] ?? ""}`);
+    const filter = parseSearchFilter(reveal[2] === "cards with {X} in their mana cost" ? "card with {X} in its mana cost" : `${reveal[2]!.replace(/s$/, "")}${reveal[3] ?? ""}`);
+    if (!ab || !filter || ab.produces.kind !== "fixed" || (reveal[5] && !ab.spendOnly)) return null;
     return { ...ab, text: line0, produces: { kind: "revealX", filter, per: ab.produces.mana } };
   }
   // "{T}: For each color among permanents you control, add one mana of that color." (Bloom Tender), "{2}, {T}: Choose a

@@ -3,8 +3,8 @@
 // (Into the Pit).
 
 import { describe, expect, it } from "vitest";
-import { act, card, putOnBattlefield, setup } from "./helpers";
-import { applyAction, botActions, castProblem, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { act, card, forest, putOnBattlefield, setup } from "./helpers";
+import { applyAction, botActions, castProblem, isFullySupported, planActivate, planCast, planPlot, plotCost, plotProblem, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -46,6 +46,8 @@ const bolt = (): CardDef => ({"oracleId":"4457ed35-7c10-48c8-9776-456485fdf070",
 const divination = (): CardDef => ({"oracleId":"273b339c-964b-4a18-8eb5-ceb8abcdfd9e","name":"Divination","manaCost":"{2}{U}","cmc":3,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Draw two cards.","colors":["U"],"colorIdentity":["U"],"keywords":[],"commanderLegal":"legal","set":"dom","releasedAt":"2018-04-27","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
 const paleo = (): CardDef => ({"oracleId":"d6026309-aae9-43e7-938b-69db7af7139c","name":"Intrepid Paleontologist","manaCost":"{1}{G}","cmc":2,"typeLine":"Creature — Human Druid","supertypes":[],"types":["Creature"],"subtypes":["Human","Druid"],"oracleText":"{T}: Add one mana of any color.\n{2}: Exile target card from a graveyard.\nYou may cast Dinosaur creature spells from among cards you own exiled with this creature. If you cast a spell this way, that creature enters with a finality counter on it. (If a creature with a finality counter on it would die, exile it instead.)","power":"2","toughness":"2","colors":["G"],"colorIdentity":["G"],"keywords":[],"producedMana":["B","G","R","U","W"],"commanderLegal":"legal","set":"lci","releasedAt":"2023-11-17","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 const adept = (): CardDef => ({"oracleId":"791cbb7c-7935-4902-b050-9ea9d030e9fa","name":"Osteomancer Adept","manaCost":"{1}{B}","cmc":2,"typeLine":"Creature — Squirrel Warlock","supertypes":[],"types":["Creature"],"subtypes":["Squirrel","Warlock"],"oracleText":"Deathtouch\n{T}: Until end of turn, you may cast creature spells from your graveyard by foraging in addition to paying their other costs. If you cast a spell this way, that creature enters with a finality counter on it. (To forage, exile three cards from your graveyard or sacrifice a Food. If a creature with a finality counter on it would die, exile it instead.)","power":"2","toughness":"2","colors":["B"],"colorIdentity":["B"],"keywords":["Deathtouch"],"commanderLegal":"legal","set":"blb","releasedAt":"2024-08-02","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const fblthp = (): CardDef => ({"oracleId":"764f6412-c4ff-4eec-9a9d-870661f97f8b","name":"Fblthp, Lost on the Range","manaCost":"{1}{U}{U}","cmc":3,"typeLine":"Legendary Creature — Homunculus","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Homunculus"],"oracleText":"Ward {2}\nYou may look at the top card of your library any time.\nThe top card of your library has plot. The plot cost is equal to its mana cost.\nYou may plot nonland cards from the top of your library.","power":"1","toughness":"1","colors":["U"],"colorIdentity":["U"],"keywords":["Plot","Ward"],"commanderLegal":"legal","set":"otj","releasedAt":"2024-04-19","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const djinn = (): CardDef => ({"oracleId":"7dbb540f-ee96-4115-b6ef-28ffc73da8b7","name":"Djinn of Fool's Fall","manaCost":"{4}{U}","cmc":5,"typeLine":"Creature — Djinn","supertypes":[],"types":["Creature"],"subtypes":["Djinn"],"oracleText":"Flying\nPlot {3}{U} (You may pay {3}{U} and exile this card from your hand. Cast it as a sorcery on a later turn without paying its mana cost. Plot only as a sorcery.)","power":"4","toughness":"3","colors":["U"],"colorIdentity":["U"],"keywords":["Flying","Plot"],"commanderLegal":"legal","set":"otj","releasedAt":"2024-04-19","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
 const rock = card("Test Rock", "Artifact", "{1}");
 const dino = card("Test Dinosaur", "Creature — Dinosaur", "{1}{G}", { power: "3", toughness: "3" });
 const food = card("Food", "Token Artifact — Food", "", { oracleText: "{2}, {T}, Sacrifice this token: You gain 3 life." });
@@ -278,5 +280,67 @@ describe("round 331: Osteomancer Adept", () => {
     for (let i = 0; i < 40 && s.objects[og]!.zone !== "battlefield" && s.step === "main1"; i++) s = act(s, botActions(s, s.pending?.player ?? s.priority)[0]!);
     expect(s.objects[og]!.zone).toBe("battlefield");
     expect(s.objects[og]!.counters.finality).toBe(1);
+  });
+});
+
+describe("round 331: Fblthp, Lost on the Range", () => {
+  it("compiles", () => supported(fblthp()));
+
+  it("plots the top card of your library for its mana cost, then casts it free on a later turn", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, fblthp());
+    const o = onTop(s0, ap, ogre);
+    expect(plotCost(s0, ap, s0.cards[s0.objects[o]!.cardId]!, s0.objects[o]!)).toBe("{2}{R}");
+    let s = run(s0, planPlot(s0, ap, o));
+    expect(s.objects[o]!.zone).toBe("exile");
+    expect(s.objects[o]!.mayPlay?.until).toBe("plot");
+    expect(s.battlefield.filter((id) => s.objects[id]!.tapped && s.objects[id]!.controller === ap).length).toBe(3);
+    // Not the same turn (CR 702.170d).
+    expect(planCast(s, ap, o)).toBeNull();
+    for (let i = 0; i < 2000 && !(s.activePlayer === ap && s.step === "main1" && s.turn > s0.turn); i++) s = act(s, s.pending ? botActions(s, s.pending.player)[0]! : { type: "passPriority", player: waitingOn(s)! });
+    const tapped = s.battlefield.filter((id) => s.objects[id]!.tapped).length;
+    s = settle(run(s, planCast(s, ap, o)));
+    expect(s.objects[o]!.zone).toBe("battlefield");
+    expect(s.battlefield.filter((id) => s.objects[id]!.tapped).length).toBe(tapped);
+  });
+
+  it("a card with plot of its own on top: the cheaper of its plot cost and its mana cost", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, fblthp());
+    const o = onTop(s0, ap, djinn());
+    expect(plotCost(s0, ap, s0.cards[s0.objects[o]!.cardId]!, s0.objects[o]!)).toBe("{3}{U}");
+  });
+
+  it("not a land, not the second card, not without Fblthp, and only at sorcery speed", () => {
+    const { s: s0, ap } = setup([]);
+    const f = putOnBattlefield(s0, ap, fblthp());
+    const second = onTop(s0, ap, ogre);
+    const land = onTop(s0, ap, forest);
+    expect(plotProblem(s0, ap, land)).toMatch(/only a card in your hand/);
+    expect(plotProblem(s0, ap, second)).toMatch(/only a card in your hand/);
+    s0.players[ap]!.library.shift();
+    s0.players[ap]!.library.push(land);
+    expect(planPlot(s0, ap, second)).not.toBeNull();
+    const o = putOnBattlefield(s0, ap, ogre);
+    s0.battlefield.splice(s0.battlefield.indexOf(o), 1);
+    s0.objects[o]!.zone = "hand";
+    s0.players[ap]!.hand.push(o);
+    // A card in your hand without plot: Fblthp gives plot only to the top card.
+    expect(plotProblem(s0, ap, o)).toMatch(/doesn't have plot/);
+    const t = run(s0, planCast(s0, ap, o));
+    expect(plotProblem(t, ap, second)).toMatch(/main phase while the stack is empty/);
+    s0.battlefield.splice(s0.battlefield.indexOf(f), 1);
+    expect(plotProblem(s0, ap, second)).toMatch(/only a card in your hand/);
+  });
+
+  it("a bot plots its top card in its second main phase with mana to spare", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, fblthp());
+    const o = onTop(s0, ap, ogre);
+    s0.players[ap]!.hand = [];
+    let s = s0;
+    for (let i = 0; i < 300 && s.objects[o]!.zone === "library" && s.activePlayer === ap; i++) s = act(s, s.pending ? botActions(s, s.pending.player)[0]! : botActions(s, waitingOn(s)!)[0]!);
+    expect(s.objects[o]!.zone).toBe("exile");
+    expect(s.objects[o]!.mayPlay?.until).toBe("plot");
   });
 });

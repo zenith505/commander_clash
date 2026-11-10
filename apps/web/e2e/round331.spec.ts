@@ -1,7 +1,8 @@
 // Round 331's cast paths: a spell cast from the top of your library with Into the Pit's permission asks for the nonland
 // permanent to sacrifice (CR 601.2f-h); Elsha of the Infinite casts a noncreature spell from the top; Osteomancer Adept's
 // "cast creature spells from your graveyard by foraging" asks for the three cards to exile, and the creature enters with
-// a finality counter; Intrepid Paleontologist exiles a Dinosaur card from your graveyard, then casts it from exile.
+// a finality counter; Intrepid Paleontologist exiles a Dinosaur card from your graveyard, then casts it from exile;
+// Fblthp, Lost on the Range adds Plot to the menu of the top card of your library.
 import { expect, test } from "@playwright/test";
 import { LANDS, one, open, pageErrors, scene } from "./scene";
 import { card, menu, modal, resolveUntil, seat } from "./ui";
@@ -72,5 +73,19 @@ test("Intrepid Paleontologist: exile Ripjaw Raptor from your graveyard, then cas
   await menu(page).getByRole("button", { name: /^Cast/ }).click();
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[raptor]!.zone === "battlefield");
   expect(after.objects[raptor]!.counters.finality).toBe(1);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Fblthp, Lost on the Range: the top card's menu plots Hill Giant for its mana cost", async ({ page }) => {
+  const s = scene({ board: [...LANDS, "Fblthp, Lost on the Range"], library: ["Hill Giant", "Shock"] });
+  const [giant, shock] = [one(s, "Hill Giant"), one(s, "Shock")];
+  await open(page, s);
+  const library = seat(page, 0).locator(".zone", { hasText: "Library" });
+  await library.locator(`[data-obj="${giant}"]`).click();
+  await menu(page).getByRole("button", { name: /^Plot/ }).click();
+  const after = await resolveUntil(page, (st) => st.objects[giant]!.zone === "exile");
+  expect(after.objects[giant]!.mayPlay?.until).toBe("plot");
+  expect(after.players[0]!.library[0]).toBe(shock);
+  expect(after.battlefield.filter((id) => after.objects[id]!.tapped)).toHaveLength(4);
   expect(pageErrors(page)).toEqual([]);
 });

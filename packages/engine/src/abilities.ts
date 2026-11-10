@@ -8247,6 +8247,11 @@ export interface CompiledCard {
   lifeForBlack?: true;
   /** Doc Aurlock: "Plotting cards from your hand costs {2} less" (CR 702.170a, 601.2f): less generic mana, for its controller. */
   plotLess?: number;
+  /**
+   * Fblthp, Lost on the Range: "The top card of your library has plot. The plot cost is equal to its mana cost." and "You
+   * may plot nonland cards from the top of your library." (`granted`, `fromTop`: each line, both needed to plot from there).
+   */
+  plotTop?: { granted?: true; fromTop?: true };
   /** Exiled Doomsayer: "All morph costs cost {2} more" (CR 118.7, 702.37b): more generic mana to turn any face-down permanent face up with its morph or megamorph cost, not a disguise cost or a manifested card's mana cost, nor casting it face down. */
   morphTax?: number;
   /** Embalmer's Tools: "Activated abilities of creature cards in your graveyard cost {1} less to activate" (CR 601.2f). */

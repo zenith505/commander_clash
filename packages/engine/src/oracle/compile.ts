@@ -4510,6 +4510,16 @@ export function compile(d: CardDef): CompiledCard {
       out.morphTax = (out.morphTax ?? 0) + Number(morphTax[1]);
       continue;
     }
+    // Fblthp, Lost on the Range: plot (CR 702.170a) for the top card of your library, its cost its mana cost, and a
+    // permission to plot a nonland card from there (the plot ability itself only exiles a card from a hand, rulings).
+    if (line === "The top card of your library has plot. The plot cost is equal to its mana cost.") {
+      (out.plotTop ??= {}).granted = true;
+      continue;
+    }
+    if (line === "You may plot nonland cards from the top of your library.") {
+      (out.plotTop ??= {}).fromTop = true;
+      continue;
+    }
     const plotLess = /^Plotting cards from your hand costs \{(\d+)\} less\.$/.exec(line);
     if (plotLess) {
       out.plotLess = (out.plotLess ?? 0) + Number(plotLess[1]);
@@ -6989,6 +6999,8 @@ export function compile(d: CardDef): CompiledCard {
     return (v as { kind?: string }).kind === "affectedControllerPoison" || (v as { kind?: string }).kind === "affectedControllerHand" || (v as { kind?: string }).kind === "affectedColors" || (v as { kind?: string }).kind === "affectedCreatureTypes" || Object.values(v).some(affectedPoison);
   };
   if (affectedPoison([out.spell, out.triggers, out.activated])) out.unsupported.push("(poison counters of an affected permanent's controller, with no affected permanent)");
+  // Fblthp, Lost on the Range: its two plot lines only work together (one grants plot, the other lets it be used there).
+  if (out.plotTop && !(out.plotTop.granted && out.plotTop.fromTop)) out.unsupported.push("(plot from the top of the library without both of its lines)");
   // Both pay with the same chosen cards: a discard for jump-start on top of a discard the spell asks for isn't modeled.
   const kinds = (costs: AdditionalCost[] = []) => costs.map((c) => c.kind);
   if (out.fromGraveyard?.some((g) => kinds(g.costs).some((k) => kinds(out.additionalCosts).includes(k)))) out.unsupported.push("graveyard cast with a cost like its additional cost");

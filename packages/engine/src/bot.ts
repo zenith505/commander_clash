@@ -143,6 +143,7 @@ import {
   lastDrawnInHand,
   deferredChoice,
   ignorableBy,
+  plotCost,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -3681,9 +3682,14 @@ function chooseUnlock(s: GameState, pid: PlayerId): Action[] | null {
 
 /** A card to plot (CR 702.170a) with mana we'd otherwise not use this turn: the biggest one, cast free on a later turn. */
 function choosePlot(s: GameState, pid: PlayerId): Action[] | null {
-  const options = player(s, pid)
-    .hand.filter((id) => compileCard(defOf(s, obj(s, id))).plot)
-    .sort((a, b) => mv(s, b) - mv(s, a));
+  // Fblthp, Lost on the Range: the top card of our library too, after the hand's (a card for later, like a draw).
+  const top = player(s, pid).library[0];
+  const options = [
+    ...player(s, pid)
+      .hand.filter((id) => compileCard(defOf(s, obj(s, id))).plot)
+      .sort((a, b) => mv(s, b) - mv(s, a)),
+    ...(top !== undefined && plotCost(s, pid, defOf(s, obj(s, top)), obj(s, top)) !== undefined ? [top] : []),
+  ];
   for (const id of options) {
     const plan = planPlot(s, pid, id);
     if (plan) return plan;

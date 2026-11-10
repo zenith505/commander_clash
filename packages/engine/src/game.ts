@@ -14239,9 +14239,9 @@ export function assistedRemaining(s: GameState): { cost: ParsedCost; extra: numb
  */
 export function plotProblem(s: GameState, pid: PlayerId, id: ObjectId): string | null {
   const o = s.objects[id];
-  if (!o || o.zone !== "hand" || o.owner !== pid) return "only a card in your hand can be plotted";
+  if (!o || !((o.zone === "hand" && o.owner === pid) || topPlotCost(s, pid, o) !== undefined)) return "only a card in your hand can be plotted";
   const d = defOf(s, o);
-  const cost = plotCost(s, pid, d);
+  const cost = plotCost(s, pid, d, o);
   if (cost === undefined) return `${d.name} doesn't have plot`;
   if (s.priority !== pid || s.pending) return "you don't have priority";
   if (!canActAtSorcerySpeed(s, pid)) return "you can only plot during your main phase while the stack is empty";
@@ -14506,7 +14506,8 @@ export function setUnlocked(s: GameState, o: GameObject, doors: number[]) {
  * What `pid` pays to plot this card now: its plot cost, less generic mana for each "Plotting cards from your hand costs
  * {2} less" they control (Doc Aurlock; reductions take off only generic mana, CR 601.2f). Undefined without plot.
  */
-export function plotCost(s: GameState, pid: PlayerId, d: CardDef): string | undefined {
+export function plotCost(s: GameState, pid: PlayerId, d: CardDef, o?: GameObject): string | undefined {
+  if (o?.zone === "library") return topPlotCost(s, pid, o);
   const cost = compileCard(d).plot;
   if (cost === undefined) return undefined;
   let less = 0;
@@ -14523,17 +14524,36 @@ export function plotCost(s: GameState, pid: PlayerId, d: CardDef): string | unde
   return out || "{0}";
 }
 
+/**
+ * Fblthp, Lost on the Range: what `pid` pays to plot the top card of their library, a nonland card (CR 702.170a): its own
+ * plot cost or its mana cost, the plot Fblthp gives it (rulings: either one), the one with the lower mana value (its own
+ * on a tie). Hand reductions (Doc Aurlock) don't apply. No mana cost, or {X} in it: not one Fblthp's plot can use.
+ */
+function topPlotCost(s: GameState, pid: PlayerId, o: GameObject): string | undefined {
+  if (o.zone !== "library" || o.owner !== pid || player(s, pid).library[0] !== o.id) return undefined;
+  const d = defOf(s, o);
+  if (isType(d, "Land")) return undefined;
+  const grants = s.battlefield.map((id) => obj(s, id)).filter((p) => controllerOf(s, p) === pid).map((p) => abilitiesOf(s, p).plotTop);
+  if (!grants.some((g) => g?.fromTop)) return undefined;
+  const own = compileCard(d).plot;
+  const given = grants.some((g) => g?.granted) && d.manaCost && !parseManaCost(d.manaCost).hasX ? d.manaCost : undefined;
+  const ways = [own, given].filter((c): c is string => c !== undefined);
+  if (!ways.length) return undefined;
+  return ways.reduce((a, b) => (manaValue(parseManaCost(b)) < manaValue(parseManaCost(a)) ? b : a));
+}
+
 /** Plot a card (CR 702.170a): pay its plot cost and exile it. Its owner may cast it free on a later turn (702.170d). */
 function plotCard(s: GameState, p: Player, id: ObjectId) {
   const problem = plotProblem(s, p.id, id);
   if (problem) throw new RulesError(problem);
   const o = obj(s, id);
   const d = defOf(s, o);
-  const cost = plotCost(s, p.id, d)!;
+  const cost = plotCost(s, p.id, d, o)!;
+  const fromTop = o.zone === "library";
   spendFromPool(s, p.id, parseManaCost(cost), "other");
   moveObject(s, id, "exile");
   o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "plot", turn: s.turn };
-  log(s, `${p.name} plots ${d.name} (${cost}). They may cast it without paying its mana cost on a later turn.`);
+  log(s, `${p.name} plots ${d.name}${fromTop ? " from the top of their library" : ""} (${cost}). They may cast it without paying its mana cost on a later turn.`);
   s.passedInSuccession = [];
   fireEvent(s, { type: "plotted", id });
 }

@@ -11117,6 +11117,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "764f6412-c4ff-4eec-9a9d-870661f97f8b",
+  "name": "Fblthp, Lost on the Range",
+  "manaCost": "{1}{U}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Homunculus",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Homunculus"
+  ],
+  "oracleText": "Ward {2}\nYou may look at the top card of your library any time.\nThe top card of your library has plot. The plot cost is equal to its mana cost.\nYou may plot nonland cards from the top of your library.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Plot",
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "otj",
+  "releasedAt": "2024-04-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c338eedb-9b70-4b77-b5d6-8ea74b7bea3e",
   "name": "Feed the Cycle",
   "manaCost": "{1}{B}",

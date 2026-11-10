@@ -549,7 +549,7 @@ export type Count =
   /** "For each mana from a Treasure spent to cast it/~" (CR 106.3): the spell's, its permanent's, or an ability's. */
   | { kind: "treasureSpent"; /** "Spent to activate this ability": in an activated ability (compile checks). */ activated?: true }
   /** "For each mana from a Desert spent to cast ~" (Cataclysmic Prospecting, CR 106.3): the resolving spell's, by its mana's sources. */
-  | { kind: "spentFrom"; origin: "desert" }
+  | { kind: "spentFrom"; origin: "desert" | /** Bat Colony: the enters trigger of the permanent the spell became, from its enters event. */ "cave" }
   /** "Equal to the result" (CR 706.2): the last roll's result, all its dice added up; in a "whenever you roll" trigger, the roll's. */
   | { kind: "rollResult" }
   /** "The other result" after "roll two dX and choose one result": the one not chosen. */
@@ -993,6 +993,8 @@ export interface TargetSpec {
     amount?: AmountExpr;
     /** `total` holds the amount, worked out. */
     settled?: true;
+    /** Avacyn's Judgment: "If ~'s madness cost was paid, it deals X damage divided ... instead": `amount` when cast that way (gateBody, CR 601.2b before 601.2d). */
+    altAmount?: { alt: "madness"; amount: AmountExpr };
   };
   /** "Another target creature" on a permanent's ability: not the source itself. */
   notSource?: boolean;
@@ -3523,6 +3525,11 @@ export type Effect =
    */
   | { type: "revealRandomDiscardNamed"; who: PlayerRef; n: Amount }
   /**
+   * Bribe Taker: "for each kind of counter on permanents you control, you may put your choice of a +1/+1 counter or a
+   * counter of that kind on ~": the kinds there as it resolves, each counted once (rulings), each its own choice.
+   */
+  | { type: "counterKindsBribe" }
+  /**
    * Bazaar of Wonders: "counter it if a card with the same name is in a graveyard or a nontoken permanent with the same name
    * is on the battlefield": the spell whose cast triggered this, checked as it resolves; a face-down spell has no name
    * (CR 708.2a), and a split card has both of its names in a graveyard (CR 709.4a).
@@ -5135,6 +5142,8 @@ export type EntersOption = /** "As ~ enters, choose another creature you control
  * white mana"), of one color (adamant's "three mana of the same color"), in all ("five or more mana"), or none at all.
  */
 export interface SpentReq {
+  /** Wumpus Aberration: "if {C} wasn't spent": the rest of the requirement isn't met. */
+  not?: true;
   colors?: Partial<Record<Color, number>>;
   sameColor?: number;
   total?: number;
@@ -7621,6 +7630,12 @@ export interface CompiledCard {
   betrayer?: true;
   /** The Mindskinner: "If a source you control would deal damage to an opponent, prevent that damage and each opponent mills that many cards." (CR 615.5) */
   damageToOpponentsMills?: true;
+  /**
+   * Hostility: "If a spell you control would deal damage to an opponent, prevent that damage. Create a 3/1 ... token
+   * ... for each 1 damage prevented this way" (CR 615.5): one token for each 1 damage it prevents, none for damage that
+   * can't be prevented. See staticRules in damage.ts.
+   */
+  spellDamageToOpponentsTokens?: TokenSpec;
   /** Angel of Suffering: "If damage would be dealt to you, prevent that damage and mill twice that many cards" (CR 615.5, 615.12). */
   damageToYouMillsTwice?: true;
   /** Nine Lives: "If a source would deal damage to you, prevent that damage and put an incarnation counter on ~": the counter kind, one for each source (rulings, CR 615.5, 615.12). */

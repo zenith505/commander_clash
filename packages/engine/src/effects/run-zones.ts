@@ -375,6 +375,11 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       if (bounced) (s.resolving!.bouncedThisWay ??= []).push(bounced);
       moveObject(s, id, e.action === "sacrifice" ? "graveyard" : "hand", e.action === "sacrifice" ? { sacrificed: true } : {});
       if (bounced && s.objects[id]?.zone === "hand") (bounced as { returned?: true }).returned = true;
+      // Heart-Shaped Herb's "return that card": the card it became in the graveyard (CR 400.7), if it went there.
+      if (e.action === "sacrifice" && s.resolving && s.objects[id]?.zone === "graveyard") {
+        const last = s.resolving.sacrificedThisWay?.at(-1);
+        if (last?.id === id) last.cardZc = s.objects[id]!.zoneChanges ?? 0;
+      }
     }
 }
 
@@ -3121,8 +3126,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             if (me?.zone === "battlefield") attachTo(s, me, o);
           }
           if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+          // Random Encounter: "return those creatures to their owner's hand", each while it's still that object (CR 400.7).
           if (e.atEndStep)
-            addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [e.atEndStep === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${e.atEndStep === "exile" ? "Exile" : "Sacrifice"} ~.` });
+            addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [e.atEndStep === "exile" ? { type: "exile", what: { ref: "subject" } } : e.atEndStep === "hand" ? { type: "bounce", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${e.atEndStep === "exile" ? "Exile" : e.atEndStep === "hand" ? "Return" : "Sacrifice"} ~${e.atEndStep === "hand" ? " to its owner's hand" : ""}.` });
           if (e.exileAtYourNextUpkeep) addDelayed(s, "yourNextUpkeep", ctx.controller, o, { targets: [], effects: [{ type: "exile", what: { ref: "subject" } }], text: "Exile ~." });
           // "Sacrifice it when you lose control of ~" (Krovikan Vampire): once you've controlled ~ since now (Seraph rulings).
           const w = watched && s.objects[watched.id];

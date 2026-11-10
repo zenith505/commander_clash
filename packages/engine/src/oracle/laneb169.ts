@@ -1,6 +1,7 @@
 // Lane B round B169's sentences, read at the end of round B168's (parseBodyText is at TS2563's limit).
 import type { Amount, Effect } from "../abilities";
 import { parseOne, type Ctx } from "./body";
+import { roundB170Sentence } from "./laneb170";
 import { NUM, num } from "./words";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
@@ -85,5 +86,5 @@ export function roundB169Sentence(s: string, sentences: string[], si: number, ct
   // Soulgorger Orgg: "When ~ enters, you lose all but 1 life.": the life lost noted for its leaves ability (CR 607.2e).
   const allBut = /^you lose all but (\d+) life$/.exec(s);
   if (allBut && !ctx.spell && !ctx.activated && !effects.length && si + 1 === sentences.length) return { effect: { type: "loseAllBut", keep: Number(allBut[1]) }, next: si + 1 };
-  return null;
+  return roundB170Sentence(s, sentences, si, ctx, effects);
 }

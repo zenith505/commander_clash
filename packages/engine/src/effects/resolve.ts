@@ -34,6 +34,7 @@ import { runLaneB166Effect } from "./run-laneb166";
 import { runLaneB167Effect } from "./run-laneb167";
 import { runLaneB168Effect } from "./run-laneb168";
 import { runLaneB169Effect } from "./run-laneb169";
+import { runLaneB170Effect } from "./run-laneb170";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -551,6 +552,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const o = c && s.objects[c.id];
     return o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === c.zc && objectMatches(s, ref.filter, o, ctx.controller, false) ? [o] : [];
   }
+  if (ref.ref === "sacrificedThisWayCards") return (s.resolving?.sacrificedThisWay ?? []).flatMap((l) => (l.id !== undefined && l.cardZc !== undefined && s.objects[l.id]?.zone === "graveyard" && (s.objects[l.id]!.zoneChanges ?? 0) === l.cardZc ? [s.objects[l.id]!] : []));
   if (ref.ref === "sacrificedCards") return (ctx.sacrificed ?? []).flatMap((l) => (l.id !== undefined && l.cardZc !== undefined && s.objects[l.id]?.zone === "graveyard" && (s.objects[l.id]!.zoneChanges ?? 0) === l.cardZc ? [s.objects[l.id]!] : []));
   if (ref.ref === "costExiled") return (s.resolving?.item.costExiled ?? []).flatMap((c) => (s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : []));
   if (ref.ref === "yourGraveyard") return player(s, ctx.controller).graveyard.map((id) => obj(s, id)).filter((o) => printedMatches(ref.filter, defOf(s, o)));
@@ -1742,6 +1744,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "loseAllBut":
     case "gainLinkedLifeLost":
       return runLaneB169Effect(s, e, ctx, src);
+    case "eachRevealFromHand":
+      return runLaneB170Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

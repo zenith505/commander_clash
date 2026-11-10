@@ -8304,9 +8304,22 @@ export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?
   return (ab.costs ?? []).map((c0) => {
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the type chosen for the source (linked, CR 607.2d).
     const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, src?.chosen) } : c0;
-    const c = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, src?.id, src?.attachedTo) } : c1;
+    const c2 = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, src?.id, src?.attachedTo) } : c1;
+    const c = s && pid !== undefined ? bindLegendaryNames(s, pid, c2) : c2;
     return xCost(c) ? { ...c, n: x ?? 0 } : (c.kind === "discard" || c.kind === "sacrifice" || c.kind === "exileFromGraveyard") && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c;
   });
+}
+
+/**
+ * Key to the Side-Door: "Discard a legendary card with the same name as a legendary permanent you control": the names of
+ * the legendary permanents `pid` controls as the cost is paid (CR 201.2, 601.2h), each permanent's as it is now (a copy's
+ * copied name, CR 707.2); a face-down one has none (CR 708.2).
+ */
+export function bindLegendaryNames(s: GameState, pid: PlayerId, c: AdditionalCost): AdditionalCost {
+  if (c.kind !== "discard" || !c.filter?.namedAsYourLegendary) return c;
+  const names = s.battlefield.map((id) => obj(s, id)).filter((o) => !o.faceDown && controllerOf(s, o) === pid && characteristics(s, o).supertypes.includes("Legendary")).map((o) => characteristics(s, o).name);
+  const { namedAsYourLegendary: _, ...filter } = c.filter;
+  return { ...c, filter: { ...filter, namedAny: [...new Set(names)] } };
 }
 
 /** "Discard a card with mana value X" (Kozilek, the Great Distortion): X announced, then a card with that mana value. */

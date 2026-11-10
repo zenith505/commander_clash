@@ -89,6 +89,15 @@ export function parseGraveyardKeyword(
   // permission with an alternative cost (CR 118.9), so at the usual timing (rulings).
   if ((m = /^You may cast (?:~|this card) from your graveyard by paying ((?:\{[WUBRGC\d]\})+) rather than paying its mana cost\.?$/.exec(line)))
     return parseManaCost(m[1]!).supported ? { fromGraveyard: { kind: "permission", mana: m[1]!, costs: [], exile: false } } : "fail";
+  // Glimpse the Cosmos: "As long as you control a Giant, you may cast ~ from your graveyard by paying {U} rather than paying
+  // its mana cost. If you cast ~ this way and it would be put into your graveyard, exile it instead.": the same permission
+  // only while the condition holds as it's cast (CR 601.2), at the usual timing (rulings), and a replacement for its going
+  // to the graveyard only (CR 614.1a), not flashback's for its leaving the stack. Cast with another permission, neither
+  // applies (rulings).
+  if ((m = /^As long as (.+?), you may cast (?:~|this card) from your graveyard by paying ((?:\{[WUBRGC\d]\})+) rather than paying its mana cost\. If you cast (?:~|this card) this way and it would be put into your graveyard, exile it instead\.?$/.exec(line))) {
+    const cond = parseStaticCondition(m[1]!, { affects: { kind: "self" }, mods: [], text: line });
+    return cond && parseManaCost(m[2]!).supported ? { fromGraveyard: { kind: "permission", mana: m[2]!, costs: [], exile: false, if: cond, exileIfToGraveyard: true } } : "fail";
+  }
   // Scourge of Nel Toth: "You may cast this creature from your graveyard by paying {B}{B} and sacrificing two creatures
   // rather than paying its mana cost": the same, the sacrifice part of that cost (CR 118.9, 601.2h), at the usual timing.
   // Squee, Dubious Monarch: "... by paying {3}{R} and exiling four other cards from your graveyard ...": the same, the

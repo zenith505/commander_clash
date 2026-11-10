@@ -2290,6 +2290,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Its caster's spells this turn, this one included (it was counted as it was cast).
         if (t.cast.notFirst && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, s.cards[c.card]!)))).length < 2) return false;
         if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, s.cards[c.card]!)))).length !== t.cast.nth) return false;
+        // Nullstone Gargoyle: "the first noncreature spell of a turn", by any player (its card types as each was cast).
+        if (t.cast.nth && t.cast.ofTurn && (ev.copy || (s.castThisTurn ?? []).filter((c) => !!s.cards[c.card] && (c.types ? printedMatches(t.cast!.spell, { ...s.cards[c.card]!, types: c.types }) : printedMatches(t.cast!.spell, s.cards[c.card]!))).length !== t.cast.nth)) return false;
         // Alania: the first spell of one of these kinds its caster has cast this turn, this one (a copy wasn't cast).
         if (t.cast.firstOfKinds) {
           const mine = (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && !!s.cards[c.card]);

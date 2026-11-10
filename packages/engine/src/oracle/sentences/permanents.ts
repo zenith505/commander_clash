@@ -1370,7 +1370,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "eachMayCounter", n: num(m[1]!), counter: counterKind(m[2]!), attackBan: true }];
   // "Distribute three +1/+1 counters among one, two, or three target creatures you control": how many targets and how
   // many each gets are chosen with the targets, at least one each (CR 601.2d), like divided damage.
-  if ((m = /^Distribute (two|three|four|five|six|seven|eight) ([+-]1\/[+-]1) counters among (one or two|one, two, or three|any number of|up to (?:two|three|four)) ((?:other )?target .+)$/i.exec(s))) {
+  if ((m = /^Distribute (two|three|four|five|six|seven|eight) ([+-]\d\/[+-]\d) counters among (one or two|one, two, or three|any number of|up to (?:two|three|four)) ((?:other )?target .+)$/i.exec(s))) {
     const total = num(m[1]!);
     const upTo = /^up to /.test(m[3]!);
     const n = m[3] === "one or two" ? 2 : m[3] === "one, two, or three" ? 3 : upTo ? num(m[3]!.slice(6)) : total;
@@ -1516,7 +1516,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "eachMayCounter", n: num(m[1]!), counter: counterKind(m[2]!), attackBan: true }];
   // "Distribute three +1/+1 counters among one, two, or three target creatures you control": how many targets and how
   // many each gets are chosen with the targets, at least one each (CR 601.2d), like divided damage.
-  if ((m = /^Distribute (two|three|four|five|six|seven|eight) ([+-]1\/[+-]1) counters among (one or two|one, two, or three|any number of|up to (?:two|three|four)) ((?:other )?target .+)$/i.exec(s))) {
+  if ((m = /^Distribute (two|three|four|five|six|seven|eight) ([+-]\d\/[+-]\d) counters among (one or two|one, two, or three|any number of|up to (?:two|three|four)) ((?:other )?target .+)$/i.exec(s))) {
     const total = num(m[1]!);
     const upTo = /^up to /.test(m[3]!);
     const n = m[3] === "one or two" ? 2 : m[3] === "one, two, or three" ? 3 : upTo ? num(m[3]!.slice(6)) : total;

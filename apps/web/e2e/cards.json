@@ -180,6 +180,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7d540860-ae94-4773-a526-aaffca3eb057",
+  "name": "Academy Loremaster",
+  "manaCost": "{U}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "At the beginning of each player's draw step, that player may draw an additional card. If they do, spells they cast this turn cost {2} more to cast.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dmu",
+  "releasedAt": "2022-09-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "981b0e21-e5e6-4a1e-bfde-679d56623f7f",
   "name": "Ad Nauseam",
   "manaCost": "{3}{B}{B}",
@@ -11687,6 +11718,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "394c6de5-7957-4a0b-a6b9-ee0c707cd022",
+  "name": "Forgotten Cave",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "This land enters tapped.\n{T}: Add {R}.\nCycling {R} ({R}, Discard this card: Draw a card.)",
+  "colors": [],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Cycling"
+  ],
+  "producedMana": [
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "m3c",
+  "releasedAt": "2024-06-14",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "97b97728-bfe6-483a-a323-c758f41ff9dc",
   "name": "Fossil Find",
   "manaCost": "{R/G}",
@@ -12070,6 +12130,43 @@
   "set": "ecl",
   "releasedAt": "2026-01-23",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "716a3bb8-04bd-41f5-a568-131f175e00a6",
+  "name": "Gavi, Nest Warden",
+  "manaCost": "{2}{U}{R}{W}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Shaman",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Shaman"
+  ],
+  "oracleText": "You may pay {0} rather than pay the cycling cost of the first card you cycle each turn.\nWhenever you draw your second card each turn, create a 2/2 red and white Dinosaur Cat creature token.",
+  "power": "2",
+  "toughness": "5",
+  "colors": [
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c20",
+  "releasedAt": "2020-04-17",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -26967,6 +27064,39 @@
   "set": "roe",
   "releasedAt": "2010-04-23",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "47af21d3-b43f-4101-81cf-ca44db1a2706",
+  "name": "Seeker of Slaanesh",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Creature — Demon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Demon"
+  ],
+  "oracleText": "Haste\nAllure of Slaanesh — Each opponent must attack with at least one creature each combat if able.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Haste",
+   "Allure of Slaanesh"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

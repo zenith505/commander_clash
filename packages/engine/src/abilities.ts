@@ -1592,7 +1592,7 @@ export type ObjRef =
    * turn with `of` as it was then (TurnLog.blocks), even if they're no longer blocking (rulings), each still that object.
    * `at`: `of` as a delayed trigger remembers it.
    */
-  | { ref: "blockHistory"; of: ObjRef; at?: { id: ObjectId; zc: number }; blockers?: true; blocked?: true; /** "This combat" (Ride Down): only blocks declared in the current combat phase (TurnLog.blocks `combat`). */ thisCombat?: true; /** With `of` self, in a dies trigger (Cathedral Membrane): the source as it last existed on the battlefield. */ diedSelf?: true; /** With `of` self: "destroy it and all creatures it blocked this turn" (Defiant Vanguard): the source too, while it's still that object. */ andSelf?: true; /** Heat Stroke: "each creature that blocked or was blocked this turn": every blocker and every blocked attacker of this turn's blocks, whoever's (`of` unused). */ anyone?: true }
+  | { ref: "blockHistory"; of: ObjRef; at?: { id: ObjectId; zc: number }; blockers?: true; blocked?: true; /** "This combat" (Ride Down): only blocks declared in the current combat phase (TurnLog.blocks `combat`). */ thisCombat?: true; /** With `of` self, in a dies trigger (Cathedral Membrane): the source as it last existed on the battlefield. */ diedSelf?: true; /** With `of` self: "destroy it and all creatures it blocked this turn" (Defiant Vanguard): the source too, while it's still that object. */ andSelf?: true; /** Heat Stroke: "each creature that blocked or was blocked this turn": every blocker and every blocked attacker of this turn's blocks, whoever's (`of` unused). */ anyone?: true; /** Ib Halfheart: "each creature blocking it" once the attacker (`of` subject) is gone: only those still blocking creatures (CR 506.4). */ stillBlocking?: true }
   /**
    * "Each permanent with the most votes or tied for most votes" (Council's Judgment), "each card with the most votes ..."
    * (Custodi Squire): what this ability's vote chose (CR 701.38), while each is still that object; none if no one voted.
@@ -4370,6 +4370,8 @@ export type Effect =
       index: number;
       unless?: UnlessPays;
       exile?: boolean;
+      /** Spell Crumple: "put it on the bottom of its owner's library instead of into that player's graveyard". */
+      bottom?: true;
       top?: boolean;
       /** Remand: "If that spell is countered this way, put it into its owner's hand instead of into that player's graveyard." */
       hand?: true;
@@ -5391,6 +5393,8 @@ export type SpellCondition =
   | { kind: "spellCountered" }
   /** "If it's a creature card" about the card "reveal the top card of your library" revealed, by its printed characteristics; `not`: "if it isn't". */
   | { kind: "revealedIs"; filter: TargetSpec; not?: true }
+  /** Peer Pressure: "if you control more creatures of that type than each other player": strictly more permanents matching `filter` (the chosen type bound as it resolves) than each other player still in the game, as this instruction is carried out. */
+  | { kind: "youControlMost"; filter: TargetSpec }
   /** Omnath, Locus of All: "if it has three or more colored mana symbols in its mana cost": the card "look at the top card" looked at, its mana cost's colored symbols counted, hybrid and Phyrexian ones included (rulings), one each. */
   | { kind: "revealedColoredSymbols"; atLeast: number }
   /** "If it has the same mana value as the revealed card" (Counterbalance): the revealed card's (X as 0 off the stack, CR 202.3e) is `mv`. */
@@ -6124,6 +6128,8 @@ export interface TriggeredAbility {
   subjectFilter?: TargetSpec;
   /** With `subjectFilter`: "Whenever ~ or a commander you control attacks alone" (Ironsoul Enforcer): the source itself matches too. */
   subjectOrSelf?: true;
+  /** With `subjectFilter`: "Whenever another Goblin you control becomes blocked" (Ib Halfheart): never the source itself. */
+  subjectNotSelf?: true;
   /**
    * "Whenever ~ blocks or becomes blocked by one or more black creatures" (Serra Inquisitors), "blocks one or more black
    * creatures" (Rashka the Slayer): once per combat, if any creature it blocks or that blocks it matches (rulings).
@@ -6482,6 +6488,8 @@ export interface BatchTrigger {
 }
 
 export interface ActivatedAbility {
+  /** Clay Golem: "Roll a d8" in its cost: a die with this many sides rolled as it's activated, its result the ability's "the result" (StackItem.rolled). */
+  rollCost?: number;
   /** Another permanent's ability that this one has through "~ has all activated abilities of ..." (CompiledCard.borrows). */
   borrowed?: true;
   /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): the color chosen as its source entered. */
@@ -7717,6 +7725,11 @@ export interface CompiledCard {
   /** "No more than one creature can attack each combat" (Silent Arbiter); `attackYou`: "... can attack you each combat" (Crawlspace), its controller only, not their planeswalkers (rulings). */
   /** War's Toll: "If a creature an opponent controls attacks, all creatures that opponent controls attack if able" (CR 508.1d): a requirement on each opponent's creatures once any of them is declared as an attacker. */
   opponentsAttackAll?: true;
+  /**
+   * Seeker of Slaanesh: "Each opponent must attack with at least one creature each combat if able" (CR 508.1d): a requirement
+   * on each opponent of its controller as they declare attackers, not on any one creature (rulings).
+   */
+  opponentsAttackWithOne?: true;
   /** Viashino Bey: "If ~ attacks, all creatures you control attack if able" (CR 508.1d): its controller's other creatures, once it's declared as an attacker. */
   allAttackIfSelfAttacks?: true;
   /** Cunning Giant: "If ~ is unblocked, you may have it assign its combat damage to a creature defending player controls" (game.ts askDamageToCreature). */
@@ -7998,6 +8011,12 @@ export interface CompiledCard {
   noGraveyardActivations?: true;
   /** Ground Seal: "Cards in graveyards can't be the targets of spells or abilities." Untargeted effects still reach them (rulings). */
   graveyardUntargetable?: true;
+  /** Tomik, Distinguished Advokist: land cards in graveyards can't be the targets of spells or abilities this permanent's controller's opponents control. */
+  yardLandsUntargetableByOpponents?: true;
+  /** Tomik: "Your opponents can't play land cards from graveyards.", whatever lets them (rulings). */
+  opponentsCantPlayYardLands?: true;
+  /** Experimental Frenzy: "You can't play lands or cast spells from your hand." (its controller). */
+  youCantPlayFromHand?: true;
   /** Aven Mindcensor: "If an opponent would search a library, that player searches the top four cards of that library instead." (CR 614.1a) */
   opponentsSearchTop?: number;
   /**
@@ -8320,6 +8339,12 @@ export interface CompiledCard {
   youActivateLess?: { n: number; atLeastOne?: true };
   /** Fluctuator: "Cycling abilities you activate cost {2} less to activate", from any zone (CR 702.29f: typecycling too). */
   cyclingLess?: number;
+  /**
+   * An alternative cost of {0} for its controller's cycling abilities (CR 118.9; typecycling too, CR 702.29f): Gavi, Nest
+   * Warden's "of the first card you cycle each turn" (`first`), New Perspectives' "As long as you have seven or more cards
+   * in hand" (`handAtLeast`, the card being cycled counted, rulings). The discard is still part of the cost (rulings).
+   */
+  freeCycling?: { first?: true; handAtLeast?: number }[];
   /**
    * "Players can't untap more than one nonbasic land during their untap steps" (Winter Moon), "You can't untap more than
    * one land during your untap step" (Mungha Wurm, `you`), "As long as ~ is untapped, players can't untap more than two

@@ -43,6 +43,8 @@ import {
   attackLifeCost,
   attackYouLimit,
   attackAllIfOne,
+  attackWithOneOptions,
+  attackWithOneRequired,
   combatLimit,
   playerBlockLimit,
   attackTaxPer,
@@ -5945,7 +5947,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const modes = ab.body.modal ? chooseModes(s, pid, ab.body, false, id)?.modes : undefined;
       if (ab.body.modal && !modes) continue;
       const body = withModes(ab.body, modes);
-      if (!craft && (groupValue(s, pid, body, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
+      // Clay Golem: "the result" of the die its cost rolls, weighed at the middle of the die (rounded down).
+      const valued = ab.rollCost ? (JSON.parse(JSON.stringify(body).replaceAll('{"count":{"kind":"rollResult"}}', String(Math.floor((ab.rollCost + 1) / 2)))) as typeof body) : body;
+      if (!craft && (groupValue(s, pid, valued, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
       // An X ability: the biggest X we can pay for (never 0).
       const cost = parseManaCost(ab.manaCost);
       // Prototype Portal: X set by the ability (CR 107.3c).
@@ -7627,6 +7631,15 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   if (declared.length > cap) {
     const must = (a: { attacker: string }) => (characteristics(s, obj(s, a.attacker)).attacksIfAble ? 1 : 0);
     declared = [...declared].sort((a, b) => must(b) - must(a) || power(s, obj(s, b.attacker)) - power(s, obj(s, a.attacker))).slice(0, cap);
+  }
+  // Seeker of Slaanesh: with nobody attacking, one creature has to (CR 508.1d): the toughest one that can go alone, at
+  // whoever it can attack for free (the target first); failing that, the group that can only attack together.
+  if (!declared.length && attackWithOneRequired(s, pid) !== undefined) {
+    const options = attackWithOneOptions(s, pid).map((id) => obj(s, id));
+    const at = (o: GameObject) => [target, ...opps].find((d) => !attackProblem(s, o, d) && !attackTaxPer(s, d, false, o.id) && attackYouLimit(s, d) > 0)!;
+    const solo = options.filter((o) => !characteristics(s, o).cantAttackAlone && !withoutCompany(s, o.id, [{ attacker: o.id }]));
+    const pick = solo.length ? [[...solo].sort((a, b) => toughness(s, b) - toughness(s, a) || power(s, a) - power(s, b))[0]!] : options;
+    declared = pick.map((o) => ({ attacker: o.id, defender: at(o) }));
   }
   // Crawlspace: no more than its limit at that player; the ones that have to attack and the strongest stay, the rest go at
   // another opponent with room, or stay home.

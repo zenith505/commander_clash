@@ -3386,6 +3386,8 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // Mandate of Peace: "End the combat phase" (CR 724.2) only against an attack on us that hasn't dealt its damage yet.
   if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endCombatPhase") && !endCombatWorth(s, pid)) return null;
   if (lifeSwapHurts(s, pid, compileCard(d).spell?.effects ?? [])) return null;
+  // Fighting Chance: only while creatures block ours, before combat damage.
+  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "flipCoinEachWon") && !s.battlefield.some((b) => (obj(s, b).blocking ?? []).some((a) => s.objects[a] && controllerOf(s, obj(s, a)) === pid))) return null;
   // Stunning Reversal: kept for when our life is low enough that we might lose this turn.
   if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "loseInsteadThisTurn") && player(s, pid).life > 5) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).

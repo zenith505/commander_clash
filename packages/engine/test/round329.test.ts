@@ -5,7 +5,8 @@
 // 1. If you put a noncreature, nonland card into your graveyard this way, put that card into your hand." (Chandra, Chill
 // of Compliance; Enlightened Confidant's mana value bound); "If it was a creature card, ... If it was a land card, ...
 // Otherwise, ..." (Misfortune Teller); "exile all cards from your library face down, then shuffle all cards from your
-// graveyard into your library." (Inverter of Truth).
+// graveyard into your library." (Inverter of Truth); "For each blocking creature, flip a coin. If you win the flip, prevent
+// all combat damage that would be dealt by that creature this turn." (Fighting Chance).
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup, target } from "./helpers";
@@ -39,6 +40,7 @@ const throne = (): CardDef => ({"oracleId":"a68f41a2-37ee-46e1-bf3c-164c78b003ca
 const teller = (): CardDef => ({"oracleId":"bd1ccc6f-d281-413e-889e-1e022c3f2a99","name":"Misfortune Teller","manaCost":"{3}{B}","cmc":4,"typeLine":"Creature — Human Warlock","supertypes":[],"types":["Creature"],"subtypes":["Human","Warlock"],"oracleText":"Deathtouch\nWhenever this creature enters or deals combat damage to a player, exile target card from a graveyard. If it was a creature card, create a 2/2 black Rogue creature token. If it was a land card, create a Treasure token. Otherwise, you gain 3 life.","power":"3","toughness":"1","colors":["B"],"colorIdentity":["B"],"keywords":["Treasure","Deathtouch"],"commanderLegal":"legal","set":"ncc","releasedAt":"2022-04-29","rarity":"rare","layout":"normal","gameChanger":false} as CardDef);
 const chandra = (): CardDef => ({"oracleId":"c3dfa1e2-6785-49a0-a194-fb842a8eb63c","name":"Chandra, Chill of Compliance","manaCost":"{1}{U}{U}","cmc":3,"typeLine":"Legendary Planeswalker — Chandra","supertypes":["Legendary"],"types":["Planeswalker"],"subtypes":["Chandra"],"oracleText":"+1: Surveil 1. If you put a noncreature, nonland card into your graveyard this way, put that card into your hand.\n+1: Add {U}. Spend this mana only to cast a noncreature spell.\n−X: Tap target artifact or creature. Put X stun counters on it.\n−6: You get an emblem with \"Whenever you cast a spell, draw a card.\"","loyalty":"3","colors":["U"],"colorIdentity":["U"],"keywords":["Surveil"],"producedMana":["U"],"commanderLegal":"legal","set":"fra","releasedAt":"2026-10-02","rarity":"mythic","layout":"normal","gameChanger":false} as CardDef);
 const confidant = (): CardDef => ({"oracleId":"a139eb7f-3853-490c-a839-35d0e5aed7b5","name":"Enlightened Confidant","manaCost":"{1}{W}","cmc":2,"typeLine":"Creature — Kor Cleric","supertypes":[],"types":["Creature"],"subtypes":["Kor","Cleric"],"oracleText":"Lifelink\nAt the beginning of your end step, if you gained life this turn, surveil 1. If you put a card with mana value less than or equal to the amount of life you gained this turn into your graveyard this way, put that card into your hand.","power":"2","toughness":"1","colors":["W"],"colorIdentity":["W"],"keywords":["Surveil","Lifelink"],"commanderLegal":"legal","set":"fra","releasedAt":"2026-10-02","rarity":"mythic","layout":"normal","gameChanger":false} as CardDef);
+const chance = (): CardDef => ({"oracleId":"fece632b-d8d5-4d3d-a4a7-643293b67538","name":"Fighting Chance","manaCost":"{R}","cmc":1,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"For each blocking creature, flip a coin. If you win the flip, prevent all combat damage that would be dealt by that creature this turn.","colors":["R"],"colorIdentity":["R"],"keywords":[],"commanderLegal":"legal","set":"exo","releasedAt":"1998-06-15","rarity":"rare","layout":"normal","gameChanger":false} as CardDef);
 const inverter = (): CardDef => ({"oracleId":"941350ba-30e2-4549-865f-ca1bd7626782","name":"Inverter of Truth","manaCost":"{2}{B}{B}","cmc":4,"typeLine":"Creature — Eldrazi","supertypes":[],"types":["Creature"],"subtypes":["Eldrazi"],"oracleText":"Devoid (This card has no color.)\nFlying\nWhen this creature enters, exile all cards from your library face down, then shuffle all cards from your graveyard into your library.","power":"6","toughness":"6","colors":[],"colorIdentity":["B"],"keywords":["Flying","Devoid"],"commanderLegal":"legal","set":"ogw","releasedAt":"2016-01-22","rarity":"mythic","layout":"normal","gameChanger":false} as CardDef);
 
 /** A card put into `pid`'s graveyard. */
@@ -63,7 +65,7 @@ const platinum = () => card("Platinum Angel", "Artifact Creature — Angel", "{7
 const doom = () => card("Doom Decree", "Sorcery", "{B}", { cmc: 1, oracleText: "Target player loses the game." });
 
 describe("round 329", () => {
-  it("are fully supported", () => supported(reversal(), archangel(), teller(), chandra(), confidant(), inverter()));
+  it("are fully supported", () => supported(reversal(), archangel(), teller(), chandra(), confidant(), inverter(), chance()));
   it("Stunning Reversal and Exquisite Archangel compile to their replacements", () => {
     expect(compileCard(archangel()).loseGameExileSelf).toBe("startingLife");
     expect(compileCard(throne()).loseGameExileSelf).toBe(true);
@@ -310,5 +312,48 @@ describe("round 329: Inverter of Truth", () => {
   it("a bot doesn't cast it with a small graveyard", () => {
     const { s: s0, ap, ids } = setup([inverter()]);
     expect(botActions(s0, ap).some((a) => a.type === "castSpell" && a.objectId === ids[0])).toBe(false);
+  });
+});
+
+describe("round 329: Fighting Chance", () => {
+  const blocked = (seed: number) => {
+    const { s: s0, ap, ids, opp } = setup([chance()], seed);
+    const bear = (name: string) => card(name, "Creature — Bear", "{1}{G}", { cmc: 2, power: "3", toughness: "3" });
+    const attackers = ["Red Bear", "Blue Bear", "Green Bear"].map((n) => putOnBattlefield(s0, ap, bear(n)));
+    const blockers = ["Gray Bear", "Brown Bear", "Black Bear"].map((n) => putOnBattlefield(s0, opp, bear(n)));
+    let s = passUntil(s0, "declareAttackers");
+    s = act(s, { type: "declareAttackers", player: ap, attacks: attackers.map((a) => ({ attacker: a, defender: opp })) });
+    while (!(s.pending?.kind === "declareBlockers" && s.pending.player === opp)) s = act(s, s.pending?.kind === "declareBlockers" ? { type: "declareBlockers", player: s.pending.player, blocks: [] } : { type: "passPriority", player: waitingOn(s)! });
+    s = act(s, { type: "declareBlockers", player: opp, blocks: blockers.map((b, i) => ({ blocker: b, attacker: attackers[i]! })) });
+    while (waitingOn(s) !== ap) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, ap, ids, opp, attackers, blockers };
+  };
+  it("a flip for each blocking creature: each one won deals no combat damage this turn, each one lost does", () => {
+    let wins = 0;
+    let losses = 0;
+    for (const seed of [1, 2, 3, 4]) {
+      const { s: s0, ap, ids, attackers, blockers } = blocked(seed);
+      let s = settle(run(s0, planCast(s0, ap, ids[0]!)), ap);
+      const line = s.log.find((l) => l.text.includes("for Fighting Chance"))!.text;
+      // "A flips 3 coins for Fighting Chance: won for X, Y, lost for Z."
+      const wonNames = (/: won for (.*?)(?:, lost for .*)?\.$/.exec(line)?.[1] ?? "").split(", ");
+      s = passUntil(s, "endCombat");
+      blockers.forEach((b, i) => {
+        const name = s.cards[s.objects[b]!.cardId]!.name;
+        const won = wonNames.includes(name);
+        if (won) wins++;
+        else losses++;
+        expect(s.objects[attackers[i]!]!.zone, `${line} (${name})`).toBe(won ? "battlefield" : "graveyard");
+        expect(s.objects[b]!.zone).toBe("graveyard"); // the attacker's damage isn't prevented
+      });
+    }
+    expect(wins).toBeGreaterThan(0);
+    expect(losses).toBeGreaterThan(0);
+  });
+  it("with no blocking creature it flips no coins; a bot doesn't cast it then", () => {
+    const { s: s0, ap, ids } = setup([chance()]);
+    expect(botActions(s0, ap).some((a) => a.type === "castSpell" && a.objectId === ids[0])).toBe(false);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!)), ap);
+    expect(s.log.some((l) => l.text.includes("flips no coins for Fighting Chance"))).toBe(true);
   });
 });

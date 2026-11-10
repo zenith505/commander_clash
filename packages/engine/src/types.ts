@@ -2711,6 +2711,8 @@ export interface Resolving {
   countersPutThisWay?: { id: ObjectId; zc: number; kind?: string; /** How many were put (distributed counters, Shambling Swarm). */ n?: number }[];
   /** "Put a +1/+1 counter on each of those Vampires" (Urge to Feed): the permanents its tapAnyNumber tapped. */
   tappedIds?: { id: ObjectId; zc: number }[];
+  /** Fighting Chance: the permanents whose flips this resolution won (ObjRef "wonFlipThisWay"). */
+  wonFlipIds?: { id: ObjectId; zc: number }[];
   /** Out of Time: how many creatures its phaseOut phased out directly (Count "phasedThisWay"). */
   phasedThisWay?: number;
   /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */

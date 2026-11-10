@@ -1,15 +1,45 @@
 // Round 329's effects.
 import type { Effect } from "../abilities";
-import { defOf } from "../cards";
-import { log, moveObject, player } from "../game";
+import { abilitiesOf, defOf } from "../cards";
+import { log, moveObject, nameOf, obj, player } from "../game";
+import { controllerOf } from "../layers";
+import { nextRandom } from "../rng";
 import type { GameState } from "../types";
-import { amountCtx, type ResolveCtx } from "./resolve";
+import { amountCtx, objects, type ResolveCtx } from "./resolve";
+import { flipsRigged, noteFlipped } from "./run-dice";
+import { fireEvent } from "./triggers";
 import { bindBound, printedMatches } from "./targeting";
 
-type R329Effect = Extract<Effect, { type: "surveilledToHand" | "loseInsteadThisTurn" }>;
+type R329Effect = Extract<Effect, { type: "surveilledToHand" | "loseInsteadThisTurn" | "flipCoinEachWon" }>;
 
 export function runRound329Effect(s: GameState, e: R329Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "flipCoinEachWon": {
+      // One flip for each, called by the controller and won or lost (CR 705.2), each a "coinFlipped" event. Edgar, King
+      // of Figaro: the first flips this turn come up heads and are won (rulings). Krark's Thumb: two coins each, and the
+      // won one kept (its controller's choice, CR 705.3, taken for them: ROADMAP).
+      const who = ctx.controller;
+      const each = objects(s, { ref: "each", filter: e.filter }, ctx);
+      const r = s.resolving!;
+      r.wonFlipIds = [];
+      if (!each.length) {
+        log(s, `${player(s, who).name} flips no coins for ${src}.`);
+        return;
+      }
+      const rigged = flipsRigged(s, who);
+      noteFlipped(s, who);
+      const thumb = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === who && !!abilitiesOf(s, obj(s, id)).flipTwo);
+      const won: string[] = [];
+      const lost: string[] = [];
+      for (const o of each) {
+        const win = rigged || (thumb ? [nextRandom(s) < 0.5, nextRandom(s) < 0.5] : [nextRandom(s) < 0.5]).some((x) => x);
+        fireEvent(s, { type: "coinFlipped", player: who, won: win });
+        if (win) r.wonFlipIds.push({ id: o.id, zc: o.zoneChanges ?? 0 });
+        (win ? won : lost).push(nameOf(s, o.id));
+      }
+      log(s, `${player(s, who).name} flips ${each.length} coin${each.length === 1 ? "" : "s"} for ${src}: ${won.length ? `won for ${won.join(", ")}` : "none won"}${lost.length ? `, lost for ${lost.join(", ")}` : ""}.`);
+      return;
+    }
     case "loseInsteadThisTurn": {
       // Stunning Reversal: a shield for the rest of this turn, used by the next loss (game.ts playerLoses).
       const p = player(s, ctx.controller);

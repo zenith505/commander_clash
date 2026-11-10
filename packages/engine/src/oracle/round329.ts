@@ -64,6 +64,18 @@ export function round329Trigger(raw: string): TriggeredAbility | "fail" | null {
 
 /** A whole ability's text read another way (a string), or null. */
 export function round329WholeText(text: string, parse: (t: string) => AbilityBody | null): AbilityBody | string | null {
-  void text, parse;
+  const t = text.trim();
+  // Fighting Chance: "For each blocking creature, flip a coin. If you win the flip, prevent all combat damage that would be
+  // dealt by that creature this turn.": the creatures blocking as it resolves, each with a flip of its own, won or lost
+  // (CR 705.2); each one won gets the prevention, not targeted.
+  const each = /^For each (blocking creature), flip a coin\. If you win the flip, (prevent all combat damage that would be dealt by) that creature this turn\.$/.exec(t);
+  if (each) {
+    const all = parse(`Destroy each ${each[1]!}.`);
+    const prevent = parse(`${each[2]!.charAt(0).toUpperCase()}${each[2]!.slice(1)} target creature this turn.`);
+    const d = all?.effects.length === 1 ? all.effects[0] : undefined;
+    const c = prevent?.effects.length === 1 ? prevent.effects[0] : undefined;
+    if (!all || all.targets.length || d?.type !== "destroy" || d.what.ref !== "each" || !prevent || prevent.targets.length !== 1 || c?.type !== "continuous" || c.what.ref !== "target") return null;
+    return { targets: [], effects: [{ type: "flipCoinEachWon", filter: d.what.filter }, { ...c, what: { ref: "wonFlipThisWay" } }], text: t };
+  }
   return null;
 }

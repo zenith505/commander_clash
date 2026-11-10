@@ -2633,7 +2633,7 @@ function KickPickBar({
     return (
       <div className="targeting x-pick">
         <span>
-          <strong>{pick.label}</strong>: {pick.name} {pick.text && !pick.costs[0] ? `(${pick.text})` : <ManaCost cost={pick.costs[0]!} size="sm" />}, how many times?
+          <strong>{pick.label}</strong>: {pick.name} {pick.text ? `(${pick.text})` : <ManaCost cost={pick.costs[0]!} size="sm" />}, how many times?
         </span>
         <button className="ghost" disabled={n <= 0} onClick={() => set(n - 1)} aria-label="Kick one time fewer">
           −
@@ -5021,6 +5021,8 @@ function AbilityMenu({
         // Commander ninjutsu works from the command zone too (CR 702.49d).
         // Mister Immortal's works from exile too.
         if ((ab.zone ?? "battlefield") !== o.zone && !(ab.orCommand && o.zone === "command") && !(ab.orExile && o.zone === "exile")) return null;
+        // Torrent Elemental's works only from exile.
+        if (ab.onlyExile && o.zone !== "exile") return null;
         const problem = abilityProblem(s, HUMAN, objectId, i);
         const ok = !problem || (/not enough mana/.test(problem) && planActivate(s, HUMAN, objectId, i) !== null);
         // A mana ability with a choice of mana (CR 605.1a): a button for each, like a land's.

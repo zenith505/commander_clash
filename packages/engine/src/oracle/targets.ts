@@ -225,6 +225,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (poisoned) return { ref: "opponentsWithPoison", n: num(poisoned[1]!) };
   const life = /^each player with exactly (\d+) life$/.exec(x);
   if (life) return { ref: "playersWithLife", n: Number(life[1]) };
+  // Outpace Oblivion: "each player who doesn't have max speed" (a speed of 4, CR 702.179).
+  if (x === "each player who doesn't have max speed") return { ref: "playersWithoutMaxSpeed" };
   if (/^each opponent dealt combat damage this game by a creature named ~$/.test(x)) return { ref: "opponentsCombatDamagedByName" };
   if (x === "each player who controls the most creatures") return { ref: "mostCreatures" };
   if (x === "each player who controls the most lands") return { ref: "mostCreatures", lands: true };

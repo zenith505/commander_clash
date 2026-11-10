@@ -6,6 +6,7 @@ import type { Ctx } from "./body";
 import { parseTargetPhrase } from "./targets";
 import { parseTrigger } from "./triggers";
 import { COLOR_WORDS } from "./words";
+import { roundB175Sentence } from "./laneb175";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -78,7 +79,7 @@ export function roundB174Line(line: string, raw: string, out: CompiledCard, isSp
   return false;
 }
 
-export function roundB174Sentence(s: string, _sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+export function roundB174Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
   // Predatory Focus: "You may have creatures you control assign their combat damage this turn as though they weren't
   // blocked.": chosen as it resolves; if you do, every creature you control this turn deals its combat damage to the player
   // or planeswalker it's attacking, blocked or not, ones that come later too (rulings, CR 510.1c).
@@ -91,5 +92,5 @@ export function roundB174Sentence(s: string, _sentences: string[], si: number, c
   if (/^Put up to two creature cards from graveyards onto the battlefield under your control$/.test(s)) {
     return { effect: { type: "chooseFromGraveyard", n: 2, upTo: true, dest: "battlefield", anyGraveyard: true, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" } }, next: si + 1 };
   }
-  return null;
+  return roundB175Sentence(s, sentences, si, ctx, effects);
 }

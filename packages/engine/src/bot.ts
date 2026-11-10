@@ -6692,7 +6692,8 @@ function chooseUnearth(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbility
     const abilities = abilitiesOf(s, obj(s, id)).activated;
     for (let i = 0; i < abilities.length; i++) {
       const ab = abilities[i]!;
-      if (ab.zone !== "graveyard" || (only && !only(ab)) || (obj(s, id).zone === "exile" && !ab.orExile)) continue;
+      // Torrent Elemental: from exile only (ActivatedAbility.onlyExile).
+      if (ab.zone !== "graveyard" || (only && !only(ab)) || (obj(s, id).zone === "exile" && !ab.orExile) || (obj(s, id).zone !== "exile" && ab.onlyExile)) continue;
       // Scavenge needs a creature to grow (CR 702.97a).
       const targets = ab.body.targets.length ? chooseTargets(s, pid, ab.body, false, id) : undefined;
       if (ab.body.targets.length && !targets) continue;

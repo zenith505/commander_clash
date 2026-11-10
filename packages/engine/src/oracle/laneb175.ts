@@ -7,6 +7,7 @@ import { parseAdditionalCost } from "./keyword-abilities";
 import { parseBecomes } from "./sentence";
 import { parseConditionalStatic, parseStatic, parseStaticCondition } from "./statics";
 import { parseTrigger } from "./triggers";
+import { roundB176Sentence } from "./laneb176";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -88,7 +89,7 @@ export function roundB175Line(line: string, raw: string, out: CompiledCard, isSp
   return false;
 }
 
-export function roundB175Sentence(s: string, _sentences: string[], si: number, ctx: Ctx, _effects: Effect[]): Found {
+export function roundB175Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
   // Fatal Fissure: "Choose target creature. When that creature dies this turn, you earthbend 4.": a delayed trigger about
   // the target (CR 603.7), for the rest of this turn, whatever makes it die; earthbend's land is that trigger's own target,
   // chosen as it's put on the stack (CR 603.3d, 701.68a).
@@ -108,5 +109,5 @@ export function roundB175Sentence(s: string, _sentences: string[], si: number, c
       next: si + 1,
     };
   }
-  return null;
+  return roundB176Sentence(s, sentences, si, ctx, effects);
 }

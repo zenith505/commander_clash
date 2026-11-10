@@ -1290,6 +1290,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (text === "a card left your graveyard this turn") return { kind: "cardLeftYourGraveyard" };
   if (text === "a creature card left your graveyard this turn") return { kind: "cardLeftYourGraveyard", creature: true };
   if (text === "a permanent was put into your hand from the battlefield this turn") return { kind: "permanentToYourHand" };
+  // Dimir Strandcatcher (TurnLog.toGraveyardNotBattlefield).
+  if ((m = new RegExp(`^${NUM} or more cards were put into your graveyard from anywhere other than the battlefield this turn$`).exec(text))) return { kind: "cardsToYourGraveyardNotBattlefield", n: num(m[1]!) };
+  // Laboratory Drudge: a spell cast from any graveyard (CR 601.2a), or an ability of a card in any graveyard (CR 602.2).
+  if (text === "you've cast a spell from a graveyard or activated an ability of a card in a graveyard this turn") return { kind: "usedGraveyardThisTurn" };
   if ((m = new RegExp(`^${NUM} or more cards left your graveyard this turn$`).exec(text))) return { kind: "cardLeftYourGraveyard", n: num(m[1]!) };
   // Slick Sequence: "If you've cast another spell this turn, draw a card": checked as it resolves (rulings).
   if (text === "you've cast another spell this turn") return { kind: "castAnother", resolving: true };

@@ -3239,9 +3239,10 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
   const chosen = chosenText(s, o);
   return (
     <>
-      {(m.grantedKeywords.length > 0 || m.grantedAbilities.length > 0 || m.lostKeywords.length > 0 || m.lostAllAbilities) && (
+      {(m.grantedKeywords.length > 0 || m.grantedAbilities.length > 0 || m.lostKeywords.length > 0 || m.lostAllAbilities || m.manaAbilitiesOnly) && (
         <span className="kw-overlay">
           {m.lostAllAbilities && <span className="kw none">No abilities</span>}
+          {m.manaAbilitiesOnly && <span className="kw none">Only mana abilities</span>}
           {m.grantedKeywords.map((k) => (
             <span key={k} className="kw">
               {keywordLabel(k, (x) => s.players[x]!.name)}
@@ -3253,6 +3254,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
             </span>
           )}
           {!m.lostAllAbilities &&
+            !m.manaAbilitiesOnly &&
             m.lostKeywords.map((k) => (
               <span key={k} className="kw lost" title={`Lost ${k.toLowerCase()}`}>
                 {k}

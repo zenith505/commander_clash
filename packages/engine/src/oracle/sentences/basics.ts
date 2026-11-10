@@ -1672,6 +1672,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (m[1] === "X" && !ctx.activated) return null;
     return [{ type: "blockTaxThisTurn", n: m[1] === "X" ? X : Number(m[1]) }];
   }
+  // War Tax: "This turn, creatures can't attack unless their controller pays {X} for each attacking creature they
+  // control": the same cost to attack (CR 508.1g-h), whatever each creature attacks, for attacks declared the rest of the
+  // turn (rulings); with X 0 it costs nothing.
+  if ((m = /^This turn, creatures can't attack unless their controller pays \{(X|\d+)\} for each attacking creature they control$/.exec(s))) {
+    if (m[1] === "X" && !ctx.activated) return null;
+    return [{ type: "attackTaxThisTurn", n: m[1] === "X" ? X : Number(m[1]) }];
+  }
   // "Target player can't play lands this turn" (Moonhold): one player, until the turn ends.
   if ((m = /^(target player|that player) can't play lands this turn$/i.exec(s))) {
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);

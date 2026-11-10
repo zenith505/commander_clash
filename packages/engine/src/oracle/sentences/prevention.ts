@@ -198,6 +198,12 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (i === undefined || t?.kind !== "object" || t.many || t.optional || !t.types?.includes("Creature")) return null;
     return rule({ by: { target: { ref: "target", index: i } }, nextTime: true });
   }
+  // Awe Strike: "The next time target creature would deal damage this turn, prevent that damage.": the same shield on a
+  // creature it targets, whatever it would deal that damage to (CR 615.8), for as long as it's that object.
+  if (/^The next time target creature would deal damage this turn, prevent that damage$/.test(s)) {
+    const i = addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "target creature" });
+    return rule({ by: { target: { ref: "target", index: i } }, nextTime: true });
+  }
   // Feint: "Tap all creatures blocking target attacking creature. Prevent all combat damage that would be dealt this turn by
   // that creature and each creature blocking it.": the target and the creatures blocking it as this resolves (CR 611.2c),
   // whose combat damage this turn is prevented (CR 615.1a); tapped blockers still deal combat damage (CR 510.1).

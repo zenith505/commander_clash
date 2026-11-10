@@ -6741,7 +6741,8 @@ export function compile(d: CardDef): CompiledCard {
     // the spell sets up (CR 603.7a), its own paragraph part of the spell's text.
     // Siren's Call: "At the beginning of the next end step, ..." in a paragraph of its own: a delayed trigger the spell sets
     // up as it resolves (CR 603.7a).
-    if (isSpell && spellLines.length && /^At the beginning of the next end step, /.test(line)) {
+    // Vivien's Stampede: "At the beginning of the next main phase this turn, ..." the same way.
+    if (isSpell && spellLines.length && /^At the beginning of the next (?:end step|main phase this turn), /.test(line)) {
       spellLines.push(line);
       continue;
     }

@@ -2728,6 +2728,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         s.delayed = s.delayed!.filter((x) => x !== d);
         continue;
       }
+      // Vivien's Stampede: "the next main phase this turn" never came: it never will.
+      if (d.when === "nextMainThisTurn" && d.turn !== s.turn) {
+        s.delayed = s.delayed!.filter((x) => x !== d);
+        continue;
+      }
       // "That combat" never came this turn: it never will.
       if (d.when === "thatCombat" && d.turn !== s.turn) {
         s.delayed = s.delayed!.filter((x) => x !== d);
@@ -2750,6 +2755,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
             ? ev.step === "endCombat" && !(d.turn === s.turn && d.step === "endCombat")
             : d.when === "eachYourPrecombatMain"
               ? ev.step === "main1" && ev.active === d.controller
+              : d.when === "nextMainThisTurn"
+              ? (ev.step === "main1" || ev.step === "main2") && d.turn === s.turn && STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf(ev.step)
               : d.when === "yourNextMain"
               ? (ev.step === "main1" || ev.step === "main2") && ev.active === d.controller && (d.turn < s.turn || STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf(ev.step))
               : d.when === "yourNextFirstMain"

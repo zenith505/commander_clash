@@ -1,6 +1,6 @@
 # Roadmap
 
-30,910 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,918 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,804 of
 9,979 (98%).
 
@@ -2380,7 +2380,7 @@ line blocks.
    player casts an instant or sorcery card, exile it. Then that player copies each instant or sorcery card exiled with
    ~. For each copy, the player may cast the copy without paying its mana cost." (Eye of the Storm: a card, not a copy,
    rulings; exiled, not countered, linked to it, CR 607.2a; the caster picks the copies one at a time, in the order
-   they choose, whoever owns the cards). Browser tests for Leori's picker and Guile's free cast. +5, 30,910 of 31,936.
+   they choose, whoever owns the cards). Browser tests for Leori's picker and Guile's free cast. +5, 30,918 of 31,936.
    Bots: a bot picks the planeswalker type most of its planeswalkers have (on the battlefield, then in hand); it casts
    what Guile or Eye of the Storm offers when it can, as any free cast.
    Not looked at yet (no list names them; next in popularity after these): Zevlor, Elturel Exile; Ore-Rich Stalactite
@@ -2401,7 +2401,7 @@ line blocks.
    plot. The plot cost is equal to its mana cost." with "You may plot nonland cards from the top of your library."
    (Fblthp, Lost on the Range: a Plot button in the top card's menu, at sorcery speed, for its own plot cost or its mana
    cost, the one with the lower mana value; no mana cost or an {X} in it can't be plotted this way). Browser tests for
-   each cast path. +5, 30,905 of 31,936 with B168 and B169.
+   each cast path. +5, 30,913 of 31,936 with B168, B169 and B170.
    Bots: a bot casts from the top with Into the Pit, sacrificing a nonland permanent worth little (never Into the Pit or
    its commander); it taps Osteomancer Adept in its first main phase when a creature card costing 2 or more in its
    graveyard is affordable and it can forage, then casts it; it plots the top card with Fblthp in its second main phase,
@@ -7749,6 +7749,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   attacking a player gets +1/+0 ... for each creature that player controls": each attacker's own defending player, CR
   802.2a, counted once as it resolves, CR 608.2h; an attacker of a planeswalker counts its controller for Mercadia's
   Downfall and gets nothing from Jurin). +7, 30,894 of 31,936 with B168 and rounds 328 and 329.
+- Round B170 (least played first, mechanics that could be built from the skip lists): Random Encounter ("Put each
+  creature card milled this way onto the battlefield. They gain haste. At the beginning of the next end step, return those
+  creatures to their owner's hand": the cards that mill put into your graveyard and still there, CR 400.7; each returned
+  only while it's still that permanent, CR 603.7c). Mordor on the March ("Exile a creature card from your graveyard.
+  Create a token that's a copy of it": the card just exiled, as printed, rulings; storm copies each exile a card of their
+  own). Torch the Tower ("If this spell was bargained, instead it deals 3 damage to that permanent and you scry 1"; "If a
+  permanent dealt damage by ~ would die this turn, exile it instead": the permanent it damaged, for any reason it dies
+  this turn, rulings; none if the damage was prevented). Vivien's Stampede ("At the beginning of the next main phase this
+  turn, draw a card for each player who was dealt combat damage this turn": a delayed trigger, CR 603.7, never on a later
+  turn). Heart-Shaped Herb ("You may sacrifice a creature. If you do, return that card to the battlefield under its owner's
+  control with three +1/+1 counters on it and you become the monarch": the card that sacrifice put into a graveyard, CR
+  400.7; a browser test). Kamahl's Summons ("Each player may reveal any number of creature cards from their hand. Then
+  each player creates a 2/2 green Bear creature token for each card they revealed this way": each chooses in turn order
+  from the active player, CR 101.4; bots reveal all; a browser test). Follow the Lumarets ("If you gained life this turn,
+  you may instead reveal two creature and/or land cards", checked as it resolves). First Family ("the number of colors
+  among permanents you control and spells you've cast this turn": each color once, the spell's own colors included). +8,
+  30,908 of 31,936 with B169 and round 330.
+- Out after round B170 (looked at, not done): Abby, Merciless Soldier (named tokens for the mana spent to cast it, and
+  entering under the control of an opponent of your choice) stays out.
 - Out after round B169 (looked at, not done): Dimir Strandcatcher (an intervening "if three or more cards were put into
   your graveyard from anywhere other than the battlefield this turn": no turn count of those yet), Emrakul's Evangel
   (sacrificing any number of creatures as a cost) stay out.

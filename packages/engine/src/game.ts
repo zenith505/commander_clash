@@ -5,6 +5,7 @@ import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
 import { joinMeld } from "./meld";
 import { liveEmblems } from "./emblems";
 import { meldResultsFor } from "./meld-results";
+import { askYardExile, yardExileChosen } from "./enters-yard";
 import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layoutOf, registerFace, registerRoom, restingDef, sameName, setFace, transformedFace } from "./faces";
 import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
@@ -1588,8 +1589,9 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // it as it would exist on the battlefield (CR 614.12, rulings). Unleash likewise ("Other Dogs you control have unleash",
   // Tesak), each instance its own choice.
   const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot" || x === "unleash"));
-  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersDiscardKeywords ? (["discardKeywords"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
-  options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
+  const options: EntersOption[] = [...(printed.entersExileFromYard ? (["exileFromYard"] as const) : []), ...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersDiscardKeywords ? (["discardKeywords"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
+  // Frankenstein's Monster: "exile X creature cards" with the X it was cast with (CR 107.3m).
+  options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(what === "exileFromYard" && opts.x ? { enterOpts: { x: opts.x } } : {}), ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
     const ev = { type: "enters" as const, id, ...(opts.x ? { x: opts.x } : {}) };
     if (together) together.events.push(ev);
@@ -10499,6 +10501,10 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       enterAsCopy(s, o, choice, entry?.enterOpts ?? {});
       return;
     }
+    if (pend.what === "exileFromYard") {
+      yardExileChosen(s, o, entry, choice, pend.options);
+      return;
+    }
     if (pend.what === "copyOther") {
       if (!pend.options.includes(choice)) throw new RulesError("choose another creature card offered");
       const first = entry!.options![0]!;
@@ -10706,7 +10712,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -11271,7 +11277,7 @@ function amplifyChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { 
  * A permanent that would have entered goes to its owner's graveyard instead (Mox Diamond, Lake of the Dead): it never
  * entered (rulings), so nothing sees it enter or leave.
  */
-function neverEnters(s: GameState, o: GameObject) {
+export function neverEnters(s: GameState, o: GameObject) {
   s.entersChoices = (s.entersChoices ?? []).filter((c) => c.id !== o.id);
   s.battlefield = s.battlefield.filter((x) => x !== o.id);
   o.zone = "stack"; // in no zone list, so moving it isn't leaving the battlefield
@@ -11333,6 +11339,11 @@ function askEntersChoice(s: GameState): boolean {
       }
       s.pending = { kind: "pickPermanents", player: you, source: defOf(s, o).name, action: "sacrifice", what: devour!.filter.text, options, count: options.length, min: 0, objectId: o.id, ...(said ? { prompt: `sacrifice any number of ${devour!.filter.text}s as it enters (${said}): click them, then sacrifice.` } : devour!.n === 2 && devour!.filter.types?.includes("Planeswalker") ? { prompt: `sacrifice any number of creatures and/or planeswalkers as it enters (two +1/+1 counters for each): click them, then sacrifice.` } : {}) };
       return true;
+    }
+    if (c.what === "exileFromYard") {
+      // Sutured Ghoul, Living Lore, Frankenstein's Monster: one card at a time (enters-yard.ts).
+      if (askYardExile(s, o, c)) return true;
+      continue;
     }
     if (c.what === "discardKeywords") {
       // Indominus Rex: any number of creature cards from its controller's hand (not itself, it isn't there).
@@ -11606,7 +11617,8 @@ function askEntersChoice(s: GameState): boolean {
       return true;
     }
     if (c.what === "counterChoice") {
-      const choice = compileCard(defOf(s, o)).entersCounterChoice;
+      // Frankenstein's Monster: the kinds on the entry, one choice for each card it exiled (enters-yard.ts).
+      const choice = c.options ? { counters: c.options } : compileCard(defOf(s, o)).entersCounterChoice;
       const counters = choice?.counters ?? [];
       if (choice?.two) {
         // Grimdancer: two different ones, so one of the pairs.

@@ -1,6 +1,6 @@
 # Roadmap
 
-30,913 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,922 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,804 of
 9,979 (98%).
 
@@ -2363,6 +2363,29 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 332 took the most played cards no list named yet: '{1}{R}: If ~ is a Scout, it becomes a Human Faerie
+   Detective and gains "Whenever ~ deals combat damage to a player, exile the top card of your library. You may play
+   that card this turn."' (Kellan, Planar Trailblazer: its name in an ability it gives itself is "this creature", CR
+   201.5a; its creature types replaced, no duration, rulings); "If a spell or ability you control would counter a spell,
+   instead exile that spell and you may play that card without paying its mana cost." (Guile: a replacement of every
+   counter by your spells and abilities, ward and "unless its controller pays" too, CR 614.1a; the spell is never
+   countered, so nothing about countering it happens, and you may cast the card right away or never, rulings; a spell
+   that can't be countered stays); "{0}: You may cast target instant or sorcery card from your graveyard this turn. If
+   that spell doesn't target a creature you control, it costs {8} more to cast this way. ..." (Mavinda, Students'
+   Advocate: the increase decided by the targets chosen as it's cast, CR 601.2c, 601.2f); "Whenever ~ deals combat damage
+   to a player, choose a planeswalker type. Until end of turn, whenever you activate an ability of a planeswalker of
+   that type, copy that ability. ..." (Leori, Sparktouched Hunter: any of CR 205.3j's types, in the creature type
+   picker's search with planeswalker types and a browser test; delayed triggered abilities now trigger on activations
+   too, CR 603.7b; PLANESWALKER_TYPES brought up to CR 205.3j, adding Comet, Dellian, Jeska and Vronos); "Whenever a
+   player casts an instant or sorcery card, exile it. Then that player copies each instant or sorcery card exiled with
+   ~. For each copy, the player may cast the copy without paying its mana cost." (Eye of the Storm: a card, not a copy,
+   rulings; exiled, not countered, linked to it, CR 607.2a; the caster picks the copies one at a time, in the order
+   they choose, whoever owns the cards). Browser tests for Leori's picker and Guile's free cast. +5, 30,922 of 31,936
+   with B171. Bots: a bot picks the planeswalker type most of its planeswalkers have (on the battlefield, then in
+   hand); it casts what Guile or Eye of the Storm offers when it can, as any free cast.
+   Not looked at yet (no list names them; next in popularity after these): Zevlor, Elturel Exile; Ore-Rich Stalactite
+   // Cosmium Catalyst; Rosheen, Roaring Prophet; Feather, Radiant Arbiter; Nathan Drake, Treasure Hunter; Stangg, Echo
+   Warrior.
    Round 331 took cards back off the "Out after round N" lists, most played first: "You may cast noncreature spells from
    the top of your library. If you cast a spell this way, you may cast it as though it had flash." (Elsha of the
    Infinite, CR 702.8a: any time it could cast an instant, its costs paid as usual, rulings; not with Bolas's Citadel's

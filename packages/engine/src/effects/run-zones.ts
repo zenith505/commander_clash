@@ -1383,7 +1383,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // no alternative costs (CR 107.3b, 118.9). The total counts the spells' mana values on the stack, which for a
       // card cast without paying its mana cost is its own with X as 0 (rulings on Primeval Spawn). Lands can't be cast.
       const sc = (s.resolving!.scratch ??= {});
-      const you = player(s, ctx.controller);
+      const by = e.castBy ? players(s, e.castBy, ctx)[0] : ctx.controller;
+      if (by === undefined) return;
+      const you = player(s, by);
       if (!sc.castAmong) {
         if (e.each) {
           // Etali: the top card of each player's library, all exiled at once.
@@ -1469,6 +1471,20 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Tasha: every player's cards in exile (each player has their own exile here).
         const pool = e.anyOwnerExile ? s.turnOrder.flatMap((pid) => s.players[pid]!.exile) : you.exile;
         sc.castAmong = { ids: pool.filter((id) => (obj(s, id).counters[k] ?? 0) > 0 && (e.anyOwnerExile || obj(s, id).owner === you.id) && !obj(s, id).faceDown).map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
+      }
+      if (!sc.castAmong && e.fromYard?.causeLinked) {
+        // Eye of the Storm: the card that was cast, while it's still that spell on the stack (CR 400.7), exiled, not
+        // countered; then every card still exiled with Eye of the Storm, whoever owns it (rulings).
+        const item = ctx.cause ? s.stack.find((x) => x.id === ctx.cause && x.kind === "spell") : undefined;
+        const o = item?.objectId ? s.objects[item.objectId] : undefined;
+        if (item && o && !o.spellCopy && !item.copy && o.zone === "stack") {
+          s.stack.splice(s.stack.indexOf(item), 1);
+          moveObject(s, o.id, "exile");
+          log(s, `${src} exiles ${defOf(s, o).name} from the stack.`);
+          const gone = obj(s, o.id);
+          if (gone.zone === "exile" && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id: gone.id, zc: gone.zoneChanges ?? 0 });
+        }
+        sc.castAmong = { ids: linkedCards(s, ctx.sourceId, ctx.sourceZc ?? 0).filter((x) => !e.fromYard!.filter || printedMatches(e.fromYard!.filter, defOf(s, obj(s, x.id)))), declined: [] };
       }
       if (!sc.castAmong && e.fromYard?.randomLinked) {
         // Arcane Bombardment: one card at random, linked to the source; then every card still exiled with it.
@@ -2780,7 +2796,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, `${player(s, ctx.controller).name} may cast ${defOf(s, o).name} from their graveyard as an Adventure until the end of their next turn.`);
           continue;
         }
-        o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.play ? {} : { castOnly: true as const }), ...(e.exileAfter ? { exileAfter: true as const } : {}), ...(e.free ? { free: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.tapped ? { tapped: true as const } : {}) };
+        o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.play ? {} : { castOnly: true as const }), ...(e.exileAfter ? { exileAfter: true as const } : {}), ...(e.free ? { free: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(e.moreUnlessTargets ? { moreUnlessTargets: e.moreUnlessTargets } : {}) };
         log(s, `${player(s, ctx.controller).name} may ${e.play ? "play" : "cast"} ${defOf(s, o).name} from ${e.inExile ? "exile" : "their graveyard"} this turn${e.free ? " without paying its mana cost" : ""}${e.anyType ? ", spending mana of any type" : ""}${e.tapped ? " (it enters tapped)" : ""}.`);
       }
       return;

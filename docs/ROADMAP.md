@@ -1,6 +1,6 @@
 # Roadmap
 
-30,932 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,937 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,804 of
 9,979 (98%).
 
@@ -7808,7 +7808,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the battlefield or in your graveyard": one ability for each zone, CR 113.6; moved to the other zone, a new object isn't
   returned, rulings; a browser test from the graveyard). Glimpse the Cosmos (from your graveyard for {U} while you control
   a Giant, at its usual timing; exiled only instead of going to the graveyard, not flashback, CR 614.1a; cast another way,
-  neither applies, rulings; a browser test). +8, 30,932 of 31,936 with B172.
+  neither applies, rulings; a browser test). +8, 30,937 of 31,936 with B172 and round 332.
 - Out after round B173 (looked at, not done): Corrosive Ooze (the Equipment attached to the creature just before it left the
   battlefield is destroyed at end of combat, rulings: attachments as they last existed aren't kept), Oppressive Rays and
   Gloom (the tax reaches mana abilities), Murktide Regent and Soulflayer (which cards delve exiled aren't kept with the

@@ -1423,7 +1423,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Immortal Obligation: "Return target creature card from an opponent's graveyard to the battlefield under their control":
   // "their" is that opponent, the card's owner, so the same as "under its owner's control".
   if (/^Return target [a-z ]+ card from an opponent's graveyard to the battlefield under their control\b/.test(s)) s = s.replace(/ under their control\b/, " under its owner's control");
-  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyards?(?: that was (?:put there from their library|milled) this turn| that (?:was|were) put there from the battlefield this turn)?|exiled with ~)) (?:to|onto) the battlefield( tapped(?: and attacking)?)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature| attached to that creature| attached to ~)?$`, "i").exec(s.replace(/ onto the battlefield under your control tapped and attacking$/, " onto the battlefield tapped and attacking under your control")))) {
+  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyards?(?: that was (?:put there from their library|milled) this turn| that (?:was|were) put there from the battlefield this turn)?|exiled with ~)) (?:to|onto) the battlefield( tapped(?: and attacking)?)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature| attached to that creature| attached to ~| attached to a creature you control)?$`, "i").exec(s.replace(/ onto the battlefield under your control tapped and attacking$/, " onto the battlefield tapped and attacking under your control")))) {
     // Without "under your control", only your own cards: the card then enters under your control (CR 110.2a)
     // either way, but "return" text that reaches other graveyards always says whose control. "Under its owner's
     // control" (Bilbo, Unexpected Adventurer): a card from any graveyard, for its owner.
@@ -1444,6 +1444,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Magnetic Snuffler: "return target Equipment card from your graveyard to the battlefield attached to ~": attached to
     // the creature if it's still on the battlefield and could be equipped, else unattached (rulings).
     const toSelf = m[8] === " attached to ~";
+    // One Last Job: "Return target Aura or Equipment card from your graveyard to the battlefield attached to a creature you
+    // control": one of yours chosen as it resolves (rulings), from your own graveyard only.
+    const toYours = m[8] === " attached to a creature you control";
+    if (toYours && !(spec?.owner === "you" && !underYou && !owner && what?.ref === "target" && !what.n && spec.subtypes?.length && spec.subtypes.every((st) => st === "Aura" || st === "Equipment"))) return null;
     // Iridescent Drake: "put target Aura card from a graveyard onto the battlefield under your control attached to ~": any
     // graveyard's Aura, which stays there if it can't enchant ~ (rulings, CR 303.4g). Hakim, Loreweaver: "{U}{U}: Return
     // target Aura card from your graveyard to the battlefield attached to ~", in an activated ability likewise.
@@ -1471,7 +1475,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Chorale of the Void: "under your control tapped and attacking", another player's card under your control.
     const attacking = / and attacking$/.test(m[3] ?? "");
     if (attacking && (owner || attach)) return null;
-    return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(attacking ? { attacking: true as const } : {}), ...(owner ? { owner: true } : {}), ...(m[6] ? { counters: { [counterKind(m[6])]: n } } : {}), ...(attach ? (toSelf ? { attachToSource: true as const } : toThat ? { attachToCreated: true as const } : { attachToEnchanted: true as const }) : {}) }];
+    return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(attacking ? { attacking: true as const } : {}), ...(owner ? { owner: true } : {}), ...(m[6] ? { counters: { [counterKind(m[6])]: n } } : {}), ...(attach ? (toSelf ? { attachToSource: true as const } : toThat ? { attachToCreated: true as const } : toYours ? { attachToYours: true as const } : { attachToEnchanted: true as const }) : {}) }];
   }
   // "When this creature dies, return it to the battlefield under its owner's control and suspect it" (Presumed Dead's
   // granted ability): the card that went to the graveyard, if it's still there (CR 400.7), and then the permanent it

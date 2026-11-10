@@ -2670,6 +2670,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Satoru: not if any of them was cast with mana spent on it (rulings: mana for additional costs counts too).
         if (b.noneCastWithMana && matched.some((m) => s.objects[m.id]?.wasCast && (s.objects[m.id]!.manaSpent ?? 0) > 0)) continue;
         if (b.fromGraveyard && !matched.some(fromYard)) continue;
+        // Extraordinary Journey: one of them entered from exile or was cast from exile (rulings: any of them, however).
+        if (b.fromExile && !matched.some((m) => !!(s.objects[m.id]?.enteredFromExile || s.objects[m.id]?.castFromExile))) continue;
         if (b.first && b.what === "created" && (s.turnLog?.tokensCreated ?? []).filter((c) => c.player === you).length > n) continue;
         if (b.first && b.what === "discards" && (s.turnLog?.discards ?? []).some((d) => (b.whose !== "you" || d.player === you) && d.cards.some((c) => !b.filter || printedMatches(b.filter, s.cards[c]!)))) continue;
         if (b.first && b.what === "toGraveyard" && (s.turnLog?.toGraveyardEvents ?? []).some((d) => (b.whose !== "you" || d.player === you) && d.cards.some((c) => !b.filter || printedMatches(b.filter, s.cards[c]!)))) continue;

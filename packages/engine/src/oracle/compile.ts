@@ -3826,6 +3826,18 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Chancellor of the Annex: "You may reveal ~ from your opening hand. If you do, when each opponent casts their first
+    // spell of the game, counter that spell unless that player pays {1}.": revealed before the game begins (CR 103.6b), a
+    // delayed trigger for each opponent, once, on the first spell that player casts (CR 603.7c; rulings: one for each
+    // Chancellor revealed, each opponent in a multiplayer game).
+    const annex = /^You may reveal ~ from your opening hand\. If you do, when each opponent casts their first spell of the game, (.+)$/.exec(line);
+    if (annex && !out.openingReveal) {
+      const t = parseTrigger(`Whenever an opponent casts a spell, ${annex[1]!}`);
+      if (t && t !== "fail" && t.event === "castSpell" && t.cast?.by === "opponent" && Object.keys(t).every((k) => k === "event" || k === "body" || k === "cast") && Object.keys(t.cast).every((k) => k === "by" || k === "spell")) {
+        out.openingReveal = { when: "opponentsFirstSpell", body: t.body, trigger: t };
+        continue;
+      }
+    }
     // Gemstone Caverns (CR 103.6a; the starting player is the one taking the first turn, 103.1).
     const caverns = /^If ~ is in your opening hand and you're not the starting player, you may begin the game with ~ on the battlefield with an? ([a-z]+) counter on it\. If you do, exile a card from your hand\.$/.exec(line);
     if (caverns) {
@@ -7437,9 +7449,11 @@ function linkExile(out: CompiledCard) {
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     // Azor's Gateway: "exile a card from your hand", its one exile instruction (CR 607.2a), the cards it exiles kept face up.
     const fromHand = all.filter((e): e is Extract<Effect, { type: "discard" }> => e.type === "discard" && !!e.exile && e.who.ref === "you" && !e.until && !e.ownerMay && !e.controllerMay && !e.suspendMv && !e.random);
-    const others = all.some((e) => e.type === "exileGraveyard" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile && !fromHand.includes(e)));
-    if (others || out.spell || exiles.length + fromHand.length !== 1) out.unsupported.push("(counts cards exiled with it that it can't link to one exile ability)");
-    else (exiles[0] ?? fromHand[0]!).linked = true;
+    // Creeping Inn: "you may exile a creature card from your graveyard", one card chosen as it resolves, its one exile.
+    const fromYard = all.filter((e): e is Extract<Effect, { type: "chooseFromGraveyard" }> => e.type === "chooseFromGraveyard" && e.dest === "exile" && e.n === 1 && !e.who && !e.anyGraveyard && !e.fromExile && !e.nAmount && !e.anyNumber && !e.chooser);
+    const others = all.some((e) => e.type === "exileGraveyard" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile && !fromHand.includes(e)) || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !fromYard.includes(e)));
+    if (others || out.spell || exiles.length + fromHand.length + fromYard.length !== 1) out.unsupported.push("(counts cards exiled with it that it can't link to one exile ability)");
+    else (exiles[0] ?? fromHand[0] ?? fromYard[0]!).linked = true;
   }
   // Evendo Brushrazer: "play cards exiled with ~" is about the cards its one "exile the top card of your library" exiled
   // (CR 607.2a); Nightveil Specter's "that player exiles the top card of their library" likewise.

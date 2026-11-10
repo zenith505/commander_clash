@@ -1002,6 +1002,7 @@ export function moveObject(
   const castFromHand = fromZone === "stack" && o.castFrom === "hand" && !o.spellCopy;
   const castFromGraveyard = fromZone === "stack" && o.castFrom === "graveyard" && !o.spellCopy;
   const castFromLibrary = fromZone === "stack" && o.castFrom === "library" && !o.spellCopy;
+  const castFromExile = fromZone === "stack" && o.castFrom === "exile" && !o.spellCopy;
   // Cycle of Life: "target creature you cast this turn": the player who cast the spell it was (CR 601.2), kept as it
   // resolves into this permanent.
   const castBy = fromZone === "stack" && to === "battlefield" && !o.spellCopy ? o.castBy : undefined;
@@ -1230,6 +1231,7 @@ export function moveObject(
   // exiled from the library was cast from exile, rulings). A library is its owner's (CR 400.3).
   o.fromOwnLibrary = to === "battlefield" && (fromZone === "library" || castFromLibrary) ? true : undefined;
   o.enteredFromExile = to === "battlefield" && fromZone === "exile" ? true : undefined;
+  o.castFromExile = to === "battlefield" && castFromExile ? true : undefined;
   // Sigarda's Splendor: "As ~ enters, note your life total" (a new object notes anew, CR 400.7); one that left keeps it.
   if (to === "battlefield") o.notedLife = compileCard(defOf(s, o)).notesLifeOnEnter ? player(s, o.controller).life : undefined;
   if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
@@ -10366,6 +10368,11 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
         const o = obj(s, id);
         const r = compileCard(defOf(s, o)).openingReveal!;
         log(s, `${p.name} reveals ${nameOf(s, id)} from their opening hand.`);
+        // Chancellor of the Annex: one for each opponent, on the first spell that player casts this game (CR 603.7c).
+        if (r.when === "opponentsFirstSpell") {
+          for (const opp of opponents(s, p.id)) (s.floatingTriggers ??= []).push({ id: `f${s.nextId++}`, controller: p.id, sourceId: id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0, trigger: r.trigger!, until: "game", turn: s.turn, once: true, forPlayer: opp });
+          continue;
+        }
         (s.delayed ??= []).push({ when: r.when, controller: p.id, sourceCardId: cardIdOf(o), subject: { id, zc: o.zoneChanges ?? 0 }, body: r.body, turn: 0, step: s.step });
       }
       nextOpeningAction(s);
@@ -11212,7 +11219,16 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   // A creature for an Equipment to enter attached to is chosen as it enters, with an objectId (askEntersChoice).
-  if (pend.what === "attachHost") throw new RulesError("nothing to attach");
+  if (pend.what === "attachHost") {
+    // One Last Job: the creature an Equipment returned "attached to a creature you control" enters attached to.
+    const sc = r.scratch;
+    if (!sc?.equipAsking) throw new RulesError("nothing to attach");
+    (sc.equipHosts ??= {})[sc.equipAsking] = choice;
+    log(s, `${p.name} chooses ${nameOf(s, choice)} for ${defOf(s, obj(s, sc.equipAsking)).name} (${pend.source}).`);
+    sc.equipAsking = undefined;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "enchant") {
     // What an Aura entering without being cast enchants, chosen as it enters (CR 303.4f).
     const sc = (r.scratch ??= {});
@@ -12081,7 +12097,8 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender || (characteristics(s, o).attackDespiteDefenderVs && opps.some((d) => attackedYouLastTurn(s, d, pid)))) &&
       !characteristics(s, o).cantAttack &&
       !bridged(s, o) &&
-      !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false) && !(r.except && r.except.id === o.id && r.except.zc === (o.zoneChanges ?? 0))) &&
+      // Overencumbered: "creatures can't attack this combat", only in the combat phase it was made in.
+      !(s.cantAttackThisTurn ?? []).some((r) => (r.combat === undefined || r.combat === (s.combatsThisTurn ?? 0)) && objectMatches(s, r.filter, o, r.controller, false) && !(r.except && r.except.id === o.id && r.except.zc === (o.zoneChanges ?? 0))) &&
       // "Only land creatures can attack during that combat phase" (Bumi, Unleashed): an added combat phase's own rule.
       !(s.thatCombat !== undefined && s.combatAttackOnly?.[s.thatCombat] && !objectMatches(s, s.combatAttackOnly[s.thatCombat]!, o, pid, false)) &&
       (!(characteristics(s, o).attackUnless.length || characteristics(s, o).attackUnlessYard || characteristics(s, o).attackUnlessDefenderIs?.length || characteristics(s, o).attackIfNot?.length || characteristics(s, o).attackUnlessMore?.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackPlayersOnly.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),

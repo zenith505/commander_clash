@@ -2324,6 +2324,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const grant = what?.ref === "target" && !what.n ? parseGrants(m[2]!) : null;
     if (what && grant?.length && grant.every((x) => x.kind === "addAbility")) return [{ type: "continuous", what, mods: grant, duration: "game" }];
   }
+  // Musician: 'If it doesn't have "At the beginning of your upkeep, destroy this creature unless you pay {1} for each music
+  // counter on it," it gains that ability.': the target as it resolves; one that has it already, from any Musician or
+  // anything else, doesn't gain it again (rulings), and it's kept with no duration (CR 611.2a, rulings).
+  if ((m = /^If it doesn't have "([^"]+?),?" it gains that ability$/.exec(s)) && ctx.lastObjectTarget !== undefined) {
+    const what = parseObject("it", ctx);
+    const grant = what?.ref === "target" && !what.n ? parseGrants(`"${m[1]!}."`) : null;
+    if (what && grant?.length === 1 && grant[0]!.kind === "addAbility")
+      return [{ type: "if", cond: { kind: "hasGrantedAbility", what, text: grant[0]!.text }, effects: [], otherwise: [{ type: "continuous", what, mods: grant, duration: "game" }] }];
+  }
   // Mindbender Spores: "Whenever ~ blocks a creature, put four fungus counters on that creature. The creature gains "This
   // creature doesn't untap during your untap step if it has a fungus counter on it" and "At the beginning of your upkeep,
   // remove a fungus counter from this creature."": the trigger's creature, with no duration, so for as long as it stays on

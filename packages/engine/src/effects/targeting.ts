@@ -560,7 +560,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.notNamed !== undefined && hasName(d.name, spec.notNamed)) return false;
   if (spec.notNamedAny?.some((n) => sameName(d.name, n))) return false;
   if (spec.namedAny && !spec.namedAny.some((n) => sameName(d.name, n))) return false;
-  if (spec.notNamedAsYours || spec.namedAsSource) return false; // not worked out yet
+  if (spec.notNamedAsYours || spec.namedAsSource || spec.sameNameAsCause) return false; // not worked out yet
   if (spec.sharesTypeWithAttached || spec.sharesTypeWithSubjectCreature || spec.sharesTypeWithSelf || spec.notKinOfYourCreatures) return false; // bound where it's used (dig)
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;

@@ -1736,8 +1736,13 @@ export function compile(d: CardDef): CompiledCard {
     // "As Arachne enters, look at an opponent's hand, then choose a card type other than creature." (CR 614.12): an
     // opponent, then their hand is seen, then a card type. Kindred is a card type too, but no kindred card plays here.
     // Myr Superion (CompiledCard.creatureManaOnly): a permanent spell's restriction on the mana that casts it (CR 106.6).
-    if (line === "Spend only mana produced by creatures to cast ~." && !isSpell && !out.creatureManaOnly) {
+    if (line === "Spend only mana produced by creatures to cast ~." && !isSpell && !out.creatureManaOnly && !out.basicLandManaOnly) {
       out.creatureManaOnly = true;
+      continue;
+    }
+    // Imperiosaur (CompiledCard.basicLandManaOnly), the same way.
+    if (line === "Spend only mana produced by basic lands to cast ~." && !isSpell && !out.creatureManaOnly && !out.basicLandManaOnly) {
+      out.basicLandManaOnly = true;
       continue;
     }
     // Sorcerous Spyglass, Anointed Peacekeeper: "look at an opponent's hand, then choose any card name": the same, then any
@@ -1819,6 +1824,18 @@ export function compile(d: CardDef): CompiledCard {
     if (asName) {
       if (!nameChoice || out.entersChoose?.some((c) => c.what === "cardName")) out.unsupported.push(raw);
       else (out.entersChoose ??= []).push({ what: "cardName", ...nameChoice });
+      continue;
+    }
+    // Null Chamber (CompiledCard.entersNamesWithOpponent).
+    const withOpp = /^As ~ enters, you and an opponent each choose (a card name(?: other than a basic land card name)?)\.$/.exec(line);
+    if (withOpp) {
+      const nameChoice = parseCardNameChoice(withOpp[1]!);
+      if (!nameChoice || out.entersNamesWithOpponent || out.entersChoose?.some((c) => c.what === "cardName") || out.entersChoosePlayer) out.unsupported.push(raw);
+      else out.entersNamesWithOpponent = nameChoice;
+      continue;
+    }
+    if (line === "Spells with the chosen names can't be cast and lands with the chosen names can't be played." && out.entersNamesWithOpponent && !out.nameBans) {
+      out.nameBans = [{ kind: "cast", who: "all" }, { kind: "play" }];
       continue;
     }
     // Meddling Mage, Gideon's Intervention, Pithing Needle (CR 201.4): what the name chosen as it entered does.
@@ -4385,6 +4402,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "You may spend mana as though it were mana of any color.") {
       out.spendAnyColor = true;
+      continue;
+    }
+    // Sunglasses of Urza (CompiledCard.spendWhiteAsRed).
+    if (line === "You may spend white mana as though it were red mana." && !out.spendWhiteAsRed) {
+      out.spendWhiteAsRed = true;
       continue;
     }
     const unlockLess = /^Unlock costs you pay cost \{(\d+)\} less\.$/.exec(line);
@@ -7548,6 +7570,7 @@ function checkCastingLinks(out: CompiledCard) {
   const choices = new Set<ChoiceKind>((out.entersChoose ?? []).map((c) => c.what));
   // Selective Snare: the creature type chosen as it's cast (CompiledCard.castChooseType) is its targets' type.
   if (out.castChooseType) choices.add("creatureType");
+  if (out.entersNamesWithOpponent) choices.add("cardName");
   // "The sacrificed creature" refers to a sacrifice cost: the spell's, or the activated ability's own.
   // "The exiled card's power" (Corpse Lunge): the one card an "exile a creature card from your graveyard" cost exiled,
   // with nothing sacrificed to share the record.
@@ -7593,7 +7616,9 @@ function checkCastingLinks(out: CompiledCard) {
   if (out.costMods?.some((m) => m.perChosenColor) && !out.entersChoose?.some((c) => c.what === "color" && c.many)) bad = true;
   // Petrified Hamlet: a ban's or a static's chosen name is the one the permanent chose as it entered (its Chosen.name);
   // the choice of a "When ~ enters, choose a land card name" trigger is only kept while that trigger resolves.
-  if ((out.nameBans || out.protectionFromChosenName || JSON.stringify(out.statics).includes('"chosen":"name"')) && !out.entersChoose?.some((c) => c.what === "cardName")) bad = true;
+  if ((out.nameBans || out.protectionFromChosenName || JSON.stringify(out.statics).includes('"chosen":"name"')) && !out.entersChoose?.some((c) => c.what === "cardName") && !out.entersNamesWithOpponent) bad = true;
+  // Null Chamber: its two names ban casting and land plays, and nothing else here reads them.
+  if (out.entersNamesWithOpponent && (out.nameBans?.length !== 2 || out.protectionFromChosenName || JSON.stringify(out.statics).includes('"chosen"') || JSON.stringify([out.triggers, out.activated]).includes('"chosen"'))) bad = true;
   if (out.noncreatureChosenMvCantBeCast) needs.add("number");
   // A basic land type is a land type too (CR 205.3i): Giant Slug's choice gives its landwalk.
   if (choices.has("basicLandType")) choices.add("landType");

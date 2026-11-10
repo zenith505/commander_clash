@@ -779,7 +779,8 @@ export interface CopyEffect {
  * from a creature", "mana from an artifact".
  */
 /** Where mana came from (CR 106.3): a snow source, a Treasure, a creature, an artifact, a Desert (Cataclysmic Prospecting). */
-export type ManaOrigin = "snow" | "treasure" | "creature" | "artifact" | "desert";
+/** "basicLand": a basic land on the battlefield (Imperiosaur, CR 106.3, 205.4a); only lots record it, nothing counts it as spent. */
+export type ManaOrigin = "snow" | "treasure" | "creature" | "artifact" | "desert" | "basicLand";
 
 /**
  * `n` of the `mana` in a player's pool that's set apart from the rest (counted in manaPool too): it can only be spent
@@ -2326,7 +2327,7 @@ export interface GameState {
   untilReturns?: { auras: { id: ObjectId; zc: number; under: PlayerId; source: string; asking?: true }[]; returned: ObjectId[] };
   /** Legends chosen to keep under the legend rule (CR 704.5j), until the state-based actions are next performed. */
   legendKeep?: ObjectId[];
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; many?: true; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; random?: number[]; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; /** One of "two players" (Sower of Discord): added to Chosen.players, not one chosen before. */ pair?: true; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean } }[];
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; many?: true; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; random?: number[]; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; /** One of "two players" (Sower of Discord): added to Chosen.players, not one chosen before. */ pair?: true; /** Null Chamber: the first or second of two card names, chosen by its controller and the opponent it chose, in turn order from the active player (CR 101.4). */ pairName?: 0 | 1; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean } }[];
   nextId: number;
   /**
    * Resolutions in a row in this step with every player only passing priority, and the states they left (as hashes,
@@ -2380,6 +2381,8 @@ export interface Chosen {
   anchor?: string;
   /** "Choose a card name" (CR 201.4). */
   name?: string;
+  /** Null Chamber: "you and an opponent each choose a card name": the name the opponent (Chosen.player) chose. */
+  opponentName?: string;
   /** "Choose a number between 1 and 10" (Talion, Sanctum Prelate). */
   number?: number;
   /** "Each player chooses a creature type" (Patriarch's Bidding): every type chosen, in the order chosen. */

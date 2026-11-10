@@ -5531,7 +5531,9 @@ function chooseCardName(s: GameState, pid: PlayerId, pend: Extract<PendingDecisi
     return best(ready.length ? ready : board, (o) => power(s, o)) ?? best([...me.hand, ...me.library], value) ?? pend.options[0]!;
   }
   if (pend.purpose === "own") return best([...me.hand, ...me.library], (o) => value(o) + (o.zone === "hand" ? 10 : 0)) ?? pend.options[0]!;
-  const opps = pend.purpose === "theirs" && pend.of !== undefined && pend.of !== pid ? [pend.of] : opponents(s, pid);
+  // Null Chamber's opponent: a name that hurts the player whose Chamber it is.
+  const chamber = pend.objectId && s.objects[pend.objectId] && compileCard(defOf(s, obj(s, pend.objectId))).entersNamesWithOpponent ? controllerOf(s, obj(s, pend.objectId)) : undefined;
+  const opps = chamber !== undefined && chamber !== pid ? [chamber] : pend.purpose === "theirs" && pend.of !== undefined && pend.of !== pid ? [pend.of] : opponents(s, pid);
   const shown = opps.flatMap((x) => [...player(s, x).command, ...player(s, x).graveyard, ...player(s, x).exile.filter((id) => !obj(s, id).faceDown), ...s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x)]);
   const card = pend.objectId ? compileCard(defOf(s, obj(s, pend.objectId))) : undefined;
   const silences = !!card?.nameBans?.some((b) => b.kind === "activate") || !!card?.activationTaxes;

@@ -1565,6 +1565,11 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (printed.entersChoosePlayer && printed.entersLookHand) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", except: "you", lookHand: true });
   // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
   for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, ...c });
+  // Null Chamber: the opponent first, then the two names (CompiledCard.entersNamesWithOpponent).
+  if (printed.entersNamesWithOpponent) {
+    const names = printed.entersNamesWithOpponent.names;
+    (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", except: "you" }, ...([0, 1] as const).map((pairName) => ({ id, zc: o.zoneChanges ?? 0, what: "cardName" as const, ...(names ? { names } : {}), pairName })));
+  }
   if (printed.entersAnchor) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "anchor" });
   if (printed.entersEachPlayerChooses) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "playerWord", options: printed.entersEachPlayerChooses });
   // Dauntless Bodyguard: "As ~ enters, choose another creature you control" (CR 614.12).
@@ -5509,7 +5514,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
 }
 
 /** What mana casting it can spend (CR 106.6): Security Rhox's alternative cost only mana from Treasures (CR 106.3). */
-export const spellUse = (d: CardDef, alt?: AltCostKind, cost?: ParsedCost, choices?: CostChoices, o?: GameObject): ManaUse => ({ spell: d, ...(altCost(d, alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(compileCard(d).creatureManaOnly ? { creatureOnly: true as const } : {}), ...(cost ? { xCost: cost.hasX } : {}), ...spellHow(d, choices, o) });
+export const spellUse = (d: CardDef, alt?: AltCostKind, cost?: ParsedCost, choices?: CostChoices, o?: GameObject): ManaUse => ({ spell: d, ...(altCost(d, alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(compileCard(d).creatureManaOnly ? { creatureOnly: true as const } : {}), ...(compileCard(d).basicLandManaOnly ? { basicLandOnly: true as const } : {}), ...(cost ? { xCost: cost.hasX } : {}), ...spellHow(d, choices, o) });
 
 /** Kicked (CR 702.33d), cast for its disturb cost (CR 702.146a) or from a hand, for mana spent only on such spells or not on them (ManaUse). */
 export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true; fromExile?: true; fromGraveyard?: true; flashbackFromGraveyard?: true; owner?: PlayerId; faceDown?: true } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}), ...(o?.zone === "exile" ? { fromExile: true as const } : {}), ...(o?.zone === "graveyard" ? { fromGraveyard: true as const } : {}), ...(o?.zone === "graveyard" && (d.keywords.includes("Flashback") || choices?.via === "grantedFlashback") ? { flashbackFromGraveyard: true as const } : {}), ...(o ? { owner: o.owner } : {}), ...(choices?.faceDown ? { faceDown: true as const } : {}) });
@@ -10512,6 +10517,11 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(", ")}`);
       o.chosen = { ...o.chosen, keywords: [...(o.chosen?.keywords ?? []), choice] };
       log(s, `${p.name} chooses ${choice.toLowerCase()} for ${pend.source}.`);
+    } else if (pend.what === "cardName" && entry?.pairName !== undefined) {
+      // Null Chamber: its controller's name, or the chosen opponent's (Chosen.opponentName).
+      if (!pend.options.includes(choice)) throw new RulesError("choose one of the offered card names");
+      o.chosen = p.id === controllerOf(s, o) ? { ...o.chosen, name: choice } : { ...o.chosen, opponentName: choice };
+      log(s, `${p.name} chooses ${choice} for ${pend.source}.`);
     } else {
       if (pend.what === "colorAndType" && !pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(", ")}`);
       o.chosen = withChoice(o.chosen, pend.what as ChoiceKind, choice);
@@ -11362,10 +11372,20 @@ function askEntersChoice(s: GameState): boolean {
     if (c.what === "cardName") {
       // "As ~ enters, choose a nonland card name" (CR 614.12, 201.4).
       const options = cardNameOptions(s, c.names);
-      if (!options.length) {
+      // Null Chamber: its controller and the chosen opponent, the active player first (CR 101.4); with that opponent gone
+      // from the game, only its controller.
+      const you = controllerOf(s, o);
+      const opp = o.chosen?.player;
+      const pairBy = c.pairName === undefined ? undefined : (opp === undefined || opp === you || player(s, opp).lost ? [you] : turnOrderFrom(s, s.activePlayer).filter((x) => x === you || x === opp))[c.pairName];
+      if (!options.length || (c.pairName !== undefined && pairBy === undefined)) {
         q.shift();
         if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
         continue;
+      }
+      if (pairBy !== undefined) {
+        const first = c.pairName === 1 ? (pairBy === you ? o.chosen?.opponentName : o.chosen?.name) : undefined;
+        s.pending = { kind: "chooseOption", player: pairBy, source: defOf(s, o).name, what: "cardName", options, objectId: o.id, prompt: `choose ${c.names ? `a ${c.names.text} name` : "a card name"}: spells with it can't be cast and lands with it can't be played${first ? ` (${player(s, pairBy === you ? opp! : you).name} chose ${first})` : ""}`, purpose: "deny" };
+        return true;
       }
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "cardName", options, objectId: o.id, prompt: `choose ${c.names ? `a ${c.names.text} name` : "a card name"}`, purpose: c.purpose ?? "deny" };
       return true;

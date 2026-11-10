@@ -1078,6 +1078,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // The Tabernacle at Pendrell Vale's granted "At the beginning of your upkeep, destroy this creature unless you pay {1}":
   // pay to keep it, or it's destroyed (and can be regenerated).
   // Cosmic Horror: "destroy ~ unless you pay {3}{B}{B}{B}".
+  // Musician's granted "destroy ~ unless you pay {1} for each music counter on it": counted as it resolves (CR 608.2h).
+  if ((m = /^[Dd]estroy ~ unless you pay (\{\d+\}|(?:\{[WUBRG]\})+) for each (.+)$/.exec(s))) {
+    const n = parseCount(m[2]!.replace(/ on it$/, " on ~"), ctx, true);
+    if (!n) return null;
+    return [{ type: "may", effects: [], pay: { mana: m[1]! }, payTimes: n, otherwise: [{ type: "destroy", what: { ref: "self" } }], keep: true, text: `Pay ${m[1]} for each ${m[2]} to keep ~` }];
+  }
   if ((m = /^[Dd]estroy ~ unless you pay ((?:\{(?:\d+|[WUBRGC])\})+)$/.exec(s))) return [{ type: "may", effects: [], pay: { mana: m[1]! }, otherwise: [{ type: "destroy", what: { ref: "self" } }], keep: true, text: `Pay ${m[1]} to keep ~` }];
   // Volatile Stormdrake: "sacrifice that creature unless you pay an amount of {E} equal to its mana value", the creature
   // it targeted (now yours): its mana value as this resolves.

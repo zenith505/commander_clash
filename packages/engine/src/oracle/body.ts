@@ -1517,6 +1517,38 @@ function roundB164Text(text: string): string {
   return text;
 }
 
+/** Lane B round B165's sentences, chained first (parseBodyText is at TS2563's limit). */
+function roundB165Sentence(s: string, sentences: string[], si: number, ctx: Ctx): { effect: Effect; next: number } | "fail" | null {
+  // Rohgahh of Kher Keep: "you may pay {R}{R}{R}. If you don't, tap ~ and all creatures named Kobolds of Kher Keep, then an
+  // opponent gains control of them.": unpaid, every creature with that name is tapped, anyone's, and the opponent chosen
+  // then (not targeted, rulings) gains control of ~ and all of them, tapped before or not (rulings), for as long as each
+  // stays on the battlefield (CR 611.2c: the set is locked in as it resolves).
+  const payKobolds = !ctx.spell && ctx.lastObjectTarget === undefined && !ctx.chosenOpponent && !ctx.eventPlayer ? /^[Yy]ou may pay ((?:\{[WUBRG]\})+)$/.exec(s) : null;
+  const koboldsDont = payKobolds ? /^If you don't, tap ~ and all creatures named ([A-Z][A-Za-z' -]+), then an opponent gains control of them\.?$/.exec(sentences[si + 1] ?? "") : null;
+  if (payKobolds && koboldsDont) {
+    const named: ObjRef = { ref: "each", filter: { kind: "object", types: ["Creature"], named: koboldsDont[1]!, text: `creature named ${koboldsDont[1]}` } };
+    ctx.chosenOpponent = true;
+    const otherwise: Effect[] = [
+      { type: "tap", what: { ref: "self" } },
+      { type: "tap", what: named },
+      { type: "choose", choice: "opponent" },
+      { type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } },
+      { type: "continuous", what: named, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } },
+    ];
+    return { effect: { type: "may", effects: [], pay: { mana: payKobolds[1]! }, keep: true, otherwise, text: `Pay ${payKobolds[1]} to keep ~ and the creatures named ${koboldsDont[1]}` }, next: si + 2 };
+  }
+  // Mishra, Artificer Prodigy: "you may search your graveyard, hand, and/or library for a card with the same name as that
+  // spell and put it onto the battlefield. If you search your library this way, shuffle.": in a cast trigger, the name the
+  // spell had as it was cast (TargetSpec.sameNameAsCause, StackItem.castName), looked for as it resolves; the library only
+  // if you choose, and only then a shuffle (CR 701.23), as Dark Supplicant's search.
+  const sameName = ctx.castSpell ? /^(?:([Yy]ou may) )?[Ss]earch your graveyard, hand, and\/or library for a card with the same name as that spell and put it onto the battlefield$/.exec(s) : null;
+  if (sameName && sentences[si + 1]?.replace(/\.$/, "") === "If you search your library this way, shuffle") {
+    const search: Effect = { type: "search", filter: { kind: "card", sameNameAsCause: true, text: "card with the same name as that spell" }, n: 1, upTo: false, reveal: false, dest: { zone: "battlefield" }, orGraveyard: true, andHand: true };
+    return { effect: sameName[1] ? { type: "may", effects: [search], text: s.replace(/^[Yy]ou may /, "") } : search, next: si + 2 };
+  }
+  return null;
+}
+
 /** Lane B round B164's sentences, chained first (parseBodyText is at TS2563's limit). */
 function roundB164Sentence(s: string, sentences: string[], si: number, ctx: Ctx): { effect: Effect; next: number } | "fail" | null {
   // Arni Brokenbrow: "You may have ~'s base power become 1 plus the greatest power among other creatures you control
@@ -1581,6 +1613,16 @@ function roundB160Sentence(s: string, sentences: string[], si: number, ctx: Ctx,
     const e = rule?.[0];
     if (rule?.length !== 1 || e?.type !== "damageRule" || !e.rule.by?.choose || e.rule.by.choose.colors?.length) return "fail";
     e.rule.by.choose = { ...e.rule.by.choose, sharesColorWithLinked: true };
+    return { effect: e, next: si + 1 };
+  }
+  // Protective Sphere: "Prevent all damage that would be dealt to you this turn by a source of your choice that shares a color
+  // with the mana spent on this activation cost.": the colors of the mana spent to activate it, as the source is chosen
+  // (CR 609.7a); colorless mana prevents no damage.
+  if (s === "Prevent all damage that would be dealt to you this turn by a source of your choice that shares a color with the mana spent on this activation cost" && ctx.activated && !effects.length && si + 1 === sentences.length) {
+    const rule = parseOne("Prevent all damage that would be dealt to you this turn by a source of your choice", ctx);
+    const e = rule?.[0];
+    if (rule?.length !== 1 || e?.type !== "damageRule" || !e.rule.by?.choose || e.rule.by.choose.colors?.length) return "fail";
+    e.rule.by.choose = { ...e.rule.by.choose, sharesColorWithManaSpent: true };
     return { effect: e, next: si + 1 };
   }
   // Clarion Ultimatum: "Choose five permanents you control. For each of those permanents, you may search your library for a
@@ -7087,7 +7129,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3); first
     // rounds B158, B157, B156, B155, B154, B153, B152, B151, B148 and 311 to 317's sentences (Courier of Comestibles, Xathrid Demon, Council Guardian, Celestial Judgment, Borderland Explorer).
-    const faceDown = roundB164Sentence(s, sentences, si, ctx) ?? roundB160Sentence(s, sentences, si, ctx, effects) ?? roundB159Sentence(s, sentences, si, ctx, effects) ?? roundB158Sentence(s, sentences, si, ctx, effects) ?? roundB157Sentence(s, sentences, si, ctx, effects) ?? roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
+    const faceDown = roundB165Sentence(s, sentences, si, ctx) ?? roundB164Sentence(s, sentences, si, ctx) ?? roundB160Sentence(s, sentences, si, ctx, effects) ?? roundB159Sentence(s, sentences, si, ctx, effects) ?? roundB158Sentence(s, sentences, si, ctx, effects) ?? roundB157Sentence(s, sentences, si, ctx, effects) ?? roundB156Sentence(s, sentences, si, ctx, effects) ?? roundB155Sentence(s, sentences, si, ctx, effects) ?? roundB154Sentence(s, sentences, si, ctx, effects) ?? roundB153Sentence(s, sentences, si, ctx, effects) ?? roundB152Sentence(s, sentences, si, ctx, effects) ?? roundB151Sentence(s, sentences, si, ctx, effects) ?? roundB148Sentence(s, sentences, si, ctx, effects) ?? round311Sentence(s, sentences, si, ctx, effects) ?? round312Sentence(s, sentences, si, ctx, effects) ?? round313Sentence(s, sentences, si, ctx, effects) ?? round314Sentence(s, sentences, si, ctx) ?? round315Sentence(s, sentences, si, ctx, effects) ?? round316Sentence(s, sentences, si, ctx, effects) ?? round317Sentence(s, sentences, si, ctx, effects) ?? parseFaceDownPlay(sentences, si, ctx);
     if (faceDown === "fail") return null;
     if (faceDown) {
       effects.push(faceDown.effect);

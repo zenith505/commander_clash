@@ -46,7 +46,7 @@ const objectMatchesFor = (s: GameState, spec: TargetSpec, id: ObjectId, you: Pla
  * Put a copy of this spell on the stack under `controller` (CR 707.10): its values and every choice made casting
  * it (modes, X, kicker, what was sacrificed), with these targets. It isn't cast.
  */
-function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targets: TargetChoice[] | undefined, gains?: { mods: Modification[]; source: string }, except?: CopyExcept) {
+export function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targets: TargetChoice[] | undefined, gains?: { mods: Modification[]; source: string }, except?: CopyExcept) {
   const card = orig.objectId ? s.objects[orig.objectId] : undefined;
   if (!card) return;
   // A copy of a nonmodal double-faced spell's back face (cast transformed: disturb) has mana value 0 (CR 202.3b).
@@ -471,10 +471,23 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (e.n === "eachOther") {
           // Zada, Ink-Treader Nephilim, Precursor Golem: no copy is made if the spell has left the stack.
           // Ivy, Gleeful Spellthief's is made from the spell as it last was (rulings).
-          if (orig.kind !== "spell" || (!e.eachOther!.toSource && !s.stack.some((x) => x.id === orig.id))) return;
-          const each = eachOtherTargets(s, orig, e.eachOther!, ctx);
-          if (!each.length) return;
+          if (orig.kind !== "spell" || (!e.eachOther!.toSource && !e.eachOther!.choosePay && !s.stack.some((x) => x.id === orig.id))) return;
+          const all = eachOtherTargets(s, orig, e.eachOther!, ctx);
           const by = e.eachOther!.caster ? orig.controller : ctx.controller;
+          // Feather, Radiant Arbiter: its controller picks any of them, paying for each (pickPermanents `payEach`).
+          const pay = e.eachOther!.choosePay;
+          if (pay && all.length && !sc.chosen?.[by]) {
+            sc.queue = [by];
+            sc.chosen = {};
+            s.pending = { kind: "pickPermanents", player: by, source: src, action: "copyFor", what: "creature", options: all, count: all.length, min: 0, anyNumber: true, payEach: pay, prompt: `click any number of other creatures ${orig.description} could target, paying ${pay} for each: a copy of it targets each one` };
+            return "paused";
+          }
+          const each = pay ? (sc.chosen?.[by] ?? []).filter((id) => all.includes(id)) : all;
+          if (pay) {
+            sc.queue = undefined;
+            sc.chosen = undefined;
+          }
+          if (!each.length) return;
           const extra = extraSpellCopies(s, by);
           sc.copies = { of: id!, left: each.length, each, by, ...(extra ? { extra } : {}) };
         } else {
@@ -586,6 +599,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." },
           turn: s.turn,
           ...(e.cascade ? { cascade: true as const } : {}),
+          ...(e.onlyOpponentOrTheirs ? { onlyOpponentOrTheirs: true as const } : {}),
           ...(e.allTurn ? { allTurn: true as const } : {}),
           ...(e.storm ? { storm: true as const } : {}),
           ...(e.uncounterable ? { uncounterable: true as const } : {}),

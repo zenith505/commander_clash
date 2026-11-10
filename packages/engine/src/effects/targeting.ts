@@ -128,6 +128,9 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.bound || spec.saddledSource || spec.crewedSource || spec.drafted || spec.targetsSource) return false;
   if (spec.objectId !== undefined && o.id !== spec.objectId) return false;
   if (spec.notId !== undefined && o.id === spec.notId) return false;
+  // Dire Blunderbuss's granted "sacrifice an artifact other than Dire Blunderbuss": not the permanent that gave it, while
+  // it's that object (bound as the layers give the ability, grants.ts; CR 400.7).
+  if (spec.notGrantSource && o.id === spec.notGrantSource.id && (o.zoneChanges ?? 0) === spec.notGrantSource.zc) return false;
   const c = chars ?? characteristics(s, o);
   const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
   if (spec.noAbilities && !hasNoAbilities(s, o, c)) return false;

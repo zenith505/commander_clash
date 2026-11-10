@@ -133,6 +133,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return { count: { kind: "permanents", filter: { kind: "object", types: ["Land"], notTypes: [], notColors: [], text: "land" }, sameNameAsLinked: true } };
   // Jadeheart Attendant: "the mana value of the exiled card used to craft it" (CR 702.167c): the cards its craft cost exiled.
   if (/^the mana value of the exiled card used to craft (?:it|~)$/.test(p) && (ctx === null || ctx.selfIt)) return { count: { kind: "linkedExiledMv" } };
+  // Mastercraft Raptor, Wretched Bonemass: "the total power of the exiled cards used to craft it" (CR 702.167c): the
+  // creature cards among them, each by its power in exile, a characteristic-defining ability of its own included (CR 604.3;
+  // rulings), a negative one too (CR 107.1b).
+  if (/^the total power of the exiled cards used to craft (?:it|~)$/.test(p) && (ctx === null || ctx.selfIt)) return { count: { kind: "linkedExiledPT", stat: "power", signed: true, crafted: true } };
+  // Sunbird Effigy: "the number of colors among the exiled cards used to craft it": five at most (rulings).
+  if (/^the number of colors among the exiled cards used to craft (?:it|~)$/.test(p) && (ctx === null || ctx.selfIt)) return { count: { kind: "linkedExiled", colors: true, crafted: true } };
   // Wood Elemental: "the number of Forests sacrificed as it entered", what its "As ~ enters, sacrifice any number of
   // untapped Forests" sacrificed (CompiledCard.devour), as devour's count. Only its own abilities know it.
   if (/^the number of Forests sacrificed as (?:it|~) entered$/.test(p) && (ctx === null || ctx.selfIt)) return { count: { kind: "devoured" } };

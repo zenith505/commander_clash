@@ -4085,7 +4085,9 @@ export function compile(d: CardDef): CompiledCard {
     // each keyword while a card exiled with it has that one (linked to its one exile ability below, CR 607.2a), layer 6.
     // Death-Mask Duplicant: "As long as a card exiled with ~ has flying, ~ has flying. The same is true for fear, ...,
     // landwalk, protection, and trample.": the same, landwalk and protection being every one of those it has (rulings).
-    const linkedKw = /^~ has ([a-z ]+) as long as a card exiled with it has \1\. The same is true for ((?:[a-z ]+, )+)and ([a-z ]+)\.$/.exec(line) ?? /^As long as a card exiled with ~ has ([a-z ]+), ~ has \1\. The same is true for ((?:[a-z ]+, )+)and ([a-z ]+)\.$/.exec(line);
+    // Wretched Bonemass: "~ has flying as long as an exiled card used to craft it has flying. ...": the cards its craft cost
+    // exiled (CR 702.167c), linked as it entered (no exile ability of its own to link).
+    const linkedKw = /^~ has ([a-z ]+) as long as (?:a card exiled with it|an exiled card used to craft it) has \1\. The same is true for ((?:[a-z ]+, )+)and ([a-z ]+)\.$/.exec(line) ?? /^As long as a card exiled with ~ has ([a-z ]+), ~ has \1\. The same is true for ((?:[a-z ]+, )+)and ([a-z ]+)\.$/.exec(line);
     if (linkedKw) {
       const kws = [linkedKw[1]!, ...linkedKw[2]!.split(", ").filter(Boolean), linkedKw[3]!].map((k) => (k === "landwalk" ? "Landwalk" : k === "protection" ? "Protection" : canonicalKeyword(k)));
       if (kws.some((k) => !k || !/^[A-Z][a-z]+(?: [a-z]+)?$/.test(k))) out.unsupported.push(raw);
@@ -7304,7 +7306,7 @@ function linkExile(out: CompiledCard) {
   }
   // Urborg Scavengers: "a card exiled with it" is one its one exile ability exiled (CR 607.2a): "Whenever ~ enters or
   // attacks, exile ..." is one ability, compiled as one trigger for each event with the same body.
-  if (out.statics.some((st) => st.mods.some((m) => m.kind === "addKeywords" && m.keywords.some((k) => k.startsWith(LINKED_CARD_KEYWORD))))) {
+  if (out.statics.some((st) => !/ used to craft it /.test(st.text) && st.mods.some((m) => m.kind === "addKeywords" && m.keywords.some((k) => k.startsWith(LINKED_CARD_KEYWORD))))) {
     const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects));
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");
     const others = all.some((e) => e.type === "exileGraveyard" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileTop" || e.type === "chooseFromGraveyard" || (e.type === "discard" && !!e.exile));
@@ -7384,7 +7386,8 @@ function linkExile(out: CompiledCard) {
   // The Kenriths' Royal Funeral: a cost reduction "for each card exiled with ~", the same.
   // Sutured Ghoul: "the exiled cards" are what its "As ~ enters, exile ..." exiled (CR 607.2b), when nothing else exiles.
   if (out.entersExileFromYard && !yardEntersLinkOnly(out, bodies)) out.unsupported.push("(counts cards exiled with it that it can't link to one exile ability)");
-  else if (!out.entersExileFromYard && (out.statics.some((st) => /"linkedExiled(?:PT)?"/.test(JSON.stringify(st.mods)) || JSON.stringify(st.condition ?? null).includes('"linkedExiled"')) || (out.costMods ?? []).some((cm) => JSON.stringify(cm.times ?? null).includes('"linkedExiled"')) || bodies.some((b) => JSON.stringify(b).includes('"linkedExiled"')) || out.triggers.some((t) => JSON.stringify(t.ifCond ?? null).includes('{"kind":"linkedExiled","ever":true}'))) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
+  // Mastercraft Raptor, Sunbird Effigy: "the exiled cards used to craft it" are linked by its craft cost (CR 702.167c).
+  else if (!out.entersExileFromYard && (out.statics.some((st) => /"linkedExiled(?:PT)?"/.test(JSON.stringify(st.mods).replace(/\{"kind":"linkedExiled(?:PT)?"[^{}]*"crafted":true[^{}]*\}/g, "")) || JSON.stringify(st.condition ?? null).includes('"linkedExiled"')) || (out.costMods ?? []).some((cm) => JSON.stringify(cm.times ?? null).includes('"linkedExiled"')) || bodies.some((b) => JSON.stringify(b).includes('"linkedExiled"')) || out.triggers.some((t) => JSON.stringify(t.ifCond ?? null).includes('{"kind":"linkedExiled","ever":true}'))) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const others = all.some((e) => e.type === "exileGraveyard" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
@@ -7470,7 +7473,7 @@ function linkExile(out: CompiledCard) {
   // Kaho, Minamo Historian; Jeleva, Nephalia's Scourge; Shell of the Last Kappa: "cast a spell from among cards exiled
   // with ~" as it resolves: the cards its one exile instruction exiled (CR 607.2a): Kaho's search, Jeleva's "each player
   // exiles the top X cards", Shell's exiled spell.
-  if (bodies.some((b) => allEffects(b.effects).some((e) => (e.type === "castFromAmong" && e.fromLinked) || e.type === "playLinkedThisTurn"))) {
+  if (bodies.some((b) => allEffects(b.effects).some((e) => (e.type === "castFromAmong" && e.fromLinked && !e.crafted) || e.type === "playLinkedThisTurn"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);

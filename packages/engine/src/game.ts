@@ -8386,13 +8386,13 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       // Craft's materials (CR 702.167a-b): any mix of permanents you control and cards in your graveyard, each once, and
       // not one that pays another cost.
       const pool = craftCandidates(s, pid, o, c).filter((id) => !both.includes(id));
-      const what = `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`;
+      const what = craftWhat(c);
       const chosen = choices?.craft;
       if (!chosen) {
-        if (pool.length < c.n) return `you need to exile ${what} you control or in your graveyard to ${doing}`;
+        if (pool.length < c.n || (c.slots && !craftSlotsFit(s, pid, c, pool, true))) return `you need to exile ${what} ${c.cardsOnly ? "from your graveyard" : "you control or in your graveyard"} to ${doing}`;
         continue;
       }
-      if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id))) return `choose ${what} to exile`;
+      if ((c.orMore ? chosen.length < c.n : chosen.length !== c.n) || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || (c.slots && !craftSlotsFit(s, pid, c, chosen))) return `choose ${what} to exile`;
       continue;
     }
     if (c.kind === "revealHand") continue; // always possible, even with an empty or already revealed hand (rulings)
@@ -8798,9 +8798,43 @@ export function processExiled(s: GameState, pid: PlayerId, chosen: ObjectId[], m
  * characteristics), then cards in their graveyard that match (by their printed ones, CR 109.2), never `o`, the source.
  */
 export function craftCandidates(s: GameState, pid: PlayerId, o: GameObject, c: Extract<AdditionalCost, { kind: "craft" }>): ObjectId[] {
-  const field = s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.filter, obj(s, id), pid, false));
+  const field = c.cardsOnly ? [] : s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.filter, obj(s, id), pid, false));
   const yard = player(s, pid).graveyard.filter((id) => id !== o.id && printedMatches(c.filter, defOf(s, obj(s, id))));
   return [...field, ...yard];
+}
+
+/** "A Dinosaur", "two artifacts", "one or more creatures", "four or more red instant and/or sorcery cards". */
+export function craftWhat(c: Extract<AdditionalCost, { kind: "craft" }>): string {
+  if (c.slots) return c.slots.map((f) => `${/^[aeiou]/i.test(f.text) ? "an" : "a"} ${f.text}`).join(", ").replace(/, (an? \w+)$/, ", and $1");
+  if (c.orMore) return c.filter.types?.length || c.filter.subtypes?.length ? `${c.n} or more ${c.filter.text}` : `${c.n} or more permanents and/or cards`;
+  return `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`;
+}
+
+/**
+ * Throne of the Grim Captain's materials: whether `ids` give each slot an object of its own (CR 702.167a; rulings), every
+ * one of `ids` used (`some`: whether some of them can fill every slot). A permanent by its characteristics, a card by its
+ * printed ones (CR 109.2).
+ */
+export function craftSlotsFit(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "craft" }>, ids: ObjectId[], some = false): boolean {
+  const slots = c.slots ?? [];
+  if (!some && ids.length !== slots.length) return false;
+  const fits = (id: ObjectId, f: TargetSpec) => {
+    const o = obj(s, id);
+    return o.zone === "battlefield" ? objectMatches(s, f, o, pid, false) : printedMatches(f, defOf(s, o));
+  };
+  // A matching of slots to objects, by backtracking (four slots at most).
+  const used = new Set<ObjectId>();
+  const fill = (i: number): boolean => {
+    if (i === slots.length) return true;
+    for (const id of ids) {
+      if (used.has(id) || !fits(id, slots[i]!)) continue;
+      used.add(id);
+      if (fill(i + 1)) return true;
+      used.delete(id);
+    }
+    return false;
+  };
+  return fill(0);
 }
 
 /** Behold (CR 701.4a): the matching cards in `pid`'s hand and the matching permanents they control, not `o` itself. */

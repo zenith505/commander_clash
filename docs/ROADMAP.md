@@ -1,7 +1,7 @@
 # Roadmap
 
-30,935 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,804 of
+30,942 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,805 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1355,7 +1355,7 @@ line blocks.
    any color": a payment rule for colored symbols); War's Toll ("If a creature an opponent controls attacks, all
    creatures that opponent controls attack if able": a requirement that depends on the declaration); Kaito, Dancing
    Shadow ("activate loyalty abilities of ~ twice this turn", a one-turn grant); Saheeli's Lattice, Altar of the
-   Wretched, Paleontologist's Pick-Axe and Sunbird Standard ("Craft with one or more ...", and what their back faces
+   Wretched, Paleontologist's Pick-Axe and Sunbird Standard (all but the Pick-Axe done in round 334) ("Craft with one or more ...", and what their back faces
    read from the exiled cards used to craft them); Teyo, Geometric Tactician (attack only the nearest opponent in a
    direction); Ramses, Assassin Lord (done in round 265).
    Round 232 (unexamined cards from ranks 6,400 to 13,000, now done): a search's exile linked to a dies ability (Hoarding
@@ -2347,7 +2347,7 @@ line blocks.
    and/or cards from their hand", you first (Descent into Madness, with a browser test of the pick). +10, 30,170 of 31,936 with B123.
    Out after round 293 (looked at, not done): Spellweaver Helix (copying the other imprinted card when a card with one's
    name is cast, cast as the trigger resolves); Yavimaya Bloomsage's Channel (paying life whenever a mana ability could be
-   activated); Throne of the Grim Captain (craft with four named creature types); Uvilda, Dean of Perfection (refine
+   activated); Throne of the Grim Captain (done in round 334) (craft with four named creature types); Uvilda, Dean of Perfection (refine
    counters on a card exiled from hand, granted triggers in exile); Blood of the Martyr (a redirection chosen for each
    damage event); The Raven's Warning, Fae of Wishes, North Wind Avatar (cards from outside the game); Bishop of Binding,
    Caller of the Hunt, Enigmatic Incarnation (how it was cast); Don't Blink (entering from exile replaced by a shuffle);
@@ -2363,6 +2363,29 @@ line blocks.
    Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
+   Round 334 took the next card no list named (Ore-Rich Stalactite) and the craft cards whose materials or back faces
+   were missing: "Craft with one or more creatures", "one or more Dinosaurs", "one or more" alone and "four or more red
+   instant and/or sorcery cards" (CR 702.167a-b: any number from that many up, any mix of permanents you control and
+   graveyard cards, never the source; "cards" means graveyard cards only, 109.2), and "Craft with a Dinosaur, a Merfolk,
+   a Pirate, and a Vampire" (four separate objects, one for each type, a changeling filling any one of them, rulings), in
+   the craft picker ("chosen 2 of up to 3", Done only once the picks fit) with browser tests; the back faces that read
+   "the exiled cards used to craft it" (CR 702.167c, cards still in exile, a token counting for nothing): "~'s power is
+   equal to the total power of ..." (Mastercraft Raptor) and "power and toughness are each equal to the total power"
+   (Wretched Bonemass, with each keyword of its list that a card has, protection and "hexproof from" as the cards' own
+   variants, CR 702.11e and rulings on Soulflayer; Urborg Scavengers now gets "hexproof from" variants too), "the number
+   of colors among ..." with "For each color among ..., add one mana of that color" (Sunbird Effigy), "Choose an exiled
+   card used to craft ~ at random. You may cast that card without paying its mana cost." (Cosmium Catalyst, as the
+   ability resolves), "Then you may put an exiled creature card used to craft ~ onto the battlefield under your control
+   tapped and attacking" (The Grim Captain: attacking whom its controller chooses, CR 508.4); "Activate only if ~ or
+   another artifact entered the battlefield under your control this turn" (Master's Manufactory) and a granted
+   "sacrifice an artifact other than [the Equipment that gave it]" (Dire Blunderbuss). +7, 30,942 of 31,936 with B172.
+   Bots: a bot crafts "one or more" with every spare graveyard card and cheap token that fits (more power, colors or
+   cards to cast for the back face), and for the Throne finds one material for each type among those.
+   Out after round 334 (looked at, not done): Paleontologist's Pick-Axe (its craft works now; Dinosaur Headdress makes the
+   equipped creature a copy of a card chosen as it becomes attached); The Enigma Jewel ("four or more nonlands with
+   activated abilities", and Locus of Enlightenment has the exiled cards' activated abilities).
+   Not looked at yet (no list names them; next in popularity): Sasaya, Orochi Ascendant; Tazri, Stalwart Survivor; The
+   Master, Formed Anew; Tezzeret, Cruel Machinist.
    Round 333 took the most played cards round 332 left for later and three no list named: "Reveal any number of cards
    with {X} in their mana cost in your hand. Add {C}{C} for each card revealed this way. Spend this mana only on costs that
    contain {X}." (Rosheen, Roaring Prophet: the reveal a mana ability's choice, CR 605.1a, its mana restricted, CR 106.6,
@@ -3385,7 +3408,7 @@ line blocks.
    (cards from outside the game); Lucy MacLean, Positively Armed; Three Dog, Galaxy News DJ; Baron Helmut Zemo (black mana
    symbols among exiled cards' costs); March from Velis Vel (lands of a chosen type become copies); Judgment of Alexander;
    The Brothers' War (chapter II's attack requirement); Duelist's Flame; Spirit of Resilience; Eye of Ojer Taq and Ore-Rich
-   Stalactite (craft with cards that share a type, or four or more); Kaya, Spirits' Justice; Ashiok, Wicked Manipulator (a
+   Stalactite (done in round 334) (craft with cards that share a type, or four or more); Kaya, Spirits' Justice; Ashiok, Wicked Manipulator (a
    life payment replaced by exiling); Parallel Thoughts (a draw replaced by the exiled pile's top card); Nathan Drake,
    Treasure Hunter (mana spent as any color for spells you don't own); Invasion Plans (the attacking player declares
    blocks); Alaundo the Seer (time counters given to a card exiled from your hand).
@@ -3653,7 +3676,7 @@ line blocks.
    able": requirements on the number of blockers); Calamity, Galloping Inferno (token copies of the creatures that saddled
    it, chosen one by one).
    Out after round 240 (looked at, not done): Geyadrone Dihada (protection from permanents with corruption counters
-   on them: the protection quality would need the source's counters); Altar of the Wretched and The Enigma Jewel (their
+   on them: the protection quality would need the source's counters); Altar of the Wretched (done in round 334) and The Enigma Jewel (their
    back faces don't parse yet); Huatli, Poet of Unity (chapter II grants a static that works in layer 6, which granted
    statics don't support); Nethergoyf and Winter, Cynical Opportunist (exile any number of cards with four or more card types
    among them: a picker constraint on the cost); Repeated Reverberation (copy the next instant or sorcery spell OR the
@@ -3767,7 +3790,7 @@ line blocks.
    Smaller gaps from round 161: craft takes one kind of material only ("craft with a creature", "with two creatures",
    "with an Island", "with artifact"); "one or more", "creatures that share a creature type" and the like stay out
    (Jade Seedstones also needs the mana value of the card used to craft it, Master's Guide-Mural an "activate only if"
-   condition, Dire Flail, Spring-Loaded Sawblades and Braided Net their other lines). Bots craft only in their second
+   condition, Dire Flail (both done in round 334), Spring-Loaded Sawblades and Braided Net their other lines). Bots craft only in their second
    main phase, with graveyard cards they have no use for or tokens worth 3 or less. "Tokens created with ~" (Faerie
    Artisans) are the tokens its own abilities created as they resolved, as that object (rulings).
    Smaller gaps from round 160: when Nemata, Primeval Warden and another "exile it instead" replacement both apply to a
@@ -6056,7 +6079,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the Past (a group sharing a creature type with the dying creature), Loki Laufeyson (a mana value limit from its power on
   a delayed cast trigger), The Fugitive Doctor and Filigree Racer (flashback or jump-start granted until end of turn),
   Mazzy (an Aura put into a graveyard, cast until your next turn), Saheeli's Lattice, Paleontologist's Pick-Axe and Throne
-  of the Grim Captain ("craft with one or more"), Seifer (blocked by two or more), Distended Mindbender (done in round B158) (a choice of two
+  of the Grim Captain (all but the Pick-Axe done in round 334) ("craft with one or more"), Seifer (blocked by two or more), Distended Mindbender (done in round B158) (a choice of two
   cards by different rules), plus Shaun & Rebecca, Wild Shape, Bridge from Below, Aetherborn Marauder (done in round 315), Sigardian Zealot,
   Rhuk (done in round B70), Alpha Brawl, Brain in a Jar (done in round B158), Sita Varma (done in round B114), Munda and Hans Eriksson.
 - Round B61 (the unlisted ones from EDHREC rank about 19,700 up, and from the B10/B11 lists below): "gets +2/+2 until

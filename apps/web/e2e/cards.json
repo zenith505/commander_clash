@@ -778,6 +778,78 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c551f007-9740-4a2a-8ef5-7be1a7afe14b",
+  "name": "Altar of the Wretched // Wretched Bonemass",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Artifact // Creature — Skeleton Horror",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "When this artifact enters, you may sacrifice a nontoken creature. If you do, draw X cards, then mill X cards, where X is that creature's power.\nCraft with one or more creatures {2}{B}{B}\n{2}{B}: Return this card from your graveyard to your hand.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Craft",
+   "Transform",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "lcc",
+  "releasedAt": "2023-11-17",
+  "rarity": "rare",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Altar of the Wretched",
+    "manaCost": "{2}{B}",
+    "typeLine": "Artifact",
+    "supertypes": [],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [],
+    "oracleText": "When this artifact enters, you may sacrifice a nontoken creature. If you do, draw X cards, then mill X cards, where X is that creature's power.\nCraft with one or more creatures {2}{B}{B}\n{2}{B}: Return this card from your graveyard to your hand.",
+    "colors": [
+     "B"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/e/2/e2c812bb-19f8-4a22-bda9-f2a6233cf700.jpg?1783951757",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/e/2/e2c812bb-19f8-4a22-bda9-f2a6233cf700.jpg?1783951757"
+   },
+   {
+    "name": "Wretched Bonemass",
+    "manaCost": "",
+    "typeLine": "Creature — Skeleton Horror",
+    "supertypes": [],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Skeleton",
+     "Horror"
+    ],
+    "oracleText": "Wretched Bonemass's power and toughness are each equal to the total power of the exiled cards used to craft it.\nThis creature has flying as long as an exiled card used to craft it has flying. The same is true for first strike, double strike, deathtouch, haste, hexproof, indestructible, lifelink, menace, protection, reach, trample, and vigilance.",
+    "power": "*",
+    "toughness": "*",
+    "colors": [
+     "B"
+    ],
+    "colorIndicator": [
+     "B"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/e/2/e2c812bb-19f8-4a22-bda9-f2a6233cf700.jpg?1783951757",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/e/2/e2c812bb-19f8-4a22-bda9-f2a6233cf700.jpg?1783951757"
+   }
+  ]
+ },
+ {
   "oracleId": "44e02e70-07ab-4795-8037-55185bd11d54",
   "name": "Aluren",
   "manaCost": "{2}{G}{G}",
@@ -11174,6 +11246,39 @@
   "commanderLegal": "legal",
   "set": "mrd",
   "releasedAt": "2003-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7bcf3090-95c6-4384-a857-9fe571e6da85",
+  "name": "Fathom Fleet Captain",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Pirate",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Pirate"
+  ],
+  "oracleText": "Menace\nWhenever this creature attacks, if you control another nontoken Pirate, you may pay {2}. If you do, create a 2/2 black Pirate creature token with menace.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "xln",
+  "releasedAt": "2017-09-29",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -25854,6 +25959,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0673f4e0-66ff-458c-b4ba-eb067e560cce",
+  "name": "Regisaur Alpha",
+  "manaCost": "{3}{R}{G}",
+  "cmc": 5,
+  "typeLine": "Creature — Dinosaur",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dinosaur"
+  ],
+  "oracleText": "Other Dinosaurs you control have haste.\nWhen this creature enters, create a 3/3 green Dinosaur creature token with trample.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "xln",
+  "releasedAt": "2017-09-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d39c378b-f0a2-400f-af40-a632e24b6d72",
   "name": "Relentless Pursuit",
   "manaCost": "{2}{G}",
@@ -33426,6 +33563,85 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a7c96442-706b-4fd8-9b38-052872dafe58",
+  "name": "Throne of the Grim Captain // The Grim Captain",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Legendary Artifact // Legendary Creature — Skeleton Spirit Pirate",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Mill two cards.\nCraft with a Dinosaur, a Merfolk, a Pirate, and a Vampire {4} ({4}, Exile this artifact, Exile the four from among permanents you control and/or cards in your graveyard: Return this card transformed under its owner's control. Craft only as a sorcery.)",
+  "colors": [],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Lifelink",
+   "Craft",
+   "Transform",
+   "Hexproof",
+   "Trample",
+   "Menace",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "lci",
+  "releasedAt": "2023-11-17",
+  "rarity": "rare",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Throne of the Grim Captain",
+    "manaCost": "{2}",
+    "typeLine": "Legendary Artifact",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [],
+    "oracleText": "{T}: Mill two cards.\nCraft with a Dinosaur, a Merfolk, a Pirate, and a Vampire {4} ({4}, Exile this artifact, Exile the four from among permanents you control and/or cards in your graveyard: Return this card transformed under its owner's control. Craft only as a sorcery.)",
+    "colors": [],
+    "imageUrl": "https://cards.scryfall.io/normal/front/4/f/4f7a6892-5f6b-49aa-9b4f-3fcf20236306.jpg?1783913707",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/4/f/4f7a6892-5f6b-49aa-9b4f-3fcf20236306.jpg?1783913707"
+   },
+   {
+    "name": "The Grim Captain",
+    "manaCost": "",
+    "typeLine": "Legendary Creature — Skeleton Spirit Pirate",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Skeleton",
+     "Spirit",
+     "Pirate"
+    ],
+    "oracleText": "Menace, trample, lifelink, hexproof\nWhenever The Grim Captain attacks, each opponent sacrifices a nonland permanent of their choice. Then you may put an exiled creature card used to craft The Grim Captain onto the battlefield under your control tapped and attacking.",
+    "power": "7",
+    "toughness": "7",
+    "colors": [
+     "B"
+    ],
+    "colorIndicator": [
+     "B"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/4/f/4f7a6892-5f6b-49aa-9b4f-3fcf20236306.jpg?1783913707",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/4/f/4f7a6892-5f6b-49aa-9b4f-3fcf20236306.jpg?1783913707"
+   }
+  ]
+ },
+ {
   "oracleId": "78260893-c443-44c8-ab45-ce86ef347d98",
   "name": "Thunderous Wrath",
   "manaCost": "{4}{R}{R}",
@@ -34816,6 +35032,41 @@
   "set": "shm",
   "releasedAt": "2008-05-02",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "feb244f8-bcb1-44cf-9940-2719221a7309",
+  "name": "Vampire Nighthawk",
+  "manaCost": "{1}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Creature — Vampire Shaman",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vampire",
+   "Shaman"
+  ],
+  "oracleText": "Flying\nDeathtouch (Any amount of damage this deals to a creature is enough to destroy it.)\nLifelink (Damage dealt by this creature also causes you to gain that much life.)",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Deathtouch",
+   "Flying",
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "zen",
+  "releasedAt": "2009-10-02",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

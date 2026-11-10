@@ -124,7 +124,7 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
   if (p.kind === "anyColors") return [...(p.colors ?? COLORS)];
   if (p.kind === "colorsAmong") return colorsAmong(s, o, p);
   // "For each color among permanents you control": all of them at once, whichever is named (none with no color).
-  if (p.kind === "eachColorAmong") return eachColorAmong(s, o, !!p.monocolored);
+  if (p.kind === "eachColorAmong") return eachColorAmong(s, o, !!p.monocolored, !!p.linked);
   if (p.kind === "devotion") return [...COLORS];
   if (p.kind === "doublePool") return [...COLORS, "C"];
   if (p.kind === "noted") return [o.notedMana ?? "C"];
@@ -149,8 +149,14 @@ function colorsAmong(s: GameState, o: GameObject, p: Extract<ManaProduce, { kind
 }
 
 /** The colors among permanents `o`'s controller controls (CR 105.2): Bloom Tender itself counts if it has a color. */
-function eachColorAmong(s: GameState, o: GameObject, monocolored = false): ManaType[] {
+function eachColorAmong(s: GameState, o: GameObject, monocolored = false, linked = false): ManaType[] {
   const pid = controllerOf(s, o);
+  // Sunbird Effigy: the colors of the exiled cards used to craft it, while they stay exiled (CR 702.167c); at most five
+  // (rulings).
+  if (linked) {
+    const colors = new Set(linkedExileCards(s, o).filter((id) => !obj(s, id).faceDown).flatMap((id) => characteristics(s, obj(s, id)).colors));
+    return COLORS.filter((c) => colors.has(c));
+  }
   // Tarnation Vista: only monocolored ones, exactly one color each (CR 105.2b).
   const colors = new Set(s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid).map((id) => characteristics(s, obj(s, id)).colors).filter((c) => !monocolored || c.length === 1).flat());
   return COLORS.filter((c) => colors.has(c));
@@ -347,7 +353,7 @@ function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: 
   if (p.kind === "landsCouldProduce") return Array<ManaType>(p.n ?? 1).fill(choice);
   if (p.kind === "chosenColor") return Array<ManaType>(p.n ?? 1).fill(choice);
   if (p.kind === "commanderIdentity" || p.kind === "colorsAmong") return [choice];
-  if (p.kind === "eachColorAmong") return eachColorAmong(s, o, !!p.monocolored);
+  if (p.kind === "eachColorAmong") return eachColorAmong(s, o, !!p.monocolored, !!p.linked);
   if (p.kind === "devotion") return Array<ManaType>(evalAmount(s, { count: { kind: "devotion", colors: [choice as Color] } }, { controller: controllerOf(s, o), sourceId: o.id })).fill(choice);
   if (!p.count) return p.mana;
   const pid = controllerOf(s, o);

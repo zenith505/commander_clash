@@ -61,6 +61,7 @@ import {
   tapCostCandidates,
   shareablePick,
   craftCandidates,
+  craftSlotsFit,
   untapViaMana,
   counterCostCandidates,
   counterOnCandidates,
@@ -6757,7 +6758,15 @@ export function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: Act
       const field = pool.filter((x) => obj(s, x).zone === "battlefield" && obj(s, x).isToken && worth(s, pid, obj(s, x)) <= 3).sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)));
       const picks = [...yard, ...field];
       if (picks.length < c.n) return null;
-      out.craft = picks.slice(0, c.n);
+      if (c.slots) {
+        // Throne of the Grim Captain: the first picks that give each slot its own object.
+        const fit = craftSlotPicks(s, pid, c, picks);
+        if (!fit) return null;
+        out.craft = fit;
+        continue;
+      }
+      // "One or more": every pick, the back faces counting what was used to craft them (Wretched Bonemass, Sunbird Effigy).
+      out.craft = c.orMore ? picks : picks.slice(0, c.n);
     } else if (c.kind === "tap" && c.untap) {
       // "Untap a tapped creature you control" (Halo Fountain): untapping is all gain, the most valuable first.
       // Then a mana creature, tapped for mana while paying and untapped for the cost (rulings).
@@ -8155,4 +8164,19 @@ function powerFloorSet(s: GameState, pid: PlayerId, options: ObjectId[], min: nu
     total += power(s, o);
   }
   return total >= min ? ids : null;
+}
+
+/** Throne of the Grim Captain's materials from `picks`, in order of preference: one for each slot (craftSlotsFit). */
+function craftSlotPicks(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "craft" }>, picks: ObjectId[]): ObjectId[] | null {
+  const n = c.slots!.length;
+  const go = (start: number, chosen: ObjectId[]): ObjectId[] | null => {
+    if (chosen.length === n) return craftSlotsFit(s, pid, c, chosen) ? chosen : null;
+    for (let i = start; i < picks.length; i++) {
+      const r = go(i + 1, [...chosen, picks[i]!]);
+      if (r) return r;
+    }
+    return null;
+  };
+  picks = picks.slice(0, 12); // the cheapest few: the search stays small
+  return go(0, []);
 }

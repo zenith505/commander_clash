@@ -2360,6 +2360,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         sc.linkedPick = undefined;
         cards = cards.filter((c) => sc.found?.includes(c.id));
+      } else if (e.one && sc.linkedTaken) {
+        // The Grim Captain: picked before what it attacks was chosen.
+        const taken = sc.linkedTaken;
+        cards = cards.filter((c) => taken.includes(c.id));
       } else if (e.one) {
         if (!sc.linkedPick) {
           if (!cards.length) return;
@@ -2371,15 +2375,37 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         sc.linkedPick = undefined;
         cards = cards.filter((c) => sc.found?.includes(c.id));
+        if (e.attacking) sc.linkedTaken = cards.map((c) => c.id);
       }
       if (!cards.length) return;
+      // The Grim Captain: "onto the battlefield under your control tapped and attacking": what it attacks chosen as it
+      // enters, any opponent, planeswalker or battle, not necessarily what the source attacks (CR 508.4; rulings). Never
+      // declared as an attacker, so "whenever ... attacks" doesn't trigger. Outside combat it enters tapped only.
+      let attack: ReturnType<typeof attackChoices>[number] | undefined;
+      if (e.attacking && e.dest === "battlefield") {
+        const attackOptions = inCombat(s) && cards.some((c) => isType(defOf(s, c), "Creature")) ? attackChoices(s, ctx.controller, ctx.sourceId) : [];
+        if (attackOptions.length > 1 && sc.attackWhom === undefined) {
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "attackWhom", options: attackOptions.map((a) => a.key), labels: attackOptions.map((a) => a.label), prompt: `choose what ${defOf(s, cards[0]!).name} attacks` };
+          return "paused";
+        }
+        attack = attackOptions.length > 1 ? attackOptions.find((a) => a.key === sc.attackWhom) : attackOptions[0];
+        sc.linkedTaken = undefined;
+        sc.attackWhom = undefined;
+      }
       if (e.dest === "battlefield") {
         // All at once (CR 608.2f), under this ability's controller's control.
         if (e.faceDown) log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} exiled with ${src} onto the battlefield face down: ${cards.length === 1 ? "a 2/2 Cyberman artifact creature" : "2/2 Cyberman artifact creatures"}.`);
         else log(s, `${e.ownersControl ? "" : `${p.name} puts `}${cards.map((c) => defOf(s, c).name).join(", ")} ${e.ownersControl ? `${cards.length === 1 ? "returns" : "return"} to the battlefield under ${cards.length === 1 ? "its owner's" : "their owners'"} control` : "onto the battlefield"} from exile (${src}).`);
         const ids = cards.map((c) => c.id);
         enterTogether(s, () => {
-          for (const c of cards) moveObject(s, c.id, "battlefield", { controller: e.ownersControl ? c.owner : p.id, ...(e.counters ? { counters: { ...e.counters } } : {}), ...(e.faceDown ? { faceDown: e.faceDown } : {}), ...(e.tapped ? { tapped: true } : {}), ...(e.alsoMods ? { entersAs: e.alsoMods, entersAsBy: { controller: p.id, source: src } } : {}) }); // as it enters (CR 614.12)
+          for (const c of cards) {
+            moveObject(s, c.id, "battlefield", { controller: e.ownersControl ? c.owner : p.id, ...(e.counters ? { counters: { ...e.counters } } : {}), ...(e.faceDown ? { faceDown: e.faceDown } : {}), ...(e.tapped || e.attacking ? { tapped: true } : {}), ...(e.alsoMods ? { entersAs: e.alsoMods, entersAsBy: { controller: p.id, source: src } } : {}) }); // as it enters (CR 614.12)
+            // Attacking as it enters, before its enters abilities trigger (CR 508.4).
+            if (attack && (c.zone as string) === "battlefield" && objIsType(s, c, "Creature")) {
+              c.attacking = attack.player;
+              if (attack.planeswalker) c.attackingPermanent = attackingPermanentOf(s, attack.planeswalker);
+            }
+          }
         });
         const now = ids.filter((id) => obj(s, id).zone === "battlefield");
         if (e.gain && now.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: "game", affected: now, mods: [{ kind: "addKeywords", keywords: e.gain }] });

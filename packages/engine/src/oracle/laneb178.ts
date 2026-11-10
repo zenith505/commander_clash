@@ -4,6 +4,7 @@ import type { CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseStaticCondition } from "./statics";
 import { parseObject } from "./targets";
+import { QUOTED_SOURCE_NAME } from "./compile";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -40,6 +41,15 @@ export function roundB178Sentence(s: string, sentences: string[], si: number, ct
     const what = parseObject("another target creature or artifact", ctx);
     if (what?.ref !== "target" || what.n) return "fail";
     return { effect: { type: "delayed", when: "dies", of: what, anyPermanent: true, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "graveyard" }, owner: true }], text: "return that card to the battlefield under its owner's control", thisTurn: true }, next: si + 2 };
+  }
+  // Heliod's Punishment's granted ability, after "Remove a task counter from Heliod's Punishment": "Then if it has no task
+  // counters on it, destroy Heliod's Punishment.": "it" is the Aura giving the ability (rulings: only that one), counted
+  // as this resolves; nothing happens once it has left the battlefield.
+  const noneLeft = new RegExp(`^(?:Then )?[Ii]f it has no ([a-z]+) counters on it, destroy ${QUOTED_SOURCE_NAME}$`).exec(s);
+  if (noneLeft) {
+    const last = effects[effects.length - 1];
+    if (last?.type !== "removeCounters" || last.what.ref !== "grantSource" || last.counter !== noneLeft[1]) return "fail";
+    return { effect: { type: "if", cond: { kind: "state", cond: { kind: "amount", amount: { count: { kind: "counters", counter: noneLeft[1]!, of: { ref: "grantSource" } } }, max: 0 } }, effects: [{ type: "destroy", what: { ref: "grantSource" } }] }, next: si + 1 };
   }
   // Psychic Rebuttal, after "Counter target instant or sorcery spell that targets you": "Spell mastery — If there are two or
   // more instant and/or sorcery cards in your graveyard, you may copy the spell countered this way. You may choose new

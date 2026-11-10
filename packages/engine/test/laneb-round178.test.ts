@@ -24,6 +24,8 @@ const prologue = (): CardDef => ({"oracleId":"3f661b58-e8ca-412c-bdac-af151162de
 const ornithopter = (): CardDef => ({"oracleId":"a3a98bc9-caa0-49b7-951c-fe4e4f54e4ba","name":"Ornithopter","manaCost":"{0}","cmc":0,"typeLine":"Artifact Creature — Thopter","supertypes":[],"types":["Artifact","Creature"],"subtypes":["Thopter"],"oracleText":"Flying","power":"0","toughness":"2","colors":[],"colorIdentity":[],"keywords":["Flying"],"imageUrl":"https://cards.scryfall.io/normal/front/d/d/ddb96645-44d2-426c-90cb-3186297a8728.jpg?1783936724","artUrl":"https://cards.scryfall.io/art_crop/front/d/d/ddb96645-44d2-426c-90cb-3186297a8728.jpg?1783936724","commanderLegal":"legal","set":"aer","releasedAt":"2017-01-20","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
 const grime = (): CardDef => ({"oracleId":"0b8adb9e-97a5-43d9-87d6-993f22edaf3b","name":"Gutter Grime","manaCost":"{4}{G}","cmc":5,"typeLine":"Enchantment","supertypes":[],"types":["Enchantment"],"subtypes":[],"oracleText":"Whenever a nontoken creature you control dies, put a slime counter on this enchantment, then create a green Ooze creature token with \"This token's power and toughness are each equal to the number of slime counters on Gutter Grime.\"","colors":["G"],"colorIdentity":["G"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/a/9/a9d007a2-163d-4e09-a70b-280a6fa3203b.jpg?1783940917","artUrl":"https://cards.scryfall.io/art_crop/front/a/9/a9d007a2-163d-4e09-a70b-280a6fa3203b.jpg?1783940917","commanderLegal":"legal","set":"isd","releasedAt":"2011-09-30","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 const burst = (): CardDef => ({"oracleId":"7b31ecf8-5266-4376-ace0-8b873706c4ea","name":"Saproling Burst","manaCost":"{4}{G}","cmc":5,"typeLine":"Enchantment","supertypes":[],"types":["Enchantment"],"subtypes":[],"oracleText":"Fading 7 (This enchantment enters with seven fade counters on it. At the beginning of your upkeep, remove a fade counter from it. If you can't, sacrifice it.)\nRemove a fade counter from this enchantment: Create a green Saproling creature token. It has \"This token's power and toughness are each equal to the number of fade counters on Saproling Burst.\"\nWhen this enchantment leaves the battlefield, destroy all tokens created with this enchantment. They can't be regenerated.","colors":["G"],"colorIdentity":["G"],"keywords":["Fading"],"imageUrl":"https://cards.scryfall.io/normal/front/d/e/de3a293d-08d8-49e4-b0fa-91afa0a5591d.jpg?1783945813","artUrl":"https://cards.scryfall.io/art_crop/front/d/e/de3a293d-08d8-49e4-b0fa-91afa0a5591d.jpg?1783945813","commanderLegal":"legal","set":"nem","releasedAt":"2000-02-14","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const punish = (): CardDef => ({"oracleId":"ac5d5133-6f5c-43b7-82da-24802246e5a4","name":"Heliod's Punishment","manaCost":"{1}{W}","cmc":2,"typeLine":"Enchantment — Aura","supertypes":[],"types":["Enchantment"],"subtypes":["Aura"],"oracleText":"Enchant creature\nThis Aura enters with four task counters on it.\nEnchanted creature can't attack or block. It loses all abilities and has \"{T}: Remove a task counter from Heliod's Punishment. Then if it has no task counters on it, destroy Heliod's Punishment.\"","colors":["W"],"colorIdentity":["W"],"keywords":["Enchant"],"imageUrl":"https://cards.scryfall.io/normal/front/3/b/3b8e6878-06aa-4505-b3a5-172083b7d258.jpg?1783931596","artUrl":"https://cards.scryfall.io/art_crop/front/3/b/3b8e6878-06aa-4505-b3a5-172083b7d258.jpg?1783931596","commanderLegal":"legal","set":"thb","releasedAt":"2020-01-24","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
+const prodigal = (): CardDef => ({"oracleId":"5e961d15-5972-4e4b-9385-1cd7cd7c6bbe","name":"Prodigal Sorcerer","manaCost":"{2}{U}","cmc":3,"typeLine":"Creature — Human Wizard Sorcerer","supertypes":[],"types":["Creature"],"subtypes":["Human","Wizard","Sorcerer"],"oracleText":"{T}: This creature deals 1 damage to any target.","power":"1","toughness":"1","colors":["U"],"colorIdentity":["U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/5/0/50aef269-55f9-4d84-8bc5-29e794297f11.jpg?1783937607","artUrl":"https://cards.scryfall.io/art_crop/front/5/0/50aef269-55f9-4d84-8bc5-29e794297f11.jpg?1783937607","commanderLegal":"legal","set":"ema","releasedAt":"2016-06-10","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const tgt = (id: string): TargetChoice => ({ kind: "object", id }) as TargetChoice;
@@ -65,7 +67,7 @@ const into = (s: GameState, pid: PlayerId, def: CardDef, zone: "hand" | "graveya
 const zone = (s: GameState, id: string) => s.objects[id]?.zone;
 
 describe("Lane B round B178: cards", () => {
-  it("compile", () => supported(rebuttal(), sphinx(), mannequin(), reservoir(), melira(), grime(), burst()));
+  it("compile", () => supported(rebuttal(), sphinx(), mannequin(), reservoir(), melira(), grime(), burst(), punish()));
 });
 
 describe("Psychic Rebuttal", () => {
@@ -325,5 +327,44 @@ describe("Saproling Burst", () => {
     s = settleBots(run(s, planCast(s, ap, hex, [tgt(id)])));
     expect(zone(s, id)).toBe("graveyard");
     expect(tokens.every((t) => zone(s, t) !== "battlefield")).toBe(true);
+  });
+});
+
+describe("Heliod's Punishment", () => {
+  it("the creature loses its abilities and has one that removes the Aura's task counters; the fourth destroys it", () => {
+    let { s, ap, opp, ids } = setup([punish()]);
+    const c = putOnBattlefield(s, opp, prodigal());
+    s = settleBots(run(s, planCast(s, ap, ids[0]!, [tgt(c)])));
+    const aura = ids[0]!;
+    expect(s.objects[aura]!.attachedTo).toBe(c);
+    expect(s.objects[aura]!.counters.task).toBe(4);
+    // Prodigal Sorcerer's ping is gone; the granted ability is its only one.
+    const acts = abilitiesOf(s, s.objects[c]!).activated;
+    expect(acts.length).toBe(1);
+    expect(acts[0]!.body.effects[0]).toMatchObject({ type: "removeCounters", what: { ref: "grantSource", id: aura } });
+    for (let i = 3; i >= 0; i--) {
+      s = passTo(s, opp);
+      s = settleBots(run(s, planActivate(s, opp, c, 0)));
+      if (i > 0) {
+        expect(s.objects[aura]!.counters.task).toBe(i);
+        s.objects[c]!.tapped = false;
+      }
+    }
+    expect(zone(s, aura)).toBe("graveyard");
+    // Its own ability is back.
+    expect(abilitiesOf(s, s.objects[c]!).activated.length).toBe(1);
+    expect(abilitiesOf(s, s.objects[c]!).activated[0]!.body.effects[0]).toMatchObject({ type: "damage" });
+  });
+
+  it("with two on it, only the one attached last gives the ability, and it removes that one's counters", () => {
+    let { s, ap, opp, ids } = setup([punish(), punish()]);
+    const c = putOnBattlefield(s, opp, prodigal());
+    s = settleBots(run(s, planCast(s, ap, ids[0]!, [tgt(c)])));
+    s = settleBots(run(s, planCast(s, ap, ids[1]!, [tgt(c)])));
+    const acts = abilitiesOf(s, s.objects[c]!).activated;
+    expect(acts.length).toBe(1);
+    s = passTo(s, opp);
+    s = settleBots(run(s, planActivate(s, opp, c, 0)));
+    expect([s.objects[ids[0]!]!.counters.task, s.objects[ids[1]!]!.counters.task]).toEqual([4, 3]);
   });
 });

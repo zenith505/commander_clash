@@ -1303,7 +1303,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Venarian Gold: "remove a sleep counter from that creature", the enchanted creature as it resolves. Defiant Greatmaw:
   // "remove a -1/-1 counter from another target creature you control".
   // Confront the Past: "Remove twice X loyalty counters from target planeswalker an opponent controls".
-  if ((m = new RegExp(`^Remove (all|twice X|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|(?:another )?target .+|enchanted creature)$`, "i").exec(s))) {
+  // Heliod's Punishment's granted "{T}: Remove a task counter from Heliod's Punishment": from the Aura giving it.
+  if ((m = new RegExp(`^Remove (all|twice X|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|\u27easource\u27eb|(?:another )?target .+|enchanted creature)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
     const n = /^all$/i.test(m[1]!) ? "all" : m[1] === "twice X" ? { count: { kind: "x" as const }, times: 2 } : amt(m[1]!);
     return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n }] : null;

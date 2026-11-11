@@ -137,6 +137,7 @@ import {
   conspireInstances,
   dredgeOptions,
   madnessCastOf,
+  castPayText,
   planSuspend,
   suspendProblem,
   planPlot,
@@ -5097,7 +5098,15 @@ function Controls({
     return (
       <div className="controls">
         <span onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)}>
-          {pending.how === "madness" ? (
+          {pending.pay ? (
+            <>
+              {/* The Infamous Cruelclaw, Anrakyr the Traveller: cast now for that alternative cost (CR 118.9), or not at all. */}
+              <strong>{pending.source}:</strong> cast <strong>{d.name}</strong>
+              {o.zone === "hand" ? " from your hand" : o.zone === "graveyard" ? " from your graveyard" : o.zone === "exile" ? " from exile" : ""} {castPayText(pending.pay)}
+              {pending.pay.kind === "lifeMv" || pending.pay.kind === "energyMv" ? ` (${manaValue(parseManaCost(d.manaCost))})` : ""} rather than paying its mana cost?
+              {o.spellCopy || o.zone === "exile" ? " Only now." : ""}
+            </>
+          ) : pending.how === "madness" ? (
             <>
               <strong>Madness:</strong> cast <strong>{d.name}</strong> for <ManaCost cost={madnessCastOf(s, HUMAN, pending.objectId) ?? ""} size="sm" />
               {compileCard(d).madnessLife ? ` and ${compileCard(d).madnessLife} life` : ""}? If you don&apos;t, it goes to your graveyard.
@@ -5137,8 +5146,8 @@ function Controls({
         </span>
         {s.cards[o.cardId]?.layout !== "split" && !transformed && (
           <button
-            disabled={((pending.how === "madness" || pending.how === "miracle" || pending.how === "paid" || (o.zone === "command" && commanderTax(s.players[HUMAN]!, o, d) > 0)) && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null) || (!!pending.mv && /mana value/.test(castProblem(s, HUMAN, pending.objectId) ?? ""))}
-            title={pending.how === "madness" || pending.how === "miracle" || pending.how === "paid" || pending.mv ? (castProblem(s, HUMAN, pending.objectId) ?? "") : ""}
+            disabled={((pending.how === "madness" || pending.how === "miracle" || pending.how === "paid" || !!pending.pay || (o.zone === "command" && commanderTax(s.players[HUMAN]!, o, d) > 0)) && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null) || (!!pending.mv && /mana value/.test(castProblem(s, HUMAN, pending.objectId) ?? ""))}
+            title={pending.how === "madness" || pending.how === "miracle" || pending.how === "paid" || pending.pay || pending.mv ? (castProblem(s, HUMAN, pending.objectId) ?? "") : ""}
             onClick={() => onCastFree(pending.objectId)}
           >
             Cast it

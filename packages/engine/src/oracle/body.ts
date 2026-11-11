@@ -1,4 +1,5 @@
 import { parseFromTop } from "./compile";
+import { parseCastPay } from "./round343";
 import { ANY_COUNTER, NON_AURA_ENCHANTMENT, allEffects, refCovers, type SearchDest, type AbilityBody, type TokenSpec, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type PunisherOption, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification, type DamageRuleSpec, type CounterKind, type TriggeredAbility } from "../abilities";
 import { substituteX } from "../amounts";
 import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS, plainMana, BASIC_TYPES } from "./words";
@@ -966,7 +967,7 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
   const exile = !shuffleFirst && /^[Ee]xile cards from the top of your library until you exile a nonland card$/.test(s);
   // "They exile cards ... until they exile a nonland card" in a villainous choice's option (Ensnared by the Mara): the
   // player facing it, the event player as it runs.
-  const they = shuffleFirst ? null : (/^(Target opponent|Target player) exiles cards from the top of their library until they exile a nonland card$/.exec(s) ?? (ctx.eventPlayer ? /^(They|That player) exiles? cards from the top of their library until they exile a nonland card$/.exec(s) : null));
+  const they = shuffleFirst ? null : (/^(Target opponent|Target player) exiles cards from the top of their library until they exile a nonland card$/.exec(s) ?? (ctx.eventPlayer ? /^([Tt]hey|[Tt]hat player) exiles? cards from the top of their library until they exile a nonland card$/.exec(s) : null));
   const flourish = !shuffleFirst && /^If that (?:permanent|creature) is destroyed this way, its controller exiles cards from the top of their library until they exile a nonland card, then they may cast that card without paying its mana cost$/.test(s);
   if (!reveal && !exile && !they && !flourish) return null;
   if (flourish) {
@@ -1015,6 +1016,15 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
     next++;
   }
   const cast = sentences[next] ?? "";
+  // The Infamous Cruelclaw: "You may cast that card by discarding a card rather than paying its mana cost."; Bismuth
+  // Mindrender: "... by paying life equal to the spell's mana value ..."; Amped Raptor: "... by paying an amount of {E}
+  // equal to its mana value ...". Cast as this resolves, for that alternative cost (CR 608.2g, 118.9; rulings).
+  const payWay = parseCastPay(cast);
+  if (payWay) {
+    const payer = they ? (/^(?:[Tt]hey|[Tt]hat player)$/.test(they[1]!) ? ({ ref: "eventPlayer" } as const) : parsePlayer(they[1]!, ctx)) : undefined;
+    if (they && !payer) return "fail";
+    return { effect: { type: "exileUntilNonland", ...(payer ? { who: payer } : {}), ...(reveal ? { reveal: true as const } : {}), ...(shuffleFirst ? { shuffleFirst: true as const } : {}), then: "castFree", pay: payWay }, next: next + 1 };
+  }
   const then: Extract<Effect, { type: "exileUntilNonland" }>["then"] | undefined = /^You may cast (?:that card|it|the exiled card) without paying its mana cost$/.test(cast)
     ? "castFree"
     : /^Until end of turn, you may cast that card without paying its mana cost$/.test(cast)
@@ -1028,7 +1038,7 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
   if (suspend && /^If it doesn't have suspend, it gains suspend$/.test(sentences[next + 1] ?? ""))
     return { effect: { type: "exileUntilNonland", then: "suspend", suspend: Number(amt(suspend[1]!)) }, next: next + 2 };
   if (!then) return null;
-  const who = they ? (/^(?:They|That player)$/.test(they[1]!) ? ({ ref: "eventPlayer" } as const) : parsePlayer(they[1]!, ctx)) : undefined;
+  const who = they ? (/^(?:[Tt]hey|[Tt]hat player)$/.test(they[1]!) ? ({ ref: "eventPlayer" } as const) : parsePlayer(they[1]!, ctx)) : undefined;
   if (they && !who) return "fail";
   return { effect: { type: "exileUntilNonland", ...(who ? { who } : {}), ...(reveal ? { reveal: true as const } : {}), ...(shuffleFirst ? { shuffleFirst: true as const } : {}), then }, next: next + 1 };
 }

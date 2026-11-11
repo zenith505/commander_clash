@@ -937,6 +937,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3ed14ea7-ee62-4604-af3b-deafb00108c3",
+  "name": "Amped Raptor",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Creature — Dinosaur",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dinosaur"
+  ],
+  "oracleText": "First strike\nWhen this creature enters, you get {E}{E} (two energy counters). Then if you cast it from your hand, exile cards from the top of your library until you exile a nonland card. You may cast that card by paying an amount of {E} equal to its mana value rather than paying its mana cost.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "First strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "aa7d3e99-fc14-4f62-bf00-c0428c11e4f2",
   "name": "Amy Pond",
   "manaCost": "{2}{R}",
@@ -1256,6 +1288,41 @@
   "commanderLegal": "legal",
   "set": "otj",
   "releasedAt": "2024-04-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "32476743-c9d4-49ca-bec2-0669c215841b",
+  "name": "Anrakyr the Traveller",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Artifact Creature — Necron",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Necron"
+  ],
+  "oracleText": "Lord of the Pyrrhian Legions — Whenever Anrakyr the Traveller attacks, you may cast an artifact spell from your hand or graveyard by paying life equal to its mana value rather than paying its mana cost.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Lord of the Pyrrhian Legions"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -3833,6 +3900,38 @@
   "set": "blb",
   "releasedAt": "2024-08-02",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6290233b-b015-4909-8aba-bf8d65cc37b5",
+  "name": "Blue Mage's Cane",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Job select\nEquipped creature gets +0/+2, is a Wizard in addition to its other types, and has \"Whenever this creature attacks, exile up to one target instant or sorcery card from defending player's graveyard. If you do, copy it. You may cast the copy by paying {3} rather than paying its mana cost.\"\nSpirit of the Whalaqee — Equip {2}",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Job select",
+   "Spirit of the Whalaqee",
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -34012,6 +34111,43 @@
   "releasedAt": "2022-10-07",
   "rarity": "rare",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e229d55c-9513-437d-bd67-015ac46aaa18",
+  "name": "The Infamous Cruelclaw",
+  "manaCost": "{1}{B}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Weasel Mercenary",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Weasel",
+   "Mercenary"
+  ],
+  "oracleText": "Menace\nWhenever The Infamous Cruelclaw deals combat damage to a player, exile cards from the top of your library until you exile a nonland card. You may cast that card by discarding a card rather than paying its mana cost.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "blb",
+  "releasedAt": "2024-08-02",
+  "rarity": "mythic",
+  "layout": "normal",
   "gameChanger": false
  },
  {

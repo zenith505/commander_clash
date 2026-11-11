@@ -193,6 +193,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const spec: TargetSpec = { kind: "spell", types: [], notTypes: [], notColors: [], text: "target spell", ...(m[1] === "target spell" ? {} : { many: "any" as const }) };
     return [{ type: "counterSpell", index: addTarget(ctx, spec), exileSpell: true }];
   }
+  // Spell Queller: "exile target spell with mana value 4 or less": the same, its mana value counting its X (CR 202.3e,
+  // rulings).
+  if ((m = /^[Ee]xile target (spell with mana value \d+ or less)$/.exec(s))) {
+    const spec = parseTargetPhrase(m[1]!);
+    return spec?.kind === "spell" ? [{ type: "counterSpell", index: addTarget(ctx, spec), exileSpell: true }] : null;
+  }
   // Smirking Spelljacker: "exile target spell an opponent controls": the same, a spell an opponent controls (CR 115.1).
   if (/^[Ee]xile target spell an opponent controls$/.test(s)) {
     const spec: TargetSpec = { kind: "spell", types: [], notTypes: [], notColors: [], controller: "opponent", text: "target spell an opponent controls" };
@@ -1734,6 +1740,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Smirking Spelljacker: "you may cast the exiled card without paying its mana cost", the spell its enters ability exiled
   // (linked in compile.ts), cast as this resolves or not at all (rulings); cast, so never played as a land.
   if (/^[Yy]ou may cast the exiled card without paying its mana cost$/.test(s) && !ctx.spell && !ctx.activated) return [{ type: "playLinked", castOnly: true }];
+  // Spell Queller: "the exiled card's owner may cast that card without paying its mana cost", the spell its enters ability
+  // exiled (linked the same way): its owner casts it as this resolves or not at all, timing permissions ignored (rulings).
+  if (/^[Tt]he exiled card's owner may cast that card without paying its mana cost$/.test(s) && !ctx.spell && !ctx.activated) return [{ type: "playLinked", castOnly: true, byOwner: true }];
   if ((m = /^[Yy]ou may play the exiled card without paying its mana cost(?: if (.+))?$/.exec(s)) && !ctx.spell) {
     if (!m[1]) return [{ type: "playLinked" }];
     const cond = parseStaticCondition(m[1], { affects: { kind: "self" }, mods: [], text: "" });

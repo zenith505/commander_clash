@@ -251,7 +251,9 @@ function thenSubject(first: string, next: string): string {
   // Cait, Cage Brawler: "you and defending player each draw a card, then discard a card": the same two players.
   if (/^[Yy]ou and defending player each draw /.test(first) && /^discard /.test(next)) return `You and defending player each ${next}`;
   // Oblation: "The owner of target nonland permanent shuffles it into their library, then draws two cards": that owner.
-  if (/^The owner of target [^,]+ shuffles it into their library$/.test(first) && /^draws /.test(next)) return `Its owner ${next}`;
+  // Blink: "Choose target creature. Its owner shuffles it into their library, then investigates": that owner too (CR
+  // 701.16a), even if the creature was a token that ceased to exist.
+  if (/^The owner of target [^,]+ shuffles it into their library$/.test(first) && /^(?:draws |investigates\.?$)/.test(next)) return `Its owner ${next}`;
   // Rolling Hamsphere: "create three 1/1 red Hamster creature tokens, then it deals X damage to any target": the tokens
   // are made by you, so "it" is the source.
   if (/^[Cc]reate [^,]+ tokens?$/.test(first) && !/\btarget\b/.test(first) && /^it deals /.test(next)) return `~${next.slice(2)}`;
@@ -2779,7 +2781,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^Choose (target creature, planeswalker, or Vehicle)\. (Mill two cards, then destroy) the chosen permanent (if its mana value is less than or equal to the number of cards in your graveyard\.)$/, "$2 $1 $3");
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
   // Riftsweeper: "When ~ enters, choose target face-up exiled card. Its owner shuffles ...": a trigger's body, the same.
-  text = text.replace(/^[Cc]hoose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
+  // Blink: "... Its owner shuffles it into their library, then investigates." the same, with what that owner does next.
+  text = text.replace(/^[Cc]hoose (target [^.]+?)\. Its owner shuffles it into their library(\.|, then investigates\.)/, "The owner of $1 shuffles it into their library$2");
   // Clockspinning: "Choose a counter on target permanent or suspended card. Remove that counter from that permanent or
   // card or put another of those counters on it." One instruction: one kind of counter it has, chosen as it resolves,
   // then one more or one fewer of it (rulings).

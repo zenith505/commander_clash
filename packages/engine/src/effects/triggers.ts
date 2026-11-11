@@ -292,7 +292,7 @@ export type TriggerSourceEvent =
   /** A permanent dealt damage to a creature (`id`). */
   | { type: "damagedCreature"; source: ObjectId; id: ObjectId; amount: number; combat: boolean; /** The excess damage that creature has been dealt this turn (CR 120.10). */ excess?: number }
   /** A spell (`card`, controlled by `by`) dealt damage to a player or a battle. */
-  | { type: "spellDealtDamage"; by: PlayerId; card: CardDef; player?: PlayerId; battle?: ObjectId; amount: number }
+  | { type: "spellDealtDamage"; by: PlayerId; card: CardDef; /** The spell's card or copy (its stack item's objectId). */ spellObject?: ObjectId; player?: PlayerId; battle?: ObjectId; /** Imodane: a creature dealt the damage. */ creature?: ObjectId; amount: number }
   /**
    * Damage dealt to players at the same time (CR 603.2c): each source's to each player, with the source's controller and
    * its card types and subtypes as it dealt it, and the permanent it was (not for a spell).
@@ -2035,7 +2035,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "spellDealtDamage") {
     // "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix, in
     // a graveyard too): once for each player or battle dealt damage (CR 603.2c).
-    const fits = (t: TriggeredAbility) => !!t.spellDamage && printedMatches(t.spellDamage.filter, ev.card) && (ev.battle !== undefined ? !!t.spellDamage.orBattle : ev.player !== undefined && (!!t.spellDamage.anyPlayer || ev.player !== ev.by));
+    // Imodane, the Pyrohammer: a creature dealt damage by a spell whose every target is that creature (CR 115.1), as the
+    // spell is now, resolving or on the stack.
+    const onlyTarget = () => {
+      const item = s.resolving?.item.objectId === ev.spellObject && s.resolving?.item.kind === "spell" ? s.resolving.item : s.stack.find((x) => x.kind === "spell" && x.objectId === ev.spellObject);
+      const ts = (item?.targets ?? []).filter((x) => x.kind !== "none");
+      return !!ts.length && ts.every((x) => x.kind === "object" && x.id === ev.creature);
+    };
+    const fits = (t: TriggeredAbility) => !!t.spellDamage && printedMatches(t.spellDamage.filter, ev.card) && (ev.creature !== undefined ? !!t.spellDamage.onlyTargetCreature && onlyTarget() : !t.spellDamage.onlyTargetCreature && (ev.battle !== undefined ? !!t.spellDamage.orBattle : ev.player !== undefined && (!!t.spellDamage.anyPlayer || ev.player !== ev.by)));
     // Satyr Firedancer: "that much" is the damage dealt to that player, "that player" the one dealt it.
     const watch = (w: GameObject) => add(w, ev.by, (e, t) => e === "spellYouControlDealsDamage" && fits(t), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount, ...(ev.player !== undefined ? { player: ev.player } : {}) });
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.by) watch(obj(s, id));

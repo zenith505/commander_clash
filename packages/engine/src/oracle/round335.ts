@@ -1,16 +1,19 @@
-// Round 335's sentences, read before round 334's (round334Sentence in oracle/round334.ts).
+// Round 335's sentences (after round 337's, oracle/round337.ts), read before round 334's (round334Sentence in oracle/round334.ts).
 import type { Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { counterKind } from "./words";
 import { pickFilter } from "./targets";
 import { parseSearchFilter } from "./search";
+import { round337Sentence } from "./round337";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round335Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void ctx;
+  // Round 337's sentences first (oracle/round337.ts).
+  const r337 = round337Sentence(s, sentences, si, ctx, effects);
+  if (r337) return r337;
   const line = plain(s);
   // The Master, Formed Anew's Body Thief: "you may exile a creature you control and put a takeover counter on it": one
   // chosen as the trigger resolves (not targeted), and the counter on the card it became in exile (CR 400.7, 122.1); a

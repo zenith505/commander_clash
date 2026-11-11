@@ -154,9 +154,9 @@ import { prepareSpellOf } from "./prepare";
 import { castingBody, castTimeTargets, compileCard } from "./oracle";
 import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PendingDecision, type PlayerId, type StackItem, type DeferredAct } from "./types";
 import { evalAmount } from "./amounts";
-import { CHOSEN_HEXPROOF, CREATURE_TYPES, CHOSEN_PARITY_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION } from "./keywords";
+import { CHOSEN_HEXPROOF, CREATURE_TYPES, CHOSEN_PARITY_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, protectedFrom } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
-import { damageEstimate } from "./damage";
+import { damageEstimate, objectSource, protectionHolder } from "./damage";
 import { blightOptions, removableCounters } from "./counters";
 
 /**
@@ -1479,7 +1479,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // A villainous choice (CR 701.55): the option that costs us less, as roughly guessed.
     if (pend.kind === "chooseOption" && pend.what === "villainous") {
       const v = s.resolving ? allEffects(s.resolving.body.effects).find((e) => e.type === "villainous") : undefined;
-      const costs = v?.type === "villainous" ? v.options.map((fx) => villainCost(s, pid, fx)) : [0, 0];
+      const costs = v?.type === "villainous" ? v.options.map((fx) => villainCost(s, pid, fx, pend.about)) : [0, 0];
       return [{ type: "chooseOption", player: pid, choice: costs[1]! < costs[0]! ? "1" : "0" }];
     }
     // "Unlock a locked door" for free: the door that would cost the most to unlock (CR 709.5f).
@@ -1881,6 +1881,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         if (alt && alt[alt.length - 1]!.type === "castSpell") return alt;
       }
     }
+    // Spell Queller, Smirking Spelljacker: a flash creature whose enters ability exiles a spell, cast while the spell it
+    // can take is on top (its trigger then aims at it).
+    for (const id of player(s, pid).hand) {
+      const d = defOf(s, obj(s, id));
+      if (!d.keywords.includes("Flash") || !isType(d, "Creature")) continue;
+      const enters = compileCard(d).triggers.find((t) => t.event === "selfEnters" && t.body.effects.length === 1 && t.body.effects[0]!.type === "counterSpell" && !!t.body.effects[0]!.exileSpell && t.body.targets.length === 1);
+      if (!enters || !spellMatches(s, enters.body.targets[0]!, top)) continue;
+      const plan = planCast(s, pid, id, undefined, undefined, "auto");
+      if (plan && plan[plan.length - 1]!.type === "castSpell") return plan;
+    }
     for (const id of s.battlefield) {
       const o = obj(s, id);
       if (controllerOf(s, o) !== pid) continue;
@@ -2038,8 +2048,11 @@ function countersTheirStack(body: AbilityBody): boolean {
  * What one option of a villainous choice we face would cost us, roughly, in life points: what we'd lose (life, cards,
  * permanents) plus what its controller would gain (cards, tokens, a free spell). "eventPlayer" in it is us.
  */
-function villainCost(s: GameState, pid: PlayerId, fx: Effect[]): number {
+function villainCost(s: GameState, pid: PlayerId, fx: Effect[], about?: ObjectId): number {
   const me = player(s, pid);
+  // Hunted by The Family: what the creature the choice is about is worth, by its stats and abilities.
+  const it = about && s.objects[about]?.zone === "battlefield" ? s.objects[about]! : undefined;
+  const worth = it ? Math.max(0, power(s, it)) + Math.max(0, toughness(s, it)) + 2 * (characteristics(s, it).keywords.length + abilitiesOf(s, it).triggers.length + abilitiesOf(s, it).activated.length + abilitiesOf(s, it).statics.length) : 3;
   const n = (a: unknown, guess: number) => (typeof a === "number" ? a : guess);
   const us = (w: { ref: string } | undefined) => w?.ref === "eventPlayer";
   return fx.reduce((sum, e) => {
@@ -2085,6 +2098,12 @@ function villainCost(s: GameState, pid: PlayerId, fx: Effect[]): number {
         return sum + 5;
       case "createToken":
         return sum + 3 * n(e.n, 1);
+      // Hunted by The Family: our creature made a vanilla 1/1 loses what it's worth beyond that; a copy of it for the
+      // player making us choose is worth all of it to them.
+      case "continuous":
+        return sum + (e.what.ref === "subject" && it && e.mods.some((m) => m.kind === "loseAllAbilities") ? Math.max(0, worth - 2) : 3);
+      case "createTokenCopy":
+        return sum + (e.what.ref === "subject" && e.who.ref === "you" ? worth + 1 : 3);
       default:
         return sum + 3;
     }
@@ -7691,6 +7710,9 @@ function combatHits(s: GameState): (from: GameObject, to: GameObject | PlayerId)
     const k = `${from.id}>${typeof to === "number" ? `p${to}` : to.id}`;
     let n = memo.get(k);
     if (n === undefined) memo.set(k, (n = damageEstimate(s, from, typeof to === "number" ? { player: to } : { object: to.id }, Math.max(0, combatDamageOf(s, from)))));
+    // Weeping Angel: its combat damage to a creature is prevented, but the creature is shuffled away, as good as lethal
+    // (unless protection from it or a shield counter is used instead, which a bot does).
+    if (typeof to !== "number" && n === 0 && abilitiesOf(s, from).combatToCreatureShuffles && combatDamageOf(s, from) > 0 && objIsType(s, to, "Creature") && !protectedFrom(characteristics(s, to).keywords, objectSource(s, from), protectionHolder(s, to)) && !(to.counters.shield ?? 0)) memo.set(k, (n = Math.max(1, lethalDamage(s, to))));
     return n;
   };
 }

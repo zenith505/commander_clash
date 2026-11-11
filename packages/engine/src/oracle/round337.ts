@@ -1,15 +1,20 @@
-// Round 337's sentences, read before round 335's (round335Sentence in oracle/round335.ts).
+// Round 337's sentences (after round 338's, oracle/round338.ts), read before round 335's (round335Sentence in
+// oracle/round335.ts).
 import type { Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseChanges } from "./sentence";
 import { parseObject } from "./targets";
 import { num } from "./words";
+import { round338Sentence } from "./round338";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round337Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 338's sentences first (oracle/round338.ts).
+  const r338 = round338Sentence(s, sentences, si, ctx, effects);
+  if (r338) return r338;
   const line = plain(s);
   // Azor's Gateway: "Draw a card, then exile a card from your hand. If cards with five or more different mana values are
   // exiled with ~, you gain 5 life, untap ~, and transform it.": the cards its one exile instruction exiled (linked in

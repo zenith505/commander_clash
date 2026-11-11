@@ -270,7 +270,7 @@ export function dealDamage(
         enterTogether(s, () => {
           const batch = tokenBatch(s, me, tokens, n);
           for (let i = 0; i < batch.same; i++) createToken(s, me, tokens);
-          log(s, `${player(s, me).name} creates ${batch.same} ${tokens.name} token${batch.same === 1 ? "" : "s"} (${name}).`);
+          if (batch.same) log(s, `${player(s, me).name} creates ${batch.same} ${tokens.name} token${batch.same === 1 ? "" : "s"} (${name}).`);
           createExtraTokens(s, me, batch.extra);
         });
       }
@@ -1565,7 +1565,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
         if (n <= 0 || player(s, r.controller).lost) continue;
         const batch = tokenBatch(s, r.controller, r.tokens!, n);
         for (let i = 0; i < batch.same; i++) createToken(s, r.controller, r.tokens!);
-        log(s, `${player(s, r.controller).name} creates ${batch.same} ${r.tokens!.name} token${batch.same === 1 ? "" : "s"} (${cardName(s, r)}).`);
+        if (batch.same) log(s, `${player(s, r.controller).name} creates ${batch.same} ${r.tokens!.name} token${batch.same === 1 ? "" : "s"} (${cardName(s, r)}).`);
         createExtraTokens(s, r.controller, batch.extra);
       }
     });

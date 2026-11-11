@@ -828,8 +828,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // Cast as this resolves, so its card type's timing doesn't matter; it still needs legal targets and modes.
         // Solstice Revelations: "less than the number of Mountains you control", counted now.
         const maxMv = e.mvLessThan !== undefined ? amountNow(s, e.mvLessThan, ctx) - 1 : e.maxMv;
-        s.pending = { kind: "castFree", player: caster, objectId: hit, source: src, ...(maxMv !== undefined ? { mv: { max: maxMv } } : {}) };
-        if (maxMv === undefined || maxMv >= 0) if (freeCastable(s, caster, hit)) return "paused";
+        // The Infamous Cruelclaw: "You may cast that card by discarding a card rather than paying its mana cost", that
+        // alternative cost instead (CR 118.9); Jadzi's "by paying {1}" is mana, paid as it's cast.
+        const pay = e.pay;
+        s.pending = { kind: "castFree", player: caster, objectId: hit, source: src, ...(maxMv !== undefined ? { mv: { max: maxMv } } : {}), ...(pay ? { pay } : {}), ...(pay?.kind === "mana" ? { how: "paid" as const } : {}) };
+        if (maxMv === undefined || maxMv >= 0) if (freeCastable(s, caster, hit, pay?.kind === "mana")) return "paused";
         s.pending = null;
         log(s, `${defOf(s, obj(s, hit)).name} can't be cast${maxMv !== undefined ? ` (mana value ${maxMv < 0 ? "less than 0" : `${maxMv} or less`})` : ""}.`);
       }
@@ -1000,6 +1003,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (!sc.guileLoop)
         for (const item of [...s.stack].reverse()) {
           if (item.id === s.resolving?.item.id || item.controller === ctx.controller || !s.stack.includes(item)) continue;
+          if (e.abilitiesOnly && item.kind === "spell") continue;
           counterOnStack(s, ctx, item.id, src);
         }
       sc.guileLoop = true;

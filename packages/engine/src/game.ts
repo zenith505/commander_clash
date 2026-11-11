@@ -1,5 +1,5 @@
 import { isRealKicker, kickerName } from "./abilities";
-import type { AbilityBody, ActivatedAbility, Count, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CounterKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersChoice, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, ActivatedAbility, Count, AdditionalCost, CastPay, ManaAbility, AltCostKind, ChoiceKind, CounterKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersChoice, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
 import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
 import { joinMeld } from "./meld";
@@ -573,6 +573,11 @@ export function log(s: GameState, text: string, to?: PlayerId) {
   s.log.push({ seq: s.log.length, turn: s.turn, step: s.step, text, ...(to !== undefined ? { to } : {}) });
 }
 
+/** What a CastPay has its caster pay, as the card says it: "by discarding a card", "by paying life equal to its mana value". */
+export function castPayText(pay: CastPay): string {
+  return pay.kind === "discard" ? `by discarding ${pay.n === 1 ? "a card" : `${pay.n} cards`}` : pay.kind === "lifeMv" ? "by paying life equal to its mana value" : pay.kind === "energyMv" ? "by paying {E} equal to its mana value" : `by paying ${pay.mana}`;
+}
+
 /** The card `pid` may cast for free right now, as cascade resolves (see PendingDecision "castFree"), or for its madness cost. */
 export function freeCastOf(s: GameState, pid: PlayerId): ObjectId | undefined {
   return s.pending?.kind === "castFree" && s.pending.player === pid ? s.pending.objectId : undefined;
@@ -585,7 +590,8 @@ export function freeCastOf(s: GameState, pid: PlayerId): ObjectId | undefined {
 export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string | undefined {
   const pend = s.pending;
   if (pend?.kind !== "castFree" || pend.player !== pid || pend.objectId !== id || (pend.how !== "madness" && pend.how !== "miracle" && pend.how !== "paid")) return undefined;
-  return pend.how === "paid" ? defOf(s, obj(s, id)).manaCost : pend.how === "miracle" ? (pend.miracleCost ?? compileCard(defOf(s, obj(s, id))).miracle) : (compileCard(defOf(s, obj(s, id))).madness ?? pend.madnessCost);
+  // Jadzi: "by paying {1} rather than paying its mana cost", an alternative cost (CR 118.9).
+  return pend.how === "paid" ? (pend.pay?.kind === "mana" ? pend.pay.mana : defOf(s, obj(s, id)).manaCost) : pend.how === "miracle" ? (pend.miracleCost ?? compileCard(defOf(s, obj(s, id))).miracle) : (compileCard(defOf(s, obj(s, id))).madness ?? pend.madnessCost);
 }
 
 /**
@@ -593,11 +599,12 @@ export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string
  * mid-resolution, like ward's; casting a card for its madness cost as madness's trigger resolves (CR 702.35a, 601.2g);
  * helping to pay for a spell with assist, or paying the rest of it (CR 702.132a); declaring attackers, to pay what
  * attacking costs (CR 508.1i); declaring blockers, to pay what blocking costs (CR 509.1f); casting a commander free
- * from the command zone, for the commander tax (Geode Golem, CR 903.8); any free cast while Trinisphere raises what it costs.
+ * from the command zone, for the commander tax (Geode Golem, CR 903.8); any free cast while Trinisphere raises what it costs;
+ * a cast for an alternative cost as an instruction resolves (CastPay), for a kicker on top of it (CR 118.9d).
  */
 export function paysManaNow(s: GameState): boolean {
   const pd = s.pending;
-  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && blocksMayCost(s, pd.player)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "pickPermanents" && !!pd.payEach) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid" || s.objects[pd.objectId]?.zone === "command" || costFloorInPlay(s)));
+  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && blocksMayCost(s, pd.player)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "pickPermanents" && !!pd.payEach) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid" || !!pd.pay || s.objects[pd.objectId]?.zone === "command" || costFloorInPlay(s)));
 }
 
 function requireNoPending(s: GameState) {
@@ -1007,6 +1014,7 @@ export function moveObject(
   const castFromHand = fromZone === "stack" && o.castFrom === "hand" && !o.spellCopy;
   const castFromGraveyard = fromZone === "stack" && o.castFrom === "graveyard" && !o.spellCopy;
   const castFromLibrary = fromZone === "stack" && o.castFrom === "library" && !o.spellCopy;
+  const castFromExile = fromZone === "stack" && o.castFrom === "exile" && !o.spellCopy;
   // Cycle of Life: "target creature you cast this turn": the player who cast the spell it was (CR 601.2), kept as it
   // resolves into this permanent.
   const castBy = fromZone === "stack" && to === "battlefield" && !o.spellCopy ? o.castBy : undefined;
@@ -1235,6 +1243,7 @@ export function moveObject(
   // exiled from the library was cast from exile, rulings). A library is its owner's (CR 400.3).
   o.fromOwnLibrary = to === "battlefield" && (fromZone === "library" || castFromLibrary) ? true : undefined;
   o.enteredFromExile = to === "battlefield" && fromZone === "exile" ? true : undefined;
+  o.castFromExile = to === "battlefield" && castFromExile ? true : undefined;
   // Sigarda's Splendor: "As ~ enters, note your life total" (a new object notes anew, CR 400.7); one that left keeps it.
   if (to === "battlefield") o.notedLife = compileCard(defOf(s, o)).notesLifeOnEnter ? player(s, o.controller).life : undefined;
   if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
@@ -1603,7 +1612,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // it as it would exist on the battlefield (CR 614.12, rulings). Unleash likewise ("Other Dogs you control have unleash",
   // Tesak), each instance its own choice.
   const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot" || x === "unleash"));
-  const options: EntersOption[] = [...(printed.entersExileFromYard ? (["exileFromYard"] as const) : []), ...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersDiscardKeywords ? (["discardKeywords"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
+  const options: EntersOption[] = [...(printed.entersExileFromYard ? (["exileFromYard"] as const) : []), ...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.entersRemoveCounters ? (["removeCounters"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersDiscardKeywords ? (["discardKeywords"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
   // Frankenstein's Monster: "exile X creature cards" with the X it was cast with (CR 107.3m).
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(what === "exileFromYard" && opts.x ? { enterOpts: { x: opts.x } } : {}), ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
@@ -1868,11 +1877,15 @@ function auraObjectHost(s: GameState, aura: GameObject, pid: PlayerId, enchant: 
   if (enchant.kind === "card") return graveyardCards(s, enchant).filter((id) => !among || among.includes(id)).sort((a, b) => defMv(defOf(s, obj(s, b))) - defMv(defOf(s, obj(s, a))))[0];
   const legal = s.battlefield.filter((id) => id !== aura.id && (!among || among.includes(id)) && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)) && enchantableBy(characteristics(s, obj(s, id)), aura.id));
   const mine = (id: ObjectId) => controllerOf(s, obj(s, id)) === pid;
+  return (auraHelps(defOf(s, aura)) ? legal.find(mine) : legal.find((id) => !mine(id))) ?? legal[0];
+}
+
+/** An Aura whose static abilities only help what it enchants (keywords, abilities that aren't harmful, P/T that isn't lowered): one a player would put on their own permanent. */
+export function auraHelps(d: CardDef): boolean {
   const good = (m: Modification) =>
     m.kind === "addKeywords" || (m.kind === "addAbility" && !modsAreHarmful([m])) || (m.kind === "modifyPT" && !(typeof m.power === "number" && m.power < 0) && !(typeof m.toughness === "number" && m.toughness < 0));
-  const statics = compileCard(defOf(s, aura)).statics;
-  const helps = statics.length > 0 && statics.every((st) => st.mods.every(good));
-  return (helps ? legal.find(mine) : legal.find((id) => !mine(id))) ?? legal[0];
+  const statics = compileCard(d).statics;
+  return statics.length > 0 && statics.every((st) => st.mods.every(good));
 }
 
 /**
@@ -7449,8 +7462,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (convoke?.length ? `, convoking with ${convoke.map((c) => nameOf(s, c)).join(", ")}` : "") +
     (improvise?.length ? `, improvising with ${improvise.map((c) => nameOf(s, c)).join(", ")}` : "");
   const kickText = byControl ? ` (controlling ${/^[aeiou]/i.test(ifControl!.text) ? "an" : "a"} ${ifControl!.text.replace(/ you control$/, "")})` : kicks ? describeKicks(d, kicks) : "";
+  // The Infamous Cruelclaw, Anrakyr the Traveller, Jadzi: the alternative cost it was cast for as that resolved.
+  const payWay = s.pending?.kind === "castFree" && s.pending.player === p.id && s.pending.objectId === id ? s.pending.pay : undefined;
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
+    (payWay ? ` ${castPayText(payWay)} rather than paying its mana cost` : "") +
     (choices.prototyped && choices.alt !== "prototype" ? " prototyped" : "") +
     (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "lifeForMv" || choices.alt === "nextLife" ? " for life" : choices.alt === "nextFree" ? " without paying its mana cost" : choices.alt === "genericMv" ? " for generic mana" : choices.alt === "energyForSpell" ? " for energy" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt.replace(/^granted(.)/, (_, c: string) => c.toLowerCase())} cost` : "") +
     (madness && o.castAlt === "madness" ? " for its madness cost" : madness && o.castAlt === "miracle" ? " for its miracle cost" : "") +
@@ -7713,6 +7729,16 @@ export function graveyardCast(d: CardDef, via?: CastFromGraveyardKind): CastFrom
 
 /** Flashback an effect gave this card until end of turn, its cost equal to the card's mana cost (Snapcaster Mage). */
 export const hasGrantedFlashback = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && !g.escape && !g.cast);
+/**
+ * Flashback an effect gave this card until end of turn: its mana cost (Snapcaster Mage), or a cost of its own (Archmage's
+ * Newt's {0}, which a card with no mana cost can pay too, rulings). With both, one way is offered: the {0} one (simplified:
+ * an {X} spell's caster can't pick the mana-cost one to choose X, CR 107.3b).
+ */
+const grantedFlashbackWays = (s: GameState, o: GameObject, d: CardDef): CastFromGraveyard[] => {
+  if (!hasGrantedFlashback(s, o)) return [];
+  const own = s.flashbackGrants!.find((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && !g.escape && !g.cast && g.mana)?.mana;
+  return [{ kind: "grantedFlashback" as const, mana: own ?? d.manaCost, costs: [], exile: true }];
+};
 /** "You may cast this card from your graveyard" an effect gave this card until end of turn (Case of the Uneaten Feast). */
 const hasGrantedCast = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && g.cast);
 /**
@@ -7746,7 +7772,7 @@ export function graveyardWays(s: GameState, o: GameObject, caster?: PlayerId): C
   const asAdventure = face !== undefined ? asFace(s, o, face, () => grantedWays(s, o, defOf(s, o), caster ?? o.owner)).filter((g) => g.kind === "permission").map((g) => ({ ...g, face })) : [];
   const granted = grantedWays(s, o, d, caster ?? o.owner);
   const escapeEot = granted.some((g) => g.kind === "grantedEscape") ? [] : grantedEscapeUntilEot(s, o);
-  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : []), ...granted, ...escapeEot, ...asAdventure];
+  return [...(compileCard(d).fromGraveyard ?? []), ...grantedFlashbackWays(s, o, d), ...granted, ...escapeEot, ...asAdventure];
 }
 
 /**
@@ -8298,7 +8324,12 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   // Into the Pit: the cost of the permission it's cast from the top of a library with (once it's on the stack, the
   // costs castSpell kept, `topCosts`).
   const topCosts = choices?.topCosts ?? (s && pid !== undefined && taxObj?.zone === "library" ? (topPermission(s, taxObj, pid, choices?.alt === "citadel" ? "life" : "mana")?.costs ?? []) : []);
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...topCosts, ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : []), ...entwineExtraCosts(d, choices?.modes), ...(s ? spliceExtraCosts(s, choices?.splice) : [])];
+  // The Infamous Cruelclaw, Anrakyr the Traveller: "You may cast that card by discarding a card (paying life equal to its
+  // mana value) rather than paying its mana cost", cast as that resolves (CR 608.2g): that alternative cost's payment (CR
+  // 118.9), the mana value of what's cast (a split card's half, X as 0, CR 107.3b), for the card it lets be cast only.
+  const payPend = s?.pending?.kind === "castFree" && s.pending.player === pid && s.pending.pay && s.pending.pay.kind !== "mana" && choices?.objectId === s.pending.objectId ? s.pending.pay : undefined;
+  const payCosts: AdditionalCost[] = !payPend ? [] : payPend.kind === "discard" ? [{ kind: "discard", n: payPend.n }] : payPend.kind === "lifeMv" ? [{ kind: "payLife", n: manaValue(parseManaCost(d.manaCost)) }] : payPend.kind === "energyMv" ? [{ kind: "payEnergy", n: manaValue(parseManaCost(d.manaCost)) }] : [];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...payCosts, ...topCosts, ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : []), ...entwineExtraCosts(d, choices?.modes), ...(s ? spliceExtraCosts(s, choices?.splice) : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   // Phyrexian Purge: so much life for each target chosen (CR 601.2c before 601.2f).
@@ -8467,12 +8498,15 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (c.kind === "removeCounters") {
       // Any mix of the counters on those permanents (CR 602.2b): as many as it says, each one there to remove.
       const pool = counterCostCandidates(s, pid, o, c);
-      const what = `${c.n} ${counterCostKinds(c)}counter${c.n === 1 ? "" : "s"} ${c.self ? `from ${d.name}` : `from among ${c.filter.text}`}`;
+      const what = `${c.n} ${counterCostKinds(c)}counter${c.n === 1 ? "" : "s"} ${c.self ? `from ${d.name}` : c.one ? `from ${c.filter.text}` : `from among ${c.filter.text}`}`;
       const chosen = choices?.counters;
+      // Moxite Refinery: all of them from one permanent.
+      const most = c.one ? Math.max(0, ...[...new Set(pool.map((x) => x.id))].map((id) => pool.filter((x) => x.id === id).reduce((n, x) => n + x.n, 0))) : pool.reduce((n, x) => n + x.n, 0);
       if (!chosen) {
-        if (pool.reduce((n, x) => n + x.n, 0) < c.n) return `you need to remove ${what} to ${doing}`;
+        if (most < c.n) return `you need to remove ${what} to ${doing}`;
         continue;
       }
+      if (c.one && new Set(chosen.map((x) => x.id)).size > 1) return `remove all ${c.n} counters from the same permanent`;
       const used = new Map<string, number>();
       for (const x of chosen) used.set(`${x.id}|${x.kind}`, (used.get(`${x.id}|${x.kind}`) ?? 0) + 1);
       if (chosen.length !== c.n || [...used].some(([k, n]) => n > (pool.find((x) => `${x.id}|${x.kind}` === k)?.n ?? 0))) return `choose ${what} to remove`;
@@ -10265,6 +10299,10 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
       sacrificedInstead(s, obj(s, pend.objectId), ids, entry.enters);
       return;
     }
+    if (entry?.what === "removeCounters") {
+      countersTakenAsEnters(s, obj(s, pend.objectId), ids, entry.enters);
+      return;
+    }
     if (pend.action === "discard") discardKeywordsChosen(s, obj(s, pend.objectId), ids, entry?.enters);
     else if (pend.action === "reveal") amplifyChosen(s, obj(s, pend.objectId), ids, entry?.enters);
     else devourChosen(s, obj(s, pend.objectId), ids, entry?.enters);
@@ -10324,11 +10362,12 @@ function distributeChosen(s: GameState, p: Player, parts: Record<ObjectId, numbe
     continueResolution(s);
     return;
   }
-  if (pend.move ? sum > pend.total : sum !== pend.total) throw new RulesError(pend.move ? `move at most ${pend.total} ${pend.counter} counters` : `distribute all ${pend.total} ${pend.counter} counters`);
+  if (pend.move || pend.upTo ? sum > pend.total : sum !== pend.total) throw new RulesError(pend.move ? `move at most ${pend.total} ${pend.counter} counters` : pend.upTo ? `distribute at most ${pend.total} ${pend.counter} counters` : `distribute all ${pend.total} ${pend.counter} counters`);
   r.scratch = { ...r.scratch, distributed: Object.fromEntries(given) };
   s.pending = null;
   if (pend.move) log(s, sum ? `${p.name} moves ${sum} ${pend.counter} counter${sum > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} onto ${nameOf(s, id)}`).join(", ")}.` : `${p.name} moves no counters.`);
-  else log(s, `${p.name} distributes ${pend.total} ${pend.counter} counter${pend.total > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} on ${nameOf(s, id)}`).join(", ")}.`);
+  else if (pend.upTo && !sum) log(s, `${p.name} distributes no ${pend.counter} counters.`);
+  else log(s, `${p.name} distributes ${sum} ${pend.counter} counter${sum > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} on ${nameOf(s, id)}`).join(", ")}.`);
   continueResolution(s);
 }
 
@@ -10390,6 +10429,11 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
         const o = obj(s, id);
         const r = compileCard(defOf(s, o)).openingReveal!;
         log(s, `${p.name} reveals ${nameOf(s, id)} from their opening hand.`);
+        // Chancellor of the Annex: one for each opponent, on the first spell that player casts this game (CR 603.7c).
+        if (r.when === "opponentsFirstSpell") {
+          for (const opp of opponents(s, p.id)) (s.floatingTriggers ??= []).push({ id: `f${s.nextId++}`, controller: p.id, sourceId: id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0, trigger: r.trigger!, until: "game", turn: s.turn, once: true, forPlayer: opp });
+          continue;
+        }
         (s.delayed ??= []).push({ when: r.when, controller: p.id, sourceCardId: cardIdOf(o), subject: { id, zc: o.zoneChanges ?? 0 }, body: r.body, turn: 0, step: s.step });
       }
       nextOpeningAction(s);
@@ -10547,6 +10591,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const answers = s.resolving?.shieldAnswers;
     if (!answers) throw new RulesError("no damage is waiting on its shields");
     answers.push(Number(choice));
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "tokenInstead") {
+    // An optional token replacement (CR 616.1): the instruction runs again with the answers so far (resolve.ts runAsking).
+    const answers = s.resolving?.tokenAnswers;
+    if (!answers) throw new RulesError("no tokens are waiting on a replacement choice");
+    answers.push(choice);
     continueResolution(s);
     return;
   }
@@ -10807,7 +10859,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord" || pend.what === "removeCounters") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -11121,6 +11173,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "defendingPlayer") {
+    // Kusari-Gama: which defending player "defending player" is (CR 508.5a; Effect damageDefendingOthers).
+    if (!r.scratch || !pend.options.includes(choice)) throw new RulesError("choose one of the defending players");
+    r.scratch.defendingChosen = Number(choice) as PlayerId;
+    log(s, `${p.name} chooses ${pend.labels?.[pend.options.indexOf(choice)] ?? choice} as defending player for ${pend.source}.`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "copyTargetFor") {
     // Zevlor, Elturel Exile: the player or permanent this opponent's copy targets (Effect copyPerOtherOpponent).
     const z = r.scratch?.zevlor;
@@ -11236,7 +11296,16 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   // A creature for an Equipment to enter attached to is chosen as it enters, with an objectId (askEntersChoice).
-  if (pend.what === "attachHost") throw new RulesError("nothing to attach");
+  if (pend.what === "attachHost") {
+    // One Last Job: the creature an Equipment returned "attached to a creature you control" enters attached to.
+    const sc = r.scratch;
+    if (!sc?.equipAsking) throw new RulesError("nothing to attach");
+    (sc.equipHosts ??= {})[sc.equipAsking] = choice;
+    log(s, `${p.name} chooses ${nameOf(s, choice)} for ${defOf(s, obj(s, sc.equipAsking)).name} (${pend.source}).`);
+    sc.equipAsking = undefined;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "enchant") {
     // What an Aura entering without being cast enchants, chosen as it enters (CR 303.4f).
     const sc = (r.scratch ??= {});
@@ -11305,6 +11374,48 @@ function devourChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x
     invalidateCharacteristics(s);
     const put = putCounters(s, o, "+1/+1", n * (devour.n === "devoured" ? n : devour.n), true);
     log(s, devour.bounce ? `${d.name} enters with ${put} +1/+1 counter${put === 1 ? "" : "s"}.` : `${d.name} devours ${n} and enters with ${put} +1/+1 counter${put === 1 ? "" : "s"}.`);
+  }
+  invalidateCharacteristics(s);
+  if (enters) fireEvent(s, { type: "enters", id: o.id, ...enters });
+}
+
+/** Sin, Unending Cataclysm's choice as it enters: the other permanents its filter matches with counters that can come off. */
+export function removeCountersAsEntersOptions(s: GameState, o: GameObject): ObjectId[] {
+  const how = compileCard(defOf(s, o)).entersRemoveCounters;
+  if (!how) return [];
+  const you = controllerOf(s, o);
+  return s.battlefield.filter((id) => {
+    const x = obj(s, id);
+    return id !== o.id && objectMatches(s, how.filter, x, you, false) && Object.entries(x.counters).some(([k, n]) => n > 0 && !countersStay(s, x, k));
+  });
+}
+
+/**
+ * Sin, Unending Cataclysm: every counter comes off each permanent chosen, and it enters with `per` +1/+1 counters for each
+ * one removed, as part of how it enters (CR 614.1c, 614.12).
+ * Then it has entered, and its enters abilities trigger.
+ */
+function countersTakenAsEnters(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x?: number }) {
+  const d = defOf(s, o);
+  const per = compileCard(d).entersRemoveCounters?.per ?? 1;
+  let removed = 0;
+  for (const id of ids) {
+    const p = s.objects[id];
+    if (!p || p.zone !== "battlefield") continue;
+    const kinds = Object.entries(p.counters).filter(([k, n]) => n > 0 && !countersStay(s, p, k));
+    if (!kinds.length) continue;
+    for (const [k, n] of kinds) {
+      p.counters[k] = 0;
+      removed += n;
+    }
+    invalidateCharacteristics(s);
+    log(s, `${characteristics(s, p).name} loses all its counters (${kinds.map(([k, n]) => `${n} ${k}`).join(", ")}) as ${d.name} enters.`);
+    for (const [k, n] of kinds) countersRemoved(s, p, k, n);
+    for (const [k] of kinds) fireEvent(s, { type: "lastCounterRemoved", id: p.id, counter: k });
+  }
+  if (removed && characteristics(s, o).hasPrintedAbilities) {
+    const put = putCounters(s, o, "+1/+1", removed * per, true);
+    log(s, `${d.name} enters with ${put} +1/+1 counter${put === 1 ? "" : "s"}.`);
   }
   invalidateCharacteristics(s);
   if (enters) fireEvent(s, { type: "enters", id: o.id, ...enters });
@@ -11451,6 +11562,19 @@ function askEntersChoice(s: GameState): boolean {
         return true;
       }
       s.pending = { kind: "pickPermanents", player: you, source: defOf(s, o).name, action: "sacrifice", what: devour!.filter.text, options, count: options.length, min: 0, objectId: o.id, ...(said ? { prompt: `sacrifice any number of ${devour!.filter.text}s as it enters (${said}): click them, then sacrifice.` } : devour!.n === 2 && devour!.filter.types?.includes("Planeswalker") ? { prompt: `sacrifice any number of creatures and/or planeswalkers as it enters (two +1/+1 counters for each): click them, then sacrifice.` } : {}) };
+      return true;
+    }
+    if (c.what === "removeCounters") {
+      // Sin, Unending Cataclysm: any number of the other artifacts, creatures and enchantments with counters on them,
+      // anyone's (it isn't on the battlefield yet as they're chosen, CR 614.12).
+      const options = removeCountersAsEntersOptions(s, o);
+      if (!options.length) {
+        q.shift();
+        countersTakenAsEnters(s, o, [], c.enters);
+        continue;
+      }
+      const per = compileCard(defOf(s, o)).entersRemoveCounters?.per ?? 1;
+      s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "choose", what: "artifact, creature, or enchantment", options, count: options.length, min: 0, objectId: o.id, prompt: `remove all counters from any number of artifacts, creatures, and enchantments as it enters (${per === 1 ? "a +1/+1 counter" : `${per} +1/+1 counters`} for each counter removed): click them, then choose.` };
       return true;
     }
     if (c.what === "exileFromYard") {
@@ -12105,7 +12229,8 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender || (characteristics(s, o).attackDespiteDefenderVs && opps.some((d) => attackedYouLastTurn(s, d, pid)))) &&
       !characteristics(s, o).cantAttack &&
       !bridged(s, o) &&
-      !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false) && !(r.except && r.except.id === o.id && r.except.zc === (o.zoneChanges ?? 0))) &&
+      // Overencumbered: "creatures can't attack this combat", only in the combat phase it was made in.
+      !(s.cantAttackThisTurn ?? []).some((r) => (r.combat === undefined || r.combat === (s.combatsThisTurn ?? 0)) && objectMatches(s, r.filter, o, r.controller, false) && !(r.except && r.except.id === o.id && r.except.zc === (o.zoneChanges ?? 0))) &&
       // "Only land creatures can attack during that combat phase" (Bumi, Unleashed): an added combat phase's own rule.
       !(s.thatCombat !== undefined && s.combatAttackOnly?.[s.thatCombat] && !objectMatches(s, s.combatAttackOnly[s.thatCombat]!, o, pid, false)) &&
       (!(characteristics(s, o).attackUnless.length || characteristics(s, o).attackUnlessYard || characteristics(s, o).attackUnlessDefenderIs?.length || characteristics(s, o).attackIfNot?.length || characteristics(s, o).attackUnlessMore?.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackPlayersOnly.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),

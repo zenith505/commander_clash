@@ -937,6 +937,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3ed14ea7-ee62-4604-af3b-deafb00108c3",
+  "name": "Amped Raptor",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Creature — Dinosaur",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dinosaur"
+  ],
+  "oracleText": "First strike\nWhen this creature enters, you get {E}{E} (two energy counters). Then if you cast it from your hand, exile cards from the top of your library until you exile a nonland card. You may cast that card by paying an amount of {E} equal to its mana value rather than paying its mana cost.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "First strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "aa7d3e99-fc14-4f62-bf00-c0428c11e4f2",
   "name": "Amy Pond",
   "manaCost": "{2}{R}",
@@ -1256,6 +1288,41 @@
   "commanderLegal": "legal",
   "set": "otj",
   "releasedAt": "2024-04-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "32476743-c9d4-49ca-bec2-0669c215841b",
+  "name": "Anrakyr the Traveller",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Artifact Creature — Necron",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Necron"
+  ],
+  "oracleText": "Lord of the Pyrrhian Legions — Whenever Anrakyr the Traveller attacks, you may cast an artifact spell from your hand or graveyard by paying life equal to its mana value rather than paying its mana cost.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Lord of the Pyrrhian Legions"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -3833,6 +3900,38 @@
   "set": "blb",
   "releasedAt": "2024-08-02",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6290233b-b015-4909-8aba-bf8d65cc37b5",
+  "name": "Blue Mage's Cane",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Job select\nEquipped creature gets +0/+2, is a Wizard in addition to its other types, and has \"Whenever this creature attacks, exile up to one target instant or sorcery card from defending player's graveyard. If you do, copy it. You may cast the copy by paying {3} rather than paying its mana cost.\"\nSpirit of the Whalaqee — Equip {2}",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Job select",
+   "Spirit of the Whalaqee",
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -10408,6 +10507,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9d22960b-babc-4cf3-b228-d32e13bc6014",
+  "name": "Esix, Fractal Bloom",
+  "manaCost": "{4}{G}{U}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Fractal",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Fractal"
+  ],
+  "oracleText": "Flying\nThe first time you would create one or more tokens during each of your turns, you may instead choose a creature other than Esix and create that many tokens that are copies of that creature.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "c21",
+  "releasedAt": "2021-04-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5def9f38-0a0b-4e8d-9f9d-29dcb46520b4",
   "name": "Esper Sentinel",
   "manaCost": "{W}",
@@ -13775,6 +13910,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dd91f4f2-ea46-48c5-8a80-0dc4ae5b79c4",
+  "name": "Godsend",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Artifact — Equipment",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +3/+3.\nWhenever equipped creature blocks or becomes blocked by one or more creatures, you may exile one of those creatures.\nYour opponents can't cast spells with the same name as a card exiled with Godsend.\nEquip {3}",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "jou",
+  "releasedAt": "2014-05-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "fca3545a-2956-49f9-8465-1c8937deb294",
   "name": "Goldberry, River-Daughter",
   "manaCost": "{1}{U}",
@@ -15218,6 +15385,31 @@
   "set": "c18",
   "releasedAt": "2018-08-10",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "32263baa-d3f0-463f-92b3-4e9938476add",
+  "name": "Hedron Archive",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}{C}.\n{2}, {T}, Sacrifice this artifact: Draw two cards.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -17338,6 +17530,43 @@
   ]
  },
  {
+  "oracleId": "61fbaaf2-4286-4e9a-b9cb-aa31262b596a",
+  "name": "Jinnie Fay, Jetmir's Second",
+  "manaCost": "{R/G}{G}{G/W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Elf Druid",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Druid"
+  ],
+  "oracleText": "If you would create one or more tokens, you may instead create that many 2/2 green Cat creature tokens with haste or that many 3/1 green Dog creature tokens with vigilance.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bd43b485-e42e-4c20-adcb-799b0ce18a59",
   "name": "Jorn, God of Winter // Kaldring, the Rimestaff",
   "manaCost": "{2}{G}",
@@ -18549,6 +18778,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9cfe86ae-eebe-44aa-a956-4b3e9e621105",
+  "name": "Krenko's Command",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Create two 1/1 red Goblin creature tokens.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clu",
+  "releasedAt": "2024-02-23",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a0ff742b-f709-43ac-84d2-dc00c723bad6",
   "name": "Krosan Cloudscraper",
   "manaCost": "{7}{G}{G}{G}",
@@ -18632,6 +18887,32 @@
   "commanderLegal": "legal",
   "set": "lea",
   "releasedAt": "1993-08-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b5585eb5-4df3-4ae2-8c39-a8e7a9706dc2",
+  "name": "Kusari-Gama",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature has \"{2}: This creature gets +1/+0 until end of turn.\"\nWhenever equipped creature deals damage to a blocking creature, this Equipment deals that much damage to each other creature defending player controls.\nEquip {3} ({3}: Attach to target creature you control. Equip only as a sorcery.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -21139,6 +21420,31 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5963e0ef-e0bc-4611-ad4f-813a4c0eacfb",
+  "name": "Mishra's Factory",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{1}: This land becomes a 2/2 Assembly-Worker artifact creature until end of turn. It's still a land.\n{T}: Target Assembly-Worker creature gets +1/+1 until end of turn.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "slc",
+  "releasedAt": "2022-11-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "03dc8820-ec10-42c1-8200-d323cfcbf2b0",
   "name": "Misinformation",
   "manaCost": "{B}",
@@ -21569,6 +21875,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "df702b0c-e011-497f-ae29-9876efac4a4c",
+  "name": "Moonlit Meditation",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant artifact or creature you control\nThe first time you would create one or more tokens each turn, you may instead create that many tokens that are copies of enchanted permanent.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "eoe",
+  "releasedAt": "2025-08-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "87aa466e-7985-40ff-bef6-dcae35fe0106",
   "name": "Mossbridge Troll",
   "manaCost": "{5}{G}{G}",
@@ -21821,6 +22157,28 @@
   "set": "mps",
   "releasedAt": "2016-09-30",
   "rarity": "special",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3fe9367b-def1-4820-9e23-92ce3d7a4afc",
+  "name": "Moxite Refinery",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}, {T}, Remove X counters from an artifact or creature you control: Choose one. Activate only as a sorcery.\n• Put X charge counters on target artifact.\n• Put X +1/+1 counters on target creature.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "eoc",
+  "releasedAt": "2025-08-01",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -23302,6 +23660,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "55cba59c-932c-4295-87dc-9179fbdfbd53",
+  "name": "One Last Job",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Spree (Choose one or more additional costs.)\n+ {2} — Return target creature card from your graveyard to the battlefield.\n+ {1} — Return target Mount or Vehicle card from your graveyard to the battlefield.\n+ {1} — Return target Aura or Equipment card from your graveyard to the battlefield attached to a creature you control.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Spree"
+  ],
+  "commanderLegal": "legal",
+  "set": "otj",
+  "releasedAt": "2024-04-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "06bb4272-25d1-46db-8585-15f919267e1e",
   "name": "One with the Multiverse",
   "manaCost": "{6}{U}{U}",
@@ -23556,6 +23942,40 @@
   "set": "aer",
   "releasedAt": "2017-01-20",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "276c4643-13ad-43bf-840b-08c025ebc065",
+  "name": "Orvar, the All-Form",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Shapeshifter",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Shapeshifter"
+  ],
+  "oracleText": "Changeling\nWhenever you cast an instant or sorcery spell, if it targets one or more other permanents you control, create a token that's a copy of one of those permanents.\nWhen a spell or ability an opponent controls causes you to discard this card, create a token that's a copy of target permanent.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Changeling"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -24407,6 +24827,31 @@
     "artUrl": "https://cards.scryfall.io/art_crop/back/3/c/3ce33422-5dba-4a42-8375-dd8ccc692a7b.jpg?1783905367"
    }
   ]
+ },
+ {
+  "oracleId": "78a2972c-14f4-41f3-99f9-167948bdd73a",
+  "name": "Petrified Hamlet",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "When this land enters, choose a land card name.\nActivated abilities of sources with the chosen name can't be activated unless they're mana abilities.\nLands with the chosen name have \"{T}: Add {C}.\"\n{T}: Add {C}.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "sos",
+  "releasedAt": "2026-04-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "520c4d88-34b6-4a26-81ca-65eb8b10461c",
@@ -26073,6 +26518,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5b2364d7-a811-4595-a1b4-224c70555ffa",
+  "name": "Raise the Alarm",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Create two 1/1 white Soldier creature tokens.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "j25",
+  "releasedAt": "2024-11-15",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "361f534b-39d1-4421-b5a8-d3813c62f86d",
   "name": "Rakdos Guildgate",
   "manaCost": "",
@@ -26724,6 +27195,39 @@
   "set": "war",
   "releasedAt": "2019-05-03",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "42e4d4d8-e4e0-4cf8-a6d0-887a17513280",
+  "name": "Reservoir Kraken",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Kraken",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Kraken"
+  ],
+  "oracleText": "Trample, ward {2}\nAt the beginning of each combat, if this creature is untapped, any opponent may tap an untapped creature they control. If they do, tap this creature and create a 1/1 blue Fish creature token with \"This token can't be blocked.\"",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Trample",
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -28593,6 +29097,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dd3d4d96-1e88-49e1-8276-7f62c22ad91a",
+  "name": "Seeds of Strength",
+  "manaCost": "{G}{W}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Target creature gets +1/+1 until end of turn.\nTarget creature gets +1/+1 until end of turn.\nTarget creature gets +1/+1 until end of turn.",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rav",
+  "releasedAt": "2005-10-07",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "47af21d3-b43f-4101-81cf-ca44db1a2706",
   "name": "Seeker of Slaanesh",
   "manaCost": "{3}{R}",
@@ -29653,6 +30185,44 @@
   "commanderLegal": "legal",
   "set": "soi",
   "releasedAt": "2016-04-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "48534bbf-06b6-46a0-8a86-b14f38caee58",
+  "name": "Sin, Unending Cataclysm",
+  "manaCost": "{5}{G}{U}",
+  "cmc": 7,
+  "typeLine": "Legendary Creature — Leviathan Avatar",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Leviathan",
+   "Avatar"
+  ],
+  "oracleText": "Flying, trample\nAs Sin enters, remove all counters from any number of artifacts, creatures, and enchantments. Sin enters with X +1/+1 counters on it, where X is twice the number of counters removed this way.\nWhen Sin dies, put its counters on target creature you control, then shuffle this card into its owner's library.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -31882,6 +32452,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9b157b9a-92da-4054-8441-04fb4e415d77",
+  "name": "Stumpsquall Hydra",
+  "manaCost": "{X}{G}{G}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Hydra",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Hydra"
+  ],
+  "oracleText": "When this creature enters, distribute X +1/+1 counters among it and any number of commanders.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e3480c8f-15ad-451b-bb34-b129805569e1",
   "name": "Stunted Growth",
   "manaCost": "{3}{G}{G}",
@@ -33546,6 +34146,43 @@
   "releasedAt": "2022-10-07",
   "rarity": "rare",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e229d55c-9513-437d-bd67-015ac46aaa18",
+  "name": "The Infamous Cruelclaw",
+  "manaCost": "{1}{B}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Weasel Mercenary",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Weasel",
+   "Mercenary"
+  ],
+  "oracleText": "Menace\nWhenever The Infamous Cruelclaw deals combat damage to a player, exile cards from the top of your library until you exile a nonland card. You may cast that card by discarding a card rather than paying its mana cost.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "blb",
+  "releasedAt": "2024-08-02",
+  "rarity": "mythic",
+  "layout": "normal",
   "gameChanger": false
  },
  {
@@ -37000,6 +37637,38 @@
   "set": "c19",
   "releasedAt": "2019-08-23",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cd4cadb4-3156-49bd-b36e-12ba5c85938b",
+  "name": "Wall of Stone",
+  "manaCost": "{1}{R}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Wall",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wall"
+  ],
+  "oracleText": "Defender (This creature can't attack.)",
+  "power": "0",
+  "toughness": "8",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Defender"
+  ],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

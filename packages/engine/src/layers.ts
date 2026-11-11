@@ -1482,6 +1482,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "dealtDamageToOpponentThisTurn") return src.zone === "battlefield" && Object.entries(s.turnLog?.damagedBy ?? {}).some(([pid, by]) => Number(pid) !== you && by.includes(`${src.id}@${src.zoneChanges ?? 0}`));
       if (cond.is === "kicked") return !!src.kicked?.length;
       if (cond.is === "cast") return src.zone === "battlefield" && !!src.wasCast;
+      // Amped Raptor: "if you cast it from your hand" (a commander cast from the command zone wasn't): this object, or as it
+      // last existed once it left (CR 608.2h).
+      if (cond.is === "castFromHand") {
+        const lk = sourceZc !== undefined && (src.zoneChanges ?? 0) !== sourceZc ? s.lastKnown?.[sourceId] : undefined;
+        return lk ? lk.zc === sourceZc && lk.castFromHandBy === you : src.zone === "battlefield" && !!src.castFromHand && src.castBy === you;
+      }
       if (cond.is === "sneakThisTurn") return src.zone === "battlefield" && src.castAlt === "sneak" && src.enteredTurn === s.turn;
       if (cond.is === "countersPutThisTurn") return src.countersPutAt?.turn === s.turn && src.countersPutAt.zc === (src.zoneChanges ?? 0);
       if (cond.is === "impending") return src.castAlt === "impending" && (src.counters.time ?? 0) > 0; // CR 702.176a

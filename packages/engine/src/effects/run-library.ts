@@ -2190,6 +2190,8 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         // Break Out: "If that card has mana value 2 or less, you may put it onto the battlefield ...": with a greater mana
         // value there's no choice, it goes into the hand.
         if (e.orHandMvMax !== undefined && found.length && found.every((id) => defMv(defOf(s, obj(s, id))) > e.orHandMvMax!)) return dig(s, { ...e, into: "hand", orHand: undefined, orHandMvMax: undefined, tapped: undefined, hasteOnto: undefined }, ctx, src, pid);
+        // Whiskervale Forerunner: "You may put it onto the battlefield if it's your turn": otherwise into the hand.
+        if (e.orHandIf && found.length && !staticConditionNow(s, e.orHandIf, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller)) return dig(s, { ...e, into: "hand", orHand: undefined, orHandIf: undefined, tapped: undefined, hasteOnto: undefined }, ctx, src, pid);
         if (found.length && sc.either === undefined) {
           const them = found.length === 1 ? names(found) : "them";
           s.pending = { kind: "chooseOption", player: p.id, source: src, what: "either", options: ["0", "1"], labels: [`Put ${names(found)} onto the battlefield`, `Put ${them} into your hand`], prompt: "choose one" };

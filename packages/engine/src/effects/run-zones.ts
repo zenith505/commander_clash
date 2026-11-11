@@ -124,6 +124,35 @@ export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: Pla
 }
 
 /**
+ * One Last Job: what each Equipment card entering (not an Aura) is attached to as it enters, a creature `you` control it
+ * could be attached to (CR 301.5c-d: not one with protection from it or that can't be equipped, and not while the
+ * Equipment would be a creature itself unless it has reconfigure, CR 702.151b), chosen as it resolves (not targeted,
+ * rulings); "" with none, so it enters unattached.
+ */
+function chooseEquipHosts(s: GameState, cards: GameObject[], you: PlayerId, src: string): "paused" | Map<ObjectId, ObjectId | ""> {
+  const sc = (s.resolving!.scratch ??= {});
+  const chosen = (sc.equipHosts ??= {});
+  const ids = new Set(cards.map((o) => o.id));
+  for (const o of cards) {
+    const d = defOf(s, o);
+    if (d.subtypes.includes("Aura") || !d.subtypes.includes("Equipment") || chosen[o.id] !== undefined) continue;
+    const compiled = compileCard(d);
+    const only = compiled.attachOnly ?? { kind: "object" as const, text: "" };
+    const options = isType(d, "Creature") && !compiled.reconfigure ? [] : s.battlefield.filter((id) => !ids.has(id) && controllerOf(s, obj(s, id)) === you && objIsType(s, obj(s, id), "Creature") && !characteristics(s, obj(s, id)).cantBeEquipped && objectMatches(s, only, obj(s, id), you, false, d));
+    if (options.length <= 1) {
+      chosen[o.id] = options[0] ?? "";
+      continue;
+    }
+    sc.equipAsking = o.id;
+    s.pending = { kind: "chooseOption", player: you, source: src, what: "attachHost", options, labels: options.map((id) => defOf(s, obj(s, id)).name), prompt: `choose a creature you control for ${d.name} to enter attached to` };
+    return "paused";
+  }
+  const out = new Map<ObjectId, ObjectId | "">();
+  for (const o of cards) if (chosen[o.id] !== undefined) out.set(o.id, chosen[o.id]!);
+  return out;
+}
+
+/**
  * Each player picks their own permanents, in APNAP order, then they're all sacrificed or returned to
  * their owners' hands at once (CR 101.4, 701.21a). With no more than they have to pick, there's no choice.
  */
@@ -3102,8 +3131,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const types = here ? creatureTypesOf(s, subj!) : lk && (lk.zc === ctx.subject!.zc || lk.zc === ctx.subject!.zc - 1) && lk.creatureTypes ? (lk.creatureTypes === "all" ? ("all" as const) : new Set(lk.creatureTypes)) : undefined;
         kin = (h) => !!types && objIsType(s, h, "Creature") && shareCreatureType(types, creatureTypesOf(s, h));
       }
+      // One Last Job: an Aura only onto a creature you control (CR 303.4f), chosen as it resolves (rulings).
+      if (e.attachToYours) kin = (h) => objIsType(s, h, "Creature") && controllerOf(s, h) === ctx.controller;
       const hosts = e.attachRandom ? randomAuraHosts(s, entering, under, src) : e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted || e.attachToCreated || e.attachToSource ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src, undefined, undefined, undefined, kin);
       if (hosts === "paused") return "paused";
+      // One Last Job: an Equipment onto a creature you control it could be attached to, chosen as it resolves (not
+      // targeted); with none it enters unattached (rulings, CR 301.5c).
+      const equipHosts = e.attachToYours ? chooseEquipHosts(s, entering, ctx.controller, src) : undefined;
+      if (equipHosts === "paused") return "paused";
       // "Put a +1/+1 counter on it": the permanents these cards became (CR 400.7), like tokens just created.
       if (s.resolving) s.resolving.created = [];
       enterTogether(s, () => {
@@ -3164,6 +3199,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             }
             log(s, `${src} returns ${d.name} to the battlefield${ok ? ` attached to ${defOf(s, returned!).name}` : ", unattached"}.`);
             moveObject(s, o.id, "battlefield", { controller: ctx.controller, ...(ok ? { attachTo: returned!.id } : {}) });
+            if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
+            continue;
+          }
+          if (equipHosts?.has(o.id)) {
+            const host = equipHosts.get(o.id)!;
+            log(s, `${src} returns ${d.name} to the battlefield${host ? ` attached to ${defOf(s, obj(s, host)).name}` : ", unattached"}.`);
+            moveObject(s, o.id, "battlefield", { controller: under(o), ...(host ? { attachTo: host } : {}) });
             if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
             continue;
           }

@@ -2577,6 +2577,12 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     batch.fromGraveyard = true;
     rest = fromYard[1]!;
   }
+  // Extraordinary Journey: "if one or more of them entered from exile or was cast from exile" (an intervening if, CR 603.4).
+  const fromExile = /^if one or more of them entered from exile or was cast from exile, (.+)$/.exec(rest);
+  if (fromExile && batch.what === "enters" && !batch.fromGraveyard) {
+    batch.fromExile = true;
+    rest = fromExile[1]!;
+  }
   // Twilight Diviner: "if they entered or were cast from a graveyard, create a token that's a copy of one of them": an
   // intervening if (CR 603.4) about those that did, and one of them of your choice, while it's still that permanent.
   const diviner = /^if they entered or were cast from a graveyard, create a token that's a copy of one of them\.?$/.exec(rest);
@@ -2965,6 +2971,13 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
     // "That player draws two additional cards" in their draw step: a trigger, so they just draw two more.
     const body = parseBody(theyAreThatPlayer(step[2]!).replace(/^that player draws (\w+) additional cards?\.$/, "that player draws $1 cards."), { eventPlayer: true });
     return body ? { event, body, enchantedPlayersTurn: true } : "fail";
+  }
+  // Overencumbered: "At the beginning of combat on enchanted opponent's turn, ...": each beginning of combat step (CR 507.1)
+  // of that player's turns; "that player" is them.
+  const combat = /^At the beginning of combat on enchanted (?:player|opponent)'s turn, (.+)$/.exec(line);
+  if (combat) {
+    const body = parseBody(theyAreThatPlayer(combat[1]!), { eventPlayer: true });
+    return body ? { event: "eachBeginCombat", body, enchantedPlayersTurn: true } : "fail";
   }
   // Witch-king of Angmar: "Whenever one or more creatures deal combat damage to you, ...".
   // Tamiyo, Upriser Crowned: "... to you while you're the monarch, tap those creatures and put a stun counter on each of

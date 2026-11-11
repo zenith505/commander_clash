@@ -440,8 +440,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // A tax whose penalty is only a card or a Treasure for its controller (Rhystic Study, Smothering Tithe, Mystic Remora):
       // {1} is worth paying, more only with plenty of mana to spare.
       const pu = s.resolving?.scratch?.punish;
+      // Overencumbered: "If they don't, creatures can't attack this combat": worth paying only with a creature that could
+      // attack.
+      const noAttacks = pu && s.resolving ? allEffects(s.resolving.body.effects).some((x) => x.type === "punisher" && x.effects.some((y) => y.type === "cantAttackRule" && !!y.combat)) : false;
+      if (noAttacks && !potentialAttackers(s, pid).length) return [{ type: "payUnless", player: pid, pay: false }];
       const generic = [...pend.cost.matchAll(/\{(\d+)\}|\{[^}]+\}/g)].reduce((n, x) => n + (x[1] ? Number(x[1]) : 1), 0);
-      if (pu && pu.lose === undefined && generic >= 2 && !planMana(s, pid, parseManaCost(`{${generic + 3}}`))) return [{ type: "payUnless", player: pid, pay: false }];
+      if (pu && !noAttacks && pu.lose === undefined && generic >= 2 && !planMana(s, pid, parseManaCost(`{${generic + 3}}`))) return [{ type: "payUnless", player: pid, pay: false }];
       const taps = planMana(s, pid, parseManaCost(pend.cost));
       // Ward—Waterbend: mana first, then artifacts and creatures for the rest (CR 701.67a).
       const wb = !taps && pend.waterbend ? autoWaterbend(s, pid, parseManaCost(pend.cost), 0, pend.waterbend, []) : null;

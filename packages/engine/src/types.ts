@@ -644,6 +644,8 @@ export interface GameObject {
   fromOwnLibrary?: true;
   /** It entered the battlefield from exile (Faldorn's "a land you control enters from exile", CR 603.6a). */
   enteredFromExile?: true;
+  /** On the battlefield: it entered as a spell cast from exile (Extraordinary Journey: "was cast from exile"). */
+  castFromExile?: true;
   /** Sigarda's Splendor: the life total last noted for it, its controller's (as it entered, then at each of their upkeeps). */
   notedLife?: number;
   castVia?: CastFromGraveyardKind;
@@ -2064,7 +2066,7 @@ export interface GameState {
   /** "Creatures without flying can't block this turn": matching creatures can't block, also ones that arrive later. */
   cantBlockThisTurn?: { filter: TargetSpec; controller: PlayerId; /** Not this object, while it's the same one (CR 400.7). */ except?: { id: string; zc: number } }[];
   /** "Creatures can't attack this turn": matching creatures can't attack, also ones that arrive later. */
-  cantAttackThisTurn?: { filter: TargetSpec; controller: PlayerId; /** Not this object (Intimidation Bolt's target), while it's the same one (CR 400.7). */ except?: { id: string; zc: number } }[];
+  cantAttackThisTurn?: { filter: TargetSpec; controller: PlayerId; /** Not this object (Intimidation Bolt's target), while it's the same one (CR 400.7). */ except?: { id: string; zc: number }; /** Overencumbered: only in this combat phase of the turn (GameState.combatsThisTurn). */ combat?: number }[];
   /**
    * Wall of Dust: "that creature can't attack during its controller's next turn": `player`'s first turn after `since`, the
    * object as it was (`zc`). As that turn begins it becomes an effect for that turn.
@@ -3202,6 +3204,10 @@ export interface Resolving {
     attachEach?: ObjectId[];
     /** The Aura whose host is being chosen. */
     auraAsking?: ObjectId;
+    /** One Last Job (putOntoBattlefield attachToYours): each Equipment's creature to enter attached to, "" for none. */
+    equipHosts?: Record<ObjectId, string>;
+    /** The Equipment whose creature is being chosen. */
+    equipAsking?: ObjectId;
     /** Effect attachToChosen with `pickOne` (Gilgamesh): the permanent chosen to attach, or "none". */
     attachWhich?: string;
     /** Effect attachEquipmentTo (Goldwardens' Gambit): the next of `attachEach` to choose an Equipment for. */

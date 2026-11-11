@@ -622,6 +622,9 @@ export function parseChanges(text: string): Modification[] | null {
     // Neurok Transmuter: "becomes blue and isn't an artifact": the card type and its subtypes go (layer 4, rulings), its
     // other types stay.
     else if (/^isn't an artifact$/i.test(p)) out.push({ kind: "loseTypes", types: ["Artifact"] });
+    // Weeping Angel: "~ isn't a creature until end of turn": the card type and its creature types go (layer 4, CR 205.1b;
+    // rulings: still an artifact, no longer an Alien or Angel); an attacking or blocking one leaves combat (CR 506.4).
+    else if (/^isn't a creature$/i.test(p)) out.push({ kind: "loseTypes", types: ["Creature"] });
     // "Lose hexproof and shroud and can't have hexproof or shroud" (Arcane Lighthouse): effects with later timestamps
     // can't give them back either (rulings).
     else if ((m = /^loses? (.+?) and can't have (?:or gain )?(.+)$/i.exec(p))) {

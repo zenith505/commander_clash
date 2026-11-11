@@ -2901,6 +2901,11 @@ function parseDiscardTrigger(line0: string): TriggeredAbility | "fail" | null {
   // Hashaton: "create a tapped token that's a copy of that card": the discarded card, as it last existed in the
   // graveyard if it has left (CR 608.2h).
   const copyIt = /\bcopy of that card\b/.test(m[5]!) && !/\b(?:it|its)\b/.test(m[5]!.replace(/\bexcept it's\b/, ""));
+  // Oskar, Rubbish Reclaimer: "Whenever you discard a nonland card, you may cast it from your graveyard": the discarded
+  // card, if it's still there as the same object (CR 400.7; not one discarded to madness, CR 702.35a), cast as this
+  // resolves, paying all its costs (rulings), timing permissions ignored (CR 608.2g).
+  const castIt = m[1] === "you" && m[2] === "discard" && m[3] === "a" && /^you may cast it from your graveyard\.$/.test(m[5]!);
+  if (castIt) return { event: "playerDiscards", discards: { by: "you", ...(filter ? { filter } : {}) }, body: { targets: [], effects: [{ type: "castNow", what: { ref: "subjectCard", zone: "graveyard" } }], text: m[5]! } };
   const body = exile ? { targets: [], effects: [exileIt?.[1] ? { type: "may" as const, effects: [exile], text: m[5]!.replace(/^you may /, "").replace(/\.$/, "") } : exile], text: m[5]! } : parseBody(m[5]!, { eventPlayer: true, ...(copyIt ? { subjectIt: true, subjectLeft: true } : {}) });
   if (!body) return "fail";
   const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "any";
@@ -4114,6 +4119,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const filter = parseTargetPhrase(selfOrSpell[1]!);
     const body = filter?.kind === "spell" && !filter.controller ? parseBody(`${selfOrSpell[2]![0]!.toUpperCase()}${selfOrSpell[2]!.slice(1)}`) : null;
     return body ? { event: "spellYouControlDealsDamage", spellDamage: { filter: filter!, anyPlayer: true, orSelf: true }, body } : "fail";
+  }
+  // Imodane, the Pyrohammer: "Whenever an instant or sorcery spell you control that targets only a single creature deals
+  // damage to that creature, ~ deals that much damage to each opponent.": once for each time it deals damage to it, "that
+  // much" the damage dealt to that creature then (CR 603.2c, 120.3); every target of the spell that creature (CR 115.1).
+  const imodane = /^Whenever an? (.+? spell) you control that targets only a single creature deals damage to that creature, (.+)$/.exec(line);
+  if (imodane) {
+    const filter = parseTargetPhrase(imodane[1]!);
+    const body = filter?.kind === "spell" && !filter.controller ? thatMuchBody(imodane[2]!, {}) : null;
+    return body ? { event: "spellYouControlDealsDamage", spellDamage: { filter: filter!, onlyTargetCreature: true }, body } : "fail";
   }
   // "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix).
   const spellDmg = /^Whenever an? (.+? spell) you control deals damage to an opponent( or battle)?, (.+)$/.exec(line);

@@ -11132,6 +11132,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "copyOrder") {
     const c = r.scratch?.copies;
     if (!c?.each) throw new RulesError("no copies to order");
+    // Frontline Heroism: the one token the copy targets (CR 707.10e).
+    if (c.pickOne) {
+      if (!c.each.includes(choice)) throw new RulesError("not one of the tokens");
+      c.each = [choice];
+      c.pickOne = undefined;
+      c.picked = true;
+      continueResolution(s);
+      return;
+    }
     const at = c.each.length - c.left;
     const i = c.each.indexOf(choice);
     if (i < at) throw new RulesError("not one of the copies still to make");

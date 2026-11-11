@@ -112,6 +112,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // value once (CR 202.3).
   // Sudden Insight: "for each different mana value among nonland cards in your graveyard".
   if (each && /^different mana value among nonland cards in your graveyard$/i.test(p)) return { count: { kind: "graveyardManaValues", who: { ref: "you" }, filter: { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "nonland card" } } };
+  // Oskar, Rubbish Reclaimer: "for each different mana value among cards in your graveyard": every card, a land's 0 too
+  // (rulings, CR 202.3).
+  if (each && /^different mana value among cards in your graveyard$/i.test(p)) return { count: { kind: "graveyardManaValues", who: { ref: "you" } } };
   // All-Seeing Arbiter: "where X is the number of different mana values among cards in your graveyard": every card, a
   // land's 0 too (rulings, CR 202.3).
   if (!each && /^the number of different mana values among cards in your graveyard$/i.test(p)) return { count: { kind: "graveyardManaValues", who: { ref: "you" } } };
@@ -1047,6 +1050,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (of?.ref === "castSpell" && kind !== "manaValue" && !/^that spell's$/i.test(m[1]!)) return null;
     return of && count({ kind, of });
   }
+  // Curie, Emergent Intelligence: "draw cards equal to its base power", its own (CR 613.4a-b, rulings).
+  if ((m = /^(~'s|its) base power$/.exec(p))) return whoseObject(m[1]!, ctx)?.ref === "self" ? count({ kind: "basePower", of: { ref: "self" } }) : null;
   // Whipkeeper: "~ deals damage to target creature equal to the damage already dealt to it this turn".
   if (/^the damage already dealt to it this turn$/.test(p)) {
     const of = whoseObject("its", ctx);

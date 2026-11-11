@@ -5,6 +5,7 @@ import type { Ctx } from "./body";
 import { parseStaticCondition } from "./statics";
 import { parseObject } from "./targets";
 import { QUOTED_SOURCE_NAME } from "./compile";
+import { roundB179Sentence } from "./laneb179";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -63,5 +64,5 @@ export function roundB178Sentence(s: string, sentences: string[], si: number, ct
     last.copyCountered = true;
     return { effect: { type: "if", cond: { kind: "state", cond }, effects: [{ type: "may", effects: [{ type: "copySpell", spell: "countered", n: 1, newTargets: true }], text: "copy the spell countered this way" }] }, next: si + 2 };
   }
-  return null;
+  return roundB179Sentence(s, sentences, si, ctx, effects);
 }

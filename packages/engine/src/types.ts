@@ -1093,7 +1093,7 @@ export interface StackItem {
   finalChapter?: number;
   lki?: LastKnown;
   /** A station ability: the creature tapped to pay for it, and its power as it last existed if it has left (CR 702.184a). */
-  stationed?: { id: ObjectId; zc: number; power: number };
+  stationed?: { id: ObjectId; zc: number; power: number; /** Tapped for a station ability (CR 702.184a), for Tapestry Warden. */ station?: true };
   /** Cryptic Gateway: the creatures tapped to pay its "Tap two untapped creatures you control" cost, and their creature types, as they last existed once they leave (CR 608.2h). */
   costTapped?: { id: ObjectId; zc: number; types: string[] | "all" }[];
   /** "Target creature that's blocking equipped creature" (Plasma Caster): the creature the source was attached to as it was activated (rulings). */
@@ -2623,6 +2623,8 @@ export interface Resolving {
   counteredExiled?: { id: ObjectId; zc: number };
   /** Psychic Rebuttal: the spell a counterSpell `copyCountered` countered, as it last was on the stack, its card's object then too (CR 707.10: a copy copies its choices). */
   counteredCopy?: { item: StackItem; card: GameObject };
+  /** Counterlash: the card types of the spell a counterSpell with noteTypes targeted, as it was on the stack just before. */
+  counterTargetTypes?: string[];
   /** The card its "reveal the top card of your library" revealed (CR 701.20a), for "if it's a creature card, put it ...". */
   revealed?: { id: ObjectId; zc: number };
   /** The cards "reveal cards from the top of your library until you reveal a nonland card" revealed, in order (Erratic Explosion). */
@@ -2669,6 +2671,8 @@ export interface Resolving {
   excessDamage?: number;
   /** "The damage dealt this way": all of it, so far in this resolution. */
   damageThisWay?: number;
+  /** Drain Life: that damage, each recipient's part no more than its life total or loyalty just before, or its toughness (CR 120.3). */
+  damageCappedThisWay?: number;
   /** That excess damage by the permanent dealt it (a fight's "the creature the opponent controls"). */
   excessTo?: Record<ObjectId, number>;
   /** The part of it dealt to creatures ("if excess damage was dealt to a creature this way", Vikya). */

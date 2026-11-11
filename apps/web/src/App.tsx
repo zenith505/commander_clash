@@ -4776,7 +4776,7 @@ function AbilityMenu({
       <strong>{d.name}</strong>
       {choice && (
         <button disabled={!playable || !canEnterUntapped(s, HUMAN, objectId)} onClick={() => onPlay(true)}>
-          {choice.kind === "mayTapRad" ? "Play it untapped" : <>Play it untapped ({choice.kind === "payLife" ? `pay ${choice.n} life` : `reveal ${/^[AEIOU]/.test(choice.filter.text) ? "an" : "a"} ${choice.filter.text}`})</>}
+          {choice.kind === "mayTapRad" ? "Play it untapped" : <>Play it untapped ({choice.kind === "payLife" ? `pay ${choice.n} life` : choice.behold ? `behold ${/^[AEIOU]/.test(choice.orControl?.text ?? "") ? "an" : "a"} ${choice.orControl?.text ?? ""}` : `reveal ${/^[AEIOU]/.test(choice.filter.text) ? "an" : "a"} ${choice.filter.text}`})</>}
         </button>
       )}
       {foretold && (

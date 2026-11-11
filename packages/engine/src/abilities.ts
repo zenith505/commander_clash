@@ -340,7 +340,7 @@ export type Count =
    * ability's damage dealt to permanents beyond lethal damage, their loyalty or their defense (CR 120.4a, 120.10).
    */
   /** "You gain life equal to the damage dealt this way" (Syphon Soul): all the damage the instructions before dealt, after prevention. */
-  | { kind: "damageThisWay" }
+  | { kind: "damageThisWay"; /** Drain Life: "but not more life than the player's life total before the damage was dealt, the planeswalker's loyalty before the damage was dealt, or the creature's toughness": each recipient's part no more than that (ResolvingState.damageCappedThisWay). */ capped?: true }
   | { kind: "excessThisWay"; /** Only that target's (The Last Agni Kai's "add that much {R}"). */ target?: number }
   /** "If you lost life this way, draw that many cards" after exchanging life totals (Mister Negative): the life you lost doing it. */
   | { kind: "lifeLostThisWay"; /** "If no life is lost this way" (Blitzwing, Cruel Tormentor): what its loseLife instructions took off life totals, any player's. */ byLoss?: true }
@@ -3525,7 +3525,7 @@ export type Effect =
    * "You may cast a spell with mana value 3 or less from your hand without paying its mana cost" (the Expertises,
    * Electrodominance's "X or less"): one card, picked and cast as this resolves (rulings).
    */
-  | { type: "castFromHand"; filter: TargetSpec; /** "If you don't, scry 1" after it (In Search of Greatness): whether a spell was cast this way is what "if you do" asks. */ setsDid?: true; /** "Draw three cards and reveal them. You may cast one of them ...": only those, revealed. */ drawn?: true; /** "... from your graveyard without paying its mana cost. If that spell would be put into your graveyard, exile it instead." (Sword of Once and Future): a card there, and the spell is exiled instead of going back. */ fromGraveyard?: true; /** With `fromGraveyard`: no "exile it instead" (Counterpoint). */ yardNoExile?: true; /** Jace's Mindseeker: "target opponent mills five cards. You may cast an instant or sorcery spell from among them": one of the cards this resolution milled, where they went (exile too, rulings). */ milled?: true; /** Twinning Glass: "if it has the same name as a spell that was cast this turn": by anyone, as it resolves (rulings), the spell as it's cast (see castFree's names). */ sameNameCastThisTurn?: true }
+  | { type: "castFromHand"; filter: TargetSpec; /** "If you don't, scry 1" after it (In Search of Greatness): whether a spell was cast this way is what "if you do" asks. */ setsDid?: true; /** "Draw three cards and reveal them. You may cast one of them ...": only those, revealed. */ drawn?: true; /** "... from your graveyard without paying its mana cost. If that spell would be put into your graveyard, exile it instead." (Sword of Once and Future): a card there, and the spell is exiled instead of going back. */ fromGraveyard?: true; /** With `fromGraveyard`: no "exile it instead" (Counterpoint). */ yardNoExile?: true; /** Jace's Mindseeker: "target opponent mills five cards. You may cast an instant or sorcery spell from among them": one of the cards this resolution milled, where they went (exile too, rulings). */ milled?: true; /** Twinning Glass: "if it has the same name as a spell that was cast this turn": by anyone, as it resolves (rulings), the spell as it's cast (see castFree's names). */ sameNameCastThisTurn?: true; /** Counterlash: "a spell that shares a card type with it": a card type of the spell its counterSpell targeted, as it was on the stack (ResolvingState.counterTargetTypes). */ sharesTypeWithCountered?: true }
   /** Suspend's upkeep trigger (CR 702.62a): if the card (the subject) is still suspended, remove a time counter from it. */
   | { type: "suspendTick" }
   /** Suspend's last-counter trigger (CR 702.62a): its owner may cast the exiled card without paying its mana cost. */
@@ -4467,6 +4467,8 @@ export type Effect =
       unless?: UnlessPays;
       /** Psychic Rebuttal: note the spell as it was on the stack, if it's countered this way (ResolvingState.counteredCopy), for "copy the spell countered this way" after it. */
       copyCountered?: true;
+      /** Counterlash: note the target spell's card types as it is on the stack (ResolvingState.counterTargetTypes), countered or not, for "a spell that shares a card type with it" after it. */
+      noteTypes?: true;
       exile?: boolean;
       /** Spell Crumple: "put it on the bottom of its owner's library instead of into that player's graveyard". */
       bottom?: true;
@@ -7089,7 +7091,7 @@ export type EntersCondition =
 /** `orControl`: "or you control a Dragon" (Temple of the Dragon Queen): untapped then with nothing revealed. */
 export type EntersChoice =
   | { kind: "payLife"; n: number }
-  | { kind: "reveal"; filter: TargetSpec; orControl?: TargetSpec }
+  | { kind: "reveal"; filter: TargetSpec; orControl?: TargetSpec; /** Theorist's Sanctum: "you may behold a Jace" (CR 701.4a), said so. */ behold?: true }
   /** Mariposa Military Base: "You may have ~ enter tapped. If you do, you get two rad counters." Untapped unless its player chooses (CR 614.1c); entering by an effect, it's untapped. */
   | { kind: "mayTapRad"; n: number };
 
@@ -7988,6 +7990,10 @@ export interface CompiledCard {
   noPoisonForYou?: true;
   /** Melira, the Living Cure: "If you would get one or more poison counters, instead you get one poison counter and you can't get additional poison counters this turn" (putPlayerCounters, TurnLog.noMorePoison). */
   onePoisonForYou?: true;
+  /** Drain Life, Consume Spirit: "Spend only black mana on X." in a spell whose mana cost has more than {X}: the mana paying X is of this type (spellCost), less whatever reductions take off X (rulings). */
+  spendOnlyOnX?: ManaType;
+  /** Tapestry Warden: "Each creature you control with toughness greater than its power stations permanents using its toughness rather than its power." (amounts.ts stationPower, rulings). */
+  stationByToughness?: true;
   /** Tatterkite: "~ can't have counters put on it." (counters.ts countersBanned). */
   selfNoCounters?: true;
   /** "Creatures you control can boast twice during each of your turns rather than once." (Birgi, CR 702.142a) */

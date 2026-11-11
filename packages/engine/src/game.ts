@@ -6508,7 +6508,13 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // World): what that spell or ability targets now (rulings).
   for (const c of compileCard(d).costLessIfTargets ?? []) if (targetsFor(c.filter)) less += c.n;
   // Increases first, then reductions, which only take off generic mana (CR 601.2f, 118.7a).
-  return costAtLeast(s, { cost: reducedCost, extra: Math.max(0, total.extra + mods.more + more + flashbackMore + wayMore - less) });
+  const extra = Math.max(0, total.extra + mods.more + more + flashbackMore + wayMore - less);
+  // Drain Life: "Spend only black mana on X": X's part of the generic mana, less the reductions (which may take off X,
+  // rulings), is paid with that type, as colored symbols (CR 601.2g-h). Not when mana of any type can be spent (CR 609.4b).
+  const onX = compileCard(d).spendOnlyOnX;
+  const xPaid = onX && !how.faceDown && !anyTypeNow ? Math.min(extra, Math.max(0, x * xCount(mana) - less)) : 0;
+  if (xPaid) return costAtLeast(s, { cost: { ...reducedCost, symbols: [...reducedCost.symbols, ...Array.from({ length: xPaid }, () => ({ kind: "colored" as const, color: onX! }))] }, extra: extra - xPaid });
+  return costAtLeast(s, { cost: reducedCost, extra });
 }
 
 /**
@@ -9920,7 +9926,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(costExiled.length ? { costExiled } : {}),
     ...(tappedKin.length ? { costTapped: tappedKin } : {}),
     ...(body.targets.some((t) => t.blockingEquipped) && o.attachedTo && s.objects[o.attachedTo] ? { hostThen: { id: o.attachedTo, zc: s.objects[o.attachedTo]!.zoneChanges ?? 0 } } : {}),
-    ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
+    ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)), station: true as const } } : {}),
     // "Tap an untapped creature you control: ... where X is the power of the creature tapped this way" (Keldon Battlewagon).
     ...(!ab.station && tappedOne !== undefined ? { stationed: { id: tappedOne, zc: obj(s, tappedOne).zoneChanges ?? 0, power: power(s, obj(s, tappedOne)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),

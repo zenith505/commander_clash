@@ -1235,6 +1235,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const snapItem = e.copyCountered ? s.stack.find((x) => x.id === t.id && x.kind === "spell") : undefined;
       const snapCard = snapItem?.objectId ? s.objects[snapItem.objectId] : undefined;
       const snap = snapItem && snapCard ? { item: structuredClone(snapItem), card: structuredClone(snapCard) } : undefined;
+      // Counterlash: "it" is the target spell, countered or not; its card types as it is on the stack now.
+      if (e.noteTypes && s.resolving) {
+        const item = s.stack.find((x) => x.id === t.id && x.kind === "spell");
+        const o = item?.objectId ? s.objects[item.objectId] : undefined;
+        s.resolving.counterTargetTypes = o ? [...characteristics(s, o).types] : [];
+      }
       const counteredBefore = s.resolving?.spellsCountered ?? 0;
       const done = counterOnStack(s, ctx, t.id, src, e.unless, toField ? "battlefield" : exileIt ? "exile" : e.librarySecond ? "librarySecond" : e.libraryChoice ? "libraryChoice" : e.top ? "libraryTop" : e.bottom ? "libraryBottom" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
       if (done === "paused") return done;

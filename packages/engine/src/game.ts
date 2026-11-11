@@ -41,6 +41,7 @@ import {
   type CardDef,
   type Color,
   type ContinuousEffect,
+  type DelayedTrigger,
   type AttackCostDue,
   type CostChoices,
   type ExtraTurn,
@@ -465,6 +466,10 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "endEffect":
       requireNoPending(s);
       endEffect(s, p, action.objectId);
+      break;
+    case "payDelayed":
+      requireNoPending(s);
+      payDelayed(s, p, action.id);
       break;
     case "ignoreEffect":
       requireNoPending(s);
@@ -6510,7 +6515,13 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // World): what that spell or ability targets now (rulings).
   for (const c of compileCard(d).costLessIfTargets ?? []) if (targetsFor(c.filter)) less += c.n;
   // Increases first, then reductions, which only take off generic mana (CR 601.2f, 118.7a).
-  return costAtLeast(s, { cost: reducedCost, extra: Math.max(0, total.extra + mods.more + more + flashbackMore + wayMore - less) });
+  const extra = Math.max(0, total.extra + mods.more + more + flashbackMore + wayMore - less);
+  // Drain Life: "Spend only black mana on X": X's part of the generic mana, less the reductions (which may take off X,
+  // rulings), is paid with that type, as colored symbols (CR 601.2g-h). Not when mana of any type can be spent (CR 609.4b).
+  const onX = compileCard(d).spendOnlyOnX;
+  const xPaid = onX && !how.faceDown && !anyTypeNow ? Math.min(extra, Math.max(0, x * xCount(mana) - less)) : 0;
+  if (xPaid) return costAtLeast(s, { cost: { ...reducedCost, symbols: [...reducedCost.symbols, ...Array.from({ length: xPaid }, () => ({ kind: "colored" as const, color: onX! }))] }, extra: extra - xPaid });
+  return costAtLeast(s, { cost: reducedCost, extra });
 }
 
 /**
@@ -9922,7 +9933,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(costExiled.length ? { costExiled } : {}),
     ...(tappedKin.length ? { costTapped: tappedKin } : {}),
     ...(body.targets.some((t) => t.blockingEquipped) && o.attachedTo && s.objects[o.attachedTo] ? { hostThen: { id: o.attachedTo, zc: s.objects[o.attachedTo]!.zoneChanges ?? 0 } } : {}),
-    ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
+    ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)), station: true as const } } : {}),
     // "Tap an untapped creature you control: ... where X is the power of the creature tapped this way" (Keldon Battlewagon).
     ...(!ab.station && tappedOne !== undefined ? { stationed: { id: tappedOne, zc: obj(s, tappedOne).zoneChanges ?? 0, power: power(s, obj(s, tappedOne)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
@@ -14294,6 +14305,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
   }
   for (const id of s.battlefield) for (const door of [0, 1]) if (unlockProblem(s, pid, id, door) === null) out.push({ type: "unlockDoor", player: pid, objectId: id, door });
   for (const id of s.battlefield) if (endEffectProblem(s, pid, id) === null) out.push({ type: "endEffect", player: pid, objectId: id });
+  for (const d of payableDelayed(s, pid)) if (payDelayedProblem(s, pid, d.unlessPaid!.id) === null) out.push({ type: "payDelayed", player: pid, id: d.unlessPaid!.id });
   for (const id of s.battlefield) if (!ignorableBy(s, pid, id)?.costs && ignoreEffectProblem(s, pid, id) === null) out.push({ type: "ignoreEffect", player: pid, objectId: id });
   // "You may play lands from your graveyard" (Crucible of Worlds).
   if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid))
@@ -14582,6 +14594,42 @@ export function endEffectProblem(s: GameState, pid: PlayerId, id: ObjectId): str
   if (s.priority !== pid || s.pending) return "you can end that effect only while you have priority";
   if (!canPayFromPool(s, pid, parseManaCost(e.endable!.cost), "other")) return `not enough mana to end ${e.sourceName}'s effect (${e.endable!.cost})`;
   return null;
+}
+
+/**
+ * The delayed triggers `pid` may still stop by paying (Nafs Asp: "unless they pay {1} before that draw step";
+ * DelayedTrigger.unlessPaid): theirs to pay, or for a planeswalker (Quenchable Fire) its controller's while it's still
+ * that permanent. None once the step has begun: the trigger has left `s.delayed` then.
+ */
+export function payableDelayed(s: GameState, pid: PlayerId): DelayedTrigger[] {
+  if (player(s, pid).lost) return [];
+  return (s.delayed ?? []).filter((d) => {
+    const u = d.unlessPaid;
+    if (!u) return false;
+    if (!u.subjectController) return u.player === pid;
+    const pw = s.objects[d.subject.id];
+    return !!pw && pw.zone === "battlefield" && (pw.zoneChanges ?? 0) === d.subject.zc && controllerOf(s, pw) === pid;
+  });
+}
+
+/** Why `pid` can't pay to stop that delayed trigger now, or null (with the mana in their pool): a special action any time they have priority (rulings). */
+export function payDelayedProblem(s: GameState, pid: PlayerId, id: number): string | null {
+  const d = payableDelayed(s, pid).find((x) => x.unlessPaid!.id === id);
+  if (!d) return "there's nothing of that kind for you to pay";
+  if (s.priority !== pid || s.pending) return "you can pay that only while you have priority";
+  if (!canPayFromPool(s, pid, parseManaCost(d.unlessPaid!.cost), "other")) return `not enough mana to pay ${d.unlessPaid!.cost} for ${d.unlessPaid!.source}`;
+  return null;
+}
+
+/** Pay it: that delayed trigger won't trigger (it's gone), and the player gets priority again (CR 116.3). */
+function payDelayed(s: GameState, p: Player, id: number) {
+  const problem = payDelayedProblem(s, p.id, id);
+  if (problem) throw new RulesError(problem);
+  const d = payableDelayed(s, p.id).find((x) => x.unlessPaid!.id === id)!;
+  spendFromPool(s, p.id, parseManaCost(d.unlessPaid!.cost), "other");
+  s.delayed = s.delayed!.filter((x) => x !== d);
+  log(s, `${p.name} pays ${d.unlessPaid!.cost} for ${d.unlessPaid!.source}: its delayed ability won't happen.`);
+  s.passedInSuccession = [];
 }
 
 /** Pay to end an effect (CR 116.2c), then get priority again (CR 116.3). */

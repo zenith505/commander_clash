@@ -6,7 +6,7 @@
 
 import type { Amount, AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "./abilities";
 import { ANY_COUNTER } from "./abilities";
-import { basePowerNow, defOf } from "./cards";
+import { abilitiesOf, basePowerNow, defOf } from "./cards";
 import { compileCard } from "./oracle";
 import { bindChosen, cardPT, isSuspended, objectMatches, printedMatches, ringBearer, spellManaValue, spellPT } from "./effects";
 import { characteristics, controllerOf, staticConditionNow, type Characteristics } from "./layers";
@@ -52,7 +52,7 @@ export interface AmountCtx {
   /** The cards the costs of the spell its permanent was discarded (Dralnu's Pet's kicker, GameObject.costDiscarded). */
   costDiscarded?: string[];
   /** A station ability's tapped creature (CR 702.184a). */
-  stationed?: { id: ObjectId; zc: number; power: number };
+  stationed?: { id: ObjectId; zc: number; power: number; /** Tapped for a station ability (CR 702.184a), for Tapestry Warden. */ station?: true };
   /** The creature type or color chosen ("for each creature of the chosen type"). */
   chosen?: Chosen;
   /** For a triggered ability, what its event was about ("that much"). */
@@ -598,7 +598,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "parleyRevealed":
       return (c.mv ? s.resolving?.parley?.mv : c.land ? s.resolving?.parley?.land : s.resolving?.parley?.nonland) ?? 0;
     case "damageThisWay":
-      return s.resolving?.damageThisWay ?? 0;
+      return (c.capped ? s.resolving?.damageCappedThisWay : s.resolving?.damageThisWay) ?? 0;
     case "excessThisWay":
       if (c.target !== undefined) {
         const t = s.resolving?.item.targets?.[c.target];
@@ -1002,9 +1002,18 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const st = ctx.stationed;
       const o = st && s.objects[st.id];
       if (!st) return 0;
-      if (o?.zone === "battlefield" && (o.zoneChanges ?? 0) === st.zc) return Math.max(0, characteristics(s, o).power);
+      // Tapestry Warden: "Each creature you control with toughness greater than its power stations permanents using its
+      // toughness rather than its power", while the station ability's controller controls one as it resolves; the creature
+      // is checked as it is then, or as it last existed (rulings). Only for station (CR 702.184a), nothing else's power.
+      const you = ctx.controller;
+      const warden = !!st.station && s.battlefield.some((id) => !!s.objects[id] && controllerOf(s, s.objects[id]!) === you && !!abilitiesOf(s, s.objects[id]!).stationByToughness);
+      if (o?.zone === "battlefield" && (o.zoneChanges ?? 0) === st.zc) {
+        const c = characteristics(s, o);
+        return Math.max(0, warden && controllerOf(s, o) === you && c.toughness > c.power ? c.toughness : c.power);
+      }
       // As it last existed on the battlefield (CR 608.2h), if that's recorded; else as it was tapped.
       const lk = s.lastKnown?.[st.id];
+      if (lk && lk.zc === st.zc && warden && lk.controller === you && lk.toughness > lk.power) return Math.max(0, lk.toughness);
       return Math.max(0, lk && lk.zc === st.zc ? lk.power : st.power);
     }
     case "beheldPower": {

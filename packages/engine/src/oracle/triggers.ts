@@ -1153,8 +1153,12 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   const parsedHue = parsedHue0 ?? (both?.kind === "spell" && !both.subtypes?.length ? { ...both, subtypes: [spellType![1]!], text: `${spellType![1]} instant or sorcery spell` } : null);
   // Umara Mystic: "an instant, sorcery, or Wizard spell": any one of them.
   const orKind = !parsed0 ? /^(non[a-z]+|[A-Z][a-z]+) or ([A-Z][a-z]+|non[a-z]+)(?: spell)?$/.exec(what) ?? /^(instant), (sorcery), or ([A-Z][a-z]+)(?: spell)?$/.exec(what) : null;
-  const sides = orKind ? orKind.slice(1).filter(Boolean).map((k) => parseTargetPhrase(`${k} spell`)) : [];
-  const parsed = parsedHue ? parsedHue : orKind && sides.every((x) => x?.kind === "spell" && !x.anyOf) ? { kind: "spell" as const, types: [], notTypes: [], notColors: [], anyOf: sides as TargetSpec[], text: `${orKind.slice(1).filter(Boolean).join(sides.length > 2 ? ", " : " or ").replace(/, ([^,]+)$/, ", or $1")} spell` } : parsed0;
+  // Brimaz, Blight of Oreskos: "a Phyrexian creature or artifact creature spell": either kind (TargetSpec.anyOf), a spell
+  // that's both triggering it once (rulings).
+  const orCreatures = !parsed0 && !orKind && !parsedHue ? /^((?:[A-Z][a-z]+|artifact|enchantment) creature) or ((?:[A-Z][a-z]+|artifact|enchantment) creature)(?: spell)?$/.exec(what) : null;
+  const sides = orKind ? orKind.slice(1).filter(Boolean).map((k) => parseTargetPhrase(`${k} spell`)) : orCreatures ? orCreatures.slice(1).map((k) => parseTargetPhrase(`${k} spell`)) : [];
+  const orAny = orKind ?? orCreatures;
+  const parsed = parsedHue ? parsedHue : orAny && sides.every((x) => x?.kind === "spell" && !x.anyOf) ? { kind: "spell" as const, types: [], notTypes: [], notColors: [], anyOf: sides as TargetSpec[], text: `${orAny.slice(1).filter(Boolean).join(sides.length > 2 ? ", " : " or ").replace(/, ([^,]+)$/, ", or $1")} spell` } : parsed0;
   if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
   const range = pw && (pw[4] ? { min: Number(pw[2]), max: Number(pw[4]) } : pw[3] === "greater" ? { min: Number(pw[2]) } : { max: Number(pw[2]) });
   const spell = range ? { ...parsed, [pw![1] as "power" | "toughness"]: range } : parsed;

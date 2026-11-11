@@ -1,7 +1,7 @@
 # Roadmap
 
-31,053 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,975 of 4,988 (99%), top 10,000: 9,830 of
+31,059 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,975 of 4,988 (99%), top 10,000: 9,831 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2398,6 +2398,29 @@ line blocks.
    They're 5/5 artifact creatures." (CR 708.2, a face-down instant or sorcery stays face down), with a browser test.
    +4, 30,978 of 31,936 with B173 through B176. Bots activate Sasaya only when the flip happens, cast The Master with an exile only when one of
    their creatures has an enters trigger worth copying, and put all of their hand onto the battlefield with Tezzeret.
+   Round 344 went on down the "Out after round N" lists, most played first: Brimaz, Blight of Oreskos ("a Phyrexian
+   creature or artifact creature spell" in a cast trigger, and "if a Phyrexian died under your control this turn", an
+   intervening if, CR 603.4); The Foretold Soldier's "Whenever this creature deals damage, exile it face down. It becomes
+   foretold." (the permanent itself, still the same object, CR 400.7; its owner casts it on a later turn for its
+   foretell cost, CR 702.143a, d; a token is just exiled); The Eagles Are Coming!'s "Choose target creature you own. If
+   this spell was kicked, instead choose any number of target creatures you own." (the targets the kicker allows, chosen
+   as it's cast, CR 702.33g, with a browser test) and "At the beginning of the next upkeep, create ... for each creature
+   returned to your hand this way" (any player's upkeep, the count fixed as it resolves, tokens too, rulings); Identity
+   Thief's "you may exile another target nontoken creature. If you do, ~ becomes a copy of that creature until end of
+   turn. Return the exiled card ... at the beginning of the next end step." (the copy of the creature as it last
+   existed, CR 608.2h, 707.2; no return for a commander that went to the command zone, CR 903.9a; with a browser
+   test); Bronzehide Lion's and Old-Growth Troll's "return it to the battlefield. It's an Aura enchantment with enchant
+   ... and \"...\"" (an Aura and nothing else from as it enters, CR 205.1a, 614.1c, with the enchant ability and the
+   granted text as layer 6 abilities, CR 613.1f; the host chosen as it enters, not targeted, CR 303.4f, and with no
+   legal host it stays in the graveyard, CR 303.4g, with a browser test for the host picker). The enchant ability is a
+   new layer 6 modification ("enchant", read by enchantOf for SBA 704.5m). +6, 31,059 of 31,936. Bots say yes to
+   Identity Thief only for an opponent's creature. Bot gap: bots don't cast The Eagles Are Coming! (returning their own
+   creatures is never worth it to them, even to save one).
+   Out after round 344 (looked at, not done): Harold and Bob, First Numens (its granted mana ability gives rad counters,
+   and "Harold and Bob loses all other abilities" as a separate sentence); Garth One-Eye (copies of cards named from
+   outside the game); Ob Nixilis, the Adversary (casualty X with a copy that "isn't legendary and has starting loyalty
+   X"); Reap ("up to X target cards ..., where X is the number of black permanents target opponent controls as you cast
+   this spell": a target count set by another target).
    Round 343 went on down the "Out after round N" lists, most played first, to casting a card as an instruction resolves
    "by paying [a cost] rather than paying its mana cost" (an alternative cost, CR 118.9, cast then or never, CR 608.2g;
    so no other alternative cost, X is 0, CR 107.3b, and additional costs such as kicker are still paid, rulings): The

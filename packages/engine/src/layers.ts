@@ -61,6 +61,7 @@ export function layerOf(m: Modification): Layer {
     case "loseActivated":
     case "loseStatic":
     case "enchantCreature":
+    case "enchant":
       return "6";
     case "definePT":
       return "7a";
@@ -235,6 +236,8 @@ export interface Characteristics {
   lostStatics?: string[];
   /** "Becomes an Aura enchantment with enchant creature" (a Licid): enchant creature from an effect (enchantOf). */
   enchantCreature?: true;
+  /** "It's an Aura enchantment with enchant creature you control" (Bronzehide Lion): an enchant ability from an effect (enchantOf). */
+  enchantSpec?: TargetSpec;
   /** Goaded (CR 701.15): not by an effect that only asks the same (Kardur, Maximum Carnage rulings). */
   goaded?: true;
   /** "Can't attack unless defending player controls ...": what the defending player has to control. */
@@ -1877,6 +1880,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "enchantCreature":
       c.enchantCreature = true;
       return;
+    case "enchant":
+      c.enchantSpec = m.spec;
+      return;
     case "addAbility":
       if (/^ward\b/i.test(m.text)) delete c.wardLost;
       // An ability that names the permanent giving it ("Sacrifice Blazing Torch"): bound to that object (grants.ts).
@@ -2238,7 +2244,7 @@ function readsKeywords(e: Inst): boolean {
  * give or take abilities (CR 613.8a).
  */
 const readsAbilities = (e: Inst) => e.affects?.kind === "filter" && !!e.affects.spec?.noAbilities;
-const GIVES_ABILITIES = new Set<Modification["kind"]>(["addAbility", "enchantCreature", "cantHaveKeywords"]);
+const GIVES_ABILITIES = new Set<Modification["kind"]>(["addAbility", "enchantCreature", "enchant", "cantHaveKeywords"]);
 
 function signature(s: GameState, e: Inst, chars: CharMap): string {
   if (!exists(s, e, chars)) return "gone";

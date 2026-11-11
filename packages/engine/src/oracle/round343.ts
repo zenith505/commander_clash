@@ -4,6 +4,7 @@ import type { CastPay, Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseObject } from "./targets";
 import { capital } from "./words";
+import { round344Sentence } from "./round344";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -22,7 +23,9 @@ export function parseCastPay(text: string): CastPay | null {
 }
 
 export function round343Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void effects;
+  // Round 344's sentences first (oracle/round344.ts).
+  const r344 = round344Sentence(s, sentences, si, ctx, effects);
+  if (r344 !== null) return r344;
   const line = plain(s);
   if (ctx.spell) return null;
   // Amped Raptor: "Then if you cast it from your hand, exile cards from the top of your library until you exile a nonland

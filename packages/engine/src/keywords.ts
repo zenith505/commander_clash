@@ -282,6 +282,11 @@ export const LINKED_TYPES_PROTECTION = "Protection from each of the exiled card'
  * has that keyword itself, as the layers apply it.
  */
 export const LINKED_CARD_KEYWORD = "As long as a card exiled with it has it: ";
+/**
+ * Soulflayer: "If a creature card with flying was exiled with ~'s delve ability, ~ has flying. The same is true for ...":
+ * as LINKED_CARD_KEYWORD, but only a creature card among those its delve exiled counts (CR 607.2q).
+ */
+export const LINKED_CREATURE_CARD_KEYWORD = "If a creature card exiled with it has it: ";
 /** "Protection from creatures" and the like for each of these card types (CR 205.2a, 702.16a). */
 export function protectionFromCardTypes(types: readonly string[]): string[] {
   return Object.entries(PROTECTION_TYPES).filter(([, t]) => types.includes(t)).map(([q]) => `Protection from ${q}`);

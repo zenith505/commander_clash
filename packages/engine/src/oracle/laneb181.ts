@@ -5,6 +5,7 @@ import { LAND_TYPES } from "../keywords";
 import { isGroup } from "./words";
 import { parseObject } from "./targets";
 import { parseSearchFilter } from "./search";
+import { roundB182Sentence } from "./laneb182";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -43,5 +44,5 @@ export function roundB181Sentence(s: string, sentences: string[], si: number, ct
     const search = (zone: "hand" | "battlefield"): Effect => ({ type: "search", filter, n, upTo: true, reveal: true, dest: { zone }, orGraveyard: true });
     return { effect: { type: "if", cond: { kind: "kicked" }, effects: [search("battlefield")], otherwise: [search("hand")] }, next: si + 3 };
   }
-  return null;
+  return roundB182Sentence(s, sentences, si, ctx, effects);
 }

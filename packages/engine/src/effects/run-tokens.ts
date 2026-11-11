@@ -20,7 +20,7 @@ import { manaValue, parseManaCost } from "../mana";
  */
 /** How many token copies of `base` one copy becomes for `pid` (token doublers, CR 614.1a), the first batch. */
 export function tokenCopyBatch(s: GameState, pid: PlayerId, base: CardDef): number {
-  return tokenBatch(s, pid, s.cards[tokenCopyKey(s, base).key]!, 1).same;
+  return tokenBatch(s, pid, s.cards[tokenCopyKey(s, base).key]!, 1, true).same;
 }
 
 export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId; /** What each of the first ones attacks, as chosen (attackChoices). */ attackAt?: { player: PlayerId; planeswalker?: ObjectId }[]; /** An Aura copy: what it enchants as it enters (auraCopyHost), none if nothing it could. */ auraHost?: AuraHost | null; embalmed?: true } = {}) {
@@ -53,7 +53,7 @@ export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: numbe
       s.resolving?.created?.push(o.id);
       noteCreated(s, pid, o);
     }
-    createExtraTokens(s, pid, extra, { tapped: opts.tapped || opts.attacking, attacking: defender });
+    createExtraTokens(s, pid, extra, { tapped: opts.tapped || opts.attacking, attacking: defender }, opts.attackAt?.slice(k));
   });
   if (made) log(s, `${player(s, pid).name} creates ${made === 1 ? "a token that's a copy" : `${made} tokens that are copies`} of ${base.name}${opts.auraHost ? ` attached to ${auraHostName(s, opts.auraHost)}` : ""}.`);
   else if (k) log(s, `${player(s, pid).name} can't create a token copy of ${base.name}: there's nothing it could enchant.`);
@@ -338,7 +338,7 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (e.attackingEach && e.orPlaneswalker && inCombat(s) && s.activePlayer === ctx.controller) {
         const sc = (s.resolving!.scratch ??= {});
         const picks = (sc.attackEach ??= {});
-        const k = tokenBatch(s, ctx.controller, e.token, n).same;
+        const k = tokenBatch(s, ctx.controller, e.token, n, true).same;
         for (const opp of apnap(s, opponents(s, ctx.controller))) {
           const options = attackChoices(s, ctx.controller, ctx.sourceId).filter((a) => a.player === opp);
           if (options.length < 2) continue;
@@ -360,7 +360,7 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const who = players(s, e.who, ctx);
         const choices = who.length === 1 ? attackChoices(s, who[0]!, ctx.sourceId) : [];
         if (choices.length > 1) {
-          const k = tokenBatch(s, who[0]!, e.token, n).same;
+          const k = tokenBatch(s, who[0]!, e.token, n, true).same;
           const sc = (s.resolving!.scratch ??= {});
           const picks = [...(sc.attackPicks ?? [])];
           if (sc.attackWhom !== undefined) takeAttackWhom(sc, picks, k);
@@ -489,7 +489,7 @@ function createTokensFor(s: GameState, e00: Extract<Effect, { type: "createToken
     // Another player's tokens (Gluntch's "choose a third player to create two Treasure tokens"): they create them.
     const maker = pid === ctx.controller ? src : player(s, pid).name;
     if (k) log(s, `${maker} creates ${k === 1 ? "a" : k}${tapped ? " tapped" : ""}${defender !== undefined ? `${tapped ? " and" : ""} attacking` : ""}${blocking && blocking.attacking !== undefined ? ` blocking ${defOf(s, blocking).name}` : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${whom.size && livingPlayers(s).length > 2 ? ` (attacking ${[...whom].join(" and ")})` : ""}${pid === ctx.controller ? "" : ` (${src})`}.`);
-    createExtraTokens(s, pid, extra, opts);
+    createExtraTokens(s, pid, extra, opts, attackAt?.slice(k));
   }
 }
 
@@ -579,11 +579,54 @@ export function createToken(s: GameState, pid: PlayerId, t0: TokenSpec, opts: { 
  * the same time. Anything else the effect says about its tokens (tapped, attacking, with counters, "exile it at end of
  * combat") applies to these too (rulings on Peregrin Took and Chatterfang).
  */
-export function createExtraTokens(s: GameState, pid: PlayerId, extra: TokenBatch["extra"], opts: { tapped?: boolean; attacking?: PlayerId; counters?: Record<string, number>; blocking?: GameObject } = {}) {
-  for (const { token, n } of extra) {
-    for (let i = 0; i < n; i++) createToken(s, pid, token, opts);
-    log(s, `${player(s, pid).name} also creates ${n === 1 ? "a" : n}${opts.tapped ? " tapped" : ""} ${token.power !== undefined ? `${token.power}/${token.toughness} ` : ""}${token.name} token${n > 1 ? "s" : ""}.`);
+export function createExtraTokens(s: GameState, pid: PlayerId, extra: TokenBatch["extra"], opts: { tapped?: boolean; attacking?: PlayerId; counters?: Record<string, number>; blocking?: GameObject } = {}, /** What each of the first ones attacks, as chosen for the tokens they replace (attackChoices). */ attackAt?: { player: PlayerId; planeswalker?: ObjectId }[]) {
+  let at = 0;
+  const attackFor = (o: GameObject) => {
+    const a = attackAt?.[at++];
+    if (!a || o.zone !== "battlefield" || o.attacking === undefined) return;
+    o.attacking = a.player;
+    const pw = a.planeswalker !== undefined ? s.objects[a.planeswalker] : undefined;
+    if (pw?.zone === "battlefield") o.attackingPermanent = { id: pw.id, zc: pw.zoneChanges ?? 0 };
+  };
+  for (const x of extra) {
+    if (x.copyOf !== undefined) {
+      for (const o of copiesInstead(s, pid, x.copyOf, x.n, opts)) attackFor(o);
+      continue;
+    }
+    const { token, n } = x;
+    for (let i = 0; i < n; i++) attackFor(createToken(s, pid, token, opts));
+    log(s, `${player(s, pid).name} ${x.instead ? "" : "also "}creates ${n === 1 ? "a" : n}${opts.tapped ? " tapped" : ""} ${token.power !== undefined ? `${token.power}/${token.toughness} ` : ""}${token.name} token${n > 1 ? "s" : ""}${x.instead ? " instead" : ""}.`);
   }
+}
+
+/**
+ * Esix, Mirrormind Crown: `n` tokens that are copies of this permanent as it is now (CR 707.2: a token is copied as the
+ * effect that made it said, a copy as what it copies, X is 0, rulings), instead of the tokens an effect would create.
+ * What the effect says about how they enter (tapped, attacking, with counters) still applies to them (rulings).
+ */
+function copiesInstead(s: GameState, pid: PlayerId, of: ObjectId, n: number, opts: { tapped?: boolean; attacking?: PlayerId; counters?: Record<string, number>; blocking?: GameObject }): GameObject[] {
+  const src = s.objects[of];
+  if (!src || n <= 0) return [];
+  const base = copiableDef(s, src);
+  const { key, face } = tokenCopyKey(s, base);
+  const made: GameObject[] = [];
+  for (let i = 0; i < n; i++) {
+    const o = newObject(s, s.cards[key]!, pid, "exile");
+    o.isToken = true;
+    moveObject(s, o.id, "battlefield", { ...(opts.tapped ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}), ...(opts.counters ? { counters: opts.counters } : {}) });
+    if (opts.attacking !== undefined && o.zone === "battlefield" && objIsType(s, o, "Creature")) o.attacking = opts.attacking;
+    const at = opts.blocking;
+    if (at && o.zone === "battlefield" && at.zone === "battlefield" && at.attacking !== undefined && objIsType(s, o, "Creature")) {
+      o.blocking = [at.id];
+      (at.blockedBy ??= []).push(o.id);
+      at.becameBlockedTurn = s.turn;
+    }
+    s.resolving?.created?.push(o.id);
+    noteCreated(s, pid, o);
+    made.push(o);
+  }
+  log(s, `${player(s, pid).name} creates ${n === 1 ? "a token that's a copy" : `${n} tokens that are copies`} of ${base.name} instead.`);
+  return made;
 }
 
 /** A token `pid` created (CR 111.2), for "the number of Treasure tokens you created this turn". */

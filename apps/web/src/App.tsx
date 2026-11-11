@@ -447,7 +447,7 @@ type CastDraft = {
  * spell (its optional additional cost, or Conspiracy Unraveler's alternative cost), or activate an ability.
  */
 /** "Remove three counters from among ... you control" (Tekuthal): which counters, as the ability is activated. */
-type CounterPick = { label: string; what: string; n: number; candidates: { id: string; kind: string; n: number }[] } & ({ activate: ActivateDraft; draft?: undefined } | { draft: CastDraft; activate?: undefined });
+type CounterPick = { label: string; what: string; n: number; candidates: { id: string; kind: string; n: number }[]; single?: boolean } & ({ activate: ActivateDraft; draft?: undefined } | { draft: CastDraft; activate?: undefined });
 type EvidencePick = { label: string; n: number; candidates: string[]; optional: boolean; /** The Capitoline Triad: its own words, not collecting evidence. */ title?: string } & ({ draft: CastDraft; key: "evidence" | "collect"; activate?: undefined } | { activate: ActivateDraft; draft?: undefined; key?: undefined });
 
 /** Choosing how to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
@@ -821,7 +821,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       // "Exile one or more ...": X can't be 0 (Corpseweft), so 0 is never what we ask about.
       const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, Math.max(n, ab.xMin ?? 0)));
       // "Tap X untapped Knights you control" (Aryel): the noun before "you control" in the plural.
-      const extra = [...(ab.energyX ? ["pay X energy"] : []), ...(ab.removeCounters?.x ? [`remove X ${ab.removeCounters.counter} counters`] : []), ...(ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [c.kind === "removeCounters" ? `remove X ${c.counter ?? ""} counters from among ${c.filter.text}`.replace(/  +/g, " ") : `${c.kind === "sacrifice" ? "sacrifice" : c.kind === "exileFromGraveyard" ? "exile" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : c.kind === "tap" ? c.filter.text.replace(/(\w)( you control)$/, "$1s$2") : c.kind === "reveal" ? `${plural(c.filter.text)} from your hand` : c.kind === "exileFromGraveyard" ? `${plural(c.filter?.text ?? "card")} from your graveyard` : ""}`.trim()] : []))].join(" and ");
+      const extra = [...(ab.energyX ? ["pay X energy"] : []), ...(ab.removeCounters?.x ? [`remove X ${ab.removeCounters.counter} counters`] : []), ...(ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [c.kind === "removeCounters" ? `remove X ${c.counter ?? ""} counters ${c.one ? "from" : "from among"} ${c.filter.text}`.replace(/  +/g, " ") : `${c.kind === "sacrifice" ? "sacrifice" : c.kind === "exileFromGraveyard" ? "exile" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : c.kind === "tap" ? c.filter.text.replace(/(\w)( you control)$/, "$1s$2") : c.kind === "reveal" ? `${plural(c.filter.text)} from your hand` : c.kind === "exileFromGraveyard" ? `${plural(c.filter?.text ?? "card")} from your graveyard` : ""}`.trim()] : []))].join(" and ");
       return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: Math.min(max, Math.max(ab.xMin ?? 0, 1)), modes, extra, ...(ab.xMin ? { min: ab.xMin } : {}) });
     }
     // −X loyalty abilities: X loyalty counters, up to how many it has (CR 606.6).
@@ -870,7 +870,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (c.kind === "removeCounters") {
         // "Remove three counters from among other artifacts, creatures, and planeswalkers you control": pick them (CR 602.2b).
         if (d.counters !== undefined) continue;
-        return setCounterPick({ activate: d, label: cardOf(s, d.objectId).name, what: `remove ${c.n} ${counterCostKinds(c)}counter${c.n === 1 ? "" : "s"} ${c.self ? "from it" : `from among ${c.filter.text}`}`, n: c.n, candidates: counterCostCandidates(s, HUMAN, s.objects[d.objectId]!, c) });
+        // Moxite Refinery: all of them from one permanent (`single`).
+        return setCounterPick({ activate: d, label: cardOf(s, d.objectId).name, what: `remove ${c.n} ${counterCostKinds(c)}counter${c.n === 1 ? "" : "s"} ${c.self ? "from it" : c.one ? `from ${c.filter.text}` : `from among ${c.filter.text}`}`, n: c.n, candidates: counterCostCandidates(s, HUMAN, s.objects[d.objectId]!, c), ...(c.one ? { single: true } : {}) });
       }
       if (c.kind === "putCounter") {
         // "Put a -1/-1 counter on a creature you control" (Hatchet Bully): click the creature (CR 602.2b).
@@ -2141,6 +2142,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               title={`${counterPick.label}: ${counterPick.what}`}
               n={counterPick.n}
               candidates={counterPick.candidates}
+              single={!!counterPick.single}
               onHover={setHover}
               onDone={(counters) => {
                 setCounterPick(null);
@@ -2907,7 +2909,7 @@ function DistributeChoice({
     <div className="controls">
       <span>
         <strong>{pending.source}:</strong>{" "}
-        {pending.remove && pending.exact ? `remove ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from among ${pending.what} (${left} left)` : pending.remove ? `remove up to ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from among ${pending.what}, if you want (${left} left)` : pending.move ? `move up to ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from it onto ${pending.what}, if you want (${left} left)` : `distribute ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} among any number of ${pending.what} (${left} left)`}
+        {pending.remove && pending.exact ? `remove ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from among ${pending.what} (${left} left)` : pending.remove ? `remove up to ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from among ${pending.what}, if you want (${left} left)` : pending.move ? `move up to ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from it onto ${pending.what}, if you want (${left} left)` : pending.upTo ? `distribute up to ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} among any number of ${pending.what}, if you want (${left} left)` : `distribute ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} among any number of ${pending.what} (${left} left)`}
       </span>
       {pending.options.map((id) => {
         const n = parts[id] ?? 0;
@@ -2926,7 +2928,7 @@ function DistributeChoice({
           </span>
         );
       })}
-      <button disabled={(pending.move || pending.remove) && !pending.exact ? left < 0 : left !== 0} onClick={() => dispatch([{ type: "distribute", player: HUMAN, parts }])}>
+      <button disabled={(pending.move || pending.remove || pending.upTo) && !pending.exact ? left < 0 : left !== 0} onClick={() => dispatch([{ type: "distribute", player: HUMAN, parts }])}>
         Done
       </button>
     </div>
@@ -2939,6 +2941,7 @@ function CounterChoice({
   title,
   n,
   candidates,
+  single,
   onHover,
   onDone,
   onCancel,
@@ -2947,12 +2950,16 @@ function CounterChoice({
   title: string;
   n: number;
   candidates: { id: string; kind: string; n: number }[];
+  /** Moxite Refinery: every counter from the same permanent, so the others can't be picked once one is. */
+  single?: boolean;
   onHover: (d: CardDef | null) => void;
   onDone: (counters: { id: string; kind: string }[]) => void;
   onCancel: () => void;
 }) {
   const [taken, setTaken] = useState<number[]>(() => candidates.map(() => 0));
   const total = taken.reduce((a, b) => a + b, 0);
+  const usedId = single ? candidates.find((_, i) => taken[i]! > 0)?.id : undefined;
+  const blocked = (i: number) => usedId !== undefined && candidates[i]!.id !== usedId;
   const set = (i: number, v: number) => setTaken(taken.map((t, j) => (j === i ? v : t)));
   return (
     <div className="modal-backdrop">
@@ -2975,7 +2982,7 @@ function CounterChoice({
             const d = cardOf(s, c.id);
             return (
               <div key={`${c.id}:${c.kind}`} className="counter-row" data-counter={`${c.id}:${c.kind}`}>
-                <div className={`card big ${taken[i] ? "selected" : "targetable"}`} onClick={() => set(i, taken[i]! < c.n && total < n ? taken[i]! + 1 : 0)} {...hoverProps(d, onHover)}>
+                <div className={`card big ${taken[i] ? "selected" : blocked(i) ? "" : "targetable"}`} onClick={() => !blocked(i) && set(i, taken[i]! < c.n && total < n ? taken[i]! + 1 : 0)} {...hoverProps(d, onHover)}>
                   <CardFace d={d} />
                 </div>
                 <span>
@@ -2985,7 +2992,7 @@ function CounterChoice({
                   <strong>
                     {taken[i]} / {c.n} {c.kind}
                   </strong>
-                  <button className="ghost" disabled={taken[i]! >= c.n || total >= n} onClick={() => set(i, taken[i]! + 1)}>
+                  <button className="ghost" disabled={taken[i]! >= c.n || total >= n || blocked(i)} onClick={() => set(i, taken[i]! + 1)}>
                     +
                   </button>
                 </span>
@@ -5428,7 +5435,7 @@ function Controls({
       </div>
     );
   if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "bid" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy" || pending.what === "evidenceX" || pending.what === "payLifeRound") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "faceUpForm" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "chosenObject" || pending.what === "anchor" || pending.what === "playerWord" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "unlessWay" || pending.what === "payWhich" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "addOrRemoveCounter" || pending.what === "bribeCounter" || pending.what === "eitherToken" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser" || pending.what === "modeChooser" || pending.what === "direction" || pending.what === "skipChoice" || pending.what === "payLifeOrDestroy" || pending.what === "nextTarget" || pending.what === "loseReplacement" || pending.what === "copyTargetFor" || ((pending.what === "textFrom" || pending.what === "textTo" || pending.what === "typeOrder") && pending.options.length <= 10)) && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "faceUpForm" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "chosenObject" || pending.what === "anchor" || pending.what === "playerWord" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "unlessWay" || pending.what === "payWhich" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "addOrRemoveCounter" || pending.what === "bribeCounter" || pending.what === "eitherToken" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser" || pending.what === "modeChooser" || pending.what === "direction" || pending.what === "skipChoice" || pending.what === "payLifeOrDestroy" || pending.what === "nextTarget" || pending.what === "loseReplacement" || pending.what === "copyTargetFor" || pending.what === "defendingPlayer" || pending.what === "tokenInstead" || ((pending.what === "textFrom" || pending.what === "textTo" || pending.what === "typeOrder") && pending.options.length <= 10)) && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>
@@ -5554,7 +5561,7 @@ function Controls({
           ) : null}
         </span>
         <button disabled={!ok} onClick={() => dispatch([...(payTaps ?? []), { type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.payEach && pending.action === "copyFor" ? (n ? `Pay ${pending.payEach.repeat(n)} and copy ${n}` : "Copy none") : pending.payEach ? (n ? `Pay ${pending.payEach.repeat(n)} and untap ${n}` : "Untap none") : pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "untapLimited" ? `Untap ${n}` : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "damageCreature" ? (n ? "Damage that creature" : "Damage the player") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.action === "discard" ? (n ? `Discard ${n}` : "Discard none") : pending.action === "pile" ? `First pile: ${n}, second pile: ${pending.count - n}` : pending.action === "flicker" ? (n ? `Exile and return ${n}` : "Exile none") : pending.prompt && pending.action === "counters" ? (n ? "Put counters" : "Put none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : pending.action === "choose" ? "Choose none" : pending.action === "bounce" ? "Return none" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "exile" ? "Exile" : pending.action === "libraryTop" ? "Put on top" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
+          {pending.payEach && pending.action === "copyFor" ? (n ? `Pay ${pending.payEach.repeat(n)} and copy ${n}` : "Copy none") : pending.payEach ? (n ? `Pay ${pending.payEach.repeat(n)} and untap ${n}` : "Untap none") : pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "untapLimited" ? `Untap ${n}` : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "damageCreature" ? (n ? "Damage that creature" : "Damage the player") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.action === "discard" ? (n ? `Discard ${n}` : "Discard none") : pending.action === "pile" ? `First pile: ${n}, second pile: ${pending.count - n}` : pending.action === "flicker" ? (n ? `Exile and return ${n}` : "Exile none") : pending.prompt && pending.action === "counters" ? (n ? "Put counters" : "Put none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : pending.action === "choose" ? "Choose none" : pending.action === "bounce" ? "Return none" : pending.action === "exile" ? "Exile none" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "exile" ? "Exile" : pending.action === "libraryTop" ? "Put on top" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
         </button>
       </div>
     );

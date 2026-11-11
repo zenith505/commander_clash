@@ -165,7 +165,134 @@ type TokenKind = Pick<TokenSpec, "types" | "subtypes">;
 /** What an effect creating tokens really creates: `same` of its own token, and `extra` other tokens replacements add. */
 export interface TokenBatch {
   same: number;
-  extra: { token: TokenSpec; n: number }[];
+  /** `copyOf`: tokens that are copies of that permanent instead (Esix, Mirrormind Crown; createExtraTokens). */
+  extra: ({ token: TokenSpec; n: number; copyOf?: undefined; /** Created instead of all the others (Jinnie Fay). */ instead?: true } | { copyOf: ObjectId; n: number; token?: undefined })[];
+}
+
+/** A question about an optional token replacement (CountMod mayInstead): what `player` creates instead, if anything. */
+export interface TokenQuestion {
+  player: PlayerId;
+  source: string;
+  prompt: string;
+  /** "none", then the index of each replacement result. */
+  options: string[];
+  labels: string[];
+  /** The option a bot picks (tokenInsteadPick). */
+  botChoice: string;
+}
+
+/**
+ * The players' answers to the token replacement questions met while a resolving spell or ability runs one instruction
+ * (resolve.ts runAsking, like the damage shields' in damage.ts): the instruction runs again from its start once each
+ * answer is in, `used` of them taken so far. Null elsewhere: the choice is made the way a bot makes it.
+ */
+let tokenAnswers: { answers: string[]; used: number; ask?: TokenQuestion } | null = null;
+
+/** Thrown out of a resolving instruction that needs a player's answer about a token replacement (CR 616.1). */
+export class TokenQuestionPause extends Error {}
+
+/** Run `fn` with these answers for the token replacement questions; null runs it without asking. */
+export function withTokenAnswers<T>(answers: string[] | null, fn: (asked: () => TokenQuestion | undefined) => T): T {
+  const outer = tokenAnswers;
+  const mine: typeof tokenAnswers = answers ? { answers, used: 0 } : null;
+  tokenAnswers = mine;
+  try {
+    return fn(() => mine?.ask);
+  } finally {
+    tokenAnswers = outer;
+  }
+}
+
+/** The optional token replacements on the battlefield (CountMod mayInstead), with their sources. */
+function mayInsteads(s: GameState): { mod: Extract<CountMod, { op: "mayInstead" }>; o: GameObject; controller: PlayerId }[] {
+  const out: { mod: Extract<CountMod, { op: "mayInstead" }>; o: GameObject; controller: PlayerId }[] = [];
+  for (const id of s.battlefield) {
+    const o = s.objects[id]!;
+    for (const mod of abilitiesOf(s, o).countMods ?? []) if (mod.what === "tokens" && mod.op === "mayInstead") out.push({ mod, o, controller: controllerOf(s, o) });
+  }
+  return out;
+}
+
+/** Could a token creation now meet an optional replacement (so a resolving instruction must be able to stop and ask)? */
+export function tokenChoicesPossible(s: GameState): boolean {
+  const had = s.turnLog?.tokenEvents ?? [];
+  return mayInsteads(s).some(({ mod, controller }) => !mod.first || !had.includes(controller));
+}
+
+/** What a token or a copy of a permanent is worth to a bot, roughly (tokenInsteadPick). */
+function tokenWorth(s: GameState, pid: PlayerId, x: { token: TokenSpec } | { copyOf: ObjectId }, n: number): number {
+  if ("token" in x) {
+    const t = x.token;
+    // A card a token copy is made of has its power and toughness as text.
+    const one = t.types.includes("Creature") ? (Number(t.power) || 0) + (Number(t.toughness) || 0) + (t.keywords?.length ?? 0) + (t.abilities ? 1 : 0) : 2;
+    return one * n;
+  }
+  const o = s.objects[x.copyOf]!;
+  const c = characteristics(s, o);
+  const d = o.isToken ? undefined : s.cards[o.cardId];
+  const one = Math.max(c.types.includes("Creature") ? (Number(c.power) || 0) + (Number(c.toughness) || 0) : 0, 2 * (d?.cmc ?? 1));
+  // Only one of a legendary permanent's copies stays (CR 704.5j), none if it already has one by that name.
+  if (c.supertypes.includes("Legendary")) return s.battlefield.some((id) => id !== o.id && controllerOf(s, s.objects[id]!) === pid && characteristics(s, s.objects[id]!).name === c.name) || controllerOf(s, o) === pid ? 0 : one;
+  return one * n;
+}
+
+const COLOR_WORD: Record<string, string> = { W: "white", U: "blue", B: "black", R: "red", G: "green" };
+const tokenWords = (t: TokenSpec) => `${t.power !== undefined ? `${t.power}/${t.toughness} ` : ""}${t.colors.length ? `${t.colors.map((c) => COLOR_WORD[c]).join(" and ")} ` : ""}${t.name}${t.types.includes("Creature") && t.power !== undefined ? " creature" : ""}`;
+
+/**
+ * The optional replacements of `pid` creating these tokens now (CountMod mayInstead), asked once for the whole event
+ * after the replacements that change how many are created (so "that many" is all of them), each option one of them
+ * applied. `first`: whether this is the first time `pid` would create tokens this turn. Each applies once to the event
+ * (CR 616.1), and the "first time" ones are used up whether or not they apply (rulings on Moonlit Meditation and Esix).
+ */
+function applyMayInstead(s: GameState, pid: PlayerId, entries: { kind: TokenKind; spec?: TokenSpec; n: number }[], first: boolean): TokenBatch | undefined {
+  const total = entries.reduce((a, e) => a + e.n, 0);
+  if (total <= 0) return undefined;
+  type Result = { token: TokenSpec } | { copyOf: ObjectId };
+  const results: { label: string; result: Result; source: string }[] = [];
+  const pl = total === 1 ? "" : "s";
+  for (const { mod, o, controller } of mayInsteads(s)) {
+    if (controller !== pid) continue;
+    if (mod.first && (!first || (mod.first === "yourTurn" && s.activePlayer !== pid))) continue;
+    const name = characteristics(s, o).name;
+    for (const t of mod.tokens ?? []) results.push({ label: `${total} ${tokenWords(t)} token${pl}${t.keywords.length ? ` with ${t.keywords.join(", ").toLowerCase()}` : ""}`, result: { token: t }, source: name });
+    if (mod.copy === "host") {
+      const host = o.attachedTo !== undefined ? s.objects[o.attachedTo] : undefined;
+      if (host?.zone === "battlefield" && (!mod.hostCreature || characteristics(s, host).types.includes("Creature"))) results.push({ label: `${total} token${pl} that ${total === 1 ? "is a copy" : "are copies"} of ${characteristics(s, host).name}`, result: { copyOf: host.id }, source: name });
+    }
+    if (mod.copy === "chosen")
+      for (const id of s.battlefield) {
+        const c = s.objects[id]!;
+        if (c.id === o.id || !characteristics(s, c).types.includes("Creature")) continue;
+        const whose = controllerOf(s, c) === pid ? "" : ` (${s.players[controllerOf(s, c)]!.name}'s)`;
+        results.push({ label: `${total} token${pl} that ${total === 1 ? "is a copy" : "are copies"} of ${characteristics(s, c).name}${whose}`, result: { copyOf: c.id }, source: name });
+      }
+  }
+  if (!results.length) return undefined;
+  const what = entries.filter((e) => e.n > 0).map((e) => `${e.n} ${"name" in e.kind && typeof e.kind.name === "string" ? e.kind.name.replace(/ Token$/, "") : "other"} token${e.n === 1 ? "" : "s"}`).join(" and ");
+  const sources = [...new Set(results.map((r) => r.source))];
+  const original = entries.reduce((a, e) => a + (e.n > 0 ? tokenWorth(s, pid, { token: e.spec ?? (e.kind as TokenSpec) }, e.n) : 0), 0);
+  const worths = results.map((r) => tokenWorth(s, pid, r.result, total));
+  const best = worths.reduce((b, w, i) => (w > (b < 0 ? original : worths[b]!) ? i : b), -1);
+  const q: TokenQuestion = {
+    player: pid,
+    source: sources.join(" and "),
+    prompt: `you would create ${what}. Create ${total === 1 ? "another token" : "other tokens"} instead?`,
+    options: ["none", ...results.map((_, i) => String(i))],
+    labels: [`No, create the ${what}`, ...results.map((r) => `Create ${r.label}`)],
+    botChoice: best < 0 ? "none" : String(best),
+  };
+  let pick: string;
+  const ask = tokenAnswers;
+  if (!ask) pick = q.botChoice;
+  else if (ask.used < ask.answers.length) pick = ask.answers[ask.used++]!;
+  else {
+    ask.ask = q;
+    throw new TokenQuestionPause(q.prompt);
+  }
+  if (pick === "none" || !q.options.includes(pick)) return undefined;
+  const chosen = results[Number(pick)]!;
+  return { same: 0, extra: ["token" in chosen.result ? { token: chosen.result.token, n: total, instead: true as const } : { copyOf: chosen.result.copyOf, n: total }] };
 }
 
 /**
@@ -175,9 +302,18 @@ export interface TokenBatch {
  * each (two Manufactors make three of each, rulings), then a token for each token (Chatterfang), then the doublers, then
  * Divine Visitation's Angels.
  */
-export function tokenBatch(s: GameState, pid: PlayerId, token: TokenKind, n: number): TokenBatch {
-  const mods = modsInPlay(s).flatMap(({ mod, controller }) => (mod.what === "tokens" && (mod.who === "any" || controller === pid) ? [mod] : []));
-  if (n <= 0 || !mods.length) return { same: n, extra: [] };
+export function tokenBatch(s: GameState, pid: PlayerId, token: TokenKind, n: number, /** Only how many: not the event itself (no optional replacement is asked about or used up). */ probe = false): TokenBatch {
+  // "The first time you would create one or more tokens each turn" (Moonlit Meditation): every such event counts, whether
+  // or not something replaced it (rulings).
+  let first = false;
+  if (!probe && n > 0) {
+    const had = ((s.turnLog ??= {}).tokenEvents ??= []);
+    first = !had.includes(pid);
+    if (first) had.push(pid);
+  }
+  const mods = modsInPlay(s).flatMap(({ mod, controller }) => (mod.what === "tokens" && mod.op !== "mayInstead" && (mod.who === "any" || controller === pid) ? [mod] : []));
+  if (n <= 0) return { same: n, extra: [] };
+  if (!mods.length) return (!probe && applyMayInstead(s, pid, [{ kind: token, n }], first)) || { same: n, extra: [] };
   // The original token is the entry with no `spec`.
   const entries: { kind: TokenKind; spec?: TokenSpec; n: number }[] = [{ kind: token, n }];
   const fits = (k: TokenKind, mod: CountMod) => (!("subtype" in mod) || !mod.subtype || k.subtypes.includes(mod.subtype)) && (!("type" in mod) || !mod.type || k.types.includes(mod.type));
@@ -235,12 +371,15 @@ export function tokenBatch(s: GameState, pid: PlayerId, token: TokenKind, n: num
       changed = true;
     }
   }
+  // Jinnie Fay, Esix: optional, chosen last, for all of them (see applyMayInstead).
+  const instead = !probe && applyMayInstead(s, pid, entries, first);
+  if (instead) return instead;
   return { same: entries[0]!.n, extra: entries.slice(1).flatMap((e) => (e.n > 0 ? [{ token: e.spec!, n: e.n }] : [])) };
 }
 
 /** How many of this token `pid` really creates when an effect would create `n` (without any other tokens added). */
 export function tokensToCreate(s: GameState, pid: PlayerId, token: TokenKind, n: number): number {
-  return tokenBatch(s, pid, token, n).same;
+  return tokenBatch(s, pid, token, n, true).same;
 }
 
 /** Put counters on a permanent through those replacement effects; returns how many were put on. */

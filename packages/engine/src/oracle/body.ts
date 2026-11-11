@@ -2879,6 +2879,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Field-Tested Frying Pan: "create a Food token, then create a 1/1 white Halfling creature token and attach ~ to it": the
   // Halfling, created second.
   text = text.replace(/(create an? [^.,]+ token), then (create an? [^.,]+ creature token) and (attach ~ to it\.)/, (_, a: string, b: string, c: string) => `${a}. ${b.charAt(0).toUpperCase()}${b.slice(1)}, then ${c}`);
+  // Sin, Unending Cataclysm: "put its counters on target creature you control, then shuffle ~ into its owner's library":
+  // two instructions in order, the card shuffled in only if it's still where it went (CR 400.7); with the target illegal
+  // the ability doesn't resolve at all (CR 608.2b, rulings).
+  text = text.replace(/^([Pp]ut its counters on target creature you control), then (shuffle ~ into its owner's library\.)$/, (_, a: string, b: string) => `${a}. ${b.charAt(0).toUpperCase()}${b.slice(1)}`);
   // Fractal Harness: "create a 0/0 green and blue Fractal creature token. Put X +1/+1 counters on it and attach ~ to it":
   // two instructions about the token, in that order.
   text = text.replace(/(create an? [^.]+ creature token\. Put (?:X|\w+) \+1\/\+1 counters? on it) and attach (~ to it\.)/, "$1. Attach $2");
@@ -3545,6 +3549,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Heirloom Mirror: "Draw a card, mill a card, then put a ritual counter on ~": three instructions in order. Its "Then if it
   // has three or more ritual counters on it, remove them and transform it" is Brass's Tunnel-Grinder's below.
   text = text.replace(/^Draw a card, mill a card, then put an? ([a-z]+) counter on ~\. /, "Draw a card. Mill a card. Put a $1 counter on ~. ");
+  // Hostile Hostel: "Then if there are three or more soul counters on it, remove those counters, transform it, then untap
+  // it.": the three instructions in order, all under the condition (as Brass's Tunnel-Grinder's below).
+  text = text.replace(/(Then if there are [a-z]+ or more [a-z]+ counters on it), remove those counters, transform it, then untap it\.$/, "$1, remove those counters, transform ~, and untap ~.");
   // Brass's Tunnel-Grinder: "Then if there are three or more bore counters on it, remove those counters and transform it."
   // Primal Amulet: "..., you may remove those counters and transform it."
   // Edgar Markov's Coffin: "create a 1/1 ... token with lifelink and put a bloodline counter on ~. Then if ..." too.

@@ -293,6 +293,18 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = /^destroy both creatures\.$/.test(text) ? { targets: [], effects: [{ type: "destroy" as const, what: { ref: "eventGroup" as const } }], text } : parseBody(text, { subject: true });
     return body ? { event: "selfBlocksOrBlockedByCreature", body, host: "attached", ...(filter ? { subjectFilter: { ...filter, text: what } } : {}) } : "fail";
   }
+  // Godsend: "Whenever equipped creature blocks or becomes blocked by one or more creatures, you may exile one of those
+  // creatures.": once, however many there are (rulings), "those creatures" the ones it blocks or is blocked by as blockers
+  // are declared (the event's group); not targeted, chosen as it resolves among those still on the battlefield (rulings),
+  // anyone's. They're "exiled with ~" for its name ban (CR 607.2a).
+  if (m[2] === "creature" && !m[1] && !yours && /^blocks or becomes blocked by one or more creatures, you may exile one of those creatures\.$/.test(m[3]!)) {
+    const creature = { kind: "object" as const, types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+    return { event: "selfBlocksOrBlockedByMany", host: "attached", body: { targets: [], effects: [{ type: "pick", who: { ref: "you" }, filter: creature, n: 1, upTo: true, action: "exile", fromGroup: true, anyController: true, linked: true, prompt: "you may exile one of those creatures: click it, then exile." }], text: "you may exile one of those creatures." } };
+  }
+  // Kusari-Gama: "Whenever equipped creature deals damage to a blocking creature, ~ deals that much damage to each other
+  // creature defending player controls." (Effect damageDefendingOthers.)
+  if (m[2] === "creature" && !m[1] && !yours && /^deals damage to a blocking creature, ~ deals that much damage to each other creature defending player controls\.$/.test(m[3]!))
+    return { event: "selfDealsDamageToBlocker", host: "attached", body: { targets: [], effects: [{ type: "damageDefendingOthers", amount: { count: { kind: "eventAmount" } } }], text: "~ deals that much damage to each other creature defending player controls." } };
   // Shield of the Righteous: "Whenever equipped creature blocks a creature, that creature doesn't untap during its
   // controller's next untap step": once for each creature it blocks, "that creature" that attacker, whoever controls it
   // then (rulings: it isn't tapped by this, and it's that creature's next untap step under whoever controls it).
@@ -2577,6 +2589,12 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     batch.fromGraveyard = true;
     rest = fromYard[1]!;
   }
+  // Extraordinary Journey: "if one or more of them entered from exile or was cast from exile" (an intervening if, CR 603.4).
+  const fromExile = /^if one or more of them entered from exile or was cast from exile, (.+)$/.exec(rest);
+  if (fromExile && batch.what === "enters" && !batch.fromGraveyard) {
+    batch.fromExile = true;
+    rest = fromExile[1]!;
+  }
   // Twilight Diviner: "if they entered or were cast from a graveyard, create a token that's a copy of one of them": an
   // intervening if (CR 603.4) about those that did, and one of them of your choice, while it's still that permanent.
   const diviner = /^if they entered or were cast from a graveyard, create a token that's a copy of one of them\.?$/.exec(rest);
@@ -2966,6 +2984,13 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
     const body = parseBody(theyAreThatPlayer(step[2]!).replace(/^that player draws (\w+) additional cards?\.$/, "that player draws $1 cards."), { eventPlayer: true });
     return body ? { event, body, enchantedPlayersTurn: true } : "fail";
   }
+  // Overencumbered: "At the beginning of combat on enchanted opponent's turn, ...": each beginning of combat step (CR 507.1)
+  // of that player's turns; "that player" is them.
+  const combat = /^At the beginning of combat on enchanted (?:player|opponent)'s turn, (.+)$/.exec(line);
+  if (combat) {
+    const body = parseBody(theyAreThatPlayer(combat[1]!), { eventPlayer: true });
+    return body ? { event: "eachBeginCombat", body, enchantedPlayersTurn: true } : "fail";
+  }
   // Witch-king of Angmar: "Whenever one or more creatures deal combat damage to you, ...".
   // Tamiyo, Upriser Crowned: "... to you while you're the monarch, tap those creatures and put a stun counter on each of
   // them": the monarch as the damage is dealt (a condition on the event, like Emberwilde Captain's), "those creatures" the
@@ -3282,6 +3307,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever ~ deals damage to an opponent, ${dealsMin[2]}`);
     return t && t !== "fail" && t.event === "selfDealsDamageToPlayer" && t.toOpponent && !t.minDamage ? { ...t, minDamage: num(dealsMin[1]!) } : "fail";
   }
+  // Paranormal Analyst: "Whenever you manifest dread, put a card you put into your graveyard this way into your hand.": the
+  // card that manifesting dread put there, while it's still there (rulings; CR 400.7), none if it put none.
+  if (/^Whenever you manifest dread, put a card you put into your graveyard this way into your hand\.?$/.test(line))
+    return { event: "youManifestDread", body: { targets: [], effects: [{ type: "bounce", what: { ref: "eventGroup" } }], text: "Put a card you put into your graveyard this way into your hand." } };
   // "Whenever you expend 4, ..." (CR 700.14): read as any "whenever you" trigger with no event of its own to refer to.
   const expend = /^Whenever you expend (\d+), (.+)$/.exec(line);
   if (expend) {
@@ -3702,6 +3731,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (timeExiled) {
     const body = parseBody(capital(timeExiled[2]!));
     return body ? { event: timeExiled[1] === "When the last" ? "selfLastTimeCounterRemovedExiled" : "selfTimeCounterRemovedExiled", zone: "exile", body } : "fail";
+  }
+  // Watcher of Hours: "Whenever you remove a time counter from this card while it's exiled, ...": the same, for the counters
+  // its owner removes, each with an effect they control (its suspend ability's, CR 702.62a), not another player's.
+  const youRemove = /^Whenever you remove a time counter from ~ while it's exiled, (.+)$/.exec(line);
+  if (youRemove) {
+    const body = parseBody(capital(youRemove[1]!));
+    return body ? { event: "selfTimeCounterRemovedExiled", zone: "exile", removedByYou: true, body } : "fail";
   }
   // Curator of Sun's Creation: "Whenever you discover, discover again for the same value": the value of the discover that
   // triggered it (CR 701.57a; you discover once the whole process is done, rulings).
@@ -4985,6 +5021,17 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(entersCauses[1]!, { activatedAbility: true });
     return body ? { event: "opponentEntersCausesTrigger", body } : "fail";
   }
+  // Hellish Rebuke's granted "When ~ deals damage to the player who cast ⟪source⟫, sacrifice ~. You lose 2 life.": that
+  // player fixed as the spell resolved (grants.ts casterMark), or no one; "you" is the permanent's controller.
+  const toCaster = /^When ~ deals damage to \u27eacaster (\d|none)\|[^\u27eb]*\u27eb, (.+)$/.exec(line);
+  if (toCaster) {
+    const body = parseBody(toCaster[2]!, { selfIt: true });
+    return body ? { event: "selfDealsDamageToPlayer", toPlayerId: toCaster[1] === "none" ? -1 : Number(toCaster[1]), body } : "fail";
+  }
+  // Strict Proctor: "that ability" is the triggered ability a permanent entering caused, put on the stack just below this
+  // one (rulings); its controller may pay.
+  const proctor = /^Whenever a permanent entering causes a triggered ability to trigger, counter that ability unless its controller pays (\{\d+\})\.$/.exec(line);
+  if (proctor) return { event: "entersCausesTrigger", body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: proctor[1]! } }], text: `counter that ability unless its controller pays ${proctor[1]}.` } };
   const manaTap = parseManaTapTrigger(line);
   if (manaTap) return manaTap;
   const dies = parseDiesTrigger(line);

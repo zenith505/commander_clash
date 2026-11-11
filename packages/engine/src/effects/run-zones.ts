@@ -1373,7 +1373,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (sc.castFromHand === undefined) {
         // "With mana value X or less": this spell's X (TargetSpec.xRange).
         // "With mana value less than or equal to the other result" (TargetSpec.bound): as it resolves.
-        const { xRange, ...rest } = bindBound(s, e.filter, amountCtx(s, ctx));
+        // Counterlash: sharing a card type with the countered spell (any one of them); with none, nothing does.
+        const shared = e.sharesTypeWithCountered ? (s.resolving!.counterTargetTypes?.length ? s.resolving!.counterTargetTypes : ["(none)"]) : undefined;
+        const { xRange, ...rest } = bindBound(s, shared ? { ...e.filter, types: shared } : e.filter, amountCtx(s, ctx));
         const x = ctx.x ?? 0;
         const filter: TargetSpec = xRange ? { ...rest, manaValue: xRange.at === "exact" ? { min: x, max: x } : xRange.at === "least" ? { min: x } : { max: x } } : rest;
         // "Draw three cards and reveal them": the ones still in hand, which everyone sees (CR 701.20a).

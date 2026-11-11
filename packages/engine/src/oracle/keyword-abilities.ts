@@ -6,7 +6,7 @@ import type { CardDef, FaceDownKind } from "../types";
 import { NUM, num, keywordOf, plainMana, xMana, sacrificeSelf, pumpSelf, BASIC_TYPES, capital, singular, singularWord } from "./words";
 import { parseBody, parsePayCost } from "./body";
 import { parseSearchFilter } from "./search";
-import { parseTargetPhrase, pickFilter } from "./targets";
+import { parseTargetPhrase, pickFilter, PLANESWALKER_TYPES } from "./targets";
 import { parseStaticCondition } from "./statics";
 import { parseCount } from "./counts";
 
@@ -933,8 +933,8 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
   }
   // Behold (CR 701.4a): "behold an Elf", "behold a Kithkin and exile it" (exile an Elf you control or an Elf card from your
   // hand), "behold a Gamma creature" (Hulk's Thunderclap: a Gamma creature card or a Gamma creature you control). A
-  // subtype only, as yet.
-  if ((m = /^behold an? ([A-Z][a-z]+)( creature)?( and exile it)?$/.exec(text)) && subtypeSet(m[1]!)) {
+  // subtype only, as yet. Countersculpt: "behold a Jace", a planeswalker type: a Jace you control or a Jace card.
+  if ((m = /^behold an? ([A-Z][a-z]+)( creature)?( and exile it)?$/.exec(text)) && (subtypeSet(m[1]!) || (!m[2] && PLANESWALKER_TYPES.has(m[1]!)))) {
     const st = m[1]!;
     const creature = m[2] ? { types: ["Creature"] } : {};
     return { kind: "reveal", filter: { kind: "card", subtypes: [st], ...creature, text: `${st}${m[2] ?? ""} card` }, n: 1, orControl: { kind: "object", subtypes: [st], ...creature, controller: "you", text: `${st}${m[2] ?? ""} you control` }, ...(m[3] ? { exile: true as const } : {}) };

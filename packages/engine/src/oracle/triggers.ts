@@ -3471,10 +3471,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // Social Snub: "When you cast ~ while you control a creature, you may copy ~": the same, checked as it's cast only (CR
   // 603.2), not again as the trigger resolves.
-  const castWhile = /^When you cast ~ while (you control an? [a-z]+), (.+)$/.exec(line);
+  // Ancestral Communion: "while you control your commander", one you own (CR 903.3), the same.
+  const castWhile = /^When you cast ~ while (you control an? [a-z]+|you control your commander), (.+)$/.exec(line);
   if (castWhile) {
     const cond = parseActivateCondition(castWhile[1]!);
-    const t = cond && parseTrigger(`When you cast ~, ${castWhile[2]}`);
+    // "You may choose a new target for the copy" of a spell with one target: the same as "new targets".
+    const t = cond && parseTrigger(`When you cast ~, ${castWhile[2]!.replace(/^copy ~\. You may choose a new target for the copy\.$/, "copy ~. You may choose new targets for the copy.")}`);
     return cond && t && t !== "fail" && !t.activeIf ? { ...t, activeIf: cond } : "fail";
   }
   // Bristlebane Battler, Moonshadow: "Whenever ... while this creature has a -1/-1 counter on it, ...": a condition on the

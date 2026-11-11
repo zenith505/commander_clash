@@ -6253,7 +6253,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   31,936).
 - Out after round B60 (looked at, not done): Mossbridge Troll (tapping creatures with total power 10 as a cost), Faces of
   the Past (a group sharing a creature type with the dying creature), Loki Laufeyson (a mana value limit from its power on
-  a delayed cast trigger), The Fugitive Doctor and Filigree Racer (flashback or jump-start granted until end of turn),
+  a delayed cast trigger), The Fugitive Doctor (done in round B184) and Filigree Racer (flashback or jump-start granted until end of turn),
   Mazzy (an Aura put into a graveyard, cast until your next turn), Saheeli's Lattice, Paleontologist's Pick-Axe and Throne
   of the Grim Captain (all but the Pick-Axe done in round 334) ("craft with one or more"), Seifer (blocked by two or more), Distended Mindbender (done in round B158) (a choice of two
   cards by different rules), plus Shaun & Rebecca, Wild Shape, Bridge from Below, Aetherborn Marauder (done in round 315), Sigardian Zealot,
@@ -8182,10 +8182,10 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   it resolves, one of each "hexproof from" variant, rulings; a browser test). Feral Encounter ("You may cast the exiled card
   this turn", CR 601.3; "At the beginning of the next combat phase this turn, ...": a delayed trigger with targets, none if
   no combat is left, rulings). Oppressive Rays and Gloom ("Activated abilities of ... cost {3} more to activate": mana
-  abilities too, CR 605.1a and 602.2b). +7, @@COUNT@@ of 31,936 with B177 to B183 and rounds 336 to 343.
-- Out after round B184 (looked at, not done): The Fugitive Doctor still waits for round 340's flashback grant to reach the
-  Lane B chain (this round is stacked on B183, which doesn't have it yet).
-- Out after round B183 (looked at, not done): The Fugitive Doctor ("gains flashback {2}{R}{G} until end of turn": round 340's
+  abilities too, CR 605.1a and 602.2b). The Fugitive Doctor ("target instant or sorcery card in your graveyard gains
+  flashback {2}{R}{G} until end of turn", after "you may sacrifice a Clue. When you do": round 340's fixed-cost flashback
+  grant, so X is 0, CR 702.34a, rulings). +8, 31,083 of 31,936 with B177 to B183 and rounds 336 to 343.
+- Out after round B183 (looked at, not done): The Fugitive Doctor (done in round B184) ("gains flashback {2}{R}{G} until end of turn": round 340's
   fixed-cost flashback grant for Archmage's Newt, now on main, does this: a next round), Elemental Resonance ("add
   mana equal to enchanted permanent's mana cost": what a {2/W} symbol adds isn't settled by its rulings), Medomai's Prophecy
   ("when you cast a spell with the chosen name for the first time this turn": a spell of that name cast earlier that turn,
@@ -8691,7 +8691,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Reweave, Kheru Mind-Eater, Day of the Dragons, Bloodbond March, Song of Inspiration, Countersculpt, Order of
   Succession, Drain Power, Volcano Hellion, Drain Life (done in round B179), Desolation, Urza's Sylex, Diabolic Servitude, Shared Fate.
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 460 are still unsupported there, its skips
-  included): Aeon Engine, Haunting Imitation, The Fugitive Doctor, Shifting Shadow, Prince of Thralls,
+  included): Aeon Engine, Haunting Imitation, The Fugitive Doctor (done in round B184), Shifting Shadow, Prince of Thralls,
   Eriette, Manifold Insights, Fortune's Favor, Curse of Inertia (done in round B184), Dreamshaper Shaman, Fishing Pole, Regna's Sanction (done in round B184),
   Kathril (done in round B184), Feral Encounter (done in round B184); then on up from 13,200.
 

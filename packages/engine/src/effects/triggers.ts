@@ -2749,8 +2749,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (d.thisTurn !== s.turn) s.delayed = s.delayed!.filter((x) => x !== d);
         continue;
       }
-      // "At this turn's next end of combat" (Venomous Breath): none came this turn, so none will.
-      if (d.when === "endOfCombat" && d.thisTurn !== undefined && d.thisTurn !== s.turn) {
+      // "At this turn's next end of combat" (Venomous Breath), "At the beginning of the next combat phase this turn" (Feral
+      // Encounter): none came this turn, so none will.
+      if ((d.when === "endOfCombat" || d.when === "nextBeginCombat") && d.thisTurn !== undefined && d.thisTurn !== s.turn) {
         s.delayed = s.delayed!.filter((x) => x !== d);
         continue;
       }
@@ -2964,6 +2965,8 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
         }
         chooser = t.targetChooser ?? opps[0] ?? t.controller;
       } else if (by === "eventPlayer") chooser = t.event?.player ?? t.controller;
+      // Curse of Inertia: the attacking player, the active player (CR 506.2).
+      else if (by === "activePlayer") chooser = s.activePlayer;
       else if (by === "subjectController") {
         const subj = t.subject && s.objects[t.subject.id];
         chooser = subj && subj.zone === "battlefield" && (subj.zoneChanges ?? 0) === t.subject!.zc ? controllerOf(s, subj) : (s.lastKnown?.[t.subject?.id ?? ""]?.controller ?? t.controller);

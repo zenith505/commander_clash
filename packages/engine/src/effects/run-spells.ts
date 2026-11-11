@@ -301,7 +301,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       else if (id && goneCardId) (s.delayed ??= []).push({ when: e.when as DelayedTrigger["when"], controller: ctx.controller, sourceCardId: goneCardId, subject: { id, zc: ctx.sourceZc ?? 0 }, body, turn: s.turn, step: s.step });
       const made = !!o || !!(id && goneCardId);
       // "At this turn's next end of combat" (Venomous Breath): never on a later turn.
-      if (made && e.thisTurn && e.when === "endOfCombat") s.delayed![s.delayed!.length - 1]!.thisTurn = s.turn;
+      // Feral Encounter: "At the beginning of the next combat phase this turn": the same.
+      if (made && e.thisTurn && (e.when === "endOfCombat" || e.when === "nextBeginCombat")) s.delayed![s.delayed!.length - 1]!.thisTurn = s.turn;
       // What it remembers from now (CR 603.7c, 608.2h): the countered spell's controller, its mana value.
       if (made && e.event) {
         const who = e.event.player ? players(s, e.event.player, ctx)[0] : undefined;

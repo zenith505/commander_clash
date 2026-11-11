@@ -439,11 +439,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const o = objects(s, e.what, ctx).find((x) => x.zone === "battlefield");
       if (!o) return;
       const sc = (s.resolving!.scratch ??= {});
+      // Curse of Inertia: "that attacking player may tap or untap": that player decides (CR 608.2d), not the controller.
+      const decider = (e.by && players(s, e.by, ctx).find((p) => !player(s, p).lost)) ?? ctx.controller;
       if (sc.tapOrUntap === undefined) {
         const name = defOf(s, o).name;
         s.pending = {
           kind: "chooseOption",
-          player: ctx.controller,
+          player: decider,
           source: src,
           what: "tapOrUntap",
           about: o.id,
@@ -455,7 +457,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       const choice = sc.tapOrUntap;
       sc.tapOrUntap = undefined;
-      if (choice === "tap") tapPermanent(s, o, undefined, ctx.controller);
+      if (choice === "tap") tapPermanent(s, o, undefined, decider);
       else if (choice === "untap") untapPermanent(s, o);
       log(s, choice === "neither" ? `${src}: ${defOf(s, o).name} is neither tapped nor untapped.` : `${src} ${choice}s ${defOf(s, o).name}.`);
       return;

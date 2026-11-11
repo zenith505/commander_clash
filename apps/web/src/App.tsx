@@ -5535,7 +5535,7 @@ function Controls({
                 : pending.action === "keep" && pending.sparesKin
                 ? `click a creature ${pending.of === undefined ? "of yours" : `for ${s.players[pending.of]!.name}`} to keep. The rest that share no creature type with it are sacrificed.`
                 : pending.action === "keep"
-                ? `click ${pending.count === 1 ? (pending.min === 0 ? `up to one ${pending.what}` : an) : `${pending.min === 0 ? "up to " : ""}${pending.count} ${pending.what}s`} ${pending.destroy ? "to keep (anyone's)" : pending.of === undefined ? "of yours to keep" : `for ${s.players[pending.of]!.name} to keep`}. The rest are ${pending.destroy ? "destroyed" : pending.bounce ? "returned to their owners' hands" : "sacrificed"}.`
+                ? `click ${pending.count === 1 ? (pending.min === 0 ? `up to one ${pending.what}` : an) : `${pending.min === 0 ? "up to " : ""}${pending.count} ${pending.what}s`} ${pending.destroy ? "to keep (anyone's)" : pending.of === undefined ? "of yours to keep" : `for ${s.players[pending.of]!.name} to keep`}. The rest are ${pending.destroy ? "destroyed" : pending.bounce ? "returned to their owners' hands" : pending.tap ? "tapped" : "sacrificed"}.`
                 : pending.owned
                 ? `click a permanent ${theirs ? `${theirs} owns` : "you own"} (whoever controls it) to gain control of it.`
                 : `click ${what} ${theirs ? `${theirs} controls` : anyones ? "(anyone's)" : "of yours"} to ${verb}.`}

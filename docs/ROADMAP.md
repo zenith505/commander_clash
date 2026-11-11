@@ -1073,14 +1073,14 @@ line blocks.
    each player, choose friend or foe" (Pir's Whim, Virtus's Maneuver, Khorvath's Fury: eachChooses byYou, a new
    friend-or-foe prompt for each player, e2e round218.spec.ts); "Whenever a permanent you control transforms into a
    Phyrexian" (Norn's Inquisitor, trigger permanentTransformsInto, CR 701.27e). +18 (28,122 of 31,936 with Lane B rounds B46 and B47).
-   Out after round 218 (looked at, not done): Kathril, Aspect Warper (a counter per keyword, onto any creature,
+   Out after round 218 (looked at, not done): Kathril, Aspect Warper (done in round B184) (a counter per keyword, onto any creature,
    including the hexproof-from variants per its rulings); Key to the Side-Door (done in round B173) (a discard cost "with the same name as a
    legendary permanent you control"); Sivriss, Nightmare Speaker (done in round 320) (a per-opponent loop binding "that player"); Sanctuary
    Blade (a color chosen each time it becomes attached); Eater of Virtue (keywords of the cards exiled with it); Life and
    Limb (Forests that are Saprolings and Saprolings that are Forests, a layer 4 dependency); Tombstone Stairwell (done in round 296) (tokens
    "created with this enchantment" destroyed at each end step); Inferno of the Star Mounts ("when its power becomes 20
    this way"); Anzrag's Rampage (done in round 321) (put a creature card from among the exiled ones onto the battlefield, return it at end
-   step); Regna's Sanction and Zndrsplt's Judgment (friend or foe with "chooses one ..., then taps the rest" and "a
+   step); Regna's Sanction and Zndrsplt's Judgment (done in round B184) (friend or foe with "chooses one ..., then taps the rest" and "a
    token that's a copy of a creature they control"; Lane B's range); Swooping Pteranodon (done in round 321) (a delayed trigger in which a
    target land deals the damage); Hellish Rebuke; Osteomancer Adept; Hostile Negotiations (done in round 318); Unexplained Absence.
    Round 219: the Will of the Planeswalkers paths (Path of the Enigma, Animist, Ghosthunter, Pyromancer, Schemer: a
@@ -8045,6 +8045,19 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   end of turn": the cards there as it resolves, rulings, CR 611.2c). Dovin Baan's emblem ("Your opponents can't untap more
   than two permanents during their untap steps": each opponent chooses which two, rulings, CR 502.3). +7, 31,042 of 31,936
   with B177 to B182 and rounds 336 to 337.
+- Round B184 (least played first, single-line blockers from the skip lists): Regna's Sanction ("Each friend puts a +1/+1
+  counter on each creature they control. Each foe chooses one untapped creature they control, then taps the rest.": each
+  foe in APNAP order sees the earlier choices, then the rest are tapped at once, rulings; a browser test) and Zndrsplt's
+  Judgment ("Each friend creates a token that's a copy of a creature they control": each chooses one, not targeted, then the
+  copies at once, CR 707.2). Curse of Inertia ("that attacking player may tap or untap target permanent of their choice":
+  the active player chooses the target though the Curse's controller controls the ability, hexproof checked against that
+  controller, rulings; a browser test). Kathril, Aspect Warper (keyword counters, CR 122.1b, each on a creature you choose as
+  it resolves, one of each "hexproof from" variant, rulings; a browser test). Feral Encounter ("You may cast the exiled card
+  this turn", CR 601.3; "At the beginning of the next combat phase this turn, ...": a delayed trigger with targets, none if
+  no combat is left, rulings). Oppressive Rays and Gloom ("Activated abilities of ... cost {3} more to activate": mana
+  abilities too, CR 605.1a and 602.2b). +7, 31,049 of 31,936 with B177 to B183 and rounds 336 to 337.
+- Out after round B184 (looked at, not done): The Fugitive Doctor still waits for round 340's flashback grant to reach the
+  Lane B chain (this round is stacked on B183, which doesn't have it yet).
 - Out after round B183 (looked at, not done): The Fugitive Doctor ("gains flashback {2}{R}{G} until end of turn": round 340's
   fixed-cost flashback grant for Archmage's Newt does this; reuse it once that round is on main), Elemental Resonance ("add
   mana equal to enchanted permanent's mana cost": what a {2/W} symbol adds isn't settled by its rulings), Medomai's Prophecy
@@ -8088,7 +8101,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Long Rest (X targets), Pulsemage Advocate (three targets from one opponent's graveyard).
 - Out after round B173 (looked at, not done): Corrosive Ooze (the Equipment attached to the creature just before it left the
   battlefield is destroyed at end of combat, rulings: attachments as they last existed aren't kept), Oppressive Rays and
-  Gloom (the tax reaches mana abilities), Murktide Regent and Soulflayer (done in round B182) (which cards delve exiled aren't kept with the
+  Gloom (done in round B184) (the tax reaches mana abilities), Murktide Regent and Soulflayer (done in round B182) (which cards delve exiled aren't kept with the
   permanent), Heart of Kiran (a loyalty counter removed instead of crewing, still crewing for "crews" triggers), Crypsis
   ("protection from creatures your opponents control"), Gorm the Great ("must be blocked by two or more creatures if able"),
   Phyrexian Devourer and Boneyard Mycodrax (their other lines) stay out.
@@ -8323,7 +8336,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature's own defending player), Matopi Golem, Skeleton Scavengers, Soldevi Sentry and Debt of Loyalty ("When it
   regenerates this way": shields with riders need the creature's controller to choose which shield applies, CR 616.1;
   done in round B132).
-- Out after round B105 (looked at, not done): Gloom and Oppressive Rays ("Activated abilities of ... cost {3} more": mana
+- Out after round B105 (looked at, not done): Gloom and Oppressive Rays (done in round B184) ("Activated abilities of ... cost {3} more": mana
   abilities too, and the engine taxes only abilities that aren't mana abilities); Briarbridge Patrol ("deals damage to one
   or more creatures": once per damage event, not once per creature); Light of Judgment (done in round B156) ("Destroy up to one Equipment
   attached to that creature", chosen as it resolves); Rasputin, the Oneiromancer (done in round B122), Kyren Toy (done in round B122), Petalmane Baku (done in round B122) and Haruspex (done in round B122)
@@ -8552,8 +8565,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Succession, Drain Power, Volcano Hellion, Drain Life (done in round B179), Desolation, Urza's Sylex, Diabolic Servitude, Shared Fate.
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 460 are still unsupported there, its skips
   included): Aeon Engine, Haunting Imitation, The Fugitive Doctor, Shifting Shadow, Prince of Thralls,
-  Eriette, Manifold Insights, Fortune's Favor, Curse of Inertia, Dreamshaper Shaman, Fishing Pole, Regna's Sanction,
-  Kathril, Feral Encounter; then on up from 13,200.
+  Eriette, Manifold Insights, Fortune's Favor, Curse of Inertia (done in round B184), Dreamshaper Shaman, Fishing Pole, Regna's Sanction (done in round B184),
+  Kathril (done in round B184), Feral Encounter (done in round B184); then on up from 13,200.
 
 ## Known gaps (from earlier rounds)
 

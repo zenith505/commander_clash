@@ -4,6 +4,7 @@ import type { ActivatedAbility, CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseCardTarget, parseTargetPhrase } from "./targets";
 import { parseManaCost } from "../mana";
+import { roundB184Sentence } from "./laneb184";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -56,7 +57,7 @@ export function roundB183Line(line: string, raw: string, out: CompiledCard, isSp
   return false;
 }
 
-export function roundB183Sentence(s: string, sentences: string[], si: number, ctx: Ctx, _effects: Effect[]): Found {
+export function roundB183Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
   // Ghost Ark: "each artifact creature card in your graveyard gains unearth {3} until end of turn": the cards there as it
   // resolves (CR 611.2c, rulings), each with unearth {3} of its own (CR 702.84a) while it's that card.
   const unearth = /^[Ee]ach (artifact creature|artifact|creature) card in your graveyard gains unearth ((?:\{[^}]+\})+) until end of turn$/.exec(s);
@@ -80,5 +81,5 @@ export function roundB183Sentence(s: string, sentences: string[], si: number, ct
     if (what?.ref !== "target" || ctx.targets.length !== i + 1 || !spec?.types?.length || spec.types.some((t) => t !== "Instant" && t !== "Sorcery")) return "fail";
     return { effect: { type: "grantYardCast", what, kind: harmonize ? "harmonize" : "jumpStart" }, next: si + (harmonize ? 2 : 1) };
   }
-  return null;
+  return roundB184Sentence(s, sentences, si, ctx, effects);
 }

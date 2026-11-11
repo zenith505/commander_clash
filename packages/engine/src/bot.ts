@@ -832,6 +832,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Cipher: encode it on the creature most likely to deal combat damage to a player.
     if (pend.kind === "pickPermanents" && pend.action === "encode") return [{ type: "pickPermanents", player: pid, ids: chooseEncode(s, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "untap") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "untap") }];
+    // Reservoir Kraken: the creature we tap for it is the one we'd miss least, the weakest.
+    if (pend.kind === "pickPermanents" && pend.action === "tap" && s.resolving?.scratch?.punish?.options.some((o) => "tap" in o)) return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0]!] }];
     if (pend.kind === "pickPermanents" && pend.action === "tap") {
       // Exactly that many ("you may tap three untapped creatures you control", Aziza, once we said yes): creatures that
       // could still attack too, if it takes them.
@@ -959,6 +961,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Armed and Armored: the Equipment to put on the Dwarf just chosen.
     const toChosen = pend.kind === "pickPermanents" && pend.action === "attach" ? s.resolving?.body.effects[s.resolving.next] : undefined;
     if (pend.kind === "pickPermanents" && toChosen?.type === "attachAny" && toChosen.toChosen) return [{ type: "pickPermanents", player: pid, ids: attachPicks(s, pid, pend.options) }];
+    // Godsend: "you may exile one of those creatures": an opponent's, the one worth the most; never our own.
+    if (pend.kind === "pickPermanents" && pend.action === "exile" && pend.min === 0 && pend.count === 1 && allEffects(s.resolving?.body.effects ?? []).some((e) => e.type === "pick" && e.fromGroup && e.action === "exile")) {
+      const theirs = pend.options.filter((id) => opponents(s, pid).includes(controllerOf(s, obj(s, id)))).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+      return [{ type: "pickPermanents", player: pid, ids: theirs.slice(0, 1) }];
+    }
     if (pend.kind === "pickPermanents" && pend.min !== undefined && pend.action !== "keep") return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     // Stick Together: for this slot of the party, the creature the most valuable whole party (this slot and the ones still
     // to come, each creature once) uses, or none.
@@ -1049,6 +1056,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const k = pend.counterKind ?? "";
       const keyword = ["shield", "flying", "first strike", "double strike", "deathtouch", "hexproof", "indestructible", "lifelink", "menace", "reach", "trample", "vigilance"].includes(k);
       return [{ type: "chooseOption", player: pid, choice: keyword && pend.options.includes("kind") ? "kind" : "plus" }];
+    }
+    // Kusari-Gama: the defending player whose creatures would take the most of the damage, never ourselves.
+    if (pend.kind === "chooseOption" && pend.what === "defendingPlayer") {
+      const theirs = (q: string) => (Number(q) === pid ? -1 : s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === Number(q) && objIsType(s, obj(s, id), "Creature")).length);
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => theirs(b) - theirs(a))[0]! }];
     }
     // Exotic Pets: helpful counters stack up on the first token, harmful ones go to the second.
     if (pend.kind === "chooseOption" && pend.what === "eitherToken") {
@@ -1921,6 +1933,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   if (dial) return dial;
   const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid);
   if (regen) return regen;
+  const silencer = chooseSilencerFaceUp(s, pid);
+  if (silencer) return silencer;
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
     if (land) return [land];
@@ -3913,8 +3927,13 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
   const rat = quiet && s.resolving?.item.sourceId ? s.objects[s.resolving.item.sourceId] : undefined;
   const ratThreat = rat?.zone === "battlefield" ? (rat.attacking === pid || (rat.blocking !== undefined && [rat.blocking].flat().some((b) => s.objects[b] && controllerOf(s, obj(s, b)) === pid)) ? Math.max(1, power(s, rat)) : 0) : 0;
   const penalty = quiet ? (controller === pid || settled ? 0 : ratThreat) : mode && pu.losesSource ? sourceWorth : mode ? (controller === pid ? buys : controller === undefined || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.hurts ? hurtCost : doomed ? (doomed.zone === "battlefield" && !objHasKeyword(s, doomed, "Indestructible") ? worth(s, pid, doomed) : 0) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
+  // Reservoir Kraken: tapping one of ours to tap its source (and hand its controller a Fish) is worth it only while the
+  // source would attack (its controller's turn) or could block our attack (our turn), and no one has tapped it already.
+  const tapOpt = pu.options.some((o) => "tap" in o);
+  const tapSource = tapOpt && s.resolving?.item.sourceId ? s.objects[s.resolving.item.sourceId] : undefined;
+  const tapThreat = tapSource?.zone === "battlefield" && !tapSource.tapped && controller !== pid && !settled ? (s.activePlayer === controller ? Math.max(1, power(s, tapSource)) : s.activePlayer === pid ? 3 : 0) : 0;
   const cost = (o: string): number => {
-    if (o === "none") return penalty;
+    if (o === "none") return tapOpt ? tapThreat : penalty;
     const w = pu.options[Number(o)];
     if (!w) return Infinity;
     if ("discard" in w) return handCost(w.discard, w.filter);
@@ -3928,6 +3947,11 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
       return worths.length < takenSacs + n ? Infinity : worths.slice(takenSacs, takenSacs + n).reduce((a, b) => a + b, 0);
     }
     if ("damage" in w) return lifeCost(typeof w.damage === "number" ? w.damage : 3);
+    // The creature we'd tap: its attack if it's our turn and it could still attack, little otherwise; and the Fish.
+    if ("tap" in w) {
+      const costs = pickOptions(s, { filter: w.tap }, pid).map((id) => obj(s, id)).map((x) => (s.activePlayer === pid && objIsType(s, x, "Creature") && x.controlledSinceTurn < s.turn && (s.step === "beginCombat" || s.step === "main1" || s.step === "upkeep" || s.step === "draw") ? Math.max(1, power(s, x)) + 1 : 0.5)).sort((a, b) => a - b);
+      return costs.length ? costs[0]! + 1 : Infinity;
+    }
     // Sin Prodder: the revealed card's mana value in damage to us, rather than that card in its controller's hand.
     if ("allow" in w && s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "punisher" && x.firstOnly)) {
       const rv = s.resolving.revealed && s.objects[s.resolving.revealed.id];
@@ -3971,6 +3995,27 @@ function chooseEncode(s: GameState, options: ObjectId[]): ObjectId[] {
   const evasive = (id: ObjectId) => (["Flying", "Shadow", "Horsemanship", "Fear", "Intimidate", "Menace", "Trample"].some((k) => objHasKeyword(s, obj(s, id), k)) ? 10 : 0);
   const best = [...options].sort((a, b) => evasive(b) + power(s, obj(s, b)) - evasive(a) - power(s, obj(s, a)))[0];
   return best ? [best] : [];
+}
+
+/**
+ * Kadena's Silencer: turned face up (a special action, CR 702.37e) with an opponent's activated or triggered ability on
+ * the stack, its "counter all abilities your opponents control" trigger then answers it.
+ */
+function chooseSilencerFaceUp(s: GameState, pid: PlayerId): Action[] | null {
+  if (!s.stack.some((it) => it.kind !== "spell" && opponents(s, pid).includes(it.controller))) return null;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (!o.faceDown || controllerOf(s, o) !== pid) continue;
+    const real = compileCard(realDefOf(s, o));
+    if (!real.triggers.some((tr) => tr.event === "selfTurnedFaceUp" && tr.body.effects.some((e) => e.type === "counterOpponentsStack" && e.abilitiesOnly))) continue;
+    const ways = faceUpWays(s, o);
+    for (let i = 0; i < ways.length; i++) {
+      if (ways[i]!.costs) continue;
+      const plan = planTurnFaceUp(s, pid, id, i, faceUpX(s, pid, o, i), undefined, botFaceUpForm(s, o));
+      if (plan) return plan;
+    }
+  }
+  return null;
 }
 
 /** A creature we can tap for a cost without losing an attack or a block: it can't attack this turn, or combat is over. */

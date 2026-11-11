@@ -2,7 +2,7 @@ import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption
 import { coloredManaSymbols, manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool, mayPayUse, type ManaUse } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, evidenceCandidates, evidenceValue, livingPlayers, gainLife, inCombatPhase, loseEnergy, processCandidates, adventureExileCards, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
+import { autoEvidence, evidenceCandidates, evidenceValue, livingPlayers, gainLife, inCombatPhase, loseEnergy, processCandidates, adventureExileCards, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, tapPermanent, whileControlledHolds } from "../game";
 import { abilitiesOf, realDefOf, canBeSacrificed, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import type { Color, GameObject, GameState, ObjectId, PlayerId } from "../types";
@@ -1450,6 +1450,7 @@ export function punisherLabel(o: PunisherOption): string {
   if ("allow" in o) return o.allow;
   if ("halfLife" in o) return `Pay half your life, rounded ${o.halfLife}`;
   if ("handToTop" in o) return `Put ${o.handToTop === 1 ? "a card" : `${o.handToTop} cards`} from your hand on top of your library`;
+  if ("tap" in o) return `Tap ${/^[aeiou]/i.test(o.tap.text) ? "an" : "a"} ${o.tap.text}`;
   if ("exileFromGraveyard" in o) return `Exile ${o.exileFromGraveyard === 1 ? "a card" : `${o.exileFromGraveyard} cards`} from your graveyard`;
   if (!o.pay.cost && o.pay.generic === undefined && o.pay.life !== undefined) return `Pay ${o.pay.life} life`;
   return `Pay ${o.pay.cost}${o.pay.life ? ` and ${o.pay.life} life` : ""}`;
@@ -1466,7 +1467,7 @@ export function punisherOptions(s: GameState, e: Extract<Effect, { type: "punish
   }, 0);
   // "Pay 5 life": only with at least that much (CR 119.4, rulings on Dash Hopes).
   // "Unless they discard a nonland card": only with one in hand.
-  return e.options.flatMap((o, i) => (("discard" in o && (o.filter ? p.hand.filter((id) => printedMatches(o.filter!, defOf(s, obj(s, id)))) : p.hand).length < discarding + o.discard) || ("sacrifice" in o && pickOptions(s, { filter: o.sacrifice }, pid, sourceId).length < sacrificing + (o.n ?? 1)) || ("pay" in o && !o.pay.cost && !o.pay.generic && (o.pay.life ?? 0) > payableLife(s, pid)) || ("halfLife" in o && halfOfLife(s, pid, o.halfLife) > payableLife(s, pid)) || ("exileFromGraveyard" in o && p.graveyard.length < o.exileFromGraveyard) || ("handToTop" in o && p.hand.length < discarding + o.handToTop) ? [] : [i]));
+  return e.options.flatMap((o, i) => (("discard" in o && (o.filter ? p.hand.filter((id) => printedMatches(o.filter!, defOf(s, obj(s, id)))) : p.hand).length < discarding + o.discard) || ("sacrifice" in o && pickOptions(s, { filter: o.sacrifice }, pid, sourceId).length < sacrificing + (o.n ?? 1)) || ("pay" in o && !o.pay.cost && !o.pay.generic && (o.pay.life ?? 0) > payableLife(s, pid)) || ("halfLife" in o && halfOfLife(s, pid, o.halfLife) > payableLife(s, pid)) || ("exileFromGraveyard" in o && p.graveyard.length < o.exileFromGraveyard) || ("handToTop" in o && p.hand.length < discarding + o.handToTop) || ("tap" in o && !pickOptions(s, { filter: o.tap }, pid, sourceId).length) ? [] : [i]));
 }
 
 /** Half a player's life total, rounded as the text says; 0 for a total of 0 or less (CR 107.1a-b). */
@@ -1627,6 +1628,23 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
         sc.chosen = undefined;
         sc.queue = undefined;
       }
+      // Reservoir Kraken: which of their untapped creatures they tap (one option, one pick).
+      const tapping = made.map((m) => e.options[Number(m)]).find((o): o is Extract<PunisherOption, { tap: TargetSpec }> => !!o && "tap" in o);
+      if (tapping && !mine.tap) {
+        const options = pickOptions(s, { filter: tapping.tap }, pid, ctx.sourceId);
+        if (pu.tapAsked === pid && sc.chosen?.[pid]) mine.tap = sc.chosen[pid]!.slice(0, 1);
+        else if (options.length <= 1) mine.tap = options;
+        else {
+          pu.tapAsked = pid;
+          sc.chosen = {};
+          sc.queue = [pid];
+          s.pending = { kind: "pickPermanents", player: pid, source: src, action: "tap", what: tapping.tap.text, options, count: 1 };
+          return "paused";
+        }
+        pu.tapAsked = undefined;
+        sc.chosen = undefined;
+        sc.queue = undefined;
+      }
       pu.queue.shift();
       // Sin Prodder: once a player does, no one else is asked (rulings).
       if (e.firstOnly && made.some((x) => x !== "none")) pu.queue.length = 0;
@@ -1645,6 +1663,14 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
         if (gone.length) log(s, `${player(s, pid).name} exiles ${gone.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their graveyard.`);
         for (const id of gone) moveObject(s, id, "exile");
       }
+      // Reservoir Kraken: the creatures chosen to be tapped, still untapped ones under that player's control.
+      for (const pid of who)
+        for (const id of pu.chosen?.[pid]?.tap ?? []) {
+          const x = s.objects[id];
+          if (x?.zone !== "battlefield" || x.tapped || controllerOf(s, x) !== pid) continue;
+          tapPermanent(s, x, undefined, pid);
+          log(s, `${player(s, pid).name} taps ${defOf(s, x).name}.`);
+        }
       for (const pid of who)
         for (const id of pu.chosen?.[pid]?.sacrifice ?? []) {
           const x = s.objects[id];

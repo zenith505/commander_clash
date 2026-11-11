@@ -54,7 +54,7 @@ export interface PayCost {
  * One way to avoid a punisher's penalty: discard that many cards, sacrifice a permanent like this (`n` of them: "two
  * creatures"), pay, or have the source deal that much damage to you ("any opponent may have it deal 4 damage to them").
  */
-export type PunisherOption = { discard: number; /** "Unless they discard a nonland card" (Bandit's Talent): only cards like this. */ filter?: TargetSpec } | { sacrifice: TargetSpec; n?: number; /** "Unless they sacrifice that many permanents" (Archfiend of Spite): how many, worked out as the punisher starts (into `n`). */ nAmount?: Amount } | { pay: UnlessPays } | { /** "Equal to ~'s power" (Combustion Man): worked out as the punisher starts. */ damage: Amount } | { /** "Any opponent may have you put that card into your hand" (Distant Memories): nothing to pay, only a choice; its button's label. */ allow: string } | { /** "Any player may pay half their life, rounded up" (Temporal Extortion): half their own life total as it's paid (CR 107.1a, 119.4). */ halfLife: "up" | "down" } | { /** "Any player may exile three cards from their graveyard" (Carrion Wurm): that many cards of their choice from their own graveyard. */ exileFromGraveyard: number } | { /** "Unless they put a card from their hand on top of their library" (Tainted Specter): that many cards of their choice from their hand. */ handToTop: number };
+export type PunisherOption = { discard: number; /** "Unless they discard a nonland card" (Bandit's Talent): only cards like this. */ filter?: TargetSpec } | { sacrifice: TargetSpec; n?: number; /** "Unless they sacrifice that many permanents" (Archfiend of Spite): how many, worked out as the punisher starts (into `n`). */ nAmount?: Amount } | { pay: UnlessPays } | { /** "Equal to ~'s power" (Combustion Man): worked out as the punisher starts. */ damage: Amount } | { /** "Any opponent may have you put that card into your hand" (Distant Memories): nothing to pay, only a choice; its button's label. */ allow: string } | { /** "Any player may pay half their life, rounded up" (Temporal Extortion): half their own life total as it's paid (CR 107.1a, 119.4). */ halfLife: "up" | "down" } | { /** "Any player may exile three cards from their graveyard" (Carrion Wurm): that many cards of their choice from their own graveyard. */ exileFromGraveyard: number } | { /** "Unless they put a card from their hand on top of their library" (Tainted Specter): that many cards of their choice from their hand. */ handToTop: number } | { /** "Any opponent may tap an untapped creature they control" (Reservoir Kraken): one permanent of their choice they control matching it, tapped (not a cost: tapped as the choices are carried out, CR 701.26a). */ tap: TargetSpec };
 
 export interface UnlessPays {
   cost: string;
@@ -4455,7 +4455,18 @@ export type Effect =
    */
   | { type: "dismissStack" }
   /** Glen Elendra's Answer: "Counter all spells your opponents control and all abilities your opponents control": each one already on the stack, from the top down (rulings; mana abilities never are, CR 605.3a). */
-  | { type: "counterOpponentsStack" }
+  /**
+   * Kusari-Gama: "~ deals that much damage to each other creature defending player controls" after "Whenever equipped
+   * creature deals damage to a blocking creature": the equipped creature's defending player (CR 508.5: the player it's
+   * attacking, the trigger's event player); one not attacking has none of its own, so its controller chooses among the
+   * defending players (CR 508.5a). "Other": not the blocking creature dealt the damage (the subject).
+   */
+  | { type: "damageDefendingOthers"; amount: Amount }
+  | {
+      type: "counterOpponentsStack";
+      /** Kadena's Silencer: "counter all abilities your opponents control": only the activated and triggered abilities already on the stack (rulings: not spells; mana abilities never are there, CR 605.3a). */
+      abilitiesOnly?: true;
+    }
   /**
    * Whirlwind Denial: "For each spell and ability your opponents control, counter it unless its controller pays {4}":
    * the opponent whose turn it is (or the next in turn order) chooses and pays for theirs, then each other opponent in
@@ -5917,6 +5928,12 @@ export type TriggerEvent =
   | "attackCausesTrigger"
   /** "Whenever a creature entering under an opponent's control causes a triggered ability of that creature to trigger" (Aboleth Spawn). */
   | "opponentEntersCausesTrigger"
+  /** Strict Proctor: "Whenever a permanent entering causes a triggered ability to trigger" (any ability, anyone's; see effects/triggers.ts proctorCaused). */
+  | "entersCausesTrigger"
+  /** Godsend: "Whenever equipped creature blocks or becomes blocked by one or more creatures": once as blockers are declared, the creatures it blocks or is blocked by the event's group (host "attached" only). */
+  | "selfBlocksOrBlockedByMany"
+  /** Kusari-Gama: "Whenever equipped creature deals damage to a blocking creature": that creature the subject, the damage the amount, the equipped creature's defending player (if it's attacking) the event player (host "attached" only). */
+  | "selfDealsDamageToBlocker"
   /** "Whenever you sacrifice another permanent", "a Food", "~ or another creature": see TriggeredAbility.sacrifices. */
   | "youSacrifice"
   /** "Whenever you expend 4" (CR 700.14): see TriggeredAbility.expend. */
@@ -6584,6 +6601,8 @@ export interface TriggeredAbility {
   toOpponent?: true;
   /** "Whenever enchanted creature deals damage to you" (Backfire): only to this ability's controller. */
   toYou?: true;
+  /** Hellish Rebuke's granted "deals damage to the player who cast ~": only to this player (-1: no one, for a copy that wasn't cast). */
+  toPlayerId?: number;
   /** "Whenever a creature deals combat damage to its owner" (The Beast, Deathless Prince): only to the dealing creature's owner. */
   toOwner?: true;
   /** "Deals combat damage to enchanted player" (Curse of Stalked Prey): the player this Aura enchants. */

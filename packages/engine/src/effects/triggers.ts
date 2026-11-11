@@ -558,12 +558,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const again = !fromYard && !fromExile && !floating ? triggersAgain(s, o, controller, causedBy) : 0;
         attackCaused(queued);
         entersCaused(queued);
+        proctorCaused(queued);
         for (let n = again; n > 0; n--) {
           const more: PendingTrigger = { ...queued };
           delete more.tag;
           s.triggerQueue.push(more);
           attackCaused(more);
           entersCaused(more);
+          proctorCaused(more);
         }
       }
     });
@@ -606,6 +608,25 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (!opponents(s, owner).includes(wc) || locked?.(wc)) continue;
       abilitiesOf(s, w).triggers.forEach((t, index) => {
         if (t.event !== "opponentEntersCausesTrigger" || (t.activeIf && !staticConditionNow(s, t.activeIf, id, wc))) return;
+        q.tag ??= `t${s.nextId++}`;
+        const printed = compileCard(defOf(s, w)).triggers;
+        s.triggerQueue.push({ sourceId: id, sourceCardId: cardIdOf(w), controller: wc, index, sourceZc: w.zoneChanges ?? 0, causeTag: q.tag, ...(printed[index] !== t ? { body: t.body } : {}) });
+      });
+    }
+  };
+  /**
+   * Strict Proctor: "Whenever a permanent entering causes a triggered ability to trigger": any triggered ability, whoever
+   * controls it and wherever it works from (a delayed one, one of a card in a graveyard, an Aura's or Equipment's), once
+   * for each time it triggers (CR 603.2d). Replacement effects and "as ~ enters" abilities aren't triggers (rulings). Its
+   * trigger goes on the stack just above that ability (rulings), which becomes its `cause` once it's there.
+   */
+  const proctorCaused = (q: PendingTrigger) => {
+    if (causedBy?.event !== "enters") return;
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const wc = controllerOf(s, w);
+      abilitiesOf(s, w).triggers.forEach((t, index) => {
+        if (t.event !== "entersCausesTrigger" || (t.activeIf && !staticConditionNow(s, t.activeIf, id, wc))) return;
         q.tag ??= `t${s.nextId++}`;
         const printed = compileCard(defOf(s, w)).triggers;
         s.triggerQueue.push({ sourceId: id, sourceCardId: cardIdOf(w), controller: wc, index, sourceZc: w.zoneChanges ?? 0, causeTag: q.tag, ...(printed[index] !== t ? { body: t.body } : {}) });
@@ -1066,6 +1087,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const anyBlocked = (t: TriggeredAbility) => (!t.blockFilter || o.blocking!.some((a) => !!s.objects[a] && objectMatches(s, t.blockFilter!, s.objects[a]!, you, false))) && (!t.blocksAtLeast || o.blocking!.length >= t.blocksAtLeast);
         add(o, you, (e, t) => (e === "selfBlocks" || e === "selfBlocksOrBecomesBlocked" || e === "selfAttacksOrBlocks") && anyBlocked(t));
         addHosted(o, (e) => e === "selfBlocks" || e === "selfBlocksOrBecomesBlocked" || e === "selfAttacksOrBlocks");
+        // Godsend: once, "those creatures" the ones it blocks.
+        const blocked = o.blocking.map((a) => s.objects[a]).filter((a): a is GameObject => !!a);
+        if (blocked.length) addHosted(o, (e) => e === "selfBlocksOrBlockedByMany", undefined, o, { group: blocked.map((x) => ({ id: x.id, zc: x.zoneChanges ?? 0 })) });
         for (const a of o.blocking) {
           const at = s.objects[a];
           if (at) add(o, you, (e, t) => (e === "selfBlocksCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, at, you), undefined, undefined, at);
@@ -1098,6 +1122,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host === "orSelf", undefined, undefined, o, undefined, undefined, undefined, { player: o.attacking });
         // Hedron Blade: "Whenever equipped creature becomes blocked by one or more colorless creatures": the same check.
         addHosted(o, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && anyBlocker(t), undefined, o, { player: o.attacking });
+        // Godsend: once, "those creatures" the ones blocking it.
+        const blockers = o.blockedBy.map((b) => s.objects[b]).filter((b): b is GameObject => !!b);
+        if (blockers.length) addHosted(o, (e) => e === "selfBlocksOrBlockedByMany", undefined, o, { player: o.attacking, group: blockers.map((x) => ({ id: x.id, zc: x.zoneChanges ?? 0 })) });
         // Barreling Attack: "When that creature becomes blocked this turn" (a delayed trigger, CR 603.7b).
         for (const d of s.delayed ?? []) if (d.when === "becomesBlocked" && d.thisTurn === s.turn && d.subject.id === o.id && d.subject.zc === (o.zoneChanges ?? 0)) s.triggerQueue.push({ sourceId: o.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.subject.zc, body: d.body });
         const bearer = isRingBearer(s, o);
@@ -1927,7 +1954,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const info = { player: ev.player, amount: ev.amount };
     if (o?.zone === "battlefield") {
       const you = controllerOf(s, o);
-      add(o, you, (e, t) => e === "selfDealsDamageToPlayer" && !(t.toOpponent && ev.player === you) && !(t.toYou && ev.player !== you) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
+      add(o, you, (e, t) => e === "selfDealsDamageToPlayer" && !(t.toOpponent && ev.player === you) && !(t.toYou && ev.player !== you) && !(t.toPlayerId !== undefined && ev.player !== t.toPlayerId) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
       addHosted(o, (e) => e === "selfDealsDamageToPlayer", undefined, o, info);
       // Syr Carah: "Whenever ~ or an instant or sorcery spell you control deals damage to a player": ~ itself too.
       add(o, you, (e, t) => e === "spellYouControlDealsDamage" && !!t.spellDamage?.orSelf, undefined, undefined, undefined, undefined, undefined, undefined, info);
@@ -2025,6 +2052,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // Vampire Slayer: "deals damage to a Vampire", only a creature that fits (as it's dealt the damage).
       add(o, controllerOf(s, o), (e, t) => (e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature")) && (!t.subjectFilter || objectMatches(s, t.subjectFilter, hit, controllerOf(s, o), false)), undefined, undefined, hit, undefined, undefined, undefined, info);
       addHosted(o, (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, hit, info);
+      // Kusari-Gama: to a creature that's blocking as it's dealt the damage (CR 509.1h), any damage; the defending player
+      // the one the equipped creature is attacking (CR 508.5), if it is.
+      if (hit.blocking !== undefined && hit.zone === "battlefield") addHosted(o, (e) => e === "selfDealsDamageToBlocker", undefined, hit, { ...info, ...(o.attacking !== undefined ? { player: o.attacking } : {}) });
       // Greatbow Doyen, Ohabi Caleria: "Whenever an Archer you control deals damage to a creature": combat or not (rulings),
       // the Archer the subject ("that Archer deals ...") and "that creature's controller" the damaged creature's as the
       // ability resolves while it's still that permanent, otherwise as it last existed (CR 608.2h).

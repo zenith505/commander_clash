@@ -447,7 +447,7 @@ type CastDraft = {
  * spell (its optional additional cost, or Conspiracy Unraveler's alternative cost), or activate an ability.
  */
 /** "Remove three counters from among ... you control" (Tekuthal): which counters, as the ability is activated. */
-type CounterPick = { label: string; what: string; n: number; candidates: { id: string; kind: string; n: number }[] } & ({ activate: ActivateDraft; draft?: undefined } | { draft: CastDraft; activate?: undefined });
+type CounterPick = { label: string; what: string; n: number; candidates: { id: string; kind: string; n: number }[]; single?: boolean } & ({ activate: ActivateDraft; draft?: undefined } | { draft: CastDraft; activate?: undefined });
 type EvidencePick = { label: string; n: number; candidates: string[]; optional: boolean; /** The Capitoline Triad: its own words, not collecting evidence. */ title?: string } & ({ draft: CastDraft; key: "evidence" | "collect"; activate?: undefined } | { activate: ActivateDraft; draft?: undefined; key?: undefined });
 
 /** Choosing how to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
@@ -821,7 +821,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       // "Exile one or more ...": X can't be 0 (Corpseweft), so 0 is never what we ask about.
       const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, Math.max(n, ab.xMin ?? 0)));
       // "Tap X untapped Knights you control" (Aryel): the noun before "you control" in the plural.
-      const extra = [...(ab.energyX ? ["pay X energy"] : []), ...(ab.removeCounters?.x ? [`remove X ${ab.removeCounters.counter} counters`] : []), ...(ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [c.kind === "removeCounters" ? `remove X ${c.counter ?? ""} counters from among ${c.filter.text}`.replace(/  +/g, " ") : `${c.kind === "sacrifice" ? "sacrifice" : c.kind === "exileFromGraveyard" ? "exile" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : c.kind === "tap" ? c.filter.text.replace(/(\w)( you control)$/, "$1s$2") : c.kind === "reveal" ? `${plural(c.filter.text)} from your hand` : c.kind === "exileFromGraveyard" ? `${plural(c.filter?.text ?? "card")} from your graveyard` : ""}`.trim()] : []))].join(" and ");
+      const extra = [...(ab.energyX ? ["pay X energy"] : []), ...(ab.removeCounters?.x ? [`remove X ${ab.removeCounters.counter} counters`] : []), ...(ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [c.kind === "removeCounters" ? `remove X ${c.counter ?? ""} counters ${c.one ? "from" : "from among"} ${c.filter.text}`.replace(/  +/g, " ") : `${c.kind === "sacrifice" ? "sacrifice" : c.kind === "exileFromGraveyard" ? "exile" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : c.kind === "tap" ? c.filter.text.replace(/(\w)( you control)$/, "$1s$2") : c.kind === "reveal" ? `${plural(c.filter.text)} from your hand` : c.kind === "exileFromGraveyard" ? `${plural(c.filter?.text ?? "card")} from your graveyard` : ""}`.trim()] : []))].join(" and ");
       return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: Math.min(max, Math.max(ab.xMin ?? 0, 1)), modes, extra, ...(ab.xMin ? { min: ab.xMin } : {}) });
     }
     // −X loyalty abilities: X loyalty counters, up to how many it has (CR 606.6).
@@ -870,7 +870,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (c.kind === "removeCounters") {
         // "Remove three counters from among other artifacts, creatures, and planeswalkers you control": pick them (CR 602.2b).
         if (d.counters !== undefined) continue;
-        return setCounterPick({ activate: d, label: cardOf(s, d.objectId).name, what: `remove ${c.n} ${counterCostKinds(c)}counter${c.n === 1 ? "" : "s"} ${c.self ? "from it" : `from among ${c.filter.text}`}`, n: c.n, candidates: counterCostCandidates(s, HUMAN, s.objects[d.objectId]!, c) });
+        // Moxite Refinery: all of them from one permanent (`single`).
+        return setCounterPick({ activate: d, label: cardOf(s, d.objectId).name, what: `remove ${c.n} ${counterCostKinds(c)}counter${c.n === 1 ? "" : "s"} ${c.self ? "from it" : c.one ? `from ${c.filter.text}` : `from among ${c.filter.text}`}`, n: c.n, candidates: counterCostCandidates(s, HUMAN, s.objects[d.objectId]!, c), ...(c.one ? { single: true } : {}) });
       }
       if (c.kind === "putCounter") {
         // "Put a -1/-1 counter on a creature you control" (Hatchet Bully): click the creature (CR 602.2b).
@@ -2141,6 +2142,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               title={`${counterPick.label}: ${counterPick.what}`}
               n={counterPick.n}
               candidates={counterPick.candidates}
+              single={!!counterPick.single}
               onHover={setHover}
               onDone={(counters) => {
                 setCounterPick(null);
@@ -2939,6 +2941,7 @@ function CounterChoice({
   title,
   n,
   candidates,
+  single,
   onHover,
   onDone,
   onCancel,
@@ -2947,12 +2950,16 @@ function CounterChoice({
   title: string;
   n: number;
   candidates: { id: string; kind: string; n: number }[];
+  /** Moxite Refinery: every counter from the same permanent, so the others can't be picked once one is. */
+  single?: boolean;
   onHover: (d: CardDef | null) => void;
   onDone: (counters: { id: string; kind: string }[]) => void;
   onCancel: () => void;
 }) {
   const [taken, setTaken] = useState<number[]>(() => candidates.map(() => 0));
   const total = taken.reduce((a, b) => a + b, 0);
+  const usedId = single ? candidates.find((_, i) => taken[i]! > 0)?.id : undefined;
+  const blocked = (i: number) => usedId !== undefined && candidates[i]!.id !== usedId;
   const set = (i: number, v: number) => setTaken(taken.map((t, j) => (j === i ? v : t)));
   return (
     <div className="modal-backdrop">
@@ -2975,7 +2982,7 @@ function CounterChoice({
             const d = cardOf(s, c.id);
             return (
               <div key={`${c.id}:${c.kind}`} className="counter-row" data-counter={`${c.id}:${c.kind}`}>
-                <div className={`card big ${taken[i] ? "selected" : "targetable"}`} onClick={() => set(i, taken[i]! < c.n && total < n ? taken[i]! + 1 : 0)} {...hoverProps(d, onHover)}>
+                <div className={`card big ${taken[i] ? "selected" : blocked(i) ? "" : "targetable"}`} onClick={() => !blocked(i) && set(i, taken[i]! < c.n && total < n ? taken[i]! + 1 : 0)} {...hoverProps(d, onHover)}>
                   <CardFace d={d} />
                 </div>
                 <span>
@@ -2985,7 +2992,7 @@ function CounterChoice({
                   <strong>
                     {taken[i]} / {c.n} {c.kind}
                   </strong>
-                  <button className="ghost" disabled={taken[i]! >= c.n || total >= n} onClick={() => set(i, taken[i]! + 1)}>
+                  <button className="ghost" disabled={taken[i]! >= c.n || total >= n || blocked(i)} onClick={() => set(i, taken[i]! + 1)}>
                     +
                   </button>
                 </span>

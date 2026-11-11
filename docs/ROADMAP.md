@@ -1,7 +1,7 @@
 # Roadmap
 
-31,042 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,974 of 4,988 (99%), top 10,000: 9,820 of
+31,048 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,975 of 4,988 (99%), top 10,000: 9,825 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2398,6 +2398,29 @@ line blocks.
    They're 5/5 artifact creatures." (CR 708.2, a face-down instant or sorcery stays face down), with a browser test.
    +4, 30,978 of 31,936 with B173 through B176. Bots activate Sasaya only when the flip happens, cast The Master with an exile only when one of
    their creatures has an enters trigger worth copying, and put all of their hand onto the battlefield with Tezzeret.
+   Round 342 went on down the "Out after round N" lists, most played first: Iron Man, Titan of Innovation's "then you
+   may sacrifice a noncreature artifact. If you do, search your library for an artifact card with mana value equal to 1
+   plus the sacrificed artifact's mana value" (the optional sacrifice of one permanent now counts for "the sacrificed",
+   as it last existed, CR 608.2h; the Treasure it just made has mana value 0), which Enigmatic Incarnation's end step
+   trigger needed too; Petrified Hamlet's "When this land enters, choose a land card name." (the name kept on the land as
+   the trigger resolves; until then nothing is banned and no land gets "{T}: Add {C}."); Orvar, the All-Form's "Whenever
+   you cast an instant or sorcery spell, if it targets one or more other permanents you control, create a token that's a
+   copy of one of those permanents." (an intervening if, CR 603.4: only targets still on the battlefield as the objects
+   they were and still yours, not Orvar, checked again as it resolves; with more than one, a choice, with a browser
+   test); Sin, Unending Cataclysm's "As ~ enters, remove all counters from any number of artifacts, creatures, and
+   enchantments. ~ enters with X +1/+1 counters on it, where X is twice the number of counters removed this way."
+   (anyone's, not targeted, CR 614.12, with a browser test) and "put its counters on target creature you control, then
+   shuffle ~ into its owner's library" (every kind it had, rulings; nothing at all with the target gone, CR 608.2b);
+   Moxite Refinery's "Remove X counters from an artifact or creature you control" (counters of any kinds, all from one
+   permanent, X 0 included; the counter picker locks to the first permanent picked from, with a browser test). +6,
+   31,048 of 31,936. Bots take Sin's counters from every opponent's permanent and from their own only when all of its
+   counters are -1/-1 or stun counters. Bot gap: bots never activate Moxite Refinery (as with other abilities with an X
+   in a removal cost). Still simplified: once the spell has left the stack, Orvar uses its targets as it was cast, not
+   as they were when it left (they differ only if something changed them in between).
+   Out after round 342 (looked at, not done): Shelob, Child of Ungoliant (creatures dealt damage this turn by a Spider
+   you controlled, and a copy that's a Food artifact losing its other card types); Finale of Promise (an instant and a
+   sorcery cast from the graveyard as it resolves, each copied twice when X is 10 or more); Breath of Fury (the Aura
+   moved after its creature is sacrificed, then an extra combat).
    Round 341 went on down the "Out after round N" lists, most played first, to the optional token replacements four of
    them were waiting on: a choice made as tokens would be created (CR 614.1a, 616.1), so a resolving instruction stops to
    ask and then runs again from its start with the answer, on a copy of the state taken before it, the way damage shields

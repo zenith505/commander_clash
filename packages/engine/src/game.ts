@@ -1862,11 +1862,15 @@ function auraObjectHost(s: GameState, aura: GameObject, pid: PlayerId, enchant: 
   if (enchant.kind === "card") return graveyardCards(s, enchant).filter((id) => !among || among.includes(id)).sort((a, b) => defMv(defOf(s, obj(s, b))) - defMv(defOf(s, obj(s, a))))[0];
   const legal = s.battlefield.filter((id) => id !== aura.id && (!among || among.includes(id)) && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)) && enchantableBy(characteristics(s, obj(s, id)), aura.id));
   const mine = (id: ObjectId) => controllerOf(s, obj(s, id)) === pid;
+  return (auraHelps(defOf(s, aura)) ? legal.find(mine) : legal.find((id) => !mine(id))) ?? legal[0];
+}
+
+/** An Aura whose static abilities only help what it enchants (keywords, abilities that aren't harmful, P/T that isn't lowered): one a player would put on their own permanent. */
+export function auraHelps(d: CardDef): boolean {
   const good = (m: Modification) =>
     m.kind === "addKeywords" || (m.kind === "addAbility" && !modsAreHarmful([m])) || (m.kind === "modifyPT" && !(typeof m.power === "number" && m.power < 0) && !(typeof m.toughness === "number" && m.toughness < 0));
-  const statics = compileCard(defOf(s, aura)).statics;
-  const helps = statics.length > 0 && statics.every((st) => st.mods.every(good));
-  return (helps ? legal.find(mine) : legal.find((id) => !mine(id))) ?? legal[0];
+  const statics = compileCard(d).statics;
+  return statics.length > 0 && statics.every((st) => st.mods.every(good));
 }
 
 /**
@@ -7697,6 +7701,16 @@ export function graveyardCast(d: CardDef, via?: CastFromGraveyardKind): CastFrom
 
 /** Flashback an effect gave this card until end of turn, its cost equal to the card's mana cost (Snapcaster Mage). */
 export const hasGrantedFlashback = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && !g.escape && !g.cast);
+/**
+ * Flashback an effect gave this card until end of turn: its mana cost (Snapcaster Mage), or a cost of its own (Archmage's
+ * Newt's {0}, which a card with no mana cost can pay too, rulings). With both, one way is offered: the {0} one (simplified:
+ * an {X} spell's caster can't pick the mana-cost one to choose X, CR 107.3b).
+ */
+const grantedFlashbackWays = (s: GameState, o: GameObject, d: CardDef): CastFromGraveyard[] => {
+  if (!hasGrantedFlashback(s, o)) return [];
+  const own = s.flashbackGrants!.find((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && !g.escape && !g.cast && g.mana)?.mana;
+  return [{ kind: "grantedFlashback" as const, mana: own ?? d.manaCost, costs: [], exile: true }];
+};
 /** "You may cast this card from your graveyard" an effect gave this card until end of turn (Case of the Uneaten Feast). */
 const hasGrantedCast = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && g.cast);
 /**
@@ -7730,7 +7744,7 @@ export function graveyardWays(s: GameState, o: GameObject, caster?: PlayerId): C
   const asAdventure = face !== undefined ? asFace(s, o, face, () => grantedWays(s, o, defOf(s, o), caster ?? o.owner)).filter((g) => g.kind === "permission").map((g) => ({ ...g, face })) : [];
   const granted = grantedWays(s, o, d, caster ?? o.owner);
   const escapeEot = granted.some((g) => g.kind === "grantedEscape") ? [] : grantedEscapeUntilEot(s, o);
-  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : []), ...granted, ...escapeEot, ...asAdventure];
+  return [...(compileCard(d).fromGraveyard ?? []), ...grantedFlashbackWays(s, o, d), ...granted, ...escapeEot, ...asAdventure];
 }
 
 /**
@@ -10302,11 +10316,12 @@ function distributeChosen(s: GameState, p: Player, parts: Record<ObjectId, numbe
     continueResolution(s);
     return;
   }
-  if (pend.move ? sum > pend.total : sum !== pend.total) throw new RulesError(pend.move ? `move at most ${pend.total} ${pend.counter} counters` : `distribute all ${pend.total} ${pend.counter} counters`);
+  if (pend.move || pend.upTo ? sum > pend.total : sum !== pend.total) throw new RulesError(pend.move ? `move at most ${pend.total} ${pend.counter} counters` : pend.upTo ? `distribute at most ${pend.total} ${pend.counter} counters` : `distribute all ${pend.total} ${pend.counter} counters`);
   r.scratch = { ...r.scratch, distributed: Object.fromEntries(given) };
   s.pending = null;
   if (pend.move) log(s, sum ? `${p.name} moves ${sum} ${pend.counter} counter${sum > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} onto ${nameOf(s, id)}`).join(", ")}.` : `${p.name} moves no counters.`);
-  else log(s, `${p.name} distributes ${pend.total} ${pend.counter} counter${pend.total > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} on ${nameOf(s, id)}`).join(", ")}.`);
+  else if (pend.upTo && !sum) log(s, `${p.name} distributes no ${pend.counter} counters.`);
+  else log(s, `${p.name} distributes ${sum} ${pend.counter} counter${sum > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} on ${nameOf(s, id)}`).join(", ")}.`);
   continueResolution(s);
 }
 

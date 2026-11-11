@@ -3307,6 +3307,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever ~ deals damage to an opponent, ${dealsMin[2]}`);
     return t && t !== "fail" && t.event === "selfDealsDamageToPlayer" && t.toOpponent && !t.minDamage ? { ...t, minDamage: num(dealsMin[1]!) } : "fail";
   }
+  // Paranormal Analyst: "Whenever you manifest dread, put a card you put into your graveyard this way into your hand.": the
+  // card that manifesting dread put there, while it's still there (rulings; CR 400.7), none if it put none.
+  if (/^Whenever you manifest dread, put a card you put into your graveyard this way into your hand\.?$/.test(line))
+    return { event: "youManifestDread", body: { targets: [], effects: [{ type: "bounce", what: { ref: "eventGroup" } }], text: "Put a card you put into your graveyard this way into your hand." } };
   // "Whenever you expend 4, ..." (CR 700.14): read as any "whenever you" trigger with no event of its own to refer to.
   const expend = /^Whenever you expend (\d+), (.+)$/.exec(line);
   if (expend) {
@@ -3725,6 +3729,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (timeExiled) {
     const body = parseBody(capital(timeExiled[2]!));
     return body ? { event: timeExiled[1] === "When the last" ? "selfLastTimeCounterRemovedExiled" : "selfTimeCounterRemovedExiled", zone: "exile", body } : "fail";
+  }
+  // Watcher of Hours: "Whenever you remove a time counter from this card while it's exiled, ...": the same, for the counters
+  // its owner removes, each with an effect they control (its suspend ability's, CR 702.62a), not another player's.
+  const youRemove = /^Whenever you remove a time counter from ~ while it's exiled, (.+)$/.exec(line);
+  if (youRemove) {
+    const body = parseBody(capital(youRemove[1]!));
+    return body ? { event: "selfTimeCounterRemovedExiled", zone: "exile", removedByYou: true, body } : "fail";
   }
   // Curator of Sun's Creation: "Whenever you discover, discover again for the same value": the value of the discover that
   // triggered it (CR 701.57a; you discover once the whole process is done, rulings).

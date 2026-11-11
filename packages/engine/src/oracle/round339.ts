@@ -3,13 +3,16 @@ import type { Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseBody } from "./body";
 import { pickFilter } from "./targets";
+import { round340Sentence } from "./round340";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round339Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void effects;
+  // Round 340's sentences first (oracle/round340.ts).
+  const r340 = round340Sentence(s, sentences, si, ctx, effects);
+  if (r340) return r340;
   const line = plain(s);
   // Kadena's Silencer: "When this creature is turned face up, counter all abilities your opponents control.": each activated
   // and triggered ability an opponent controls already on the stack as it resolves, not spells, nor any activated or

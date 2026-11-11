@@ -6782,7 +6782,9 @@ export function compile(d: CardDef): CompiledCard {
             : twice[1] === "create or sacrifice"
               ? [`Whenever you create a token, ${effect}`, `Whenever you sacrifice a token, ${effect}`]
             : /^whenever /.test(twice[1]!)
-              ? [`When ~ enters, ${effect}`, `W${twice[1]!.slice(1)}, ${effect}`]
+              // Hoarder's Overflow: "When ~ enters and whenever you expend 4, put a stash counter on it.": "it" is ~ in
+              // both, the second trigger's event being about a player, not an object.
+              ? [`When ~ enters, ${effect}`, `W${twice[1]!.slice(1)}, ${/^whenever you expend \d+$/.test(twice[1]!) ? effect.replace(/^put (an? [a-z]+ counter) on it\.$/, "put $1 on ~.") : effect}`]
             : /^When ~ phases out or leaves the battlefield, /.test(line)
               ? [`Whenever ~ phases out, ${effect}`, `When ~ leaves the battlefield, ${effect}`]
             : /^Whenever ~ attacks, blocks, or becomes the target of a spell, /.test(line)

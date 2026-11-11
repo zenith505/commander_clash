@@ -1,7 +1,7 @@
 # Roadmap
 
-30,996 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,814 of
+31,008 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,816 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -925,7 +925,7 @@ line blocks.
    of 31,936 with rounds 210, 211 and B40 to B43).
    Out after round 212 (looked at, not done): Sheltering Ancient (done in round 312) (cumulative upkeep putting a counter on an opponent's
    creature); Power Sink (done in round 304) ("tap all lands with mana abilities"); Zilortha (lethal damage by power everywhere); Ravenous
-   Slime (a die replacement); Astral Drift (done in round 314) and Paranormal Analyst ("whenever you manifest dread" and cycling triggers);
+   Slime (a die replacement); Astral Drift (done in round 314) and Paranormal Analyst (done in round 340) ("whenever you manifest dread" and cycling triggers);
    Rowan, Scion of War; Aven Courier (done in round 296); Galactus. Eligeth with Kenessos: Kenessos's "scry one more" applies first (draws
    n+1), not the controller's choice of order (CR 616.1).
    Round 213 took fresh cards from ranks 11,900 to 13,500: "each opponent chooses a permanent they control that shares a
@@ -1123,7 +1123,7 @@ line blocks.
    Out after round 220 (looked at, not done): Ghost of Ramirez DePietro (no record yet of a card discarded this turn,
    only of cards put into a graveyard from a library); Reservoir Kraken (done in round 339) ("any opponent may tap an untapped creature they
    control": each opponent's choice in turn); Marshland Bloodcaster (paying life equal to the next spell's mana value
-   instead of its mana cost); Watcher of Hours (a trigger of a card in exile, "whenever you remove a time counter from
+   instead of its mana cost); Watcher of Hours (done in round 340) (a trigger of a card in exile, "whenever you remove a time counter from
    this card while it's exiled"); Tarmogoyf Nest and Disa the Restless (done in round 275);
    Kethek, Crucible Goliath (done in round 311) (reveal until a nonlegendary creature card with lesser mana value than the sacrificed
    creature); Yidris, Maelstrom Wielder (done in round 303) (cascade on spells cast from hand for the turn); Animal Friend (done in round 328) (a quoted
@@ -1152,7 +1152,7 @@ line blocks.
    arrived uses up the turn's first one (as the rules say).
    Out after round 221 (looked at, not done): New Perspectives (done in round 326) ({0} instead of every cycling cost, non-mana ones
    included); Clay Golem (a die roll as a cost, done in round 325); Ian the Reckless (done in round B175) (damage to you and any target at once);
-   Stumpsquall Hydra (distribute counters among it and commanders); Cursecloth
+   Stumpsquall Hydra (done in round 340) (distribute counters among it and commanders); Cursecloth
    Wrappings (done in round 303) (granted embalm with the card's own mana cost); Rift Elemental (remove a time counter from a permanent or
    suspended card); Ashcloud Phoenix (return face down); Nightshade Assassin (reveal X black cards); Silverquill
    Lecturer (granted demonstrate); Cosi's Trickster (whenever an opponent shuffles, done in round B71); Ib Halfheart, Goblin Tactician
@@ -2398,6 +2398,28 @@ line blocks.
    They're 5/5 artifact creatures." (CR 708.2, a face-down instant or sorcery stays face down), with a browser test.
    +4, 30,978 of 31,936 with B173 through B176. Bots activate Sasaya only when the flip happens, cast The Master with an exile only when one of
    their creatures has an enters trigger worth copying, and put all of their hand onto the battlefield with Tezzeret.
+   Round 340 went on down the "Out after round N" lists, most played first: Nomad Mythmaker's "Return target Aura card
+   from a graveyard to the battlefield under your control attached to a creature you control." (any graveyard, the
+   creature chosen as it enters, CR 303.4f; with none it stays in the graveyard); Archmage's Newt's "target instant or
+   sorcery card in your graveyard gains flashback until end of turn. The flashback cost is equal to its mana cost. That
+   card gains flashback {0} until end of turn instead if ~ is saddled." (decided as it resolves, saddled as ~ last
+   existed, CR 608.2h, 702.171b; flashback {0} works for a card with no mana cost, and X is 0, CR 107.3b); Hoarder's
+   Overflow's "When ~ enters and whenever you expend 4, put a stash counter on it." (CR 700.14, once each turn);
+   Watcher of Hours's "Whenever you remove a time counter from ~ while it's exiled" (only removals you make, so not
+   another player's Clockspinning-style effect); Paranormal Analyst's "Whenever you manifest dread, put a card you put
+   into your graveyard this way into your hand." (the cards the dread put there, none with an empty library); Stumpsquall
+   Hydra's "distribute X +1/+1 counters among it and any number of commanders" (not targeted, divided as it resolves,
+   CR 608.2d, any player's commanders, creature or not, rulings; with the Hydra gone, up to X among the commanders, with a
+   browser test). +6, 31,008 of 31,936 with B175-B176. Bots sacrifice Hoarder's Overflow in their second main phase
+   once its counters beat their hand by two, return only Auras that help their creature with Nomad Mythmaker, and give
+   the Hydra's counters only to their own permanents. Still simplified: a card with both a {0} and a mana-cost granted
+   flashback offers only the {0} one (so an {X} card can't pick X there); bots never activate Nomad Mythmaker; Watcher's
+   surveil and suspend's cast trigger aren't ordered by their controller (as with Aeon Chronicler).
+   Out after round 340 (looked at, not done): Regenerations Restored (its last-counter trigger and vanishing's sacrifice
+   trigger go on the stack in an order its controller picks, CR 603.3b, and the engine has no such choice yet); Rift
+   Elemental (a cost removing a time counter from a permanent or suspended card); Words of Waste (a choice in the middle
+   of a draw); Fade Away (every player's payments announced before any sacrifice); Lodestone Bauble (one player's
+   graveyard chosen with no target).
    Round 339 went on down the "Out after round N" lists, most played first: Kadena's Silencer's "counter all abilities
    your opponents control" (abilities only, spells stay, CR 701.6b) and Strict Proctor's "Whenever a permanent entering
    causes a triggered ability to trigger, counter that ability unless its controller pays {2}." (each trigger an entering
@@ -3756,7 +3778,7 @@ line blocks.
    bolster, and a floating "when that creature deals combat damage this turn"); The War Doctor (phasing out and exile
    batch triggers); Saving Grace (done in round 311) (redirecting damage to itself); Volcanic Offering (done in round B141) (a target an opponent chooses);
    Riftmarked Knight (the token its suspend makes, with flanking and protection from white); Roiling Horror (done in round B111) (its
-   characteristic-defining P/T counts a life difference); Watcher of Hours ("you remove a time counter", a choice of
+   characteristic-defining P/T counts a life difference); Watcher of Hours (done in round 340) ("you remove a time counter", a choice of
    which); Jaya's Phoenix and Repeated Reverberation (copy the next loyalty ability); Coveted Falcon, Shadow Kin, Arna
    Kennerüd, Confusion in the Ranks, Imodane (done in round 337), Mavinda, Manascape Refractor, Cass, Bronzehide Lion, Ria Ivor and
    Fabrication Foundry (looked at, not done this round).
@@ -3986,7 +4008,7 @@ line blocks.
    choice of a +1/+1 counter or ..." with "up to one" target still asks which when no target was chosen. Smaller gaps from round 132: bots choose Selective Obliteration's color by the worth of their own one-color
    permanents and take Atraxa's cards one at a time, the first that fits. Smaller gaps from round 131: Thundermane Dragon checks a creature card's printed
    power (a */* card counts as 0); with several "cast from the top" permissions the one that gives haste is used;
-   Hoarder's Overflow ("When ~ enters and whenever you expend 4"), Blood Operative and Council's Deliberation
+   Hoarder's Overflow (done in round 340) ("When ~ enters and whenever you expend 4"), Blood Operative and Council's Deliberation
    ("whenever you surveil, if ~ is in your graveyard") are out; bots answer Zada's copy order with the first creature
    offered. Smaller gaps from round 130: Laboratory Maniac is taken over Out of the Tombs when both would replace a draw
    (no choice between the two, CR 616.1), and bots return the creature card with the highest mana value;
@@ -4706,7 +4728,7 @@ line blocks.
      Grift), Smuggler's Surprise.
    - Saddle: "the creature that saddled it this turn" (Giant Beaver, Rambling Possum, Calamity, Fortune, The Gitrog),
      effects that make a Mount saddled (Guidelight Matrix, Kolodin, Alacrian Armory), "is saddled" and "becomes
-     saddled for the first time each turn" (Archmage's Newt, Caustic Bronco, Stubborn Burrowfiend (done in round B163)), "saddles a Mount
+     saddled for the first time each turn" (Archmage's Newt (done in round 340), Caustic Bronco, Stubborn Burrowfiend (done in round B163)), "saddles a Mount
      or crews a Vehicle" triggers (Canyon Vaulter (done in round B174), Reckless Velocitaur (done in round B174)), "Mount or Vehicle" groups (Cloudspire Captain),
      Bounding Felidar, Guardian Sunmare, Lagorin, Ornery Tumblewagg. Bots only saddle Mounts that have an "attacks
      while saddled" trigger.
@@ -5869,7 +5891,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   activated), Ley Line (done in round B110) and Mausoleum Turnkey (done in round B110) (another player chooses the target), Tamanoa and Molten Lavamancer (done in round B122)
   (noncombat or noncreature damage triggers), Venser's Diffusion (a target among suspended cards), Nivmagus Elemental
   (exile an instant or sorcery spell you control as a cost), Warbringer (equip costs less: Lane A round 217 does it),
-  Nomad Mythmaker (attach to a creature you choose as it resolves).
+  Nomad Mythmaker (done in round 340) (attach to a creature you choose as it resolves).
 - Round B50 (harder skipped cards, least played first): "unless its controller has ~ deal N damage to them" on a
   land, a creature or a spell (Dwarven Driller, Dwarven Scorcher, Blazing Salvo, Molten Influence), "unless they have
   exactly three or exactly four cards in hand" (Skullcage), "Exile all/each ... until ~ leaves the battlefield"

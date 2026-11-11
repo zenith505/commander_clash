@@ -185,7 +185,9 @@ export type TriggerSourceEvent =
   | { type: "finalChapterResolved"; player: PlayerId; amount: number }
   | { type: "gaveGift"; player: PlayerId }
   /** `n` time counters were removed from this card in exile (Aeon Chronicler: once for each, CR 113.6). */
-  | { type: "timeCountersRemovedExiled"; id: ObjectId; n: number }
+  /** Paranormal Analyst: a player manifested dread (CR 701.62a); `cards`, what it put into their graveyard. */
+  | { type: "manifestedDread"; player: PlayerId; cards: { id: ObjectId; zc: number }[] }
+  | { type: "timeCountersRemovedExiled"; id: ObjectId; n: number; /** The controller of the effect that removed them (Watcher of Hours' "you remove"). */ by: PlayerId }
   /** "Whenever you discover" (Curator of Sun's Creation): the discover value as `amount`. */
   | { type: "discovered"; player: PlayerId; amount: number }
   | { type: "cumulativeUpkeepPaid"; id: ObjectId }
@@ -1852,6 +1854,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "trained") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfTrains");
+  } else if (ev.type === "manifestedDread") {
+    // "Whenever you manifest dread": the player who did (CR 701.62a), the card it put into the graveyard the event's group.
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youManifestDread", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, group: ev.cards });
+    }
   } else if (ev.type === "timeCountersRemovedExiled") {
     // Aeon Chronicler: "Whenever a time counter is removed from ~ while it's exiled": it works in exile (CR 113.6), its
     // owner controlling it (CR 113.8), once for each counter.
@@ -1859,7 +1867,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (o?.zone === "exile" && !o.faceDown) {
       fromExile = true;
       try {
-        for (let i = 0; i < ev.n; i++) add(o, o.owner, (e) => e === "selfTimeCounterRemovedExiled", compileCard(defOf(s, o)).triggers);
+        for (let i = 0; i < ev.n; i++) add(o, o.owner, (e, t) => e === "selfTimeCounterRemovedExiled" && (!t.removedByYou || ev.by === o.owner), compileCard(defOf(s, o)).triggers);
       } finally {
         fromExile = false;
       }

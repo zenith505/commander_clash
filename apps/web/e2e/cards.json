@@ -31966,6 +31966,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9b157b9a-92da-4054-8441-04fb4e415d77",
+  "name": "Stumpsquall Hydra",
+  "manaCost": "{X}{G}{G}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Hydra",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Hydra"
+  ],
+  "oracleText": "When this creature enters, distribute X +1/+1 counters among it and any number of commanders.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e3480c8f-15ad-451b-bb34-b129805569e1",
   "name": "Stunted Growth",
   "manaCost": "{3}{G}{G}",

@@ -1897,7 +1897,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       else delete o.counters.time;
       log(s, `${defOf(s, o).name} loses a time counter${left ? ` (${left} left)` : ""}.`);
       countersRemoved(s, o, "time", 1);
-      fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n: 1 });
+      fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n: 1, by: ctx.controller });
       if (!left) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "time" });
       return;
     }
@@ -2071,9 +2071,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       for (const o of cards) {
         const escape = escapeOf(o);
         if (escape && !escape.mana) continue;
-        (s.flashbackGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, ...(escape ? { escape } : {}), ...(e.cast ? { cast: true as const } : {}) });
+        (s.flashbackGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, ...(escape ? { escape } : {}), ...(e.cast ? { cast: true as const } : {}), ...(e.mana && !escape && !e.cast ? { mana: e.mana } : {}) });
       }
-      if (cards.length) log(s, `${cards.length > 2 ? `${cards.length} cards` : cards.map((o) => defOf(s, o).name).join(" and ")} ${cards.length === 1 ? "gains" : "gain"} ${e.escape ? `escape (${cards.length === 1 ? escapeOf(cards[0]!)!.mana : (e.escape.mana ?? "its mana cost")}, exile ${e.escape.exile} other cards from your graveyard)` : e.cast ? `"You may cast this card from your graveyard"` : "flashback"} until end of turn.`);
+      if (cards.length) log(s, `${cards.length > 2 ? `${cards.length} cards` : cards.map((o) => defOf(s, o).name).join(" and ")} ${cards.length === 1 ? "gains" : "gain"} ${e.escape ? `escape (${cards.length === 1 ? escapeOf(cards[0]!)!.mana : (e.escape.mana ?? "its mana cost")}, exile ${e.escape.exile} other cards from your graveyard)` : e.cast ? `"You may cast this card from your graveyard"` : e.mana ? `flashback ${e.mana}` : "flashback"} until end of turn.`);
       return;
     }
     case "cipher":

@@ -2070,6 +2070,8 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       if (!sc.looked || (e.sacrificeFirst && !sc.digSacrificed)) {
         if (!sc.looked) {
           sc.looked = player(s, from).library.slice(0, amountNow(s, e.n, ctx));
+          // Paranormal Analyst: manifesting dread with an empty library still triggers "whenever you manifest dread" (rulings).
+          if (!sc.looked.length && e.dread) fireEvent(s, { type: "manifestedDread", player: pid, cards: [] });
           if (!sc.looked.length && !e.sacrificeFirst) return;
           if (e.sacrificeFirst) log(s, `${p.name} looks at the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of their library.`);
         }
@@ -2305,6 +2307,9 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           s.resolving.movedLinked = rest.filter((id) => s.objects[id]?.zone === "graveyard").length;
           s.resolving.movedLinkedIds = rest.filter((id) => s.objects[id]?.zone === "graveyard");
         }
+        // Manifest dread done (CR 701.62a): the card put into the graveyard (none with one card looked at, or if a
+        // replacement sent it elsewhere, rulings).
+        if (e.dread) fireEvent(s, { type: "manifestedDread", player: pid, cards: rest.filter((id) => s.objects[id]?.zone === "graveyard").map((id) => ({ id, zc: s.objects[id]!.zoneChanges ?? 0 })) });
       } else if (restTo === "keep") {
         // They stay on top, in the order they were in (an orderTop's digRest).
         r.digRest = rest.length;

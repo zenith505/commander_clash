@@ -354,16 +354,16 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^(?:(Its controller|That creature's controller|That permanent's controller) manifests|[Mm]anifest) dread( twice)?$/.exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : undefined;
     if (who === null) return null;
-    const one: Effect = { type: "dig", n: 2, count: 1, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false, ...(who ? { who } : {}) };
+    const one: Effect = { type: "dig", n: 2, count: 1, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false, dread: true, ...(who ? { who } : {}) };
     return m[2] ? [one, one] : [one];
   }
   // Unidentified Hovership: "When ~ leaves the battlefield, the exiled card's owner manifests dread": each owner of a card
   // its own exile ability took that's still exiled, one after another (rulings); compile() links the two.
   if (/^[Tt]he exiled card's owner manifests dread$/.test(s) && ctx.selfCard)
-    return [{ type: "dig", n: 2, count: 1, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false, each: true, eachOf: { ref: "linkedExileOwners" } }];
+    return [{ type: "dig", n: 2, count: 1, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false, dread: true, each: true, eachOf: { ref: "linkedExileOwners" } }];
   // Valgavoth's Onslaught: "Manifest dread X times" (the spell's X): one manifest dread after another (rulings: players
   // can't act between them), every face-down creature remembered for "each of those creatures".
-  if (/^Manifest dread X times$/.test(s) && ctx.spell) return [{ type: "repeat", n: amt("X"), gather: true, effects: [{ type: "dig", n: 2, count: 1, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false }] }];
+  if (/^Manifest dread X times$/.test(s) && ctx.spell) return [{ type: "repeat", n: amt("X"), gather: true, effects: [{ type: "dig", n: 2, count: 1, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false, dread: true }] }];
   // "Manifest the top card of your library", "Cloak the top two cards of your library" (CR 701.40a, 701.58a): one at a
   // time (CR 701.40e).
   if ((m = new RegExp(`^(?:(Its controller) (manifests|cloaks)|(Manifest|Cloak)) the top (card|${NUM} cards) of (?:your|their) library$`, "i").exec(s))) {
@@ -1447,7 +1447,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // One Last Job: "Return target Aura or Equipment card from your graveyard to the battlefield attached to a creature you
     // control": one of yours chosen as it resolves (rulings), from your own graveyard only.
     const toYours = m[8] === " attached to a creature you control";
-    if (toYours && !(spec?.owner === "you" && !underYou && !owner && what?.ref === "target" && !what.n && spec.subtypes?.length && spec.subtypes.every((st) => st === "Aura" || st === "Equipment"))) return null;
+    // Nomad Mythmaker: "Put target Aura card from a graveyard onto the battlefield under your control attached to a creature
+    // you control": any graveyard's Aura, under your control, onto one of your creatures it could enchant, chosen as it
+    // resolves; with none it stays in the graveyard (rulings, CR 303.4f-g).
+    const anyYardAura = underYou && !owner && spec?.owner === undefined && spec?.subtypes?.length === 1 && spec.subtypes[0] === "Aura";
+    if (toYours && !((anyYardAura || (spec?.owner === "you" && !underYou && !owner)) && what?.ref === "target" && !what.n && spec?.subtypes?.length && spec.subtypes.every((st) => st === "Aura" || st === "Equipment"))) return null;
     // Iridescent Drake: "put target Aura card from a graveyard onto the battlefield under your control attached to ~": any
     // graveyard's Aura, which stays there if it can't enchant ~ (rulings, CR 303.4g). Hakim, Loreweaver: "{U}{U}: Return
     // target Aura card from your graveyard to the battlefield attached to ~", in an activated ability likewise.
@@ -1467,7 +1471,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const namedCard = !!spec?.named && !types.length && !spec.subtypes?.length;
     if (!what || !spec || (!artifactSub && !namedCard && (!types.length || types.some((ty) => !PERMANENT_TYPES.includes(ty)))) || (m[6] && (what.ref !== "target" || (what.n && m[5]?.toLowerCase() !== "an additional")))) return null;
     // Attached to the creature an Aura's own ability is about: only from an Aura (compile checks it enchants a creature).
-    if (attach && (!spec.subtypes?.length || spec.types?.length || m[3] || (m[4] && !(toSelf && underYou && !owner)) || m[6])) return null;
+    if (attach && (!spec.subtypes?.length || spec.types?.length || m[3] || (m[4] && !((toSelf || (toYours && anyYardAura)) && underYou && !owner)) || m[6])) return null;
     // Aberrant Return: one, two, or three target cards, each "with an additional -1/-1 counter on it".
     // "With two additional +1/+1 counters on it" (The Darkness Crystal): it enters with them (CR 614.1c).
     const n = m[5] ? ({ "two additional": 2, "three additional": 3 } as Record<string, number>)[m[5].toLowerCase()] ?? 1 : 0;

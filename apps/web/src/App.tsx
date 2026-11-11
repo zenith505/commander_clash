@@ -2907,7 +2907,7 @@ function DistributeChoice({
     <div className="controls">
       <span>
         <strong>{pending.source}:</strong>{" "}
-        {pending.remove && pending.exact ? `remove ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from among ${pending.what} (${left} left)` : pending.remove ? `remove up to ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from among ${pending.what}, if you want (${left} left)` : pending.move ? `move up to ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from it onto ${pending.what}, if you want (${left} left)` : `distribute ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} among any number of ${pending.what} (${left} left)`}
+        {pending.remove && pending.exact ? `remove ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from among ${pending.what} (${left} left)` : pending.remove ? `remove up to ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from among ${pending.what}, if you want (${left} left)` : pending.move ? `move up to ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from it onto ${pending.what}, if you want (${left} left)` : pending.upTo ? `distribute up to ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} among any number of ${pending.what}, if you want (${left} left)` : `distribute ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} among any number of ${pending.what} (${left} left)`}
       </span>
       {pending.options.map((id) => {
         const n = parts[id] ?? 0;
@@ -2926,7 +2926,7 @@ function DistributeChoice({
           </span>
         );
       })}
-      <button disabled={(pending.move || pending.remove) && !pending.exact ? left < 0 : left !== 0} onClick={() => dispatch([{ type: "distribute", player: HUMAN, parts }])}>
+      <button disabled={(pending.move || pending.remove || pending.upTo) && !pending.exact ? left < 0 : left !== 0} onClick={() => dispatch([{ type: "distribute", player: HUMAN, parts }])}>
         Done
       </button>
     </div>

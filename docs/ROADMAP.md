@@ -1,7 +1,7 @@
 # Roadmap
 
-31,038 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,816 of
+31,042 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,974 of 4,988 (99%), top 10,000: 9,820 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2398,6 +2398,26 @@ line blocks.
    They're 5/5 artifact creatures." (CR 708.2, a face-down instant or sorcery stays face down), with a browser test.
    +4, 30,978 of 31,936 with B173 through B176. Bots activate Sasaya only when the flip happens, cast The Master with an exile only when one of
    their creatures has an enters trigger worth copying, and put all of their hand onto the battlefield with Tezzeret.
+   Round 341 went on down the "Out after round N" lists, most played first, to the optional token replacements four of
+   them were waiting on: a choice made as tokens would be created (CR 614.1a, 616.1), so a resolving instruction stops to
+   ask and then runs again from its start with the answer, on a copy of the state taken before it, the way damage shields
+   are asked about (resolve.ts runAsking; counters.ts applyMayInstead; a mana ability's tokens, and tokens made outside
+   a resolving spell or ability, get the choice a bot would make). Jinnie Fay, Jetmir's Second's "If you would create one
+   or more tokens, you may instead create that many 2/2 green Cat creature tokens with haste or that many 3/1 green Dog
+   creature tokens with vigilance." (only the chosen token's characteristics, what the effect says about the tokens,
+   tapped or attacking, still applying, rulings); Mirrormind Crown's "As long as ~ is attached to a creature, the first
+   time you would create one or more tokens each turn, you may instead create that many tokens that are copies of
+   equipped creature." and Moonlit Meditation's "... copies of enchanted permanent." (copiable values, CR 707.2; any kind
+   of token; declined, it's used up for the turn, and tokens made before it came under your control use it up too,
+   rulings: every token creation is recorded in the turn log); Esix, Fractal Bloom's "The first time you would create one
+   or more tokens during each of your turns, you may instead choose a creature other than ~ and create that many tokens
+   that are copies of that creature." (any player's creature), with browser tests for Jinnie, Esix and declining Moonlit
+   Meditation. +4, 31,042 of 31,936 with B179-B180. Bots take the option their rough token worth rates highest (a copy of a legendary
+   creature they'd lose to the legend rule counts for nothing). Still simplified: the optional replacement is applied
+   after the ones that change how many tokens there are (Doubling Season, Chatterfang, Divine Visitation), so "that
+   many" is all of them; the other orders its controller could pick (CR 616.1) aren't offered. When an instruction asks
+   what a token that's attacking attacks first (Brimaz) and the tokens are then replaced, the new ones attack what was
+   chosen, in order.
    Round 340 went on down the "Out after round N" lists, most played first: Nomad Mythmaker's "Return target Aura card
    from a graveyard to the battlefield under your control attached to a creature you control." (any graveyard, the
    creature chosen as it enters, CR 303.4f; with none it stays in the graveyard); Archmage's Newt's "target instant or
@@ -2438,8 +2458,8 @@ line blocks.
    the defending player instead of using the one it attacked.
    Out after round 339 (looked at, not done): Encroaching Mycosynth and Biotransference (types for cards in every zone
    and spells, CR 613.1d over hidden zones); Crucible of the Spirit Dragon (mana spendable only on Dragons, in any
-   combination of colors); Jinnie Fay, Jetmir's Second (a choice replacing every token creation); Guff Rewrites History
-   (a target for each player, then free casts for each of them); Mirrormind Crown and Moonlit Meditation ("the first
+   combination of colors); Jinnie Fay, Jetmir's Second (done in round 341) (a choice replacing every token creation); Guff Rewrites History
+   (a target for each player, then free casts for each of them); Mirrormind Crown and Moonlit Meditation (both done in round 341) ("the first
    time you would create one or more tokens each turn" as copies); Sokrates, Athenian Teacher (combat damage to a player
    replaced by both drawing); Sunken Palace (mana that copies what it's spent on).
    Round 338 went on down the "Out after round N" lists, most played first: One Last Job's third spree mode "Return target

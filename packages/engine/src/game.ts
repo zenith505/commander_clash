@@ -10571,6 +10571,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "tokenInstead") {
+    // An optional token replacement (CR 616.1): the instruction runs again with the answers so far (resolve.ts runAsking).
+    const answers = s.resolving?.tokenAnswers;
+    if (!answers) throw new RulesError("no tokens are waiting on a replacement choice");
+    answers.push(choice);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "mutate") {
     // A mutating spell's controller puts it on top of the creature or underneath (CR 702.140c).
     const m = s.mutatingSpell;

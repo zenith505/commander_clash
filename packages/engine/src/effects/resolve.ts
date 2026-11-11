@@ -1,5 +1,5 @@
 import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type Effect, type ManaAbility, type Modification, type ObjRef, type PlayerRef, type TargetChoice } from "../abilities";
-import { withPutter } from "../counters";
+import { tokenChoicesPossible, TokenQuestionPause, withPutter, withTokenAnswers } from "../counters";
 import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
 import { addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, draw, endTheCombatPhase, endTheTurn, enterTogether, inCombatPhase, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
@@ -247,24 +247,42 @@ export function continueResolution(s: GameState): Resolution {
  */
 function runAsking(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | void {
   const r = s.resolving!;
-  if (r.item.manaAbility || !shieldChoicesPossible(s)) return runEffect(s, e, ctx);
+  const shields = !r.item.manaAbility && shieldChoicesPossible(s);
+  // Jinnie Fay, Esix: an optional replacement of tokens it creates (CR 616.1), asked the same way (counters.ts).
+  const tokens = !r.item.manaAbility && tokenChoicesPossible(s);
+  if (!shields && !tokens) return runEffect(s, e, ctx);
   const before = cloneState(s);
-  return withShieldAnswers(r.shieldAnswers ?? [], (asked) => {
-    try {
-      const out = runEffect(s, e, ctx);
-      r.shieldAnswers = undefined;
-      return out;
-    } catch (err) {
-      const q = asked();
-      if (!(err instanceof ShieldQuestionPause) || !q) throw err;
-      for (const k of Object.keys(s)) delete (s as unknown as Record<string, unknown>)[k];
-      Object.assign(s, before);
-      invalidateCharacteristics(s);
-      s.resolving!.shieldAnswers ??= [];
-      s.pending = { kind: "chooseOption", player: q.player, source: ctx.sourceDef.name, what: "damageShield", prompt: q.prompt, options: q.labels.map((_, i) => String(i)), labels: q.labels };
-      return "paused";
-    }
-  });
+  const restore = () => {
+    for (const k of Object.keys(s)) delete (s as unknown as Record<string, unknown>)[k];
+    Object.assign(s, before);
+    invalidateCharacteristics(s);
+  };
+  return withTokenAnswers(tokens ? (r.tokenAnswers ?? []) : null, (tokenAsked) =>
+    withShieldAnswers(shields ? (r.shieldAnswers ?? []) : null, (asked) => {
+      try {
+        const out = runEffect(s, e, ctx);
+        r.shieldAnswers = undefined;
+        // Kept while the instruction waits on another choice of its own: it runs again with the same answers.
+        if (out !== "paused") r.tokenAnswers = undefined;
+        return out;
+      } catch (err) {
+        if (err instanceof TokenQuestionPause) {
+          const q = tokenAsked();
+          if (!q) throw err;
+          restore();
+          s.resolving!.tokenAnswers ??= [];
+          s.pending = { kind: "chooseOption", player: q.player, source: q.source, what: "tokenInstead", prompt: q.prompt, options: q.options, labels: q.labels, botChoice: q.botChoice };
+          return "paused";
+        }
+        const q = asked();
+        if (!(err instanceof ShieldQuestionPause) || !q) throw err;
+        restore();
+        s.resolving!.shieldAnswers ??= [];
+        s.pending = { kind: "chooseOption", player: q.player, source: ctx.sourceDef.name, what: "damageShield", prompt: q.prompt, options: q.labels.map((_, i) => String(i)), labels: q.labels };
+        return "paused";
+      }
+    }),
+  );
 }
 
 /**
@@ -277,8 +295,8 @@ export function resolveManaAbility(s: GameState, item: StackItem, body: AbilityB
   const inside = !!outer || !!s.pending;
   const left = s.leftTogether;
   s.resolving = { item, body, legal: [], next: 0, ...(color ? { chosen: { color } } : {}) };
-  // Its damage can't stop for a question (its shields are chosen the way a bot would).
-  if (withShieldAnswers(null, () => continueResolution(s)) === "paused" && inside) throw new RulesError(`${s.cards[item.sourceCardId!]?.name ?? "That"}'s mana ability needs a choice that can't be made now`);
+  // Its damage can't stop for a question (its shields are chosen the way a bot would), nor its tokens (Jinnie Fay).
+  if (withTokenAnswers(null, () => withShieldAnswers(null, () => continueResolution(s))) === "paused" && inside) throw new RulesError(`${s.cards[item.sourceCardId!]?.name ?? "That"}'s mana ability needs a choice that can't be made now`);
   if (!inside) return;
   s.resolving = outer;
   s.leftTogether = left;

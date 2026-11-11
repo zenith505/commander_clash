@@ -276,7 +276,7 @@ export type Count =
   /** Goblin Charbelcher: "the number of nonland cards revealed this way" after exileUntilNonland "keep": of all the cards revealed (every one, with no land among them, rulings). */
   | { kind: "revealedUntilNonland" }
   /** Parley: "for each nonland card revealed this way" after "each player reveals the top card of their library" (`land`: land cards instead). */
-  | { kind: "parleyRevealed"; land?: true; /** Naya Soulbeast: "the total mana value of all cards revealed this way". */ mv?: true }
+  | { kind: "parleyRevealed"; land?: true; /** Haunting Imitation: "if no creature cards were revealed this way". */ creature?: true; /** Naya Soulbeast: "the total mana value of all cards revealed this way". */ mv?: true }
   | { kind: "bottomedFromHand" }
   /** How many cards "you may choose a nonland card from it" chose (0 or 1): for "If you do" and "If you don't". */
   | { kind: "tookFromHand" }
@@ -1564,6 +1564,8 @@ export type ObjRef =
   | { ref: "exiledThisWay"; /** Hour of Eternity: "for each card exiled this way" after "Exile X target creature cards from your graveyard": the cards this resolution moved from a graveyard to exile (ResolvingInfo.exiledCards), while they're still there. */ cards?: true }
   /** "Defending player chooses a nonland card in your graveyard. Return that card to your hand." (O-Kagachi Made Manifest): the card this resolution's chooseFromGraveyard moved, where it went, while it's still that card (CR 400.7). */
   | { ref: "chosenFromYard" }
+  /** Haunting Imitation: "for each creature card revealed this way" after a parley reveal: the cards it revealed (ResolvingState.parley.ids), still on top of their libraries (rulings), matching `filter`. */
+  | { ref: "parleyRevealed"; filter?: TargetSpec }
   /** Scion of the Ur-Dragon: "Search your library for a Dragon permanent card and put it into your graveyard. If you do, ... that card": the card this resolution's last search found, while it's in that zone. */
   | { ref: "searchFound"; zone: "graveyard" }
   /** "The discarded card" (Malcolm): the one card this resolution's last discard put into a graveyard, while it's still that card there. */
@@ -3166,7 +3168,7 @@ export type Effect =
    */
   /** Tevesh Szat: "Put all commanders from the command zone onto the battlefield under your control" (CR 903.3, 110.2a): every player's. */
   | { type: "commandersOntoBattlefield" }
-  | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; /** "With an additional -1/-1 counter on it" (Pyrrhic Revival). */ counters?: Record<string, number>; owners?: true; /** "... to your hand" instead of the battlefield. */ toHand?: true; /** With `toHand`: "Mill six cards, then put all instant and sorcery cards from among them into your hand" (Gleam of Death): only the cards the mill just before put there, still those cards (CR 400.7). */ milled?: true; /** "Target creature card and all other cards with the same name as that card" (Echoing Return): only cards with target `sameNameAs`'s name, that card included. */ sameNameAs?: number; /** "Only creatures can be enchanted this way" (Retether): an Aura can attach only to a creature. */ auraOnCreature?: true; /** "That weren't put there this way" (Bringer of the Last Gift): not the cards this ability's sacrifice put there (ResolvingState.sacrificedThisWay). */ notSacrificedThisWay?: true; /** Storm of Souls: "Each of them is a 1/1 Spirit with flying in addition to its other types", from then on (CR 611.2c). */ alsoMods?: Modification[]; /** "Exile those creatures at the beginning of your next upkeep" (Rally the Ancestors): a delayed trigger for each permanent it returned (CR 603.7). */ exileAtYourNextUpkeep?: true }
+  | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; /** "With an additional -1/-1 counter on it" (Pyrrhic Revival). */ counters?: Record<string, number>; owners?: true; /** "... to your hand" instead of the battlefield. */ toHand?: true; /** With `toHand`: "Mill six cards, then put all instant and sorcery cards from among them into your hand" (Gleam of Death): only the cards the mill just before put there, still those cards (CR 400.7). */ milled?: true; /** "Target creature card and all other cards with the same name as that card" (Echoing Return): only cards with target `sameNameAs`'s name, that card included. */ sameNameAs?: number; /** "Only creatures can be enchanted this way" (Retether): an Aura can attach only to a creature. */ auraOnCreature?: true; /** "That weren't put there this way" (Bringer of the Last Gift): not the cards this ability's sacrifice put there (ResolvingState.sacrificedThisWay). */ notSacrificedThisWay?: true; /** Storm of Souls: "Each of them is a 1/1 Spirit with flying in addition to its other types", from then on (CR 611.2c). */ alsoMods?: Modification[]; /** Bloodbond March: "all cards with the same name as that spell" in a cast trigger: the name the spell had as it was cast (StackItem.castName, CR 201.2). */ sameNameAsCast?: true; /** "Exile those creatures at the beginning of your next upkeep" (Rally the Ancestors): a delayed trigger for each permanent it returned (CR 603.7). */ exileAtYourNextUpkeep?: true }
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
   /** "Target unblocked attacking creature becomes blocked" (Dazzling Beauty), "Attacking creatures become blocked" (Fog Patch): blocked by no creature (CR 509.1h), its whole band too (CR 702.22i). */
   | { type: "becomeBlocked"; what: ObjRef }
@@ -4213,6 +4215,19 @@ export type Effect =
   /** Parley: "Each player reveals the top card of their library." (ResolvingState.parley counts them.) */
   /** Dakra Mystic: "You may put the revealed cards into their owners' graveyards" after a parleyReveal: those cards, still in their libraries (CR 400.7). */
   | { type: "parleyToGraveyards" }
+  /**
+   * Manifold Insights: "Reveal the top ten cards of your library. Starting with the next opponent in turn order, each
+   * opponent chooses a different nonland card from among them. Put the chosen cards into your hand and the rest on the
+   * bottom of your library in a random order.": `n` cards revealed, then each opponent in turn order after you chooses one
+   * matching `filter` not already chosen (all of them once there are no more than that, rulings).
+   */
+  | { type: "opponentsChooseFromTop"; n: number; filter: TargetSpec }
+  /**
+   * Mirror Match: "For each creature attacking you or a planeswalker you control, create a token that's a copy of that
+   * creature and that's blocking that creature.": all at once (CR 707.2 copiable values), each blocking the one it copies
+   * though never declared as a blocker (rulings); "those tokens" are Resolving.created.
+   */
+  | { type: "copiesBlockingAttackers" }
   | { type: "parleyReveal"; /** Game Preserve: "If all cards revealed this way are creature cards, put those cards onto the battlefield under their owners' control": together (CR 608.2f), only if every card revealed is a creature card. */ allCreaturesEnter?: true }
   /**
    * "Put the revealed cards on the bottom of your library in any order" after an exileUntilNonland "keep" (Erratic
@@ -5688,6 +5703,7 @@ export type TriggerEvent =
   | "selfDies" // When this dies
   | "selfExiledCrafting" // "When this creature is exiled from the battlefield while you're activating a craft ability" (Market Gnome)
   | "selfDiesOrExiled" // "When this dies or is put into exile from the battlefield" (the God-Eternals)
+  | "selfExiled" // "When this is put into exile from the battlefield" (Urza's Sylex)
   | "selfToGraveyard" // "When this is put into a graveyard from the battlefield" (any permanent, not just a creature)
   | "selfLeaves" // "When this leaves the battlefield", wherever it goes (CR 603.6c, 603.10a)
   /**

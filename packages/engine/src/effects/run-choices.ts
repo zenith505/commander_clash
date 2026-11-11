@@ -199,7 +199,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Thick-Skinned Goblin: {0} rather than the echo cost of a permanent its controller controls (CR 118.9; rulings: paying
       // {0} is paying the echo cost). Paying the echo cost itself instead would only cost more, so {0} is what's offered.
       if (e.echo && echoZeroFor(s, ctx)) {
-        const zero: Extract<Effect, { type: "may" }> = { ...e, echo: undefined, effects: [{ type: "echoPaid" }], pay: { mana: "{0}" }, text: `${e.text} (paying {0} rather than its echo cost)` };
+        const zero: Extract<Effect, { type: "may" }> = { ...e, echo: undefined, payTimes: undefined, effects: [{ type: "echoPaid" }], pay: { mana: "{0}" }, text: `${e.text} (paying {0} rather than its echo cost)` };
         return runEffect(s, zero, ctx);
       }
       const pay = e.payOneOf && sc.payX !== undefined && sc.payX !== "none" ? { mana: e.payOneOf[Number(sc.payX)]! } : ownCost !== undefined ? (ownCost === null ? undefined : { mana: ownCost }) : e.payEnergy !== undefined ? { ...e.pay, energy: Math.max(0, amountNow(s, e.payEnergy, ctx)) } : e.payLife !== undefined ? { ...e.pay, life: Math.max(0, amountNow(s, e.payLife, ctx)) } : e.payTimes !== undefined && e.pay ? timesPay(e.pay, Math.max(0, amountNow(s, e.payTimes, ctx))) : e.pay;

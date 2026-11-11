@@ -3628,8 +3628,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         sc.found = [];
         // Rat King, Verminister: only cards with target `sameNameAs`'s name, that card included (CR 201.2).
         const t = e.sameNameAs !== undefined ? ctx.targets[e.sameNameAs] : undefined;
-        const name = t?.kind === "object" && s.objects[t.id]?.zone === "graveyard" ? defOf(s, obj(s, t.id)).name : undefined;
-        if (e.sameNameAs !== undefined && name === undefined) return;
+        // Bloodbond March: the name the cast spell had as it was cast, even if it has left the stack since (CR 201.2,
+        // 608.2h); none face down (CR 708.2a), so nothing returns then.
+        const name = e.sameNameAsCast ? (ctx.cause !== undefined ? s.castItems?.[ctx.cause]?.castName : undefined) : t?.kind === "object" && s.objects[t.id]?.zone === "graveyard" ? defOf(s, obj(s, t.id)).name : undefined;
+        if ((e.sameNameAs !== undefined || e.sameNameAsCast) && name === undefined) return;
         // "With mana value X or less": this spell's X (TargetSpec.xRange).
         // "With mana value X" (Fix What's Broken, Immortal Servitude): exactly X.
         // Demigod of Revenge: "all cards named ~", the source's name (CR 201.5).

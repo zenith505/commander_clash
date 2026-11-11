@@ -40,6 +40,7 @@ import { runLaneB174Effect } from "./run-laneb174";
 import { runLaneB177Effect } from "./run-laneb177";
 import { runLaneB180Effect } from "./run-laneb180";
 import { runLaneB184Effect } from "./run-laneb184";
+import { runLaneB185Effect } from "./run-laneb185";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -591,6 +592,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const o = c && s.objects[c.id];
     return o && (o.zoneChanges ?? 0) === c.zc ? [o] : [];
   }
+  // Haunting Imitation: the cards a parley reveal showed, still on top of their libraries (rulings), like `filter`.
+  if (ref.ref === "parleyRevealed") return (s.resolving?.parley?.ids ?? []).map((id) => s.objects[id]).filter((o): o is GameObject => o?.zone === "library" && (!ref.filter || printedMatches(ref.filter, defOf(s, o))));
   if (ref.ref === "revealed") {
     const rv = s.resolving?.revealed;
     const o = rv && s.objects[rv.id];
@@ -1769,6 +1772,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "playersPutCounterEach":
     case "keywordCountersFromYard":
       return runLaneB184Effect(s, e, ctx, src);
+    case "opponentsChooseFromTop":
+    case "copiesBlockingAttackers":
+      return runLaneB185Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

@@ -2994,6 +2994,9 @@ export interface Resolving {
     /** Retriever Phoenix (chooseMay `insteadOfLearn`): the cards asked about so far, and the last answer for the last of them. */
     learnInstead?: { asked: ObjectId[]; yes?: boolean };
     found?: ObjectId[]; // the cards a library search found
+    /** Effect "opponentsChooseFromTop" (Manifold Insights): the cards revealed, the ones chosen so far, and the opponents still to choose. */
+    insights?: { revealed: ObjectId[]; chosen: ObjectId[]; left: PlayerId[]; asking?: PlayerId };
+    insightsMoved?: true;
     /** takeFromHand `reveal`: the cards that player revealed from their hand to choose among (Disciple of Phenax). */
     handRevealed?: ObjectId[];
     toughnessGained?: true; // Talara's Bane's life was gained before the discard waited on a choice

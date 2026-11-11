@@ -79,8 +79,13 @@ describe("Aurification", () => {
     expect(characteristics(s0, s0.objects[theirs]!).subtypes).toContain("Giant");
     expect(characteristics(s0, s0.objects[plain]!).subtypes).toEqual(["Bear"]);
     expect(objHasKeyword(s0, s0.objects[plain]!, "Defender")).toBe(false);
-    // Defender (CR 702.3b): with only that creature, ap's turn has no attack to declare.
-    expect(() => passUntil(s0, "declareAttackers", ap)).toThrow(/never reached/);
+    // Defender (CR 702.3b): with only that creature, ap's turn has no attack to declare. 60 passes cover the rest of this
+    // turn (passing 2000 went round the table for seconds and timed out under load, review follow-up 14); the same Bears
+    // without the counter does reach the declare attackers step within them.
+    expect(() => passUntil(s0, "declareAttackers", ap, 60)).toThrow(/never reached/);
+    s0.objects[mine]!.counters.gold = 0;
+    invalidateCharacteristics(s0);
+    expect(passUntil(s0, "declareAttackers", ap, 60).step).toBe("declareAttackers");
   });
   it("a creature that deals damage to you gets a gold counter and becomes a Wall", () => {
     const { s: s0, ap, opp } = setup([]);

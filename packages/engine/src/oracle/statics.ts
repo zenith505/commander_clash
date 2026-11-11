@@ -1301,6 +1301,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (text === "a permanent was put into your hand from the battlefield this turn") return { kind: "permanentToYourHand" };
   // Dimir Strandcatcher (TurnLog.toGraveyardNotBattlefield).
   if ((m = new RegExp(`^${NUM} or more cards were put into your graveyard from anywhere other than the battlefield this turn$`).exec(text))) return { kind: "cardsToYourGraveyardNotBattlefield", n: num(m[1]!) };
+  // Churning Reservoir: an oil counter removed from a permanent you controlled then, for any reason (a cost, an effect),
+  // or any player's permanent with an oil counter put into a graveyard from the battlefield (CR 122.1, 400.7).
+  if (text === "an oil counter was removed from a permanent you controlled this turn or a permanent with an oil counter on it was put into a graveyard this turn") return { kind: "oilRemovedOrOilPermanentToGraveyard" };
   // Laboratory Drudge: a spell cast from any graveyard (CR 601.2a), or an ability of a card in any graveyard (CR 602.2).
   if (text === "you've cast a spell from a graveyard or activated an ability of a card in a graveyard this turn") return { kind: "usedGraveyardThisTurn" };
   if ((m = new RegExp(`^${NUM} or more cards left your graveyard this turn$`).exec(text))) return { kind: "cardLeftYourGraveyard", n: num(m[1]!) };
@@ -2639,6 +2642,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't become suspected$/.test(rest)) return [{ kind: "cantBeSuspected" }];
   // Frozen in Ice, Blossombind: "can't become untapped": no effect or rule untaps it (see untapPermanent).
   if (/^can't become untapped$/.test(rest)) return [{ kind: "cantBecomeUntapped" }];
+  // Blossombind: "can't have counters put on it": none from then on, the ones already there stay (rulings).
+  if (/^can't have counters put on (?:it|them)$/.test(rest)) return [{ kind: "cantHaveCounters" }];
   if (/^loses? all abilities$/.test(rest)) return [{ kind: "loseAllAbilities" }];
   // Blood Sun: "All lands lose all abilities except mana abilities": the rest go in layer 6 (CR 613.1f); its mana abilities
   // (CR 605.1a) stay, and so do those of its basic land types (CR 305.6).

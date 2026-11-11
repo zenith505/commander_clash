@@ -2268,6 +2268,12 @@ export function parseTargetPhrase(
     extra.orSubtypes = ["Vehicle"];
     p = p.replace(/ or vehicle$/, "");
   }
+  // Quag Feast: "creature, planeswalker, or Vehicle": a creature or a planeswalker, or a Vehicle whether or not it's a
+  // creature right now.
+  if (p === "creature, planeswalker, or vehicle" && !extra.orSubtypes) {
+    extra.orSubtypes = ["Vehicle"];
+    p = "creature or planeswalker";
+  }
   // Ragamuffin Raptor: "creature or Food card": a creature card, or a Food card (an artifact subtype, CR 205.3g).
   if (p === "creature or food" && !extra.orSubtypes) {
     extra.orSubtypes = ["Food"];

@@ -2,6 +2,7 @@
 // its sentences, read at the end of round B176's.
 import type { CompiledCard, Effect } from "../abilities";
 import { parseBody, parseOne, type Ctx } from "./body";
+import { roundB178Sentence } from "./laneb178";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -45,5 +46,5 @@ export function roundB177Sentence(s: string, sentences: string[], si: number, ct
   const shares = /^Each opponent who discarded a card that shares a card type with the card you discarded loses (\d+) life$/.exec(s);
   if (shares) return eachDiscard && last.who.ref === "eachPlayer" ? { effect: { type: "discardSharesTypeLoss", n: Number(shares[1]) }, next: si + 1 } : "fail";
   if (/^Each player who discarded a card with the greatest mana value among cards discarded this way loses life equal to that mana value$/.test(s)) return eachDiscard ? { effect: { type: "discardGreatestMvLoss" }, next: si + 1 } : "fail";
-  return null;
+  return roundB178Sentence(s, sentences, si, ctx, effects);
 }

@@ -1,6 +1,6 @@
 # Roadmap
 
-30,998 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,006 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,812 of
 9,979 (98%).
 
@@ -7964,6 +7964,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature, planeswalker, or Vehicle", destroyed if its mana value fits after the mill). Mossbridge Troll ("Tap any number of
   untapped creatures you control other than ~ with total power 10 or greater": paid like crew but not crewing,
   ActivatedAbility.tapPower; a browser test; bots don't use it yet). +8, 30,998 of 31,936 with rounds 335 to 337.
+- Round B178 (least played first, single-line blockers from the skip lists): Psychic Rebuttal ("Counter target instant or
+  sorcery spell that targets you", then with spell mastery "you may copy the spell countered this way": checked as it
+  resolves, only a spell it really countered, copied as it last was on the stack, CR 707.10, rulings). Sphinx's Approach
+  (Dragon's Approach's exile-five for a Sphinx, after "Draw two cards"). Makeshift Mannequin (the granted "When this creature
+  becomes the target of a spell or ability, sacrifice it" from the moment it enters, for as long as it has a mannequin
+  counter, CR 611.2b). Churning Reservoir ("if an oil counter was removed from a permanent you controlled this turn or a
+  permanent with an oil counter on it was put into a graveyard this turn": TurnLog.oilRemoved, oilPermanentToGraveyard).
+  Melira, the Living Cure (one poison counter instead, then none more this turn even after she's gone, rulings; "Exile ~:
+  Choose another target creature or artifact. When it's put into a graveyard this turn, return that card ..."). Gutter Grime
+  and Saproling Burst (a token whose power and toughness are the counters on the permanent of that name that created it,
+  each remembering its own and 0 once it has left, rulings; Count countersOnCreator). Heliod's Punishment (the granted
+  "{T}: Remove a task counter from Heliod's Punishment. Then if it has no task counters on it, destroy Heliod's Punishment",
+  about the Aura giving it; with two, only the later one's, rulings). +8, 31,006 of 31,936 with B177 and rounds 336 to 337.
+- Out after round B178 (looked at, not done): Peace Talks ("players and permanents can't be the targets of spells or activated
+  abilities": triggered abilities still can, and whether a source is a triggered ability isn't known everywhere targets are
+  checked), Wall of Shadows ("spells that can target only Walls": a property of the whole spell or ability, every mode, not
+  of one target), Fishing Pole ("Tap Fishing Pole" as a cost of the ability it grants: no cost taps the permanent giving an
+  ability yet), Cleansing (each land's destruction paid off by any player) and Grime Gorger stay out for the reasons in
+  the earlier lists.
 - Out after round B177 (looked at, not done): Divine Intervention (only its controller removing the last counter triggers it,
   rulings: who removes counters isn't tracked), Rain of Gore (whether lifelink damage from a spell is that spell causing its
   controller to gain life isn't settled by its rulings), Lich's Mirror, Blood Scrivener, Snowblind and Garruk, Curse Breaker

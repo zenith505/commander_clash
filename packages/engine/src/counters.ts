@@ -109,6 +109,8 @@ export function playerCountersToPut(s: GameState, pid: PlayerId, kind: string, n
   if (counterBans(s).some((b) => b.player === pid)) return 0;
   // Melira, Sylvok Outcast: "You can't get poison counters" (the ones already there stay, rulings).
   if (kind === "poison" && s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).noPoisonForYou && controllerOf(s, s.objects[id]!) === pid)) return 0;
+  // Melira, the Living Cure: once her replacement has applied this turn, no more (rulings).
+  if (kind === "poison" && s.turnLog?.noMorePoison?.includes(pid)) return 0;
   const putter = putterNow ?? pid;
   const ops = modsInPlay(s)
     .filter(({ mod, controller }) => ("onPlayer" in mod && pid === controller && (!mod.counter || mod.counter === kind)) || ("putter" in mod && !!mod.putter && putterFits(s, mod, controller, putter) && (mod.counter === undefined || mod.counter === kind) && (!mod.putOn || (mod.putOn === "creatureOrPlaneswalkerYouControlOrYou" && pid === controller))))
@@ -143,8 +145,14 @@ export function batchPlayerCounters<T>(s: GameState, fn: () => T): T {
  * put on. "Whenever you put one or more counters on a ... player" sees who put them (CR 122.6).
  */
 export function putPlayerCounters(s: GameState, pid: PlayerId, kind: "poison" | "energy" | "experience" | "rad", n: number): number {
-  const m = playerCountersToPut(s, pid, kind, n);
+  let m = playerCountersToPut(s, pid, kind, n);
   if (m <= 0) return 0;
+  // Melira, the Living Cure: one poison counter instead, applied after the counter-doubling mods (the player getting them
+  // orders the replacements, CR 616.1, and gets the fewest this way), then none more this turn.
+  if (kind === "poison" && s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).onePoisonForYou && controllerOf(s, s.objects[id]!) === pid)) {
+    m = 1;
+    ((s.turnLog ??= {}).noMorePoison ??= []).push(pid);
+  }
   const p = s.players.find((x) => x.id === pid)!;
   p[kind] = (p[kind] ?? 0) + m;
   const by = putterNow ?? pid;
@@ -285,6 +293,12 @@ let removedBatch: { id: ObjectId; counter: string; n: number }[] | null = null;
  */
 export function countersRemoved(s: GameState, o: GameObject, counter: string, n: number): void {
   if (n <= 0) return;
+  // Churning Reservoir: "if an oil counter was removed from a permanent you controlled this turn": its controller then.
+  if (counter === "oil" && o.zone === "battlefield") {
+    const by = controllerOf(s, o);
+    const list = ((s.turnLog ??= {}).oilRemoved ??= []);
+    if (!list.includes(by)) list.push(by);
+  }
   if (removedBatch) {
     const x = removedBatch.find((r) => r.id === o.id && r.counter === counter);
     if (x) x.n += n;

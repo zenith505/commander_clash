@@ -1205,10 +1205,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // do, search your library for a Dragon creature card, put it onto the battlefield, then shuffle.": offered only with four
   // such cards there (canDoNow), since exiling them all is what "if you do" needs (CR 609.3); the spell on the stack is exiled with
   // them, a copy too (it ceases to exist, CR 707.10a, rulings), and the four are chosen if there are more.
-  if (opts.spell && text.trim() === "~ deals 3 damage to each opponent. You may exile ~ and four cards named ~ from your graveyard. If you do, search your library for a Dragon creature card, put it onto the battlefield, then shuffle.") {
-    const dmg = parseBody("~ deals 3 damage to each opponent.", opts);
+  // Sphinx's Approach: "Draw two cards. Then you may exile ~ and four cards named ~ from your graveyard. If you do, search
+  // your library for a Sphinx creature card, ...": the same, after the draw.
+  const approach = opts.spell ? /^(~ deals 3 damage to each opponent\.|Draw two cards\.) (?:Then y|Y)ou may exile ~ and four cards named ~ from your graveyard\. If you do, search your library for an? (Dragon|Sphinx) creature card, put it onto the battlefield, then shuffle\.$/.exec(text.trim()) : null;
+  if (approach) {
+    const dmg = parseBody(approach[1]!, opts);
     const four = parseBody("Exile four cards named ~ from your graveyard.", opts);
-    const search = parseBody("Search your library for a Dragon creature card, put it onto the battlefield, then shuffle.", opts);
+    const search = parseBody(`Search your library for a ${approach[2]!} creature card, put it onto the battlefield, then shuffle.`, opts);
     if (!dmg || !four || !search || dmg.targets.length || four.targets.length || search.targets.length) return null;
     // The four first: the may runs its instructions again from the start after the choice.
     return {
@@ -16385,7 +16388,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const prev = effects[effects.length - 1];
       const counter = counterKind(grantCtr[1]!);
       const grant = parseGrants(`"${grantCtr[2]!}"`);
-      if (prev?.type !== "counters" || prev.counter !== counter || prev.what.ref !== "target" || grant?.length !== 1 || grant[0]!.kind !== "addAbility") return null;
+      if (grant?.length !== 1 || grant[0]!.kind !== "addAbility") return null;
+      // Makeshift Mannequin: "Return target creature card from your graveyard to the battlefield with a mannequin counter on
+      // it. For as long as that creature has a mannequin counter on it, it has "...": the ability is the permanent's from
+      // the moment it enters (as Immortal Obligation's, CR 611.2b), for as long as it has one of those counters.
+      if (prev?.type === "putOntoBattlefield" && prev.what.ref === "target" && prev.counters?.[counter] && !prev.alsoMods && effects.length === 1) {
+        effects[0] = { ...prev, alsoMods: grant, alsoModsWhileCounter: counter };
+        continue;
+      }
+      if (prev?.type !== "counters" || prev.counter !== counter || prev.what.ref !== "target") return null;
       effects.push({ type: "continuous", what: prev.what, mods: grant, duration: "game", whileCounter: counter });
       continue;
     }

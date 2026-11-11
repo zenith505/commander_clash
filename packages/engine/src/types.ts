@@ -1813,6 +1813,12 @@ export interface TurnLog {
   toGraveyardNotBattlefield?: Partial<Record<PlayerId, number>>;
   /** The players who activated an ability of a card while it was in a graveyard this turn (Laboratory Drudge). */
   activatedInGraveyard?: PlayerId[];
+  /** Churning Reservoir: the players who controlled a permanent an oil counter was removed from this turn (CR 122.1). */
+  oilRemoved?: PlayerId[];
+  /** Churning Reservoir: a permanent with an oil counter on it was put into a graveyard from the battlefield this turn (a token too, CR 111.7). */
+  oilPermanentToGraveyard?: true;
+  /** Melira, the Living Cure: the players who can't get additional poison counters this turn. */
+  noMorePoison?: PlayerId[];
   /** The players a permanent was put into the hand of from the battlefield this turn, its owner's (CR 400.3), a token too (Barrin, Tolarian Archmage). */
   permanentToHand?: PlayerId[];
   /** Each creature put into a graveyard from the battlefield this turn: its owner's graveyard, and whether it was a token (Caller of the Claw, Fresh Meat). */
@@ -2620,6 +2626,8 @@ export interface Resolving {
   targetedAbilitySource?: { id: ObjectId; zc: number };
   /** "If that spell is countered this way, exile it instead": the card it became in exile (Transcendent Dragon, Spelljack). */
   counteredExiled?: { id: ObjectId; zc: number };
+  /** Psychic Rebuttal: the spell a counterSpell `copyCountered` countered, as it last was on the stack, its card's object then too (CR 707.10: a copy copies its choices). */
+  counteredCopy?: { item: StackItem; card: GameObject };
   /** The card its "reveal the top card of your library" revealed (CR 701.20a), for "if it's a creature card, put it ...". */
   revealed?: { id: ObjectId; zc: number };
   /** The cards "reveal cards from the top of your library until you reveal a nonland card" revealed, in order (Erratic Explosion). */

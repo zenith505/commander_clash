@@ -653,6 +653,8 @@ export type Count =
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
   | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; /** "Your opponents who were dealt combat damage by ~ or a Dragon this turn" (Estinien Varlineau): by this object (CR 400.7) or by a creature of this type as it dealt it, those who have lost since too (as for Tymna). */ combatDamagedBySelfOr?: string; /** "For each opponent who was dealt damage this turn" (Gnoll War Band): by any source, those still in the game (rulings). */ damaged?: true; drewThisWay?: true; /** "Opponents who investigated this way" after "each opponent may investigate" (Wernog): those who chose to (PlayerRef choseThisWay). */ choseThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "For each opponent who didn't discard two nonland cards this way" (Garruk, Veiled Butcher): those in the game who discarded fewer than this many nonland cards in this resolution. */ discardedFewerNonland?: number; /** "Who discarded a card this turn" (Azula, Ruthless Firebender): one or more cards, any way, players still in the game. */ discardedThisTurn?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "With four or more cards in hand" (Wolfcaller's Howl), counted now. */ handAtLeast?: number; /** "Opponents who have three or more poison counters" (Glissa's Retriever), counted now. */ poisonAtLeast?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent who has less life than you" (Great Unclean One), counted now. */ lifeLessThanYou?: true; /** "For each opponent whose life total is less than half their starting life total" (Anya, Merciless Angel): with at most this much life, counted now. */ lifeAtMost?: number; /** "For each opponent who controls fewer creatures than you" (Birth of the Imperium), counted now. */ fewerCreaturesThanYou?: true; /** "The number of opponents who control more creatures than you" (Heidegger, Shinra Executive), counted now. */ moreCreaturesThanYou?: true; /** "Players who control at least two more lands than you" (Surveyor's Scope), counted now. */ moreLandsThanYou?: number; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true; /** "For each graveyard with seven or more cards in it" (The Master of Lake-town): players whose graveyard has this many, counted now. */ yardAtLeast?: number }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
+  /** Gutter Grime's Ooze, Saproling Burst's Saproling: "the number of slime counters on Gutter Grime": on the permanent named this whose ability created this token (GameObject.createdWith), while it's that object on the battlefield; 0 otherwise (rulings). */
+  | { kind: "countersOnCreator"; counter: CounterKind; name: string }
   | { kind: "counters"; counter: CounterKind; of: ObjRef; /** With ANY_COUNTER, "for each kind of counter on it" (Blitzball Stadium): the kinds it has, each once. */ kinds?: true }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
   /** Station's "the tapped creature's power" (CR 702.184a), and "the power of the creature tapped this way" after a "Tap an untapped creature you control" cost (Keldon Battlewagon): as the ability resolves, or as it last existed (rulings on Impelled Giant); never below 0 (CR 107.1b). */
@@ -2660,6 +2662,8 @@ export type StaticCondition =
   /** "If a card left your graveyard this turn" (Gau, Feral Youth). */
   /** Dimir Strandcatcher: "if three or more cards were put into your graveyard from anywhere other than the battlefield this turn" (TurnLog.toGraveyardNotBattlefield). */
   | { kind: "cardsToYourGraveyardNotBattlefield"; n: number }
+  /** Churning Reservoir: "if an oil counter was removed from a permanent you controlled this turn or a permanent with an oil counter on it was put into a graveyard this turn" (TurnLog.oilRemoved, oilPermanentToGraveyard). */
+  | { kind: "oilRemovedOrOilPermanentToGraveyard" }
   /** Laboratory Drudge: "if you've cast a spell from a graveyard or activated an ability of a card in a graveyard this turn" (castThisTurn's `from`, TurnLog.activatedInGraveyard). */
   | { kind: "usedGraveyardThisTurn" }
   | { kind: "cardLeftYourGraveyard"; /** "If three or more cards left your graveyard this turn" (Bonecache Overseer). */ n?: number; /** "If a creature card left your graveyard this turn" (Syrix, Carrier of the Flame). */ creature?: true }
@@ -3664,7 +3668,7 @@ export type Effect =
    */
   /** `epic`: the spell with epic as it resolved, by its stack id in `GameState.epics` (CR 702.50a). */
   /** `self`: the spell that's resolving ("you may copy this spell", Sevinne's Reclamation), as it is on the stack. */
-  | { type: "copySpell"; spell: "cause" | "self" | { target: number; /** "Copy any number of target instant and/or sorcery spells" (Display of Power): the targets from `target` on, `n` of them once cast (expandMany), each copied in turn. */ many?: true; n?: number } | { epic: string }; /** "stormInstantSorcery": the instant and sorcery spells its controller cast before it this turn (Thousand-Year Storm). "otherInstantSorcery": all the others its controller has cast this turn, counted as this resolves (Show of Confidence). "eachOther": see `eachOther`. */ n: Amount | "storm" | "kicked" | "stormInstantSorcery" | "otherInstantSorcery" | "eachOther"; newTargets: boolean;
+  | { type: "copySpell"; spell: "cause" | "self" | /** Psychic Rebuttal: "copy the spell countered this way", as it last was on the stack (ResolvingState.counteredCopy, CR 707.10). */ "countered" | { target: number; /** "Copy any number of target instant and/or sorcery spells" (Display of Power): the targets from `target` on, `n` of them once cast (expandMany), each copied in turn. */ many?: true; n?: number } | { epic: string }; /** "stormInstantSorcery": the instant and sorcery spells its controller cast before it this turn (Thousand-Year Storm). "otherInstantSorcery": all the others its controller has cast this turn, counted as this resolves (Show of Confidence). "eachOther": see `eachOther`. */ n: Amount | "storm" | "kicked" | "stormInstantSorcery" | "otherInstantSorcery" | "eachOther"; newTargets: boolean;
     /**
      * Zada, Ink-Treader Nephilim, Precursor Golem: "copy that spell for each other creature (you control) that the spell
      * could target. Each copy targets a different one of those creatures": one copy for each permanent matching `among`
@@ -4466,6 +4470,8 @@ export type Effect =
       type: "counterSpell";
       index: number;
       unless?: UnlessPays;
+      /** Psychic Rebuttal: note the spell as it was on the stack, if it's countered this way (ResolvingState.counteredCopy), for "copy the spell countered this way" after it. */
+      copyCountered?: true;
       exile?: boolean;
       /** Spell Crumple: "put it on the bottom of its owner's library instead of into that player's graveyard". */
       bottom?: true;
@@ -7992,6 +7998,8 @@ export interface CompiledCard {
   yourCreaturesNoCounters?: CounterKind;
   /** Melira, Sylvok Outcast: "You can't get poison counters." (counters.ts playerCountersToPut). */
   noPoisonForYou?: true;
+  /** Melira, the Living Cure: "If you would get one or more poison counters, instead you get one poison counter and you can't get additional poison counters this turn" (putPlayerCounters, TurnLog.noMorePoison). */
+  onePoisonForYou?: true;
   /** Tatterkite: "~ can't have counters put on it." (counters.ts countersBanned). */
   selfNoCounters?: true;
   /** "Creatures you control can boast twice during each of your turns rather than once." (Birgi, CR 702.142a) */

@@ -953,12 +953,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (what?.kind !== "object") return null;
     return [{ type: "counterSpell", index: addTarget(ctx, { ...stackSpec("spell or ability"), controller: "opponent", targetsWhat: what, text: `target spell or ability an opponent controls that targets a ${response[1]}` }), thenSource: "destroy" }];
   }
-  if ((m = /^Counter target (spell|spell or ability|instant or Aura spell) that targets (you or )?(you|an? .+)$/i.exec(s)) && !(m[2] && m[3] === "you")) {
+  // Psychic Rebuttal: "Counter target instant or sorcery spell that targets you": one with you among its targets (rulings).
+  if ((m = /^Counter target (spell|spell or ability|instant or Aura spell|instant or sorcery spell) that targets (you or )?(you|an? .+)$/i.exec(s)) && !(m[2] && m[3] === "you")) {
     const what = m[3] === "you" ? "you" : parseTargetPhrase(m[3]!.replace(/^an? /, ""));
     // Outwit: "Counter target spell that targets a player": any player (targetsMatch).
     if (what !== "you" && what?.kind !== "object" && !(what?.kind === "player" && m[3] === "a player" && !what.opponent)) return null;
-    const kinds = /^instant or Aura spell$/.test(m[1]!) ? parseTargetPhrase(m[1]!) : null;
-    if (/^instant or Aura spell$/.test(m[1]!) && kinds?.kind !== "spell") return null;
+    const typed = /^instant or (?:Aura|sorcery) spell$/.test(m[1]!);
+    const kinds = typed ? parseTargetPhrase(m[1]!) : null;
+    if (typed && kinds?.kind !== "spell") return null;
     const base = kinds ? { ...kinds } : m[1]!.toLowerCase() === "spell" ? { kind: "spell" as const } : stackSpec("spell or ability");
     return [{ type: "counterSpell", index: addTarget(ctx, { ...base, targetsWhat: what, ...(m[2] ? { targetsYouToo: true as const } : {}), text: `target ${m[1]!.toLowerCase()} that targets ${m[2] ?? ""}${m[3]}` }) }];
   }

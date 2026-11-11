@@ -1605,7 +1605,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // it as it would exist on the battlefield (CR 614.12, rulings). Unleash likewise ("Other Dogs you control have unleash",
   // Tesak), each instance its own choice.
   const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot" || x === "unleash"));
-  const options: EntersOption[] = [...(printed.entersExileFromYard ? (["exileFromYard"] as const) : []), ...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersDiscardKeywords ? (["discardKeywords"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
+  const options: EntersOption[] = [...(printed.entersExileFromYard ? (["exileFromYard"] as const) : []), ...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.entersRemoveCounters ? (["removeCounters"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersDiscardKeywords ? (["discardKeywords"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
   // Frankenstein's Monster: "exile X creature cards" with the X it was cast with (CR 107.3m).
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(what === "exileFromYard" && opts.x ? { enterOpts: { x: opts.x } } : {}), ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
@@ -8482,12 +8482,15 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (c.kind === "removeCounters") {
       // Any mix of the counters on those permanents (CR 602.2b): as many as it says, each one there to remove.
       const pool = counterCostCandidates(s, pid, o, c);
-      const what = `${c.n} ${counterCostKinds(c)}counter${c.n === 1 ? "" : "s"} ${c.self ? `from ${d.name}` : `from among ${c.filter.text}`}`;
+      const what = `${c.n} ${counterCostKinds(c)}counter${c.n === 1 ? "" : "s"} ${c.self ? `from ${d.name}` : c.one ? `from ${c.filter.text}` : `from among ${c.filter.text}`}`;
       const chosen = choices?.counters;
+      // Moxite Refinery: all of them from one permanent.
+      const most = c.one ? Math.max(0, ...[...new Set(pool.map((x) => x.id))].map((id) => pool.filter((x) => x.id === id).reduce((n, x) => n + x.n, 0))) : pool.reduce((n, x) => n + x.n, 0);
       if (!chosen) {
-        if (pool.reduce((n, x) => n + x.n, 0) < c.n) return `you need to remove ${what} to ${doing}`;
+        if (most < c.n) return `you need to remove ${what} to ${doing}`;
         continue;
       }
+      if (c.one && new Set(chosen.map((x) => x.id)).size > 1) return `remove all ${c.n} counters from the same permanent`;
       const used = new Map<string, number>();
       for (const x of chosen) used.set(`${x.id}|${x.kind}`, (used.get(`${x.id}|${x.kind}`) ?? 0) + 1);
       if (chosen.length !== c.n || [...used].some(([k, n]) => n > (pool.find((x) => `${x.id}|${x.kind}` === k)?.n ?? 0))) return `choose ${what} to remove`;
@@ -10280,6 +10283,10 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
       sacrificedInstead(s, obj(s, pend.objectId), ids, entry.enters);
       return;
     }
+    if (entry?.what === "removeCounters") {
+      countersTakenAsEnters(s, obj(s, pend.objectId), ids, entry.enters);
+      return;
+    }
     if (pend.action === "discard") discardKeywordsChosen(s, obj(s, pend.objectId), ids, entry?.enters);
     else if (pend.action === "reveal") amplifyChosen(s, obj(s, pend.objectId), ids, entry?.enters);
     else devourChosen(s, obj(s, pend.objectId), ids, entry?.enters);
@@ -10836,7 +10843,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord" || pend.what === "removeCounters") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -11356,6 +11363,48 @@ function devourChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x
   if (enters) fireEvent(s, { type: "enters", id: o.id, ...enters });
 }
 
+/** Sin, Unending Cataclysm's choice as it enters: the other permanents its filter matches with counters that can come off. */
+export function removeCountersAsEntersOptions(s: GameState, o: GameObject): ObjectId[] {
+  const how = compileCard(defOf(s, o)).entersRemoveCounters;
+  if (!how) return [];
+  const you = controllerOf(s, o);
+  return s.battlefield.filter((id) => {
+    const x = obj(s, id);
+    return id !== o.id && objectMatches(s, how.filter, x, you, false) && Object.entries(x.counters).some(([k, n]) => n > 0 && !countersStay(s, x, k));
+  });
+}
+
+/**
+ * Sin, Unending Cataclysm: every counter comes off each permanent chosen, and it enters with `per` +1/+1 counters for each
+ * one removed, as part of how it enters (CR 614.1c, 614.12).
+ * Then it has entered, and its enters abilities trigger.
+ */
+function countersTakenAsEnters(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x?: number }) {
+  const d = defOf(s, o);
+  const per = compileCard(d).entersRemoveCounters?.per ?? 1;
+  let removed = 0;
+  for (const id of ids) {
+    const p = s.objects[id];
+    if (!p || p.zone !== "battlefield") continue;
+    const kinds = Object.entries(p.counters).filter(([k, n]) => n > 0 && !countersStay(s, p, k));
+    if (!kinds.length) continue;
+    for (const [k, n] of kinds) {
+      p.counters[k] = 0;
+      removed += n;
+    }
+    invalidateCharacteristics(s);
+    log(s, `${characteristics(s, p).name} loses all its counters (${kinds.map(([k, n]) => `${n} ${k}`).join(", ")}) as ${d.name} enters.`);
+    for (const [k, n] of kinds) countersRemoved(s, p, k, n);
+    for (const [k] of kinds) fireEvent(s, { type: "lastCounterRemoved", id: p.id, counter: k });
+  }
+  if (removed && characteristics(s, o).hasPrintedAbilities) {
+    const put = putCounters(s, o, "+1/+1", removed * per, true);
+    log(s, `${d.name} enters with ${put} +1/+1 counter${put === 1 ? "" : "s"}.`);
+  }
+  invalidateCharacteristics(s);
+  if (enters) fireEvent(s, { type: "enters", id: o.id, ...enters });
+}
+
 /** The creature types an object has: "all" with changeling (CR 702.73a). On the battlefield, as the layers make it. */
 export function creatureTypesOf(s: GameState, o: GameObject): Set<string> | "all" {
   if (o.zone === "battlefield") {
@@ -11497,6 +11546,19 @@ function askEntersChoice(s: GameState): boolean {
         return true;
       }
       s.pending = { kind: "pickPermanents", player: you, source: defOf(s, o).name, action: "sacrifice", what: devour!.filter.text, options, count: options.length, min: 0, objectId: o.id, ...(said ? { prompt: `sacrifice any number of ${devour!.filter.text}s as it enters (${said}): click them, then sacrifice.` } : devour!.n === 2 && devour!.filter.types?.includes("Planeswalker") ? { prompt: `sacrifice any number of creatures and/or planeswalkers as it enters (two +1/+1 counters for each): click them, then sacrifice.` } : {}) };
+      return true;
+    }
+    if (c.what === "removeCounters") {
+      // Sin, Unending Cataclysm: any number of the other artifacts, creatures and enchantments with counters on them,
+      // anyone's (it isn't on the battlefield yet as they're chosen, CR 614.12).
+      const options = removeCountersAsEntersOptions(s, o);
+      if (!options.length) {
+        q.shift();
+        countersTakenAsEnters(s, o, [], c.enters);
+        continue;
+      }
+      const per = compileCard(defOf(s, o)).entersRemoveCounters?.per ?? 1;
+      s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "choose", what: "artifact, creature, or enchantment", options, count: options.length, min: 0, objectId: o.id, prompt: `remove all counters from any number of artifacts, creatures, and enchantments as it enters (${per === 1 ? "a +1/+1 counter" : `${per} +1/+1 counters`} for each counter removed): click them, then choose.` };
       return true;
     }
     if (c.what === "exileFromYard") {

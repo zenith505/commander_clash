@@ -821,6 +821,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         if (discardKeywordKinds(s, rex, [...ids, id]).length > discardKeywordKinds(s, rex, ids).length) ids.push(id);
       return [{ type: "pickPermanents", player: pid, ids }];
     }
+    // Sin, Unending Cataclysm: every opponent's permanent with counters, and ours only when all their counters hurt us.
+    if (pend.kind === "pickPermanents" && pend.action === "choose" && pend.objectId && s.objects[pend.objectId] && compileCard(defOf(s, obj(s, pend.objectId))).entersRemoveCounters) {
+      const bad = new Set(["-1/-1", "stun"]);
+      const ids = pend.options.filter((id) => {
+        const x = obj(s, id);
+        return controllerOf(s, x) !== pid || Object.entries(x.counters).every(([k, n]) => n <= 0 || bad.has(k));
+      });
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
     // Amplify: reveal everything that counts, for the most counters (CR 702.38a).
     if (pend.kind === "pickPermanents" && pend.action === "reveal") return [{ type: "pickPermanents", player: pid, ids: pend.options }];
     // Champion: exile our least useful one (it comes back when the champion leaves), unless the champion is gone already.
@@ -7091,6 +7100,11 @@ function spareCounters(s: GameState, pid: PlayerId, source: GameObject, c: Extra
     .filter((x) => rank(x.kind) < 9)
     .flatMap((x) => Array.from({ length: x.kind === "+1/+1" ? x.n - 1 : x.n }, () => ({ id: x.id, kind: x.kind })))
     .sort((a, b) => rank(a.kind) - rank(b.kind));
+  // Moxite Refinery: all from one permanent, the first that has enough to spare.
+  if (c.one) {
+    const id = [...new Set(pool.map((x) => x.id))].find((x) => pool.filter((p) => p.id === x).length >= c.n);
+    return id === undefined ? (c.n ? null : []) : pool.filter((p) => p.id === id).slice(0, c.n);
+  }
   return pool.length < c.n ? null : pool.slice(0, c.n);
 }
 

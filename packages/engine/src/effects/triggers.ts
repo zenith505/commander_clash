@@ -2370,7 +2370,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "A spell that targets a creature you control": its targets as it was cast (CR 601.2c), once however many match.
         // Danitha, Sword of Hope: "an Equipment spell or a spell that targets a creature you control": either one.
         const orSpell = !!t.cast.orSpell && (item?.objectId ? spellMatches(s, t.cast.orSpell, item) : printedMatches(t.cast.orSpell, ev.card));
-        if (t.cast.targets && !orSpell && !t.cast.targets.some((w) => targetsMatch(s, item?.targets ?? [], w, you))) return false;
+        // Orvar, the All-Form: "one or more other permanents you control": not this permanent (TargetSpec.notSource).
+        if (t.cast.targets && !orSpell && !t.cast.targets.some((w) => targetsMatch(s, item?.targets ?? [], w !== "you" && w.notSource ? { ...w, notId: o.id } : w, you))) return false;
         // "A spell with one or more targets" (Voracious Bibliophile): cast with at least one (CR 115.1).
         if (t.cast.hasTargets && !(item?.targets ?? []).some((x) => x.kind !== "none")) return false;
         // "That targets only ~" (Zada), "only a single Golem": every target it has names one permanent.

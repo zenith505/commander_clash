@@ -241,6 +241,10 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const n = nFor[pid] ?? 0;
     // "One of those Dragons" (Zurgo and Ojutai): those still on the battlefield as the objects they were, whoever controls them now.
     const group = e.fromGroup ? (ctx.event?.group ?? []).filter((g) => s.objects[g.id]?.zone === "battlefield" && (obj(s, g.id).zoneChanges ?? 0) === g.zc).map((g) => g.id) : undefined;
+    // Orvar, the All-Form: "one of those permanents": the cast spell's targets, from the stack or, once it has left, as it
+    // was cast (rulings), each still that object on the battlefield, matching, and not ~ ("other permanents", CR 603.4).
+    const causeItem = e.fromCauseTargets && ctx.cause !== undefined ? (s.stack.find((x) => x.id === ctx.cause) ?? s.castItems?.[ctx.cause]) : undefined;
+    const ofCause = e.fromCauseTargets ? [...new Set((causeItem?.targets ?? []).flatMap((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && (t.zc === undefined || (obj(s, t.id).zoneChanges ?? 0) === t.zc) && t.id !== ctx.sourceId && objectMatches(s, e.filter, obj(s, t.id), pid, false) ? [t.id] : [])))] : undefined;
     // "On either of them" (Call of the Death-Dweller): the permanents the targets became, still on the battlefield.
     const ofTargets = e.fromTargets ? objects(s, { ref: "target", index: e.fromTargets.index, n: e.fromTargets.n }, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id) : undefined;
     // Suppression Ray: "creatures tapped this way", the ones that became tapped (rulings), still those objects.
@@ -250,7 +254,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     // Grenzo's Rebuttal: among the permanents of the player to this one's left (the next in turn order, CR 101.4).
     const left = e.amongLeft ? nearestOpponent(s, pid, "left") : undefined;
     // The Legend of Yangchen: among the permanents this ability's controller's opponents control, whoever picks.
-    const options0 = e.amongYourOpponents ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) !== ctx.controller && objectMatches(s, e.filter, obj(s, id), ctx.controller, false)) : e.amongLeft ? (left === undefined ? [] : pickOptions(s, e, left, ctx.sourceId, ctx.sourceZc)) : tappedHere ?? createdHere ?? ofTargets ?? group ?? (e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId, ctx.sourceZc)) : pickOptions(s, e, pid, ctx.sourceId, ctx.sourceZc));
+    const options0 = e.amongYourOpponents ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) !== ctx.controller && objectMatches(s, e.filter, obj(s, id), ctx.controller, false)) : e.amongLeft ? (left === undefined ? [] : pickOptions(s, e, left, ctx.sourceId, ctx.sourceZc)) : tappedHere ?? createdHere ?? ofCause ?? ofTargets ?? group ?? (e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId, ctx.sourceZc)) : pickOptions(s, e, pid, ctx.sourceId, ctx.sourceZc));
     // Labyrinth Raptor: only creatures blocking the trigger's subject now, the same attacking object (CR 400.7, 509.1h).
     const attacker = e.filter.blockingSubject && ctx.subject ? s.objects[ctx.subject.id] : undefined;
     const options1 = !e.filter.blockingSubject ? options0 : attacker && attacker.zone === "battlefield" && (attacker.zoneChanges ?? 0) === ctx.subject!.zc && attacker.attacking !== undefined ? options0.filter((id) => !!attacker.blockedBy?.includes(id) && obj(s, id).blocking?.includes(attacker.id)) : [];

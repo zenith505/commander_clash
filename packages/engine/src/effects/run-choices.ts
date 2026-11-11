@@ -822,7 +822,16 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (e.choice === "cardName") {
         // "Choose a nonland card name" (CR 201.4), as it resolves (rulings on Cabal Therapy): asked each time it's reached.
         const sc = (r.scratch ??= {});
-        if (sc.asked) return;
+        if (sc.asked) {
+          // Petrified Hamlet: "When this land enters, choose a land card name.": kept on the permanent for its ban and
+          // static (GameObject.chosen.name), while it's still the object it was (CR 400.7).
+          const me = e.keepOnSource && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+          if (me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) && r.chosen?.name !== undefined) {
+            me.chosen = { ...me.chosen, name: r.chosen.name };
+            invalidateCharacteristics(s);
+          }
+          return;
+        }
         sc.asked = true;
         const chooser = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
         const options = cardNameOptions(s, e.names);

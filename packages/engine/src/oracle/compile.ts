@@ -2100,6 +2100,15 @@ export function compile(d: CardDef): CompiledCard {
       out.entersStealsCounters = true;
       continue;
     }
+    // Sin, Unending Cataclysm: "As ~ enters, remove all counters from any number of artifacts, creatures, and enchantments.
+    // ~ enters with X +1/+1 counters on it, where X is twice the number of counters removed this way." (see
+    // CompiledCard.entersRemoveCounters).
+    if (line === "As ~ enters, remove all counters from any number of artifacts, creatures, and enchantments. ~ enters with X +1/+1 counters on it, where X is twice the number of counters removed this way." && !isSpell) {
+      const filter = parseTargetPhrase("artifact, creature, or enchantment");
+      if (filter?.kind !== "object" || out.entersRemoveCounters || out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersRemoveCounters = { filter: { ...filter, text: "artifact, creature, or enchantment" }, per: 2 };
+      continue;
+    }
     // Slumbering Trudge: "~ enters with a number of stun counters on it equal to three minus X. If X is 2 or less, it
     // enters tapped.": the X chosen as it was cast (CR 107.3m), 0 entering any other way (rulings); none below 0 (CR
     // 107.1b). Both replacements apply as it enters (CR 614.1c).
@@ -6289,6 +6298,23 @@ export function compile(d: CardDef): CompiledCard {
         });
       continue;
     }
+    // Orvar, the All-Form: "Whenever you cast an instant or sorcery spell, if it targets one or more other permanents you
+    // control, create a token that's a copy of one of those permanents." An intervening if (CR 603.4) on the spell's
+    // targets as it was cast, checked again as this resolves: only targets still on the battlefield as the objects they
+    // were and still yours, not ~, from the spell on the stack or, once it has left, as it was cast (rulings); with more
+    // than one, its controller chooses which (rulings, CR 707.2).
+    if (line === "Whenever you cast an instant or sorcery spell, if it targets one or more other permanents you control, create a token that's a copy of one of those permanents.") {
+      const spell = parseTargetPhrase("instant or sorcery spell");
+      const yours = parseTargetPhrase("permanent you control");
+      if (spell?.kind !== "spell" || yours?.kind !== "object") out.unsupported.push(raw);
+      else
+        out.triggers.push({
+          event: "castSpell",
+          cast: { by: "you", spell: { ...spell, text: "instant or sorcery spell" }, targets: [{ ...yours, notSource: true, text: "other permanent you control" }] },
+          body: { targets: [], effects: [{ type: "pick", who: { ref: "you" }, filter: { ...yours, text: "one of those permanents" }, n: 1, action: "choose", fromCauseTargets: true }, { type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "created" } }], text: "if it targets one or more other permanents you control, create a token that's a copy of one of those permanents." },
+        });
+      continue;
+    }
     // Feather, Radiant Arbiter: "Whenever you cast a noncreature spell that targets only ~, you may choose any number of
     // other creatures that spell could target and pay {2} for each of those creatures. If you do, for each of those
     // creatures, copy that spell. The copy targets that creature." Every target of the spell ~ (rulings), chosen and paid
@@ -7709,6 +7735,13 @@ function checkCastingLinks(out: CompiledCard) {
         visit(x);
         const e = x as { type?: string; action?: string; n?: unknown; who?: { ref?: string } } | null;
         if (e?.type === "pick" && e.action === "sacrifice" && e.n === 1 && e.who?.ref === "you") effectSac = true;
+        // Iron Man, Titan of Innovation: "then you may sacrifice a noncreature artifact. If you do, ... the sacrificed
+        // artifact's mana value": the optional sacrifice of one permanent, for the "if you do" after it.
+        const inner = (x as { type?: string; effects?: unknown[] } | null)?.type === "may" ? (x as { effects: unknown[] }).effects : undefined;
+        if (inner?.length === 1) {
+          const p = inner[0] as typeof e;
+          if (p?.type === "pick" && p.action === "sacrifice" && p.n === 1 && p.who?.ref === "you") effectSac = true;
+        }
       }
       effectSac = was;
       return;
@@ -7844,7 +7877,12 @@ function checkCastingLinks(out: CompiledCard) {
   if (out.costMods?.some((m) => m.perChosenColor) && !out.entersChoose?.some((c) => c.what === "color" && c.many)) bad = true;
   // Petrified Hamlet: a ban's or a static's chosen name is the one the permanent chose as it entered (its Chosen.name);
   // the choice of a "When ~ enters, choose a land card name" trigger is only kept while that trigger resolves.
-  if ((out.nameBans || out.protectionFromChosenName || JSON.stringify(out.statics).includes('"chosen":"name"')) && !out.entersChoose?.some((c) => c.what === "cardName") && !out.entersNamesWithOpponent) bad = true;
+  // Its one "When ~ enters, choose a land card name" trigger keeps the name on the permanent as it resolves (keepOnSource);
+  // until then no name is chosen, so nothing is banned (round 342).
+  const nameTrigger = out.triggers.length === 1 && out.triggers[0]!.event === "selfEnters" && !out.triggers[0]!.body.targets.length && out.triggers[0]!.body.effects.length === 1 ? out.triggers[0]!.body.effects[0]! : undefined;
+  const keepsName = nameTrigger?.type === "choose" && nameTrigger.choice === "cardName" && !nameTrigger.who && !out.spell && !out.entersChoose && !out.entersNamesWithOpponent && !out.protectionFromChosenName && !JSON.stringify([out.activated, out.triggers]).includes('"chosen"');
+  if (keepsName && nameTrigger.type === "choose") nameTrigger.keepOnSource = true;
+  if ((out.nameBans || out.protectionFromChosenName || JSON.stringify(out.statics).includes('"chosen":"name"')) && !out.entersChoose?.some((c) => c.what === "cardName") && !out.entersNamesWithOpponent && !keepsName) bad = true;
   // Null Chamber: its two names ban casting and land plays, and nothing else here reads them.
   if (out.entersNamesWithOpponent && (out.nameBans?.length !== 2 || out.protectionFromChosenName || JSON.stringify(out.statics).includes('"chosen"') || JSON.stringify([out.triggers, out.activated]).includes('"chosen"'))) bad = true;
   if (out.noncreatureChosenMvCantBeCast) needs.add("number");

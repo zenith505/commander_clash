@@ -1,7 +1,7 @@
 # Roadmap
 
-31,055 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,975 of 4,988 (99%), top 10,000: 9,825 of
+31,060 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,975 of 4,988 (99%), top 10,000: 9,830 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2398,6 +2398,26 @@ line blocks.
    They're 5/5 artifact creatures." (CR 708.2, a face-down instant or sorcery stays face down), with a browser test.
    +4, 30,978 of 31,936 with B173 through B176. Bots activate Sasaya only when the flip happens, cast The Master with an exile only when one of
    their creatures has an enters trigger worth copying, and put all of their hand onto the battlefield with Tezzeret.
+   Round 343 went on down the "Out after round N" lists, most played first, to casting a card as an instruction resolves
+   "by paying [a cost] rather than paying its mana cost" (an alternative cost, CR 118.9, cast then or never, CR 608.2g;
+   so no other alternative cost, X is 0, CR 107.3b, and additional costs such as kicker are still paid, rulings): The
+   Infamous Cruelclaw's "You may cast that card by discarding a card rather than paying its mana cost." (the discard
+   picked as it's cast, with a browser test; with no card in hand it stays in exile); Bismuth Mindrender's "... by paying
+   life equal to the spell's mana value ..." (that player's card, cast by you; not with less life than that, CR 119.4);
+   Amped Raptor's "Then if you cast it from your hand, exile cards ... You may cast that card by paying an amount of {E}
+   equal to its mana value ..." (cast from a hand as it last existed, CR 608.2h; the energy is still gotten otherwise;
+   with a browser test); Anrakyr the Traveller's "you may cast an artifact spell from your hand or graveyard by paying
+   life equal to its mana value rather than paying its mana cost" (one, an artifact as the spell it's cast as, with a
+   browser test); Blue Mage's Cane's granted "exile up to one target instant or sorcery card from defending player's
+   graveyard. If you do, copy it. You may cast the copy by paying {3} rather than paying its mana cost." (the copy not
+   cast ceases to exist, CR 707.12, with a browser test). The way to pay is CastPay (abilities.ts) on the castFree
+   decision; its costs are added in castExtraCosts (game.ts). +5, 31,053 of 31,936. Bots pay the life only while they'd
+   keep 15 (as for any life cost) and discard their least useful card.
+   Out after round 343 (looked at, not done): Jadzi, Oracle of Arcavios (a revealed card cast from the library "by
+   paying {1}", and Journey to the Oracle's "Then if you control eight or more lands, you may discard a card. If you do,
+   return ~ to its owner's hand"); Wizard's Spellbook (a d20 table whose rows copy "that card", the target exiled);
+   Hama, the Bloodbender ("by waterbending {X} rather than paying its mana cost, where X is its mana value", a
+   permission for as long as you control it); Eye of Duskmantle (cards in your graveyard you've surveilled this turn).
    Round 342 went on down the "Out after round N" lists, most played first: Iron Man, Titan of Innovation's "then you
    may sacrifice a noncreature artifact. If you do, search your library for an artifact card with mana value equal to 1
    plus the sacrificed artifact's mana value" (the optional sacrifice of one permanent now counts for "the sacrificed",
@@ -8124,7 +8144,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   you and you control a Forest and a Plains, you may cast ~ without paying its mana cost and as though it had flash": a
   creature attacking you, not a planeswalker of yours, one land with both types enough, rulings; the flash only for that
   cost, CR 601.3; a browser test). Michelangelo's Technique ("up to two creature cards with total mana value 6 or less"
-  from among the top eight). +7, 31,027 of 31,936 with B177 to B180 and rounds 336 to 337; 31,055 with rounds 338 to 342.
+  from among the top eight). +7, 31,027 of 31,936 with B177 to B180 and rounds 336 to 337; 31,060 with rounds 338 to 343.
 - Out after round B181 (looked at, not done): Ludevic, Necrogenius (its back face becomes a copy of a creature card exiled
   with it as it transforms), Song of Inspiration ("add the total mana value of those cards" to a d20 roll: whether a target
   that became illegal still counts isn't settled by its rulings) stay out.

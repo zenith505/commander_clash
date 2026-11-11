@@ -3,6 +3,7 @@ import type { Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseSentence } from "./sentence";
 import { amt } from "./words";
+import { round343Sentence } from "./round343";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -10,6 +11,9 @@ const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round340Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
   void effects;
+  // Round 343's sentences first (oracle/round343.ts).
+  const r343 = round343Sentence(s, sentences, si, ctx, effects);
+  if (r343 !== null) return r343;
   const line = plain(s);
   // Archmage's Newt: "target instant or sorcery card in your graveyard gains flashback until end of turn. The flashback cost
   // is equal to its mana cost. That card gains flashback {0} until end of turn instead if ~ is saddled.": which one is

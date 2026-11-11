@@ -1,5 +1,5 @@
 import { isRealKicker, kickerName } from "./abilities";
-import type { AbilityBody, ActivatedAbility, Count, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CounterKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersChoice, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, ActivatedAbility, Count, AdditionalCost, CastPay, ManaAbility, AltCostKind, ChoiceKind, CounterKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersChoice, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
 import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
 import { joinMeld } from "./meld";
@@ -573,6 +573,11 @@ export function log(s: GameState, text: string, to?: PlayerId) {
   s.log.push({ seq: s.log.length, turn: s.turn, step: s.step, text, ...(to !== undefined ? { to } : {}) });
 }
 
+/** What a CastPay has its caster pay, as the card says it: "by discarding a card", "by paying life equal to its mana value". */
+export function castPayText(pay: CastPay): string {
+  return pay.kind === "discard" ? `by discarding ${pay.n === 1 ? "a card" : `${pay.n} cards`}` : pay.kind === "lifeMv" ? "by paying life equal to its mana value" : pay.kind === "energyMv" ? "by paying {E} equal to its mana value" : `by paying ${pay.mana}`;
+}
+
 /** The card `pid` may cast for free right now, as cascade resolves (see PendingDecision "castFree"), or for its madness cost. */
 export function freeCastOf(s: GameState, pid: PlayerId): ObjectId | undefined {
   return s.pending?.kind === "castFree" && s.pending.player === pid ? s.pending.objectId : undefined;
@@ -585,7 +590,8 @@ export function freeCastOf(s: GameState, pid: PlayerId): ObjectId | undefined {
 export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string | undefined {
   const pend = s.pending;
   if (pend?.kind !== "castFree" || pend.player !== pid || pend.objectId !== id || (pend.how !== "madness" && pend.how !== "miracle" && pend.how !== "paid")) return undefined;
-  return pend.how === "paid" ? defOf(s, obj(s, id)).manaCost : pend.how === "miracle" ? (pend.miracleCost ?? compileCard(defOf(s, obj(s, id))).miracle) : (compileCard(defOf(s, obj(s, id))).madness ?? pend.madnessCost);
+  // Jadzi: "by paying {1} rather than paying its mana cost", an alternative cost (CR 118.9).
+  return pend.how === "paid" ? (pend.pay?.kind === "mana" ? pend.pay.mana : defOf(s, obj(s, id)).manaCost) : pend.how === "miracle" ? (pend.miracleCost ?? compileCard(defOf(s, obj(s, id))).miracle) : (compileCard(defOf(s, obj(s, id))).madness ?? pend.madnessCost);
 }
 
 /**
@@ -593,11 +599,12 @@ export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string
  * mid-resolution, like ward's; casting a card for its madness cost as madness's trigger resolves (CR 702.35a, 601.2g);
  * helping to pay for a spell with assist, or paying the rest of it (CR 702.132a); declaring attackers, to pay what
  * attacking costs (CR 508.1i); declaring blockers, to pay what blocking costs (CR 509.1f); casting a commander free
- * from the command zone, for the commander tax (Geode Golem, CR 903.8); any free cast while Trinisphere raises what it costs.
+ * from the command zone, for the commander tax (Geode Golem, CR 903.8); any free cast while Trinisphere raises what it costs;
+ * a cast for an alternative cost as an instruction resolves (CastPay), for a kicker on top of it (CR 118.9d).
  */
 export function paysManaNow(s: GameState): boolean {
   const pd = s.pending;
-  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && blocksMayCost(s, pd.player)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "pickPermanents" && !!pd.payEach) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid" || s.objects[pd.objectId]?.zone === "command" || costFloorInPlay(s)));
+  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && blocksMayCost(s, pd.player)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "pickPermanents" && !!pd.payEach) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid" || !!pd.pay || s.objects[pd.objectId]?.zone === "command" || costFloorInPlay(s)));
 }
 
 function requireNoPending(s: GameState) {
@@ -7455,8 +7462,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (convoke?.length ? `, convoking with ${convoke.map((c) => nameOf(s, c)).join(", ")}` : "") +
     (improvise?.length ? `, improvising with ${improvise.map((c) => nameOf(s, c)).join(", ")}` : "");
   const kickText = byControl ? ` (controlling ${/^[aeiou]/i.test(ifControl!.text) ? "an" : "a"} ${ifControl!.text.replace(/ you control$/, "")})` : kicks ? describeKicks(d, kicks) : "";
+  // The Infamous Cruelclaw, Anrakyr the Traveller, Jadzi: the alternative cost it was cast for as that resolved.
+  const payWay = s.pending?.kind === "castFree" && s.pending.player === p.id && s.pending.objectId === id ? s.pending.pay : undefined;
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
+    (payWay ? ` ${castPayText(payWay)} rather than paying its mana cost` : "") +
     (choices.prototyped && choices.alt !== "prototype" ? " prototyped" : "") +
     (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "lifeForMv" || choices.alt === "nextLife" ? " for life" : choices.alt === "nextFree" ? " without paying its mana cost" : choices.alt === "genericMv" ? " for generic mana" : choices.alt === "energyForSpell" ? " for energy" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt.replace(/^granted(.)/, (_, c: string) => c.toLowerCase())} cost` : "") +
     (madness && o.castAlt === "madness" ? " for its madness cost" : madness && o.castAlt === "miracle" ? " for its miracle cost" : "") +
@@ -8314,7 +8324,12 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   // Into the Pit: the cost of the permission it's cast from the top of a library with (once it's on the stack, the
   // costs castSpell kept, `topCosts`).
   const topCosts = choices?.topCosts ?? (s && pid !== undefined && taxObj?.zone === "library" ? (topPermission(s, taxObj, pid, choices?.alt === "citadel" ? "life" : "mana")?.costs ?? []) : []);
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...topCosts, ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : []), ...entwineExtraCosts(d, choices?.modes), ...(s ? spliceExtraCosts(s, choices?.splice) : [])];
+  // The Infamous Cruelclaw, Anrakyr the Traveller: "You may cast that card by discarding a card (paying life equal to its
+  // mana value) rather than paying its mana cost", cast as that resolves (CR 608.2g): that alternative cost's payment (CR
+  // 118.9), the mana value of what's cast (a split card's half, X as 0, CR 107.3b), for the card it lets be cast only.
+  const payPend = s?.pending?.kind === "castFree" && s.pending.player === pid && s.pending.pay && s.pending.pay.kind !== "mana" && choices?.objectId === s.pending.objectId ? s.pending.pay : undefined;
+  const payCosts: AdditionalCost[] = !payPend ? [] : payPend.kind === "discard" ? [{ kind: "discard", n: payPend.n }] : payPend.kind === "lifeMv" ? [{ kind: "payLife", n: manaValue(parseManaCost(d.manaCost)) }] : payPend.kind === "energyMv" ? [{ kind: "payEnergy", n: manaValue(parseManaCost(d.manaCost)) }] : [];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...payCosts, ...topCosts, ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : []), ...entwineExtraCosts(d, choices?.modes), ...(s ? spliceExtraCosts(s, choices?.splice) : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   // Phyrexian Purge: so much life for each target chosen (CR 601.2c before 601.2f).

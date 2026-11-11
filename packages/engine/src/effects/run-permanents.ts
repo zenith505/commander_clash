@@ -1238,7 +1238,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       enterTogether(s, () => {
         const { same, extra } = tokenBatch(s, who, spirit, 1);
         for (let i = same; i > 0; i--) createToken(s, who, spirit);
-        log(s, `${src} endures ${n}: ${player(s, who).name} creates ${same === 1 ? "a" : same} ${n}/${n} Spirit token${same === 1 ? "" : "s"}.`);
+        if (same) log(s, `${src} endures ${n}: ${player(s, who).name} creates ${same === 1 ? "a" : same} ${n}/${n} Spirit token${same === 1 ? "" : "s"}.`);
         createExtraTokens(s, who, extra);
       });
       return;

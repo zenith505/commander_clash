@@ -10326,6 +10326,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9d22960b-babc-4cf3-b228-d32e13bc6014",
+  "name": "Esix, Fractal Bloom",
+  "manaCost": "{4}{G}{U}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Fractal",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Fractal"
+  ],
+  "oracleText": "Flying\nThe first time you would create one or more tokens during each of your turns, you may instead choose a creature other than Esix and create that many tokens that are copies of that creature.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "c21",
+  "releasedAt": "2021-04-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5def9f38-0a0b-4e8d-9f9d-29dcb46520b4",
   "name": "Esper Sentinel",
   "manaCost": "{W}",
@@ -17288,6 +17324,43 @@
   ]
  },
  {
+  "oracleId": "61fbaaf2-4286-4e9a-b9cb-aa31262b596a",
+  "name": "Jinnie Fay, Jetmir's Second",
+  "manaCost": "{R/G}{G}{G/W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Elf Druid",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Druid"
+  ],
+  "oracleText": "If you would create one or more tokens, you may instead create that many 2/2 green Cat creature tokens with haste or that many 3/1 green Dog creature tokens with vigilance.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bd43b485-e42e-4c20-adcb-799b0ce18a59",
   "name": "Jorn, God of Winter // Kaldring, the Rimestaff",
   "manaCost": "{2}{G}",
@@ -18495,6 +18568,32 @@
   "set": "mkm",
   "releasedAt": "2024-02-09",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9cfe86ae-eebe-44aa-a956-4b3e9e621105",
+  "name": "Krenko's Command",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Create two 1/1 red Goblin creature tokens.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clu",
+  "releasedAt": "2024-02-23",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -21540,6 +21639,36 @@
   "commanderLegal": "legal",
   "set": "rav",
   "releasedAt": "2005-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "df702b0c-e011-497f-ae29-9876efac4a4c",
+  "name": "Moonlit Meditation",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant artifact or creature you control\nThe first time you would create one or more tokens each turn, you may instead create that many tokens that are copies of enchanted permanent.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "eoe",
+  "releasedAt": "2025-08-01",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -26007,6 +26136,32 @@
   "commanderLegal": "legal",
   "set": "5dn",
   "releasedAt": "2004-06-04",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5b2364d7-a811-4595-a1b4-224c70555ffa",
+  "name": "Raise the Alarm",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Create two 1/1 white Soldier creature tokens.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "j25",
+  "releasedAt": "2024-11-15",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

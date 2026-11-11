@@ -1597,6 +1597,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "clash") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Damage shields: the options come in the order we'd pick them (damage.ts shieldPreference).
     if (pend.kind === "chooseOption" && pend.what === "damageShield") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+    // Jinnie Fay, Esix: what the engine judged worth more, the tokens as they are or one replacement (counters.ts tokenWorth).
+    if (pend.kind === "chooseOption" && pend.what === "tokenInstead") return [{ type: "chooseOption", player: pid, choice: pend.botChoice && pend.options.includes(pend.botChoice) ? pend.botChoice : "none" }];
     if (pend.kind === "chooseOption" && pend.what === "venture") return [{ type: "chooseOption", player: pid, choice: chooseRoom(s, pid, pend.options) }];
     // Friend or foe (Pir's Whim): a friend is the bot itself, every other player a foe.
     if (pend.kind === "chooseOption" && pend.what === "word" && pend.options.join() === "friend,foe") return [{ type: "chooseOption", player: pid, choice: pend.of === pid ? "friend" : "foe" }];

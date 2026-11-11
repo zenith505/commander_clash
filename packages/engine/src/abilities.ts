@@ -7402,6 +7402,17 @@ export type CountMod =
   | { what: "tokens"; who: "you"; op: "instead"; type: string; token: TokenSpec }
   /** "If you would create a Fish token, create a 3/3 blue Shark creature token instead" (Fisher's Talent): each token you'd create with `subtype` is a `token` instead. */
   | { what: "tokens"; who: "you"; op: "instead"; subtype: string; token: TokenSpec }
+  /**
+   * An optional replacement of the whole event (CR 614.1a, 616.1), its controller choosing as it applies, so it can stop
+   * a resolving spell or ability to ask (counters.ts tokenBatch): "If you would create one or more tokens, you may instead
+   * create that many 2/2 green Cat creature tokens with haste or that many 3/1 green Dog creature tokens with vigilance"
+   * (Jinnie Fay: one of `tokens`); "... you may instead create that many tokens that are copies of equipped creature" /
+   * "of enchanted permanent" (`copy` "host": what the source is attached to, a creature for Mirrormind Crown,
+   * `hostCreature`); "you may instead choose a creature other than ~ and create that many tokens that are copies of that
+   * creature" (`copy` "chosen", Esix). `first`: only the first time its controller would create tokens each turn
+   * ("turn") or during each of their turns ("yourTurn"), whether or not it applied then (rulings).
+   */
+  | { what: "tokens"; who: "you"; op: "mayInstead"; tokens?: TokenSpec[]; copy?: "host" | "chosen"; hostCreature?: true; first?: "turn" | "yourTurn" }
   | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet" | "creatureOrVehicle"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean; /** "On an Army, Goblin, or Orc you control" (Mauhúr): only a permanent with one of these subtypes. */ subtypes?: string[]; /** "Would be put on ~" (Mowu): only the source. */ self?: true; /** "If a modular triggered ability would put" (Zabaz): only counters a modular trigger puts. */ modular?: true }
   /** "If you would get one or more counters, you get that many plus one of each of those kinds of counters instead" (Winding Constrictor): counters on its controller, whoever puts them. */
   /** Izzet Generatorium, Aether Refinery: "If you would get one or more {E}, you get that many plus one {E} instead" / "twice that many": energy only (`counter`); you order them, plus one first (rulings, CR 616.1). */

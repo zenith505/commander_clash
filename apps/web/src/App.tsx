@@ -350,7 +350,7 @@ type ModePick = { mode: "cast"; objectId: string; label: string; body: AbilityBo
 
 /** Picking creatures to tap: to crew a Vehicle (CR 702.122a), to station (CR 702.184a, one creature) or to convoke a spell (CR 702.51a). */
 type TapPick =
-  | { kind: "crew"; objectId: string; index: number; n: number; chosen: string[]; saddle?: boolean }
+  | { kind: "crew"; objectId: string; index: number; n: number; chosen: string[]; saddle?: boolean; /** Mossbridge Troll's "Tap any number of untapped creatures ... with total power 10 or greater": not crewing. */ plain?: boolean }
   | { kind: "station"; objectId: string; index: number; chosen: string[] }
   | { kind: "convoke"; objectId: string; chosen: string[]; face?: number }
   /** Teamwork N: tap creatures with total power N or more as you cast it, or none. */
@@ -775,7 +775,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const ab = abilitiesOf(s, s.objects[objectId]!).activated[index]!;
     const label = `${cardOf(s, objectId).name}: ${ab.text}`;
     // Crew: pick the creatures to tap, starting from a suggestion.
-    if (ab.crew !== undefined) return setTapPick({ kind: "crew", objectId, index, n: ab.crew, chosen: autoCrew(s, HUMAN, objectId, ab.crew, ab.saddle) ?? [], ...(ab.saddle ? { saddle: true } : {}) });
+    if (ab.crew !== undefined) return setTapPick({ kind: "crew", objectId, index, n: ab.crew, chosen: autoCrew(s, HUMAN, objectId, ab.crew, ab.saddle, ab.tapPower) ?? [], ...(ab.saddle ? { saddle: true } : {}), ...(ab.tapPower ? { plain: true } : {}) });
     // Station: pick the one creature to tap, starting from the one with the greatest power.
     if (ab.station) {
       const best = convokers(s).filter((o) => o.id !== objectId).sort((a, b) => power(s, b) - power(s, a))[0];
@@ -2506,7 +2506,7 @@ function tapCandidates(s: GameState, pick: TapPick): GameObject[] {
   if (pick.kind === "teamwork") return convokers(s).filter((o) => !pick.convoke?.includes(o.id));
   if (pick.kind === "harmonize") return convokers(s);
   // Not one that "can't crew Vehicles" (Revoke Privileges); saddling isn't crewing.
-  return convokers(s).filter((o) => !(pick.kind !== "convoke" && o.id === pick.objectId) && !(pick.kind === "crew" && !pick.saddle && characteristics(s, o).cantCrew));
+  return convokers(s).filter((o) => !(pick.kind !== "convoke" && o.id === pick.objectId) && !(pick.kind === "crew" && !pick.saddle && !pick.plain && characteristics(s, o).cantCrew));
 }
 
 /** The bar shown while announcing X. */
@@ -3090,8 +3090,8 @@ function TapPickBar({ s, pick, onDone, onSkip, onCancel }: { s: GameState; pick:
     );
   }
   if (pick.kind === "crew") {
-    const total = pick.chosen.reduce((n, id) => n + crewPower(s, s.objects[id]!, pick.saddle), 0);
-    const verb = pick.saddle ? "Saddle" : "Crew";
+    const total = pick.chosen.reduce((n, id) => n + (pick.plain ? Math.max(0, power(s, s.objects[id]!)) : crewPower(s, s.objects[id]!, pick.saddle)), 0);
+    const verb = pick.plain ? "Tap" : pick.saddle ? "Saddle" : "Crew";
     return (
       <div className="targeting">
         <span>

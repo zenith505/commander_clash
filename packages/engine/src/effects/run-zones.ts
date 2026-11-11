@@ -2186,7 +2186,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "playLinked": {
       // The card this permanent's hideaway exiled, still the same object in exile (CR 400.7, 607.2a), played as this
       // resolves (rulings: it can't wait). Asked once; a land goes through "you may" since it isn't cast.
-      const key = `${ctx.sourceId}@${ctx.sourceZc ?? 0}`;
+      const nowKey = `${ctx.sourceId}@${ctx.sourceZc ?? 0}`;
+      // Spell Queller's leaves ability triggered after it moved: the object it links to is the one before (CR 400.7).
+      const key = e.byOwner && !s.linkedExile?.[nowKey] ? `${ctx.sourceId}@${(ctx.sourceZc ?? 1) - 1}` : nowKey;
       const linked = e.revealed ? (s.resolving?.revealed ? [s.resolving.revealed] : []) : (s.linkedExile?.[key] ?? []);
       const from = e.revealed ? "library" : "exile";
       const live = linked.map((l) => ({ o: s.objects[l.id], zc: l.zc })).filter((x) => x.o && x.o.zone === from && (x.o.zoneChanges ?? 0) === x.zc).map((x) => x.o!);
@@ -2206,7 +2208,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const card = live[0];
       if (!card) return;
-      const p = player(s, ctx.controller);
+      // Spell Queller: its owner casts it (a player who has left the game can't, CR 800.4a).
+      const p = player(s, e.byOwner ? card.owner : ctx.controller);
+      if (p.lost) return;
       const d = defOf(s, card);
       if (!sc.playLinked) {
         sc.playLinked = true;

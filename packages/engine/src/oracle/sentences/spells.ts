@@ -882,9 +882,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Bygone Marvels: "When you cast this spell, ... copy this spell twice" ("this spell" is ~ by now).
   // Tawnos, the Toymaker: "copy it, except the copy is an artifact in addition to its other types" (CR 707.9b): the token
   // the copy becomes is one too (CR 608.3f).
-  if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell), except the copy is (an artifact) in addition to its other types$/.exec(s))) {
+  // Donal, Herald of Wings: "copy it, except the copy is a 1/1 Spirit in addition to its other types": base 1/1 and a
+  // Spirit too (CR 707.9b), as the token it becomes (CR 608.3f; rulings).
+  if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell), except the copy is (an artifact|a \d+\/\d+ [A-Z][a-z]+) in addition to its other types$/.exec(s))) {
     const except = parseCopyExcept(`it's ${m[1]} in addition to its other types`);
-    return except?.addTypes?.length === 1 && !except.addSubtypes?.length ? [{ type: "copySpell", spell: "cause", n: 1, newTargets: false, except }] : null;
+    const keys = except ? Object.keys(except) : [];
+    if (m[1] === "an artifact") return except?.addTypes?.length === 1 && !except.addSubtypes?.length ? [{ type: "copySpell", spell: "cause", n: 1, newTargets: false, except }] : null;
+    return except?.pt && except.addSubtypes?.length === 1 && CREATURE_TYPES.has(except.addSubtypes[0]!) && keys.every((k) => k === "pt" || k === "addSubtypes") ? [{ type: "copySpell", spell: "cause", n: 1, newTargets: false, except }] : null;
   }
   if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell)( twice| X times)?(, except the copy isn't legendary)?$/.exec(s) ?? (ctx.selfCastSpell ? /^[Cc]opy ~( twice)?()$/.exec(s) : null))) return [{ type: "copySpell", spell: "cause", n: m[1] === " X times" ? X : m[1] ? 2 : 1, newTargets: false, ...(m[2] ? { except: { notLegendary: true as const } } : {}) }];
   // Bonus Round: "that player copies it and may choose new targets for the copy": the caster copies it and controls the

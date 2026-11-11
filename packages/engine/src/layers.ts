@@ -25,7 +25,7 @@ import { activatedAbilityCount } from "./manaabilities";
 import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
 import { liveEmblems } from "./emblems";
-import { bindChosenKeywords, CHOSEN_LAND_TYPE, COLOR_WORD, CREATURE_TYPES, IDENTITY_PROTECTION, isLandwalk, YOURS_BASIC_LANDWALK, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, YOURS_COLORS_PROTECTION, protectionFromCardTypes, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
+import { bindChosenKeywords, CHOSEN_LAND_TYPE, COLOR_WORD, CREATURE_TYPES, IDENTITY_PROTECTION, isLandwalk, YOURS_BASIC_LANDWALK, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, YOURS_COLORS_PROTECTION, YOURS_ARTIFACT_MV_PROTECTION, protectionFromCardTypes, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
 import { bindGrantSource, compileCard, compileGranted, QUOTED_SOURCE_NAME } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
@@ -1553,6 +1553,13 @@ function colorsAmongYours(chars: CharMap, pid: PlayerId): Color[] {
   return (["W", "U", "B", "R", "G"] as Color[]).filter((col) => all.has(col));
 }
 
+/** The mana values among the artifacts this player controls, as layer 4 left their types (Rebbec, Architect of Ascension). */
+function artifactManaValuesAmongYours(chars: CharMap, pid: PlayerId): number[] {
+  const all = new Set<number>();
+  for (const c of chars.values()) if (c.controller === pid && c.types.includes("Artifact")) all.add(c.manaValue ?? 0);
+  return [...all].sort((a, b) => a - b);
+}
+
 /** The basic land types among the lands this player controls, as layer 4 left them (Magnigoth Treefolk's domain). */
 function basicLandTypesAmongYours(chars: CharMap, pid: PlayerId): string[] {
   const all = new Set<string>();
@@ -1784,7 +1791,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "addKeywords":
       // "Has protection from the chosen color": the color chosen as the source entered.
       // Empty-Shrine Kannushi: "protection from each color among permanents you control", the colors layer 5 left them.
-      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) || m.keywords.includes(YOURS_COLORS_PROTECTION) || m.keywords.includes(YOURS_BASIC_LANDWALK) || m.keywords.some((k) => k.startsWith(LINKED_CARD_KEYWORD)) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : k === YOURS_COLORS_PROTECTION ? colorsAmongYours(chars, controllerOfInst(e, chars)).map((col) => `Protection from ${COLOR_WORD[col]}`) : k === YOURS_BASIC_LANDWALK ? basicLandTypesAmongYours(chars, controllerOfInst(e, chars)).map((t) => `${t}walk`) : k.startsWith(LINKED_CARD_KEYWORD) ? linkedCardKeyword(s, e.sourceId, k.slice(LINKED_CARD_KEYWORD.length)) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors, e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.parity : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.number : undefined)) {
+      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) || m.keywords.includes(YOURS_COLORS_PROTECTION) || m.keywords.includes(YOURS_ARTIFACT_MV_PROTECTION) || m.keywords.includes(YOURS_BASIC_LANDWALK) || m.keywords.some((k) => k.startsWith(LINKED_CARD_KEYWORD)) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : k === YOURS_COLORS_PROTECTION ? colorsAmongYours(chars, controllerOfInst(e, chars)).map((col) => `Protection from ${COLOR_WORD[col]}`) : k === YOURS_ARTIFACT_MV_PROTECTION ? artifactManaValuesAmongYours(chars, controllerOfInst(e, chars)).map((n) => `Protection from mana value ${n}`) : k === YOURS_BASIC_LANDWALK ? basicLandTypesAmongYours(chars, controllerOfInst(e, chars)).map((t) => `${t}walk`) : k.startsWith(LINKED_CARD_KEYWORD) ? linkedCardKeyword(s, e.sourceId, k.slice(LINKED_CARD_KEYWORD.length)) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors, e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.parity : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.number : undefined)) {
         const key = k.toLowerCase();
         if (/^ward\b/i.test(k)) delete c.wardLost;
         if (!c.keywords.some((x) => sameCI(x, k))) {

@@ -6,7 +6,7 @@
 
 import type { Amount, AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "./abilities";
 import { ANY_COUNTER } from "./abilities";
-import { abilitiesOf, defOf } from "./cards";
+import { abilitiesOf, basePowerNow, defOf } from "./cards";
 import { compileCard } from "./oracle";
 import { bindChosen, cardPT, isSuspended, objectMatches, printedMatches, ringBearer, spellManaValue, spellPT } from "./effects";
 import { characteristics, controllerOf, staticConditionNow, type Characteristics } from "./layers";
@@ -366,6 +366,16 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
           if (o?.zone === "exile" && (o.zoneChanges ?? 0) === l.zc && !o.faceDown) for (const x of characteristics(s, o).colors) colors.add(x);
         }
         return colors.size;
+      }
+      // Azor's Gateway: the different mana values among them, each card face up in exile (an {X} as 0, a split card's
+      // two halves together, a card with no mana cost 0: rulings, CR 202.3).
+      if (c.manaValues) {
+        const mvs = new Set<number>();
+        for (const l of linked) {
+          const o = s.objects[l.id];
+          if (o?.zone === "exile" && (o.zoneChanges ?? 0) === l.zc && !o.faceDown) mvs.add(defMv(defOf(s, o)));
+        }
+        return mvs.size;
       }
       if (c.cardTypes) {
         const types = new Set<string>();
@@ -1035,6 +1045,13 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "toxicValue": {
       const o = refObjects(s, c.of, ctx)[0];
       return o && o.zone === "battlefield" ? toxicValue(characteristics(s, o).keywords) : 0;
+    }
+    case "basePower": {
+      // As it is now, or as it last existed on the battlefield (rulings on Curie, CR 608.2h).
+      const o = ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined;
+      if (o && o.zone === "battlefield" && (ctx.sourceZc === undefined || (o.zoneChanges ?? 0) === ctx.sourceZc)) return Math.max(0, basePowerNow(s, o));
+      const lk = ctx.sourceId !== undefined ? s.lastKnown?.[ctx.sourceId] : undefined;
+      return lk && (ctx.sourceZc === undefined || lk.zc === ctx.sourceZc) ? Math.max(0, lk.basePower ?? 0) : 0;
     }
     case "power":
     case "toughness":

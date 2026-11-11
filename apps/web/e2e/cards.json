@@ -30420,6 +30420,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "13f0863f-ae54-4bea-8f01-7f3891797577",
+  "name": "Songcrafter Mage",
+  "manaCost": "{G}{U}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Bard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Bard"
+  ],
+  "oracleText": "Flash\nWhen this creature enters, target instant or sorcery card in your graveyard gains harmonize until end of turn. Its harmonize cost is equal to its mana cost. (You may cast that card from your graveyard for its harmonize cost. You may tap a creature you control to reduce that cost by {X}, where X is its power. Then exile the spell.)",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "tdm",
+  "releasedAt": "2025-04-11",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "945e56b9-709f-4bb3-8a6b-0a04d9202a03",
   "name": "Sorceress's Schemes",
   "manaCost": "{3}{R}",
@@ -36049,6 +36086,43 @@
   "set": "mir",
   "releasedAt": "1996-10-08",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b6b83b88-0660-4227-895e-78ac43d01b66",
+  "name": "Varolz, the Scar-Striped",
+  "manaCost": "{1}{B}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Troll Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Troll",
+   "Warrior"
+  ],
+  "oracleText": "Each creature card in your graveyard has scavenge. The scavenge cost is equal to its mana cost. (Exile a creature card from your graveyard and pay its mana cost: Put a number of +1/+1 counters equal to that card's power on target creature. Scavenge only as a sorcery.)\nSacrifice another creature: Regenerate Varolz.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [
+   "Regenerate"
+  ],
+  "commanderLegal": "legal",
+  "set": "dgm",
+  "releasedAt": "2013-05-03",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -1,7 +1,7 @@
 import type { AbilityBody, CompiledCard, ManaAbility, TargetSpec, TriggeredAbility } from "./abilities";
 import { characteristics, controllerOf, offFieldColored, offFieldDefinedPT, offFieldTyped, printedKeywords, type PTPart } from "./layers";
 import { cleavedText, compileCard, compileGranted, normalizeSelf, overloadedText } from "./oracle";
-import { parseCostKeyword } from "./oracle/keyword-abilities";
+import { parseCostKeyword, parseGraveyardKeyword } from "./oracle/keyword-abilities";
 import { COLORS, type CardDef, type Chosen, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
 import { faceKey, isRoom, registerFace, registerRoom, restingDef, roomKey, sameName } from "./faces";
@@ -434,15 +434,22 @@ function yardGranted(s: GameState, o: GameObject): CompiledCard["activated"] {
       // X in a card's mana cost is 0 here (CR 202.3e).
       // A card with no mana cost has an unpayable cost for "equal to its mana cost" (CR 118.6): no ability to activate.
       if (g.manaCostCost && !d.manaCost) continue;
-      const mv = g.manaValueCost ? `{${manaValue(parseManaCost(d.manaCost ?? ""))}}` : g.manaCostCost ? d.manaCost! : undefined;
+      // Varolz, the Scar-Striped's scavenge: an {X} in it is 0 (rulings).
+      const mv = g.manaValueCost ? `{${manaValue(parseManaCost(d.manaCost ?? ""))}}` : g.manaCostCost ? (g.xZero ? d.manaCost!.replace(/\{X\}/g, "") || "{0}" : d.manaCost!) : undefined;
       out.push(mv ? { ...g.activated, manaCost: mv, text: g.activated.text.replace(/\{[^}]+\}$/, mv) } : g.activated);
     }
   }
   // Cursecloth Wrappings: embalm (or encore) until end of turn for this card, "equal to its mana cost": its printed mana
   // cost, an {X} in it counted as 0 (CR 202.3e, 107.3); with no mana cost, nothing to pay it with (CR 118.6).
   for (const g of s.yardKeywordGrants ?? []) {
-    if (g.id !== o.id || g.zc !== (o.zoneChanges ?? 0) || !d.manaCost) continue;
-    const cost = d.manaCost.replace(/\{X\}/g, "") || "{0}";
+    if (g.id !== o.id || g.zc !== (o.zoneChanges ?? 0) || (!d.manaCost && !g.cost)) continue;
+    const cost = g.cost ?? (d.manaCost!.replace(/\{X\}/g, "") || "{0}");
+    // Ghost Ark: "unearth {3}" (CR 702.84a), the card's own ability until end of turn.
+    if (g.keyword === "Unearth") {
+      const kw = parseGraveyardKeyword(`Unearth ${cost}`, d);
+      if (kw && kw !== "fail" && "unearth" in kw && kw.unearth) out.push(kw.unearth);
+      continue;
+    }
     const kw = parseCostKeyword(`${g.keyword} ${cost}`, d);
     if (kw && kw !== "fail" && kw.activated) out.push(kw.activated);
   }

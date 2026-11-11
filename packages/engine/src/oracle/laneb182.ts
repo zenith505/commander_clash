@@ -7,6 +7,7 @@ import { parseActivated } from "./activated";
 import { parseSearchFilter } from "./search";
 import { parseTrigger } from "./triggers";
 import { COUNTER, counterKind } from "./words";
+import { roundB183Sentence } from "./laneb183";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -117,5 +118,5 @@ export function roundB182Sentence(s: string, _sentences: string[], si: number, c
     if (ctx.spell || effects.length || ctx.targets.length) return null;
     return { effect: { type: "damageRule", rule: { by: { target: { ref: "self" } }, n: Number(byMe[1]) } }, next: si + 1 };
   }
-  return null;
+  return roundB183Sentence(s, _sentences, si, ctx, effects);
 }

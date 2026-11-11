@@ -2029,7 +2029,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
         if (who !== undefined && who !== c.controller && !c.mustAttack.includes(who)) c.mustAttack.push(who);
         return;
       }
-      if (m.player === "chosen" || m.player === "you" || typeof m.player === "object" || (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0))) return;
+      if (m.player === "chosen" || m.player === "you" || m.player === "eventPlayer" || typeof m.player === "object" || (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0))) return;
       if (!c.mustAttack.includes(m.player)) c.mustAttack.push(m.player);
       return;
     case "cantBeBlockedBy":

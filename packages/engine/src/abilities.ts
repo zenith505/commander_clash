@@ -2059,7 +2059,7 @@ export type Modification =
   /** "Attacks that opponent this turn if able" (encore, CR 702.141a): a requirement to attack that player (CR 508.1d). */
   /** Galactus, Devourer of Worlds: "~ attacks an opponent with the most life among your opponents each combat if able" (CR 508.1d). */
   | { kind: "mustAttackMostLife" }
-  | { kind: "mustAttackPlayer"; player: PlayerId | /** "That player" after "choose an opponent" (Raving Dead): bound as it resolves (Effect "continuous"). */ "chosen" | /** "Attacks target opponent this turn if able" (Dulcet Sirens): that target, bound as it resolves. */ { target: number } | /** "Attacks you this turn if able" (Alluring Siren): the ability's controller, bound as it resolves. */ "you" | /** Public Enemy: "All creatures attack enchanted creature's controller each combat if able": whoever controls the creature the source enchants now. */ "enchantedController"; /** "Attacks that player this combat if able": in that combat only, as "attacksIfAble". */ combat?: number | "this" }
+  | { kind: "mustAttackPlayer"; player: PlayerId | /** "That player" after "choose an opponent" (Raving Dead): bound as it resolves (Effect "continuous"). */ "chosen" | /** "Attacks target opponent this turn if able" (Dulcet Sirens): that target, bound as it resolves. */ { target: number } | /** "Attacks you this turn if able" (Alluring Siren): the ability's controller, bound as it resolves. */ "you" | /** Public Enemy: "All creatures attack enchanted creature's controller each combat if able": whoever controls the creature the source enchants now. */ "enchantedController" | /** "Target creature attacks that player each combat if able" in a "deals combat damage to a player" trigger (Silver Surfer, Galactus's Herald): that player, bound as it resolves. */ "eventPlayer"; /** "Attacks that player this combat if able": in that combat only, as "attacksIfAble". */ combat?: number | "this" }
   /** "Can't be blocked by creatures with power 2 or less", "by Walls", "by blue creatures" (CR 509.1b). */
   | { kind: "cantBeBlockedBy"; filter: TargetSpec }
   /** "Can't be the target of spells or abilities your opponents control", "... of black spells or abilities from black sources" (CR 115.4). */
@@ -9033,6 +9033,8 @@ export interface CompiledCard {
     treasureOnly?: true;
     /** Web-slinging (CR 702.188a), for "if ~ was cast using web-slinging". */
     webSlinging?: true;
+    /** Qasali Ambusher: "... and as though it had flash": cast this way, it may be cast any time you could cast an instant (CR 601.3). */
+    flash?: true;
   }[];
   /** Madness [cost] (CR 702.35a): discarded, it's exiled instead, and its owner may cast it for this cost. */
   madness?: string;

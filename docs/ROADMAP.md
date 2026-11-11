@@ -1,6 +1,6 @@
 # Roadmap
 
-31,020 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,027 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,971 of 4,988 (99%), top 10,000: 9,812 of
 9,979 (98%).
 
@@ -8002,6 +8002,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ("sacrifice it, draw a card, and put a +1/+1 counter on each creature you control"). Maeve, Insidious Singer ("Whenever
   that creature attacks one of your opponents this turn, you draw a card": a delayed trigger about the goaded creature,
   each time it attacks one of your opponents this turn, the player and not a planeswalker). +7, 31,020 of 31,936 with B177 to B179 and rounds 336 to 337.
+- Round B181 (least played first, single-line blockers from the skip lists): Winter, Cursed Rider ("Exile X artifact cards
+  from your graveyard" with no {X} to pay: X announced as it's activated, that many artifact cards, CR 107.3a, 602.2b;
+  "each other nonartifact creature gets -X/-X", the creatures there as it resolves; bots exhaust it when it kills two or
+  more of their opponents' creatures and more of theirs than their own; a browser test). Shackles of Treachery (a granted
+  "Whenever this creature deals damage, destroy target Equipment attached to it": attached to the trigger's source as the
+  target is chosen and as it resolves, whoever controls the Equipment, any damage, rulings). Cosmium Confluence ("Put
+  three +1/+1 counters on a Cave you control. It becomes a 0/0 Elemental creature with haste. It's still a land.": the Cave
+  chosen as it resolves, not a target, one just put onto the battlefield by the first mode too, for the rest of the game,
+  rulings, CR 611.2a). Silver Surfer, Galactus's Herald ("until the end of your next turn, target creature attacks that
+  player each combat if able": the player it dealt combat damage to, not a planeswalker of theirs). The Five Doctors (up to
+  five Doctor cards in all from your library and/or graveyard, the library too or not chosen as it resolves; a card with
+  the Doctor creature type, rulings; kicked, onto the battlefield instead). Qasali Ambusher ("If a creature is attacking
+  you and you control a Forest and a Plains, you may cast ~ without paying its mana cost and as though it had flash": a
+  creature attacking you, not a planeswalker of yours, one land with both types enough, rulings; the flash only for that
+  cost, CR 601.3; a browser test). Michelangelo's Technique ("up to two creature cards with total mana value 6 or less"
+  from among the top eight). +7, 31,027 of 31,936 with B177 to B180 and rounds 336 to 337.
+- Out after round B181 (looked at, not done): Ludevic, Necrogenius (its back face becomes a copy of a creature card exiled
+  with it as it transforms), Song of Inspiration ("add the total mana value of those cards" to a d20 roll: whether a target
+  that became illegal still counts isn't settled by its rulings) stay out.
 - Out after round B180 (looked at, not done): Strax, Sontaran Nurse (a reflexive trigger's target limited to the creatures
   of a player chosen at random), Battletide Alchemist ("you may prevent X of that damage" to any player: a choice for each
   player as each source's damage is dealt), Zethi, Arcane Blademaster (X targets by kicks, then copies of the kicked

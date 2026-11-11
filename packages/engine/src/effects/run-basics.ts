@@ -1243,14 +1243,28 @@ function dealtWithExcess(s: GameState, from: DamageSource, events: DamageEvent[]
   const lethal = new Map(events.flatMap((ev) => ("object" in ev.to ? [[ev.to.object, lethalAmounts(s, ev.src ?? from, obj(s, ev.to.object))] as const] : [])));
   const creatures = new Set(events.flatMap((ev) => ("object" in ev.to && objIsType(s, obj(s, ev.to.object), "Creature") ? [ev.to.object] : [])));
   const toObject = new Map<ObjectId, number>();
+  // Drain Life's cap on each recipient, as it is just before the damage (CR 120.3): a player's life total, a planeswalker's
+  // loyalty, a creature's toughness (even if it's already damaged, rulings); the smallest that applies.
+  const keyOf = (to: DamageEvent["to"]) => ("player" in to ? `p:${to.player}` : `o:${to.object}`);
+  const capOf = (to: DamageEvent["to"], loyaltyLost = 0): number => {
+    if ("player" in to) return Math.max(0, player(s, to.player).life);
+    const o = obj(s, to.object);
+    const caps = [...(objIsType(s, o, "Planeswalker") ? [(o.counters.loyalty ?? 0) + loyaltyLost] : []), ...(objIsType(s, o, "Creature") ? [toughness(s, o)] : [])];
+    return Math.max(0, caps.length ? Math.min(...caps) : 0);
+  };
+  const caps = new Map<string, number>([...s.turnOrder.map((p) => [`p:${p}`, Math.max(0, player(s, p).life)] as const), ...events.flatMap((ev) => ("object" in ev.to ? [[keyOf(ev.to), capOf(ev.to)] as const] : []))]);
+  const dealtTo = new Map<string, { to: DamageEvent["to"]; n: number }>();
   let dealt = 0;
   for (const e of deal(events)) {
     dealt += e.dealt;
+    const key = keyOf(e.to);
+    dealtTo.set(key, { to: e.to, n: (dealtTo.get(key)?.n ?? 0) + e.dealt });
     if (e.dealt > 0 && "object" in e.to) toObject.set(e.to.object, (toObject.get(e.to.object) ?? 0) + e.dealt);
     if (e.dealt > 0 && "object" in e.to && s.resolving) (s.resolving.damagedThisWay ??= []).push(e.to.object);
     if (e.dealt > 0 && "player" in e.to && s.resolving && !(s.resolving.playersDamagedThisWay ??= []).includes(e.to.player)) s.resolving.playersDamagedThisWay.push(e.to.player);
   }
   if (s.resolving) s.resolving.damageThisWay = (s.resolving.damageThisWay ?? 0) + dealt;
+  if (s.resolving && dealt > 0) s.resolving.damageCappedThisWay = (s.resolving.damageCappedThisWay ?? 0) + [...dealtTo].reduce((n, [key, d]) => n + Math.min(d.n, caps.get(key) ?? ("object" in d.to && s.objects[d.to.object] ? capOf(d.to, d.n) : 0)), 0);
   if (s.resolving) for (const [id, n] of toObject) noteExcess(s, id, excessOver(lethal.get(id) ?? [], n), creatures.has(id));
   return dealt;
 }

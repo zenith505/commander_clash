@@ -154,6 +154,8 @@ export interface Characteristics {
   doesntUntap: boolean;
   /** "Can't become untapped" (Frozen in Ice): not by any effect either (game.ts untapPermanent). */
   cantBecomeUntapped?: true;
+  /** "Can't have counters put on it" (Blossombind): see countersBanned. */
+  cantHaveCounters?: true;
   cantBeSuspected: boolean;
   /** "Can block only creatures with flying" (CR 509.1b). */
   blocksOnlyFlyers: boolean;
@@ -1050,6 +1052,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.turnLog?.permanentToHand ?? []).includes(you);
     case "cardsToYourGraveyardNotBattlefield":
       return (s.turnLog?.toGraveyardNotBattlefield?.[you] ?? 0) >= cond.n;
+    case "oilRemovedOrOilPermanentToGraveyard":
+      return !!s.turnLog?.oilRemoved?.includes(you) || !!s.turnLog?.oilPermanentToGraveyard;
     case "usedGraveyardThisTurn":
       return (s.castThisTurn ?? []).some((c) => c.player === you && c.from === "graveyard") || !!s.turnLog?.activatedInGraveyard?.includes(you);
     case "cardLeftYourGraveyard":
@@ -1951,6 +1955,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantBecomeUntapped":
       c.doesntUntap = true;
       c.cantBecomeUntapped = true;
+      return;
+    case "cantHaveCounters":
+      c.cantHaveCounters = true;
       return;
     case "cantBeSuspected":
       c.cantBeSuspected = true;

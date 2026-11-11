@@ -49,8 +49,9 @@ const objectMatchesFor = (s: GameState, spec: TargetSpec, id: ObjectId, you: Pla
  * Put a copy of this spell on the stack under `controller` (CR 707.10): its values and every choice made casting
  * it (modes, X, kicker, what was sacrificed), with these targets. It isn't cast.
  */
-export function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targets: TargetChoice[] | undefined, gains?: { mods: Modification[]; source: string }, except?: CopyExcept) {
-  const card = orig.objectId ? s.objects[orig.objectId] : undefined;
+export function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targets: TargetChoice[] | undefined, gains?: { mods: Modification[]; source: string }, except?: CopyExcept, cardThen?: GameObject) {
+  // `cardThen`: the spell's object as it last was on the stack, once it has left (Psychic Rebuttal, CR 707.10).
+  const card = cardThen ?? (orig.objectId ? s.objects[orig.objectId] : undefined);
   if (!card) return;
   // A copy of a nonmodal double-faced spell's back face (cast transformed: disturb) has mana value 0 (CR 202.3b).
   const def = s.cards[cardIdOf(card)]!;
@@ -184,12 +185,13 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         return;
       }
-      if (e.when === "becomesBlocked") {
+      // Maeve, Insidious Singer: "Whenever that creature attacks one of your opponents this turn", the same way.
+      if (e.when === "becomesBlocked" || e.when === "attacksOpponent") {
         // Barreling Attack: "When that creature becomes blocked this turn, it gets ...": about that permanent as it is now
         // (CR 603.7c, 400.7), each time it becomes blocked this turn (CR 603.7b); its source is the spell (603.7d).
         for (const o of objects(s, e.of!, ctx)) {
           if (o.zone !== "battlefield") continue;
-          addDelayed(s, "becomesBlocked", ctx.controller, o, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
+          addDelayed(s, e.when, ctx.controller, o, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
           s.delayed![s.delayed!.length - 1]!.thisTurn = s.turn;
         }
         return;
@@ -460,7 +462,16 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         return;
       }
       if (!sc.copies) {
-        const i = e.spell === "cause" || e.spell === "self" || "epic" in e.spell ? -1 : e.spell.target;
+        // Psychic Rebuttal: the spell countered this way, as it last was on the stack (none if it wasn't countered).
+        if (e.spell === "countered") {
+          const snap = r.counteredCopy;
+          if (!snap) return;
+          const extra = extraSpellCopies(s, ctx.controller); // Twinning Staff (CR 614.1a)
+          sc.copies = { of: snap.item.id, left: 1, ...(extra ? { extra } : {}) };
+        }
+      }
+      if (!sc.copies) {
+        const i = e.spell === "cause" || e.spell === "self" || e.spell === "countered" || "epic" in e.spell ? -1 : e.spell.target;
         const t = i >= 0 ? ctx.targets[i] : undefined;
         const id = e.spell === "self" ? r.item.id : typeof e.spell === "object" && "epic" in e.spell ? e.spell.epic : i < 0 ? ctx.cause : t?.kind === "stack" && ctx.legal[i] ? t.id : undefined;
         const orig = e.spell === "self" ? r.item : id ? (s.stack.find((x) => x.id === id) ?? s.castItems?.[id] ?? s.epics?.[id]) : undefined;
@@ -518,7 +529,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       const c = sc.copies;
       // As it is now, or as it was cast if it has left the stack.
-      const orig = s.stack.find((x) => x.id === c.of) ?? s.castItems?.[c.of] ?? s.epics?.[c.of] ?? (r.item.id === c.of ? r.item : undefined);
+      const countered = r.counteredCopy?.item.id === c.of ? r.counteredCopy : undefined;
+      const orig = countered?.item ?? s.stack.find((x) => x.id === c.of) ?? s.castItems?.[c.of] ?? s.epics?.[c.of] ?? (r.item.id === c.of ? r.item : undefined);
       const specs = orig?.body?.targets ?? [];
       while (orig && c.left > 0) {
         if (e.newTargets && specs.length && c.targets === undefined) {
@@ -543,7 +555,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const one = c.each?.[c.each.length - c.left];
         const aimed = one !== undefined ? (orig.targets ?? []).map((t): TargetChoice => (t.kind === "object" ? { kind: "object", id: one } : t)) : undefined;
         if (orig.kind === "ability") putAbilityCopy(s, orig, ctx.controller, c.targets ?? orig.targets);
-        else putSpellCopy(s, orig, c.by ?? ctx.controller, aimed ?? c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, e.except);
+        else putSpellCopy(s, orig, c.by ?? ctx.controller, aimed ?? c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, e.except, countered?.card);
         c.targets = undefined;
         c.left--;
       }
@@ -553,7 +565,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           s.pending = { kind: "copyTargets", player: c.by ?? ctx.controller, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.extra };
           return "paused";
         }
-        putSpellCopy(s, orig, c.by ?? ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, e.except);
+        putSpellCopy(s, orig, c.by ?? ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, e.except, countered?.card);
         c.targets = undefined;
         c.extra--;
       }
@@ -1232,8 +1244,21 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
         return !!o && !o.spellCopy && !item!.copy && characteristics(s, o).types.some((ty) => e.battlefieldIf!.types!.includes(ty));
       })();
+      // Psychic Rebuttal: the spell as it is on the stack, kept only if it's countered this way (not if it can't be, or
+      // Guile exiles it instead, rulings).
+      const snapItem = e.copyCountered ? s.stack.find((x) => x.id === t.id && x.kind === "spell") : undefined;
+      const snapCard = snapItem?.objectId ? s.objects[snapItem.objectId] : undefined;
+      const snap = snapItem && snapCard ? { item: structuredClone(snapItem), card: structuredClone(snapCard) } : undefined;
+      // Counterlash: "it" is the target spell, countered or not; its card types as it is on the stack now.
+      if (e.noteTypes && s.resolving) {
+        const item = s.stack.find((x) => x.id === t.id && x.kind === "spell");
+        const o = item?.objectId ? s.objects[item.objectId] : undefined;
+        s.resolving.counterTargetTypes = o ? [...characteristics(s, o).types] : [];
+      }
+      const counteredBefore = s.resolving?.spellsCountered ?? 0;
       const done = counterOnStack(s, ctx, t.id, src, e.unless, toField ? "battlefield" : exileIt ? "exile" : e.librarySecond ? "librarySecond" : e.libraryChoice ? "libraryChoice" : e.top ? "libraryTop" : e.bottom ? "libraryBottom" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
       if (done === "paused") return done;
+      if (snap && s.resolving && (s.resolving.spellsCountered ?? 0) > counteredBefore) s.resolving.counteredCopy = snap;
       if (offerGuileCasts(s, src)) return "paused";
       // Spelljack, Kheru Spellsnatcher: the card countered and exiled this way, while it stays exiled (CR 400.7).
       const ex = e.youMayFree && s.resolving?.counteredExiled ? s.objects[s.resolving.counteredExiled.id] : undefined;

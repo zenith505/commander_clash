@@ -340,7 +340,7 @@ export type Count =
    * ability's damage dealt to permanents beyond lethal damage, their loyalty or their defense (CR 120.4a, 120.10).
    */
   /** "You gain life equal to the damage dealt this way" (Syphon Soul): all the damage the instructions before dealt, after prevention. */
-  | { kind: "damageThisWay" }
+  | { kind: "damageThisWay"; /** Drain Life: "but not more life than the player's life total before the damage was dealt, the planeswalker's loyalty before the damage was dealt, or the creature's toughness": each recipient's part no more than that (ResolvingState.damageCappedThisWay). */ capped?: true }
   | { kind: "excessThisWay"; /** Only that target's (The Last Agni Kai's "add that much {R}"). */ target?: number }
   /** "If you lost life this way, draw that many cards" after exchanging life totals (Mister Negative): the life you lost doing it. */
   | { kind: "lifeLostThisWay"; /** "If no life is lost this way" (Blitzwing, Cruel Tormentor): what its loseLife instructions took off life totals, any player's. */ byLoss?: true }
@@ -653,6 +653,8 @@ export type Count =
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
   | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; /** "Your opponents who were dealt combat damage by ~ or a Dragon this turn" (Estinien Varlineau): by this object (CR 400.7) or by a creature of this type as it dealt it, those who have lost since too (as for Tymna). */ combatDamagedBySelfOr?: string; /** "For each opponent who was dealt damage this turn" (Gnoll War Band): by any source, those still in the game (rulings). */ damaged?: true; drewThisWay?: true; /** "Opponents who investigated this way" after "each opponent may investigate" (Wernog): those who chose to (PlayerRef choseThisWay). */ choseThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "For each opponent who didn't discard two nonland cards this way" (Garruk, Veiled Butcher): those in the game who discarded fewer than this many nonland cards in this resolution. */ discardedFewerNonland?: number; /** "Who discarded a card this turn" (Azula, Ruthless Firebender): one or more cards, any way, players still in the game. */ discardedThisTurn?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "With four or more cards in hand" (Wolfcaller's Howl), counted now. */ handAtLeast?: number; /** "Opponents who have three or more poison counters" (Glissa's Retriever), counted now. */ poisonAtLeast?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent who has less life than you" (Great Unclean One), counted now. */ lifeLessThanYou?: true; /** "For each opponent whose life total is less than half their starting life total" (Anya, Merciless Angel): with at most this much life, counted now. */ lifeAtMost?: number; /** "For each opponent who controls fewer creatures than you" (Birth of the Imperium), counted now. */ fewerCreaturesThanYou?: true; /** "The number of opponents who control more creatures than you" (Heidegger, Shinra Executive), counted now. */ moreCreaturesThanYou?: true; /** "Players who control at least two more lands than you" (Surveyor's Scope), counted now. */ moreLandsThanYou?: number; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true; /** "For each graveyard with seven or more cards in it" (The Master of Lake-town): players whose graveyard has this many, counted now. */ yardAtLeast?: number }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
+  /** Gutter Grime's Ooze, Saproling Burst's Saproling: "the number of slime counters on Gutter Grime": on the permanent named this whose ability created this token (GameObject.createdWith), while it's that object on the battlefield; 0 otherwise (rulings). */
+  | { kind: "countersOnCreator"; counter: CounterKind; name: string }
   | { kind: "counters"; counter: CounterKind; of: ObjRef; /** With ANY_COUNTER, "for each kind of counter on it" (Blitzball Stadium): the kinds it has, each once. */ kinds?: true }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
   /** Station's "the tapped creature's power" (CR 702.184a), and "the power of the creature tapped this way" after a "Tap an untapped creature you control" cost (Keldon Battlewagon): as the ability resolves, or as it last existed (rulings on Impelled Giant); never below 0 (CR 107.1b). */
@@ -2015,6 +2017,8 @@ export type Modification =
   | { kind: "doesntUntap"; /** Fall from Favor: "unless that player is the monarch": not while its controller is (CR 725). */ unlessMonarch?: true }
   /** "Can't become untapped" (Frozen in Ice): it doesn't untap in its untap step or from any effect (see untapPermanent). */
   | { kind: "cantBecomeUntapped" }
+  /** "Can't have counters put on it" (Blossombind): none of any kind, by an effect, a cost or a replacement (countersBanned; rulings). */
+  | { kind: "cantHaveCounters" }
   /** "Can't become suspected" (Airtight Alibi, CR 701.60): suspect effects don't apply to it. */
   | { kind: "cantBeSuspected" }
   /**
@@ -2658,6 +2662,8 @@ export type StaticCondition =
   /** "If a card left your graveyard this turn" (Gau, Feral Youth). */
   /** Dimir Strandcatcher: "if three or more cards were put into your graveyard from anywhere other than the battlefield this turn" (TurnLog.toGraveyardNotBattlefield). */
   | { kind: "cardsToYourGraveyardNotBattlefield"; n: number }
+  /** Churning Reservoir: "if an oil counter was removed from a permanent you controlled this turn or a permanent with an oil counter on it was put into a graveyard this turn" (TurnLog.oilRemoved, oilPermanentToGraveyard). */
+  | { kind: "oilRemovedOrOilPermanentToGraveyard" }
   /** Laboratory Drudge: "if you've cast a spell from a graveyard or activated an ability of a card in a graveyard this turn" (castThisTurn's `from`, TurnLog.activatedInGraveyard). */
   | { kind: "usedGraveyardThisTurn" }
   | { kind: "cardLeftYourGraveyard"; /** "If three or more cards left your graveyard this turn" (Bonecache Overseer). */ n?: number; /** "If a creature card left your graveyard this turn" (Syrix, Carrier of the Flame). */ creature?: true }
@@ -3520,7 +3526,7 @@ export type Effect =
    * spell's) is its event player, "that spell's mana value" (Mana Drain) its event amount. `yourNextMain`: "at the
    * beginning of your next main phase", the next one that begins after it's made (rulings on Mana Drain).
    */
-  | { type: "delayed"; when: /** Vivien's Stampede: "At the beginning of the next main phase this turn": a later main phase of this turn, none on a later turn. */ "nextMainThisTurn" | "nextTurnUpkeep" | "yourNextUpkeep" | /** "At the beginning of their next upkeep" (Phytotitan), with `each` "selfCard": the card's owner's next upkeep. */ "ownersNextUpkeep" | /** "When that creature becomes blocked this turn" (Barreling Attack): each time it does this turn (CR 603.7b). */ "becomesBlocked" | "nextEndStep" | "yourNextEndStep" | /** "At the beginning of the end step on your next turn" (Kav Landseeker): your end step on a later turn. */ "yourNextTurnEndStep" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep" | /** "At the beginning of the end step of that player's next turn" (Suppress): `whose`'s end step on a later turn. */ "playersNextTurnEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; /** Heroic Sacrifice: the delayed trigger's own targets, chosen as it's put on the stack (CR 603.3d); with `when` "dies", `lkiCounters` gives it the counters the creature had as it died (CR 608.2h). */ targets?: TargetSpec[]; lkiCounters?: true; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned" | /** Unexpected Request: each Equipment the attach before attached this way (ResolvingState.attachedThisWay). */ "attachedThisWay"; /** With each "subject": the delayed trigger also remembers this ability's source as it is now, its "~" (Contempt). */ withSource?: true; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; /** With `when` "dies": "When the permanent you don't control dies this turn" (Devouring Tendrils): a planeswalker too, any permanent put into a graveyard from the battlefield (CR 700.4). */ anyPermanent?: true; /** With "dies": "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only if you own it. */ intoYourGraveyard?: true; /** With "dies": "if it has an egg counter on it" (Xira), as it last existed (CR 603.4, 603.10a). */ ifHadCounter?: CounterKind; /** With `of` countersPutThisWay: "For each -1/-1 counter you put on a creature this way, remove a -1/-1 counter from that creature at the beginning of the next end step" (Shambling Swarm): each creature's removeCounters is as many as were put on it. */ perCounterPut?: true; /** With "leaves" `of` self: "When ~ leaves the battlefield this turn, destroy that creature" (War Barge): its instructions are about this target as it is now, not about ~ (CR 603.7c, 400.7). */ about?: number; event?: { player?: PlayerRef; amount?: Amount } }
+  | { type: "delayed"; when: /** Vivien's Stampede: "At the beginning of the next main phase this turn": a later main phase of this turn, none on a later turn. */ "nextMainThisTurn" | "nextTurnUpkeep" | "yourNextUpkeep" | /** "At the beginning of their next upkeep" (Phytotitan), with `each` "selfCard": the card's owner's next upkeep. */ "ownersNextUpkeep" | /** "When that creature becomes blocked this turn" (Barreling Attack): each time it does this turn (CR 603.7b). */ "becomesBlocked" | /** "Whenever that creature attacks one of your opponents this turn" (Maeve, Insidious Singer): each time it attacks one this turn, the player and not a planeswalker. */ "attacksOpponent" | "nextEndStep" | "yourNextEndStep" | /** "At the beginning of the end step on your next turn" (Kav Landseeker): your end step on a later turn. */ "yourNextTurnEndStep" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep" | /** "At the beginning of the end step of that player's next turn" (Suppress): `whose`'s end step on a later turn. */ "playersNextTurnEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; /** Heroic Sacrifice: the delayed trigger's own targets, chosen as it's put on the stack (CR 603.3d); with `when` "dies", `lkiCounters` gives it the counters the creature had as it died (CR 608.2h). */ targets?: TargetSpec[]; lkiCounters?: true; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned" | /** Unexpected Request: each Equipment the attach before attached this way (ResolvingState.attachedThisWay). */ "attachedThisWay"; /** With each "subject": the delayed trigger also remembers this ability's source as it is now, its "~" (Contempt). */ withSource?: true; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; /** With `when` "dies": "When the permanent you don't control dies this turn" (Devouring Tendrils): a planeswalker too, any permanent put into a graveyard from the battlefield (CR 700.4). */ anyPermanent?: true; /** With "dies": "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only if you own it. */ intoYourGraveyard?: true; /** With "dies": "if it has an egg counter on it" (Xira), as it last existed (CR 603.4, 603.10a). */ ifHadCounter?: CounterKind; /** With `of` countersPutThisWay: "For each -1/-1 counter you put on a creature this way, remove a -1/-1 counter from that creature at the beginning of the next end step" (Shambling Swarm): each creature's removeCounters is as many as were put on it. */ perCounterPut?: true; /** With "leaves" `of` self: "When ~ leaves the battlefield this turn, destroy that creature" (War Barge): its instructions are about this target as it is now, not about ~ (CR 603.7c, 400.7). */ about?: number; event?: { player?: PlayerRef; amount?: Amount } }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu"; /** Zareth San, the Trickster: not ninjutsu, so it attacks what its controller chooses as it enters (CR 508.4; rulings), not what the returned creature attacked (702.49c). */ chooseDefender?: true }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -3531,7 +3537,7 @@ export type Effect =
    * "You may cast a spell with mana value 3 or less from your hand without paying its mana cost" (the Expertises,
    * Electrodominance's "X or less"): one card, picked and cast as this resolves (rulings).
    */
-  | { type: "castFromHand"; filter: TargetSpec; /** "If you don't, scry 1" after it (In Search of Greatness): whether a spell was cast this way is what "if you do" asks. */ setsDid?: true; /** "Draw three cards and reveal them. You may cast one of them ...": only those, revealed. */ drawn?: true; /** "... from your graveyard without paying its mana cost. If that spell would be put into your graveyard, exile it instead." (Sword of Once and Future): a card there, and the spell is exiled instead of going back. */ fromGraveyard?: true; /** With `fromGraveyard`: no "exile it instead" (Counterpoint). */ yardNoExile?: true; /** Jace's Mindseeker: "target opponent mills five cards. You may cast an instant or sorcery spell from among them": one of the cards this resolution milled, where they went (exile too, rulings). */ milled?: true }
+  | { type: "castFromHand"; filter: TargetSpec; /** "If you don't, scry 1" after it (In Search of Greatness): whether a spell was cast this way is what "if you do" asks. */ setsDid?: true; /** "Draw three cards and reveal them. You may cast one of them ...": only those, revealed. */ drawn?: true; /** "... from your graveyard without paying its mana cost. If that spell would be put into your graveyard, exile it instead." (Sword of Once and Future): a card there, and the spell is exiled instead of going back. */ fromGraveyard?: true; /** With `fromGraveyard`: no "exile it instead" (Counterpoint). */ yardNoExile?: true; /** Jace's Mindseeker: "target opponent mills five cards. You may cast an instant or sorcery spell from among them": one of the cards this resolution milled, where they went (exile too, rulings). */ milled?: true; /** Twinning Glass: "if it has the same name as a spell that was cast this turn": by anyone, as it resolves (rulings), the spell as it's cast (see castFree's names). */ sameNameCastThisTurn?: true; /** Counterlash: "a spell that shares a card type with it": a card type of the spell its counterSpell targeted, as it was on the stack (ResolvingState.counterTargetTypes). */ sharesTypeWithCountered?: true }
   /** Suspend's upkeep trigger (CR 702.62a): if the card (the subject) is still suspended, remove a time counter from it. */
   | { type: "suspendTick" }
   /** Suspend's last-counter trigger (CR 702.62a): its owner may cast the exiled card without paying its mana cost. */
@@ -3669,7 +3675,7 @@ export type Effect =
    */
   /** `epic`: the spell with epic as it resolved, by its stack id in `GameState.epics` (CR 702.50a). */
   /** `self`: the spell that's resolving ("you may copy this spell", Sevinne's Reclamation), as it is on the stack. */
-  | { type: "copySpell"; spell: "cause" | "self" | { target: number; /** "Copy any number of target instant and/or sorcery spells" (Display of Power): the targets from `target` on, `n` of them once cast (expandMany), each copied in turn. */ many?: true; n?: number } | { epic: string }; /** "stormInstantSorcery": the instant and sorcery spells its controller cast before it this turn (Thousand-Year Storm). "otherInstantSorcery": all the others its controller has cast this turn, counted as this resolves (Show of Confidence). "eachOther": see `eachOther`. */ n: Amount | "storm" | "kicked" | "stormInstantSorcery" | "otherInstantSorcery" | "eachOther"; newTargets: boolean;
+  | { type: "copySpell"; spell: "cause" | "self" | /** Psychic Rebuttal: "copy the spell countered this way", as it last was on the stack (ResolvingState.counteredCopy, CR 707.10). */ "countered" | { target: number; /** "Copy any number of target instant and/or sorcery spells" (Display of Power): the targets from `target` on, `n` of them once cast (expandMany), each copied in turn. */ many?: true; n?: number } | { epic: string }; /** "stormInstantSorcery": the instant and sorcery spells its controller cast before it this turn (Thousand-Year Storm). "otherInstantSorcery": all the others its controller has cast this turn, counted as this resolves (Show of Confidence). "eachOther": see `eachOther`. */ n: Amount | "storm" | "kicked" | "stormInstantSorcery" | "otherInstantSorcery" | "eachOther"; newTargets: boolean;
     /**
      * Zada, Ink-Treader Nephilim, Precursor Golem: "copy that spell for each other creature (you control) that the spell
      * could target. Each copy targets a different one of those creatures": one copy for each permanent matching `among`
@@ -4482,6 +4488,10 @@ export type Effect =
       type: "counterSpell";
       index: number;
       unless?: UnlessPays;
+      /** Psychic Rebuttal: note the spell as it was on the stack, if it's countered this way (ResolvingState.counteredCopy), for "copy the spell countered this way" after it. */
+      copyCountered?: true;
+      /** Counterlash: note the target spell's card types as it is on the stack (ResolvingState.counterTargetTypes), countered or not, for "a spell that shares a card type with it" after it. */
+      noteTypes?: true;
       exile?: boolean;
       /** Spell Crumple: "put it on the bottom of its owner's library instead of into that player's graveyard". */
       bottom?: true;
@@ -4911,6 +4921,26 @@ export type Effect =
    * combat damage this turn, ones that came later too (rulings; TurnLog.unblockedDamage, CR 510.1c).
    */
   | { type: "yourCreaturesUnblockedThisTurn" }
+  /**
+   * After "each player discards a card" (Creeping Dread): "Each opponent who discarded a card that shares a card type with
+   * the card you discarded loses 3 life": the cards this resolution discarded (wherever they went), their owners the players
+   * who discarded them; card types only, once each opponent however many they share (rulings, CR 205.2a).
+   */
+  | { type: "discardSharesTypeLoss"; n: number }
+  /**
+   * Nafs Asp, Glass Asp, Sabertooth Cobra, Quenchable Fire: "that player loses 1 life at the beginning of their next draw
+   * step unless they pay {1} before that draw step": a delayed trigger (CR 603.7) that `whom` may stop by paying `cost`
+   * once, a special action any time they have priority until that step begins (rulings; DelayedTrigger.unlessPaid).
+   * `whom` "eventPlayer" is the trigger's event player; "target" the spell's target `index`, a player or a planeswalker
+   * (then its controller pays, and `effects` are about the planeswalker as the delayed trigger's subject). `when`: that
+   * player's next draw step or upkeep, or the controller's next upkeep.
+   */
+  | { type: "delayedUnlessPaid"; whom: "eventPlayer" | "target"; index?: number; when: "theirNextDraw" | "theirNextUpkeep" | "yourNextUpkeep"; cost: string; effects: Effect[]; text: string }
+  /**
+   * After "each opponent discards a card" (Scythe Specter): "Each player who discarded a card with the greatest mana value
+   * among cards discarded this way loses life equal to that mana value": every player tied for it (rulings).
+   */
+  | { type: "discardGreatestMvLoss" }
   /** Stromgald Spy: "defending player plays with their hand revealed for as long as ~ remains on the battlefield" (CR 402.3, 611.2b; Player.handRevealedWhile). */
   | { type: "revealHandWhile"; who: PlayerRef }
   /**
@@ -6698,6 +6728,12 @@ export interface ActivatedAbility {
   cycling?: boolean;
   /** Crew N (CR 702.122a): the cost is tapping other untapped creatures you control with total power N or more. */
   crew?: number;
+  /**
+   * Mossbridge Troll: "Tap any number of untapped creatures you control other than ~ with total power 10 or greater": `crew`
+   * is that total, paid like crew's cost (CR 702.122a) but it isn't crewing: no "crews" events, no crewed Vehicle, and each
+   * creature counts its own power.
+   */
+  tapPower?: true;
   /** Saddle N (CR 702.171a): `crew` is N, and the creatures tapped saddle this permanent (CR 702.171c). */
   saddle?: true;
   /** Station (CR 702.184a): the cost is tapping one other untapped creature you control (`tapCreatures`). */
@@ -7099,7 +7135,7 @@ export type EntersCondition =
 /** `orControl`: "or you control a Dragon" (Temple of the Dragon Queen): untapped then with nothing revealed. */
 export type EntersChoice =
   | { kind: "payLife"; n: number }
-  | { kind: "reveal"; filter: TargetSpec; orControl?: TargetSpec }
+  | { kind: "reveal"; filter: TargetSpec; orControl?: TargetSpec; /** Theorist's Sanctum: "you may behold a Jace" (CR 701.4a), said so. */ behold?: true }
   /** Mariposa Military Base: "You may have ~ enter tapped. If you do, you get two rad counters." Untapped unless its player chooses (CR 614.1c); entering by an effect, it's untapped. */
   | { kind: "mayTapRad"; n: number };
 
@@ -8001,6 +8037,12 @@ export interface CompiledCard {
   yourCreaturesNoCounters?: CounterKind;
   /** Melira, Sylvok Outcast: "You can't get poison counters." (counters.ts playerCountersToPut). */
   noPoisonForYou?: true;
+  /** Melira, the Living Cure: "If you would get one or more poison counters, instead you get one poison counter and you can't get additional poison counters this turn" (putPlayerCounters, TurnLog.noMorePoison). */
+  onePoisonForYou?: true;
+  /** Drain Life, Consume Spirit: "Spend only black mana on X." in a spell whose mana cost has more than {X}: the mana paying X is of this type (spellCost), less whatever reductions take off X (rulings). */
+  spendOnlyOnX?: ManaType;
+  /** Tapestry Warden: "Each creature you control with toughness greater than its power stations permanents using its toughness rather than its power." (amounts.ts stationPower, rulings). */
+  stationByToughness?: true;
   /** Tatterkite: "~ can't have counters put on it." (counters.ts countersBanned). */
   selfNoCounters?: true;
   /** "Creatures you control can boast twice during each of your turns rather than once." (Birgi, CR 702.142a) */

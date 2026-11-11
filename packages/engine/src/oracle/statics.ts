@@ -5,7 +5,7 @@ import { STARTING_LIFE, type Color } from "../types";
 import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, TYPE_WORDS, capital, singular, singularWord } from "./words";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
-import { HISTORIC, pickFilter, parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
+import { HISTORIC, pickFilter, parseGroup, parseKeywordList, parseTargetPhrase, PLANESWALKER_TYPES } from "./targets";
 import { parseGrants } from "./grants";
 import { parseSearchFilter } from "./search";
 import { parseDamageMod } from "./damage-mods";
@@ -55,6 +55,13 @@ export function parseEntersChoice(line: string): EntersChoice | null {
     const subtypes = m[1]!.split(/ or /);
     if (!subtypes.every((x) => BASIC_TYPES.includes(x) || CREATURE_TYPES.has(x))) return null;
     return { kind: "reveal", filter: { kind: "card", subtypes, text: `${m[1]} card` } };
+  }
+  // Theorist's Sanctum: "As ~ enters, you may behold a Jace. If you don't, ~ enters tapped.": choose a Jace you control or
+  // reveal a Jace card from your hand (CR 701.4a), as it enters (CR 614.12); controlling one is enough, as with Temple of the
+  // Dragon Queen's "or you control".
+  if ((m = /^As ~ enters(?: the battlefield)?, you may behold an? ([A-Z][a-z]+)\. If you don't, (?:it|~) enters(?: the battlefield)? tapped\.$/.exec(line))) {
+    if (!CREATURE_TYPES.has(m[1]!) && !PLANESWALKER_TYPES.has(m[1]!)) return null;
+    return { kind: "reveal", filter: { kind: "card", subtypes: [m[1]!], text: `${m[1]} card` }, orControl: { kind: "object", subtypes: [m[1]!], controller: "you", text: m[1]! }, behold: true };
   }
   // Mariposa Military Base: entering tapped is the choice, with rad counters for it (CR 614.1c, 728).
   if ((m = /^You may have ~ enter(?: the battlefield)? tapped\. If you do, you get (two|three) rad counters\.$/.exec(line))) return { kind: "mayTapRad", n: m[1] === "two" ? 2 : 3 };
@@ -1301,6 +1308,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (text === "a permanent was put into your hand from the battlefield this turn") return { kind: "permanentToYourHand" };
   // Dimir Strandcatcher (TurnLog.toGraveyardNotBattlefield).
   if ((m = new RegExp(`^${NUM} or more cards were put into your graveyard from anywhere other than the battlefield this turn$`).exec(text))) return { kind: "cardsToYourGraveyardNotBattlefield", n: num(m[1]!) };
+  // Churning Reservoir: an oil counter removed from a permanent you controlled then, for any reason (a cost, an effect),
+  // or any player's permanent with an oil counter put into a graveyard from the battlefield (CR 122.1, 400.7).
+  if (text === "an oil counter was removed from a permanent you controlled this turn or a permanent with an oil counter on it was put into a graveyard this turn") return { kind: "oilRemovedOrOilPermanentToGraveyard" };
   // Laboratory Drudge: a spell cast from any graveyard (CR 601.2a), or an ability of a card in any graveyard (CR 602.2).
   if (text === "you've cast a spell from a graveyard or activated an ability of a card in a graveyard this turn") return { kind: "usedGraveyardThisTurn" };
   if ((m = new RegExp(`^${NUM} or more cards left your graveyard this turn$`).exec(text))) return { kind: "cardLeftYourGraveyard", n: num(m[1]!) };
@@ -2639,6 +2649,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't become suspected$/.test(rest)) return [{ kind: "cantBeSuspected" }];
   // Frozen in Ice, Blossombind: "can't become untapped": no effect or rule untaps it (see untapPermanent).
   if (/^can't become untapped$/.test(rest)) return [{ kind: "cantBecomeUntapped" }];
+  // Blossombind: "can't have counters put on it": none from then on, the ones already there stay (rulings).
+  if (/^can't have counters put on (?:it|them)$/.test(rest)) return [{ kind: "cantHaveCounters" }];
   if (/^loses? all abilities$/.test(rest)) return [{ kind: "loseAllAbilities" }];
   // Blood Sun: "All lands lose all abilities except mana abilities": the rest go in layer 6 (CR 613.1f); its mana abilities
   // (CR 605.1a) stay, and so do those of its basic land types (CR 305.6).

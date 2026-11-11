@@ -6774,6 +6774,62 @@
   "gameChanger": false
  },
  {
+  "oracleId": "16de96d0-a58e-42a7-9a13-45358542a246",
+  "name": "Counterlash",
+  "manaCost": "{4}{U}{U}",
+  "cmc": 6,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Counter target spell. You may cast a spell that shares a card type with it from your hand without paying its mana cost.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dka",
+  "releasedAt": "2012-02-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fc3353e9-fe24-4ca7-bff8-9da767f2903a",
+  "name": "Countersculpt",
+  "manaCost": "{U}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, behold a Jace or pay {1}. (To behold a Jace, choose a Jace you control or reveal a Jace card from your hand.)\nCounter target spell. Empower Jace 1. (Put a loyalty counter on a Jace token you control. If you don't control one, first create a blue Jace planeswalker token with \"[−1]: Surveil 1\" and \"[−3]: Draw a card.\")",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Surveil",
+   "Empower Jace",
+   "Behold"
+  ],
+  "commanderLegal": "legal",
+  "set": "fra",
+  "releasedAt": "2026-10-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cc187110-1148-4090-bbb8-e205694a39f5",
   "name": "Counterspell",
   "manaCost": "{U}{U}",
@@ -9155,6 +9211,32 @@
   "commanderLegal": "legal",
   "set": "j25",
   "releasedAt": "2024-11-15",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e75ba79f-4cc2-4ede-8641-559ab94e7e36",
+  "name": "Drain Life",
+  "manaCost": "{X}{1}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Spend only black mana on X.\nDrain Life deals X damage to any target. You gain life equal to the damage dealt, but not more life than the player's life total before the damage was dealt, the planeswalker's loyalty before the damage was dealt, or the creature's toughness.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -21545,6 +21627,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "87aa466e-7985-40ff-bef6-dcae35fe0106",
+  "name": "Mossbridge Troll",
+  "manaCost": "{5}{G}{G}",
+  "cmc": 7,
+  "typeLine": "Creature — Troll",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Troll"
+  ],
+  "oracleText": "If this creature would be destroyed, regenerate it.\nTap any number of untapped creatures you control other than this creature with total power 10 or greater: This creature gets +20/+20 until end of turn.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Regenerate"
+  ],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5783facf-d26e-4aae-a753-b9dc553361c1",
   "name": "Mosswood Dreadknight // Dread Whispers",
   "manaCost": "{1}{G} // {1}{B}",
@@ -22202,6 +22316,36 @@
   "set": "dmr",
   "releasedAt": "2023-01-13",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "da7bc9d6-a0cc-407a-bed9-d677c2dd74f2",
+  "name": "Nafs Asp",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Creature — Snake",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Snake"
+  ],
+  "oracleText": "Whenever this creature deals damage to a player, that player loses 1 life at the beginning of their next draw step unless they pay {1} before that draw step.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arn",
+  "releasedAt": "1993-12-17",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -29376,6 +29520,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c6207f6a-a624-4754-88f5-dbe700c841ff",
+  "name": "Sign in Blood",
+  "manaCost": "{B}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target player draws two cards and loses 2 life.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sta",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8aed54cb-d1bb-45ad-adbe-38e55d84ff31",
   "name": "Silence",
   "manaCost": "{W}",
@@ -33962,6 +34132,38 @@
   "commanderLegal": "legal",
   "set": "fem",
   "releasedAt": "1994-11-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "37513bd8-7303-4ac6-a7a7-224184faf758",
+  "name": "Theorist's Sanctum",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Island",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Island"
+  ],
+  "oracleText": "({T}: Add {U}.)\nAs this land enters, you may behold a Jace. If you don't, this land enters tapped. (To behold a Jace, choose a Jace you control or reveal a Jace card from your hand.)\n{2}{U}, {T}: Empower Jace 2.",
+  "colors": [],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Empower Jace",
+   "Behold"
+  ],
+  "producedMana": [
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "fra",
+  "releasedAt": "2026-10-02",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

@@ -3,7 +3,7 @@ import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type Abili
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { mayPayUse } from "./spend";
-import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planIgnoreEffect, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
+import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planIgnoreEffect, planPayDelayed, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { cantSearch } from "./effects/run-library";
 import { GUESS_PROMPT } from "./effects/run-round319";
 import { HOST_OR_NAMED_PROMPT } from "./effects/run-round321";
@@ -145,6 +145,7 @@ import {
   bindLegendaryNames,
   deferredChoice,
   ignorableBy,
+  payableDelayed,
   plotCost,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
@@ -209,7 +210,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "copyTargets") {
       // New targets for a spell copy: the best ones for us, or keep the old ones (CR 707.10c).
       const sc = s.resolving?.scratch?.copies;
-      const orig = sc ? (s.stack.find((x) => x.id === sc.of) ?? s.castItems?.[sc.of]) : undefined;
+      const orig = sc ? (s.resolving?.counteredCopy?.item.id === sc.of ? s.resolving.counteredCopy.item : (s.stack.find((x) => x.id === sc.of) ?? s.castItems?.[sc.of])) : undefined;
       // The copy is a spell like the original, for protection and "can't be the target of" (CR 707.10).
       const best = orig?.body ? chooseTargets(s, pid, orig.body, false, orig.objectId) : null;
       return [{ type: "copyTargets", player: pid, ...(best ? { targets: best } : {}) }];
@@ -1930,7 +1931,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   const dial = chooseEndTurnEscape(s, pid);
   if (dial) return dial;
-  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseTimed(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid);
   if (regen) return regen;
   const silencer = chooseSilencerFaceUp(s, pid);
   if (silencer) return silencer;
@@ -2399,6 +2400,27 @@ function chooseUnblocked(s: GameState, pid: PlayerId, ids: ObjectId[]): ObjectId
  * our first main phase, one with a mana cost in the second, with mana left over. Command Beacon once our commander costs
  * four or more extra to cast from the command zone.
  */
+/**
+ * Nafs Asp, Sabertooth Cobra, Quenchable Fire (DelayedTrigger.unlessPaid): pay to stop the delayed trigger at the last
+ * priority we get before its step begins, so the mana isn't missed earlier: during our upkeep before our draw step, or in
+ * the end step of the turn before the upkeep it waits for.
+ */
+function choosePayDelayed(s: GameState, pid: PlayerId): Action[] | null {
+  const living = s.turnOrder.filter((q) => !player(s, q).lost);
+  const next = living[(living.indexOf(s.activePlayer) + 1) % living.length];
+  for (const d of payableDelayed(s, pid)) {
+    const lastChance =
+      d.when === "playersNextDraw" ? s.activePlayer === d.player && s.step === "upkeep"
+      : d.when === "playersNextUpkeep" ? s.step === "end" && next === d.player
+      : d.when === "yourNextUpkeep" ? s.step === "end" && next === d.controller
+      : false;
+    if (!lastChance) continue;
+    const plan = planPayDelayed(s, pid, d.unlessPaid!.id);
+    if (plan) return plan;
+  }
+  return null;
+}
+
 /**
  * CR 116.2d, a special action: pay {2} to ignore a Leonin Arbiter when we'd search this turn (a spell in hand that
  * searches, or a fetch land) and have the mana for it as well; exile three cards from our graveyard (Lost in Thought) or

@@ -3,7 +3,7 @@ import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { MANA_ABILITY_OFFSET, activatedAsMana, payableActivatedMana, manaAbilityCost, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, costIsPaid, spellHow, definedX, definedCastX, firstArtifactLess, lessWaterbend, waterbendCap, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, ignorableBy, ignoreEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, sylexed, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
+import { abilityProblem, costIsPaid, spellHow, definedX, definedCastX, firstArtifactLess, lessWaterbend, waterbendCap, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, payableDelayed, payDelayedProblem, ignorableBy, ignoreEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, sylexed, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
@@ -545,11 +545,12 @@ function convokeAll(s: GameState, pid: PlayerId, cost: ParsedCost, tax: number):
  * Creatures to crew a Vehicle with (CR 702.122a): the fewest, weakest ones that reach the crew
  * number, preferring creatures that couldn't attack anyway. Null if they can't.
  */
-export function autoCrew(s: GameState, pid: PlayerId, vehicleId: ObjectId, n: number, saddle = false): ObjectId[] | null {
-  const counts = (c: GameObject) => crewPower(s, c, saddle);
+export function autoCrew(s: GameState, pid: PlayerId, vehicleId: ObjectId, n: number, saddle = false, plain = false): ObjectId[] | null {
+  // `plain` (Mossbridge Troll's cost, ActivatedAbility.tapPower): not crewing, each creature counts its own power.
+  const counts = (c: GameObject) => (plain ? Math.max(0, power(s, c)) : crewPower(s, c, saddle));
   // What tapping a creature costs us: its power, unless it couldn't attack this turn anyway.
   const lost = (c: GameObject) => (isSummoningSick(s, c) ? 0 : Math.max(0, power(s, c)));
-  const pool = crewCandidates(s, pid, vehicleId, !saddle)
+  const pool = crewCandidates(s, pid, vehicleId, !saddle && !plain)
     .filter((c) => counts(c) > 0)
     .sort((a, b) => lost(a) - lost(b) || counts(b) - counts(a));
   // Either the cheapest single creature that's enough, or the cheapest ones added up.
@@ -865,6 +866,16 @@ export function planUnlock(s: GameState, pid: PlayerId, id: ObjectId, door: numb
   if (problem && !/not enough mana/.test(problem)) return null;
   const taps = problem ? planMana(s, pid, parseManaCost(cost), 0, undefined, [], { ability: o!, unlock: true }) : [];
   return taps ? [...taps, { type: "unlockDoor", player: pid, objectId: id, door }] : null;
+}
+
+/** Tap mana to pay to stop a delayed trigger (Nafs Asp; DelayedTrigger.unlessPaid), then pay it, or null if that can't be done now. */
+export function planPayDelayed(s: GameState, pid: PlayerId, id: number): Action[] | null {
+  const d = payableDelayed(s, pid).find((x) => x.unlessPaid!.id === id);
+  if (!d) return null;
+  const problem = payDelayedProblem(s, pid, id);
+  if (problem && !/not enough mana/.test(problem)) return null;
+  const taps = problem ? planMana(s, pid, parseManaCost(d.unlessPaid!.cost)) : [];
+  return taps ? [...taps, { type: "payDelayed", player: pid, id }] : null;
 }
 
 /** Tap mana to pay to end an effect on this permanent (a Licid; CR 116.2c), then end it, or null if that can't be done now. */

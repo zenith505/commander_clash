@@ -1385,16 +1385,26 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Jace's Mindseeker: the cards this resolution milled, still where they went.
       const milled = e.milled ? [...(s.resolving!.milled ?? []), ...(s.resolving!.milledExiled ?? [])].filter((m) => s.objects[m.id] && (s.objects[m.id]!.zoneChanges ?? 0) === m.zc).map((m) => m.id) : undefined;
       const zone = milled ?? (e.fromGraveyard ? p.graveyard : p.hand);
+      // Twinning Glass: the names of the spells cast this turn, by anyone (rulings); a face-down spell has none (CR 708.2a).
+      const names = e.sameNameCastThisTurn ? [...new Set((s.castThisTurn ?? []).flatMap((c) => c.name?.split(" // ") ?? []))] : undefined;
       const castable = (id: ObjectId) => {
-        s.pending = { kind: "castFree", player: p.id, objectId: id, source: src };
-        const problem = castProblem(s, p.id, id);
+        s.pending = { kind: "castFree", player: p.id, objectId: id, source: src, ...(names ? { names } : {}) };
+        // With names: some way to cast it has one (a split card's half, an Adventure, a back face, CR 709.3, 715.3, 712.11).
+        const d = defOf(s, obj(s, id));
+        const faces = names && d.faces?.length ? [undefined, ...d.faces.map((_, i) => i), ...(d.layout === "split" ? [d.faces.length] : [])] : [undefined];
+        const ok = faces.some((face) => {
+          const problem = castProblem(s, p.id, id, undefined, undefined, undefined, undefined, undefined, face === undefined ? undefined : { face });
+          return problem === null || /^not enough mana/.test(problem);
+        });
         s.pending = null;
-        return problem === null || /^not enough mana/.test(problem);
+        return ok;
       };
       if (sc.castFromHand === undefined) {
         // "With mana value X or less": this spell's X (TargetSpec.xRange).
         // "With mana value less than or equal to the other result" (TargetSpec.bound): as it resolves.
-        const { xRange, ...rest } = bindBound(s, e.filter, amountCtx(s, ctx));
+        // Counterlash: sharing a card type with the countered spell (any one of them); with none, nothing does.
+        const shared = e.sharesTypeWithCountered ? (s.resolving!.counterTargetTypes?.length ? s.resolving!.counterTargetTypes : ["(none)"]) : undefined;
+        const { xRange, ...rest } = bindBound(s, shared ? { ...e.filter, types: shared } : e.filter, amountCtx(s, ctx));
         const x = ctx.x ?? 0;
         const filter: TargetSpec = xRange ? { ...rest, manaValue: xRange.at === "exact" ? { min: x, max: x } : xRange.at === "least" ? { min: x } : { max: x } } : rest;
         // "Draw three cards and reveal them": the ones still in hand, which everyone sees (CR 701.20a).
@@ -1417,7 +1427,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       sc.castFromHandId = id;
       if (!s.objects[id] || (milled ? !milled.includes(id) : obj(s, id).zone !== (e.fromGraveyard ? "graveyard" : "hand")) || !castable(id)) return;
       if (e.fromGraveyard) sc.castFromYard = id;
-      s.pending = { kind: "castFree", player: p.id, objectId: id, source: src };
+      s.pending = { kind: "castFree", player: p.id, objectId: id, source: src, ...(names ? { names } : {}) };
       return "paused";
     }
     case "castFromAmong": {

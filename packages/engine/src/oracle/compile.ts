@@ -61,7 +61,9 @@ export function compileCard(card: CardDef): CompiledCard {
   // Cleave: not cast for its cleave cost, the words in square brackets are the spell's text (CR 702.148a).
   const cleaves = hasCleave(d0) && !d0.oracleId.endsWith("|cleaved");
   if (cleaves) cleavedTexts.set(d0.oracleId, cleavedText(d0.oracleText));
-  const d = cleaves ? { ...d0, oracleText: d0.oracleText.replace(/[[\]]/g, "") } : d0;
+  // Lantern Flare: "... and you gain X life. [X is the number of creatures you control.]": not cleaved, that sentence
+  // defines the X of the one before it (CR 107.3c), as "where X is" does.
+  const d = cleaves ? { ...d0, oracleText: d0.oracleText.replace(/^([^.\n[]*\bX\b[^.\n[]*)\. \[X is ([^\].]+)\.\]$/m, "$1, where X is $2.").replace(/[[\]]/g, "") } : d0;
   const hit = cache.get(d.oracleId);
   if (hit) return hit;
   const doors = d.roomDoors ? roomDoorDefs(d) : undefined;
@@ -7940,7 +7942,9 @@ function checkX(d: CardDef, out: CompiledCard) {
   // Or in an additional cost: "As an additional cost to cast this spell, pay X life" (CR 107.3a).
   // Or in its kicker cost, "Kicker {X}" (0 unless it was kicked).
   // Or in an alternative cost: "Foretell {X}{X}{W}", "Madness {X}{B}{B}" (0 unless that cost was paid, CR 107.3a).
-  const cardX = parseManaCost(d.manaCost).hasX || !!out.additionalCosts?.some((c) => ("x" in c && c.x) || (c.kind === "sacrifice" && c.mvX)) || !!out.kicker?.costs.some((c) => parseManaCost(c).hasX) || parseManaCost(out.foretell ?? "").hasX || parseManaCost(out.madness ?? "").hasX;
+  const cardX = parseManaCost(d.manaCost).hasX || !!out.additionalCosts?.some((c) => ("x" in c && c.x) || (c.kind === "sacrifice" && c.mvX)) || !!out.kicker?.costs.some((c) => parseManaCost(c).hasX) || parseManaCost(out.foretell ?? "").hasX || parseManaCost(out.madness ?? "").hasX
+    // Lantern Flare: cast for "Cleave {X}{R}{W}", X is announced as it's cast (CR 107.3a, 601.2b): the cleaved text's X.
+    || (d.oracleId.endsWith("|cleaved") && !!out.altCosts?.some((a) => a.kind === "cleave" && parseManaCost(a.mana ?? "").hasX));
   const bad = (what: string) => out.unsupported.push(what);
   // Glittering Lion: "~ loses "Prevent all damage ..."": one of its own printed static abilities, by its text.
   out.activated = out.activated.filter((a) => {

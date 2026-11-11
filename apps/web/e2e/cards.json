@@ -22262,6 +22262,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "da7bc9d6-a0cc-407a-bed9-d677c2dd74f2",
+  "name": "Nafs Asp",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Creature — Snake",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Snake"
+  ],
+  "oracleText": "Whenever this creature deals damage to a player, that player loses 1 life at the beginning of their next draw step unless they pay {1} before that draw step.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arn",
+  "releasedAt": "1993-12-17",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "12bd2051-297b-4bab-ac64-6eb26a42e3e2",
   "name": "Nahiri's Resolve",
   "manaCost": "{3}{R}{W}",

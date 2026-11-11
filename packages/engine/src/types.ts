@@ -1196,7 +1196,7 @@ export interface DelayedTrigger {
   /** `thatCombat`: at the beginning of the added combat phase `combat` (GameState.addedPhases), this turn only. */
   /** `playersNextEndStep`: at the beginning of `player`'s next end step (The Eternal Wanderer: the exiled card's owner's). */
   /** `playersNextUpkeep`: at the beginning of `player`'s next upkeep (Phytotitan: the card's owner's). */
-  when: /** Vivien's Stampede: a later main phase of the turn it was made, never one on a later turn. */ "nextMainThisTurn" | "nextEndStep" | "yourNextEndStep" | "yourNextTurnEndStep" | "playersNextEndStep" | /** Suppress: the end step of `player`'s next turn, a later turn. */ "playersNextTurnEndStep" | "playersNextUpkeep" | /** "At the beginning of the next combat" (Legion's Initiative): the next beginning of combat step, any player's. */ "nextBeginCombat" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat" | /** With `thisTurn`: each time the subject becomes blocked this turn (Barreling Attack, CR 603.7b). */ "becomesBlocked";
+  when: /** Vivien's Stampede: a later main phase of the turn it was made, never one on a later turn. */ "nextMainThisTurn" | "nextEndStep" | "yourNextEndStep" | "yourNextTurnEndStep" | "playersNextEndStep" | /** Suppress: the end step of `player`'s next turn, a later turn. */ "playersNextTurnEndStep" | "playersNextUpkeep" | /** Nafs Asp: at the beginning of `player`'s next draw step (this turn's, if it hasn't begun yet). */ "playersNextDraw" | /** "At the beginning of the next combat" (Legion's Initiative): the next beginning of combat step, any player's. */ "nextBeginCombat" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat" | /** With `thisTurn`: each time the subject becomes blocked this turn (Barreling Attack, CR 603.7b). */ "becomesBlocked" | /** With `thisTurn`: each time the subject attacks one of `controller`'s opponents this turn (Maeve, Insidious Singer). */ "attacksOpponent";
   player?: PlayerId;
   combat?: number;
   /** What it remembers as its trigger event: the player "its controller" was, the amount "that spell's mana value" was (see the delayed effect). */
@@ -1241,6 +1241,12 @@ export interface DelayedTrigger {
   /** How many times its subject had transformed when it was made: it transforms it only if that's still so (CR 701.27f). */
   transforms?: number;
   step: Step;
+  /**
+   * Nafs Asp (effect delayedUnlessPaid): it doesn't trigger if `player` (or, with `subjectController`, the controller of the
+   * planeswalker that's its subject) paid `cost` before its step began: the "payDelayed" special action, once (rulings).
+   * `id` names it for that action; `source` is the card's name.
+   */
+  unlessPaid?: { id: number; player?: PlayerId; subjectController?: true; cost: string; source: string };
 }
 
 /** An extra turn (CR 500.7). */
@@ -2284,6 +2290,8 @@ export interface GameState {
    */
   /** Delayed triggered abilities waiting for their moment (CR 603.7): unearth's exile, rebound's cast. */
   delayed?: DelayedTrigger[];
+  /** The last DelayedTrigger.unlessPaid id given out (Nafs Asp). */
+  unlessPaidSeq?: number;
   /**
    * Extra turns still to be taken (CR 500.7): the most recently created is taken first. `loseAtEnd`: "At the beginning of
    * that turn's end step, you lose the game", a delayed trigger of that player's.
@@ -3300,6 +3308,8 @@ export type Action =
   | { type: "turnFaceUp"; player: PlayerId; objectId: ObjectId; /** Which of faceUpWays (a manifested card with morph has two). */ way?: number; /** The X chosen for an {X} in the cost (CR 107.3d), "Disguise {X}{3}{W}". */ x?: number; /** What pays a morph cost that isn't mana ("Morph—Sacrifice two Mountains"). */ costs?: CostChoices; /** Aquamorph Entity (CompiledCard.faceUpForms): which of its forms it's turned face up as. */ form?: number }
   /** Answer to payUnless: pay the cost from your mana pool, or let it be countered. */
   | { type: "payUnless"; player: PlayerId; pay: boolean; /** Waterbend (CR 701.67a): untapped artifacts and creatures tapped to pay {1} each of the cost. */ tap?: ObjectId[] }
+  /** Pay to stop a delayed trigger "unless they pay {1} before that draw step" (Nafs Asp; DelayedTrigger.unlessPaid): a special action (rulings). */
+  | { type: "payDelayed"; player: PlayerId; id: number }
   | { type: "concede"; player: PlayerId };
 
 export class RulesError extends Error {}

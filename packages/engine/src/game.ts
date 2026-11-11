@@ -41,6 +41,7 @@ import {
   type CardDef,
   type Color,
   type ContinuousEffect,
+  type DelayedTrigger,
   type AttackCostDue,
   type CostChoices,
   type ExtraTurn,
@@ -465,6 +466,10 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "endEffect":
       requireNoPending(s);
       endEffect(s, p, action.objectId);
+      break;
+    case "payDelayed":
+      requireNoPending(s);
+      payDelayed(s, p, action.id);
       break;
     case "ignoreEffect":
       requireNoPending(s);
@@ -14274,6 +14279,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
   }
   for (const id of s.battlefield) for (const door of [0, 1]) if (unlockProblem(s, pid, id, door) === null) out.push({ type: "unlockDoor", player: pid, objectId: id, door });
   for (const id of s.battlefield) if (endEffectProblem(s, pid, id) === null) out.push({ type: "endEffect", player: pid, objectId: id });
+  for (const d of payableDelayed(s, pid)) if (payDelayedProblem(s, pid, d.unlessPaid!.id) === null) out.push({ type: "payDelayed", player: pid, id: d.unlessPaid!.id });
   for (const id of s.battlefield) if (!ignorableBy(s, pid, id)?.costs && ignoreEffectProblem(s, pid, id) === null) out.push({ type: "ignoreEffect", player: pid, objectId: id });
   // "You may play lands from your graveyard" (Crucible of Worlds).
   if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid))
@@ -14562,6 +14568,42 @@ export function endEffectProblem(s: GameState, pid: PlayerId, id: ObjectId): str
   if (s.priority !== pid || s.pending) return "you can end that effect only while you have priority";
   if (!canPayFromPool(s, pid, parseManaCost(e.endable!.cost), "other")) return `not enough mana to end ${e.sourceName}'s effect (${e.endable!.cost})`;
   return null;
+}
+
+/**
+ * The delayed triggers `pid` may still stop by paying (Nafs Asp: "unless they pay {1} before that draw step";
+ * DelayedTrigger.unlessPaid): theirs to pay, or for a planeswalker (Quenchable Fire) its controller's while it's still
+ * that permanent. None once the step has begun: the trigger has left `s.delayed` then.
+ */
+export function payableDelayed(s: GameState, pid: PlayerId): DelayedTrigger[] {
+  if (player(s, pid).lost) return [];
+  return (s.delayed ?? []).filter((d) => {
+    const u = d.unlessPaid;
+    if (!u) return false;
+    if (!u.subjectController) return u.player === pid;
+    const pw = s.objects[d.subject.id];
+    return !!pw && pw.zone === "battlefield" && (pw.zoneChanges ?? 0) === d.subject.zc && controllerOf(s, pw) === pid;
+  });
+}
+
+/** Why `pid` can't pay to stop that delayed trigger now, or null (with the mana in their pool): a special action any time they have priority (rulings). */
+export function payDelayedProblem(s: GameState, pid: PlayerId, id: number): string | null {
+  const d = payableDelayed(s, pid).find((x) => x.unlessPaid!.id === id);
+  if (!d) return "there's nothing of that kind for you to pay";
+  if (s.priority !== pid || s.pending) return "you can pay that only while you have priority";
+  if (!canPayFromPool(s, pid, parseManaCost(d.unlessPaid!.cost), "other")) return `not enough mana to pay ${d.unlessPaid!.cost} for ${d.unlessPaid!.source}`;
+  return null;
+}
+
+/** Pay it: that delayed trigger won't trigger (it's gone), and the player gets priority again (CR 116.3). */
+function payDelayed(s: GameState, p: Player, id: number) {
+  const problem = payDelayedProblem(s, p.id, id);
+  if (problem) throw new RulesError(problem);
+  const d = payableDelayed(s, p.id).find((x) => x.unlessPaid!.id === id)!;
+  spendFromPool(s, p.id, parseManaCost(d.unlessPaid!.cost), "other");
+  s.delayed = s.delayed!.filter((x) => x !== d);
+  log(s, `${p.name} pays ${d.unlessPaid!.cost} for ${d.unlessPaid!.source}: its delayed ability won't happen.`);
+  s.passedInSuccession = [];
 }
 
 /** Pay to end an effect (CR 116.2c), then get priority again (CR 116.3). */

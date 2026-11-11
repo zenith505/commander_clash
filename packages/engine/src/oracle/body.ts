@@ -2395,6 +2395,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text
     .replace(/^[Mm]ill a card and choose an opponent at random\. (?=~ attacks that player this combat if able\.)/, "Mill a card. Choose an opponent at random. ")
     .replace(/(^|\. )Until end of turn, ~ gains ([a-z]+) and gets (\+\d+\/\+\d+) for each ([^.]+)\.$/, "$1~ gains $2 until end of turn. ~ gets $3 until end of turn for each $4.");
+  // Political Triumph: "When the fourth plan counter is put on ~, sacrifice it, draw a card, and put a +1/+1 counter on
+  // each creature you control.": three instructions, in that order.
+  text = text.replace(/^sacrifice it, draw a card, and put ([^.,]+)\.$/, "Sacrifice it. Draw a card. Put $1.");
   // Advanced Reconstruction: "then exile a card from your graveyard at random. You may play the exiled card this turn."
   // The same as Tersa Lightshatter's wording.
   text = text.replace(/\b([Ee])xile a card from your graveyard at random\. You may play the exiled card this turn\./, "$1xile a card at random from your graveyard. You may play that card this turn.");

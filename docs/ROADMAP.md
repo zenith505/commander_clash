@@ -1,6 +1,6 @@
 # Roadmap
 
-31,035 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,042 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,974 of 4,988 (99%), top 10,000: 9,820 of
 9,979 (98%).
 
@@ -2412,7 +2412,7 @@ line blocks.
    rulings: every token creation is recorded in the turn log); Esix, Fractal Bloom's "The first time you would create one
    or more tokens during each of your turns, you may instead choose a creature other than ~ and create that many tokens
    that are copies of that creature." (any player's creature), with browser tests for Jinnie, Esix and declining Moonlit
-   Meditation. +4, 31,035 of 31,936 with B179. Bots take the option their rough token worth rates highest (a copy of a legendary
+   Meditation. +4, 31,042 of 31,936 with B179-B180. Bots take the option their rough token worth rates highest (a copy of a legendary
    creature they'd lose to the legend rule counts for nothing). Still simplified: the optional replacement is applied
    after the ones that change how many tokens there are (Doubling Season, Chatterfang, Divine Visitation), so "that
    many" is all of them; the other orders its controller could pick (CR 616.1) aren't offered. When an instruction asks
@@ -8075,6 +8075,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   abilities, not other "power of the tapped creature" amounts). Counterlash ("You may cast a spell that shares a card type
   with it from your hand without paying its mana cost": the target spell's card types as it was on the stack, countered
   or not, timing by card type ignored, rulings; a browser test). +7, 31,013 of 31,936 with B177, B178 and rounds 336 to 337.
+- Round B180 (least played first, single-line blockers from the skip lists): Nafs Asp, Glass Asp, Sabertooth Cobra and
+  Quenchable Fire ("that player loses 1 life at the beginning of their next draw step unless they pay {1} before that draw
+  step": a delayed trigger, CR 603.7, the player may stop by paying once, a special action any time they have priority
+  until that step begins, rulings; DelayedTrigger.unlessPaid, the "payDelayed" action; each hit is one more; Quenchable
+  Fire's about its target even if the first damage was prevented or redirected, a planeswalker's controller paying while
+  it's still that permanent; bots pay at their last priority before the step; your upkeep stops for it in "hold" mode;
+  a "Pay {1} for Nafs Asp" button, a browser test). Lantern Flare ("Cleave {X}{R}{W}": X announced only when cast for the
+  cleave cost, CR 107.3a; not cleaved, "[X is the number of creatures you control.]" defines X). Political Triumph
+  ("sacrifice it, draw a card, and put a +1/+1 counter on each creature you control"). Maeve, Insidious Singer ("Whenever
+  that creature attacks one of your opponents this turn, you draw a card": a delayed trigger about the goaded creature,
+  each time it attacks one of your opponents this turn, the player and not a planeswalker). +7, 31,020 of 31,936 with B177 to B179 and rounds 336 to 337.
+- Out after round B180 (looked at, not done): Strax, Sontaran Nurse (a reflexive trigger's target limited to the creatures
+  of a player chosen at random), Battletide Alchemist ("you may prevent X of that damage" to any player: a choice for each
+  player as each source's damage is dealt), Zethi, Arcane Blademaster (X targets by kicks, then copies of the kicked
+  cards cast), Back from the Brink (paying the mana cost of the card a cost exiled) stay out; Thelon's Chant, Tourach's
+  Chant, Nature's Wrath and Overburden still need who put a permanent onto the battlefield. A "Pay {1}" for Nafs Asp is
+  offered only while you have priority: in "auto" mode your upkeep doesn't stop for it.
 - Out after round B179 (looked at, not done): Soul Burn ("not more than the amount of {B} spent on X": which of the black
   mana went to X and which to the {2} is the payer's, not tracked), Emblazoned Golem (one mana of each color on its kicker
   X), Kaya, Ghost Assassin ("Exile ~ or up to one target creature": which one chosen as it resolves), Sigardian Zealot

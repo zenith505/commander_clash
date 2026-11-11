@@ -1767,6 +1767,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.controller) groupWatch(obj(s, id));
     // "Whenever one or more creatures attack" (Duelist's Heritage): every permanent's, whoever attacked.
     if (ev.type === "groupAttack") for (const id of s.battlefield) groupWatch(obj(s, id), true);
+    // Maeve, Insidious Singer: "Whenever that creature attacks one of your opponents this turn" (a delayed trigger, CR
+    // 603.7b): attacking that player, not a planeswalker they control (CR 508.1b).
+    if (ev.type === "groupAttack")
+      for (const d of s.delayed ?? []) {
+        const a = s.objects[d.subject.id];
+        if (d.when !== "attacksOpponent" || d.thisTurn !== s.turn || !ev.ids.includes(d.subject.id) || !a || (a.zoneChanges ?? 0) !== d.subject.zc) continue;
+        if (a.attacking === undefined || a.attacking === d.controller || a.attackingPermanent || player(s, a.attacking).lost) continue;
+        s.triggerQueue.push({ sourceId: a.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.subject.zc, body: d.body });
+      }
     fromGraveyards((o, owner) => owner === ev.controller && groupWatch(o));
     // An emblem's too (Lolth's: "whenever an opponent is dealt combat damage by one or more creatures you control").
     fromEmblems((o, owner) => owner === ev.controller && groupWatch(o));
@@ -2776,7 +2785,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // "The next cleanup step": every one made before this one began, so also during an earlier cleanup step of
       // this turn (CR 514.3a).
       // "When that creature becomes blocked this turn": only blocks trigger it, and this turn is over.
-      if (d.when === "becomesBlocked") {
+      if (d.when === "becomesBlocked" || d.when === "attacksOpponent") {
         if (d.thisTurn !== s.turn) s.delayed = s.delayed!.filter((x) => x !== d);
         continue;
       }
@@ -2816,6 +2825,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
               ? (ev.step === "main1" || ev.step === "main2") && d.turn === s.turn && STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf(ev.step)
               : d.when === "yourNextMain"
               ? (ev.step === "main1" || ev.step === "main2") && ev.active === d.controller && (d.turn < s.turn || STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf(ev.step))
+              : d.when === "playersNextDraw"
+              ? ev.step === "draw" && ev.active === d.player && (d.turn < s.turn || STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf("draw"))
               : d.when === "yourNextFirstMain"
               ? ev.step === "main1" && ev.active === d.controller && (d.turn < s.turn || STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf(ev.step))
               : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === (d.when === "playersNextUpkeep" ? d.player : d.controller)) && d.turn < s.turn;

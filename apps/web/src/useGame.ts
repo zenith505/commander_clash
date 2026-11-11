@@ -17,6 +17,8 @@ import {
   compileCard,
   planActivate,
   planCast,
+  planPayDelayed,
+  payableDelayed,
   createGame,
   registerMeldResults,
   defOf,
@@ -217,6 +219,14 @@ function hasInstantPlay(s: GameState): boolean {
  */
 function hasTimedPlay(s: GameState): boolean {
   const me = s.players[HUMAN]!;
+  // Nafs Asp, Quenchable Fire: the last priority before the step that ends the chance to pay (your upkeep before your draw
+  // step, the end step before that player's upkeep).
+  const living = s.turnOrder.filter((q) => !s.players[q]!.lost);
+  const next = living[(living.indexOf(s.activePlayer) + 1) % living.length];
+  for (const d of payableDelayed(s, HUMAN)) {
+    const last = d.when === "playersNextDraw" ? s.activePlayer === d.player && s.step === "upkeep" : s.step === "end" && next === (d.when === "playersNextUpkeep" ? d.player : d.controller);
+    if (last && planPayDelayed(s, HUMAN, d.unlessPaid!.id)) return true;
+  }
   for (const id of me.hand) if (timedCondition(compileCard(cardOf(s, id)).castOnly) && planCast(s, HUMAN, id, undefined, undefined, "auto")) return true;
   // Forecast works from your hand (CR 702.57a).
   for (const id of [...s.battlefield, ...me.graveyard, ...me.hand]) {

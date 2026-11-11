@@ -538,7 +538,9 @@ export function parseCostKeyword(
   // Cleave [cost] (CR 702.148a): an alternative cost for an instant or sorcery; cast for it, the words in square brackets
   // are gone from its text (compile checks that text too).
   if ((m = /^Cleave ((?:\{[^}]+\})+)$/.exec(line))) {
-    if (!plainMana(m[1]!) || /\{X\}/.test(m[1]!) || !d.types.some((ty) => ty === "Instant" || ty === "Sorcery")) return "fail";
+    // Lantern Flare: "Cleave {X}{R}{W}": one X, announced only when it's cast for that cost (CR 107.3a), its mana cost has none.
+    const xs = (m[1]!.match(/\{X\}/g) ?? []).length;
+    if (!(xs ? xMana(m[1]!) : plainMana(m[1]!)) || xs > 1 || (xs && /\{X\}/.test(d.manaCost)) || !d.types.some((ty) => ty === "Instant" || ty === "Sorcery")) return "fail";
     return { alt: { kind: "cleave", mana: m[1]! } };
   }
   if (/^Cleave\b/.test(line)) return "fail";

@@ -4,6 +4,7 @@ import type { CardDef } from "../types";
 import type { CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseManaCost } from "../mana";
+import { roundB180Sentence } from "./laneb180";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -31,7 +32,7 @@ export function roundB179Line(line: string, raw: string, out: CompiledCard, isSp
   return false;
 }
 
-export function roundB179Sentence(s: string, _sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+export function roundB179Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
   // Drain Life, after "~ deals X damage to any target": "You gain life equal to the damage dealt, but not more life than the
   // player's life total before the damage was dealt, the planeswalker's loyalty before the damage was dealt, or the
   // creature's toughness.": the damage really dealt (after prevention), no more than its recipient's life total or
@@ -50,5 +51,5 @@ export function roundB179Sentence(s: string, _sentences: string[], si: number, c
     last.noteTypes = true;
     return { effect: { type: "castFromHand", filter: { kind: "spell", types: [], notTypes: [], notColors: [], text: "spell that shares a card type with it" }, sharesTypeWithCountered: true }, next: si + 1 };
   }
-  return null;
+  return roundB180Sentence(s, sentences, si, ctx, effects);
 }

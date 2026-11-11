@@ -18,6 +18,9 @@ import {
   planTurnFaceUp,
   planUnlock,
   planEndEffect,
+  planPayDelayed,
+  payableDelayed,
+  payDelayedProblem,
   endableEffect,
   endEffectProblem,
   planIgnoreEffect,
@@ -6051,6 +6054,18 @@ function Controls({
       <button disabled={!mine} onClick={() => dispatch([{ type: "passPriority", player: HUMAN }])}>
         {s.stack.length ? "Resolve" : "Pass"}
       </button>
+      {/* Nafs Asp, Quenchable Fire: pay before that step to stop its delayed ability, a special action (rulings). */}
+      {payableDelayed(s, HUMAN).map((d) => (
+        <button
+          key={d.unlessPaid!.id}
+          data-pay-delayed={d.unlessPaid!.id}
+          disabled={!planPayDelayed(s, HUMAN, d.unlessPaid!.id)}
+          title={payDelayedProblem(s, HUMAN, d.unlessPaid!.id) ?? `Stop ${d.unlessPaid!.source}'s delayed ability ("${d.body.text}"). A special action: it doesn't use the stack.`}
+          onClick={() => dispatch(planPayDelayed(s, HUMAN, d.unlessPaid!.id) ?? [{ type: "payDelayed", player: HUMAN, id: d.unlessPaid!.id }])}
+        >
+          Pay {d.unlessPaid!.cost} for {d.unlessPaid!.source}
+        </button>
+      ))}
     </div>
   );
 }

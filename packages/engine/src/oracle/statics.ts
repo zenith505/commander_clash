@@ -5,7 +5,7 @@ import { STARTING_LIFE, type Color } from "../types";
 import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, TYPE_WORDS, capital, singular, singularWord } from "./words";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
-import { HISTORIC, pickFilter, parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
+import { HISTORIC, pickFilter, parseGroup, parseKeywordList, parseTargetPhrase, PLANESWALKER_TYPES } from "./targets";
 import { parseGrants } from "./grants";
 import { parseSearchFilter } from "./search";
 import { parseDamageMod } from "./damage-mods";
@@ -55,6 +55,13 @@ export function parseEntersChoice(line: string): EntersChoice | null {
     const subtypes = m[1]!.split(/ or /);
     if (!subtypes.every((x) => BASIC_TYPES.includes(x) || CREATURE_TYPES.has(x))) return null;
     return { kind: "reveal", filter: { kind: "card", subtypes, text: `${m[1]} card` } };
+  }
+  // Theorist's Sanctum: "As ~ enters, you may behold a Jace. If you don't, ~ enters tapped.": choose a Jace you control or
+  // reveal a Jace card from your hand (CR 701.4a), as it enters (CR 614.12); controlling one is enough, as with Temple of the
+  // Dragon Queen's "or you control".
+  if ((m = /^As ~ enters(?: the battlefield)?, you may behold an? ([A-Z][a-z]+)\. If you don't, (?:it|~) enters(?: the battlefield)? tapped\.$/.exec(line))) {
+    if (!CREATURE_TYPES.has(m[1]!) && !PLANESWALKER_TYPES.has(m[1]!)) return null;
+    return { kind: "reveal", filter: { kind: "card", subtypes: [m[1]!], text: `${m[1]} card` }, orControl: { kind: "object", subtypes: [m[1]!], controller: "you", text: m[1]! }, behold: true };
   }
   // Mariposa Military Base: entering tapped is the choice, with rad counters for it (CR 614.1c, 728).
   if ((m = /^You may have ~ enter(?: the battlefield)? tapped\. If you do, you get (two|three) rad counters\.$/.exec(line))) return { kind: "mayTapRad", n: m[1] === "two" ? 2 : 3 };

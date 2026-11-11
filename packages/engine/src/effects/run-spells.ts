@@ -185,12 +185,13 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         return;
       }
-      if (e.when === "becomesBlocked") {
+      // Maeve, Insidious Singer: "Whenever that creature attacks one of your opponents this turn", the same way.
+      if (e.when === "becomesBlocked" || e.when === "attacksOpponent") {
         // Barreling Attack: "When that creature becomes blocked this turn, it gets ...": about that permanent as it is now
         // (CR 603.7c, 400.7), each time it becomes blocked this turn (CR 603.7b); its source is the spell (603.7d).
         for (const o of objects(s, e.of!, ctx)) {
           if (o.zone !== "battlefield") continue;
-          addDelayed(s, "becomesBlocked", ctx.controller, o, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
+          addDelayed(s, e.when, ctx.controller, o, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
           s.delayed![s.delayed!.length - 1]!.thisTurn = s.turn;
         }
         return;
@@ -1248,6 +1249,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const snapItem = e.copyCountered ? s.stack.find((x) => x.id === t.id && x.kind === "spell") : undefined;
       const snapCard = snapItem?.objectId ? s.objects[snapItem.objectId] : undefined;
       const snap = snapItem && snapCard ? { item: structuredClone(snapItem), card: structuredClone(snapCard) } : undefined;
+      // Counterlash: "it" is the target spell, countered or not; its card types as it is on the stack now.
+      if (e.noteTypes && s.resolving) {
+        const item = s.stack.find((x) => x.id === t.id && x.kind === "spell");
+        const o = item?.objectId ? s.objects[item.objectId] : undefined;
+        s.resolving.counterTargetTypes = o ? [...characteristics(s, o).types] : [];
+      }
       const counteredBefore = s.resolving?.spellsCountered ?? 0;
       const done = counterOnStack(s, ctx, t.id, src, e.unless, toField ? "battlefield" : exileIt ? "exile" : e.librarySecond ? "librarySecond" : e.libraryChoice ? "libraryChoice" : e.top ? "libraryTop" : e.bottom ? "libraryBottom" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
       if (done === "paused") return done;

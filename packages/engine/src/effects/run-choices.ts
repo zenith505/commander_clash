@@ -434,23 +434,34 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // starts with what the one before it chose and found forgotten. The Valeyard has an opponent of its controller face
       // it once more for each, one time after the other (701.55c).
       const sc = (s.resolving!.scratch ??= {});
-      const st = (sc.villain ??= { queue: apnap(s, players(s, e.who, ctx)).flatMap((pid) => Array<PlayerId>(1 + villainAgain(s, pid)).fill(pid)), keep: [...Object.keys(sc), "villain"] });
+      // Hunted by The Family: one choice for each of these objects, faced by its controller as it resolves, in APNAP order
+      // (701.55d), a player's own in the order they were targeted.
+      const about = e.eachOf ? objects(s, e.eachOf, ctx).filter((o) => o.zone === "battlefield") : undefined;
+      const order = about ? apnap(s, [...new Set(about.map((o) => controllerOf(s, o)))]) : [];
+      const each = about ? order.flatMap((pid) => about.filter((o) => controllerOf(s, o) === pid).flatMap((o) => Array.from({ length: 1 + villainAgain(s, pid) }, () => ({ pid, it: { id: o.id, zc: o.zoneChanges ?? 0 } })))) : undefined;
+      const st: NonNullable<typeof sc.villain> = (sc.villain ??= each
+        ? { queue: each.map((x) => x.pid), about: each.map((x) => x.it), keep: [...Object.keys(sc), "villain"] }
+        : { queue: apnap(s, players(s, e.who, ctx)).flatMap((pid) => Array<PlayerId>(1 + villainAgain(s, pid)).fill(pid)), keep: [...Object.keys(sc), "villain"] });
       while (st.queue.length) {
         const pid = st.queue[0]!;
+        const it = st.about?.[0];
+        const itName = it && s.objects[it.id] ? ` about ${characteristics(s, s.objects[it.id]!).name}` : "";
         if (st.pick === undefined) {
           if (player(s, pid).lost) {
             st.queue.shift();
+            st.about?.shift();
             continue;
           }
-          s.pending = { kind: "chooseOption", player: pid, source: src, what: "villainous", options: ["0", "1"], labels: [...e.labels], prompt: "you face a villainous choice" };
+          s.pending = { kind: "chooseOption", player: pid, source: src, what: "villainous", options: ["0", "1"], labels: [...e.labels], prompt: `you face a villainous choice${itName}`, ...(it ? { about: it.id } : {}) };
           return "paused";
         }
-        const sub: ResolveCtx = { ...ctx, event: { ...ctx.event, player: pid }, eachOne: pid };
+        const sub: ResolveCtx = { ...ctx, event: { ...ctx.event, player: pid }, eachOne: pid, ...(it ? { subject: it } : {}) };
         const fx = e.options[st.pick] ?? [];
         for (st.step ??= 0; st.step < fx.length; st.step++) if (runEffect(s, fx[st.step]!, sub) === "paused") return "paused";
         for (const k of Object.keys(sc) as (keyof typeof sc)[]) if (!st.keep.includes(k)) delete sc[k];
         st.pick = st.step = undefined;
         st.queue.shift();
+        st.about?.shift();
       }
       sc.villain = undefined;
       return;

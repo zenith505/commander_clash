@@ -109,6 +109,9 @@ function parseOf(text: string, ctx: Ctx): ObjRef | null {
   // both; copying itself would change nothing), as Resourceful Defense's "onto a second target permanent".
   text = text.replace(/^a second target /, "another target ");
   if (/^the sacrificed (creature|artifact|permanent)$/.test(text)) return { ref: "sacrificed" };
+  // Curie, Emergent Intelligence: "the exiled creature" of an "Exile another ... creature you control" cost, as it last
+  // existed on the battlefield (CR 608.2h, 707.2; rulings: what it was copying, if anything); compile() checks the cost.
+  if (/^the exiled creature$/.test(text)) return { ref: "sacrificed", exiledCost: true };
   // "Choose target artifact you control. Each other artifact you control becomes a copy of that artifact."
   if (/^that (artifact|enchantment|land|token)$/.test(text) && ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
   // Court of Vantress (rewritten in body.ts): the target an earlier sentence chose, not the token another made.

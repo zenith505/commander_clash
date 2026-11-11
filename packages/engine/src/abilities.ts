@@ -297,7 +297,7 @@ export type Count =
   | { kind: "countersRemovedThisWay" }
   /** "Cards exiled with ~": those this object's linked exile took that are still there (CR 607.2a, 400.7). `ever`:
    * "cards have been exiled with ~" (Colfenor's Urn): every card it exiled over the game, wherever it is now (rulings). */
-  | { kind: "linkedExiled"; ever?: true; /** "Creature cards exiled with ~" (Negative Zone Portal): only those matching this, as cards in exile. */ filter?: TargetSpec; /** Keen-Eyed Curator: "card types among cards exiled with ~": how many card types they have between them (CR 205.2a). */ cardTypes?: true; /** Sunbird Effigy: "the number of colors among the exiled cards used to craft it" (CR 105.2). */ colors?: true; /** "Used to craft it": linked by its craft cost (CR 702.167c), not by an exile ability of its own. */ crafted?: true }
+  | { kind: "linkedExiled"; ever?: true; /** "Creature cards exiled with ~" (Negative Zone Portal): only those matching this, as cards in exile. */ filter?: TargetSpec; /** Keen-Eyed Curator: "card types among cards exiled with ~": how many card types they have between them (CR 205.2a). */ cardTypes?: true; /** Sunbird Effigy: "the number of colors among the exiled cards used to craft it" (CR 105.2). */ colors?: true; /** "Used to craft it": linked by its craft cost (CR 702.167c), not by an exile ability of its own. */ crafted?: true; /** Azor's Gateway: "cards with five or more different mana values are exiled with ~": how many different mana values they have between them (CR 202.3), each card face up in exile once. */ manaValues?: true }
   /** "The exiled creature card's power" (Phyrexian Ingester): the power (or toughness) of each creature card its linked
    * exile took that's still there, as it is in exile (rulings: no bonus for a card that isn't a creature card). */
   | { kind: "linkedExiledPT"; stat: "power" | "toughness"; /** Sutured Ghoul: "the total power of the exiled cards", a negative one subtracting (CR 107.1b). */ signed?: true; /** Linked by its craft cost (CR 702.167c). */ crafted?: true }
@@ -357,6 +357,11 @@ export type Count =
   | { kind: "cardsInGraveyard"; who: PlayerRef; filter?: TargetSpec; /** "The greatest power among creature cards in your graveyard" (Carrion Grub): the greatest power of those cards, 0 with none, instead of how many. */ greatestPower?: true; /** "The greatest mana value among cards in your graveyard" (Hapatra, the Desert Fang): the greatest mana value of those cards, 0 with none. */ greatestMv?: true; /** "The total mana value of instant and sorcery cards in your graveyard" (Inferno Project): their mana values added up. */ totalMv?: true; /** "For each different mana cost among nonland cards in your graveyard" (Embodiment of Agonies): each mana cost once, compared symbol by symbol (a split card's halves combined; cards with no mana cost not counted, rulings). */ differentManaCosts?: true; /** "In its controller's graveyard" (Death's Approach): the graveyard of the affected permanent's controller, instead of `who`'s. */ affectedController?: true; /** "With the same name as that spell" in a cast trigger (the Shrines): only cards with the spell's name as it was cast (StackItem.castName). */ sameNameAsCast?: true }
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
   | { kind: "power" | "toughness" | "manaValue"; of: ObjRef; /** With "manaValue": "the total mana value of those cards" (Command the Dreadhorde): every one of them added up, as each card is where it is (X counting 0, CR 107.3). */ total?: true }
+  /**
+   * Curie, Emergent Intelligence: "its base power", the ability's source's: as it is now (see basePowerNow), or as it last
+   * existed on the battlefield (rulings, CR 608.2h).
+   */
+  | { kind: "basePower"; of: { ref: "self" } }
   /** Goliath Hatchery: "its total toxic value": the sum of the N of its toxic abilities (CR 702.164b), 0 if it's gone. */
   | { kind: "toxicValue"; of: ObjRef }
   /** "For each of its colors" (Breathe Your Last): its colors now, or as it last existed on the battlefield (CR 608.2h). */
@@ -3006,7 +3011,7 @@ export type Effect =
   | { type: "takeOneExiled"; who: PlayerRef }
   /** Muse Vessel: "Choose a card exiled with ~. You may play that card this turn.": one of the cards its exile ability exiled (CR 607.2a), chosen as this resolves; playing it follows the normal rules (timing, mana, a land drop). */
   | { type: "mayPlayLinked"; /** King Narfi's Betrayal: "Until end of turn, you may cast spells from among cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells": every one of them, not one chosen, spells only, mana of any type (CR 609.4b). */ all?: true; castOnly?: true; anyType?: true }
-  | { type: "playLinked"; /** "Play one of them" (Evercoat Ursine): of the cards exiled with it, the one its controller chooses. */ one?: true; /** Kinship's "you may play that card without paying its mana cost" (Leaf-Crowned Elder): the revealed card, from the library. */ revealed?: true; /** "You may cast the exiled card" (Smirking Spelljacker): cast only, never played as a land. */ castOnly?: true }
+  | { type: "playLinked"; /** "Play one of them" (Evercoat Ursine): of the cards exiled with it, the one its controller chooses. */ one?: true; /** Kinship's "you may play that card without paying its mana cost" (Leaf-Crowned Elder): the revealed card, from the library. */ revealed?: true; /** "You may cast the exiled card" (Smirking Spelljacker): cast only, never played as a land. */ castOnly?: true; /** "The exiled card's owner may cast that card" (Spell Queller): its owner casts it, not this ability's controller. */ byOwner?: true }
   /** Cipher's spell ability (CR 702.99a): if this spell is a card, you may exile it encoded on a creature you control. */
   | { type: "cipher" }
   /**
@@ -3672,7 +3677,7 @@ export type Effect =
      * of its targets. `caster`: the spell's caster copies it (Precursor Golem), else this ability's controller.
      * `onlySelf`: an intervening "if that spell targets only ~" (CR 603.4), checked again as it resolves.
      */
-    eachOther?: { among: TargetSpec; self?: true; caster?: true; /** Mirrorwing Dragon: "each other creature they control": `among` as the spell's caster sees it ("you" is that player). */ casterControls?: true; onlySelf?: true; /** Ivy, Gleeful Spellthief: "The copy targets ~": one copy, aimed at this ability's source, made even if the spell has left the stack (rulings), if ~ could be every target of it. */ toSource?: true; /** Feather, Radiant Arbiter: "you may choose any number of other creatures that spell could target and pay {2} for each of those creatures. If you do, for each of those creatures, copy that spell": any of them, this mana paid for each one chosen; the copies are made even if the spell has left the stack, from it as it last was (CR 608.2h, 707.10d). */ choosePay?: string }; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[]; /** "Except it isn't legendary" (Double Major): exceptions to its copiable values (CR 707.9b). */ except?: CopyExcept;
+    eachOther?: { among: TargetSpec; self?: true; caster?: true; /** Mirrorwing Dragon: "each other creature they control": `among` as the spell's caster sees it ("you" is that player). */ casterControls?: true; onlySelf?: true; /** Ivy, Gleeful Spellthief: "The copy targets ~": one copy, aimed at this ability's source, made even if the spell has left the stack (rulings), if ~ could be every target of it. */ toSource?: true; /** Frontline Heroism: "create a 1/1 red Soldier creature token with haste, then copy that spell. The copy targets that token.": one copy, aimed at a token this resolution created that every target of the spell could name, the controller's choice of them if a replacement made more (CR 707.10e), made even if the spell has left the stack (rulings). */ toCreated?: true; /** Feather, Radiant Arbiter: "you may choose any number of other creatures that spell could target and pay {2} for each of those creatures. If you do, for each of those creatures, copy that spell": any of them, this mana paid for each one chosen; the copies are made even if the spell has left the stack, from it as it last was (CR 608.2h, 707.10d). */ choosePay?: string }; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[]; /** "Except it isn't legendary" (Double Major): exceptions to its copiable values (CR 707.9b). */ except?: CopyExcept;
     /** "That player copies it and may choose new targets for the copy" (Bonus Round): the spell's controller copies it and chooses the copy's targets, not this ability's controller. */ byController?: true }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; /** "allButOne": "remove all but one +1/+1 counter from it" (Lily Bowen). */ n: Amount | "all" | "allButOne"; /** "Remove a hope counter from ~. If you do, ..." (Dawn of a New Age): whether that many were removed is what "if you do" asks. */ setsDid?: true }
   /** "Remove (up to) three counters from target permanent": of any kinds, chosen as it resolves (rulings on Glissa Sunslayer); fewer than that, all of them. */
@@ -4169,7 +4174,7 @@ export type Effect =
    * options, then all of it is done, that player being the event player in it, before the next one chooses (701.55d).
    * `labels`: the options' text, for the prompt.
    */
-  | { type: "villainous"; who: PlayerRef; options: [Effect[], Effect[]]; labels: [string, string] }
+  | { type: "villainous"; who: PlayerRef; options: [Effect[], Effect[]]; labels: [string, string]; /** Hunted by The Family: "For each of them, that creature's controller faces a villainous choice": one choice for each legal object of these targets, faced by that object's controller as it resolves (CR 701.55d: APNAP order), the options about it (ObjRef "subject"); `who` is unused. */ eachOf?: ObjRef }
   /**
    * "For each player who chose fame, gain control of a creature that player controls until end of turn": for each player
    * who chose `chose`, in APNAP order, its controller chooses one of that player's creatures (not targeted); then it gains
@@ -6218,6 +6223,8 @@ export interface TriggeredAbility {
     anyPlayer?: true;
     /** "Whenever ~ or an instant or sorcery spell you control deals damage" (Syr Carah): ~ dealing damage to a player too. */
     orSelf?: true;
+    /** Imodane, the Pyrohammer: "that targets only a single creature deals damage to that creature": damage to a creature that is every target of the spell, not to a player. */
+    onlyTargetCreature?: true;
   };
   /**
    * For "youRollDie": the die's result has to be at least `min` ("a 4 or higher"), or its natural result (CR 706.2) has
@@ -7846,6 +7853,11 @@ export interface CompiledCard {
   spellDamageToYouToController?: TargetSpec;
   /** Gloom Surgeon: "If combat damage would be dealt to ~, prevent that damage and exile that many cards from the top of your library" (CR 615.5). */
   preventToSelfExileTop?: { combat?: "only" | "non" };
+  /**
+   * Weeping Angel: "If ~ would deal combat damage to a creature, prevent that damage and that creature's owner shuffles it
+   * into their library" (CR 615.5): see staticRules in damage.ts.
+   */
+  combatToCreatureShuffles?: true;
   /** "All damage that would be dealt to enchanted creature is dealt to its controller instead" (Treacherous Link, CR 614.9). */
   attachedDamageToController?: true;
   /** "Damage isn't removed from ~ during cleanup steps" (Ancient Adamantoise, CR 514.2). */

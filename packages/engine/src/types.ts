@@ -65,6 +65,11 @@ export interface DamageRule {
   millSelf?: number;
   /** Nine Lives: a counter of this kind on that permanent for each source whose damage it would prevent, even damage that can't be prevented (rulings, CR 615.12). */
   counterOn?: { id: ObjectId; kind: string };
+  /**
+   * Weeping Angel: "that creature's owner shuffles it into their library", the permanent the damage would be dealt to, right
+   * after the damage event (CR 615.5), even if the damage can't be prevented (CR 615.12).
+   */
+  shuffleIn?: true;
   /** "For each 1 damage prevented this way, put a +1/+1 counter on that creature" (Test of Faith, CR 615.5): on `to.object`, as the damage is prevented; `tally`: counted in GameState.preventedTally for a delayed trigger instead (Sacred Boon). */
   countersOn?: { counter: string; tally?: true };
   /** Vengeful Archon: "If damage is prevented this way, ~ deals that much damage to target player or planeswalker", fixed as it resolved (rulings). */
@@ -3050,7 +3055,7 @@ export interface Resolving {
     connive?: { pid: PlayerId; id?: ObjectId; zc?: number }; // who connives, and the conniving permanent (CR 701.50)
     /** Display of Power: which of its target spells is being copied now (copySpell `many`). */
     copyManyAt?: number;
-    copies?: { of: string; left: number; targets?: TargetChoice[]; /** Demonstrate: the opponent who copies it too, and whether they have. */ opp?: PlayerId; oppDone?: true; /** Twinning Staff's additional copies still to make (CR 614.1a), and the opponent's copies left. */ extra?: number; oppLeft?: number; /** Copy "eachOther" (Zada): the permanent each copy still to make targets, in order; who controls them; whether the next one's has been chosen. */ each?: ObjectId[]; by?: PlayerId; picked?: true }; // spell copies still to make, and the next one's targets
+    copies?: { of: string; left: number; targets?: TargetChoice[]; /** Demonstrate: the opponent who copies it too, and whether they have. */ opp?: PlayerId; oppDone?: true; /** Twinning Staff's additional copies still to make (CR 614.1a), and the opponent's copies left. */ extra?: number; oppLeft?: number; /** Copy "eachOther" (Zada): the permanent each copy still to make targets, in order; who controls them; whether the next one's has been chosen. */ each?: ObjectId[]; by?: PlayerId; picked?: true; /** Frontline Heroism (eachOther `toCreated`): one copy, and `each` holds the tokens it may target until its controller picks one (CR 707.10e). */ pickOne?: true }; // spell copies still to make, and the next one's targets
     /** A clash (CR 701.30): the opponent, the revealed cards, who still decides, who puts theirs on the bottom. */
     endure?: string; // "counters" or "token" (CR 701.63a)
     either?: number; // which of an "either" effect's options
@@ -3060,7 +3065,7 @@ export interface Resolving {
     jux?: { stage: number; picked: Record<number, ObjectId | null> };
     tieChoice?: ObjectId;
     /** A villainous choice (Effect villainous): the players still to face it, the option the first chose, how far it's done; `keep`, the scratch from before it. */
-    villain?: { queue: PlayerId[]; pick?: number; step?: number; keep: string[] };
+    villain?: { queue: PlayerId[]; /** Hunted by The Family (Effect villainous `eachTarget`): the object each queued choice is about, in step with `queue`. */ about?: { id: ObjectId; zc: number }[]; pick?: number; step?: number; keep: string[] };
     /** "Move a counter" (Nesting Grounds): the kind chosen. */
     counterKind?: string;
     /** "Remove up to three counters" (Glissa Sunslayer): how many of each kind are chosen so far, and whether that's all. */

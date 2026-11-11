@@ -32,6 +32,9 @@ function eachOtherTargets(s: GameState, orig: StackItem, eo: NonNullable<Extract
   const src = card ? spellQuality(s, cardIdOf(card), orig) : undefined;
   // Ivy, Gleeful Spellthief: only ~, if it's still on the battlefield and the copy (this ability's controller's) could
   // target it (rulings).
+  // Frontline Heroism: the tokens this resolution created that the copy (this ability's controller's) could target with
+  // every target of the spell (CR 707.10e).
+  if (eo.toCreated) return (s.resolving?.created ?? []).filter((id) => id !== first.id && s.objects[id]?.zone === "battlefield" && s.objects[id]!.isToken && chosen.every((x) => isLegalTarget(s, x.spec!, { kind: "object", id }, ctx.controller, src)));
   if (eo.toSource) return me && me !== first.id && s.objects[me]?.zone === "battlefield" && (ctx.sourceZc === undefined || (s.objects[me]!.zoneChanges ?? 0) === ctx.sourceZc) && chosen.every((x) => isLegalTarget(s, x.spec!, { kind: "object", id: me }, ctx.controller, src)) ? [me] : [];
   return s.battlefield.filter((id) => {
     if (id === first.id || (eo.self && id === me)) return false;
@@ -481,7 +484,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (e.n === "eachOther") {
           // Zada, Ink-Treader Nephilim, Precursor Golem: no copy is made if the spell has left the stack.
           // Ivy, Gleeful Spellthief's is made from the spell as it last was (rulings).
-          if (orig.kind !== "spell" || (!e.eachOther!.toSource && !e.eachOther!.choosePay && !s.stack.some((x) => x.id === orig.id))) return;
+          if (orig.kind !== "spell" || (!e.eachOther!.toSource && !e.eachOther!.toCreated && !e.eachOther!.choosePay && !s.stack.some((x) => x.id === orig.id))) return;
           const all = eachOtherTargets(s, orig, e.eachOther!, ctx);
           const by = e.eachOther!.caster ? orig.controller : ctx.controller;
           // Feather, Radiant Arbiter: its controller picks any of them, paying for each (pickPermanents `payEach`).
@@ -499,7 +502,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           }
           if (!each.length) return;
           const extra = extraSpellCopies(s, by);
-          sc.copies = { of: id!, left: each.length, each, by, ...(extra ? { extra } : {}) };
+          // Frontline Heroism: one copy, aimed at one of the tokens, its controller's choice if a replacement made more
+          // than one it could target (CR 707.10e).
+          if (e.eachOther!.toCreated) sc.copies = { of: id!, left: 1, each, by, ...(each.length > 1 ? { pickOne: true as const } : {}), ...(extra ? { extra } : {}) };
+          else sc.copies = { of: id!, left: each.length, each, by, ...(extra ? { extra } : {}) };
         } else {
         const n =
           e.n === "storm"
@@ -532,6 +538,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         // The copies' controller chooses the order they go on the stack (rulings on Zada, Ink-Treader Nephilim and
         // Precursor Golem): which creature the next copy targets. Copies put on the stack later resolve first.
+        if (c.each && c.pickOne && !c.picked) {
+          const names = c.each.map((id) => characteristics(s, obj(s, id)).name);
+          const labels = names.map((n, i) => (names.filter((x) => x === n).length > 1 ? `${n} ${names.slice(0, i + 1).filter((x) => x === n).length}` : n));
+          s.pending = { kind: "chooseOption", player: c.by ?? ctx.controller, source: src, what: "copyOrder", options: [...c.each], labels, prompt: `choose the token the copy of ${orig.description} targets` };
+          return "paused";
+        }
         if (c.each && c.left > 1 && !c.picked) {
           const rest = c.each.slice(c.each.length - c.left);
           s.pending = { kind: "chooseOption", player: c.by ?? ctx.controller, source: src, what: "copyOrder", options: rest, labels: rest.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name})`), prompt: `choose the creature the next copy of ${orig.description} targets (copies put on the stack later resolve first)` };

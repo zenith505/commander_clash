@@ -389,6 +389,9 @@ export function normalizeSelf(d: CardDef): string {
   // name, the card's short name (CR 201.5c) and other words after a comma, a name of its own (CR 111.4), not the card.
   const commaName = full.split(",")[0]!;
   if (full && commaName !== full) t = t.replace(new RegExp(`(\\b[Cc]reate )(${esc(commaName)}, [A-Z][\\w'-]*(?: [A-Z][\\w'-]*)*)(?=, a legendary )`, "g"), (m: string, a: string, n: string) => (n === full ? m : `${a}\u0001${tokenNames.push(n) - 1}\u0001`));
+  // Mishra, Eminent One: "create a token that's a copy of ..., except its name is Mishra's Warform": a name of its own made
+  // with the card's short name (CR 201.5c), not the card.
+  if (full && commaName !== full) t = t.replace(new RegExp(`(\\bexcept its name is )(${esc(commaName)}'s [A-Z][\\w'-]*)(?= and |,|\\.)`, "g"), (_, a: string, n: string) => `${a}\u0001${tokenNames.push(n) - 1}\u0001`);
   // Kookus: "a creature named Keeper of Kookus" is another card's name with its name in it.
   const otherNames: string[] = [];
   if (full) t = t.replace(new RegExp(`(\\bnamed )((?:[A-Z][\\w'-]*|of|the)(?: (?:[A-Z][\\w'-]*|of|the))* ${esc(full)})(?![\\w'-])`, "g"), (_, a: string, n: string) => `${a}\u0002${otherNames.push(n) - 1}\u0002`);
@@ -5169,6 +5172,12 @@ export function compile(d: CardDef): CompiledCard {
       out.preventToSelfExileTop = surgeon[1] ? { combat: surgeon[1] === "combat " ? "only" : "non" } : {};
       continue;
     }
+    // Weeping Angel: "If ~ would deal combat damage to a creature, prevent that damage and that creature's owner shuffles
+    // it into their library." (CR 615.5): see staticRules in damage.ts.
+    if (line === "If ~ would deal combat damage to a creature, prevent that damage and that creature's owner shuffles it into their library.") {
+      out.combatToCreatureShuffles = true;
+      continue;
+    }
     // Treacherous Link: see staticRules in damage.ts.
     if (line === "All damage that would be dealt to enchanted creature is dealt to its controller instead.") {
       out.attachedDamageToController = true;
@@ -6243,6 +6252,23 @@ export function compile(d: CardDef): CompiledCard {
           event: "castSpell",
           cast: { by: "any", spell: { kind: "spell", text: "spell" }, targetsOnly: { ...creature, notSource: true, text: "a single creature other than ~" } },
           body: { targets: [], effects: [{ type: "may", effects: [{ type: "copySpell", spell: "cause", n: "eachOther", newTargets: false, eachOther: { among: creature, toSource: true } }], text: "copy that spell (the copy targets ~)" }], text: "you may copy that spell. The copy targets ~." },
+        });
+      continue;
+    }
+    // Frontline Heroism: "Whenever you cast a spell that targets only a single creature you control, create a 1/1 red
+    // Soldier creature token with haste, then copy that spell. The copy targets that token." Every target of the spell that
+    // one creature (rulings), as it's cast; the copy is made even if the spell has left the stack, and only if the token
+    // could be each of its targets; with a token doubler its controller picks one of the tokens (CR 707.10e, rulings).
+    if (line === "Whenever you cast a spell that targets only a single creature you control, create a 1/1 red Soldier creature token with haste, then copy that spell. The copy targets that token.") {
+      const creature = parseTargetPhrase("creature you control");
+      const token = parseBody("Create a 1/1 red Soldier creature token with haste.");
+      const any = parseTargetPhrase("creature");
+      if (creature?.kind !== "object" || any?.kind !== "object" || !token || token.targets.length || token.effects.length !== 1 || token.effects[0]!.type !== "createToken") out.unsupported.push(raw);
+      else
+        out.triggers.push({
+          event: "castSpell",
+          cast: { by: "you", spell: { kind: "spell", text: "spell" }, targetsOnly: { ...creature, text: "a single creature you control" } },
+          body: { targets: [], effects: [...token.effects, { type: "copySpell", spell: "cause", n: "eachOther", newTargets: false, eachOther: { among: any, toCreated: true } }], text: "create a 1/1 red Soldier creature token with haste, then copy that spell. The copy targets that token." },
         });
       continue;
     }
@@ -7413,9 +7439,11 @@ function linkExile(out: CompiledCard) {
   else if (!out.entersExileFromYard && (out.statics.some((st) => /"linkedExiled(?:PT)?"/.test(JSON.stringify(st.mods).replace(/\{"kind":"linkedExiled(?:PT)?"[^{}]*"crafted":true[^{}]*\}/g, "")) || JSON.stringify(st.condition ?? null).includes('"linkedExiled"')) || (out.costMods ?? []).some((cm) => JSON.stringify(cm.times ?? null).includes('"linkedExiled"')) || bodies.some((b) => JSON.stringify(b).includes('"linkedExiled"')) || out.triggers.some((t) => JSON.stringify(t.ifCond ?? null).includes('{"kind":"linkedExiled","ever":true}'))) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
-    const others = all.some((e) => e.type === "exileGraveyard" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
-    if (others || out.spell || exiles.length !== 1) out.unsupported.push("(counts cards exiled with it that it can't link to one exile ability)");
-    else exiles[0]!.linked = true;
+    // Azor's Gateway: "exile a card from your hand", its one exile instruction (CR 607.2a), the cards it exiles kept face up.
+    const fromHand = all.filter((e): e is Extract<Effect, { type: "discard" }> => e.type === "discard" && !!e.exile && e.who.ref === "you" && !e.until && !e.ownerMay && !e.controllerMay && !e.suspendMv && !e.random);
+    const others = all.some((e) => e.type === "exileGraveyard" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile && !fromHand.includes(e)));
+    if (others || out.spell || exiles.length + fromHand.length !== 1) out.unsupported.push("(counts cards exiled with it that it can't link to one exile ability)");
+    else (exiles[0] ?? fromHand[0]!).linked = true;
   }
   // Evendo Brushrazer: "play cards exiled with ~" is about the cards its one "exile the top card of your library" exiled
   // (CR 607.2a); Nightveil Specter's "that player exiles the top card of their library" likewise.

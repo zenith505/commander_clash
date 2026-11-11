@@ -6,12 +6,16 @@ import { parseSearchFilter } from "./search";
 import { parseSentence } from "./sentence";
 import { parsePlayer } from "./targets";
 import { num } from "./words";
+import { round339Sentence } from "./round339";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round338Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 339's sentences first (oracle/round339.ts).
+  const r339 = round339Sentence(s, sentences, si, ctx, effects);
+  if (r339) return r339;
   const line = plain(s);
   // Overencumbered: "At the beginning of combat on enchanted opponent's turn, that player may pay {1} for each artifact they
   // control. If they don't, creatures can't attack this combat.": that player's choice, the amount counted as it's offered

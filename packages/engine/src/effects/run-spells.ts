@@ -988,6 +988,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (!sc.guileLoop)
         for (const item of [...s.stack].reverse()) {
           if (item.id === s.resolving?.item.id || item.controller === ctx.controller || !s.stack.includes(item)) continue;
+          if (e.abilitiesOnly && item.kind === "spell") continue;
           counterOnStack(s, ctx, item.id, src);
         }
       sc.guileLoop = true;

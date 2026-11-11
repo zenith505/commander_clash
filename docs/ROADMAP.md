@@ -163,7 +163,7 @@ line blocks.
    that parse with small pieces (Tainted Remedy, Balan, Marcus, Serra the Benevolent, Oblivion Stone, Curator's Ward
    and others) and easy ones further down, to Grinning Ignus (rank 8,293); `npm run popular` from Godsend (rank
    7,725) on is still to go through.
-   Out after round 173: Godsend (exiling one of the creatures blocking or blocked by the equipped creature, and
+   Out after round 173: Godsend (done in round 339) (exiling one of the creatures blocking or blocked by the equipped creature, and
    "can't cast spells with the same name as a card exiled with ~"), The Red Terror (a damage trigger for any red
    source you control), Amped Raptor (casting a card by paying energy instead of its mana cost), Repeated
    Reverberation (a delayed copy of the next instant, sorcery or loyalty ability), Scuttlemutt ("the color or colors of your choice" needs a multi-color
@@ -267,9 +267,9 @@ line blocks.
    ones, and further cards sharing their mechanics (Psychic Spiral, Hurkyl's Recall, Perennation, Cemetery
    Recruitment, Carrion Grub, Curse of Thirst).
    Out after round 179: Smoldering Egg (counters equal to the mana spent on another spell), Cryptic Spires (circled
-   colors), Jadzi, Oracle of Arcavios, Oskar, Rubbish Reclaimer (done in round 336), Strict Proctor and Kadena's Silencer (countering
+   colors), Jadzi, Oracle of Arcavios, Oskar, Rubbish Reclaimer (done in round 336), Strict Proctor and Kadena's Silencer (done in round 339) (countering
    triggered abilities), Alacrian Armory, Deadly Cover-Up, Chandra, Fire Artisan (loyalty counters removed),
-   Kusari-Gama, Reap (X targets set by another target), Fearless Swashbuckler (done in round 299) ("a Pirate and a Vehicle attacked"),
+   Kusari-Gama (done in round 339), Reap (X targets set by another target), Fearless Swashbuckler (done in round 299) ("a Pirate and a Vehicle attacked"),
    Friendly Rivalry (two differently targeted creatures each dealing damage), Invoke Justice (done in round 304) (counters distributed
    among a target player's creatures), The Eagles Are Coming!, Thief of Blood (done in round 300), Eldrazi Mimic ("base power and
    toughness become" another's), Arcbound Javelineer ("Remove X counters" as a cost), Wonderscape Sage (done in round 299) ("unless that
@@ -1082,7 +1082,7 @@ line blocks.
    this way"); Anzrag's Rampage (done in round 321) (put a creature card from among the exiled ones onto the battlefield, return it at end
    step); Regna's Sanction and Zndrsplt's Judgment (friend or foe with "chooses one ..., then taps the rest" and "a
    token that's a copy of a creature they control"; Lane B's range); Swooping Pteranodon (done in round 321) (a delayed trigger in which a
-   target land deals the damage); Hellish Rebuke; Osteomancer Adept; Hostile Negotiations (done in round 318); Unexplained Absence.
+   target land deals the damage); Hellish Rebuke (done in round 339); Osteomancer Adept; Hostile Negotiations (done in round 318); Unexplained Absence.
    Round 219: the Will of the Planeswalkers paths (Path of the Enigma, Animist, Ghosthunter, Pyromancer, Schemer: a
    planeswalk-or-chaos vote, both no-ops outside Planechase, CR 701.31a, 311.7); "Players can't draw cards" (Maralen of
    the Mornsong, Mornsong Aria: draw() stops, CR 121); "Lethal damage dealt to creatures you control is determined by
@@ -1121,7 +1121,7 @@ line blocks.
    makes more; Karai's "her sneak cost was paid this turn" needs Karai still on the battlefield as the same object; the
    Iron Man test runs its back face as a card of its own; bots choose Vannifar's mode like any modal trigger.
    Out after round 220 (looked at, not done): Ghost of Ramirez DePietro (no record yet of a card discarded this turn,
-   only of cards put into a graveyard from a library); Reservoir Kraken ("any opponent may tap an untapped creature they
+   only of cards put into a graveyard from a library); Reservoir Kraken (done in round 339) ("any opponent may tap an untapped creature they
    control": each opponent's choice in turn); Marshland Bloodcaster (paying life equal to the next spell's mana value
    instead of its mana cost); Watcher of Hours (a trigger of a card in exile, "whenever you remove a time counter from
    this card while it's exiled"); Tarmogoyf Nest and Disa the Restless (done in round 275);
@@ -2398,6 +2398,28 @@ line blocks.
    They're 5/5 artifact creatures." (CR 708.2, a face-down instant or sorcery stays face down), with a browser test.
    +4, 30,978 of 31,936 with B173 through B176. Bots activate Sasaya only when the flip happens, cast The Master with an exile only when one of
    their creatures has an enters trigger worth copying, and put all of their hand onto the battlefield with Tezzeret.
+   Round 339 went on down the "Out after round N" lists, most played first: Kadena's Silencer's "counter all abilities
+   your opponents control" (abilities only, spells stay, CR 701.6b) and Strict Proctor's "Whenever a permanent entering
+   causes a triggered ability to trigger, counter that ability unless its controller pays {2}." (each trigger an entering
+   permanent causes, its own included, put on the stack just above that ability, CR 603.2d, 603.3b); Reservoir Kraken's
+   "any opponent may tap an untapped creature they control. If they do, tap this creature and create a 1/1 blue Fish
+   creature token with “This token can't be blocked.”" (a punisher choice for each opponent, with a browser test); Kusari-Gama's
+   "Whenever equipped creature deals damage to a blocking creature, Kusari-Gama deals that much damage to each other
+   creature defending player controls." (the player the creature attacked, CR 508.5; with it out of combat and more than
+   one defending player, its controller chooses, with a browser test); Godsend's "Whenever equipped creature blocks or
+   becomes blocked by one or more creatures, you may exile one of those creatures." and "Your opponents can't cast spells
+   with the same name as a card exiled with Godsend." (linked, CR 607.2a, with a browser test); Hellish Rebuke's granted
+   "When this permanent deals damage to the player who cast Hellish Rebuke, sacrifice this permanent. You lose 2
+   life." (that player fixed as it resolves, a copy's caster nobody, CR 707.10). +6, 31,002 of 31,936 with B175-B176. Bots turn a face-down Kadena's Silencer face
+   up when an opponent's ability is on the stack, tap their weakest creature for the Kraken only when it threatens them,
+   and exile the strongest blocker with Godsend. Still simplified: Kusari-Gama on a creature removed from combat asks for
+   the defending player instead of using the one it attacked.
+   Out after round 339 (looked at, not done): Encroaching Mycosynth and Biotransference (types for cards in every zone
+   and spells, CR 613.1d over hidden zones); Crucible of the Spirit Dragon (mana spendable only on Dragons, in any
+   combination of colors); Jinnie Fay, Jetmir's Second (a choice replacing every token creation); Guff Rewrites History
+   (a target for each player, then free casts for each of them); Mirrormind Crown and Moonlit Meditation ("the first
+   time you would create one or more tokens each turn" as copies); Sokrates, Athenian Teacher (combat damage to a player
+   replaced by both drawing); Sunken Palace (mana that copies what it's spent on).
    Round 338 went on down the "Out after round N" lists, most played first: One Last Job's third spree mode "Return target
    Aura or Equipment card from your graveyard to the battlefield attached to a creature you control." (the creature
    chosen as it resolves, among the ones the other modes returned too, CR 303.4f, 301.5c; a Vehicle isn't a creature
@@ -2620,7 +2642,7 @@ line blocks.
    kills as many as it can, most valuable first. A bot skips its draw for Island Sanctuary when its opponents' creatures
    without flying or islandwalk could deal half its life.
    Out after round 328 (looked at, not done): Omen Machine and Wild Evocation (a card cast "if able" without paying its
-   mana cost: a mandatory free cast needs every bot and UI path); Reservoir Kraken (any opponent may tap a creature, a
+   mana cost: a mandatory free cast needs every bot and UI path); Reservoir Kraken (done in round 339) (any opponent may tap a creature, a
    choice offered to several players in turn); Reap ("up to X targets" where X counts another target's permanents, as
    before); Crafty Cutpurse (still out, for the reasons in its earlier list).
    Round 327 took cards back off the "Out after round N" lists, most played first: "Choose a creature at random. You
@@ -2844,7 +2866,7 @@ line blocks.
    question, rulings, CR 602.2b; TargetSpec.chooserOf; a browser test). +8, 30,730 of 31,936 with B157 and B158.
    Out after round 319 (looked at, not done): Rootweaver Druid (each opponent's search, one after another, for cards
    put onto the battlefield under their control), Guff Rewrites History (each player casting during the resolution of
-   another spell, no rulings to settle the order), Hellish Rebuke (a granted trigger that refers back to the spell's
+   another spell, no rulings to settle the order), Hellish Rebuke (done in round 339) (a granted trigger that refers back to the spell's
    caster), Extract Brain, and the cards of the round 318 list (still out, for the reasons in their earlier lists).
    Bots don't activate Mogg Assassin (the second target is any creature, which can be theirs); as its second chooser
    a bot picks a creature that isn't its own. Bots guess at Gollum's card at random and answer "which target is next"
@@ -3017,7 +3039,7 @@ line blocks.
    white Equipment artifact token with "...," "...," and equip {2}" (Icingdeath, Frost Tyrant: the card's short name
    inside the token's name is the token's name, CR 111.4). +8 Commander-legal (Honor the Past is an Arena-only
    card outside that count), 30,619 of 31,936 with B151 and B152.
-   Out after round 312 (looked at, not done): Kusari-Gama ("each other creature defending player controls" when the
+   Out after round 312 (looked at, not done): Kusari-Gama (done in round 339) ("each other creature defending player controls" when the
    equipped creature damages a blocking creature: CR 802.2a makes that the player the equipped creature attacks, or one
    the controller chooses when it isn't attacking, and the trigger doesn't know which yet); Old-Growth Troll, Harold and
    Bob and Bronzehide Lion (still returning as an Aura with granted abilities, next to Tom's template).
@@ -3641,7 +3663,7 @@ line blocks.
    Out after round 259 (looked at, not done): Requiem Monolith (a granted "whenever this creature is dealt damage" trigger
    and "that creature's controller may have ~ deal 1 damage to it"); Sorceress's Schemes (done in round 272); Reyhan, Last of the Abzan ("or is
    put into the command zone", with "if it had one or more +1/+1 counters on it"); Red Sun's Twilight (done in round 304) (token copies of
-   the artifacts destroyed this way, as they last existed); Hellish Rebuke (a trigger granted to every opponent's
+   the artifacts destroyed this way, as they last existed); Hellish Rebuke (done in round 339) (a trigger granted to every opponent's
    permanent about the player who cast it); Whirlwind Denial (one payment prompt per spell and ability) still out.
    Out after round 258 (looked at, not done): Green Sun's Twilight (done in round 304) ("Choose a creature card and/or a land card from among
    them": at least one if there is one, and with X 5 or more both onto the battlefield or both into your hand; the dig

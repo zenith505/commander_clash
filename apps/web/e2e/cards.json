@@ -13693,6 +13693,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dd91f4f2-ea46-48c5-8a80-0dc4ae5b79c4",
+  "name": "Godsend",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Artifact — Equipment",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +3/+3.\nWhenever equipped creature blocks or becomes blocked by one or more creatures, you may exile one of those creatures.\nYour opponents can't cast spells with the same name as a card exiled with Godsend.\nEquip {3}",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "jou",
+  "releasedAt": "2014-05-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "fca3545a-2956-49f9-8465-1c8937deb294",
   "name": "Goldberry, River-Daughter",
   "manaCost": "{1}{U}",
@@ -18550,6 +18582,32 @@
   "commanderLegal": "legal",
   "set": "lea",
   "releasedAt": "1993-08-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b5585eb5-4df3-4ae2-8c39-a8e7a9706dc2",
+  "name": "Kusari-Gama",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature has \"{2}: This creature gets +1/+0 until end of turn.\"\nWhenever equipped creature deals damage to a blocking creature, this Equipment deals that much damage to each other creature defending player controls.\nEquip {3} ({3}: Attach to target creature you control. Equip only as a sorcery.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -26573,6 +26631,39 @@
   "set": "war",
   "releasedAt": "2019-05-03",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "42e4d4d8-e4e0-4cf8-a6d0-887a17513280",
+  "name": "Reservoir Kraken",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Kraken",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Kraken"
+  ],
+  "oracleText": "Trample, ward {2}\nAt the beginning of each combat, if this creature is untapped, any opponent may tap an untapped creature they control. If they do, tap this creature and create a 1/1 blue Fish creature token with \"This token can't be blocked.\"",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Trample",
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -36791,6 +36882,38 @@
   "set": "c19",
   "releasedAt": "2019-08-23",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cd4cadb4-3156-49bd-b36e-12ba5c85938b",
+  "name": "Wall of Stone",
+  "manaCost": "{1}{R}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Wall",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wall"
+  ],
+  "oracleText": "Defender (This creature can't attack.)",
+  "power": "0",
+  "toughness": "8",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Defender"
+  ],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -11104,6 +11104,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "defendingPlayer") {
+    // Kusari-Gama: which defending player "defending player" is (CR 508.5a; Effect damageDefendingOthers).
+    if (!r.scratch || !pend.options.includes(choice)) throw new RulesError("choose one of the defending players");
+    r.scratch.defendingChosen = Number(choice) as PlayerId;
+    log(s, `${p.name} chooses ${pend.labels?.[pend.options.indexOf(choice)] ?? choice} as defending player for ${pend.source}.`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "copyTargetFor") {
     // Zevlor, Elturel Exile: the player or permanent this opponent's copy targets (Effect copyPerOtherOpponent).
     const z = r.scratch?.zevlor;

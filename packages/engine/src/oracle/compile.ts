@@ -7523,7 +7523,8 @@ function linkExile(out: CompiledCard) {
   // Exclusion Ritual, Ixalan's Binding: "the exiled card" lines linked their one exile as they were read; nothing more to do.
   // Ashiok's Erasure: its linked "exile target spell", and a leaves ability that returns that card (linked below).
   const returnsOnly = (tr: (typeof out.triggers)[number]) => tr.event === "selfLeaves" && tr.body.effects.length === 1 && tr.body.effects[0]!.type === "returnLinked";
-  const exiledCardBan = out.linkedNameCastBan && bodies.flatMap((b) => allEffects(b.effects)).filter((e) => (e.type === "exile" || e.type === "counterSpell") && e.linked).length === 1 && out.triggers.filter((tr) => !returnsOnly(tr)).length === 1 && !out.activated.length && !out.spell;
+  // Godsend: its one linked "exile one of those creatures" (a pick), with only an equip ability besides.
+  const exiledCardBan = out.linkedNameCastBan && bodies.flatMap((b) => allEffects(b.effects)).filter((e) => (e.type === "exile" || e.type === "counterSpell" || (e.type === "pick" && e.action === "exile")) && e.linked).length === 1 && out.triggers.filter((tr) => !returnsOnly(tr)).length === 1 && out.activated.every((a) => a.equip) && !out.spell;
   if (out.linkedNameCastBan && !exiledCardBan) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);

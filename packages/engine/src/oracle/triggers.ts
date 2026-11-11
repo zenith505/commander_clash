@@ -293,6 +293,18 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = /^destroy both creatures\.$/.test(text) ? { targets: [], effects: [{ type: "destroy" as const, what: { ref: "eventGroup" as const } }], text } : parseBody(text, { subject: true });
     return body ? { event: "selfBlocksOrBlockedByCreature", body, host: "attached", ...(filter ? { subjectFilter: { ...filter, text: what } } : {}) } : "fail";
   }
+  // Godsend: "Whenever equipped creature blocks or becomes blocked by one or more creatures, you may exile one of those
+  // creatures.": once, however many there are (rulings), "those creatures" the ones it blocks or is blocked by as blockers
+  // are declared (the event's group); not targeted, chosen as it resolves among those still on the battlefield (rulings),
+  // anyone's. They're "exiled with ~" for its name ban (CR 607.2a).
+  if (m[2] === "creature" && !m[1] && !yours && /^blocks or becomes blocked by one or more creatures, you may exile one of those creatures\.$/.test(m[3]!)) {
+    const creature = { kind: "object" as const, types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+    return { event: "selfBlocksOrBlockedByMany", host: "attached", body: { targets: [], effects: [{ type: "pick", who: { ref: "you" }, filter: creature, n: 1, upTo: true, action: "exile", fromGroup: true, anyController: true, linked: true, prompt: "you may exile one of those creatures: click it, then exile." }], text: "you may exile one of those creatures." } };
+  }
+  // Kusari-Gama: "Whenever equipped creature deals damage to a blocking creature, ~ deals that much damage to each other
+  // creature defending player controls." (Effect damageDefendingOthers.)
+  if (m[2] === "creature" && !m[1] && !yours && /^deals damage to a blocking creature, ~ deals that much damage to each other creature defending player controls\.$/.test(m[3]!))
+    return { event: "selfDealsDamageToBlocker", host: "attached", body: { targets: [], effects: [{ type: "damageDefendingOthers", amount: { count: { kind: "eventAmount" } } }], text: "~ deals that much damage to each other creature defending player controls." } };
   // Shield of the Righteous: "Whenever equipped creature blocks a creature, that creature doesn't untap during its
   // controller's next untap step": once for each creature it blocks, "that creature" that attacker, whoever controls it
   // then (rulings: it isn't tapped by this, and it's that creature's next untap step under whoever controls it).
@@ -4996,6 +5008,17 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(entersCauses[1]!, { activatedAbility: true });
     return body ? { event: "opponentEntersCausesTrigger", body } : "fail";
   }
+  // Hellish Rebuke's granted "When ~ deals damage to the player who cast ⟪source⟫, sacrifice ~. You lose 2 life.": that
+  // player fixed as the spell resolved (grants.ts casterMark), or no one; "you" is the permanent's controller.
+  const toCaster = /^When ~ deals damage to \u27eacaster (\d|none)\|[^\u27eb]*\u27eb, (.+)$/.exec(line);
+  if (toCaster) {
+    const body = parseBody(toCaster[2]!, { selfIt: true });
+    return body ? { event: "selfDealsDamageToPlayer", toPlayerId: toCaster[1] === "none" ? -1 : Number(toCaster[1]), body } : "fail";
+  }
+  // Strict Proctor: "that ability" is the triggered ability a permanent entering caused, put on the stack just below this
+  // one (rulings); its controller may pay.
+  const proctor = /^Whenever a permanent entering causes a triggered ability to trigger, counter that ability unless its controller pays (\{\d+\})\.$/.exec(line);
+  if (proctor) return { event: "entersCausesTrigger", body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: proctor[1]! } }], text: `counter that ability unless its controller pays ${proctor[1]}.` } };
   const manaTap = parseManaTapTrigger(line);
   if (manaTap) return manaTap;
   const dies = parseDiesTrigger(line);

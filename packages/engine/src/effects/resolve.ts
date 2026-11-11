@@ -3,7 +3,7 @@ import { withPutter } from "../counters";
 import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
 import { addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, draw, endTheCombatPhase, endTheTurn, enterTogether, inCombatPhase, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
-import { compileCard } from "../oracle";
+import { CAST_BY_SOURCE, casterMark, compileCard } from "../oracle";
 import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LANDWALK, SACRIFICED_LANDWALK, landwalkLand, CHOSEN_SNOW_LANDWALK, chosenLandwalk, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, TARGET_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION, CAST_SPELL_COLORS_PROTECTION } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, shieldChoicesPossible, ShieldQuestionPause, withShieldAnswers, type DamageSource } from "../damage";
@@ -42,6 +42,7 @@ import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
 import { runRound330Effect } from "./run-round330";
 import { runRound333Effect } from "./run-round333";
+import { runRound339Effect } from "./run-round339";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
 import { ringBearer } from "./run-ring";
@@ -1185,9 +1186,25 @@ function highestRollers(s: GameState, pid: PlayerId): PlayerId[] {
   return s.turnOrder.filter((p) => p !== pid && each[p] === top);
 }
 
+/** Hellish Rebuke: the player who cast the resolving spell (undefined for a copy, which wasn't cast, or an ability). */
+function spellCaster(s: GameState): PlayerId | undefined {
+  const item = s.resolving?.item;
+  const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+  return o && !o.spellCopy ? o.castBy : undefined;
+}
+
+/** Hellish Rebuke: the resolving spell's name, for the ability it gives (shown as "the player who cast Hellish Rebuke"). */
+function resolvingSpellName(s: GameState): string {
+  const item = s.resolving?.item;
+  const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+  return o ? defOf(s, o).name : "";
+}
+
 export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, affected?: ObjectId): Modification[] {
   const c = { ...amountCtx(s, ctx), ...(affected !== undefined ? { affected } : {}) };
-  return mods.map((m) =>
+  // Hellish Rebuke: "the player who cast ~" in the ability it gives is the player who cast this spell, fixed now (that
+  // player even if another controls the spell; a copy no one cast names no one, rulings).
+  return mods.map((m) => (m.kind === "addAbility" && m.text.includes(CAST_BY_SOURCE) ? { ...m, text: m.text.replaceAll(CAST_BY_SOURCE, casterMark(spellCaster(s), resolvingSpellName(s))) } : m)).map((m) =>
     // "Attacks this combat if able": the combat going on as it resolves.
     m.kind === "attacksIfAble" && m.combat === "this"
       ? { kind: "attacksIfAble", combat: s.combatsThisTurn ?? 0 }
@@ -1769,6 +1786,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "copyPerOtherOpponent":
     case "copyAttachedOnto":
       return runRound333Effect(s, e, ctx, src);
+    case "damageDefendingOthers":
+      return runRound339Effect(s, e, ctx, src);
     case "flipCoin":
       return runCoinEffect(s, e, ctx, src);
     case "flipCoinEach":

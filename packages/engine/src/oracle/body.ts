@@ -1725,7 +1725,8 @@ function roundB158Sentence(s: string, sentences: string[], si: number, ctx: Ctx,
   // that many cards. That player puts those cards into their hand, then shuffles.": that player orders their hand on top
   // (CR 401.4); you search for as many cards as were put there, any cards (no quality stated, so as many as there are, CR
   // 701.23d), and they go to that player's hand; the bot gives the ones it rates lowest.
-  if (s === "Target opponent puts the cards from their hand on top of their library" && next() === "Search that player's library for that many cards" && next(2) === "That player puts those cards into their hand, then shuffles") {
+  // Head Games says "The player puts those cards ...": the same player.
+  if (s === "Target opponent puts the cards from their hand on top of their library" && next() === "Search that player's library for that many cards" && (next(2) === "That player puts those cards into their hand, then shuffles" || next(2) === "The player puts those cards into their hand, then shuffles")) {
     const who = parsePlayer("target opponent", ctx);
     if (!who) return "fail";
     return out([{ type: "handToTop", who, n: 0, all: true }, { type: "search", library: who, n: { count: { kind: "handPutOnTopThisWay" } }, upTo: false, dest: { zone: "hand" }, reveal: false, away: true }], 2);
@@ -2774,6 +2775,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // revealed and put into your hand.
   text = text.replace(/^Search your library for (an? [a-z ]+? card)\. If evidence was collected, instead search your library for (an? [a-z ]+? card)\. Reveal that card, put it into your hand, then shuffle\.$/, "Search your library for $1, reveal it, put it into your hand, then shuffle. If evidence was collected, instead search your library for $2, reveal it, put it into your hand, then shuffle.");
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
+  // Quag Feast: "Choose target creature, planeswalker, or Vehicle. Mill two cards, then destroy the chosen permanent if its
+  // mana value is less than or equal to the number of cards in your graveyard.": one target (CR 115.1), its mana value
+  // checked after the mill, as the destroy happens (CR 608.2c).
+  text = text.replace(/^Choose (target creature, planeswalker, or Vehicle)\. (Mill two cards, then destroy) the chosen permanent (if its mana value is less than or equal to the number of cards in your graveyard\.)$/, "$2 $1 $3");
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
   // Riftsweeper: "When ~ enters, choose target face-up exiled card. Its owner shuffles ...": a trigger's body, the same.
   // Blink: "... Its owner shuffles it into their library, then investigates." the same, with what that owner does next.

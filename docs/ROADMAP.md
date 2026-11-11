@@ -2430,7 +2430,7 @@ line blocks.
    into your graveyard this way into your hand." (the cards the dread put there, none with an empty library); Stumpsquall
    Hydra's "distribute X +1/+1 counters among it and any number of commanders" (not targeted, divided as it resolves,
    CR 608.2d, any player's commanders, creature or not, rulings; with the Hydra gone, up to X among the commanders, with a
-   browser test). +6, 31,024 of 31,936 with B177-B178. Bots sacrifice Hoarder's Overflow in their second main phase
+   browser test). +6, 31,038 of 31,936 with B177-B180. Bots sacrifice Hoarder's Overflow in their second main phase
    once its counters beat their hand by two, return only Auras that help their creature with Nomad Mythmaker, and give
    the Hydra's counters only to their own permanents. Still simplified: a card with both a {0} and a mana-cost granted
    flashback offers only the {0} one (so an {X} card can't pick X there); bots never activate Nomad Mythmaker; Watcher's
@@ -2452,7 +2452,7 @@ line blocks.
    becomes blocked by one or more creatures, you may exile one of those creatures." and "Your opponents can't cast spells
    with the same name as a card exiled with Godsend." (linked, CR 607.2a, with a browser test); Hellish Rebuke's granted
    "When this permanent deals damage to the player who cast Hellish Rebuke, sacrifice this permanent. You lose 2
-   life." (that player fixed as it resolves, a copy's caster nobody, CR 707.10). +6, 31,002 of 31,936 with B175-B176. Bots turn a face-down Kadena's Silencer face
+   life." (that player fixed as it resolves, a copy's caster nobody, CR 707.10). +6, 31,032 of 31,936 with B175-B180. Bots turn a face-down Kadena's Silencer face
    up when an opponent's ability is on the stack, tap their weakest creature for the Kraken only when it threatens them,
    and exile the strongest blocker with Godsend. Still simplified: Kusari-Gama on a creature removed from combat asks for
    the defending player instead of using the one it attacked.
@@ -2476,7 +2476,7 @@ line blocks.
    counters, transform it, then untap it." and Creeping Inn's "where X is the number of creature cards exiled with this
    creature" (linked to its attack trigger's exile, CR 607.2a); Extraordinary Journey's "Whenever one or more nontoken
    creatures enter, if one or more of them entered from exile or was cast from exile, you draw a card." (CR 603.4, once
-   each turn). +6, 30,996 of 31,936 with B175-B176. A bot facing Overencumbered pays only when it has a creature that
+   each turn). +6, 31,026 of 31,936 with B175-B180. A bot facing Overencumbered pays only when it has a creature that
    could attack, and puts the returned Equipment on its strongest creature.
    Out after round 338 (looked at, not done): Spectral Searchlight and Yurlok of Scorch Thrash (mana into another
    player's pool, mana burn); Pulmonic Sliver ("put it on top of its owner's library instead" for Slivers); Tamiyo,

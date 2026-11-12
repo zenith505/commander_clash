@@ -6761,6 +6761,8 @@ export interface ActivatedAbility {
   orExile?: true;
   /** With `orExile`: only from exile, not the graveyard (Torrent Elemental, CR 113.6m). */
   onlyExile?: true;
+  /** With `onlyExile`, Greater Gargadon: "Activate only if ~ is suspended": in exile with suspend and a time counter on it (CR 702.62b). */
+  suspendedOnly?: true;
   /** "Discard this card" is part of the cost (cycling, transmute). */
   discardSelf?: boolean;
   /** "This ability costs {1} less to activate for each legendary creature you control" (CR 602.2b, 601.2f): generic mana only. */
@@ -6930,7 +6932,7 @@ export type ManaProduce =
    * (two colors, `min` 1, as removing none adds nothing). How many are removed is chosen as it's activated (CR 107.3a,
    * 601.2b, 602.2b): each way to do it is a combination, numbered as for "combos" (`removeXCombos`).
    */
-  | { kind: "removeX"; counter: CounterKind; colors: ManaType[]; min: number; /** The Mana Batteries: "Add {G}, then add an additional {G} for each charge counter removed this way": this much more, of the one color. */ base?: number; /** "Add X mana of any one color" (Petalmane Baku): all X of one of `colors`, not a mix. */ oneColor?: true }
+  | { kind: "removeX"; counter: CounterKind; colors: ManaType[]; min: number; /** The Mana Batteries: "Add {G}, then add an additional {G} for each charge counter removed this way": this much more, of the one color. */ base?: number; /** "Add X mana of any one color" (Petalmane Baku): all X of one of `colors`, not a mix. */ oneColor?: true; /** "Add X mana in any combination of colors" (Crucible of the Spirit Dragon): any multiset of X of `colors`. */ mix?: true }
   /**
    * Metalworker: "Reveal any number of artifact cards in your hand. Add {C}{C} for each card revealed this way." How many
    * are revealed is chosen as it's activated (rulings: zero too); each number is a combination, numbered as for "combos"

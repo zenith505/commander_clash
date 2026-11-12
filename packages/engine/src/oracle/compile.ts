@@ -37,6 +37,7 @@ import { roundB183Line } from "./laneb183";
 import { roundB184Line } from "./laneb184";
 import { round344Line } from "./round344";
 import { round345Chapter, round345Line } from "./round345";
+import { round346Line } from "./round346";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -5926,6 +5927,8 @@ export function compile(d: CardDef): CompiledCard {
     if (round344Line(line, raw, out, isSpell, d, compileCard)) continue;
     // Enduring Angel: "If your life total would be reduced to 0 or less, instead transform ~ ..." (round 345).
     if (round345Line(line, out, isSpell)) continue;
+    // Greater Gargadon: "...: Remove a time counter from ~. Activate only if ~ is suspended." (round 346).
+    if (round346Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,

@@ -19938,6 +19938,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6afe9cc7-80e4-4607-8633-6013d96bd19c",
+  "name": "Lumbering Laundry",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact Creature — Golem",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Golem"
+  ],
+  "oracleText": "{2}: Until end of turn, you may look at face-down creatures you don't control any time.\nDisguise {5} (You may cast this card face down for {3} as a 2/2 creature with ward {2}. Turn it face up any time for its disguise cost.)",
+  "power": "4",
+  "toughness": "5",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Disguise"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2f9263d7-916f-4535-95d2-888ab73cf339",
   "name": "Luxior, Giada's Gift",
   "manaCost": "{1}",
@@ -33136,6 +33165,28 @@
   "set": "usg",
   "releasedAt": "1998-10-12",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "549fe3ff-70aa-4543-b427-40b814b29894",
+  "name": "Temporal Aperture",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{5}, {T}: Shuffle your library, then reveal the top card. Until end of turn, for as long as that card remains on top of your library, play with the top card of your library revealed and you may play that card without paying its mana cost. (If it has X in its mana cost, X is 0.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "usg",
+  "releasedAt": "1998-10-12",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

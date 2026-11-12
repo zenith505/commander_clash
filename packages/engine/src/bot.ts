@@ -3677,6 +3677,11 @@ function freeAltPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     const plan = castPlan(s, pid, id, false, undefined, "nextFree");
     if (plan) return plan;
   }
+  // Temporal Aperture: the card it revealed on top of our library, for nothing.
+  if (o.zone === "library" && altCost(defOf(s, o), "topFree", s, pid)) {
+    const plan = castPlan(s, pid, id, false, undefined, "topFree");
+    if (plan) return plan;
+  }
   // Court of Locthwain: a card exiled with it, for nothing.
   if (linkedFreeGrant(s, o, pid) >= 0) {
     const plan = castPlan(s, pid, id, false, undefined, "linkedFree");

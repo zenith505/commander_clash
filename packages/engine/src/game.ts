@@ -1256,6 +1256,8 @@ export function moveObject(
   const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue, ...(o.costDiscarded ? { costDiscarded: o.costDiscarded } : {}) })) * (withCounters.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= withCounters.doubleIfXAtLeast ? 2 : 1) : 0;
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
+  // Temporal Aperture's card no longer remains on top once another card is put there (CR 611.2b).
+  if (to === "library" && opts.top && s.topFreePlays?.some((g) => g.player === o.owner && g.card !== id)) endTopFreePlays(s, o.owner);
   if (to === "graveyard") noteToGraveyard(s, o); // its owner may arrange cards put there at the same time (CR 404.3)
   // "If a card left your graveyard this turn" (Gau, Feral Youth): a card, not a token (CR 111.1).
   if (fromZone === "graveyard" && to !== "graveyard" && !o.isToken) {
@@ -4098,6 +4100,8 @@ function startNextTurn(s: GameState, skipping = false) {
   s.oneOfUsed = s.oneOfUsed?.filter((g) => Object.values(s.objects).some((o) => o.zone === "exile" && o.mayPlay?.oneOf === g && o.mayPlay.until !== "thisTurn"));
   if (!s.oneOfUsed?.length) s.oneOfUsed = undefined;
   s.linkedFreeCasts = undefined;
+  s.lookFaceDownTurn = undefined;
+  s.topFreePlays = undefined;
   s.linkedPlays = undefined;
   s.byTypeCast = undefined;
   s.diedThisTurn = undefined;
@@ -5238,6 +5242,9 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" 
   if (o.zone !== "library" || o.owner !== pid || player(s, pid).library[0] !== o.id) return undefined;
   const d = defOf(s, o);
   const land = isType(d, "Land");
+  // Temporal Aperture: the card it revealed, a land played as usual or a spell cast without paying its mana cost only
+  // (AltCostKind "topFree", not with `way`).
+  if ((land || !way) && topFreeGrant(s, o, pid)) return {};
   // A resolved effect's, for the rest of the turn (Gwenom).
   for (const g of s.topTurn ?? []) {
     const top = g.top;
@@ -5270,6 +5277,31 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" 
   if (plain) return { by: plain };
   if (once) return { by: once, once: true };
   return costly;
+}
+
+/**
+ * Temporal Aperture: the grant in GameState.topFreePlays that lets `pid` play `o`, the top card of their library, without
+ * paying its mana cost: this turn, while it's the card that was revealed, still on top (CR 611.2b, rulings).
+ */
+export function topFreeGrant(s: GameState, o: GameObject, pid: PlayerId): boolean {
+  if (!s.topFreePlays?.length || o.zone !== "library" || o.owner !== pid) return false;
+  return s.topFreePlays.some((g) => topFreeLive(s, g) && g.player === pid && g.card === o.id);
+}
+
+/** Whether a Temporal Aperture grant still holds: this turn, its card still the same object on top of its library. */
+export function topFreeLive(s: GameState, g: NonNullable<GameState["topFreePlays"]>[number]): boolean {
+  const o = s.objects[g.card];
+  return g.turn === s.turn && !!o && o.zone === "library" && (o.zoneChanges ?? 0) === g.zc && player(s, g.player).library[0] === g.card;
+}
+
+/**
+ * Temporal Aperture's "for as long as that card remains on top of your library" ends for good once it doesn't (CR 611.2b):
+ * as `pid`'s library is shuffled (rulings), or something else is put on top of it, or whenever it's found not to hold.
+ */
+export function endTopFreePlays(s: GameState, pid?: PlayerId): void {
+  if (!s.topFreePlays?.length) return;
+  s.topFreePlays = s.topFreePlays.filter((g) => g.player !== pid && topFreeLive(s, g));
+  if (!s.topFreePlays.length) s.topFreePlays = undefined;
 }
 
 /**
@@ -5306,7 +5338,10 @@ export function topVisible(s: GameState, pid: PlayerId, viewer: PlayerId): boole
 export function faceDownVisible(s: GameState, o: GameObject, viewer: PlayerId): boolean {
   if (!o.faceDown) return true;
   if (controllerOf(s, o) === viewer) return true;
-  return o.zone === "battlefield" && objIsType(s, o, "Creature") && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === viewer && !!abilitiesOf(s, obj(s, id)).lookFaceDown);
+  if (o.zone !== "battlefield" || !objIsType(s, o, "Creature")) return false;
+  // Lumbering Laundry: until end of turn, for the player who activated it (rulings: not face-down spells).
+  if (s.lookFaceDownTurn?.some((g) => g.player === viewer && g.turn === s.turn)) return true;
+  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === viewer && !!abilitiesOf(s, obj(s, id)).lookFaceDown);
 }
 
 /** Cards `pid` may play from the top of their library right now (see mayPlayFromTop). */
@@ -5317,6 +5352,8 @@ export function topPlayable(s: GameState, pid: PlayerId): ObjectId[] {
 
 /** Whether everyone can see the top card of `pid`'s library (CR 401.5): "play with the top card of your library revealed". */
 export function topRevealed(s: GameState, pid: PlayerId): boolean {
+  // Temporal Aperture: "play with the top card of your library revealed", while its card remains there.
+  if (s.topFreePlays?.some((g) => g.player === pid && topFreeLive(s, g))) return true;
   return s.battlefield.some((id) => {
     const r = abilitiesOf(s, obj(s, id)).revealTop;
     return r === "players" || (r === "you" && controllerOf(s, obj(s, id)) === pid);
@@ -6031,7 +6068,9 @@ export function castProblem(
   // From the top of the library, a permission for this way of paying: Bolas's Citadel's spells for life (CR 118.9).
   // Valgavoth's exiled cards: for life equal to their mana value, and no other way (rulings).
   if (!free && !via && castFromExileForLife(s, o, pid) && choices?.alt !== "citadel" && !isType(d, "Land")) return `pay life equal to ${d.name}'s mana value rather than its mana cost`;
-  if (!free && !via && o.zone === "library" && !mayPlayFromTop(s, o, pid, choices?.alt === "citadel" ? "life" : "mana"))
+  // Temporal Aperture's card with no other permission: only without paying its mana cost.
+  if (!free && !via && o.zone === "library" && choices?.alt !== "topFree" && choices?.alt !== "citadel" && topFreeGrant(s, o, pid) && !mayPlayFromTop(s, o, pid, "mana")) return `${d.name} can only be cast without paying its mana cost`;
+  if (!free && !via && o.zone === "library" && choices?.alt !== "topFree" && !mayPlayFromTop(s, o, pid, choices?.alt === "citadel" ? "life" : "mana"))
     return choices?.alt === "citadel" ? `nothing lets you pay life rather than ${d.name}'s mana cost` : `cast ${d.name} from the top of your library by paying life equal to its mana value`;
   if (choices?.alt) {
     if (choices.alt === "madness") return "madness is cast as its ability resolves";
@@ -6048,6 +6087,7 @@ export function castProblem(
     if (choices.alt === "genericMv" && !payZeroSource(s, pid, o, "generic")) return `nothing lets you pay generic mana rather than ${d.name}'s mana cost now`;
     if (choices.alt === "omniscience" && o.zone !== "hand") return "only spells cast from your hand are free";
     if (choices.alt === "linkedFree" && linkedFreeGrant(s, o, pid) < 0) return `${d.name} isn't a card you may cast this way`;
+    if (choices.alt === "topFree" && !topFreeGrant(s, o, pid)) return `${d.name} isn't a card you may cast this way`;
     if (choices.alt === "citadel" && o.zone !== "library" && !castFromExileForLife(s, o, pid)) return "only the top card of your library is cast for life";
     // A foretell cost is paid only for a foretold card, after the turn it was foretold (CR 702.143a).
     if (choices.alt === "foretell" && !foretoldCast(s, pid, o)) return `only a card foretold on an earlier turn can be cast for its foretell cost`;
@@ -6805,6 +6845,8 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   if (alt === "omniscience") return s && pid !== undefined && controlsPayWUBRG(s, pid, "castFromHandFree") ? { kind: "omniscience", mana: "", text: "without paying its mana cost" } : undefined;
   // Court of Locthwain: nothing at all, for a card exiled with it (castProblem checks the card is one).
   if (alt === "linkedFree") return s && pid !== undefined && s.linkedFreeCasts?.some((g) => g.player === pid && g.turn === s.turn) ? { kind: "linkedFree", mana: "", text: "without paying its mana cost" } : undefined;
+  // Temporal Aperture: nothing at all, for the card it revealed (castProblem checks the card is that one).
+  if (alt === "topFree") return s && pid !== undefined && s.topFreePlays?.some((g) => g.player === pid && topFreeLive(s, g)) ? { kind: "topFree", mana: "", text: "without paying its mana cost" } : undefined;
   // Bolas's Citadel: the top card of the caster's library, for life equal to its mana value (X is 0, CR 107.3b).
   if (alt === "citadel") {
     const top = s && pid !== undefined ? s.objects[player(s, pid).library[0] ?? ""] : undefined;
@@ -7055,7 +7097,7 @@ export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNull
   const sling = grantedWebSlinging(s, pid, defOf(s, o));
   const blitz = grantedBlitz(s, pid, defOf(s, o));
   const emerge = grantedEmerge(s, pid, defOf(s, o));
-  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(["evidence" as const, "nextFree" as const, "nextLife" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
+  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(topFreeGrant(s, o, pid) ? [altCost(defOf(s, o), "topFree", s, pid)!] : []), ...(["evidence" as const, "nextFree" as const, "nextLife" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -7453,7 +7495,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
     (choices.prototyped && choices.alt !== "prototype" ? " prototyped" : "") +
-    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "lifeForMv" || choices.alt === "nextLife" ? " for life" : choices.alt === "nextFree" ? " without paying its mana cost" : choices.alt === "genericMv" ? " for generic mana" : choices.alt === "energyForSpell" ? " for energy" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt.replace(/^granted(.)/, (_, c: string) => c.toLowerCase())} cost` : "") +
+    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "lifeForMv" || choices.alt === "nextLife" ? " for life" : choices.alt === "nextFree" || choices.alt === "topFree" ? " without paying its mana cost" : choices.alt === "genericMv" ? " for generic mana" : choices.alt === "energyForSpell" ? " for energy" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt.replace(/^granted(.)/, (_, c: string) => c.toLowerCase())} cost` : "") +
     (madness && o.castAlt === "madness" ? " for its madness cost" : madness && o.castAlt === "miracle" ? " for its miracle cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (choices.splice?.length ? `, splicing ${choices.splice.map((c) => nameOf(s, c)).join(" and ")} onto it` : "") +
@@ -13677,6 +13719,8 @@ function afterAction(s: GameState, holdTriggers = false) {
 
 export function runStateBasedActions(s: GameState, holdTriggers = false) {
   if (s.resolving) return; // not while a spell or ability is partway through resolving (CR 704.3)
+  // Temporal Aperture's grant, once its card isn't on top any more, never comes back (CR 611.2b).
+  if (s.topFreePlays) endTopFreePlays(s);
   if (!s.pending && askEntersChoice(s)) return;
   for (let guard = 0; guard < 100; guard++) {
     s.leftTogether = undefined; // each pass happens all at once (CR 704.3)
@@ -13845,7 +13889,8 @@ function attachmentSBAs(s: GameState): boolean {
       const p = o.attachedToPlayer;
       const enchant = compileCard(defOf(s, o)).enchant!;
       // Nor can it stay on a player with protection from its controller (CR 702.16c, 702.16k).
-      const legal = p !== undefined && !o.attachedTo && !player(s, p).lost && (!enchant.opponent || opponents(s, c.controller).includes(p)) && !playerProtectedFrom(s, p, c.controller, c);
+      // One that lost all its abilities has no enchant ability any more (Immovable Rod rulings, CR 702.5a).
+      const legal = c.hasPrintedAbilities && p !== undefined && !o.attachedTo && !player(s, p).lost && (!enchant.opponent || opponents(s, c.controller).includes(p)) && !playerProtectedFrom(s, p, c.controller, c);
       if (!legal) {
         log(s, `${c.name} is put into the graveyard (not attached to a player it can enchant).`);
         moveObject(s, id, "graveyard");
@@ -13857,7 +13902,9 @@ function attachmentSBAs(s: GameState): boolean {
       const link = s.animated?.[`${o.id}@${o.zoneChanges ?? 0}`];
       const card = o.enchantsCard;
       const hc = host && host.zone === "battlefield" ? characteristics(s, host) : undefined;
-      const legal = link
+      // Losing all its abilities, it loses its enchant ability too (Immovable Rod rulings, CR 702.5a); its leaves-the-
+      // battlefield ability is gone with them, so nothing is sacrificed (CR 603.10a).
+      const legal = !c.hasPrintedAbilities ? false : link
         ? !!host && host.id === link.id && (host.zoneChanges ?? 0) === link.zc && !!hc && hc.types.includes("Creature") && !protectedFrom(hc.keywords, c, protectionHolder(s, host))
         : !!host && !!card && host.id === card.id && host.zone === "graveyard" && (host.zoneChanges ?? 0) === card.zc && printedMatches(compileCard(defOf(s, o)).enchant!, defOf(s, host));
       if (!legal) {

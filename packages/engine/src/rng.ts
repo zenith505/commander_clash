@@ -24,6 +24,11 @@ export function shuffle<T>(state: { rngState: number }, arr: T[]): void {
 export function shuffleLibrary(state: GameState, p: Player, by?: PlayerId): void {
   shuffle(state, p.library);
   p.shuffles = (p.shuffles ?? 0) + 1;
+  // Temporal Aperture: "for as long as that card remains on top of your library" ends as the library is shuffled (rulings).
+  if (state.topFreePlays?.some((g) => g.player === p.id)) {
+    state.topFreePlays = state.topFreePlays.filter((g) => g.player !== p.id);
+    if (!state.topFreePlays.length) state.topFreePlays = undefined;
+  }
   // "Whenever an opponent shuffles their library" (Cosi's Trickster): its owner shuffled it. `by`: the controller of the
   // spell or ability that caused it (Psychogenic Probe, Widespread Panic), the resolving one's unless given (a static
   // replacement's, Darksteel Colossus); none for the game's own shuffles (the opening one, a mulligan, CR 103.3, 103.5).

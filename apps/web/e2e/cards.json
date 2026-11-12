@@ -20309,6 +20309,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6afe9cc7-80e4-4607-8633-6013d96bd19c",
+  "name": "Lumbering Laundry",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact Creature — Golem",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Golem"
+  ],
+  "oracleText": "{2}: Until end of turn, you may look at face-down creatures you don't control any time.\nDisguise {5} (You may cast this card face down for {3} as a 2/2 creature with ward {2}. Turn it face up any time for its disguise cost.)",
+  "power": "4",
+  "toughness": "5",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Disguise"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2f9263d7-916f-4535-95d2-888ab73cf339",
   "name": "Luxior, Giada's Gift",
   "manaCost": "{1}",
@@ -20513,6 +20542,32 @@
   "set": "dsk",
   "releasedAt": "2024-09-27",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9c793037-6ba8-400a-b24d-6032141e8dae",
+  "name": "Manifold Insights",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal the top ten cards of your library. Starting with the next opponent in turn order, each opponent chooses a different nonland card from among them. Put the chosen cards into your hand and the rest on the bottom of your library in a random order.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c16",
+  "releasedAt": "2016-11-11",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -25900,6 +25955,40 @@
   "commanderLegal": "legal",
   "set": "avr",
   "releasedAt": "2012-05-04",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e7f3b4bb-ebf5-4e59-8f0b-aa26f78e9edc",
+  "name": "Prince of Thralls",
+  "manaCost": "{4}{U}{B}{B}{R}",
+  "cmc": 8,
+  "typeLine": "Creature — Demon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Demon"
+  ],
+  "oracleText": "Whenever a permanent an opponent controls is put into a graveyard, put that card onto the battlefield under your control unless that opponent pays 3 life.",
+  "power": "7",
+  "toughness": "7",
+  "colors": [
+   "B",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2024-02-05",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
@@ -33770,6 +33859,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "549fe3ff-70aa-4543-b427-40b814b29894",
+  "name": "Temporal Aperture",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{5}, {T}: Shuffle your library, then reveal the top card. Until end of turn, for as long as that card remains on top of your library, play with the top card of your library revealed and you may play that card without paying its mana cost. (If it has X in its mana cost, X is 0.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "usg",
+  "releasedAt": "1998-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5f67698a-28db-43cd-aaf1-52371b0b47eb",
   "name": "Temporal Cleansing",
   "manaCost": "{3}{U}",
@@ -36635,6 +36746,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fb4d99c2-daec-430a-9ca2-5a178a96618b",
+  "name": "Urza's Sylex",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}{W}{W}, {T}, Exile Urza's Sylex: Each player chooses six lands they control. Destroy all other permanents. Activate only as a sorcery.\nWhen Urza's Sylex is put into exile from the battlefield, you may pay {2}. If you do, search your library for a planeswalker card, reveal it, put it into your hand, then shuffle.",
+  "colors": [],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bro",
+  "releasedAt": "2022-11-18",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c42ce2e9-4dfe-468a-8f41-49e187cb91d4",
   "name": "Vaevictis Asmadi, the Dire",
   "manaCost": "{3}{B}{R}{G}",
@@ -37710,6 +37847,36 @@
   "set": "mom",
   "releasedAt": "2023-04-21",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "12a88c08-11e3-4f51-a17c-ca06452bac6f",
+  "name": "Volcano Hellion",
+  "manaCost": "{2}{R}{R}",
+  "cmc": 4,
+  "typeLine": "Creature — Hellion",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Hellion"
+  ],
+  "oracleText": "This creature has echo {X}, where X is your life total. (At the beginning of your upkeep, if this came under your control since the beginning of your last upkeep, sacrifice it unless you pay its echo cost.)\nWhen this creature enters, it deals an amount of damage of your choice to you and target creature. The damage can't be prevented.",
+  "power": "6",
+  "toughness": "5",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "plc",
+  "releasedAt": "2007-02-02",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -23,7 +23,7 @@ export function tokenCopyBatch(s: GameState, pid: PlayerId, base: CardDef): numb
   return tokenBatch(s, pid, s.cards[tokenCopyKey(s, base).key]!, 1, true).same;
 }
 
-export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId; /** What each of the first ones attacks, as chosen (attackChoices). */ attackAt?: { player: PlayerId; planeswalker?: ObjectId }[]; /** An Aura copy: what it enchants as it enters (auraCopyHost), none if nothing it could. */ auraHost?: AuraHost | null; embalmed?: true } = {}) {
+export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId; /** What each of the first ones attacks, as chosen (attackChoices). */ attackAt?: { player: PlayerId; planeswalker?: ObjectId }[]; /** An Aura copy: what it enchants as it enters (auraCopyHost), none if nothing it could. */ auraHost?: AuraHost | null; embalmed?: true; /** Mirror Match: "that's blocking that creature": each one a creature enters blocking it (createToken's `blocking`). */ blocking?: GameObject } = {}) {
   // A copy of a double-faced object is a double-faced token, with the same face up (CR 707.8a).
   const { key, face } = tokenCopyKey(s, base, opts.except);
   const { same: k, extra } = tokenBatch(s, pid, s.cards[key]!, n);
@@ -50,10 +50,18 @@ export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: numbe
       if (defender !== undefined && o.zone === "battlefield" && objIsType(s, o, "Creature")) o.attacking = at?.player ?? defender;
       const pw = at?.planeswalker !== undefined ? s.objects[at.planeswalker] : undefined;
       if (pw && o.attacking !== undefined && pw.zone === "battlefield") o.attackingPermanent = { id: pw.id, zc: pw.zoneChanges ?? 0 };
+      // Mirror Match: entering blocking that attacker, never declared as a blocker (rulings); a noncreature one isn't
+      // blocking (rulings), and an attacker no longer attacking can't be blocked.
+      const foe = opts.blocking;
+      if (foe && o.zone === "battlefield" && objIsType(s, o, "Creature") && foe.zone === "battlefield" && foe.attacking !== undefined) {
+        o.blocking = [foe.id];
+        (foe.blockedBy ??= []).push(o.id);
+        foe.becameBlockedTurn = s.turn;
+      }
       s.resolving?.created?.push(o.id);
       noteCreated(s, pid, o);
     }
-    createExtraTokens(s, pid, extra, { tapped: opts.tapped || opts.attacking, attacking: defender }, opts.attackAt?.slice(k));
+    createExtraTokens(s, pid, extra, { tapped: opts.tapped || opts.attacking, attacking: defender, ...(opts.blocking ? { blocking: opts.blocking } : {}) }, opts.attackAt?.slice(k));
   });
   if (made) log(s, `${player(s, pid).name} creates ${made === 1 ? "a token that's a copy" : `${made} tokens that are copies`} of ${base.name}${opts.auraHost ? ` attached to ${auraHostName(s, opts.auraHost)}` : ""}.`);
   else if (k) log(s, `${player(s, pid).name} can't create a token copy of ${base.name}: there's nothing it could enchant.`);
@@ -564,7 +572,8 @@ export function createToken(s: GameState, pid: PlayerId, t0: TokenSpec, opts: { 
   if (opts.attacking !== undefined && o.zone === "battlefield") o.attacking = opts.attacking;
   // Put onto the battlefield blocking (Brimaz): it blocks that attacker, never declared as a blocker (CR 509.1, rulings).
   const at = opts.blocking;
-  if (at && o.zone === "battlefield" && at.zone === "battlefield" && at.attacking !== undefined) {
+  // Only a creature can be blocking (Mirror Match rulings: a noncreature one enters but isn't).
+  if (at && o.zone === "battlefield" && objIsType(s, o, "Creature") && at.zone === "battlefield" && at.attacking !== undefined) {
     o.blocking = [at.id];
     (at.blockedBy ??= []).push(o.id);
     at.becameBlockedTurn = s.turn;

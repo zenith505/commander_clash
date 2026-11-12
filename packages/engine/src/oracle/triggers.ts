@@ -28,6 +28,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // Kaya the Inexorable's granted "When this creature dies or is put into exile": the same, an ability that works only on
   // the battlefield (CR 113.6, 603.6c).
   [/^When(?:ever)? ~ dies or is put into exile(?: from the battlefield)?, (.+)$/, "selfDiesOrExiled"],
+  // Urza's Sylex: "When ~ is put into exile from the battlefield" (from anywhere on the battlefield, CR 603.6c, 603.10a).
+  [/^When(?:ever)? ~ is put into exile from the battlefield, (.+)$/, "selfExiled"],
   // Exiled as a craft material (CR 702.167a). The rulings' other case, exiled by a mana ability activated while paying
   // for the craft ability, can't happen here: mana abilities are activated before the craft ability is.
   [/^When ~ is exiled from the battlefield while you're activating a craft ability, (.+)$/, "selfExiledCrafting"],
@@ -187,7 +189,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
 ];
 
 const SELF_EVENTS: TriggerEvent[] = [
-  "selfEnters", "selfDies", "selfDiesOrExiled", "selfExiledCrafting", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
+  "selfEnters", "selfDies", "selfDiesOrExiled", "selfExiled", "selfExiledCrafting", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
   "selfDealsDamage", "selfDealsCombatDamage", "selfDealsCombatDamageToBlockers", "selfDealsDamageToCreatures", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfLastCounterRemoved", "selfEchoPaid", "selfTrains", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
   "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfIsDealtCombatDamage", "selfBecomesMonstrous", "selfEvolves", "selfMutates", "selfPhasesIn", "selfPhasesOut",
@@ -5607,7 +5609,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       text = text.replace(/THAT_MUCH/g, "that much").replace(/THAT_MANY/g, "that many");
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
-      const left = event === "selfDies" || event === "selfDiesOrExiled" || event === "selfExiledCrafting" || event === "selfToGraveyard" || event === "selfLeaves";
+      const left = event === "selfDies" || event === "selfDiesOrExiled" || event === "selfExiled" || event === "selfExiledCrafting" || event === "selfToGraveyard" || event === "selfLeaves";
       if (event === "selfDealtDamageBySource" || event === "selfDealtDamageByOpponentSource") text = text.replace(/\bthat source's controller\b/g, "that player");
       if (event === "selfAttacksUnblocked" && /^Whenever ~ attacks a player and isn't blocked, /.test(line)) text = text.replace(/\b[Tt]hat player\b/g, (w) => (w[0] === "T" ? "Defending player" : "defending player"));
       // "At the beginning of each player's upkeep, ~ deals 1 damage to them" (Roiling Vortex): that player.

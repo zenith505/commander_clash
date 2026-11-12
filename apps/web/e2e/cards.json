@@ -26236,6 +26236,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cbd106fb-c9c5-4c5e-8801-619b7c8ff5a6",
+  "name": "Qasali Ambusher",
+  "manaCost": "{1}{G}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Cat Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Cat",
+   "Warrior"
+  ],
+  "oracleText": "Reach\nIf a creature is attacking you and you control a Forest and a Plains, you may cast this creature without paying its mana cost and as though it had flash.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [
+   "Reach"
+  ],
+  "commanderLegal": "legal",
+  "set": "ala",
+  "releasedAt": "2008-10-03",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a55bdb73-e17a-414d-b27f-dc53af2f345c",
   "name": "Quarry Hauler",
   "manaCost": "{3}{G}",
@@ -38540,6 +38575,44 @@
   "commanderLegal": "legal",
   "set": "mh3",
   "releasedAt": "2024-06-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "343833c1-19fd-4e8f-b82e-0f20903caaff",
+  "name": "Winter, Cursed Rider",
+  "manaCost": "{U}{B}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Human Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warlock"
+  ],
+  "oracleText": "Ward—Pay 2 life.\nArtifacts you control have \"Ward—Pay 2 life.\"\nExhaust — {2}{U}{B}, {T}, Exile X artifact cards from your graveyard: Each other nonartifact creature gets -X/-X until end of turn. (Activate each exhaust ability only once.)",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Exhaust",
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "dft",
+  "releasedAt": "2025-02-14",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

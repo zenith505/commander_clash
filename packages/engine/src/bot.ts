@@ -6121,6 +6121,14 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         if (plan) return plan;
         continue;
       }
+      // Winter, Cursed Rider: "Exile X artifact cards from your graveyard: Each other nonartifact creature gets -X/-X".
+      const sweepX = graveSweepX(s, pid, o, ab);
+      if (sweepX !== undefined) {
+        if (sweepX === null) continue;
+        const plan = planActivate(s, pid, id, i, undefined, undefined, undefined, sweepX.x, { exileCards: sweepX.cards });
+        if (plan) return plan;
+        continue;
+      }
       // Osgir, the Reconstructor: two copies of the most valuable artifact card in our graveyard we can pay for.
       if (ab.costs?.some((c) => c.kind === "exileFromGraveyard" && c.mvX)) {
         const plan = exileMvXPlan(s, pid, o, i, ab);
@@ -7054,6 +7062,34 @@ function sacrificeMvXPlan(s: GameState, pid: PlayerId, o: GameObject, i: number,
     }
   }
   return null;
+}
+
+/**
+ * Winter, Cursed Rider ("{2}{U}{B}, {T}, Exile X artifact cards from your graveyard: Each other nonartifact creature gets
+ * -X/-X until end of turn"): undefined for other abilities; for this one, in our main phase with an empty stack, the X
+ * (and the graveyard cards for it, the least useful first) that kills the most of our opponents' creatures for the fewest
+ * of ours, two of theirs at least and more of theirs than ours; null when no X is worth it.
+ */
+function graveSweepX(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility): { x: number; cards: ObjectId[] } | null | undefined {
+  const xs = (ab.costs ?? []).filter((c) => "x" in c && c.x);
+  const c = xs[0];
+  if (xs.length !== 1 || c?.kind !== "exileFromGraveyard" || !c.filter || c.top || c.linked || c.process || parseManaCost(ab.manaCost).hasX) return undefined;
+  const e = ab.body.effects[0];
+  const minusX = (a: Amount) => typeof a === "object" && "count" in a && a.count.kind === "x" && !!a.negate;
+  if (ab.body.effects.length !== 1 || ab.body.targets.length || e?.type !== "continuous" || e.what.ref !== "each" || e.mods.length !== 1 || e.mods[0]!.kind !== "modifyPT" || !minusX(e.mods[0]!.power) || !minusX(e.mods[0]!.toughness)) return undefined;
+  if (s.activePlayer !== pid || (s.step !== "main1" && s.step !== "main2") || s.stack.length) return null;
+  const filter = e.what.filter;
+  const pool = player(s, pid).graveyard.filter((x) => printedMatches(c.filter!, defOf(s, obj(s, x)))).sort((a, b) => Number(usefulInGraveyard(s, a)) - Number(usefulInGraveyard(s, b)) || mv(s, a) - mv(s, b));
+  const hit = s.battlefield.map((x) => obj(s, x)).filter((x) => !(e.what.ref === "each" && e.what.other && x.id === o.id) && objectMatches(s, filter, x, pid, false));
+  let best: { x: number; score: number } | undefined;
+  for (let x = 1; x <= pool.length; x++) {
+    const dead = hit.filter((h) => toughness(s, h) <= x);
+    const theirs = dead.filter((h) => controllerOf(s, h) !== pid);
+    const ours = dead.filter((h) => controllerOf(s, h) === pid);
+    const score = theirs.reduce((t, h) => t + worth(s, pid, h), 0) - ours.reduce((t, h) => t + 1.5 * worth(s, pid, h), 0);
+    if (theirs.length >= 2 && theirs.length > ours.length && score > 0 && (!best || score > best.score)) best = { x, score };
+  }
+  return best ? { x: best.x, cards: pool.slice(0, best.x) } : null;
 }
 
 /** Osgir, the Reconstructor ("{X}, {T}, Exile an artifact card with mana value X from your graveyard: Create two tokens that are copies of the exiled card"): the card with the greatest mana value we can pay X for, never a land. */

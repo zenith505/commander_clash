@@ -719,6 +719,9 @@ export function compile(d: CardDef): CompiledCard {
       // enters (CR 614.12), each its own.
       .replace(/^As ~ enters, choose an opponent and (a card name other than a basic land card name)\.$/m, "As ~ enters, choose an opponent.\nAs ~ enters, choose $1.")
       .replace(/^As ~ enters, choose an opponent\. (~ enters with an? [-+\/\d]+ counter on it for each creature) that player controls\.$/m, "As ~ enters, choose an opponent.\n$1 the chosen player controls.")
+      // Shackles of Treachery's granted "Whenever ~ deals damage, destroy target Equipment attached to it.": "it" is the
+      // creature, the trigger's source (rulings: any damage, any Equipment's controller).
+      .replace(/^Whenever ~ deals damage, destroy target Equipment attached to it\.$/m, "Whenever ~ deals damage, destroy target Equipment attached to ~.")
       // Sludge Strider: "Whenever another artifact you control enters or leaves the battlefield, ...": two trigger events
       // (CR 603.1), an ability for each.
       .replace(/^Whenever another artifact you control enters or leaves the battlefield, ([^\n]+)$/m, "Whenever another artifact you control enters, $1\nWhenever another artifact you control leaves the battlefield, $1")

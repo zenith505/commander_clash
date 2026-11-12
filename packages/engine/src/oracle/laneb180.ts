@@ -1,7 +1,8 @@
-// Lane B round B180's sentences, read at the end of round B179's.
+// Lane B round B180's sentences, read at the end of round B179's (round B181's at the end of these).
 import type { Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseManaCost } from "../mana";
+import { roundB181Sentence } from "./laneb181";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -51,5 +52,5 @@ export function roundB180Sentence(s: string, _sentences: string[], si: number, c
     if (effects.length !== 1 || !goad || ctx.targets.length !== 1 || !ctx.activated) return "fail";
     return { effect: { type: "delayed", when: "attacksOpponent", of: { ref: "target", index: 0 }, effects: [{ type: "draw", who: { ref: "you" }, n: 1 }], text: "you draw a card", thisTurn: true }, next: si + 1 };
   }
-  return null;
+  return roundB181Sentence(s, _sentences, si, ctx, effects);
 }

@@ -144,7 +144,8 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       let what = m[3]!.replace(/\bcards\b/, "card").replace(/ and\/or /, " or ");
       // "Any number of nonland permanent cards with total mana value 4 or less" (Ao, the Dawn Sky): all the cards taken
       // together, a card with {X} in its mana cost counting X as 0 (CR 202.3e).
-      const total = how === "any number of" ? / with total mana value (\d+) or less$/.exec(what) : null;
+      // Michelangelo's Technique: "up to two creature cards with total mana value 6 or less", the same, two at most.
+      const total = how === "any number of" || (/^up to (?:two|three)$/.test(how) && count > 1) ? / with total mana value (\d+) or less$/.exec(what) : null;
       if (total) what = what.slice(0, total.index);
       // Smelting Vat: "up to two noncreature artifact cards with total mana value less than or equal to the sacrificed
       // artifact's mana value": all the cards taken together, the count as it resolves.

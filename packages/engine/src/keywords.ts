@@ -185,6 +185,9 @@ export function canonicalKeyword(text: string): string | undefined {
   if (/^mana value \d+ or (?:less|greater)$/.test(q)) return `Protection from ${q}`;
   // Tsabo Tavoc: "protection from legendary creatures"; Harbinger of Spring: "protection from non-Spirit creatures".
   if (q === "legendary creatures") return `Protection from ${q}`;
+  // Crypsis: "protection from creatures your opponents control": "your" is the protected permanent's controller's, so
+  // after a change of control, its new controller's opponents (rulings).
+  if (q === "creatures your opponents control") return "Protection from creatures your opponents control";
   const nonType = /^non-([a-z]+) creatures$/.exec(q);
   if (nonType && CREATURE_TYPES.has(nonType[1]!.charAt(0).toUpperCase() + nonType[1]!.slice(1))) return `Protection from non-${nonType[1]!.charAt(0).toUpperCase() + nonType[1]!.slice(1)} creatures`;
   // Sigrid, God-Favored: "protection from God creatures": a creature source of that type, as Riders of Gavony's chosen type
@@ -412,6 +415,10 @@ export function protectedFrom(keywords: readonly string[], src: SourceQuality, h
     // a Spirit (a changeling is every creature type, CR 702.73a).
     const isCreature = !!src.types?.includes("Creature");
     if (q === "legendary creatures" && isCreature && src.supertypes?.includes("Legendary")) return true;
+    // Crypsis: a creature source controlled by an opponent of the protected permanent's controller as it is now (rulings),
+    // every other player in this game (CR 102.3); a creature card not on the battlefield by its owner, who controls its
+    // abilities (rulings, CR 113.8).
+    if (q === "creatures your opponents control" && isCreature && holder && src.controller !== undefined && src.controller !== holder.controller) return true;
     const nonType = /^non-([a-z]+) creatures$/.exec(q);
     if (nonType && isCreature && !src.allCreatureTypes && !src.subtypes?.some((t) => t.toLowerCase() === nonType[1])) return true;
   }

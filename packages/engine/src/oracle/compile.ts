@@ -37,6 +37,7 @@ import { roundB183Line } from "./laneb183";
 import { roundB184Line } from "./laneb184";
 import { roundB185Line } from "./laneb185";
 import { roundB186Line } from "./laneb186";
+import { roundB187Line } from "./laneb187";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -2048,6 +2049,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB185Line(line, raw, out, isSpell)) continue;
     // Round B186.
     if (roundB186Line(line, raw, out, isSpell)) continue;
+    // Round B187.
+    if (roundB187Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

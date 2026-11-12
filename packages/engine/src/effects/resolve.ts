@@ -1,9 +1,9 @@
 import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type Effect, type ManaAbility, type Modification, type ObjRef, type PlayerRef, type TargetChoice } from "../abilities";
-import { withPutter } from "../counters";
+import { tokenChoicesPossible, TokenQuestionPause, withPutter, withTokenAnswers } from "../counters";
 import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
 import { addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, draw, endTheCombatPhase, endTheTurn, enterTogether, inCombatPhase, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
-import { compileCard } from "../oracle";
+import { CAST_BY_SOURCE, casterMark, compileCard } from "../oracle";
 import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LANDWALK, SACRIFICED_LANDWALK, landwalkLand, CHOSEN_SNOW_LANDWALK, chosenLandwalk, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, TARGET_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION, CAST_SPELL_COLORS_PROTECTION } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, shieldChoicesPossible, ShieldQuestionPause, withShieldAnswers, type DamageSource } from "../damage";
@@ -46,6 +46,8 @@ import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
 import { runRound330Effect } from "./run-round330";
 import { runRound333Effect } from "./run-round333";
+import { runRound339Effect } from "./run-round339";
+import { runRound344Effect } from "./run-round344";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
 import { ringBearer } from "./run-ring";
@@ -248,24 +250,42 @@ export function continueResolution(s: GameState): Resolution {
  */
 function runAsking(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | void {
   const r = s.resolving!;
-  if (r.item.manaAbility || !shieldChoicesPossible(s)) return runEffect(s, e, ctx);
+  const shields = !r.item.manaAbility && shieldChoicesPossible(s);
+  // Jinnie Fay, Esix: an optional replacement of tokens it creates (CR 616.1), asked the same way (counters.ts).
+  const tokens = !r.item.manaAbility && tokenChoicesPossible(s);
+  if (!shields && !tokens) return runEffect(s, e, ctx);
   const before = cloneState(s);
-  return withShieldAnswers(r.shieldAnswers ?? [], (asked) => {
-    try {
-      const out = runEffect(s, e, ctx);
-      r.shieldAnswers = undefined;
-      return out;
-    } catch (err) {
-      const q = asked();
-      if (!(err instanceof ShieldQuestionPause) || !q) throw err;
-      for (const k of Object.keys(s)) delete (s as unknown as Record<string, unknown>)[k];
-      Object.assign(s, before);
-      invalidateCharacteristics(s);
-      s.resolving!.shieldAnswers ??= [];
-      s.pending = { kind: "chooseOption", player: q.player, source: ctx.sourceDef.name, what: "damageShield", prompt: q.prompt, options: q.labels.map((_, i) => String(i)), labels: q.labels };
-      return "paused";
-    }
-  });
+  const restore = () => {
+    for (const k of Object.keys(s)) delete (s as unknown as Record<string, unknown>)[k];
+    Object.assign(s, before);
+    invalidateCharacteristics(s);
+  };
+  return withTokenAnswers(tokens ? (r.tokenAnswers ?? []) : null, (tokenAsked) =>
+    withShieldAnswers(shields ? (r.shieldAnswers ?? []) : null, (asked) => {
+      try {
+        const out = runEffect(s, e, ctx);
+        r.shieldAnswers = undefined;
+        // Kept while the instruction waits on another choice of its own: it runs again with the same answers.
+        if (out !== "paused") r.tokenAnswers = undefined;
+        return out;
+      } catch (err) {
+        if (err instanceof TokenQuestionPause) {
+          const q = tokenAsked();
+          if (!q) throw err;
+          restore();
+          s.resolving!.tokenAnswers ??= [];
+          s.pending = { kind: "chooseOption", player: q.player, source: q.source, what: "tokenInstead", prompt: q.prompt, options: q.options, labels: q.labels, botChoice: q.botChoice };
+          return "paused";
+        }
+        const q = asked();
+        if (!(err instanceof ShieldQuestionPause) || !q) throw err;
+        restore();
+        s.resolving!.shieldAnswers ??= [];
+        s.pending = { kind: "chooseOption", player: q.player, source: ctx.sourceDef.name, what: "damageShield", prompt: q.prompt, options: q.labels.map((_, i) => String(i)), labels: q.labels };
+        return "paused";
+      }
+    }),
+  );
 }
 
 /**
@@ -278,8 +298,8 @@ export function resolveManaAbility(s: GameState, item: StackItem, body: AbilityB
   const inside = !!outer || !!s.pending;
   const left = s.leftTogether;
   s.resolving = { item, body, legal: [], next: 0, ...(color ? { chosen: { color } } : {}) };
-  // Its damage can't stop for a question (its shields are chosen the way a bot would).
-  if (withShieldAnswers(null, () => continueResolution(s)) === "paused" && inside) throw new RulesError(`${s.cards[item.sourceCardId!]?.name ?? "That"}'s mana ability needs a choice that can't be made now`);
+  // Its damage can't stop for a question (its shields are chosen the way a bot would), nor its tokens (Jinnie Fay).
+  if (withTokenAnswers(null, () => withShieldAnswers(null, () => continueResolution(s))) === "paused" && inside) throw new RulesError(`${s.cards[item.sourceCardId!]?.name ?? "That"}'s mana ability needs a choice that can't be made now`);
   if (!inside) return;
   s.resolving = outer;
   s.leftTogether = left;
@@ -1191,9 +1211,25 @@ function highestRollers(s: GameState, pid: PlayerId): PlayerId[] {
   return s.turnOrder.filter((p) => p !== pid && each[p] === top);
 }
 
+/** Hellish Rebuke: the player who cast the resolving spell (undefined for a copy, which wasn't cast, or an ability). */
+function spellCaster(s: GameState): PlayerId | undefined {
+  const item = s.resolving?.item;
+  const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+  return o && !o.spellCopy ? o.castBy : undefined;
+}
+
+/** Hellish Rebuke: the resolving spell's name, for the ability it gives (shown as "the player who cast Hellish Rebuke"). */
+function resolvingSpellName(s: GameState): string {
+  const item = s.resolving?.item;
+  const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+  return o ? defOf(s, o).name : "";
+}
+
 export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, affected?: ObjectId): Modification[] {
   const c = { ...amountCtx(s, ctx), ...(affected !== undefined ? { affected } : {}) };
-  return mods.map((m) =>
+  // Hellish Rebuke: "the player who cast ~" in the ability it gives is the player who cast this spell, fixed now (that
+  // player even if another controls the spell; a copy no one cast names no one, rulings).
+  return mods.map((m) => (m.kind === "addAbility" && m.text.includes(CAST_BY_SOURCE) ? { ...m, text: m.text.replaceAll(CAST_BY_SOURCE, casterMark(spellCaster(s), resolvingSpellName(s))) } : m)).map((m) =>
     // "Attacks this combat if able": the combat going on as it resolves.
     m.kind === "attacksIfAble" && m.combat === "this"
       ? { kind: "attacksIfAble", combat: s.combatsThisTurn ?? 0 }
@@ -1788,6 +1824,11 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "copyPerOtherOpponent":
     case "copyAttachedOnto":
       return runRound333Effect(s, e, ctx, src);
+    case "damageDefendingOthers":
+      return runRound339Effect(s, e, ctx, src);
+    case "foretellSelf":
+    case "returnAsAura":
+      return runRound344Effect(s, e, ctx, src);
     case "flipCoin":
       return runCoinEffect(s, e, ctx, src);
     case "flipCoinEach":

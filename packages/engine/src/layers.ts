@@ -61,6 +61,7 @@ export function layerOf(m: Modification): Layer {
     case "loseActivated":
     case "loseStatic":
     case "enchantCreature":
+    case "enchant":
       return "6";
     case "definePT":
       return "7a";
@@ -235,6 +236,8 @@ export interface Characteristics {
   lostStatics?: string[];
   /** "Becomes an Aura enchantment with enchant creature" (a Licid): enchant creature from an effect (enchantOf). */
   enchantCreature?: true;
+  /** "It's an Aura enchantment with enchant creature you control" (Bronzehide Lion): an enchant ability from an effect (enchantOf). */
+  enchantSpec?: TargetSpec;
   /** Goaded (CR 701.15): not by an effect that only asks the same (Kardur, Maximum Carnage rulings). */
   goaded?: true;
   /** "Can't attack unless defending player controls ...": what the defending player has to control. */
@@ -1483,6 +1486,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "dealtDamageToOpponentThisTurn") return src.zone === "battlefield" && Object.entries(s.turnLog?.damagedBy ?? {}).some(([pid, by]) => Number(pid) !== you && by.includes(`${src.id}@${src.zoneChanges ?? 0}`));
       if (cond.is === "kicked") return !!src.kicked?.length;
       if (cond.is === "cast") return src.zone === "battlefield" && !!src.wasCast;
+      // Amped Raptor: "if you cast it from your hand" (a commander cast from the command zone wasn't): this object, or as it
+      // last existed once it left (CR 608.2h).
+      if (cond.is === "castFromHand") {
+        const lk = sourceZc !== undefined && (src.zoneChanges ?? 0) !== sourceZc ? s.lastKnown?.[sourceId] : undefined;
+        return lk ? lk.zc === sourceZc && lk.castFromHandBy === you : src.zone === "battlefield" && !!src.castFromHand && src.castBy === you;
+      }
       if (cond.is === "sneakThisTurn") return src.zone === "battlefield" && src.castAlt === "sneak" && src.enteredTurn === s.turn;
       if (cond.is === "countersPutThisTurn") return src.countersPutAt?.turn === s.turn && src.countersPutAt.zc === (src.zoneChanges ?? 0);
       if (cond.is === "impending") return src.castAlt === "impending" && (src.counters.time ?? 0) > 0; // CR 702.176a
@@ -1873,6 +1882,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "enchantCreature":
       c.enchantCreature = true;
       return;
+    case "enchant":
+      c.enchantSpec = m.spec;
+      return;
     case "addAbility":
       if (/^ward\b/i.test(m.text)) delete c.wardLost;
       // An ability that names the permanent giving it ("Sacrifice Blazing Torch"): bound to that object (grants.ts).
@@ -2234,7 +2246,7 @@ function readsKeywords(e: Inst): boolean {
  * give or take abilities (CR 613.8a).
  */
 const readsAbilities = (e: Inst) => e.affects?.kind === "filter" && !!e.affects.spec?.noAbilities;
-const GIVES_ABILITIES = new Set<Modification["kind"]>(["addAbility", "enchantCreature", "cantHaveKeywords"]);
+const GIVES_ABILITIES = new Set<Modification["kind"]>(["addAbility", "enchantCreature", "enchant", "cantHaveKeywords"]);
 
 function signature(s: GameState, e: Inst, chars: CharMap): string {
   if (!exists(s, e, chars)) return "gone";

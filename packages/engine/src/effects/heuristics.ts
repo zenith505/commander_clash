@@ -50,6 +50,9 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     // "Target unblocked attacking creature becomes blocked" (Curtain of Light): against an opponent's attacker.
     // Disorienting Choice ("controllersMayExile"): their permanent exiled, or lands for us.
     if (["destroy", "destroyRandomTarget", "exile", "bounce", "tap", "tapOrUntap", "skipUntap", "phaseOut", "replaceLandMana", "turnFaceDown", "becomeBlocked", "controllersMayExile"].includes(e.type) && "what" in e && e.what?.ref === "target") mark(e.what.index, e.what.n);
+    // Identity Thief: "exile another target nontoken creature. If you do, ~ becomes a copy of that creature until end of
+    // turn" (the card back at the next end step): an opponent's creature out of the way for the turn, and copied.
+    if (e.type === "flicker" && e.at && e.what.ref === "target" && all.some((x) => x.type === "becomeCopy" && x.of.ref === "target" && x.of.index === (e.what as { index: number }).index)) mark(e.what.index, e.what.n);
     // "Destroy target blocking creature at end of combat" (Silent Assassin): later, but aimed at an opponent's creature.
     if (e.type === "delayed" && e.when === "endOfCombat" && e.of?.ref === "target" && e.effects.length === 1 && e.effects[0]!.type === "destroy") mark(e.of.index, e.of.n);
     // A suspected creature can't block (CR 701.60c): aimed at opponents unless the card says "you control".

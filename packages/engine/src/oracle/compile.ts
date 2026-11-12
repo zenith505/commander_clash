@@ -32,6 +32,7 @@ import { roundB176Line } from "./laneb176";
 import { roundB177Line } from "./laneb177";
 import { roundB178Line } from "./laneb178";
 import { roundB179Line } from "./laneb179";
+import { roundB182Finish, roundB182Line } from "./laneb182";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -2033,6 +2034,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB178Line(line, raw, out, isSpell)) continue;
     // Drain Life, Consume Spirit (round B179).
     if (roundB179Line(line, raw, out, isSpell, d)) continue;
+    // Murktide Regent, Soulflayer, Lochmere Serpent, Skyclave Shade, Nightshade Assassin, Shadow Urchin, Curse of Chaos (round B182).
+    if (roundB182Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -7633,6 +7636,8 @@ function linkExile(out: CompiledCard) {
     const exiles = all.filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong"].includes(e.type) || (e.type === "search" && e.dest.zone === "exile") || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile));
     if (out.spell || faceDown.length !== 1 || exiles.length !== 1) out.unsupported.push("(turns face up an exiled card it can't link to one imprint ability)");
   }
+  // Murktide Regent, Soulflayer: their delve's cards and no other exile (round B182).
+  roundB182Finish(out, bodies.flatMap((b) => allEffects(b.effects)));
   // Ethereal Forager: with delve and no exile instruction of its own, "cards exiled with ~" are those its delve exiled as
   // it was cast (rulings; linked to the permanent it becomes, CR 607.2q).
   if (out.delve && !out.spell && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "moveLinked"))) {

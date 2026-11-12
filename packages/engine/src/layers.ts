@@ -25,7 +25,7 @@ import { activatedAbilityCount } from "./manaabilities";
 import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
 import { liveEmblems } from "./emblems";
-import { bindChosenKeywords, CHOSEN_LAND_TYPE, COLOR_WORD, CREATURE_TYPES, IDENTITY_PROTECTION, isLandwalk, YOURS_BASIC_LANDWALK, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, YOURS_COLORS_PROTECTION, YOURS_ARTIFACT_MV_PROTECTION, protectionFromCardTypes, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
+import { bindChosenKeywords, CHOSEN_LAND_TYPE, COLOR_WORD, CREATURE_TYPES, IDENTITY_PROTECTION, isLandwalk, YOURS_BASIC_LANDWALK, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, LINKED_CREATURE_CARD_KEYWORD, YOURS_COLORS_PROTECTION, YOURS_ARTIFACT_MV_PROTECTION, protectionFromCardTypes, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
 import { bindGrantSource, compileCard, compileGranted, QUOTED_SOURCE_NAME } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
@@ -1659,11 +1659,12 @@ function linkedCardTypesProtection(s: GameState, sourceId: ObjectId | undefined)
  * Urborg Scavengers: `keyword` if a face-up card exiled with this object (CR 607.2a), still in exile, has it as its own
  * printed keyword (CR 113.6: its abilities are there in exile, whatever zone they work in); none otherwise.
  */
-function linkedCardKeyword(s: GameState, sourceId: ObjectId | undefined, keyword: string): string[] {
+function linkedCardKeyword(s: GameState, sourceId: ObjectId | undefined, keyword: string, creatureOnly = false): string[] {
   const src = sourceId ? s.objects[sourceId] : undefined;
   if (!src) return [];
   const linked = s.linkedExile?.[`${src.id}@${src.zoneChanges ?? 0}`] ?? [];
-  const cards = linked.flatMap((l) => { const o = s.objects[l.id]; return o?.zone === "exile" && (o.zoneChanges ?? 0) === l.zc && !o.faceDown ? [o] : []; });
+  // Soulflayer: only creature cards, as cards in exile (a double-faced card by its front face, CR 712.8a).
+  const cards = linked.flatMap((l) => { const o = s.objects[l.id]; return o?.zone === "exile" && (o.zoneChanges ?? 0) === l.zc && !o.faceDown && (!creatureOnly || defOf(s, o).types.includes("Creature")) ? [o] : []; });
   // Death-Mask Duplicant: "landwalk" and "protection" are each of those abilities the cards have, all of them (rulings).
   if (keyword === "Landwalk" || keyword === "Protection") {
     const fits = (k: string) => (keyword === "Landwalk" ? isLandwalk(k) : /^Protection from /i.test(k));
@@ -1797,7 +1798,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "addKeywords":
       // "Has protection from the chosen color": the color chosen as the source entered.
       // Empty-Shrine Kannushi: "protection from each color among permanents you control", the colors layer 5 left them.
-      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) || m.keywords.includes(YOURS_COLORS_PROTECTION) || m.keywords.includes(YOURS_ARTIFACT_MV_PROTECTION) || m.keywords.includes(YOURS_BASIC_LANDWALK) || m.keywords.some((k) => k.startsWith(LINKED_CARD_KEYWORD)) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : k === YOURS_COLORS_PROTECTION ? colorsAmongYours(chars, controllerOfInst(e, chars)).map((col) => `Protection from ${COLOR_WORD[col]}`) : k === YOURS_ARTIFACT_MV_PROTECTION ? artifactManaValuesAmongYours(chars, controllerOfInst(e, chars)).map((n) => `Protection from mana value ${n}`) : k === YOURS_BASIC_LANDWALK ? basicLandTypesAmongYours(chars, controllerOfInst(e, chars)).map((t) => `${t}walk`) : k.startsWith(LINKED_CARD_KEYWORD) ? linkedCardKeyword(s, e.sourceId, k.slice(LINKED_CARD_KEYWORD.length)) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors, e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.parity : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.number : undefined)) {
+      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) || m.keywords.includes(YOURS_COLORS_PROTECTION) || m.keywords.includes(YOURS_ARTIFACT_MV_PROTECTION) || m.keywords.includes(YOURS_BASIC_LANDWALK) || m.keywords.some((k) => k.startsWith(LINKED_CARD_KEYWORD) || k.startsWith(LINKED_CREATURE_CARD_KEYWORD)) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : k === YOURS_COLORS_PROTECTION ? colorsAmongYours(chars, controllerOfInst(e, chars)).map((col) => `Protection from ${COLOR_WORD[col]}`) : k === YOURS_ARTIFACT_MV_PROTECTION ? artifactManaValuesAmongYours(chars, controllerOfInst(e, chars)).map((n) => `Protection from mana value ${n}`) : k === YOURS_BASIC_LANDWALK ? basicLandTypesAmongYours(chars, controllerOfInst(e, chars)).map((t) => `${t}walk`) : k.startsWith(LINKED_CARD_KEYWORD) ? linkedCardKeyword(s, e.sourceId, k.slice(LINKED_CARD_KEYWORD.length)) : k.startsWith(LINKED_CREATURE_CARD_KEYWORD) ? linkedCardKeyword(s, e.sourceId, k.slice(LINKED_CREATURE_CARD_KEYWORD.length), true) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors, e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.parity : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.number : undefined)) {
         const key = k.toLowerCase();
         if (/^ward\b/i.test(k)) delete c.wardLost;
         if (!c.keywords.some((x) => sameCI(x, k))) {

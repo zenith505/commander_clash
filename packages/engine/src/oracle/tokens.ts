@@ -179,6 +179,19 @@ export function parseCountMod(line: string): CountMod | undefined {
     const token = tokenPhrase(m[2]!.replace(/^an? /, ""));
     return token && token.subtypes.length === 1 && token.subtypes[0] !== m[1] ? { what: "tokens", who: "you", op: "instead", subtype: m[1]!, token } : undefined;
   }
+  // Jinnie Fay, Jetmir's Second: "If you would create one or more tokens, you may instead create that many 2/2 green Cat
+  // creature tokens with haste or that many 3/1 green Dog creature tokens with vigilance." The tokens' characteristics are
+  // entirely the chosen one's; what the effect says about them (tapped, attacking) still applies (rulings).
+  m = /^If you would create one or more tokens, you may instead create that many (\d+\/\d+ [a-z]+ [A-Z][a-z]+ creature) tokens(?: with ([a-z]+))? or that many (\d+\/\d+ [a-z]+ [A-Z][a-z]+ creature) tokens(?: with ([a-z]+))?\.$/.exec(line);
+  if (m) {
+    const a = tokenPhrase(m[1]!, m[2]);
+    const b = tokenPhrase(m[3]!, m[4]);
+    return a && b ? { what: "tokens", who: "you", op: "mayInstead", tokens: [a, b] } : undefined;
+  }
+  // Mirrormind Crown, Moonlit Meditation, Esix, Fractal Bloom: copies instead, the first time each turn (CR 707.2).
+  if (line === "As long as ~ is attached to a creature, the first time you would create one or more tokens each turn, you may instead create that many tokens that are copies of equipped creature.") return { what: "tokens", who: "you", op: "mayInstead", copy: "host", hostCreature: true, first: "turn" };
+  if (line === "The first time you would create one or more tokens each turn, you may instead create that many tokens that are copies of enchanted permanent.") return { what: "tokens", who: "you", op: "mayInstead", copy: "host", first: "turn" };
+  if (line === "The first time you would create one or more tokens during each of your turns, you may instead choose a creature other than ~ and create that many tokens that are copies of that creature.") return { what: "tokens", who: "you", op: "mayInstead", copy: "chosen", first: "yourTurn" };
   // Bilbo: "If you would create a Food token, instead create a Food token and a Treasure token."
   m = /^If you would create an? ([A-Z][a-z]+) token, instead create an? \1 token and an? ([A-Z][a-z]+) token\.$/.exec(line);
   if (m && PREDEFINED_TOKENS[m[1]!] && PREDEFINED_TOKENS[m[2]!]) return { what: "tokens", who: "you", op: "andEach", subtype: m[1]!, token: PREDEFINED_TOKENS[m[2]!]! };

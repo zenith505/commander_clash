@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, toughness } from "../cards";
 import { nameLandBan } from "../names";
-import { nearestOpponent, faceDownExileGroup, hiddenInExile, adventureExileCards, graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, payLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
+import { castPayText, nearestOpponent, faceDownExileGroup, hiddenInExile, adventureExileCards, graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, payLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { countersRemoved, putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -124,6 +124,35 @@ export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: Pla
 }
 
 /**
+ * One Last Job: what each Equipment card entering (not an Aura) is attached to as it enters, a creature `you` control it
+ * could be attached to (CR 301.5c-d: not one with protection from it or that can't be equipped, and not while the
+ * Equipment would be a creature itself unless it has reconfigure, CR 702.151b), chosen as it resolves (not targeted,
+ * rulings); "" with none, so it enters unattached.
+ */
+function chooseEquipHosts(s: GameState, cards: GameObject[], you: PlayerId, src: string): "paused" | Map<ObjectId, ObjectId | ""> {
+  const sc = (s.resolving!.scratch ??= {});
+  const chosen = (sc.equipHosts ??= {});
+  const ids = new Set(cards.map((o) => o.id));
+  for (const o of cards) {
+    const d = defOf(s, o);
+    if (d.subtypes.includes("Aura") || !d.subtypes.includes("Equipment") || chosen[o.id] !== undefined) continue;
+    const compiled = compileCard(d);
+    const only = compiled.attachOnly ?? { kind: "object" as const, text: "" };
+    const options = isType(d, "Creature") && !compiled.reconfigure ? [] : s.battlefield.filter((id) => !ids.has(id) && controllerOf(s, obj(s, id)) === you && objIsType(s, obj(s, id), "Creature") && !characteristics(s, obj(s, id)).cantBeEquipped && objectMatches(s, only, obj(s, id), you, false, d));
+    if (options.length <= 1) {
+      chosen[o.id] = options[0] ?? "";
+      continue;
+    }
+    sc.equipAsking = o.id;
+    s.pending = { kind: "chooseOption", player: you, source: src, what: "attachHost", options, labels: options.map((id) => defOf(s, obj(s, id)).name), prompt: `choose a creature you control for ${d.name} to enter attached to` };
+    return "paused";
+  }
+  const out = new Map<ObjectId, ObjectId | "">();
+  for (const o of cards) if (chosen[o.id] !== undefined) out.set(o.id, chosen[o.id]!);
+  return out;
+}
+
+/**
  * Each player picks their own permanents, in APNAP order, then they're all sacrificed or returned to
  * their owners' hands at once (CR 101.4, 701.21a). With no more than they have to pick, there's no choice.
  */
@@ -212,6 +241,10 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const n = nFor[pid] ?? 0;
     // "One of those Dragons" (Zurgo and Ojutai): those still on the battlefield as the objects they were, whoever controls them now.
     const group = e.fromGroup ? (ctx.event?.group ?? []).filter((g) => s.objects[g.id]?.zone === "battlefield" && (obj(s, g.id).zoneChanges ?? 0) === g.zc).map((g) => g.id) : undefined;
+    // Orvar, the All-Form: "one of those permanents": the cast spell's targets, from the stack or, once it has left, as it
+    // was cast (rulings), each still that object on the battlefield, matching, and not ~ ("other permanents", CR 603.4).
+    const causeItem = e.fromCauseTargets && ctx.cause !== undefined ? (s.stack.find((x) => x.id === ctx.cause) ?? s.castItems?.[ctx.cause]) : undefined;
+    const ofCause = e.fromCauseTargets ? [...new Set((causeItem?.targets ?? []).flatMap((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && (t.zc === undefined || (obj(s, t.id).zoneChanges ?? 0) === t.zc) && t.id !== ctx.sourceId && objectMatches(s, e.filter, obj(s, t.id), pid, false) ? [t.id] : [])))] : undefined;
     // "On either of them" (Call of the Death-Dweller): the permanents the targets became, still on the battlefield.
     const ofTargets = e.fromTargets ? objects(s, { ref: "target", index: e.fromTargets.index, n: e.fromTargets.n }, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id) : undefined;
     // Suppression Ray: "creatures tapped this way", the ones that became tapped (rulings), still those objects.
@@ -221,7 +254,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     // Grenzo's Rebuttal: among the permanents of the player to this one's left (the next in turn order, CR 101.4).
     const left = e.amongLeft ? nearestOpponent(s, pid, "left") : undefined;
     // The Legend of Yangchen: among the permanents this ability's controller's opponents control, whoever picks.
-    const options0 = e.amongYourOpponents ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) !== ctx.controller && objectMatches(s, e.filter, obj(s, id), ctx.controller, false)) : e.amongLeft ? (left === undefined ? [] : pickOptions(s, e, left, ctx.sourceId, ctx.sourceZc)) : tappedHere ?? createdHere ?? ofTargets ?? group ?? (e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId, ctx.sourceZc)) : pickOptions(s, e, pid, ctx.sourceId, ctx.sourceZc));
+    const options0 = e.amongYourOpponents ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) !== ctx.controller && objectMatches(s, e.filter, obj(s, id), ctx.controller, false)) : e.amongLeft ? (left === undefined ? [] : pickOptions(s, e, left, ctx.sourceId, ctx.sourceZc)) : tappedHere ?? createdHere ?? ofCause ?? ofTargets ?? group ?? (e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId, ctx.sourceZc)) : pickOptions(s, e, pid, ctx.sourceId, ctx.sourceZc));
     // Labyrinth Raptor: only creatures blocking the trigger's subject now, the same attacking object (CR 400.7, 509.1h).
     const attacker = e.filter.blockingSubject && ctx.subject ? s.objects[ctx.subject.id] : undefined;
     const options1 = !e.filter.blockingSubject ? options0 : attacker && attacker.zone === "battlefield" && (attacker.zoneChanges ?? 0) === ctx.subject!.zc && attacker.attacking !== undefined ? options0.filter((id) => !!attacker.blockedBy?.includes(id) && obj(s, id).blocking?.includes(attacker.id)) : [];
@@ -1749,7 +1782,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const mv = maxMv === undefined && st.exactMv === undefined ? undefined : { ...(maxMv !== undefined ? { max: maxMv } : {}), ...(st.exactMv !== undefined ? { exact: st.exactMv } : {}) };
       // Invoke Calamity: the spell's types as it's cast, not the card's (rulings).
       // Jacob Frye: "You may cast the copy", paying its costs (rulings).
-      const freeCast = (id: ObjectId) => ({ kind: "castFree" as const, player: you.id, objectId: id, source: src, ...(mv ? { mv } : {}), ...((e.handAndYard || e.asSpell) && e.filter?.types?.length ? { types: e.filter.types } : {}), ...(e.handAndYard && e.filter?.supertypes?.length ? { supertypes: e.filter.supertypes } : {}), ...(e.asSpell && e.filter && !e.filter.types?.length ? { spellFilter: e.filter } : {}), ...(e.paid ? { how: "paid" as const } : {}), ...(e.anyType ? { anyType: true as const } : {}) });
+      const freeCast = (id: ObjectId) => ({ kind: "castFree" as const, player: you.id, objectId: id, source: src, ...(mv ? { mv } : {}), ...((e.handAndYard || e.asSpell) && e.filter?.types?.length ? { types: e.filter.types } : {}), ...(e.handAndYard && e.filter?.supertypes?.length ? { supertypes: e.filter.supertypes } : {}), ...(e.asSpell && e.filter && !e.filter.types?.length ? { spellFilter: e.filter } : {}), ...(e.paid || e.pay?.kind === "mana" ? { how: "paid" as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.pay ? { pay: e.pay } : {}) });
       if (st.handPick) return finish();
       // Plargg and Nassari: an opponent chosen by you picks one of the nonland cards; the others may be cast (rulings).
       if (e.opponentExcludes && !st.excluded) {
@@ -1806,7 +1839,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, `${src} copies ${defOf(s, obj(s, pick)).name}${e.copyTimes ? ` (copy ${(st.copied?.[pick] ?? 0) + 1} of ${e.copyTimes})` : ""}.`);
           st.casting = copy.id;
           st.copyOf = pick;
-          s.pending = { kind: "castFree", player: you.id, objectId: copy.id, source: src, ...(mv ? { mv } : {}), ...(e.paid ? { how: "paid" as const } : {}) };
+          s.pending = { kind: "castFree", player: you.id, objectId: copy.id, source: src, ...(mv ? { mv } : {}), ...(e.paid || e.pay?.kind === "mana" ? { how: "paid" as const } : {}), ...(e.pay ? { pay: e.pay } : {}) };
           return "paused";
         }
         s.pending = freeCast(pick);
@@ -1833,7 +1866,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return runEffect(s, e, ctx);
       }
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
-      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name + (e.handAndYard ? ` (${obj(s, id).zone})` : e.anyYard ? ` (${player(s, obj(s, id).owner).name}'s graveyard)` : "")), "Done"], prompt: e.anyYard ? `cast ${e.filter ? `${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from ${e.onePerOwner ? "each opponent's graveyard (one from each)" : e.yardOf && options[0] ? `${player(s, obj(s, options[0]).owner).name}'s graveyard` : "a graveyard"} without paying its mana cost${st.maxMv !== undefined ? ` (mana value ${st.maxMv} or less)` : ""}?` : e.handAndYard ? `cast a${e.filter?.supertypes?.includes("Legendary") ? " legendary" : ""} spell from your hand${e.andExile ? ", graveyard or exile" : " or graveyard"} without paying its mana cost${left}?` : e.yourYard ? `cast ${e.filter ? `a ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from your graveyard without paying its mana cost?` : `${e.lands ? "play a land or " : ""}cast a spell from ${e.fromHand ? (obj(s, options[0]!).owner === you.id ? "your hand" : `among the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand`) : "among "}${e.fromHand ? "" : `the ${e.reveal ? "revealed" : "exiled"} cards`}${e.paid ? "" : " without paying its mana cost"}${left}?` };
+      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name + (e.handAndYard ? ` (${obj(s, id).zone})` : e.anyYard ? ` (${player(s, obj(s, id).owner).name}'s graveyard)` : "")), "Done"], prompt: e.anyYard ? `cast ${e.filter ? `${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from ${e.onePerOwner ? "each opponent's graveyard (one from each)" : e.yardOf && options[0] ? `${player(s, obj(s, options[0]).owner).name}'s graveyard` : "a graveyard"} without paying its mana cost${st.maxMv !== undefined ? ` (mana value ${st.maxMv} or less)` : ""}?` : e.handAndYard ? `cast ${e.filter?.supertypes?.includes("Legendary") ? "a legendary" : e.pay && e.filter?.types?.length === 1 ? `${/^[AEIOU]/.test(e.filter.types[0]!) ? "an" : "a"} ${e.filter.types[0]!.toLowerCase()}` : "a"} spell from your hand${e.andExile ? ", graveyard or exile" : " or graveyard"} ${e.pay ? `${castPayText(e.pay)} rather than paying its mana cost` : "without paying its mana cost"}${left}?` : e.yourYard ? `cast ${e.filter ? `a ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from your graveyard without paying its mana cost?` : `${e.lands ? "play a land or " : ""}cast a spell from ${e.fromHand ? (obj(s, options[0]!).owner === you.id ? "your hand" : `among the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand`) : "among "}${e.fromHand ? "" : `the ${e.reveal ? "revealed" : "exiled"} cards`}${e.paid ? "" : e.pay ? ` ${castPayText(e.pay)} rather than paying its mana cost` : " without paying its mana cost"}${left}?` };
       return "paused";
     }
     case "exileCastEachType": {
@@ -1875,7 +1908,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       else delete o.counters.time;
       log(s, `${defOf(s, o).name} loses a time counter${left ? ` (${left} left)` : ""}.`);
       countersRemoved(s, o, "time", 1);
-      fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n: 1 });
+      fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n: 1, by: ctx.controller });
       if (!left) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "time" });
       return;
     }
@@ -2067,9 +2100,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       for (const o of cards) {
         const escape = escapeOf(o);
         if (escape && !escape.mana) continue;
-        (s.flashbackGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, ...(escape ? { escape } : {}), ...(e.cast ? { cast: true as const } : {}) });
+        (s.flashbackGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, ...(escape ? { escape } : {}), ...(e.cast ? { cast: true as const } : {}), ...(e.mana && !escape && !e.cast ? { mana: e.mana } : {}) });
       }
-      if (cards.length) log(s, `${cards.length > 2 ? `${cards.length} cards` : cards.map((o) => defOf(s, o).name).join(" and ")} ${cards.length === 1 ? "gains" : "gain"} ${e.escape ? `escape (${cards.length === 1 ? escapeOf(cards[0]!)!.mana : (e.escape.mana ?? "its mana cost")}, exile ${e.escape.exile} other cards from your graveyard)` : e.cast ? `"You may cast this card from your graveyard"` : "flashback"} until end of turn.`);
+      if (cards.length) log(s, `${cards.length > 2 ? `${cards.length} cards` : cards.map((o) => defOf(s, o).name).join(" and ")} ${cards.length === 1 ? "gains" : "gain"} ${e.escape ? `escape (${cards.length === 1 ? escapeOf(cards[0]!)!.mana : (e.escape.mana ?? "its mana cost")}, exile ${e.escape.exile} other cards from your graveyard)` : e.cast ? `"You may cast this card from your graveyard"` : e.mana ? `flashback ${e.mana}` : "flashback"} until end of turn.`);
       return;
     }
     case "cipher":
@@ -3127,8 +3160,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const types = here ? creatureTypesOf(s, subj!) : lk && (lk.zc === ctx.subject!.zc || lk.zc === ctx.subject!.zc - 1) && lk.creatureTypes ? (lk.creatureTypes === "all" ? ("all" as const) : new Set(lk.creatureTypes)) : undefined;
         kin = (h) => !!types && objIsType(s, h, "Creature") && shareCreatureType(types, creatureTypesOf(s, h));
       }
+      // One Last Job: an Aura only onto a creature you control (CR 303.4f), chosen as it resolves (rulings).
+      if (e.attachToYours) kin = (h) => objIsType(s, h, "Creature") && controllerOf(s, h) === ctx.controller;
       const hosts = e.attachRandom ? randomAuraHosts(s, entering, under, src) : e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted || e.attachToCreated || e.attachToSource ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src, undefined, undefined, undefined, kin);
       if (hosts === "paused") return "paused";
+      // One Last Job: an Equipment onto a creature you control it could be attached to, chosen as it resolves (not
+      // targeted); with none it enters unattached (rulings, CR 301.5c).
+      const equipHosts = e.attachToYours ? chooseEquipHosts(s, entering, ctx.controller, src) : undefined;
+      if (equipHosts === "paused") return "paused";
       // "Put a +1/+1 counter on it": the permanents these cards became (CR 400.7), like tokens just created.
       if (s.resolving) s.resolving.created = [];
       enterTogether(s, () => {
@@ -3189,6 +3228,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             }
             log(s, `${src} returns ${d.name} to the battlefield${ok ? ` attached to ${defOf(s, returned!).name}` : ", unattached"}.`);
             moveObject(s, o.id, "battlefield", { controller: ctx.controller, ...(ok ? { attachTo: returned!.id } : {}) });
+            if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
+            continue;
+          }
+          if (equipHosts?.has(o.id)) {
+            const host = equipHosts.get(o.id)!;
+            log(s, `${src} returns ${d.name} to the battlefield${host ? ` attached to ${defOf(s, obj(s, host)).name}` : ", unattached"}.`);
+            moveObject(s, o.id, "battlefield", { controller: under(o), ...(host ? { attachTo: host } : {}) });
             if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
             continue;
           }

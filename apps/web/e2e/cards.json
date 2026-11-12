@@ -11328,6 +11328,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "bb0eb9c2-c26d-452d-9e02-fc0bec2655c4",
+  "name": "Extract Brain",
+  "manaCost": "{X}{U}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target opponent chooses X cards from their hand. Look at those cards. You may cast a spell from among them without paying its mana cost.",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "otc",
+  "releasedAt": "2024-04-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e597d8a1-3bbc-4001-b642-f4421447970f",
   "name": "Extract from Darkness",
   "manaCost": "{3}{U}{B}",

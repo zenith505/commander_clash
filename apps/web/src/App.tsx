@@ -4371,6 +4371,8 @@ function LibrarySearch({
                 ? `${pending.source}: ${pending.min ? "reveal" : "you may reveal"} ${pending.what} from your hand${pending.revealFor !== undefined ? `; ${pending.revealFor === HUMAN ? "you choose" : `${s.players[pending.revealFor]!.name} chooses`} one of them for you to discard` : ""}`
                 : pending.bottom
                 ? `${pending.source}: put ${pending.what} from your hand on the bottom of your library`
+                : pending.fromHand && pending.handFor !== undefined
+                ? `${pending.source}: choose ${pending.what}`
                 : pending.fromHand && pending.shuffle
                 ? `${pending.source}: shuffle ${pending.what} from your hand into your library`
                 : pending.fromHand && pending.exile

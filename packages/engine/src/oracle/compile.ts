@@ -36,6 +36,7 @@ import { roundB182Finish, roundB182Line } from "./laneb182";
 import { roundB183Line } from "./laneb183";
 import { roundB184Line } from "./laneb184";
 import { round344Line } from "./round344";
+import { round345Chapter, round345Line } from "./round345";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -1016,7 +1017,9 @@ export function compile(d: CardDef): CompiledCard {
         // "I, II, III — Pain — You draw a card ...": a chapter's name is a flavor word, with no rules meaning (CR 207.2d).
         // The Princess Takes Flight: "III — Return the exiled card to the battlefield under its owner's control": the card
         // its chapter I exiled (CR 607.2a; linkExile).
-        const body = /^Return the exiled card to the battlefield under its owner's control\.$/.test(chapter[2]!)
+        // The Aesir Escape Valhalla's linked chapters (round 345).
+        const r345 = round345Chapter(chapter[2]!, (x) => parseBody(x, {}));
+        const body = r345 === "fail" ? null : r345 ? r345 : /^Return the exiled card to the battlefield under its owner's control\.$/.test(chapter[2]!)
           ? { targets: [], effects: [{ type: "returnLinked" as const, dest: "battlefield" as const, here: true as const }], text: chapter[2]! }
           : parseBody(chapter[2]!.replace(/^(?!Choose\b)[A-Z][^—•:"]{0,30}? — (?=\S)/, ""), {});
         if (!body) out.unsupported.push(raw);
@@ -5921,6 +5924,8 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Bronzehide Lion, Old-Growth Troll: "When ~ dies, return it to the battlefield. It's an Aura enchantment with ..." (round 344).
     if (round344Line(line, raw, out, isSpell, d, compileCard)) continue;
+    // Enduring Angel: "If your life total would be reduced to 0 or less, instead transform ~ ..." (round 345).
+    if (round345Line(line, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -7671,14 +7676,19 @@ function linkExile(out: CompiledCard) {
     // Prototype Portal: "Imprint — When ~ enters, you may exile an artifact card from your hand": its only exile.
     const imprints = all.filter((e): e is Extract<Effect, { type: "takeFromHand" }> => e.type === "takeFromHand" && e.action === "exile");
     const imprintOnly = !exiles.length && imprints.length === 1 && !imprints[0]!.until && out.triggers.some((t) => t.event === "selfEnters" && allEffects(t.body.effects).includes(imprints[0]!)) && !all.some((e) => e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || (e.type === "discard" && !!e.exile));
+    // The Aesir Escape Valhalla: its chapter I's exile from the graveyard, already linked (round345Chapter), its only exile.
+    const yardLinked = !exiles.length && !others && !out.spell && aesirLinked(out);
     if (imprintOnly && !out.spell) imprints[0]!.linked = true;
-    else if (others || out.spell || exiles.length !== 1) out.unsupported.push("(copies a card exiled with it that it can't link to one exile ability)");
+    else if (yardLinked) {
+      // Linked as its chapters were read.
+    } else if (others || out.spell || exiles.length !== 1) out.unsupported.push("(copies a card exiled with it that it can't link to one exile ability)");
     else exiles[0]!.linked = true;
   }
   const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked" || e.type === "linkedExileToken" || (e.type === "dig" && e.eachOf?.ref === "linkedExileOwners")));
   if (!returns.length) return;
   // The Princess Takes Flight: a later chapter returns what an earlier one exiled, its only exile.
   if (returns.some((t) => t.event === "chapter")) {
+    if (returns.length === 1 && aesirLinked(out)) return;
     const chExiles = out.triggers.flatMap((t) => allEffects(t.body.effects).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && t.event === "chapter" && !e.until));
     const allExiles = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileTop" || e.type === "search");
     const ret = returns[0]!;
@@ -8350,4 +8360,19 @@ function round315Cost(line: string, lines: string[], d: CardDef, out: CompiledCa
     return true;
   }
   return null;
+}
+
+/**
+ * The Aesir Escape Valhalla (round 345): a Saga whose only exile is one chapter's linked exile from your graveyard
+ * (round345Chapter), with every chapter that returns or counts "the exiled card" after it.
+ */
+function aesirLinked(out: CompiledCard): boolean {
+  const exiling = (e: Effect) => ["exile", "exileTop", "exileFaceDown", "takeFromHand", "hideaway", "impulse", "exileHand", "exileGraveyard", "search", "castFromAmong"].includes(e.type) || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile);
+  const all = [...out.triggers.map((tr) => tr.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects));
+  const exiles = all.filter(exiling);
+  const linked = out.triggers.filter((tr) => tr.event === "chapter" && allEffects(tr.body.effects).some((e) => e.type === "chooseFromGraveyard" && e.dest === "exile" && e.linked));
+  if (exiles.length !== 1 || linked.length !== 1 || out.spell || out.activated.length) return false;
+  const first = linked[0]!.chapter!;
+  const refers = out.triggers.filter((tr) => JSON.stringify(tr.body).includes('"linkedCard"') || allEffects(tr.body.effects).some((e) => e.type === "returnLinked"));
+  return refers.length > 0 && refers.every((tr) => tr.event === "chapter" && tr.chapter! > first);
 }

@@ -5,6 +5,7 @@ import type { Ctx } from "./body";
 import { parsePunisherOptions } from "./sentences/basics";
 import { parseCopyExcept } from "./tokens";
 import { parseTrigger } from "./triggers";
+import { roundB186Sentence } from "./laneb186";
 import { num } from "./words";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
@@ -108,5 +109,5 @@ export function roundB185Sentence(s: string, sentences: string[], si: number, ct
     if (!Number.isInteger(n) || n < 1) return "fail";
     return { effect: { type: "opponentsChooseFromTop", n, filter: { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "nonland card" } }, next: si + 3 };
   }
-  return null;
+  return roundB186Sentence(s, sentences, si, ctx, effects);
 }

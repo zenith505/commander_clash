@@ -1,6 +1,6 @@
 # Roadmap
 
-31,096 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,103 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,976 of 4,988 (99%), top 10,000: 9,832 of
 9,979 (98%).
 
@@ -290,7 +290,7 @@ line blocks.
    Lizrog, Dimir Machinations (done in round B108) (exiling some of target player's top cards), Read the Runes (done in round 320), Liege of the Tangle, Sunder
    the Gateway (transform an Incubator you control), Myriad Construct (done in round 320), Zaffai, Thunder Conductor (an opponent chosen at
    random), All-Seeing Arbiter (done in round 320), Life's Finale (an opponent's library into their graveyard), Aerith Rescue Mission (done in round 320) (a
-   stun counter on one of them), Stunning Reversal (done in round 329), Manabond (done in round 277), Glowcap Lantern (granting "look at
+   stun counter on one of them), Stunning Reversal (done in round 329), Manabond (done in round 277), Glowcap Lantern (done in round B186) (granting "look at
    the top card of your library any time"), Jinxed Choker (done in round 320), Eligeth (scry replaced by draw), The Astonishing Ant-Man (done in round 315) ("remove any number of
    counters" as a cost), Power Surge (done in round 320) (untapped lands at the start of the turn), Jace, Cunning Castaway (done in round 320), Curse of
    Vengeance, Shaile ("entered under your control this turn"). Round 180
@@ -326,7 +326,7 @@ line blocks.
    Scheming Fence, Oath of Lieges (done in round B143), Helm of Obedience, Concerted Effort, Belbe's Portal (done in round 324), Edgewall Innkeeper, Simic
    Manipulator, Endless Whispers, Burn from Within (done in round 325), Skyfire Phoenix (done in round 276), Contagion (done in round 325), Gutter Grime, Coffin Queen, Genesis
    Storm, Grim Return (done in round 326), Infernal Offering, Varolz, Undercellar Sweep, Wave of Vitriol, Martyrdom, Soul-Scar Mage,
-   Remembrance, Spy Network, Dimir Doppelganger, Jailbreak, Inverter of Truth (done in round 329), Immovable Rod, Hypergenesis, Soul
+   Remembrance, Spy Network (done in round B186), Dimir Doppelganger, Jailbreak, Inverter of Truth (done in round 329), Immovable Rod (done in round B186), Hypergenesis, Soul
    Transfer and the rest of the 222 still unsupported in that range; past it: Phytohydra (damage replaced by +1/+1
    counters even when it can't be prevented, which needs its controller's order against prevention shields), Intimidation
    Bolt ("other creatures can't attack": other than the target), Fade Away, Viashino Heretic, Dazzling Reflection (done in round B108),
@@ -2824,7 +2824,7 @@ line blocks.
    put it on the bottom of its owner's library instead of into that player's graveyard." (Spell Crumple: Crumple itself
    goes to the bottom even when the spell can't be countered, rulings). +10, 30,840 of 31,936 with round 324 and B165.
    Bots: Clay Golem's roll counts as its average (4 or 5) when they weigh activating it.
-   Out after round 325 (looked at, not done): Kusari-Gama (as after round 312); Spectral Searchlight and Glowcap Lantern
+   Out after round 325 (looked at, not done): Kusari-Gama (as after round 312); Spectral Searchlight and Glowcap Lantern (done in round B186)
    (still out, for the reasons in their earlier lists); Eiganjo Uprising ("X minus one" tokens for each opponent next to
    "They gain menace and haste" for the X just made); Energy Field (damage from sources you don't control prevented, and
    a card put into your graveyard from anywhere); Blossombind ("can't have counters put on it": every way counters are
@@ -3006,7 +3006,7 @@ line blocks.
    Mycosynth, Biotransference, Crucible of the Spirit Dragon, Jinnie Fay, Mirrormind Crown, Moonlit Meditation, Guff
    Rewrites History, Possibility Storm, Sokrates, Sunken Palace, Ulalek, Surge to Victory, Norman Osborn, Filigree Vector
    and the rest above rank 6,800 (still out, for the reasons in their earlier lists); Kusari-Gama, Urgent Necropsy,
-   Spectral Searchlight and Glowcap Lantern (still out). Bots turn Hostile Negotiations' less valuable pile face up and
+   Spectral Searchlight and Glowcap Lantern (done in round B186) (still out). Bots turn Hostile Negotiations' less valuable pile face up and
    guess at a face-down pile by its size. When Fisher's Talent and Divine Visitation would both replace a Fish token, the
    order isn't asked (either order ends in the same Angel).
    Round 317 took cards back off the "Out after round N" lists, most played first: "Starting with you, each player
@@ -3036,7 +3036,7 @@ line blocks.
    spells), Crucible of the Spirit Dragon (storage counters with spend-only mana), Jinnie Fay, Mirrormind Crown and
    Moonlit Meditation (token replacement choices), Guff Rewrites History, Possibility Storm, Sokrates, Sunken Palace,
    Ulalek, Surge to Victory, Norman Osborn, Filigree Vector and the rest above rank 6,800 (still out, for the reasons in
-   their earlier lists); Kusari-Gama, Urgent Necropsy, Spectral Searchlight and Glowcap Lantern (still out). Bots haven't been
+   their earlier lists); Kusari-Gama, Urgent Necropsy, Spectral Searchlight and Glowcap Lantern (done in round B186) (still out). Bots haven't been
    taught when The Legend of Yangchen's chapter II is worth it (they give it the usual answer to a "you may").
    Round 316 took cards back off the "Out after round N" lists, most played first: a named Equipment token whose granted
    ability names it, "create a colorless Equipment artifact token named Rock with "Equipped creature has '{1}, {T},
@@ -3061,7 +3061,7 @@ line blocks.
    the rest into your hand" (Boreas Charger: only those opponents are offered, none when there are none, rulings; a
    browser test). +8, 30,668 of 31,936 with B154.
    Out after round 316 (looked at, not done): Spectral Searchlight (a mana ability that adds mana to another player's
-   pool), Glowcap Lantern (a granted "look at the top card of your library any time"), Kusari-Gama and Urgent Necropsy
+   pool), Glowcap Lantern (done in round B186) (a granted "look at the top card of your library any time"), Kusari-Gama and Urgent Necropsy
    (still out, for the reasons in their earlier lists). Bots haven't been taught to activate Radiant Lotus.
    Round 315 took cards back off the "Out after round N" lists, most played first: additional costs of any size as a
    spell is cast, X the number paid (CR 601.2b, 601.2f, 601.2h, 107.3a): "As an additional cost to cast this spell, you
@@ -4409,7 +4409,7 @@ line blocks.
      toughness N/N", decayed tokens (Ghoulish Procession), "entered from a graveyard", and anything about the moved
      cards as a group ("those cards", "one of them", "the greatest mana value among them").
    - Venture still out on other lines: Wandering Troubadour ("if you had a land enter this turn"), Ranger's Hawk ("tap
-     another untapped creature you control" as a cost), Immovable Rod, Intrepid Outlander (pack tactics), Radiant
+     another untapped creature you control" as a cost), Immovable Rod (done in round B186), Intrepid Outlander (pack tactics), Radiant
      Solar, Fifty Feet of Rope, Dungeon Delver (granting Hama Pashar's ability to commanders), Keen-Eared Sentry (done in round B121),
      Dungeon Crawler, Ellywick's "differently named dungeon" count.
    - "If you've completed a dungeon" inside an effect still out: Caves of Chaos Adventurer (a free play of the exiled
@@ -4788,7 +4788,7 @@ line blocks.
    - "For as long as ~ remains tapped" (27 of 40 legal supported): dynamic target filters (Vedalken Shackles' "power less
      than or equal to the number of Islands", Old Man of the Sea (done in round B163), Entrancing Lyre's X, Seasinger (done in round B131)), "a creature of an
      opponent's choice" (Preacher (done in round B141)), "isn't of the chosen type" (Callous Oppressor), "other than ~" (Hisoka's Guard),
-     attacking/blocked filters (Ice Floe, Whip Vine), "loses all abilities" (Immovable Rod), "when ~ becomes untapped
+     attacking/blocked filters (Ice Floe, Whip Vine), "loses all abilities" (Immovable Rod (done in round B186)), "when ~ becomes untapped
      or ..." delayed triggers from an activated ability (Coffin Queen, Tawnos's Coffin, The Pandorica), Giant Oyster's counters, Hivis's Dragon filter, Hedge
      Whisperer and The Blackstaff of Waterdeep's animation (both done in round B127).
    - Entwine with a non-mana cost (Betrayal of Flesh, Solar Tide); the other unsupported entwine cards fail on a mode.
@@ -4835,7 +4835,7 @@ line blocks.
    Elsha's flash (done in round 331), Thundermane Dragon's haste, Mikey & Don's counter, Galea's attach, Falco Spara's and Into the Pit's (done in round 331)
    extra costs, historic and snow filters (Crystal Skull, The Fourth Doctor, Isu), "spells with flash or flying"
    (Errant and Giada), Vizier of the Menagerie's "spend mana of any type", Experimental Frenzy's (done in round 325) "can't play cards from
-   your hand", granted look-at-top (Glowcap Lantern), "until end of turn, you may look at the top card" (Gwenom, The
+   your hand", granted look-at-top (Glowcap Lantern (done in round B186)), "until end of turn, you may look at the top card" (Gwenom, The
    Belligerent). Left from the ripple/sneak round: Karai's "if a sneak cost was paid this turn", sneak conditions on
    Last Ronin's Technique and Turncoat Kunoichi, Melek and Mistbreath Elder, putting cards from a hand on the bottom
    in any order (Arjun, Mindmoil), granting cascade, and the owner's order when several target spells or permanents
@@ -8223,6 +8223,22 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   copy of each creature attacking you or a planeswalker you control, blocking it though never declared a blocker, a
   noncreature copy not blocking, token doublers' copies blocking too, all exiled at end of combat, rulings). +7, 31,096 of
   31,936 with B177 to B184 and rounds 336 to 344.
+- Round B186 (least played first, from the Lane B skip lists): Temporal Aperture ("Shuffle your library, then reveal the
+  top card. Until end of turn, for as long as that card remains on top of your library, ... you may play that card without
+  paying its mana cost": a land played with the turn's land play, a spell cast for nothing at its usual time, X at 0; the
+  top card revealed meanwhile; ended for good by a shuffle or another card put on top, rulings, CR 611.2b; a "Cast it: without
+  paying its mana cost" menu entry and a browser test; bots cast it). Lumbering Laundry ("Until end of turn, you may look at
+  face-down creatures you don't control any time", not face-down spells, rulings; a browser test). Revealing Wind ("You may
+  look at each face-down creature that's attacking or blocking") and Spy Network ("Look at target player's hand, the top
+  card of that player's library, and any face-down creatures they control"): seen by you only (CR 708.5). Glowcap Lantern
+  (a granted "You may look at the top card of your library any time", the equipped creature's controller's, rulings).
+  Immovable Rod ("For as long as ~ remains tapped, another target permanent loses all abilities and can't attack or block":
+  an Aura that loses its enchant ability goes to the graveyard, an Equipment stays attached, rulings, CR 702.5a, 704.5m).
+  Merieke Ri Berit ("When ~ leaves the battlefield or becomes untapped, destroy that creature. It can't be regenerated.": the
+  first of either, once; another player taking ~ only ends the control, rulings, CR 603.7c). +7, 31,103 of 31,936 with B177
+  to B185 and rounds 336 to 344.
+- Out after round B186 (looked at, not done): Coffin Queen ("When ~ becomes untapped or you lose control of ~": whether ~
+  leaving the battlefield after the ability resolved counts as losing control of it isn't settled by its rulings) stays out.
 - Out after round B185 (looked at, not done): Aeon Engine (reversing turn order changes every "in turn
   order", APNAP and "next player" reading), Kheru Mind-Eater and Shared Fate (playing cards exiled face down by another
   player), Drain Power (mana abilities activated for another player, then that mana moved), Dreamshaper Shaman and Shifting
@@ -8377,7 +8393,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   or {U}": one of three payments), Cheering Fanatic (done in round B158) ("spells with the chosen name cost {1} less to cast this turn").
 - Out after round B144 (looked at, not done): Merseine ("pay enchanted creature's mana cost" as a cost, activated only
   by that creature's controller), Yare (done in round B145) and Blaze of Glory (done in round B145) ("target creature defending player controls" on a spell, with
-  several defending players, CR 508.5a), North Star (mana spent as though any type for one spell), Lumbering Laundry
+  several defending players, CR 508.5a), North Star (mana spent as though any type for one spell), Lumbering Laundry (done in round B186)
   (looking at face-down creatures), Guard Dogs (a prevention shield tied to a permanent chosen as it resolves), Butcher
   Orgg (combat damage divided among the player and their creatures).
 - Out after round B143 (looked at, not done): Preferred Selection (the two cards looked at should be shown with the
@@ -8540,7 +8556,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   for a spell that targets it), Tetravus (done in round B171) (tokens created with it exiled to put counters back).
 - Out after round B99 (looked at, not done): Cultivator Drone (its mana may also pay a cost with {C} paid as something
   resolves, rulings; such costs don't say what they contain yet), C.A.M.P. (the color of the mana its land produced),
-  Mischievous Quanar (turning itself face down), Revealing Wind and Lumbering Laundry (looking at face-down creatures),
+  Mischievous Quanar (turning itself face down), Revealing Wind (done in round B186) and Lumbering Laundry (done in round B186) (looking at face-down creatures),
   Delif's Cone (a delayed "attacks and isn't blocked" with no combat damage), Winter's Chill (pay {1} or {2} per creature),
   Rhystic Cave (a mana ability with "unless any player pays {1}"), Booby Trap (revealed draws), Sasaya (flip by revealing
   seven lands).
@@ -8691,7 +8707,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Gather Specimens (creatures entering under an opponent's control this turn, against other replacement effects),
   Varchild's War-Riders (cumulative upkeep tokens each for a different opponent), Shaun & Rebecca, Agents (a reflexive
   trigger inside a mana ability), Timecrafting (a permanent with time counters or a suspended card as one target),
-  Stardew Valley ("another player of your choice may gain control of that permanent"), Merieke Ri Berit (destroy the
+  Stardew Valley ("another player of your choice may gain control of that permanent"), Merieke Ri Berit (done in round B186) (destroy the
   creature when ~ leaves the battlefield or becomes untapped), Fortune's Favor (an opponent splits the cards into two
   piles, face down), Templar Knight (tap five untapped attacking creatures named ~ as a cost), Muse Vessel (the card its discard exiled isn't
   linked yet; "choose a card exiled with ~, you may play it this turn"; done in round B152), Purgatory (pay {4} and 2 life at upkeep to

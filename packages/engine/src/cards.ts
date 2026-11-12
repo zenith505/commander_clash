@@ -650,7 +650,8 @@ const ENCHANT_CREATURE: TargetSpec = { kind: "object", types: ["Creature"], text
  */
 export function enchantOf(s: GameState, o: GameObject): TargetSpec | undefined {
   const c = characteristics(s, o);
-  return compileCard(defOf(s, o)).enchant ?? c.enchantSpec ?? (c.enchantCreature ? ENCHANT_CREATURE : undefined);
+  // One that lost all its abilities (Immovable Rod) has no enchant ability, so it can't legally enchant anything (rulings).
+  return (c.hasPrintedAbilities ? compileCard(defOf(s, o)).enchant : undefined) ?? c.enchantSpec ?? (c.enchantCreature ? ENCHANT_CREATURE : undefined);
 }
 /** A card's abilities plus granted ones (`grantedAbilities` texts), after them in that order. */
 export function withGranted(base: CompiledCard, granted: readonly string[]): CompiledCard {
@@ -688,6 +689,9 @@ export function withGranted(base: CompiledCard, granted: readonly string[]): Com
     if (!base.exileInsteadOfDying?.self && extra.some((x) => x.exileInsteadOfDying?.self)) hit.exileInsteadOfDying = base.exileInsteadOfDying ? { ...base.exileInsteadOfDying, alsoSelf: true } : { self: true };
     // Nerd Rage's granted "You have no maximum hand size": the creature's controller's (CR 109.5, 402.2; see hasNoMaxHandSize in game.ts).
     if (!base.noMaxHandSize && extra.some((x) => x.noMaxHandSize === true)) hit.noMaxHandSize = true;
+    // Glowcap Lantern's granted "You may look at the top card of your library any time": the creature's controller's
+    // (rulings: only while it's attached to a creature you control; see topVisible in game.ts).
+    if (extra.some((x) => x.lookTop)) hit.lookTop = true;
     // Jubilant Skybonder's granted "Spells your opponents cast that target this creature cost {2} more to cast": each
     // instance adds its own.
     const tax = (base.targetTax ?? 0) + extra.reduce((n, x) => n + (x.targetTax ?? 0), 0);

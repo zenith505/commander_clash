@@ -2809,6 +2809,19 @@ function targetForOther(s: GameState, pid: PlayerId, controller: PlayerId, body:
     };
     return [[...all].sort((a, b) => rank(b) - rank(a))[0] ?? { kind: "none" }];
   }
+  // Curse of Inertia: "may tap or untap target permanent of their choice": an untapped creature of an opponent's that could
+  // block, the most valuable, or else one of ours that's tapped (we then untap it); any other one is left alone.
+  if (allEffects(body.effects).some((e) => e.type === "tapOrUntap" && e.what.ref === "target" && e.what.index === slot)) {
+    const rank = (t: TargetChoice) => {
+      if (t.kind !== "object" || s.objects[t.id]?.zone !== "battlefield") return -Infinity;
+      const o = obj(s, t.id);
+      const creature = objIsType(s, o, "Creature");
+      if (!isMine(s, pid, t) && creature && !o.tapped) return 2000 + worth(s, pid, o);
+      if (isMine(s, pid, t) && o.tapped) return 1000 + worth(s, pid, o);
+      return 0;
+    };
+    return [[...all].sort((a, b) => rank(b) - rank(a))[0] ?? { kind: "none" }];
+  }
   const harm = harmsChosenTarget(body, slot);
   const score = (t: TargetChoice) => {
     if (t.kind !== "object") return t.kind === "player" ? (t.id === pid) !== harm ? 1 : -1 : 0;

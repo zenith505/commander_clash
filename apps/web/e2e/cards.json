@@ -7498,6 +7498,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0bbeb0ee-647b-43d3-91b3-6869d5ccb8b8",
+  "name": "Curse of Inertia",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Aura Curse",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura",
+   "Curse"
+  ],
+  "oracleText": "Enchant player\nWhenever a player attacks enchanted player with one or more creatures, that attacking player may tap or untap target permanent of their choice.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "c13",
+  "releasedAt": "2013-11-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b03c7c8d-8206-45cd-8ead-8f7b35c03a7a",
   "name": "Curse of Misfortunes",
   "manaCost": "{4}{B}",
@@ -18023,6 +18054,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "730897a9-3ead-4990-9492-1a2040d8ccac",
+  "name": "Kathril, Aspect Warper",
+  "manaCost": "{2}{W}{B}{G}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Nightmare Insect",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Nightmare",
+   "Insect"
+  ],
+  "oracleText": "When Kathril enters, put a flying counter on any creature you control if a creature card in your graveyard has flying. Repeat this process for first strike, double strike, deathtouch, hexproof, indestructible, lifelink, menace, reach, trample, and vigilance. Then put a +1/+1 counter on Kathril for each counter put on a creature this way.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c20",
+  "releasedAt": "2020-04-17",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "13a4f88b-6832-43a1-b4fa-c1ee60560bad",
   "name": "Kaya the Inexorable",
   "manaCost": "{3}{W}{B}",
@@ -26977,6 +27045,32 @@
   "commanderLegal": "legal",
   "set": "xln",
   "releasedAt": "2017-09-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b594f7f1-1db7-46e9-bbc7-42ccc16ce9a1",
+  "name": "Regna's Sanction",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "For each player, choose friend or foe. Each friend puts a +1/+1 counter on each creature they control. Each foe chooses one untapped creature they control, then taps the rest.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bbd",
+  "releasedAt": "2018-06-08",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

@@ -34,6 +34,7 @@ import { roundB178Line } from "./laneb178";
 import { roundB179Line } from "./laneb179";
 import { roundB182Finish, roundB182Line } from "./laneb182";
 import { roundB183Line } from "./laneb183";
+import { roundB184Line } from "./laneb184";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -2039,6 +2040,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB182Line(line, raw, out, isSpell)) continue;
     // Varolz, Young Deathclaws, Green Goblin (round B183).
     if (roundB183Line(line, raw, out, isSpell)) continue;
+    // Kathril, Curse of Inertia, Oppressive Rays, Gloom (round B184).
+    if (roundB184Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

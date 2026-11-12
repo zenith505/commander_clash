@@ -11,7 +11,7 @@ import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
-import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
@@ -5531,7 +5531,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const from = manaOriginsOf(s, o);
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   // Doubling Cube's cost is paid with the mana from the pool chosen for it (`combo`).
-  const payCost = ab.produces.kind === "doublePool" ? parseManaCost(combos![combo!]!.map((m) => `{${m}}`).join("")) : ab.manaCost ? manaAbilityCost(s, p.id, o, ab.manaCost) : null;
+  const payCost = ab.produces.kind === "doublePool" ? parseManaCost(combos![combo!]!.map((m) => `{${m}}`).join("")) : manaAbilityCostOf(s, p.id, o, ab);
   const manaPaid = payCost ? spendFromPool(s, p.id, payCost, { ability: o }) : null;
   if (payCost && !manaPaid) throw new RulesError("not enough mana");
   batchTaps(s, () => {
@@ -9627,7 +9627,7 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   const cost0 = parseManaCost(freeEquip(s, pid, ab) || freeCycling(s, pid, o, ab, x) ? "{0}" : ab.manaCost);
   // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
   // (CR 602.2b applies 601.2f).
-  const more = (ab.mana ? 0 : activationTax(s, o, pid, ab) + opponentsTargetTax(s, pid, targets)) + (ab.costMore ? Math.max(0, evalAmount(s, ab.costMore, { controller: pid, sourceId: o.id })) : 0);
+  const more = (ab.mana ? activationTax(s, o, pid, ab, true) : activationTax(s, o, pid, ab) + opponentsTargetTax(s, pid, targets)) + (ab.costMore ? Math.max(0, evalAmount(s, ab.costMore, { controller: pid, sourceId: o.id })) : 0);
   const cost1 = more ? { ...cost0, symbols: [...cost0.symbols, { kind: "generic" as const, amount: more }] } : cost0;
   // Power-up: "If this permanent entered this turn, this ability's cost is reduced by this permanent's mana cost" (CR
   // 702.193a-b, 118.7).
@@ -9749,19 +9749,28 @@ export function loyaltyChange(s: GameState, o: GameObject, pid: PlayerId, ab: Ac
   return base + more;
 }
 
-function activationTax(s: GameState, o: GameObject, pid: PlayerId, ab: ActivatedAbility): number {
+function activationTax(s: GameState, o: GameObject, pid: PlayerId, ab: Pick<ActivatedAbility, "loyalty" | "loyaltyX"> | null, mana = false): number {
   let n = 0;
   for (const id of s.battlefield) {
     const src = obj(s, id);
     for (const tax of abilitiesOf(s, src).activationTaxes ?? []) {
+      // A mana ability (CR 605.1a) only by a tax that doesn't leave them out (Oppressive Rays, Gloom).
+      if (mana && !tax.manaToo) continue;
       const owner = controllerOf(s, src);
       if ((tax.opponents && (owner === pid || !opponents(s, owner).includes(pid))) || (tax.yourTurn && s.activePlayer !== owner)) continue;
-      if (tax.loyalty && ((ab.loyalty === undefined && !ab.loyaltyX) || !objIsType(s, o, "Planeswalker"))) continue;
-      if (tax.filter?.chosen === "name" ? src.chosen?.name === undefined || !hasName(currentName(s, o), src.chosen.name) : !!tax.filter) continue;
+      if (tax.loyalty && ((ab?.loyalty === undefined && !ab?.loyaltyX) || !objIsType(s, o, "Planeswalker"))) continue;
+      // Oppressive Rays: "activated abilities of enchanted creature": the permanent it's attached to.
+      if (tax.host && (src.attachedTo !== o.id || o.zone !== "battlefield")) continue;
+      if (tax.filter?.chosen === "name" ? src.chosen?.name === undefined || !hasName(currentName(s, o), src.chosen.name) : !!tax.filter && (o.zone !== "battlefield" || !objectMatches(s, tax.filter, o, owner, false))) continue;
       n += tax.n;
     }
   }
   return n;
+}
+
+/** What "activated abilities ... cost {3} more to activate" adds to a mana ability of `o` that `pid` activates (Oppressive Rays, Gloom; CR 602.2b, 605.1a). */
+export function manaActivationTax(s: GameState, o: GameObject, pid: PlayerId): number {
+  return activationTax(s, o, pid, null, true);
 }
 
 /**

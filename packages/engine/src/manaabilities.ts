@@ -4,7 +4,7 @@
 import { allEffects, type ActivatedAbility, type ManaAbility, type ManaProduce, type ManaTrigger } from "./abilities";
 import { abilitiesOf, basicLandManaAbility, canSacrificeForCost, exiledLentTo, defOf, lendersOf, objIsType } from "./cards";
 import { objectMatches, printedMatches } from "./effects";
-import { abilityProblem, activationLessCost, canActAtSorcerySpeed, firstArtifactLess, linkedExileCards, obj, payableLife, player, sylexed, tapAbilitySick, tapCostCandidates } from "./game";
+import { abilityProblem, activationLessCost, canActAtSorcerySpeed, firstArtifactLess, linkedExileCards, manaActivationTax, obj, payableLife, player, sylexed, tapAbilitySick, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost, type ParsedCost } from "./mana";
 import { evalAmount } from "./amounts";
@@ -219,7 +219,7 @@ export function manaCombos(s: GameState, o: GameObject, ab: ManaAbility): ManaTy
 export function doublePoolPayments(s: GameState, o: GameObject, ab: ManaAbility): ManaType[][] {
   const pid = controllerOf(s, o);
   const pool = player(s, pid).manaPool;
-  const cost = activationLessCost(s, o, parseManaCost(ab.manaCost));
+  const cost = activationLessCost(s, o, withManaTax(s, o, pid, parseManaCost(ab.manaCost)));
   if (cost.symbols.some((x) => x.kind !== "generic")) return [];
   const n = cost.symbols.reduce((a, x) => a + (x.kind === "generic" ? x.amount : 0), 0);
   const types: ManaType[] = [...COLORS, "C"];
@@ -552,7 +552,8 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.removeCounters && removableCounters(s, o, ab.removeCounters.counter) < ab.removeCounters.n) return `${name} doesn't have enough ${ab.removeCounters.counter} counters`;
   if (ab.produces.kind === "removeX" && (o.counters[ab.produces.counter] ?? 0) < ab.produces.min) return `${name} has no ${ab.produces.counter} counters`;
-  if (!ignorePool && ab.manaCost && !canPayFromPool(s, pid, manaAbilityCost(s, pid, o, ab.manaCost), { ability: o })) return "not enough mana";
+  const payCost = manaAbilityCostOf(s, pid, o, ab);
+  if (!ignorePool && payCost && !canPayFromPool(s, pid, payCost, { ability: o })) return "not enough mana";
   // "Tap an untapped creature you control" (CR 602.2b): without a choice, whether there's enough to tap.
   if (ab.tapCost) {
     const can = tapCostCandidates(s, pid, o, ab.tapCost);
@@ -565,7 +566,19 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
 /** A mana ability's mana cost as `pid` activates it, after reductions (CR 602.2b applies 601.2f; Tezzeret, Betrayer of Flesh). */
 export function manaAbilityCost(s: GameState, pid: PlayerId, o: GameObject, manaCost: string): ParsedCost {
   const first = firstArtifactLess(s, pid, o, true);
-  return activationLessCost(s, o, parseManaCost(manaCost), 0, first ? { n: first, atLeastOne: false } : undefined);
+  // Oppressive Rays, Gloom: increases first, then reductions (CR 602.2b applies 601.2f).
+  return activationLessCost(s, o, withManaTax(s, o, pid, parseManaCost(manaCost)), 0, first ? { n: first, atLeastOne: false } : undefined);
+}
+
+/** `cost` with what taxes on mana abilities add to it (Oppressive Rays, Gloom). */
+export function withManaTax(s: GameState, o: GameObject, pid: PlayerId, cost: ParsedCost): ParsedCost {
+  const tax = manaActivationTax(s, o, pid);
+  return tax ? { ...cost, symbols: [...cost.symbols, { kind: "generic" as const, amount: tax }] } : cost;
+}
+
+/** A mana ability's mana cost as `pid` activates it, or null when it costs no mana (none printed, no tax on it). */
+export function manaAbilityCostOf(s: GameState, pid: PlayerId, o: GameObject, ab: { manaCost: string }): ParsedCost | null {
+  return ab.manaCost || manaActivationTax(s, o, pid) ? manaAbilityCost(s, pid, o, ab.manaCost) : null;
 }
 
 /** How much a player gives up by using it, beyond the tap: lower is better. */
@@ -667,7 +680,7 @@ export function payableActivatedMana(s: GameState, pid: PlayerId, o: GameObject)
     const m = activatedAsMana(ab);
     if (!m || parseManaCost(ab.manaCost).hasX) return [];
     const problem = abilityProblem(s, pid, o.id, index);
-    if (problem && !(/not enough mana/.test(problem) && ab.manaCost)) return [];
+    if (problem && !(/not enough mana/.test(problem) && (ab.manaCost || manaActivationTax(s, o, pid)))) return [];
     const riders = allEffects(ab.body.effects).some((e) => !["addMana", "choose", "gainLife", "delayed", "counters", "if"].includes(e.type)) ? 2 : 0;
     return [{ index, ab, options: activatedManaOptions(s, o, index) ?? [], penalty: manaPenalty(m) + riders }];
   });

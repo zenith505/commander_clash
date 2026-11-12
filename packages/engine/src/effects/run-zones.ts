@@ -694,7 +694,7 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
       }
       // Stick Together: which slot of the party this is.
       const party = k.notKept ? { prompt: `choose your party: click up to one ${k.filter.text} of yours${kr.slot < e.keep.length - 1 ? ` (then ${e.keep.slice(kr.slot + 1).map((x) => `a ${x.filter.text}`).join(", ")})` : ""}. Creatures not in your party are sacrificed.` } : {};
-      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...party, ...(k.upTo ? { min: 0 } : {}), ...(e.destroy ? { destroy: true as const } : {}), ...(e.bounce ? { bounce: true as const } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}), ...(e.payLife !== undefined ? { payLife: lifeEach } : {}), ...(e.sparesTypeOfKept ? { sparesKin: true as const } : {}) };
+      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...party, ...(k.upTo ? { min: 0 } : {}), ...(e.destroy ? { destroy: true as const } : {}), ...(e.bounce ? { bounce: true as const } : {}), ...(e.tap ? { tap: true as const } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}), ...(e.payLife !== undefined ? { payLife: lifeEach } : {}), ...(e.sparesTypeOfKept ? { sparesKin: true as const } : {}) };
       return "paused";
     }
     kr.queue.shift();
@@ -737,6 +737,13 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
   if (e.bounce) {
     if (gone.length) log(s, `${src} returns ${gone.map((id) => nameOf(s, id)).join(", ")} to ${gone.length === 1 ? "its owner's hand" : "their owners' hands"}.`);
     for (const id of gone) if (s.objects[id]?.zone === "battlefield") moveObject(s, id, "hand");
+    return;
+  }
+  // Regna's Sanction: the rest are tapped at the same time, each by the player who chose (rulings).
+  if (e.tap) {
+    const tap = gone.filter((id) => s.objects[id]?.zone === "battlefield" && !obj(s, id).tapped);
+    if (tap.length) log(s, `${src} taps ${tap.map((id) => nameOf(s, id)).join(", ")}.`);
+    for (const id of tap) tapPermanent(s, obj(s, id), undefined, controllerOf(s, obj(s, id)));
     return;
   }
   if (gone.length) log(s, `${src}: ${gone.map((id) => nameOf(s, id)).join(", ")} ${gone.length === 1 ? "is" : "are"} sacrificed.`);

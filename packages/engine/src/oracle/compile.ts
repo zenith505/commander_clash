@@ -32,6 +32,9 @@ import { roundB176Line } from "./laneb176";
 import { roundB177Line } from "./laneb177";
 import { roundB178Line } from "./laneb178";
 import { roundB179Line } from "./laneb179";
+import { roundB182Finish, roundB182Line } from "./laneb182";
+import { roundB183Line } from "./laneb183";
+import { roundB184Line } from "./laneb184";
 import { round344Line } from "./round344";
 
 const cache = new Map<string, CompiledCard>();
@@ -720,6 +723,9 @@ export function compile(d: CardDef): CompiledCard {
       // enters (CR 614.12), each its own.
       .replace(/^As ~ enters, choose an opponent and (a card name other than a basic land card name)\.$/m, "As ~ enters, choose an opponent.\nAs ~ enters, choose $1.")
       .replace(/^As ~ enters, choose an opponent\. (~ enters with an? [-+\/\d]+ counter on it for each creature) that player controls\.$/m, "As ~ enters, choose an opponent.\n$1 the chosen player controls.")
+      // Shackles of Treachery's granted "Whenever ~ deals damage, destroy target Equipment attached to it.": "it" is the
+      // creature, the trigger's source (rulings: any damage, any Equipment's controller).
+      .replace(/^Whenever ~ deals damage, destroy target Equipment attached to it\.$/m, "Whenever ~ deals damage, destroy target Equipment attached to ~.")
       // Sludge Strider: "Whenever another artifact you control enters or leaves the battlefield, ...": two trigger events
       // (CR 603.1), an ability for each.
       .replace(/^Whenever another artifact you control enters or leaves the battlefield, ([^\n]+)$/m, "Whenever another artifact you control enters, $1\nWhenever another artifact you control leaves the battlefield, $1")
@@ -2031,6 +2037,12 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB178Line(line, raw, out, isSpell)) continue;
     // Drain Life, Consume Spirit (round B179).
     if (roundB179Line(line, raw, out, isSpell, d)) continue;
+    // Murktide Regent, Soulflayer, Lochmere Serpent, Skyclave Shade, Nightshade Assassin, Shadow Urchin, Curse of Chaos (round B182).
+    if (roundB182Line(line, raw, out, isSpell)) continue;
+    // Varolz, Young Deathclaws, Green Goblin (round B183).
+    if (roundB183Line(line, raw, out, isSpell)) continue;
+    // Kathril, Curse of Inertia, Oppressive Rays, Gloom (round B184).
+    if (roundB184Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -4058,11 +4070,12 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Winter Orb, Winter Moon, Smoke, Static Orb, Mungha Wurm: a limit on what untaps in the untap step (CR 502.3).
-    const untapLimit = /^(As long as ~ is untapped, )?([Pp]layers|[Yy]ou) can't untap more than (one|two) (.+?) during (?:their|your) untap steps?\.$/.exec(line);
+    // Dovin Baan's emblem: "Your opponents can't untap more than two permanents during their untap steps" (`opponents`).
+    const untapLimit = /^(As long as ~ is untapped, )?([Pp]layers|[Yy]ou|Your opponents) can't untap more than (one|two) (.+?) during (?:their|your) untap steps?\.$/.exec(line);
     if (untapLimit) {
       const filter = parseTargetPhrase(untapLimit[4]!.split(" ").map((w, i, a) => (i === a.length - 1 ? singularWord(w) : w)).join(" "));
       if (filter?.kind !== "object" || filter.controller || filter.bound) out.unsupported.push(raw);
-      else (out.untapLimits ??= []).push({ n: num(untapLimit[3]!), filter: { ...filter, text: untapLimit[4]! }, ...(/^you$/i.test(untapLimit[2]!) ? { you: true as const } : {}), ...(untapLimit[1] ? { whileUntapped: true as const } : {}) });
+      else (out.untapLimits ??= []).push({ n: num(untapLimit[3]!), filter: { ...filter, text: untapLimit[4]! }, ...(/^you$/i.test(untapLimit[2]!) ? { you: true as const } : {}), ...(untapLimit[2] === "Your opponents" ? { opponents: true as const } : {}), ...(untapLimit[1] ? { whileUntapped: true as const } : {}) });
       continue;
     }
     // "Artifact cards and red creature cards in your hand have warp {2}{R}" (Tannuk, Steadfast Second): an alternative cost
@@ -7633,6 +7646,8 @@ function linkExile(out: CompiledCard) {
     const exiles = all.filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong"].includes(e.type) || (e.type === "search" && e.dest.zone === "exile") || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile));
     if (out.spell || faceDown.length !== 1 || exiles.length !== 1) out.unsupported.push("(turns face up an exiled card it can't link to one imprint ability)");
   }
+  // Murktide Regent, Soulflayer: their delve's cards and no other exile (round B182).
+  roundB182Finish(out, bodies.flatMap((b) => allEffects(b.effects)));
   // Ethereal Forager: with delve and no exile instruction of its own, "cards exiled with ~" are those its delve exiled as
   // it was cast (rulings; linked to the permanent it becomes, CR 607.2q).
   if (out.delve && !out.spell && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "moveLinked"))) {

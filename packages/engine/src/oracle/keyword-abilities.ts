@@ -232,6 +232,14 @@ export function parseCostKeyword(
   // its back face up on the stack (rulings), on a transforming double-faced card's front face.
   if ((m = /^More Than Meets the Eye ((?:\{[^}]+\})+)$/.exec(line)))
     return d.layout === "transform" && (d.faceOf?.face ?? 0) === 0 && plainMana(m[1]!) ? { alt: { kind: "convert", mana: m[1]! } } : "fail";
+  // Qasali Ambusher: "If a creature is attacking you and you control a Forest and a Plains, you may cast ~ without paying its
+  // mana cost and as though it had flash.": a creature attacking you, not a planeswalker of yours, and lands with both
+  // subtypes, one land or two (rulings), checked as it's cast (CR 601.2b); the flash only for this cost (CR 601.3).
+  if ((m = /^If (a creature is attacking you) and you control (an? [A-Z][a-z]+) and (an? [A-Z][a-z]+), you may cast ~ without paying its mana cost and as though it had flash\.$/.exec(line))) {
+    const conds = [altCondition(m[1]!), altCondition(`you control ${m[2]}`), altCondition(`you control ${m[3]}`)];
+    if (conds.some((c) => !c)) return "fail";
+    return { alt: { kind: "alternative", mana: "", if: { kind: "allOf", conds: conds as StaticCondition[] }, text: "without paying its mana cost", flash: true } };
+  }
   if ((m = /^If (.+), you may cast ~ without paying its mana cost\.?$/.exec(line) ?? /^If (~ is the first spell you've cast this game), you may cast it without paying its mana cost\.$/.exec(line))) {
     // Once Upon a Time: "If ~ is the first spell you've cast this game": none cast before it (rulings: its first chance is
     // the first player's upkeep), only as an alternative cost's condition, checked as it's cast.

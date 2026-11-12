@@ -7530,6 +7530,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0bbeb0ee-647b-43d3-91b3-6869d5ccb8b8",
+  "name": "Curse of Inertia",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Aura Curse",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura",
+   "Curse"
+  ],
+  "oracleText": "Enchant player\nWhenever a player attacks enchanted player with one or more creatures, that attacking player may tap or untap target permanent of their choice.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "c13",
+  "releasedAt": "2013-11-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b03c7c8d-8206-45cd-8ead-8f7b35c03a7a",
   "name": "Curse of Misfortunes",
   "manaCost": "{4}{B}",
@@ -18085,6 +18116,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "730897a9-3ead-4990-9492-1a2040d8ccac",
+  "name": "Kathril, Aspect Warper",
+  "manaCost": "{2}{W}{B}{G}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Nightmare Insect",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Nightmare",
+   "Insect"
+  ],
+  "oracleText": "When Kathril enters, put a flying counter on any creature you control if a creature card in your graveyard has flying. Repeat this process for first strike, double strike, deathtouch, hexproof, indestructible, lifelink, menace, reach, trample, and vigilance. Then put a +1/+1 counter on Kathril for each counter put on a creature this way.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c20",
+  "releasedAt": "2020-04-17",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "13a4f88b-6832-43a1-b4fa-c1ee60560bad",
   "name": "Kaya the Inexorable",
   "manaCost": "{3}{W}{B}",
@@ -26298,6 +26366,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cbd106fb-c9c5-4c5e-8801-619b7c8ff5a6",
+  "name": "Qasali Ambusher",
+  "manaCost": "{1}{G}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Cat Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Cat",
+   "Warrior"
+  ],
+  "oracleText": "Reach\nIf a creature is attacking you and you control a Forest and a Plains, you may cast this creature without paying its mana cost and as though it had flash.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [
+   "Reach"
+  ],
+  "commanderLegal": "legal",
+  "set": "ala",
+  "releasedAt": "2008-10-03",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a55bdb73-e17a-414d-b27f-dc53af2f345c",
   "name": "Quarry Hauler",
   "manaCost": "{3}{G}",
@@ -27004,6 +27107,32 @@
   "commanderLegal": "legal",
   "set": "xln",
   "releasedAt": "2017-09-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b594f7f1-1db7-46e9-bbc7-42ccc16ce9a1",
+  "name": "Regna's Sanction",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "For each player, choose friend or foe. Each friend puts a +1/+1 counter on each creature they control. Each foe chooses one untapped creature they control, then taps the rest.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bbd",
+  "releasedAt": "2018-06-08",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -31014,6 +31143,43 @@
   "releasedAt": "2018-04-27",
   "rarity": "uncommon",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "13f0863f-ae54-4bea-8f01-7f3891797577",
+  "name": "Songcrafter Mage",
+  "manaCost": "{G}{U}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Bard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Bard"
+  ],
+  "oracleText": "Flash\nWhen this creature enters, target instant or sorcery card in your graveyard gains harmonize until end of turn. Its harmonize cost is equal to its mana cost. (You may cast that card from your graveyard for its harmonize cost. You may tap a creature you control to reduce that cost by {X}, where X is its power. Then exile the spell.)",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "tdm",
+  "releasedAt": "2025-04-11",
+  "rarity": "rare",
+  "layout": "normal",
   "gameChanger": false
  },
  {
@@ -36745,6 +36911,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b6b83b88-0660-4227-895e-78ac43d01b66",
+  "name": "Varolz, the Scar-Striped",
+  "manaCost": "{1}{B}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Troll Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Troll",
+   "Warrior"
+  ],
+  "oracleText": "Each creature card in your graveyard has scavenge. The scavenge cost is equal to its mana cost. (Exile a creature card from your graveyard and pay its mana cost: Put a number of +1/+1 counters equal to that card's power on target creature. Scavenge only as a sorcery.)\nSacrifice another creature: Regenerate Varolz.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [
+   "Regenerate"
+  ],
+  "commanderLegal": "legal",
+  "set": "dgm",
+  "releasedAt": "2013-05-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "09496421-74e4-466a-9546-56f2a0c8eef4",
   "name": "Vault of Whispers",
   "manaCost": "",
@@ -38630,6 +38833,44 @@
   "commanderLegal": "legal",
   "set": "mh3",
   "releasedAt": "2024-06-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "343833c1-19fd-4e8f-b82e-0f20903caaff",
+  "name": "Winter, Cursed Rider",
+  "manaCost": "{U}{B}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Human Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warlock"
+  ],
+  "oracleText": "Ward—Pay 2 life.\nArtifacts you control have \"Ward—Pay 2 life.\"\nExhaust — {2}{U}{B}, {T}, Exile X artifact cards from your graveyard: Each other nonartifact creature gets -X/-X until end of turn. (Activate each exhaust ability only once.)",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Exhaust",
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "dft",
+  "releasedAt": "2025-02-14",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

@@ -39,6 +39,7 @@ import { runLaneB172Effect } from "./run-laneb172";
 import { runLaneB174Effect } from "./run-laneb174";
 import { runLaneB177Effect } from "./run-laneb177";
 import { runLaneB180Effect } from "./run-laneb180";
+import { runLaneB184Effect } from "./run-laneb184";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -1235,7 +1236,7 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
         ? { ...m, turnOf: controllerOf(s, s.objects[affected]!), ...(inCombatPhase(s) && s.activePlayer === controllerOf(s, s.objects[affected]!) ? { notCombat: { turn: s.turn, combat: s.combatsThisTurn ?? 0 } } : {}) }
       : // "~ attacks that player this combat if able" (Raving Dead): the player chosen as it resolved, in the combat going on.
         m.kind === "mustAttackPlayer"
-        ? { ...m, ...(m.player === "chosen" && s.resolving?.chosen?.player !== undefined ? { player: s.resolving.chosen.player } : {}), ...(m.player === "you" ? { player: ctx.controller } : {}), ...(typeof m.player === "object" && ctx.targets[m.player.target]?.kind === "player" ? { player: (ctx.targets[m.player.target] as { id: PlayerId }).id } : {}), ...(m.combat === "this" ? { combat: s.combatsThisTurn ?? 0 } : {}) }
+        ? { ...m, ...(m.player === "chosen" && s.resolving?.chosen?.player !== undefined ? { player: s.resolving.chosen.player } : {}), ...(m.player === "you" ? { player: ctx.controller } : {}), ...(m.player === "eventPlayer" ? { player: ctx.event?.player ?? -1 } : {}), ...(typeof m.player === "object" && ctx.targets[m.player.target]?.kind === "player" ? { player: (ctx.targets[m.player.target] as { id: PlayerId }).id } : {}), ...(m.combat === "this" ? { combat: s.combatsThisTurn ?? 0 } : {}) }
       : m.kind === "mustBeBlocked" && m.combat === "this"
       ? { kind: "mustBeBlocked", combat: s.combatsThisTurn ?? 0 }
       : // "Those players" (Chaos Dragon): the opponents with the highest result of the roll just made, ties included.
@@ -1435,6 +1436,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "haunt":
     case "grantFlashback":
     case "grantYardKeyword":
+    case "grantYardKeywordEach":
+    case "grantYardCast":
     case "pick":
     case "meld":
     case "sacrificeEach":
@@ -1799,6 +1802,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB177Effect(s, e, ctx, src);
     case "delayedUnlessPaid":
       return runLaneB180Effect(s, e, ctx, src);
+    case "playersPutCounterEach":
+    case "keywordCountersFromYard":
+      return runLaneB184Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

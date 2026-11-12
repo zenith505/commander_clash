@@ -873,6 +873,8 @@ export function targetsOnlyMatch(s: GameState, targets: TargetChoice[], what: Ta
  */
 export function bindBound(s: GameState, spec0: TargetSpec, ctx: AmountCtx): TargetSpec {
   // Mistfolk: "target spell that targets ~": the source, as it is now (TargetSpec.targetsSource).
+  // Shackles of Treachery: "target Equipment attached to ~": to the source (TargetSpec.attachedTo with objectId "~").
+  if (spec0.attachedTo?.objectId === "~" && ctx.sourceId) return bindBound(s, { ...spec0, attachedTo: { ...spec0.attachedTo, objectId: ctx.sourceId } }, ctx);
   const spec1: TargetSpec = spec0.targetsSource ? (({ targetsSource: _, ...r }) => ({ ...r, targetsWhat: { kind: "object", objectId: ctx.sourceId ?? "", text: "~" } }))(spec0) : spec0;
   // Nissa, Steward of Elements: "a land card or a creature card with mana value less than or equal to ...": one of them.
   const spec2: TargetSpec = spec1.anyOf?.some((x) => x.bound) ? { ...spec1, anyOf: spec1.anyOf.map((x) => bindBound(s, x, ctx)) } : spec1;

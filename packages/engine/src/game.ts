@@ -11,7 +11,7 @@ import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
-import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
@@ -4167,9 +4167,9 @@ function startNextTurn(s: GameState, skipping = false) {
  * then, it doesn't limit anything (rulings).
  */
 export function untapLimitsNow(s: GameState, ap: PlayerId): { n: number; filter: TargetSpec }[] {
-  return s.battlefield.flatMap((id) => {
-    const o = obj(s, id);
-    return (abilitiesOf(s, o).untapLimits ?? []).filter((l) => (!l.you || controllerOf(s, o) === ap) && !(l.whileUntapped && o.tapped)).map((l) => ({ n: l.n, filter: l.filter }));
+  // Dovin Baan's emblem, in the command zone (CR 114.4): an opponent of its owner's untap step only.
+  return [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)].flatMap((o) => {
+    return (abilitiesOf(s, o).untapLimits ?? []).filter((l) => (!l.you || controllerOf(s, o) === ap) && (!l.opponents || controllerOf(s, o) !== ap) && !(l.whileUntapped && o.tapped)).map((l) => ({ n: l.n, filter: l.filter }));
   });
 }
 
@@ -4572,6 +4572,7 @@ function finishCleanup(s: GameState) {
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
   s.flashbackGrants = undefined;
   s.yardKeywordGrants = undefined; // Cursecloth Wrappings' "until end of turn" (CR 514.2)
+  s.yardCastGrants = undefined; // Filigree Racer's and Songcrafter Mage's "until end of turn" (CR 514.2)
   // "Lands you control enter tapped this turn" (Nahiri's Lithoforming, CR 514.2).
   // Zameck Guildmage's "this turn" (CR 514.2); Arlinn, the Pack's Hope's "until your next turn" goes on.
   s.entersWithCountersThisTurn = s.entersWithCountersThisTurn?.filter((r) => r.untilYourNextTurn);
@@ -5530,7 +5531,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const from = manaOriginsOf(s, o);
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   // Doubling Cube's cost is paid with the mana from the pool chosen for it (`combo`).
-  const payCost = ab.produces.kind === "doublePool" ? parseManaCost(combos![combo!]!.map((m) => `{${m}}`).join("")) : ab.manaCost ? manaAbilityCost(s, p.id, o, ab.manaCost) : null;
+  const payCost = ab.produces.kind === "doublePool" ? parseManaCost(combos![combo!]!.map((m) => `{${m}}`).join("")) : manaAbilityCostOf(s, p.id, o, ab);
   const manaPaid = payCost ? spendFromPool(s, p.id, payCost, { ability: o }) : null;
   if (payCost && !manaPaid) throw new RulesError("not enough mana");
   batchTaps(s, () => {
@@ -6156,7 +6157,8 @@ export function castProblem(
   // Tegwyll's Scouring: begun as though it had flash when there are enough creatures to tap (CR 601.3c), then only with them
   // tapped (castSpell treats kicks left out as none).
   const tapFlash = beholdFlashCost?.kind === "tap" && (!!choices?.kicks?.includes(0) || (choices?.kicks === undefined && !!s.objects[id] && tapCostCandidates(s, pid, s.objects[id]!, beholdFlashCost).length >= beholdFlashCost.n));
-  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || beholdFlash || tapFlash || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid)) || (!via && !!s.objects[id] && topFlash(s, s.objects[id]!, pid, choices?.alt === "citadel" ? "life" : "mana"));
+  // Qasali Ambusher: "you may cast ~ without paying its mana cost and as though it had flash": only cast that way (CR 601.3).
+  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "alternative" && !!altCost(d, "alternative")?.flash) || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || beholdFlash || tapFlash || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid)) || (!via && !!s.objects[id] && topFlash(s, s.objects[id]!, pid, choices?.alt === "citadel" ? "life" : "mana"));
   // Offering (CR 702.48a): with a permanent sacrificed for it; before its costs are chosen, when there's one to sacrifice.
   const offered = !!compileCard(d).offering && (choices ? choices.offering !== undefined : offeringCandidates(s, pid, id).length > 0);
   if (!free && !instantSpeed && !offered && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
@@ -7749,6 +7751,22 @@ const grantedEscapeUntilEot = (s: GameState, o: GameObject): CastFromGraveyard[]
   return g?.escape ? [{ kind: "grantedEscape", mana: g.escape.mana, costs: [{ kind: "exileFromGraveyard", n: g.escape.exile }], exile: false }] : [];
 };
 
+/**
+ * Jump-start (Filigree Racer, CR 702.133a) or harmonize with the card's mana cost (Songcrafter Mage, CR 702.180a) an effect
+ * gave this card until end of turn, while it's the card it was then (CR 400.7). Jump-start the card already has changes
+ * nothing (another instance of the same ability); a harmonize cost of its own is offered instead (one way of each kind).
+ * A card with no mana cost has no cost to pay this way (CR 118.6).
+ */
+function grantedCastUntilEot(s: GameState, o: GameObject, d: CardDef, has: CastFromGraveyard[]): CastFromGraveyard[] {
+  if (o.zone !== "graveyard" || !d.manaCost) return [];
+  const out: CastFromGraveyard[] = [];
+  for (const g of s.yardCastGrants ?? []) {
+    if (g.id !== o.id || g.zc !== (o.zoneChanges ?? 0) || [...has, ...out].some((w) => w.kind === g.kind)) continue;
+    out.push(g.kind === "jumpStart" ? { kind: "jumpStart", mana: d.manaCost, costs: [{ kind: "discard", n: 1 }], exile: true } : { kind: "harmonize", mana: d.manaCost, costs: [], exile: true });
+  }
+  return out;
+}
+
 /** The ways to cast this card from a graveyard: its own (flashback, escape, ...), and flashback an effect gave it. */
 /** `caster`: who would cast it, for a permission to cast from any graveyard (The Great Work); its owner if left out. */
 export function graveyardWays(s: GameState, o: GameObject, caster?: PlayerId): CastFromGraveyard[] {
@@ -7771,7 +7789,7 @@ export function graveyardWays(s: GameState, o: GameObject, caster?: PlayerId): C
   const asAdventure = face !== undefined ? asFace(s, o, face, () => grantedWays(s, o, defOf(s, o), caster ?? o.owner)).filter((g) => g.kind === "permission").map((g) => ({ ...g, face })) : [];
   const granted = grantedWays(s, o, d, caster ?? o.owner);
   const escapeEot = granted.some((g) => g.kind === "grantedEscape") ? [] : grantedEscapeUntilEot(s, o);
-  return [...(compileCard(d).fromGraveyard ?? []), ...grantedFlashbackWays(s, o, d), ...granted, ...escapeEot, ...asAdventure];
+  return [...(compileCard(d).fromGraveyard ?? []), ...grantedFlashbackWays(s, o, d), ...granted, ...escapeEot, ...asAdventure, ...grantedCastUntilEot(s, o, d, [...(compileCard(d).fromGraveyard ?? []), ...granted])];
 }
 
 /**
@@ -9609,7 +9627,7 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   const cost0 = parseManaCost(freeEquip(s, pid, ab) || freeCycling(s, pid, o, ab, x) ? "{0}" : ab.manaCost);
   // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
   // (CR 602.2b applies 601.2f).
-  const more = (ab.mana ? 0 : activationTax(s, o, pid, ab) + opponentsTargetTax(s, pid, targets)) + (ab.costMore ? Math.max(0, evalAmount(s, ab.costMore, { controller: pid, sourceId: o.id })) : 0);
+  const more = (ab.mana ? activationTax(s, o, pid, ab, true) : activationTax(s, o, pid, ab) + opponentsTargetTax(s, pid, targets)) + (ab.costMore ? Math.max(0, evalAmount(s, ab.costMore, { controller: pid, sourceId: o.id })) : 0);
   const cost1 = more ? { ...cost0, symbols: [...cost0.symbols, { kind: "generic" as const, amount: more }] } : cost0;
   // Power-up: "If this permanent entered this turn, this ability's cost is reduced by this permanent's mana cost" (CR
   // 702.193a-b, 118.7).
@@ -9731,19 +9749,28 @@ export function loyaltyChange(s: GameState, o: GameObject, pid: PlayerId, ab: Ac
   return base + more;
 }
 
-function activationTax(s: GameState, o: GameObject, pid: PlayerId, ab: ActivatedAbility): number {
+function activationTax(s: GameState, o: GameObject, pid: PlayerId, ab: Pick<ActivatedAbility, "loyalty" | "loyaltyX"> | null, mana = false): number {
   let n = 0;
   for (const id of s.battlefield) {
     const src = obj(s, id);
     for (const tax of abilitiesOf(s, src).activationTaxes ?? []) {
+      // A mana ability (CR 605.1a) only by a tax that doesn't leave them out (Oppressive Rays, Gloom).
+      if (mana && !tax.manaToo) continue;
       const owner = controllerOf(s, src);
       if ((tax.opponents && (owner === pid || !opponents(s, owner).includes(pid))) || (tax.yourTurn && s.activePlayer !== owner)) continue;
-      if (tax.loyalty && ((ab.loyalty === undefined && !ab.loyaltyX) || !objIsType(s, o, "Planeswalker"))) continue;
-      if (tax.filter?.chosen === "name" ? src.chosen?.name === undefined || !hasName(currentName(s, o), src.chosen.name) : !!tax.filter) continue;
+      if (tax.loyalty && ((ab?.loyalty === undefined && !ab?.loyaltyX) || !objIsType(s, o, "Planeswalker"))) continue;
+      // Oppressive Rays: "activated abilities of enchanted creature": the permanent it's attached to.
+      if (tax.host && (src.attachedTo !== o.id || o.zone !== "battlefield")) continue;
+      if (tax.filter?.chosen === "name" ? src.chosen?.name === undefined || !hasName(currentName(s, o), src.chosen.name) : !!tax.filter && (o.zone !== "battlefield" || !objectMatches(s, tax.filter, o, owner, false))) continue;
       n += tax.n;
     }
   }
   return n;
+}
+
+/** What "activated abilities ... cost {3} more to activate" adds to a mana ability of `o` that `pid` activates (Oppressive Rays, Gloom; CR 602.2b, 605.1a). */
+export function manaActivationTax(s: GameState, o: GameObject, pid: PlayerId): number {
+  return activationTax(s, o, pid, null, true);
 }
 
 /**

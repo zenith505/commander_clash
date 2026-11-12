@@ -1894,6 +1894,13 @@ export function parseTargetPhrase(
     extra.status = "unenchanted";
     p = p.slice(0, bare.index);
   }
+  // Shackles of Treachery's granted "Whenever ~ deals damage, destroy target Equipment attached to it": attached to the
+  // source as the target is chosen and as it resolves ("~" bound to its id then, bindBound), whoever controls it (rulings).
+  const toSelf = opts.target ? / attached to ~$/.exec(p) : null;
+  if (toSelf) {
+    extra.attachedTo = { kind: "object", objectId: "~", text: "~" };
+    p = p.slice(0, toSelf.index);
+  }
   // "Target Aura attached to a creature" (Crown of the Ages), "Aura or Equipment attached to a creature you control" (Halvar).
   // "Each Aura you control that's attached to a creature" (Sage's Reverie).
   // Savaen Elves: "target Aura attached to a land".

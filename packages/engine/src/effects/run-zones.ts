@@ -694,7 +694,7 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
       }
       // Stick Together: which slot of the party this is.
       const party = k.notKept ? { prompt: `choose your party: click up to one ${k.filter.text} of yours${kr.slot < e.keep.length - 1 ? ` (then ${e.keep.slice(kr.slot + 1).map((x) => `a ${x.filter.text}`).join(", ")})` : ""}. Creatures not in your party are sacrificed.` } : {};
-      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...party, ...(k.upTo ? { min: 0 } : {}), ...(e.destroy ? { destroy: true as const } : {}), ...(e.bounce ? { bounce: true as const } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}), ...(e.payLife !== undefined ? { payLife: lifeEach } : {}), ...(e.sparesTypeOfKept ? { sparesKin: true as const } : {}) };
+      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...party, ...(k.upTo ? { min: 0 } : {}), ...(e.destroy ? { destroy: true as const } : {}), ...(e.bounce ? { bounce: true as const } : {}), ...(e.tap ? { tap: true as const } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}), ...(e.payLife !== undefined ? { payLife: lifeEach } : {}), ...(e.sparesTypeOfKept ? { sparesKin: true as const } : {}) };
       return "paused";
     }
     kr.queue.shift();
@@ -737,6 +737,13 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
   if (e.bounce) {
     if (gone.length) log(s, `${src} returns ${gone.map((id) => nameOf(s, id)).join(", ")} to ${gone.length === 1 ? "its owner's hand" : "their owners' hands"}.`);
     for (const id of gone) if (s.objects[id]?.zone === "battlefield") moveObject(s, id, "hand");
+    return;
+  }
+  // Regna's Sanction: the rest are tapped at the same time, each by the player who chose (rulings).
+  if (e.tap) {
+    const tap = gone.filter((id) => s.objects[id]?.zone === "battlefield" && !obj(s, id).tapped);
+    if (tap.length) log(s, `${src} taps ${tap.map((id) => nameOf(s, id)).join(", ")}.`);
+    for (const id of tap) tapPermanent(s, obj(s, id), undefined, controllerOf(s, obj(s, id)));
     return;
   }
   if (gone.length) log(s, `${src}: ${gone.map((id) => nameOf(s, id)).join(", ")} ${gone.length === 1 ? "is" : "are"} sacrificed.`);
@@ -2058,6 +2065,24 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (o.zone !== "graveyard") continue;
         (s.yardKeywordGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, keyword: e.keyword });
         log(s, `${defOf(s, o).name} gains ${e.keyword.toLowerCase()} until end of turn (${src}).`);
+      }
+      return;
+    }
+    case "grantYardKeywordEach": {
+      // Ghost Ark: each matching card in its controller's graveyard as this resolves (CR 611.2c, rulings), unearth with
+      // this cost until end of turn, while it's that card (CR 400.7).
+      const cards = player(s, ctx.controller).graveyard.map((id) => obj(s, id)).filter((o) => printedMatches(e.filter, defOf(s, o)));
+      for (const o of cards) (s.yardKeywordGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, keyword: e.keyword, cost: e.cost });
+      if (cards.length) log(s, `${cards.length > 2 ? `${cards.length} cards` : cards.map((o) => defOf(s, o).name).join(" and ")} ${cards.length === 1 ? "gains" : "gain"} ${e.keyword.toLowerCase()} ${e.cost} until end of turn (${src}).`);
+      return;
+    }
+    case "grantYardCast": {
+      // Filigree Racer, Songcrafter Mage: the target card, still in its owner's graveyard (CR 608.2b), may be cast from
+      // there this turn with jump-start or harmonize (game.ts grantedCastUntilEot).
+      for (const o of objects(s, e.what, ctx)) {
+        if (o.zone !== "graveyard") continue;
+        (s.yardCastGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, kind: e.kind });
+        log(s, `${defOf(s, o).name} gains ${e.kind === "jumpStart" ? "jump-start" : "harmonize"} until end of turn (${src}).`);
       }
       return;
     }

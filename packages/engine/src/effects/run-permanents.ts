@@ -718,7 +718,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       invalidateCharacteristics(s);
       log(s, `${player(s, you).name} removes ${n} time counter${n === 1 ? "" : "s"} from ${defOf(s, o).name} (${src}).`);
       countersRemoved(s, o, "time", n);
-      if (o.zone === "exile") fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n });
+      if (o.zone === "exile") fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n, by: ctx.controller });
       if (!left) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "time" });
       return;
     }
@@ -783,7 +783,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           changed.push(`-1 ${k}`);
           countersRemoved(s, o, k, 1);
           // A time counter off a suspended card (CR 702.62a): "while it's exiled" triggers see it too.
-          if (k === "time" && o.zone === "exile") fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n: 1 });
+          if (k === "time" && o.zone === "exile") fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n: 1, by: ctx.controller });
           if (!left) last.push(k);
         }
       }
@@ -853,7 +853,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       invalidateCharacteristics(s);
       log(s, `${src}: ${player(s, you).name} time travels${changed.length ? ` (${changed.join(", ")})` : ""}.`);
       // Removing the last one triggers suspend's cast ability and vanishing's sacrifice (CR 702.62a, 702.63a).
-      for (const id of removedExiled) fireEvent(s, { type: "timeCountersRemovedExiled", id, n: 1 });
+      for (const id of removedExiled) fireEvent(s, { type: "timeCountersRemovedExiled", id, n: 1, by: ctx.controller });
       for (const id of last) fireEvent(s, { type: "lastCounterRemoved", id, counter: "time" });
       return;
     }
@@ -1152,6 +1152,28 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         r.countersRemoved = (r.countersRemoved ?? 0) + removed;
         return;
       }
+      // Stumpsquall Hydra: it, still that object on the battlefield, and every commander on the battlefield, anyone's and
+      // whatever its types (rulings, CR 903.3); with it gone, any number of commanders, none included (rulings).
+      if (e.selfAndCommanders) {
+        const me = objects(s, { ref: "self" }, ctx).find((o) => o.zone === "battlefield");
+        const opts = [...(me ? [me.id] : []), ...s.battlefield.filter((id) => id !== me?.id && obj(s, id).isCommander)];
+        if (n <= 0 || !opts.length) return;
+        let parts = sc.distributed;
+        if (!parts && opts.length === 1 && me) parts = { [me.id]: n };
+        if (!parts) {
+          s.pending = { kind: "distribute", player: ctx.controller, source: src, counter: e.counter, total: n, options: opts, what: me ? `${defOf(s, me).name} and commanders` : "commanders", ...(me ? {} : { upTo: true as const }) };
+          return "paused";
+        }
+        for (const id of opts) {
+          const k = parts[id] ?? 0;
+          if (k <= 0) continue;
+          const o = obj(s, id);
+          invalidateCharacteristics(s);
+          const put = putCounters(s, o, e.counter, k);
+          log(s, `${defOf(s, o).name} gets ${put} ${e.counter} counter${put > 1 ? "s" : ""}.`);
+        }
+        return;
+      }
       // Invoke Justice: what that player controls as it resolves, nothing if they're no longer a legal target.
       const among = e.of ? players(s, e.of, ctx) : undefined;
       const options = s.battlefield.filter((id) => (e.move ? id !== self!.id && objectMatches(s, e.filter, obj(s, id), ctx.controller, false) : among ? among.includes(controllerOf(s, obj(s, id))) && objectMatches(s, e.filter, obj(s, id), ctx.controller, false) : objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), ctx.controller, false)));
@@ -1218,7 +1240,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       enterTogether(s, () => {
         const { same, extra } = tokenBatch(s, who, spirit, 1);
         for (let i = same; i > 0; i--) createToken(s, who, spirit);
-        log(s, `${src} endures ${n}: ${player(s, who).name} creates ${same === 1 ? "a" : same} ${n}/${n} Spirit token${same === 1 ? "" : "s"}.`);
+        if (same) log(s, `${src} endures ${n}: ${player(s, who).name} creates ${same === 1 ? "a" : same} ${n}/${n} Spirit token${same === 1 ? "" : "s"}.`);
         createExtraTokens(s, who, extra);
       });
       return;
@@ -1368,7 +1390,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         countersRemoved(s, o, e.counter, n);
         // Deep-Sea Kraken removing a time counter from itself in exile: "whenever a time counter is removed from ~ while
         // it's exiled" sees it too (CR 113.6).
-        if (e.counter === "time" && o.zone === "exile") fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n });
+        if (e.counter === "time" && o.zone === "exile") fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n, by: ctx.controller });
         if (had === n) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });
       }
       return;

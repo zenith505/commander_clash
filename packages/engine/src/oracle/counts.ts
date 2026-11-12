@@ -128,6 +128,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Unlicensed Hearse: "the number of cards exiled with it" ("with ~"), the cards its one exile ability exiled (CR 607.2a,
   // linked by compile.ts).
   if (/^the number of cards exiled with (?:it|~)$/.test(p)) return { count: { kind: "linkedExiled" } };
+  // Creeping Inn: "the number of creature cards exiled with ~": only those of the linked cards (as Negative Zone Portal's).
+  if ((m = /^the number of (creature|artifact|land) cards exiled with ~$/.exec(p))) {
+    const filter = parseSearchFilter(`${m[1]} card`);
+    return filter ? { count: { kind: "linkedExiled", filter } } : null;
+  }
   // The Kenriths' Royal Funeral: "for each card exiled with ~", the same (still in exile, rulings).
   if (each && /^card exiled with (?:it|~)$/.test(p)) return { count: { kind: "linkedExiled" } };
   // Strata Scythe: "for each land on the battlefield with the same name as the exiled card", anyone's (rulings), the card

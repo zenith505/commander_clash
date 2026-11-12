@@ -1508,6 +1508,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (text === "a creature died under an opponent's control this turn") return { kind: "amount", amount: { count: { kind: "diedThisTurn", opponents: true } }, min: 1 };
   // White Glove Gourmand: "if another Human died under your control this turn": of that type as it last existed. "Another"
   // can't be the permanent with the ability, which hasn't died while it's on the battlefield.
+  // Brimaz, Blight of Oreskos: "if a Phyrexian died under your control this turn": a creature of that type as it last
+  // existed (only creatures die, CR 700.4), a token too.
+  if ((m = /^an? ([A-Z][a-z]+) died under your control this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "amount", amount: { count: { kind: "diedThisTurn", subtype: m[1]!, yours: true } }, min: 1 };
   if ((m = /^another ([A-Z][a-z]+) died under your control this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "amount", amount: { count: { kind: "diedThisTurn", subtype: m[1]!, yours: true } }, min: 1 };
   // Cult Conscript: "if a non-Skeleton creature died under your control this turn": not of that type as it last existed,
   // a token too (rulings).
@@ -2006,6 +2009,9 @@ export function parseAffected(subject: string): Affects | null {
   }
   // Darksteel Garrison: "Fortified land" (CR 301.6), the land a Fortification is attached to.
   if (/^(Enchanted|Equipped) (creature|permanent|artifact|land|planeswalker)$|^Fortified land$/.test(x)) return { kind: "attached" };
+  // Old-Growth Troll's granted "Enchanted Forest has ...": an Aura with enchant Forest is only ever attached to a Forest
+  // (it's put into the graveyard otherwise, CR 704.5m), so that's the permanent it's attached to.
+  if (/^Enchanted (Plains|Island|Swamp|Mountain|Forest)$/.test(x)) return { kind: "attached" };
   // Muraganda Petroglyphs: "Creatures with no abilities"; Ruxa, Patient Professor: "Creatures you control with no
   // abilities": no rules text, keywords or granted abilities as the effect applies (TargetSpec.noAbilities, rulings).
   const noAbilities = /^Creatures( you control)? with no abilities$/.exec(x);

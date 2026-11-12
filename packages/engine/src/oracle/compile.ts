@@ -33,6 +33,7 @@ import { roundB177Line } from "./laneb177";
 import { roundB178Line } from "./laneb178";
 import { roundB179Line } from "./laneb179";
 import { roundB182Finish, roundB182Line } from "./laneb182";
+import { roundB183Line } from "./laneb183";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -2036,6 +2037,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB179Line(line, raw, out, isSpell, d)) continue;
     // Murktide Regent, Soulflayer, Lochmere Serpent, Skyclave Shade, Nightshade Assassin, Shadow Urchin, Curse of Chaos (round B182).
     if (roundB182Line(line, raw, out, isSpell)) continue;
+    // Varolz, Young Deathclaws, Green Goblin (round B183).
+    if (roundB183Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -4063,11 +4066,12 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Winter Orb, Winter Moon, Smoke, Static Orb, Mungha Wurm: a limit on what untaps in the untap step (CR 502.3).
-    const untapLimit = /^(As long as ~ is untapped, )?([Pp]layers|[Yy]ou) can't untap more than (one|two) (.+?) during (?:their|your) untap steps?\.$/.exec(line);
+    // Dovin Baan's emblem: "Your opponents can't untap more than two permanents during their untap steps" (`opponents`).
+    const untapLimit = /^(As long as ~ is untapped, )?([Pp]layers|[Yy]ou|Your opponents) can't untap more than (one|two) (.+?) during (?:their|your) untap steps?\.$/.exec(line);
     if (untapLimit) {
       const filter = parseTargetPhrase(untapLimit[4]!.split(" ").map((w, i, a) => (i === a.length - 1 ? singularWord(w) : w)).join(" "));
       if (filter?.kind !== "object" || filter.controller || filter.bound) out.unsupported.push(raw);
-      else (out.untapLimits ??= []).push({ n: num(untapLimit[3]!), filter: { ...filter, text: untapLimit[4]! }, ...(/^you$/i.test(untapLimit[2]!) ? { you: true as const } : {}), ...(untapLimit[1] ? { whileUntapped: true as const } : {}) });
+      else (out.untapLimits ??= []).push({ n: num(untapLimit[3]!), filter: { ...filter, text: untapLimit[4]! }, ...(/^you$/i.test(untapLimit[2]!) ? { you: true as const } : {}), ...(untapLimit[2] === "Your opponents" ? { opponents: true as const } : {}), ...(untapLimit[1] ? { whileUntapped: true as const } : {}) });
       continue;
     }
     // "Artifact cards and red creature cards in your hand have warp {2}{R}" (Tannuk, Steadfast Second): an alternative cost

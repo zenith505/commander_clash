@@ -1,7 +1,7 @@
 # Roadmap
 
-31,068 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,975 of 4,988 (99%), top 10,000: 9,830 of
+31,075 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,976 of 4,988 (99%), top 10,000: 9,831 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -8160,6 +8160,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the damage the source deals, CR 615.7). Curse of Chaos ("that attacking player may discard a card. If the player does,
   they draw a card": the active player, asked only with a card in hand, once for the attack, rulings). +8, 31,068 of 31,936
   with B177 to B181 and rounds 336 to 343.
+- Round B183 (least played first, single-line blockers from the skip lists): Varolz, the Scar-Striped and Young Deathclaws
+  ("Each creature card in your graveyard has scavenge. The scavenge cost is equal to its mana cost.": an ability of each card,
+  its colored mana too and an {X} counted as 0, the card's power as it's exiled for the cost, rulings; bots use it; a browser
+  test). Green Goblin ("Each nonland card in your graveyard has mayhem. The mayhem cost is equal to its mana cost.": only a
+  card discarded this turn, CR 702.187b). Filigree Racer ("target instant or sorcery card in your graveyard gains jump-start
+  until end of turn", after its reflexive "pay {E}{E}. When you do") and Songcrafter Mage ("... gains harmonize until end of
+  turn. Its harmonize cost is equal to its mana cost.": tapping a creature for less, CR 702.180a; a browser test): a way to
+  cast that card this turn, while it's that card (GameState.yardCastGrants; one way of each kind, so jump-start or harmonize
+  the card already has is the one offered). Ghost Ark ("each artifact creature card in your graveyard gains unearth {3} until
+  end of turn": the cards there as it resolves, rulings, CR 611.2c). Dovin Baan's emblem ("Your opponents can't untap more
+  than two permanents during their untap steps": each opponent chooses which two, rulings, CR 502.3). +7, 31,075 of 31,936
+  with B177 to B182 and rounds 336 to 343.
+- Out after round B183 (looked at, not done): The Fugitive Doctor ("gains flashback {2}{R}{G} until end of turn": round 340's
+  fixed-cost flashback grant for Archmage's Newt, now on main, does this: a next round), Elemental Resonance ("add
+  mana equal to enchanted permanent's mana cost": what a {2/W} symbol adds isn't settled by its rulings), Medomai's Prophecy
+  ("when you cast a spell with the chosen name for the first time this turn": a spell of that name cast earlier that turn,
+  before chapter III, isn't settled by its rulings), Spectral Searchlight (another player choosing a color in the middle of a
+  mana ability), Day of the Moon (every name chosen for the Saga kept on it), Dralnu, Lich Lord (sacrifices chosen in the
+  middle of dealing damage), Words of Waste and Fade Away (see round 340's list) stay out.
 - Out after round B181 (looked at, not done): Ludevic, Necrogenius (its back face becomes a copy of a creature card exiled
   with it as it transforms), Song of Inspiration ("add the total mana value of those cards" to a d20 roll: whether a target
   that became illegal still counts isn't settled by its rulings) stay out.

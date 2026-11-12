@@ -2061,6 +2061,24 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       return;
     }
+    case "grantYardKeywordEach": {
+      // Ghost Ark: each matching card in its controller's graveyard as this resolves (CR 611.2c, rulings), unearth with
+      // this cost until end of turn, while it's that card (CR 400.7).
+      const cards = player(s, ctx.controller).graveyard.map((id) => obj(s, id)).filter((o) => printedMatches(e.filter, defOf(s, o)));
+      for (const o of cards) (s.yardKeywordGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, keyword: e.keyword, cost: e.cost });
+      if (cards.length) log(s, `${cards.length > 2 ? `${cards.length} cards` : cards.map((o) => defOf(s, o).name).join(" and ")} ${cards.length === 1 ? "gains" : "gain"} ${e.keyword.toLowerCase()} ${e.cost} until end of turn (${src}).`);
+      return;
+    }
+    case "grantYardCast": {
+      // Filigree Racer, Songcrafter Mage: the target card, still in its owner's graveyard (CR 608.2b), may be cast from
+      // there this turn with jump-start or harmonize (game.ts grantedCastUntilEot).
+      for (const o of objects(s, e.what, ctx)) {
+        if (o.zone !== "graveyard") continue;
+        (s.yardCastGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, kind: e.kind });
+        log(s, `${defOf(s, o).name} gains ${e.kind === "jumpStart" ? "jump-start" : "harmonize"} until end of turn (${src}).`);
+      }
+      return;
+    }
     case "grantFlashback": {
       // Locked to the cards there now (Past in Flames rulings); it ends with the turn (cleanup, CR 514.2).
       const each = e.each;

@@ -1434,6 +1434,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "haunt":
     case "grantFlashback":
     case "grantYardKeyword":
+    case "grantYardKeywordEach":
+    case "grantYardCast":
     case "pick":
     case "meld":
     case "sacrificeEach":

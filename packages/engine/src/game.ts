@@ -4167,9 +4167,9 @@ function startNextTurn(s: GameState, skipping = false) {
  * then, it doesn't limit anything (rulings).
  */
 export function untapLimitsNow(s: GameState, ap: PlayerId): { n: number; filter: TargetSpec }[] {
-  return s.battlefield.flatMap((id) => {
-    const o = obj(s, id);
-    return (abilitiesOf(s, o).untapLimits ?? []).filter((l) => (!l.you || controllerOf(s, o) === ap) && !(l.whileUntapped && o.tapped)).map((l) => ({ n: l.n, filter: l.filter }));
+  // Dovin Baan's emblem, in the command zone (CR 114.4): an opponent of its owner's untap step only.
+  return [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)].flatMap((o) => {
+    return (abilitiesOf(s, o).untapLimits ?? []).filter((l) => (!l.you || controllerOf(s, o) === ap) && (!l.opponents || controllerOf(s, o) !== ap) && !(l.whileUntapped && o.tapped)).map((l) => ({ n: l.n, filter: l.filter }));
   });
 }
 
@@ -4572,6 +4572,7 @@ function finishCleanup(s: GameState) {
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
   s.flashbackGrants = undefined;
   s.yardKeywordGrants = undefined; // Cursecloth Wrappings' "until end of turn" (CR 514.2)
+  s.yardCastGrants = undefined; // Filigree Racer's and Songcrafter Mage's "until end of turn" (CR 514.2)
   // "Lands you control enter tapped this turn" (Nahiri's Lithoforming, CR 514.2).
   // Zameck Guildmage's "this turn" (CR 514.2); Arlinn, the Pack's Hope's "until your next turn" goes on.
   s.entersWithCountersThisTurn = s.entersWithCountersThisTurn?.filter((r) => r.untilYourNextTurn);
@@ -7750,6 +7751,22 @@ const grantedEscapeUntilEot = (s: GameState, o: GameObject): CastFromGraveyard[]
   return g?.escape ? [{ kind: "grantedEscape", mana: g.escape.mana, costs: [{ kind: "exileFromGraveyard", n: g.escape.exile }], exile: false }] : [];
 };
 
+/**
+ * Jump-start (Filigree Racer, CR 702.133a) or harmonize with the card's mana cost (Songcrafter Mage, CR 702.180a) an effect
+ * gave this card until end of turn, while it's the card it was then (CR 400.7). Jump-start the card already has changes
+ * nothing (another instance of the same ability); a harmonize cost of its own is offered instead (one way of each kind).
+ * A card with no mana cost has no cost to pay this way (CR 118.6).
+ */
+function grantedCastUntilEot(s: GameState, o: GameObject, d: CardDef, has: CastFromGraveyard[]): CastFromGraveyard[] {
+  if (o.zone !== "graveyard" || !d.manaCost) return [];
+  const out: CastFromGraveyard[] = [];
+  for (const g of s.yardCastGrants ?? []) {
+    if (g.id !== o.id || g.zc !== (o.zoneChanges ?? 0) || [...has, ...out].some((w) => w.kind === g.kind)) continue;
+    out.push(g.kind === "jumpStart" ? { kind: "jumpStart", mana: d.manaCost, costs: [{ kind: "discard", n: 1 }], exile: true } : { kind: "harmonize", mana: d.manaCost, costs: [], exile: true });
+  }
+  return out;
+}
+
 /** The ways to cast this card from a graveyard: its own (flashback, escape, ...), and flashback an effect gave it. */
 /** `caster`: who would cast it, for a permission to cast from any graveyard (The Great Work); its owner if left out. */
 export function graveyardWays(s: GameState, o: GameObject, caster?: PlayerId): CastFromGraveyard[] {
@@ -7772,7 +7789,7 @@ export function graveyardWays(s: GameState, o: GameObject, caster?: PlayerId): C
   const asAdventure = face !== undefined ? asFace(s, o, face, () => grantedWays(s, o, defOf(s, o), caster ?? o.owner)).filter((g) => g.kind === "permission").map((g) => ({ ...g, face })) : [];
   const granted = grantedWays(s, o, d, caster ?? o.owner);
   const escapeEot = granted.some((g) => g.kind === "grantedEscape") ? [] : grantedEscapeUntilEot(s, o);
-  return [...(compileCard(d).fromGraveyard ?? []), ...grantedFlashbackWays(s, o, d), ...granted, ...escapeEot, ...asAdventure];
+  return [...(compileCard(d).fromGraveyard ?? []), ...grantedFlashbackWays(s, o, d), ...granted, ...escapeEot, ...asAdventure, ...grantedCastUntilEot(s, o, d, [...(compileCard(d).fromGraveyard ?? []), ...granted])];
 }
 
 /**

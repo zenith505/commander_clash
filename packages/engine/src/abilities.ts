@@ -2880,6 +2880,14 @@ export type Effect =
    */
   /** Cursecloth Wrappings: "target creature card in your graveyard gains embalm until end of turn. The embalm cost is equal to its mana cost" (GameState.yardKeywordGrants). */
   | { type: "grantYardKeyword"; what: ObjRef; keyword: "Embalm" | "Encore" }
+  /** Ghost Ark: "each artifact creature card in your graveyard gains unearth {3} until end of turn": the cards there as it resolves (CR 611.2c, rulings), each with that ability of its own (GameState.yardKeywordGrants). */
+  | { type: "grantYardKeywordEach"; filter: TargetSpec; keyword: "Unearth"; cost: string }
+  /**
+   * Filigree Racer: "target instant or sorcery card in your graveyard gains jump-start until end of turn" (CR 702.133a);
+   * Songcrafter Mage: "... gains harmonize until end of turn. Its harmonize cost is equal to its mana cost." (CR 702.180a):
+   * a way to cast that card from its owner's graveyard this turn (GameState.yardCastGrants).
+   */
+  | { type: "grantYardCast"; what: ObjRef; kind: "jumpStart" | "harmonize" }
   | { type: "grantFlashback"; what?: ObjRef; each?: TargetSpec; /** Archmage's Newt: "flashback {0}", this cost instead of the card's mana cost (CR 702.34a). */ mana?: string; /** The Grim Captain's Locker: "Until end of turn, each creature card in your graveyard gains "Escape—{3}{B}, Exile four other cards from your graveyard."": escape with this cost instead of flashback (CR 702.138a). */ escape?: { /** Left out: the card's own mana cost (Confession Dial: "The escape cost is equal to its mana cost plus ..."). */ mana?: string; exile: number }; /** Case of the Uneaten Feast: "Creature cards in your graveyard gain "You may cast this card from your graveyard" until end of turn": that permission instead of flashback. */ cast?: true }
   /** "Return the exiled card to the battlefield under its owner's control": the cards this object's linked exile took (CR 607.2a). */
   | { type: "returnLinked"; dest: "battlefield" | "hand" | /** Gravegouger: "return the exiled cards to their owner's graveyard". */ "graveyard"; /** "Under your control" (Prowling Geistcatcher): the ability's controller's, not their owners'. */ yours?: true; /** The Princess Takes Flight's chapter III: its source is still the object whose chapter I exiled them (not one that left). */ here?: true; /** Pyxis of Pandemonium: "Each player turns face up all cards they own exiled with ~, then puts all permanent cards among them onto the battlefield": every linked card is turned face up (CR 406.3) and only the permanent cards return, from an activated ability whose source may have just been sacrificed for its cost. */ permanentCards?: true; /** Realm Razer: "to the battlefield tapped". */ tapped?: true }
@@ -8638,7 +8646,7 @@ export interface CompiledCard {
    * one land during your untap step" (Mungha Wurm, `you`), "As long as ~ is untapped, players can't untap more than two
    * permanents ..." (Static Orb, `whileUntapped`): the active player chooses which of them untap (CR 502.3).
    */
-  untapLimits?: { n: number; filter: TargetSpec; you?: true; whileUntapped?: true }[];
+  untapLimits?: { n: number; filter: TargetSpec; you?: true; whileUntapped?: true; /** Dovin Baan's emblem: "Your opponents can't untap more than two permanents during their untap steps": only an opponent of its controller is limited. */ opponents?: true }[];
   /** "Ninjutsu abilities you activate cost {1} less to activate" (Silver-Fur Master, CR 602.2b applies 601.2f). */
   ninjutsuLess?: number;
   /** "Boast abilities you activate cost {1} less to activate for each Dragon you control" (Dragonkin Berserker): generic mana only (CR 602.2b applies 601.2f). */
@@ -8651,7 +8659,7 @@ export interface CompiledCard {
    * (Graywater's Fixer): each card's mana value is the ability's mana cost. `manaCostCost`: "Its encore cost is equal to
    * its mana cost" (Wire Surgeons): each card's mana cost as printed, and none for a card without one (CR 118.6).
    */
-  yardGrants?: { filter: TargetSpec; activated: ActivatedAbility; manaValueCost?: true; manaCostCost?: true }[];
+  yardGrants?: { filter: TargetSpec; activated: ActivatedAbility; manaValueCost?: true; manaCostCost?: true; /** With `manaCostCost`: an {X} in the mana cost is 0 (Varolz, the Scar-Striped's scavenge, rulings; CR 107.3). */ xZero?: true }[];
   /** The Master, Multiplied: "Triggered abilities you control can't cause you to sacrifice or exile creature tokens you control." */
   ownTriggersSpareTokens?: true;
   /** "The "legend rule" doesn't apply to permanents you control" (CR 704.5j): to these, from the source's controller's view. */

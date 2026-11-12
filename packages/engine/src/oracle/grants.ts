@@ -386,7 +386,7 @@ export const EMBLEM_EVENTS = new Set<TriggeredAbility["event"]>([
 export function emblemAbilityOk(text: string): boolean {
   if (text.includes(QUOTED_SOURCE_NAME)) return false;
   const c = compileGranted(text);
-  const { triggers, activated, mana, statics, entersTapped, unsupported, textKeywords, costMods, noMaxHandSize, opponentsCantCast, loyaltyAtInstantSpeed, spellsHaveStorm, landsFromGraveyard, graveyardGrants, castFromHandFree, drawsInOpponentsDrawStep, lifeFloor, lifeFloorIf, cantLose, cantWin, gameEndIf, ...rest } = c;
+  const { triggers, activated, mana, statics, entersTapped, unsupported, textKeywords, costMods, noMaxHandSize, opponentsCantCast, loyaltyAtInstantSpeed, spellsHaveStorm, landsFromGraveyard, graveyardGrants, castFromHandFree, drawsInOpponentsDrawStep, lifeFloor, lifeFloorIf, cantLose, cantWin, gameEndIf, untapLimits, ...rest } = c;
   // Gideon of the Trials': "As long as you control a Gideon planeswalker, you can't lose the game and your opponents can't
   // win the game", for its owner (game.ts gameEndBlocked).
   const gameLock = cantLose === "you" && cantWin === "opponents" && (!gameEndIf || gameEndIf.kind === "control");
@@ -396,7 +396,10 @@ export function emblemAbilityOk(text: string): boolean {
   // (CR 114.4, 602.1), whose costs are paid with mana and with permanents they control: nothing about tapping, sacrificing
   // or moving the emblem itself, which is no permanent (CR 114.5). compileCard gives it zone "command".
   if (!activated.every(emblemActivatedOk)) return false;
-  if (!triggers.length && !statics.length && !activated.length && !costMods?.length && noMaxHandSize !== true && !opponentsCantCast && !loyaltyAtInstantSpeed && !spellsHaveStorm?.length && !landsFromGraveyard && !graveyardGrants?.length && !castFromHandFree && !drawsInOpponentsDrawStep && !lifeFloor && !gameLock) return false;
+  // Dovin Baan's: "Your opponents can't untap more than two permanents during their untap steps", read from emblems in
+  // game.ts untapLimitsNow; only that form (nothing about the emblem being tapped or its owner's own untap step).
+  if (untapLimits?.some((l) => !l.opponents || l.whileUntapped || l.you)) return false;
+  if (!triggers.length && !statics.length && !activated.length && !costMods?.length && noMaxHandSize !== true && !opponentsCantCast && !loyaltyAtInstantSpeed && !spellsHaveStorm?.length && !landsFromGraveyard && !graveyardGrants?.length && !castFromHandFree && !drawsInOpponentsDrawStep && !lifeFloor && !gameLock && !untapLimits?.length) return false;
   // Serra the Benevolent's: a life floor for its owner (read from emblems in damage.ts), maybe while they control a creature.
   if (lifeFloorIf && lifeFloorIf.kind !== "control") return false;
   // "You may play lands and cast permanent spells from your graveyard" (Wrenn and Realmbreaker's): permissions for its

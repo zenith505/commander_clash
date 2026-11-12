@@ -139,8 +139,8 @@ const activateNow = (s: GameState, pid: PlayerId, id: string, index: number, tar
 describe("Lane B round 59", () => {
   it("are fully supported", () => {
     supported(mistcaller(), absorbingManAndTitania(), castThroughTime(), maestrosConfluence(), bruseTarlRovingRancher(), deathbonnet(), pathOfMettle(), frenziedFugue(), manaChargedDragon(), invasionOfTheGiants(), battleOfFrostAndFire(), senseiGoldenTail(), xathridGorgon(), fangDruidSummoner(), isperiaTheInscrutable(), clovenCasting(), academicProbation());
-    // Dovin Baan's +1 now compiles with both halves until your next turn; its emblem keeps it out.
-    expect(isFullySupported(dovinBaan())).toBe(false);
+    // Dovin Baan's +1 now compiles with both halves until your next turn; its emblem too since round B183.
+    expect(isFullySupported(dovinBaan())).toBe(true);
   });
 
   it("Mistcaller: this turn a creature put onto the battlefield without being cast is exiled; a cast one enters; next turn it's over", () => {

@@ -38,6 +38,7 @@ import { roundB184Line } from "./laneb184";
 import { roundB185Line } from "./laneb185";
 import { roundB186Line } from "./laneb186";
 import { roundB187Line } from "./laneb187";
+import { roundB188Line } from "./laneb188";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -2051,6 +2052,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB186Line(line, raw, out, isSpell)) continue;
     // Round B187.
     if (roundB187Line(line, raw, out, isSpell)) continue;
+    // Round B188.
+    if (roundB188Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -7133,10 +7136,11 @@ export function compile(d: CardDef): CompiledCard {
   // Lavabrink Venturer: protection "of the chosen quality" needs odd or even chosen as it enters (CR 614.12).
   if (JSON.stringify([out.statics, out.triggers, out.activated, out.spell]).includes(CHOSEN_NUMBER_EXCEPT_PROTECTION) && !out.entersChoose?.some((c) => c.what === "number")) out.unsupported.push("(protection from mana values but a chosen number with no number chosen as it enters)");
   if (JSON.stringify([out.statics, out.triggers, out.activated, out.spell]).includes(CHOSEN_PARITY_PROTECTION) && !out.entersChoose?.some((c) => c.what === "parity")) out.unsupported.push("(protection of a chosen quality with no odd or even chosen as it enters)");
-  // Grandeur's "Discard another card named ~": the card's own name (a copy has it too, CR 707.2).
+  // Grandeur's "Discard another card named ~": the card's own name (a copy has it too, CR 707.2); Say Its Name's "two other
+  // cards named ~" from your graveyard likewise.
   for (const ab of out.activated)
-    if (ab.costs?.some((c) => c.kind === "discard" && c.filter?.named === "~"))
-      ab.costs = ab.costs.map((c) => (c.kind === "discard" && c.filter?.named === "~" ? { ...c, filter: { ...c.filter, named: d.name, text: `card named ${d.name}` } } : c));
+    if (ab.costs?.some((c) => (c.kind === "discard" || c.kind === "exileFromGraveyard") && c.filter?.named === "~"))
+      ab.costs = ab.costs.map((c) => ((c.kind === "discard" || c.kind === "exileFromGraveyard") && c.filter?.named === "~" ? { ...c, filter: { ...c.filter, named: d.name, text: `card named ${d.name}` } } : c));
   // Overload (CR 702.96a-b): cast for that cost, the spell's text says "each" for "target", and it has no targets.
   const overload = out.altCosts?.find((a) => a.kind === "overload");
   if (overload && !d.oracleId.endsWith("|overloaded")) {

@@ -16,7 +16,7 @@ import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
-import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
+import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { canAttachTo, turnFaceDown } from "./effects/run-permanents";
@@ -4607,7 +4607,8 @@ function finishCleanup(s: GameState) {
   }
   s.preventCombatDamage = undefined;
   // Ascent of the Worthy's "until your next turn" ones stay until that turn begins (CR 611.2b).
-  const lasting = s.damageRules?.filter((r) => r.untilYourNextTurn);
+  // Old Fat Spider Can't See Me's last while its source is on the battlefield (CR 611.2b).
+  const lasting = s.damageRules?.filter((r) => r.untilYourNextTurn || whileSourceHolds(s, r));
   s.damageRules = lasting?.length ? lasting : undefined;
   // "Until end of turn" control ends: "when you lose control of the creature" triggers now (rulings on Ray of Command).
   checkLostControl(s);

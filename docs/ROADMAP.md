@@ -8098,6 +8098,24 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   different powers. Each of them gets +X/+X and gains vigilance until end of turn, where X is ~'s power": X locked in as it
   resolves, CR 608.2h). Chong and Lily, Nomads ("Put a lore counter on each of any number of target Sagas you control": the
   next chapter triggering, rulings, CR 714.2b; a browser test). +7, 31,070 of 31,936 with B177 to B186 and rounds 336 to 337.
+- Round B188 (least played first, from the Lane B skip lists): Ral and the Implicit Maze (II: "You may discard a card. If
+  you do, exile the top two cards of your library. You may play them until the end of your next turn": both only if you
+  discarded, CR 608.2c, the permission ending with your next turn, CR 611.2b; III's Spellgorger Weird a named token).
+  Eiganjo Uprising ("Each opponent creates X minus one ... tokens": none for X of 0 or 1, CR 107.1b). Old Fat Spider Can't
+  See Me ("gains hexproof for as long as this Saga remains on the battlefield" and "Prevent all damage that would be dealt
+  by up to one target creature for as long as this Saga remains on the battlefield": across turns, ending once the Saga
+  leaves, CR 611.2b, 615.1a). The Last Ronin (III: "Whenever a creature you control attacks alone this turn, ...": a
+  delayed trigger for the rest of the turn, CR 603.7b, 506.5). Cleansing Meditation (threshold "instead destroy all
+  enchantments, then return all cards in your graveyard destroyed this way to the battlefield": counted as it resolves, CR
+  608.2c, your own cards only, an Aura's host chosen and not targeted, rulings, CR 303.4f-g). Say Its Name ("Exile this
+  card and two other cards named Say Its Name from your graveyard: Search your graveyard, hand, and/or library for a card
+  named Altanak, the Thrice-Called": the library only if you choose, then a shuffle, CR 701.23; a browser test for the
+  cost pick, which now reads "2 cards named Say Its Name"). Revival Experiment ("For each permanent type, return up to one
+  card of that type from your graveyard ... You lose 3 life for each card returned this way": the six permanent types, CR
+  110.4, a card of two types counting as one of them, rulings; a browser test). +7, 31,077 of 31,936 with B185 to B187.
+- Out after round B188 (looked at, not done): Kang Dynasty (chapters I and II goad creatures of each opponent's choosing
+  and draw for their combat damage until your next turn; III is done), Drizzt Do'Urden (its short name "Drizzt" isn't read
+  as ~), Long Rest, Time Reaper, Pulsemage Advocate, Heart of Kiran and Turf War stay out.
 - Out after round B187 (looked at, not done): Kraven the Hunter (the greatest power among a player's creatures as one died,
   several dying at once), Corrosive Ooze, Trove of Temptation, Rain of Gore and Blood Scrivener stay out for the reasons in
   the earlier lists.

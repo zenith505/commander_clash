@@ -3457,7 +3457,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (e.milled) s.resolving!.did = false;
         if (!max) return;
         const kind = filter?.text ?? "card";
-        const what = e.distinctManaValues && !e.upTo
+        const what = e.oneOfEach
+          ? `up to one ${kind}`
+          : e.distinctManaValues && !e.upTo
           ? `one ${kind} of each mana value`
           : e.distinctManaValues
           ? `any number of ${kind.replace(/\bcard\b/, "cards")} with different mana values`
@@ -3476,7 +3478,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Seek Thrills: "put all cards that have an Adventure from among the milled cards": every one, no choice.
         if (e.all) sc.found = cards.slice(0, max);
         else {
-          s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : (chooser ?? p.id), source: src, what: e.youChoose || chooser !== undefined ? `${what} in ${p.name}'s graveyard` : what, ...under, ...(chooser !== undefined && chooser !== p.id ? { forPlayer: p.id, ...(e.dest === undefined || e.dest === "battlefield" ? { helps: true as const } : {}) } : {}), cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
+          s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : (chooser ?? p.id), source: src, what: e.youChoose || chooser !== undefined ? `${what} in ${p.name}'s graveyard` : what, ...under, ...(chooser !== undefined && chooser !== p.id ? { forPlayer: p.id, ...(e.dest === undefined || e.dest === "battlefield" ? { helps: true as const } : {}) } : {}), cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}), ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}) };
           return "paused";
         }
       }
@@ -3500,6 +3502,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // Drana, the Last Bloodchief: "The creature is a Vampire in addition to its other types", as it enters (CR 614.12) and for good.
           ids.forEach((id) => moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.countersN === undefined ? { ...e.counters } : Object.fromEntries(Object.keys(e.counters).map((k) => [k, Math.max(0, amountNow(s, e.countersN!, ctx))])) } : {}), ...(e.alsoMods ? { entersAs: e.alsoMods, entersAsBy: { controller: ctx.controller, source: src } } : {}), ...hosts.get(id) }));
         });
+        // Revival Experiment: "You lose 3 life for each card returned this way": the cards now on the battlefield.
+        if (e.lifeEach) {
+          const n = ids.filter((id) => obj(s, id).zone === "battlefield").length;
+          if (n) loseLife(s, p.id, n * e.lifeEach);
+        }
         return;
       }
       if (e.dest === "castThisTurn") {
@@ -3638,9 +3645,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const { xRange, ...rest } = bindChosen(e.filter.named === "~" ? { ...e.filter, named: ctx.sourceDef.name } : e.filter, ctx.chosen);
         const x = ctx.x ?? 0;
         const filter: TargetSpec = xRange ? { ...rest, manaValue: xRange.at === "exact" ? { min: x, max: x } : xRange.at === "least" ? { min: x } : { max: x } } : rest;
+        // Cleansing Meditation: only the cards the destroy before this put there, still there as those cards (CR 400.7).
+        const destroyed = e.destroyedThisWay ? new Set((s.resolving?.destroyed ?? []).filter((x) => x.died && s.objects[x.o.id]?.zone === "graveyard" && (s.objects[x.o.id]!.zoneChanges ?? 0) === (x.o.zoneChanges ?? 0) + 1).map((x) => x.o.id)) : undefined;
         // The active player chooses for their Auras first, then the others in turn order (APNAP, Open the Vaults rulings).
         for (const pid of apnap(s, players(s, e.who, ctx)))
           for (const id of player(s, pid).graveyard) {
+            if (destroyed && !destroyed.has(id)) continue;
             const d = defOf(s, s.objects[id]!);
             if (isPermanentCard(d) && printedMatches(filter, d) && (name === undefined || sameName(d.name, name)) && (!filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn) && (!filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn) && !(e.notSacrificedThisWay && s.resolving!.sacrificedThisWay?.some((k) => k.id === id))) sc.found.push(id);
           }

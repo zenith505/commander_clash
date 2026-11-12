@@ -36,6 +36,8 @@ export const CARD_TOKENS: Record<string, TokenSpec> = {
   // Tarmogoyf Nest, Disa the Restless: "a Tarmogoyf token" is a copy of the card Tarmogoyf (rulings): {1}{G}, so green
   // (CR 105.2, 202.2), whose power and toughness its characteristic-defining ability sets (CR 604.3), */1+* in print.
   Tarmogoyf: { name: "Tarmogoyf", named: true, manaCost: "{1}{G}", power: 0, toughness: 1, colors: ["G"], types: ["Creature"], subtypes: ["Lhurgoyf"], keywords: [], abilities: "Tarmogoyf's power is equal to the number of card types among cards in all graveyards and its toughness is equal to that number plus 1." },
+  // Ral and the Implicit Maze: "a Spellgorger Weird token" is a copy of the card Spellgorger Weird (rulings): {2}{R}, red.
+  "Spellgorger Weird": { name: "Spellgorger Weird", named: true, manaCost: "{2}{R}", power: 2, toughness: 2, colors: ["R"], types: ["Creature"], subtypes: ["Weird"], keywords: [], abilities: "Whenever you cast a noncreature spell, put a +1/+1 counter on this creature." },
   Gingerbrute: { name: "Gingerbrute", named: true, manaCost: "{1}", power: 1, toughness: 1, colors: [], types: ["Artifact", "Creature"], subtypes: ["Food", "Golem"], keywords: ["Haste"], abilities: "{1}: This creature can't be blocked this turn except by creatures with haste.\n{2}, {T}, Sacrifice this creature: You gain 3 life." },
 };
 

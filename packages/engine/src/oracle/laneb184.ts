@@ -3,6 +3,7 @@
 import type { CompiledCard, Effect, TargetSpec } from "../abilities";
 import type { Ctx } from "./body";
 import { reflexiveBody } from "./body";
+import { roundB185Sentence } from "./laneb185";
 import { parseSentence } from "./sentence";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
@@ -100,5 +101,5 @@ export function roundB184Sentence(s: string, sentences: string[], si: number, ct
     if (!body?.effects.length) return "fail";
     return { effect: { type: "delayed", when: "nextBeginCombat", thisTurn: true, effects: body.effects, targets: body.targets, text: plain(combat[1]) }, next: si + 1 };
   }
-  return null;
+  return roundB185Sentence(s, sentences, si, ctx, effects);
 }

@@ -904,6 +904,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       (e, t) =>
         (((e === "selfDies" && ev.wasCreature) || (e === "selfToGraveyard" && (!t.ownGraveyard || ev.controller === o.owner))) && ev.to === "graveyard" && !(t.ifNotToken && o.isToken) && !(t.ifNotSubtype && !!ev.chars?.subtypes.includes(t.ifNotSubtype)) && !(t.ifNotBlocking && !!ev.snapshot?.blocking) && !(t.ifDiesInCombat && !inCombatPhase(s)) && !(t.ifBlockedThisTurn && ev.snapshot?.becameBlockedTurn !== s.turn) && !(t.ifDealtCombatDamage && !Object.values(s.turnLog?.combatDamagedBy ?? {}).some((ids) => ids.includes(`${ev.id}@${was}`))) && !(t.ifHadCounter && !((ev.counters[t.ifHadCounter] ?? 0) >= (t.ifHadCounterMin ?? 1))) && !(t.ifDamagedThisTurn !== undefined && (s.turnLog?.damageDealtTo?.[`${ev.id}@${was}`] ?? []).reduce((n, d) => n + (d.amount ?? 0), 0) < t.ifDamagedThisTurn) && !(t.ifNoCounter && (t.ifNoCounter === "any" ? Object.values(ev.counters).some((n) => n > 0) : (ev.counters[t.ifNoCounter] ?? 0) > 0))) ||
         (e === "selfDiesOrExiled" && (ev.to === "graveyard" || ev.to === "exile")) ||
+        (e === "selfExiled" && ev.to === "exile") ||
         (e === "selfExiledCrafting" && ev.to === "exile" && !!ev.crafted) ||
         e === "selfLeaves" ||
         e === "selfLostControl",

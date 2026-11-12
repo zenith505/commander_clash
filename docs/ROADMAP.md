@@ -1,6 +1,6 @@
 # Roadmap
 
-31,089 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,096 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,976 of 4,988 (99%), top 10,000: 9,832 of
 9,979 (98%).
 
@@ -8208,6 +8208,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   abilities too, CR 605.1a and 602.2b). The Fugitive Doctor ("target instant or sorcery card in your graveyard gains
   flashback {2}{R}{G} until end of turn", after "you may sacrifice a Clue. When you do": round 340's fixed-cost flashback
   grant, so X is 0, CR 702.34a, rulings). +8, 31,083 of 31,936 with B177 to B183 and rounds 336 to 343.
+- Round B185 (least played first, from the Lane B next list): Haunting Imitation (a 1/1 flying Spirit token copy of each
+  creature card a parley reveal showed, the cards staying on top, or the spell back to its owner's hand if none, rulings).
+  Bloodbond March ("each player returns all cards with the same name as that spell from their graveyard to the
+  battlefield": the name the spell had as it was cast, CR 201.2). Prince of Thralls (an opponent's permanent put into a
+  graveyard comes back under your control "unless that opponent pays 3 life": that opponent as it last existed, nothing if
+  it was a token or has left the graveyard, rulings; a browser test). Urza's Sylex ("Each player chooses six lands they
+  control. Destroy all other permanents.", and "When ~ is put into exile from the battlefield", which resolves before the
+  activated ability, rulings; a browser test). Volcano Hellion (echo {X} where X is your life total as the echo trigger
+  resolves, not locked in, rulings; "an amount of damage of your choice to you and target creature", 0 allowed, one
+  unpreventable damage event; bots deal just enough to destroy an opponent's creature; a browser test). Manifold Insights
+  (each opponent in turn order after you chooses a different nonland card among your top ten, all of them if there aren't
+  enough, rulings; bots give you what helps you least; a browser test with you choosing for Cy). Mirror Match (a token
+  copy of each creature attacking you or a planeswalker you control, blocking it though never declared a blocker, a
+  noncreature copy not blocking, token doublers' copies blocking too, all exiled at end of combat, rulings). +7, 31,096 of
+  31,936 with B177 to B184 and rounds 336 to 344.
+- Out after round B185 (looked at, not done): Aeon Engine (reversing turn order changes every "in turn
+  order", APNAP and "next player" reading), Kheru Mind-Eater and Shared Fate (playing cards exiled face down by another
+  player), Drain Power (mana abilities activated for another player, then that mana moved), Dreamshaper Shaman and Shifting
+  Shadow (see the earlier lists) stay out.
 - Out after round B183 (looked at, not done): The Fugitive Doctor (done in round B184) ("gains flashback {2}{R}{G} until end of turn": round 340's
   fixed-cost flashback grant for Archmage's Newt, now on main, does this: a next round), Elemental Resonance ("add
   mana equal to enchanted permanent's mana cost": what a {2/W} symbol adds isn't settled by its rulings), Medomai's Prophecy
@@ -8711,11 +8730,11 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   412 between 25,000 and 19,700, mostly multi-line cards and mechanics not modeled yet (banding, text changes, mana
   replacement, damage dealt this turn by a source); only 7 are left between 19,700 and 15,000. Then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported
-  there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Reweave, Kheru Mind-Eater, Day of the Dragons, Bloodbond March, Song of Inspiration, Countersculpt, Order of
-  Succession, Drain Power, Volcano Hellion, Drain Life (done in round B179), Desolation, Urza's Sylex, Diabolic Servitude, Shared Fate.
+  there, its skips included, mostly multi-line cards and new mechanics): Mirror Match (done in round B185), Reweave, Kheru Mind-Eater, Day of the Dragons (supported), Bloodbond March (done in round B185), Song of Inspiration, Countersculpt, Order of
+  Succession (supported), Drain Power, Volcano Hellion (done in round B185), Drain Life (done in round B179), Desolation, Urza's Sylex (done in round B185), Diabolic Servitude, Shared Fate.
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 460 are still unsupported there, its skips
-  included): Aeon Engine, Haunting Imitation, The Fugitive Doctor (done in round B184), Shifting Shadow, Prince of Thralls,
-  Eriette, Manifold Insights, Fortune's Favor, Curse of Inertia (done in round B184), Dreamshaper Shaman, Fishing Pole, Regna's Sanction (done in round B184),
+  included): Aeon Engine, Haunting Imitation (done in round B185), The Fugitive Doctor (done in round B184), Shifting Shadow, Prince of Thralls (done in round B185),
+  Eriette, Manifold Insights (done in round B185), Fortune's Favor (supported), Curse of Inertia (done in round B184), Dreamshaper Shaman, Fishing Pole, Regna's Sanction (done in round B184),
   Kathril (done in round B184), Feral Encounter (done in round B184); then on up from 13,200.
 
 ## Known gaps (from earlier rounds)

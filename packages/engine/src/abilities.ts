@@ -2014,6 +2014,8 @@ export type Modification =
   | { kind: "loseStatic"; text: string }
   /** Layer 6: "becomes an Aura enchantment with enchant creature" (a Licid): it has enchant creature (CR 702.5a). */
   | { kind: "enchantCreature" }
+  /** Bronzehide Lion, Old-Growth Troll: "It's an Aura enchantment with enchant creature you control": an enchant ability from an effect (CR 702.5a), what it can enchant (enchantOf). */
+  | { kind: "enchant"; spec: TargetSpec }
   | { kind: "doesntUntap"; /** Fall from Favor: "unless that player is the monarch": not while its controller is (CR 725). */ unlessMonarch?: true }
   /** "Can't become untapped" (Frozen in Ice): it doesn't untap in its untap step or from any effect (see untapPermanent). */
   | { kind: "cantBecomeUntapped" }
@@ -4486,6 +4488,22 @@ export type Effect =
    * defending players (CR 508.5a). "Other": not the blocking creature dealt the damage (the subject).
    */
   | { type: "damageDefendingOthers"; amount: Amount }
+  /**
+   * The Foretold Soldier: "Whenever this creature deals damage, exile it face down. It becomes foretold.": the source, if
+   * it's still the same object on the battlefield (CR 400.7), exiled face down and foretold (CR 702.143a, d): only its
+   * owner may cast it, on a later turn, for its foretell cost (rulings); a token ceases to exist (CR 111.7), a copy
+   * with no foretell cost of its own can't be cast this way.
+   */
+  | { type: "foretellSelf" }
+  /**
+   * Bronzehide Lion: "When ~ dies, return it to the battlefield. It's an Aura enchantment with enchant creature you control
+   * and "[ability]," and it loses all other abilities."; Old-Growth Troll the same with enchant Forest you control and a
+   * static, keeping its other abilities. The card in the graveyard it went to (CR 400.7; a token never comes back, rulings)
+   * returns under this ability's controller's control as that Aura, from as it enters (CR 614.1c, 205.1a: only its card
+   * types and subtypes change, its name, colors and supertypes stay, rulings), attached to a permanent its controller
+   * chooses as it enters that it could enchant (CR 303.4f, not targeted); with none it stays in the graveyard (303.4g).
+   */
+  | { type: "returnAsAura"; enchant: TargetSpec; ability: string; loseOthers?: true }
   | {
       type: "counterOpponentsStack";
       /** Kadena's Silencer: "counter all abilities your opponents control": only the activated and triggered abilities already on the stack (rulings: not spells; mana abilities never are there, CR 605.3a). */

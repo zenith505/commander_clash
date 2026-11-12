@@ -4686,6 +4686,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0db3b29e-e21c-4240-8e5e-959ba6bcf706",
+  "name": "Bronzehide Lion",
+  "manaCost": "{G}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Cat",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Cat"
+  ],
+  "oracleText": "{G}{W}: This creature gains indestructible until end of turn.\nWhen this creature dies, return it to the battlefield. It's an Aura enchantment with enchant creature you control and \"{G}{W}: Enchanted creature gains indestructible until end of turn,\" and it loses all other abilities.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "thb",
+  "releasedAt": "2020-01-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6b1d178f-9713-4dcf-920b-ddf2c94cc427",
   "name": "Brood Sliver",
   "manaCost": "{4}{G}",
@@ -16042,6 +16074,36 @@
   "commanderLegal": "legal",
   "set": "rex",
   "releasedAt": "2023-11-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a200daec-983c-4ea6-ae98-1c963b50fbb1",
+  "name": "Identity Thief",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Shapeshifter",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Shapeshifter"
+  ],
+  "oracleText": "Whenever this creature attacks, you may exile another target nontoken creature. If you do, this creature becomes a copy of that creature until end of turn. Return the exiled card to the battlefield under its owner's control at the beginning of the next end step.",
+  "power": "0",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "emn",
+  "releasedAt": "2016-07-22",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -34182,6 +34244,34 @@
   "set": "afr",
   "releasedAt": "2021-07-23",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "169a4a77-12ff-4997-9550-bdcd456aa2f7",
+  "name": "The Eagles Are Coming!",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Kicker {2}{W}{W} (You may pay an additional {2}{W}{W} as you cast this spell.)\nChoose target creature you own. If this spell was kicked, instead choose any number of target creatures you own. Return each chosen creature to your hand. At the beginning of the next upkeep, create a 4/4 white Bird Soldier creature token with flying for each creature returned to your hand this way.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Kicker"
+  ],
+  "commanderLegal": "legal",
+  "set": "hob",
+  "releasedAt": "2026-08-14",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

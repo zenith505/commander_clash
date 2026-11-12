@@ -649,7 +649,8 @@ const ENCHANT_CREATURE: TargetSpec = { kind: "object", types: ["Creature"], text
  * made it "an Aura enchantment with enchant creature" (a Licid).
  */
 export function enchantOf(s: GameState, o: GameObject): TargetSpec | undefined {
-  return compileCard(defOf(s, o)).enchant ?? (characteristics(s, o).enchantCreature ? ENCHANT_CREATURE : undefined);
+  const c = characteristics(s, o);
+  return compileCard(defOf(s, o)).enchant ?? c.enchantSpec ?? (c.enchantCreature ? ENCHANT_CREATURE : undefined);
 }
 /** A card's abilities plus granted ones (`grantedAbilities` texts), after them in that order. */
 export function withGranted(base: CompiledCard, granted: readonly string[]): CompiledCard {

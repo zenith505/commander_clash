@@ -109,7 +109,7 @@ const BASIC_LAND_TYPES = ["Plains", "Island", "Swamp", "Mountain", "Forest"];
  * count (CR 708.2, 613.1f). An effect that only says something is true of it gives no ability (rulings).
  */
 export function hasNoAbilities(s: GameState, o: GameObject, c: Characteristics): boolean {
-  if (c.keywords.length || c.grantedAbilities.length || c.enchantCreature) return false;
+  if (c.keywords.length || c.grantedAbilities.length || c.enchantCreature || c.enchantSpec) return false;
   if (c.subtypes.some((t) => BASIC_LAND_TYPES.includes(t))) return false;
   // Blood Sun: what's left is its mana abilities, if it has any (CR 605.1a).
   if (c.printedManaOnly && !o.faceDown) {

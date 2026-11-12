@@ -35,6 +35,7 @@ import { roundB179Line } from "./laneb179";
 import { roundB182Finish, roundB182Line } from "./laneb182";
 import { roundB183Line } from "./laneb183";
 import { roundB184Line } from "./laneb184";
+import { round344Line } from "./round344";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -5918,6 +5919,8 @@ export function compile(d: CardDef): CompiledCard {
       out.triggers.push({ event: "selfLeaves", body: { targets: [], effects: [{ type: "sacrificeAnimated" }], text: "That creature's controller sacrifices it." } });
       continue;
     }
+    // Bronzehide Lion, Old-Growth Troll: "When ~ dies, return it to the battlefield. It's an Aura enchantment with ..." (round 344).
+    if (round344Line(line, raw, out, isSpell, d, compileCard)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -7960,7 +7963,9 @@ function checkCastingLinks(out: CompiledCard) {
   if (returnedIn(out.triggers) || returnedIn(out.activated) || returnedIn(out.statics)) bad = true;
   if (out.spell && returnedIn(out.spell)) {
     const at = out.spell.effects.findIndex((e) => returnedIn(e));
-    if (!out.spell.effects.slice(0, at).some((e) => e.type === "bounce" && e.what.ref === "target")) bad = true;
+    // The Eagles Are Coming!: one return or the other, by whether it was kicked.
+    const bouncesTarget = (e: Effect): boolean => (e.type === "bounce" && e.what.ref === "target") || (e.type === "if" && e.cond.kind === "kicked" && !!e.otherwise?.length && [...e.effects, ...e.otherwise].every(bouncesTarget));
+    if (!out.spell.effects.slice(0, at).some(bouncesTarget)) bad = true;
   }
   // "If this spell's surge cost was paid" needs that alternative cost (CR 702.117a, 702.137a): in the spell, or its
   // permanent's enters trigger.

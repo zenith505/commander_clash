@@ -46,6 +46,7 @@ import { runRound329Effect } from "./run-round329";
 import { runRound330Effect } from "./run-round330";
 import { runRound333Effect } from "./run-round333";
 import { runRound339Effect } from "./run-round339";
+import { runRound344Effect } from "./run-round344";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
 import { ringBearer } from "./run-ring";
@@ -1819,6 +1820,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runRound333Effect(s, e, ctx, src);
     case "damageDefendingOthers":
       return runRound339Effect(s, e, ctx, src);
+    case "foretellSelf":
+    case "returnAsAura":
+      return runRound344Effect(s, e, ctx, src);
     case "flipCoin":
       return runCoinEffect(s, e, ctx, src);
     case "flipCoinEach":

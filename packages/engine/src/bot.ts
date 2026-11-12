@@ -5013,6 +5013,15 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     const o = spell?.objectId ? s.objects[spell.objectId] : undefined;
     return !!o && !o.spellCopy && !o.isCommander && defMv(defOf(s, o)) <= 2 && player(s, pid).library.some((id) => !isType(defOf(s, obj(s, id)), "Land"));
   }
+  // Identity Thief: "you may exile another target nontoken creature. If you do, ~ becomes a copy of that creature until end
+  // of turn": an opponent's creature, gone until the end step, never one of ours.
+  const thiefExile = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "flicker" && e.effects[0]!.at && e.effects[0]!.what.ref === "target" ? e.effects[0]! : undefined;
+  const thiefCopy = r?.body.effects[r.next + 1];
+  if (r && thiefExile?.type === "flicker" && thiefExile.what.ref === "target" && thiefCopy?.type === "if" && thiefCopy.effects.some((x) => x.type === "becomeCopy")) {
+    const t = r.item.targets?.[thiefExile.what.index];
+    const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+    return !!o && o.zone === "battlefield" && controllerOf(s, o) !== pid;
+  }
   // Puca's Mischief: "you may exchange control of ...": only for one of theirs clearly worth more than ours.
   const exch = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "exchangeControl" ? e.effects[0]! : undefined;
   if (r && exch?.type === "exchangeControl" && exch.a.ref === "target" && exch.b.ref === "target") {

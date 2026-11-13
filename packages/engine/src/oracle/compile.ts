@@ -7765,7 +7765,7 @@ function linkExile(out: CompiledCard) {
   // Angel): with no exile as it enters or in an activated ability, its one other triggered ability that exiles.
   // Prowling Geistcatcher: "Whenever you sacrifice another creature, exile it": the card the sacrifice put in a graveyard.
   // Wall of Nets: "At end of combat, exile all creatures blocked by ~".
-  const exiles = exiles0.length ? exiles0 : out.triggers.filter((t) => !returns.includes(t)).flatMap((t) => allEffects(t.body.effects).filter((e): e is Extract<Effect, { type: "exile" }> => exiling(e) && e.type === "exile" && (e.what.ref === "target" || (e.what.ref === "subjectCard" && t.event === "youSacrifice") || (e.what.ref === "blockingIt" && !!e.what.blocked && t.event === "eachEndCombat"))));
+  const exiles = exiles0.length ? exiles0 : out.triggers.filter((t) => !returns.includes(t)).flatMap((t) => allEffects(t.body.effects).filter((e): e is Extract<Effect, { type: "exile" }> => exiling(e) && e.type === "exile" && (e.what.ref === "target" || (e.what.ref === "subjectCard" && t.event === "youSacrifice") || (e.what.ref === "blockingIt" && !!e.what.blocked && t.event === "eachEndCombat") || (e.what.ref === "eventGroup" && t.event === "batch" && t.batch?.what === "discards"))));
   // "As an additional cost to cast this spell, behold an Elf and exile it" with "When this creature leaves the battlefield,
   // return the exiled card to its owner's hand" (Champions of the Perfect): the card exiled to pay the cost of the spell
   // that became this permanent (CR 607.2q, recorded as it's cast).
@@ -7782,7 +7782,10 @@ function linkExile(out: CompiledCard) {
     return;
   }
   // "When this creature dies, you may put the exiled card into its owner's hand" (Hoarding Dragon): a leaves ability too.
-  if (exiles.length !== 1 || returns.length !== 1 || (returns[0]!.event !== "selfLeaves" && !(returns[0]!.event === "selfDies" && exiles[0]!.type === "search"))) {
+  // Toluz, Clever Conductor: "When ~ dies, put the cards exiled with it into their owner's hand", the cards its discard
+  // trigger exiled (round B193).
+  const discardExile = exiles[0]?.type === "exile" && exiles[0].what.ref === "eventGroup";
+  if (exiles.length !== 1 || returns.length !== 1 || (returns[0]!.event !== "selfLeaves" && !(returns[0]!.event === "selfDies" && (exiles[0]!.type === "search" || discardExile)))) {
     out.unsupported.push("(returns exiled cards it can't link to one exile ability)");
     return;
   }

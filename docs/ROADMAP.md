@@ -1,7 +1,7 @@
 # Roadmap
 
-31,140 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,843 of
+31,146 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,844 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -29,7 +29,7 @@ line blocks.
    spells), Hushbringer (done in round 271), Crucible of the Spirit Dragon ("remove X storage counters: add X mana in any combination of
    colors", spendable only on Dragons: the mana mix needs a picker per X and the spend restriction); Thrilling Discovery
    and Old One Eye ("you may discard two cards. If you do": no ruling on discarding with fewer in hand); Wildfire
-   Devils, Arcane Proxy, Don & Leo, Problem Solvers ("exile up to one target artifact ... and up to one target creature
+   Devils, Arcane Proxy (done in round B193), Don & Leo, Problem Solvers ("exile up to one target artifact ... and up to one target creature
    ... Then return them") too; Braid of Fire (cumulative upkeep "Add {R}": a payment that adds mana, which empties at
    the end of the upkeep step); Clockspinning (a counter on a suspended card); The Legend of Yangchen (each player in
    turn chooses among the opponents' permanents); Umbra Mystic (with several Auras, which one's umbra armor applies is
@@ -1027,7 +1027,7 @@ line blocks.
    Out after round 216 (looked at, not done): Thelon of Havenwood ("Exile a Fungus card from a graveyard" as a cost from
    any graveyard needs a cost picker); Wicked Slumber (done in round B156) ("either of them" needs a new choice); Mercadia's Downfall (the
    defending player differs per attacker); Surestrike Trident (a granted ability that names its source); Tamiyo,
-   Inquisitive Student; Demilich (casting from the graveyard by exiling four instants and sorceries). Next fresh
+   Inquisitive Student; Demilich (done in round B193) (casting from the graveyard by exiling four instants and sorceries). Next fresh
    candidates are still the ones listed after round 215.
    Round 217 took the fresh candidates listed after round 215: "If you didn't put a card into your hand this way,
    proliferate" (Contagious Vorrac); "Discard your hand, then draw cards equal to the number of cards discarded this way"
@@ -1314,7 +1314,7 @@ line blocks.
    entering as a copy of a creature card in a graveyard (Superior Spider-Man). The granted Blitz, Web-slinging and
    Freerunning cast-menu entries have an e2e test; `npm run e2e:cards` now also reads single-quoted names. +10 (28,698
    of 31,936 with round 227 and B66).
-   Out after round 228 (looked at, not done): Bilbo, Thief in the Night (a paid cast from a graveyard during
+   Out after round 228 (looked at, not done): Bilbo, Thief in the Night (done in round B193) (a paid cast from a graveyard during
    resolution); Lazav, Dimir Mastermind and Valki, God of Lies (becoming a copy of a card outside the battlefield, "that
    card" in a graveyard trigger); Ixidron and Illithid Harvester (turning permanents face down); Brazen Cannonade (done in round 314) ("until
    end of combat on your next turn"); Auntie Ool, Cursewretch (done in round 266); Arlinn's back face (a temporary "enters with
@@ -2989,7 +2989,7 @@ line blocks.
    Out after round 321 (looked at, not done): Brimaz, Blight of Oreskos (which spells "Phyrexian creature or artifact
    creature spell" covers), Bre of Clan Stoutarm (whether "Otherwise" applies when you decline to cast), Desert Warfare
    (one ability with two trigger conditions, and "from your hand or library"), Karn, Living Legacy and Ob Nixilis of the Black Oath (done in round 330)
-   (emblems with activated abilities; "Pay any amount of mana"), Bilbo, Thief in the Night (a paid cast from
+   (emblems with activated abilities; "Pay any amount of mana"), Bilbo, Thief in the Night (done in round B193) (a paid cast from
    the graveyard during resolution). Bots give Hand of Vecna's bonus to the creature with the greatest power.
    Round 320 took cards back off the "Out after round N" lists, most played first: "Tap up to three target creatures. Put
    a stun counter on one of them." (Aerith Rescue Mission: the one chosen as it resolves among the targets still legal,
@@ -4670,7 +4670,7 @@ line blocks.
    - "Total mana value / power N or X or less" for a group of targets works (Rampaging Yao Guai, Orcus, Patch Up,
      Reunion of the House), only one such group per ability. An enters trigger's own X works (Dune Drifter, Kinetic
      Ooze). "Double the number of each kind of counter you have" (on players) is out.
-   - The life you gained this turn: still out are Betor, Sproutback Trudge, Willowdusk ("whichever is greater"), Shanna
+   - The life you gained this turn: still out are Betor, Sproutback Trudge (done in round B193), Willowdusk ("whichever is greater"), Shanna
      ("X can't be greater than"), Enlightened Confidant (done in round 329), Will, Scion of Peace (cost reduction by X), Tivash ("pay X
      life"), Astarion, Ocelot Pride (city's blessing token copies), Witch of the Moors ("and you return"), Aerith and
      Doctor Jane Foster ("return that card to the battlefield instead"), Follow the Lumarets, Lunar Convocation ("gained
@@ -6445,7 +6445,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   to one other target artifact or creature. If it isn't a creature, it becomes a 0/0 Mutant creature" (Pizza Face,
   Gastromancer), "Put a +1/+1 counter on it for each Mount and/or Vehicle you control other than ~" (Spire Mechcycle).
   +16 (28,631 of 31,936 with round 225).
-- Out after round B64 (looked at, not done): Toluz, Clever Conductor ("exile them" about the discarded cards as a
+- Out after round B64 (looked at, not done): Toluz, Clever Conductor (done in round B193) ("exile them" about the discarded cards as a
   group), Shackles of Treachery (a granted trigger targeting Equipment attached to it), The Five Doctors and Say Its
   Name (searching library and/or graveyard, or graveyard, hand and/or library), Cosmium Confluence (the same mode more
   than once), Winter, Cursed Rider (exiling X cards as a cost), Melira, the Living Cure (poison replacement and a
@@ -8372,6 +8372,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   exiled with ~" and "You may cast spells from among cards exiled with ~. You can't cast more than one spell this way each
   turn": one spell a turn for that object, any number of lands as the land rules allow, rulings; TurnLog.linkedSpellOnce;
   a browser test). +6, 31,140 of 31,936 with B189.
+- Round B193 (least played first, from the Lane B skip lists): Demilich ("exile up to one target instant or sorcery card
+  from your graveyard. Copy it. You may cast the copy.") and Founding the Third Path's III (the same with one target): the
+  copy made in exile and cast as the ability resolves or never, paying all its costs with X as you choose and timing
+  ignored (rulings, CR 608.2g, 707.12); the card stays exiled either way; a browser test. Founding the Third Path's I ("an
+  instant or sorcery spell with mana value 1 or 2 from your hand without paying its mana cost": either, CR 202.3). Arcane
+  Proxy ("if you cast it, exile target instant or sorcery card with mana value less than or equal to this creature's power
+  ... Copy that card. You may cast the copy without paying its mana cost": its power on targeting and on resolution,
+  prototyped or not, rulings). Toluz, Clever Conductor ("Whenever you discard one or more cards, exile them from your
+  graveyard" and "When Toluz dies, put the cards exiled with it into their owner's hand": every card that discard put
+  there and that's still there, CR 400.7, linked to Toluz, CR 607.2a). Sproutback Trudge ("At the beginning of your end
+  step, if you gained life this turn, you may cast this creature from your graveyard": from the graveyard, CR 113.6m, its
+  own cost reduction applied, rulings). Bilbo, Thief in the Night ("you may cast an artifact, instant, or sorcery spell from
+  your graveyard. If an instant or sorcery spell cast this way would be put into your graveyard, exile it instead": paying
+  its costs as the trigger resolves, the spell's types as it's cast, only an instant or sorcery spell exiled, CR 614.1a,
+  rulings; a browser test). +6, 31,146 of 31,936 with B189 and B192.
+- Out after round B193 (looked at, not done): Kylox's Voltstrider (a spell cast from among cards collect evidence exiled,
+  put on the bottom of its owner's library if it would go to a graveyard: no such replacement for a spell yet), Wizard's
+  Spellbook (a d20 picking among a paid copy, a copy for {1} rather than its mana cost, and every card exiled with it),
+  Soundwave, Sonic Spy (a target's mana value equal to the combat damage tokens dealt), Spelltwine ("Cast the copies if
+  able": a cast that isn't optional), Swans of Bryn Argoll and Surge to Victory stay out for the reasons in the earlier
+  lists.
 - Out after round B192 (looked at, not done): Garruk, Curse Breaker (its −4: how often "whenever one or more creatures
   attack one of your opponents" triggers when creatures attack two of them still isn't settled by rulings), Charmed
   Pendant (a hybrid symbol of the milled card adds one of its colors: a choice in the middle of a mana ability), Ulamog's
@@ -8426,8 +8447,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (each opponent's own difference, then "the damage dealt this way") stay out for these reasons.
 - Out after round B175 (looked at, not done): Chong and Lily (done in round B187), Threefold Signal, Hankyu and Time Reaper stay out for the
   reasons in the earlier lists.
-- Out after round B174 (looked at, not done): Demilich, Arcane Proxy and Roving Actuator (a copy of a graveyard card cast
-  while the ability resolves), Sproutback Trudge (cast from the graveyard as its end step trigger resolves), Outmaneuver and
+- Out after round B174 (looked at, not done): Demilich (done in round B193), Arcane Proxy (done in round B193) and Roving Actuator (a copy of a graveyard card cast
+  while the ability resolves), Sproutback Trudge (done in round B193) (cast from the graveyard as its end step trigger resolves), Outmaneuver and
   Long Rest (X targets), Pulsemage Advocate (three targets from one opponent's graveyard).
 - Out after round B173 (looked at, not done): Corrosive Ooze (the Equipment attached to the creature just before it left the
   battlefield is destroyed at end of combat, rulings: attachments as they last existed aren't kept), Oppressive Rays and
@@ -8689,7 +8710,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   that didn't attack": the group remembered for a delayed trigger), Time to Reflect (done in round B110) ("blocked or was blocked by a Zombie":
   its creature types as it blocked).
 - Out after round B101 (looked at, not done): Kang Dynasty (chapter I and II delayed triggers on goaded creatures), The Bears
-  of Littjara (damage from each creature with power 4 or greater), Founding the Third Path and Helmut Zemo (casting with mana
+  of Littjara (damage from each creature with power 4 or greater), Founding the Third Path (done in round B193) and Helmut Zemo (casting with mana
   paid as something resolves), Jorn's Kaldring (playing a snow permanent card from a graveyard, entering tapped), Yannik,
   Lucius the Eternal, Cemetery Desecrator and The Spot, Crumbling Sanctuary (damage to players replaced by exiling cards),
   Ancient Hellkite (done in round B112) ("defending player" in an activated ability's target), Alluring Siren ("attacks you if able"), Dreams of

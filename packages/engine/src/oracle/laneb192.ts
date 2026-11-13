@@ -3,6 +3,7 @@
 import type { CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseSentence } from "./sentence";
+import { roundB193Sentence } from "./laneb193";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -72,5 +73,5 @@ export function roundB192Sentence(s: string, sentences: string[], si: number, ct
       return { effect: { type: "exileSelfAndTopOneOf" }, next: si + 3 };
     }
   }
-  return null;
+  return roundB193Sentence(s, sentences, si, ctx, effects);
 }

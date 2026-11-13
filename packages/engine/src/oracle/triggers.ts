@@ -2649,6 +2649,11 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   // with its normal timing (rulings).
   if (/^you may exile one of them from your graveyard\. If you do, you may cast it this turn\.?$/.test(rest) && batch.what === "discards" && batch.whose === "you" && !batch.first && !yourTurn)
     return { event: "batch", batch, body: { targets: [], effects: [{ type: "may", effects: [{ type: "chooseFromGraveyard", n: 1, eventGroup: true, ...(batch.filter ? { filter: batch.filter } : {}), dest: "exile", castExiledThisTurn: true }], text: "exile one of them from your graveyard (you may cast it this turn)" }], text: rest.replace(/\.$/, "") } };
+  // Toluz, Clever Conductor: "Whenever you discard one or more cards, exile them from your graveyard.": every card that
+  // event discarded that's still in your graveyard (CR 400.7; one gone elsewhere, a madness card, stays where it is), all
+  // at once, linked to Toluz (CR 607.2a) for its dies trigger.
+  if (/^exile them from your graveyard\.?$/.test(rest) && batch.what === "discards" && batch.whose === "you" && !batch.first && !batch.filter && !yourTurn)
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "exile", what: { ref: "eventGroup" }, linked: true }], text: rest.replace(/\.$/, "") } };
   // Captain Howler, Sea Scourge: "target creature gets +2/+0 until end of turn for each card discarded this way. Whenever
   // that creature deals combat damage to a player this turn, you draw a card.": how many cards the event discarded (all of
   // them, CR 603.2c, even those that left the graveyard since); "that creature" is the target.
@@ -4081,6 +4086,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (castSelfYard) {
     const t = parseTrigger(`${castSelfYard[1]}, draw a card.`);
     if (!t || t === "fail" || t.event !== "permanentDies" || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "draw" || t.body.targets.length || t.host || t.zone || t.ifCond) return "fail";
+    return { ...t, body: { targets: [], effects: [{ type: "castNow", what: { ref: "selfCard" } }], text: "you may cast ~ from your graveyard" }, zone: "graveyard" };
+  }
+  // Sproutback Trudge: "At the beginning of your end step, if you gained life this turn, you may cast ~ from your
+  // graveyard.": the same, from your graveyard (CR 113.6m), the life gained checked as the step begins and as it resolves
+  // (CR 603.4); its costs paid, its own cost reduction applied (rulings), as it resolves or not at all (CR 608.2g).
+  if (line === "At the beginning of your end step, if you gained life this turn, you may cast ~ from your graveyard.") {
+    const t = parseTrigger("At the beginning of your end step, if you gained life this turn, draw a card.");
+    if (!t || t === "fail" || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "draw" || t.body.targets.length || t.host || t.zone || !t.ifCond) return "fail";
     return { ...t, body: { targets: [], effects: [{ type: "castNow", what: { ref: "selfCard" } }], text: "you may cast ~ from your graveyard" }, zone: "graveyard" };
   }
   // Old One Eye: "you may discard two cards. If you do, ...": only with two cards in hand (see canDoNow).

@@ -3355,6 +3355,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "72a9a85d-7cfc-4b3c-82db-9d35be6c0982",
+  "name": "Bilbo, Thief in the Night",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Halfling Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Halfling",
+   "Rogue"
+  ],
+  "oracleText": "Spells you cast from anywhere other than your hand cost {1} less to cast.\nWhenever Bilbo attacks, you may cast an artifact, instant, or sorcery spell from your graveyard. If an instant or sorcery spell cast this way would be put into your graveyard, exile it instead.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "hob",
+  "releasedAt": "2026-08-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "86dc3a41-4fb9-4b1f-8279-2b5edbc7e170",
   "name": "Binding Negotiation",
   "manaCost": "{1}{B}",
@@ -8566,6 +8599,37 @@
   "set": "afr",
   "releasedAt": "2021-07-23",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "eeb50bfc-8443-482b-bfc1-ea96b37809cd",
+  "name": "Demilich",
+  "manaCost": "{U}{U}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Skeleton Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Skeleton",
+   "Wizard"
+  ],
+  "oracleText": "This spell costs {U} less to cast for each instant and sorcery spell you've cast this turn.\nWhenever this creature attacks, exile up to one target instant or sorcery card from your graveyard. Copy it. You may cast the copy.\nYou may cast this card from your graveyard by exiling four instant and/or sorcery cards from your graveyard in addition to paying its other costs.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

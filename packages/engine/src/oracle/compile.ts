@@ -41,6 +41,8 @@ import { roundB187Line } from "./laneb187";
 import { roundB188Line } from "./laneb188";
 import { roundB192Line } from "./laneb192";
 import { round344Line } from "./round344";
+import { roundB190Line } from "./laneb190";
+import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
 import { round345Chapter, round345Line } from "./round345";
 import { round346Line } from "./round346";
 import { round347Line } from "./round347";
@@ -582,7 +584,7 @@ export function compile(d: CardDef): CompiledCard {
   // 607.2): the tokens created with ~, of which there is only that one.
   const oneToken = /^When ~ enters, create a token that's a copy of [^\n]+$/m.test(normalizeSelf(d)) && (normalizeSelf(d).match(/\bcreate\b/g) ?? []).length === 1;
   const all = joinModes(
-    normalizeSelf(d)
+    roundB191Text(normalizeSelf(d))
       .replace(/^When ~ leaves the battlefield, exile the token\.$/m, (l) => (oneToken ? "When ~ leaves the battlefield, exile all tokens created with ~." : l))
       .replace(/^When the token leaves the battlefield, sacrifice ~\.$/m, (l) => (oneToken ? "Whenever a token created with ~ leaves the battlefield, sacrifice ~." : l))
       // "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each ..." (Banner of Kinship):
@@ -2064,6 +2066,10 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB188Line(line, raw, out, isSpell)) continue;
     // Thought Prison, Soulcipher Board, Grimoire Thief (round B189).
     if (roundB189Line(line, raw, out, isSpell)) continue;
+    // Round B190.
+    if (roundB190Line(line, raw, out, isSpell)) continue;
+    // Round B191 (Ward of Bones).
+    if (roundB191Line(line, out, isSpell)) continue;
     // Colfenor's Plans (round B192).
     if (roundB192Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
@@ -7040,7 +7046,9 @@ export function compile(d: CardDef): CompiledCard {
     // is of that type (CostChoices.creatureType, CastHow.castType).
     const ofYourChoice = " of the creature type of your choice";
     const typeChoice = !floatingFirst && tail === undefined && spellLines.length === 1 && spellLines[0]!.split(ofYourChoice).length === 2 && /\btarget creatures?(?: cards?)?$/.test(spellLines[0]!.split(ofYourChoice)[0]!) && !spellLines[0]!.includes("•");
-    const body0 = floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(typeChoice ? spellLines[0]!.replace(ofYourChoice, "") : spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}), ...(costTappedX ? { costTappedX } : {}) }) : null;
+    // Round B191 (Multiple Choice): a whole spell read at once.
+    const b191 = !floatingFirst && tail === undefined ? roundB191Spell(spellLines.join(" ")) : undefined;
+    const body0 = b191 !== undefined ? b191 : floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(typeChoice ? spellLines[0]!.replace(ofYourChoice, "") : spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}), ...(costTappedX ? { costTappedX } : {}) }) : null;
     // "Up to three target creature cards" is three target specs alike: each one of that type.
     const typed = typeChoice && body0 && !body0.modal && body0.targets.length > 0 && body0.targets.every((t) => (t.kind === "object" || t.kind === "card") && !t.chosen && t.types?.length === 1 && t.types[0] === "Creature" && !t.subtypes?.length && t.text === body0.targets[0]!.text);
     const body = typeChoice ? (typed ? { ...body0, targets: body0.targets.map((t) => ({ ...t, chosen: "type" as const, text: `${t.text} of the chosen type` })) } : null) : body0;
@@ -7755,6 +7763,10 @@ function linkExile(out: CompiledCard) {
     const others = [...out.triggers.map((tr) => tr.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => ["exile", "exileTop", "exileFaceDown", "takeFromHand", "hideaway", "impulse", "exileHand", "exileGraveyard"].includes(e.type) || (e.type === "search" && e.dest.zone === "exile"));
     if (!others.length) return;
   }
+  // Induced Amnesia: "When ~ is put into a graveyard from the battlefield, return the exiled cards to their owner's hand":
+  // the cards its enters ability exiled face down, its only exile (CR 607.2a), linked by that ability's source as it was.
+  const faceDowns = [...out.triggers.map((tr) => tr.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => ["exile", "exileTop", "exileFaceDown", "takeFromHand", "hideaway", "impulse", "exileHand", "search", "pick", "discard"].includes(e.type));
+  if (!out.spell && faceDowns.length === 1 && faceDowns[0]!.type === "exileFaceDown" && faceDowns[0]!.from === "hand" && returns.length === 1 && returns[0]!.event === "selfToGraveyard" && out.triggers.some((tr) => tr.event === "selfEnters" && tr.body.effects.includes(faceDowns[0]!)) && allEffects(returns[0]!.body.effects).every((e) => e.type === "returnLinked" && e.dest === "hand")) return;
   // "When this creature is turned face up, exile ..." (Aurelia's Vindicator) is one of its exile abilities too (CR 607.2a).
   // Hoarding Dragon: "search your library for an artifact card, exile it, then shuffle" is its exile ability too.
   // Wormfang Newt, Crab and Drake: "exile a land you control", "an opponent chooses a permanent you control ... and exiles

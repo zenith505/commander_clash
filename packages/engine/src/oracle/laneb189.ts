@@ -4,6 +4,7 @@ import type { CompiledCard, Effect } from "../abilities";
 import { addTarget, type Ctx } from "./body";
 import { parseSentence } from "./sentence";
 import { parseActivated } from "./activated";
+import { roundB190Sentence } from "./laneb190";
 import { parseTrigger } from "./triggers";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
@@ -106,5 +107,5 @@ export function roundB189Sentence(s: string, sentences: string[], si: number, ct
     if (!other) return null;
     return { effect: { type: "exileTopLandToHandElseCounter", counter: other[1]! }, next: si + 3 };
   }
-  return null;
+  return roundB190Sentence(s, sentences, si, ctx, effects);
 }

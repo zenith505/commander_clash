@@ -661,11 +661,12 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     return s.battlefield.map((id) => obj(s, id)).filter((o) => all.has(`${o.id}@${o.zoneChanges ?? 0}`));
   }
   if (ref.ref === "blockHistory") {
-    const at = blockHistoryAt(s, ref, ctx);
-    if (!at) return [];
-    const key = `${at.id}@${at.zc}`;
-    const with_ = new Set((s.turnLog?.blocks ?? []).filter((b) => !ref.thisCombat || b.combat === (s.combatsThisTurn ?? 0)).flatMap((b) => [...(ref.blockers && b.attacker === key ? [b.blocker] : []), ...(ref.blocked && b.blocker === key ? [b.attacker] : [])]));
-    if (ref.andSelf) with_.add(key);
+    // Triton Tactics: several of them.
+    const ats = ref.ats ?? [blockHistoryAt(s, ref, ctx)].filter((a): a is { id: ObjectId; zc: number } => !!a);
+    if (!ats.length) return [];
+    const keys = new Set(ats.map((at) => `${at.id}@${at.zc}`));
+    const with_ = new Set((s.turnLog?.blocks ?? []).filter((b) => !ref.thisCombat || b.combat === (s.combatsThisTurn ?? 0)).flatMap((b) => [...(ref.blockers && keys.has(b.attacker) ? [b.blocker] : []), ...(ref.blocked && keys.has(b.blocker) ? [b.attacker] : [])]));
+    if (ref.andSelf) for (const key of keys) with_.add(key);
     return s.battlefield.map((id) => obj(s, id)).filter((o) => with_.has(`${o.id}@${o.zoneChanges ?? 0}`) && (!ref.stillBlocking || o.blocking !== undefined));
   }
   if (ref.ref === "blockingIt") {

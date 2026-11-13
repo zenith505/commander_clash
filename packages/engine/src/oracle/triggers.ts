@@ -2701,7 +2701,8 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   // the exiled card, not them.
   const aboutThem = rest.replace(/exile the top card of your library\. (?:Until (?:the end of your next turn|end of turn|your next end step), you may play that card|You may play that card (?:this turn|until the end of your next turn|until your next end step))\.?$/i, "");
   // "Search your library for a Plains card, put it onto the battlefield tapped" (Deep Gnome Terramancer): the card found.
-  const notThem = aboutThem.replace(/search your library for [^,]+, put it (?:onto the battlefield(?: tapped)?|into your hand)/i, "");
+  // "Then sacrifice it if it has five or more bloodstain counters on it" (Blood Spatter Analysis): the source.
+  const notThem = aboutThem.replace(/search your library for [^,]+, put it (?:onto the battlefield(?: tapped)?|into your hand)/i, "").replace(/\. Then sacrifice it if it has [a-z]+ or more [a-z]+ counters on it\./, ".");
   if (/\b(it|its|they|them|their|those|that card|that creature|that token|one of them|among them|this way)\b/i.test(notThem)) return "fail";
   let text = rest;
   const thatMuch = /\bthat (?:much|many)\b/.test(text);

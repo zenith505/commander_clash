@@ -284,7 +284,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Forcemage Advocate: "Return target card from an opponent's graveyard to their hand": that opponent owns it (a card
   // is in its owner's graveyard, CR 404.2), so it's its owner's hand.
   // Nullmage Advocate: "Return two target cards from an opponent's graveyard to their hand", the same.
-  if ((m = /^(Return (?:target [a-z ]*card|two target cards) from an opponent's graveyard) to their hand$/.exec(s))) return parseSentence(`${m[1]} to ${/^Return two/.test(m[1]!) ? "their owner's" : "its owner's"} hand`, ctx);
+  // Pulsemage Advocate: "Return three target cards from an opponent's graveyard to their hand", the same (rulings: a single
+  // opponent with three cards in their graveyard).
+  if ((m = /^(Return (?:target [a-z ]*card|two target cards|three target cards) from an opponent's graveyard) to their hand$/.exec(s))) return parseSentence(`${m[1]} to ${/^Return two/.test(m[1]!) ? "their owner's" : "its owner's"} hand`, ctx);
   // "Return all creatures to their owners' hands except for Krakens, Leviathans, Octopuses, and Serpents" (Whelming Wave),
   // "... all permanents ... except for Giants, Wizards, and lands", "Destroy all permanents except for artifacts and lands":
   // every one that has none of those subtypes or card types.

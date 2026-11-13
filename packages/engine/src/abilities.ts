@@ -290,6 +290,8 @@ export type Count =
   | { kind: "destroyedThisWay"; filter: TargetSpec; /** "For each creature that died this way" (Reign of Terror): only those put into a graveyard (CR 700.4). */ died?: true; /** "The number of artifacts they controlled that were put into a graveyard this way" (Builder's Bane): only those this player controlled as they last existed (CR 608.2h). */ controlledBy?: PlayerRef; /** "The total mana value of permanents destroyed this way" (Convert to Slime): their mana values added up, as they last existed (rulings, CR 608.2h), instead of how many. */ totalMv?: true }
   /** "For each nontoken creature exiled this way" (Declaration in Stone): permanents, as they last existed. */
   | { kind: "exiledThisWay"; filter: TargetSpec }
+  /** Induced Amnesia: "exiles all cards from their hand face down, then draws that many cards": how many this spell or ability exiled face down (Resolving.faceDownExiled). */
+  | { kind: "faceDownExiledThisWay" }
   /**
    * "If the discovered card's mana value is less than 10, ... equal to the difference" (Hit the Mother Lode): `n` minus the
    * mana value of the card this spell or ability discovered (CR 701.57c), 0 if it's not less or nothing was discovered.
@@ -803,6 +805,8 @@ export interface TargetSpec {
   /** "With total power and toughness 5 or less" (Cut Down): its power plus its toughness (rulings). */
   totalPT?: Range;
   manaValue?: Range; // "with mana value 3 or less" (CR 202.3)
+  /** Evolving Door: "a creature card that's exactly that many colors plus one": how many colors it has (CR 105.2). */
+  colorsN?: Range;
   /** "With mana cost {0} or {1}" (Urza's Saga): its mana cost is exactly one of these (CR 202.1; not {X} or none, rulings). */
   manaCostIn?: string[];
   /** "Target spell with {X} in its mana cost" (Frontline Medic; CR 107.3). */
@@ -823,7 +827,7 @@ export interface TargetSpec {
    * it resolves (CR 601.2c, 608.2b; rulings on Beguiler of Wills and Earthshaker Khenra), for a group or a search as it
    * resolves (`bindBound`). Until then, any value.
    */
-  bound?: { key: "power" | "toughness" | "manaValue" | /** Wild Pair: "with the same total power and toughness". */ "totalPT"; at: "most" | "least" | "exact"; amount: AmountExpr };
+  bound?: { key: "power" | "toughness" | "manaValue" | /** Wild Pair: "with the same total power and toughness". */ "totalPT" | /** Evolving Door: "exactly that many colors plus one". */ "colorsN"; at: "most" | "least" | "exact"; amount: AmountExpr };
   /**
    * Chosen or noted as you drafted cards (Conspiracy, CR 905.2b): "a card with a name you noted for cards named ~",
    * "one or more of the colors chosen as you drafted cards named Regicide". No draft comes before a game here, so
@@ -1626,7 +1630,7 @@ export type ObjRef =
    * turn with `of` as it was then (TurnLog.blocks), even if they're no longer blocking (rulings), each still that object.
    * `at`: `of` as a delayed trigger remembers it.
    */
-  | { ref: "blockHistory"; of: ObjRef; at?: { id: ObjectId; zc: number }; blockers?: true; blocked?: true; /** "This combat" (Ride Down): only blocks declared in the current combat phase (TurnLog.blocks `combat`). */ thisCombat?: true; /** With `of` self, in a dies trigger (Cathedral Membrane): the source as it last existed on the battlefield. */ diedSelf?: true; /** With `of` self: "destroy it and all creatures it blocked this turn" (Defiant Vanguard): the source too, while it's still that object. */ andSelf?: true; /** Heat Stroke: "each creature that blocked or was blocked this turn": every blocker and every blocked attacker of this turn's blocks, whoever's (`of` unused). */ anyone?: true; /** Ib Halfheart: "each creature blocking it" once the attacker (`of` subject) is gone: only those still blocking creatures (CR 506.4). */ stillBlocking?: true }
+  | { ref: "blockHistory"; of: ObjRef; at?: { id: ObjectId; zc: number }; /** Triton Tactics: "each creature that was blocked by one of those creatures this turn": `of` several targets, remembered as the spell resolved (the legal ones, CR 608.2b). */ ats?: { id: ObjectId; zc: number }[]; blockers?: true; blocked?: true; /** "This combat" (Ride Down): only blocks declared in the current combat phase (TurnLog.blocks `combat`). */ thisCombat?: true; /** With `of` self, in a dies trigger (Cathedral Membrane): the source as it last existed on the battlefield. */ diedSelf?: true; /** With `of` self: "destroy it and all creatures it blocked this turn" (Defiant Vanguard): the source too, while it's still that object. */ andSelf?: true; /** Heat Stroke: "each creature that blocked or was blocked this turn": every blocker and every blocked attacker of this turn's blocks, whoever's (`of` unused). */ anyone?: true; /** Ib Halfheart: "each creature blocking it" once the attacker (`of` subject) is gone: only those still blocking creatures (CR 506.4). */ stillBlocking?: true }
   /**
    * "Each permanent with the most votes or tied for most votes" (Council's Judgment), "each card with the most votes ..."
    * (Custodi Squire): what this ability's vote chose (CR 701.38), while each is still that object; none if no one voted.
@@ -2050,6 +2054,8 @@ export type Modification =
   | { kind: "ownBlockTax"; n: number; perPlusOne?: true; amount?: Amount }
   /** Hipparion: "~ can't block creatures with power 3 or greater unless you pay {1}": paid as blockers are declared, for each such creature it blocks, its power then (CR 509.1d). */
   | { kind: "ownBlockTaxVs"; n: number; minPower: number }
+  /** Awesome Presence: "Enchanted creature can't be blocked unless defending player pays {3} for each creature they control that's blocking it": generic mana for each creature blocking this one, paid as blockers are declared (CR 509.1d). */
+  | { kind: "blockedTax"; n: number }
   | { kind: "attackTax"; n: number; amount?: Amount; planeswalkers?: true; /** Onakke Oathkeeper: "Creatures can't attack planeswalkers you control unless ...": only attacks on its controller's planeswalkers, not on the player. */ onlyPlaneswalkers?: true; /** A symbol other than generic mana per creature, "{W/P}" (Norn's Annex). */ mana?: string; /** Nils, Discipline Enforcer: each creature with counters on it, {X} for it, X its number of counters (all kinds, rulings). */ perCounter?: true; /** Elephant Grass: "Nonblack creatures can't attack you unless ...": only attackers that aren't this color as attackers are declared pay it. */ unlessColor?: Color }
   /** "Untap ~ during each other player's untap step" (CR 502.3). */
   | { kind: "untapsDuringOthers" }
@@ -8080,6 +8086,10 @@ export interface CompiledCard {
   defendingCantCastWhileAttacking?: true;
   /** "Each opponent who attacked with a creature this turn can't cast spells" (Angelic Arbiter): one who declared an attacker this turn (rulings). */
   opponentsWhoAttackedCantCast?: true;
+  /** Ward of Bones: "Each opponent who controls more creatures than you can't cast creature spells. The same is true for artifacts and enchantments.": for each of these card types, an opponent who controls more permanents of that type than this permanent's controller can't cast a spell of that type (rulings), while it's on the battlefield. */
+  opponentsWithMoreCantCast?: string[];
+  /** Ward of Bones: "Each opponent who controls more lands than you can't play lands." (rulings), while it's on the battlefield. */
+  opponentsWithMoreLandsCantPlay?: true;
   /** Sandswirl Wanderglyph: "Each opponent who attacked you or a planeswalker you control this turn can't cast spells": one who declared an attacker against its controller or their planeswalker this turn (Player.attackedPlayersOrWalkers), even before it was there; only while it's on the battlefield (rulings). */
   opponentsWhoAttackedYouCantCast?: true;
   /** "As long as ~ is attached to a creature, your opponents can't cast spells during your turn" (Conqueror's Flail): only while this holds. */

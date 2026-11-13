@@ -449,6 +449,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const d = s.resolving?.discovered;
       return d && d.mv < c.n ? c.n - d.mv : 0;
     }
+    case "faceDownExiledThisWay":
+      return s.resolving?.faceDownExiled?.length ?? 0;
     case "destroyedThisWay":
     case "exiledThisWay":
       // As they last existed on the battlefield (CR 608.2h).
@@ -795,6 +797,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return a && b ? Math.abs(characteristics(s, a).power - characteristics(s, b).power) : 0;
     }
     case "colorsOf": {
+      // Evolving Door: "the colors of the sacrificed creature", sacrificed to activate it, as it last existed (CR 608.2h).
+      if (c.of.ref === "sacrificed") return (ctx.sacrificed?.[0] ?? s.resolving?.sacrificedThisWay?.at(-1))?.colors?.length ?? 0;
       const o = refObjects(s, c.of, ctx)[0];
       if (!o) return 0;
       if (o.zone === "battlefield") return characteristics(s, o).colors.length;
@@ -1593,6 +1597,8 @@ function describeCount(c: Count): string {
       return c.totalMv ? "the total mana value of permanents destroyed" : `#${c.filter.text} ${c.died ? "that died" : "destroyed"}`;
     case "exiledThisWay":
       return `#${c.filter.text} exiled`;
+    case "faceDownExiledThisWay":
+      return "#cards exiled";
     case "cardsInGraveyard":
       if (c.greatestPower) return `the greatest power among ${c.filter ? c.filter.text.replace(/^target /, "") : "card"}s in graveyard`;
       if (c.greatestMv) return "the greatest mana value among cards in graveyard";

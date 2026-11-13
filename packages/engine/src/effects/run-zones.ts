@@ -2431,7 +2431,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Skyship Weatherlight: one at random as it resolves.
         if (!cards.length) return;
         const pick = cards[Math.floor(nextRandom(s) * cards.length)]!;
-        log(s, `${src} chooses ${defOf(s, pick).name} at random.`);
+        // Wall of Mourning: a face-down card stays unknown to the players who may not look at it (CR 406.3).
+        if (pick.hiddenExile && e.dest === "hand") {
+          log(s, `${src} chooses a card at random.`);
+          log(s, `${src} chooses ${defOf(s, pick).name} at random.`, pick.owner);
+        } else log(s, `${src} chooses ${defOf(s, pick).name} at random.`);
         cards = [pick];
       } else if (e.exactly !== undefined && cards.length > e.exactly) {
         // Vault 13: exactly that many of them, chosen as it resolves; with that many or fewer, all of them.
@@ -2546,7 +2550,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const cards = sc.flickered.map((l) => s.objects[l.id]).filter((c, i): c is GameObject => c?.zone === "exile" && (c.zoneChanges ?? 0) === sc.flickered![i]!.zc);
       if (e.dest === "hand" || e.dest === "graveyard") {
         for (const c of cards) {
-          log(s, `${src} returns ${defOf(s, c).name} to its owner's ${e.dest}.`);
+          // Induced Amnesia: a face-down card returned to a hand stays unknown to the others (CR 406.3).
+          if (c.hiddenExile && e.dest === "hand") {
+            log(s, `${src} returns a card to ${player(s, c.owner).name}'s hand.`);
+            log(s, `${src} returns ${defOf(s, c).name} to your hand.`, c.owner);
+          } else log(s, `${src} returns ${defOf(s, c).name} to its owner's ${e.dest}.`);
           moveObject(s, c.id, e.dest);
         }
         return;

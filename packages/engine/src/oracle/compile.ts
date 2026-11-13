@@ -40,6 +40,7 @@ import { roundB186Line } from "./laneb186";
 import { roundB187Line } from "./laneb187";
 import { roundB188Line } from "./laneb188";
 import { round344Line } from "./round344";
+import { roundB190Line } from "./laneb190";
 import { round345Chapter, round345Line } from "./round345";
 import { round346Line } from "./round346";
 import { round347Line } from "./round347";
@@ -2063,6 +2064,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB188Line(line, raw, out, isSpell)) continue;
     // Thought Prison, Soulcipher Board, Grimoire Thief (round B189).
     if (roundB189Line(line, raw, out, isSpell)) continue;
+    // Round B190.
+    if (roundB190Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -7734,6 +7737,10 @@ function linkExile(out: CompiledCard) {
     const others = [...out.triggers.map((tr) => tr.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => ["exile", "exileTop", "exileFaceDown", "takeFromHand", "hideaway", "impulse", "exileHand", "exileGraveyard"].includes(e.type) || (e.type === "search" && e.dest.zone === "exile"));
     if (!others.length) return;
   }
+  // Induced Amnesia: "When ~ is put into a graveyard from the battlefield, return the exiled cards to their owner's hand":
+  // the cards its enters ability exiled face down, its only exile (CR 607.2a), linked by that ability's source as it was.
+  const faceDowns = [...out.triggers.map((tr) => tr.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => ["exile", "exileTop", "exileFaceDown", "takeFromHand", "hideaway", "impulse", "exileHand", "search", "pick", "discard"].includes(e.type));
+  if (!out.spell && faceDowns.length === 1 && faceDowns[0]!.type === "exileFaceDown" && faceDowns[0]!.from === "hand" && returns.length === 1 && returns[0]!.event === "selfToGraveyard" && out.triggers.some((tr) => tr.event === "selfEnters" && tr.body.effects.includes(faceDowns[0]!)) && allEffects(returns[0]!.body.effects).every((e) => e.type === "returnLinked" && e.dest === "hand")) return;
   // "When this creature is turned face up, exile ..." (Aurelia's Vindicator) is one of its exile abilities too (CR 607.2a).
   // Hoarding Dragon: "search your library for an artifact card, exile it, then shuffle" is its exile ability too.
   // Wormfang Newt, Crab and Drake: "exile a land you control", "an opponent chooses a permanent you control ... and exiles

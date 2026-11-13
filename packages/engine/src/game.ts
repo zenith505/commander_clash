@@ -12459,7 +12459,7 @@ export const blocksMayCostLife = (s: GameState): boolean => s.battlefield.some((
 
 /** Could blocking cost `pid` mana now: every block (Archangel of Tithes), or one of their creatures' own (Qal Sisma Behemoth, Hipparion)? */
 export function blocksMayCost(s: GameState, pid: PlayerId): boolean {
-  return !!blockCost(s, 1) || creaturesOf(s, pid).some((o) => characteristics(s, o).ownBlockTax > 0 || characteristics(s, o).ownBlockTaxVs.length > 0);
+  return !!blockCost(s, 1) || creaturesOf(s, pid).some((o) => characteristics(s, o).ownBlockTax > 0 || characteristics(s, o).ownBlockTaxVs.length > 0) || s.battlefield.some((id) => obj(s, id).attacking === pid && characteristics(s, obj(s, id)).blockedTax > 0);
 }
 
 /** Hipparion: what this creature blocking that attacker costs, "can't block creatures with power 3 or greater unless you pay {1}" (CR 509.1d). */
@@ -12468,7 +12468,8 @@ export function blockTaxVs(s: GameState, blocker: ObjectId, attacker: ObjectId):
   const a = s.objects[attacker];
   if (b?.zone !== "battlefield" || a?.zone !== "battlefield") return 0;
   const at = power(s, a);
-  return characteristics(s, b).ownBlockTaxVs.reduce((t, x) => t + (at >= x.minPower ? x.n : 0), 0);
+  // Awesome Presence: what blocking the attacker costs each creature blocking it.
+  return characteristics(s, b).ownBlockTaxVs.reduce((t, x) => t + (at >= x.minPower ? x.n : 0), 0) + characteristics(s, a).blockedTax;
 }
 
 /** The total attack tax for a declaration: how many mana symbols (generic mana, and {W/P} each for Norn's Annex). */

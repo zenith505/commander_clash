@@ -152,6 +152,17 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Venomous Breath: "destroy all creatures that blocked or were blocked by it this turn": the target as it is now.
       for (const [i, x] of effects.entries())
         if ("what" in x && x.what && typeof x.what === "object" && "ref" in x.what && x.what.ref === "blockHistory" && !x.what.at) {
+          // Triton Tactics: "one of those creatures", each of the targets still legal (CR 608.2b).
+          const of = x.what.of;
+          if (of.ref === "target" && "n" in of && of.n) {
+            const ats: { id: ObjectId; zc: number }[] = [];
+            for (let j = of.index; j < of.index + of.n; j++) {
+              const t = ctx.targets[j];
+              if (t?.kind === "object" && ctx.legal?.[j] !== false) ats.push({ id: t.id, zc: t.zc ?? s.objects[t.id]?.zoneChanges ?? 0 });
+            }
+            effects[i] = { ...x, what: { ...x.what, ats } } as Effect;
+            continue;
+          }
           const at = blockHistoryAt(s, x.what, ctx);
           if (at) effects[i] = { ...x, what: { ...x.what, at } } as Effect;
         }

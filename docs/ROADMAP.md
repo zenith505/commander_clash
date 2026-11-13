@@ -8360,6 +8360,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B188 (looked at, not done): Kang Dynasty (chapters I and II goad creatures of each opponent's choosing
   and draw for their combat damage until your next turn; III is done), Drizzt Do'Urden (its short name "Drizzt" isn't read
   as ~), Long Rest, Time Reaper, Pulsemage Advocate, Heart of Kiran and Turf War stay out.
+- Round B190 (least played first, from the Lane B skip lists): Evolving Door ("Count the colors of the sacrificed creature,
+  then search your library for a creature card that's exactly that many colors plus one. Exile that card, then shuffle. You
+  may cast the exiled card.": the creature's colors as it last existed, only how many, the card cast as it resolves paying
+  its costs or not at all, rulings, CR 608.2g-h). Awesome Presence ("can't be blocked unless defending player pays {3} for
+  each creature they control that's blocking it": a block cost totalled with the others, CR 509.1d; nothing obliges paying
+  it, so Lure doesn't, CR 509.1c). Blood Spatter Analysis ("Then sacrifice it if it has five or more bloodstain counters on
+  it. When you do, return target creature card ...": only as its ability resolves, the reflexive target chosen as it
+  triggers, rulings, CR 603.12). Wall of Mourning ("exile a card from the top of your library face down for each opponent
+  you have", and its coven ability putting one back at random, unseen by anyone, rulings, CR 406.3). Induced Amnesia
+  ("target player exiles all cards from their hand face down, then draws that many cards", returned only when it's put
+  into a graveyard from the battlefield, rulings, CR 607.2a). Triton Tactics ("tap each creature that was blocked by one of
+  those creatures this turn and it doesn't untap during its controller's next untap step": the blocks of each legal target,
+  CR 608.2b). Face-down cards a linked ability moves to a hand are no longer named in the public log. +6, 31,140 of 31,936
+  with B188 and B189.
+- Out after round B190 (looked at, not done): Storm Herald ("return any number of Aura cards from your graveyard to the
+  battlefield attached to creatures you control" untargeted, each host chosen as they enter together, then exiled later and
+  if they'd leave: no such pick yet), Meandering Towershell (returns attacking "at the beginning of the declare attackers
+  step on your next turn": no such delayed timing yet), Mana Cache (a mana ability any player may activate), Kodama of the
+  Center Tree, Arcane Artisan and Cleansing stay out for the reasons in the earlier lists.
 - Out after round B187 (looked at, not done): Kraven the Hunter (the greatest power among a player's creatures as one died,
   several dying at once), Corrosive Ooze, Trove of Temptation, Rain of Gore and Blood Scrivener stay out for the reasons in
   the earlier lists.

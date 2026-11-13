@@ -16951,6 +16951,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         effects.push({ type: "if", cond: { kind: "youDid" }, effects: mayThen ? [{ type: "may", effects: inner, text: mayThen[1]! }] : inner });
         continue;
       }
+      // "Whenever another nontoken creature you control dies, exile it. If you do, create a token that's a copy of that
+      // creature ..." (Hofri Ghostforge): not optional, and done only if the card was exiled (rulings: not if it had left the
+      // graveyard before the trigger resolved, CR 400.7).
+      if (ifDid[1] === "do" && prev?.type === "exile" && prev.what.ref === "subjectCard" && !prev.until && !prev.linked && !ctx.spell && !ctx.activated) {
+        const inner = parseOne(capital(ifDid[2]!), ctx);
+        if (!inner) return null;
+        prev.setsDid = true;
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: inner });
+        continue;
+      }
       // Rysorian Badger: "If you do, you gain 1 life for each card exiled this way and ~ assigns no combat damage this turn":
       // both depend on it (CR 510.1: an attacking creature that assigns no combat damage deals none).
       const noDamage = ifDid[1] === "do" ? /^(.+) and ~ assigns no combat damage this turn$/.exec(ifDid[2]!) : null;

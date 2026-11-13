@@ -377,6 +377,7 @@ function diesMatches(
   if (d.orAttached && attachedTo !== undefined && attachedTo === dying.o.id) return true;
   if (d.damagedBySelf && !dying.o.damagedBy?.includes(damagedById ?? srcId)) return false;
   if (d.damagedByEquipped && (!attachedTo || !dying.o.damagedBy?.includes(attachedTo))) return false;
+  if (d.damagedByKindYours && !dying.o.damagedByKinds?.some((k) => k === `${you}|${d.damagedByKindYours}` || k === `${you}|*`)) return false;
   if (d.blockingSelf && !dying.o.blocking?.includes(srcId)) return false;
   // Thijarian Witness: attacking or blocking alone as it left (CR 506.5), noted then (LastKnown aloneIn).
   if (d.aloneInCombat && !s.lastKnown?.[dying.o.id]?.aloneIn) return false;

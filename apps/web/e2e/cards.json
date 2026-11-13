@@ -11005,6 +11005,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "06f7ec6d-d70e-44d8-bf43-ae667d244ab4",
+  "name": "Espers to Magicite",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile each opponent's graveyard. When you do, choose up to one target creature card exiled this way. Create a token that's a copy of that card, except it's an artifact and it loses all other card types.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0114f97f-b196-4af1-90aa-eba164cb8f22",
   "name": "Etchings of the Chosen",
   "manaCost": "{1}{W}{B}",
@@ -29014,6 +29040,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6c2e6447-c32b-4b92-a3e6-4d770e3dd250",
+  "name": "Rootweaver Druid",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Elf Druid",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Druid"
+  ],
+  "oracleText": "When this creature enters, each opponent may search their library for up to three basic land cards. They each put one of those cards onto the battlefield tapped under your control and the rest onto the battlefield tapped under their control. Then each player who searched their library this way shuffles.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f07a8c8d-73a1-44cc-9313-05f3bcf1a67c",
   "name": "Rotating Fireplace",
   "manaCost": "{3}",
@@ -38717,6 +38774,37 @@
   "set": "ktk",
   "releasedAt": "2014-09-26",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "814679b4-51bd-4b07-a7b8-d3375d36ff45",
+  "name": "Vincent's Limit Break",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Tiered (Choose one additional cost.)\nUntil end of turn, target creature you control gains \"When this creature dies, return it to the battlefield tapped under its owner's control\" and has the chosen base power and toughness.\n• Galian Beast — {0} — 3/2.\n• Death Gigas — {1} — 5/2.\n• Hellmasker — {3} — 7/2.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Hellmasker",
+   "Death Gigas",
+   "Tiered",
+   "Galian Beast"
+  ],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

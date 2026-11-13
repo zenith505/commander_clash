@@ -411,6 +411,12 @@ export interface GameObject {
   /** The permanents that dealt it damage this turn, for "whenever a creature dealt damage by ~ this turn dies". */
   damagedBy?: ObjectId[];
   /**
+   * Shelob, Child of Ungoliant: "dealt damage this turn by a Spider you controlled": each subtype the sources that dealt
+   * it damage this turn had then, with their controller then, as "player|Subtype" ("player|*" for every creature type,
+   * CR 702.73a), each once.
+   */
+  damagedByKinds?: string[];
+  /**
    * Autumn Willow: the players whose spells and abilities can target it this turn as though it didn't have shroud; gone in
    * the cleanup step (CR 514.2) and when it leaves (CR 400.7).
    */

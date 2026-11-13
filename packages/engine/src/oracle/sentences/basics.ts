@@ -1458,8 +1458,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // The monarch (CR 725).
   if (/^You become the monarch$/i.test(s)) return [{ type: "becomeMonarch", who: { ref: "you" } }];
   if (/^You can't become the monarch this turn$/i.test(s)) return [{ type: "cantBecomeMonarch", who: { ref: "you" } }];
-  // "It becomes night" (Unnatural Moonrise): CR 731.1.
-  if ((m = /^It becomes (day|night)$/.exec(s))) return [{ type: "becomeDayNight", v: m[1] as "day" | "night" }];
+  // "It becomes night" (Unnatural Moonrise): CR 731.1. Tovolar, Dire Overlord: "..., if you control three or more Wolves
+  // and/or Werewolves, it becomes night" after its trigger's condition.
+  if ((m = /^[Ii]t becomes (day|night)$/.exec(s))) return [{ type: "becomeDayNight", v: m[1] as "day" | "night" }];
   // The Celestus: "If it's night, it becomes day. Otherwise, it becomes night." (joined in body.ts): with neither, night.
   if (s === "If it's night, it becomes day, otherwise it becomes night") return [{ type: "becomeDayNight", v: "switch" }];
   // "You may play an additional land this turn", "you may play up to two additional lands this turn" (CR 305.2a).

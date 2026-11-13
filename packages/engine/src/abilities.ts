@@ -531,6 +531,12 @@ export type Count =
   | { kind: "castSpellManaSymbols"; color: Color }
   /** "Draw that many cards" after "a spell with one or more targets" (Voracious Bibliophile): how many targets it was cast with. */
   | { kind: "castSpellTargets" }
+  /**
+   * Hollow Marauder: "For each of those opponents who didn't discard a card with mana value 4 or greater" after "any number
+   * of target opponents each discard a card": the target players (`who`, still legal targets, CR 608.2b) none of whose
+   * cards discarded while this resolves matches `filter`, one with nothing to discard too (CR 701.9b).
+   */
+  | { kind: "playersDidntDiscard"; who: PlayerRef; filter: TargetSpec }
   /** "The number of times it's been cast from the command zone this game" (Study Hall): the commander spell cast's. */
   | { kind: "castSpellCommanderCasts" }
   /**
@@ -1510,6 +1516,12 @@ export type ObjRef =
   | { ref: "ringBearer" } // "your Ring-bearer" (CR 701.54a): the controller's, if they have one
   /** "That spell" in a cast trigger (Monstrous Vortex): the spell whose casting triggered it, as it was cast. Counts only. */
   | { ref: "castSpell" }
+  /**
+   * "Those permanents" after "Whenever you cast a spell that targets one or more permanents" (Dack Fayden's emblem): the
+   * permanents the spell whose cast triggered this ability targets (on the stack, or as it was cast once it has left), each
+   * still that object on the battlefield (CR 400.7) and matching `filter`.
+   */
+  | { ref: "causeTargets"; filter: TargetSpec }
   /** "Each creature dealt damage this way" (Aurelia's Fury): `filter` for the kind of permanent. */
   | { ref: "damagedThisWay"; filter?: TargetSpec }
   /** The card a "whenever a creature dies" trigger was about, in the zone it went to, while it's still that object (CR 400.7). */
@@ -3699,7 +3711,7 @@ export type Effect =
   /** "When you next cast an instant or sorcery spell this turn, ...": a delayed trigger on that cast (CR 603.7). */
   /** `cascade`: "the next noncreature spell you cast this turn has cascade" (Dark Apostle): that spell's own cascade. */
   /** `who`: "the next spell they cast": that player's (a target player), not the controller's. */
-  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; /** Zevlor, Elturel Exile: "that targets only a single opponent or a single permanent an opponent controls": every target of the spell that one player or permanent (rulings), checked as it's cast (GameState.nextCast `onlyOpponentOrTheirs`). */ onlyOpponentOrTheirs?: true; cascade?: true; /** Yidris, Maelstrom Wielder: "as you cast spells from your hand this turn, they gain cascade": every such spell this turn, not only the next one (never used up). */ allTurn?: true; /** "The next instant or sorcery spell you cast this turn has storm" (Crackling Spellslinger). */ storm?: true; who?: PlayerRef; /** "When you next cast an instant or sorcery spell from your hand this turn" (Narset Transcendent). */ fromHand?: true; /** "The next spell you cast this turn can't be countered" (Mistrise Village). */ uncounterable?: true; /** "The next spell of the chosen type you cast this turn can be cast as though it had flash" (Progenitor's Icon; CR 702.8a): used up by that spell, whenever it's cast. */ flash?: true; /** Soulfire Grand Master: "put that card into your hand instead of into your graveyard as it resolves" (GameObject.toHandOnResolve). */ toHand?: true; /** Savage Summoning: "That creature enters with an additional +1/+1 counter on it" (CR 614.1c): the counter it enters with. */ counter?: string; /** "The next red or green creature spell you cast this turn can be cast without paying its mana cost" (World War Hulk, `free`) and "Rather than pay the mana cost of the next spell you cast this turn, you may pay life equal to that spell's mana value" (Marshland Bloodcaster, `life`): an alternative cost (CR 118.9) offered to that spell only, used up by it whichever cost is paid (rulings). */ alt?: "free" | "life" }
+  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; /** "Copy the next loyalty ability you activate this turn" (Jaya's Phoenix, `only`), "When you next cast an instant spell, cast a sorcery spell, or activate a loyalty ability this turn" (Repeated Reverberation, `also`): a loyalty ability its controller activates uses it up too (CR 606.3), and with `only` no spell does. */ loyalty?: "also" | "only"; /** Zevlor, Elturel Exile: "that targets only a single opponent or a single permanent an opponent controls": every target of the spell that one player or permanent (rulings), checked as it's cast (GameState.nextCast `onlyOpponentOrTheirs`). */ onlyOpponentOrTheirs?: true; cascade?: true; /** Yidris, Maelstrom Wielder: "as you cast spells from your hand this turn, they gain cascade": every such spell this turn, not only the next one (never used up). */ allTurn?: true; /** "The next instant or sorcery spell you cast this turn has storm" (Crackling Spellslinger). */ storm?: true; who?: PlayerRef; /** "When you next cast an instant or sorcery spell from your hand this turn" (Narset Transcendent). */ fromHand?: true; /** "The next spell you cast this turn can't be countered" (Mistrise Village). */ uncounterable?: true; /** "The next spell of the chosen type you cast this turn can be cast as though it had flash" (Progenitor's Icon; CR 702.8a): used up by that spell, whenever it's cast. */ flash?: true; /** Soulfire Grand Master: "put that card into your hand instead of into your graveyard as it resolves" (GameObject.toHandOnResolve). */ toHand?: true; /** Savage Summoning: "That creature enters with an additional +1/+1 counter on it" (CR 614.1c): the counter it enters with. */ counter?: string; /** "The next red or green creature spell you cast this turn can be cast without paying its mana cost" (World War Hulk, `free`) and "Rather than pay the mana cost of the next spell you cast this turn, you may pay life equal to that spell's mana value" (Marshland Bloodcaster, `life`): an alternative cost (CR 118.9) offered to that spell only, used up by it whichever cost is paid (rulings). */ alt?: "free" | "life" }
   /**
    * "Until end of turn, whenever you cast a spell, ~ deals 2 damage to up to one target creature" (CR 603.7b): a delayed
    * triggered ability that triggers each time its event happens until `until` ends (see GameState.floatingTriggers).
@@ -4570,6 +4582,26 @@ export type Effect =
    * and may cast one of them from that hand as this resolves (castFromAmong `fromHand`, limited to those cards).
    */
   | { type: "handChooseCast"; who: PlayerRef; n: Amount }
+  /**
+   * Omen Machine: "that player exiles the top card of their library": that card, exiled, is "it" for the instructions
+   * after this one (ResolvingInfo.revealed, the card as the object it is in exile, CR 400.7). An empty library, none.
+   */
+  | { type: "exileTopAsIt"; who: PlayerRef }
+  /** Timothar, Baron of Bats: "If you do, create a 1/1 black Bat creature token ... It gains "When this token deals combat
+   * damage to a player, sacrifice it and return the exiled card to the battlefield tapped."": the trigger's card, just
+   * exiled by this ability, becomes "the exiled card" of each token it created (GameState.linkedExile, CR 607.2a, rulings). */
+  | { type: "linkSubjectCardToCreated" }
+  /** Desert Warfare: "put that card onto the battlefield under your control at the beginning of your next end step": one
+   * delayed trigger (CR 603.7) for each of these cards as it is now, at this ability's controller's next end step; it comes
+   * back only if it's still in the graveyard then (rulings, CR 400.7). */
+  | { type: "putAtYourNextEndStep"; what: ObjRef }
+  /**
+   * Omen Machine, Wild Evocation: "the player casts it without paying its mana cost if able": the card "it" names
+   * (ResolvingInfo.revealed, in a hand or in exile, still that object), cast by `who` as this resolves (CR 608.2g), for
+   * free (CR 118.9), its card type's timing ignored (CR 601.2, rulings); they must cast it if they can (PendingDecision
+   * "castFree" `must`), and if they can't, it stays where it is (rulings).
+   */
+  | { type: "castItIfAble"; who: PlayerRef }
   | {
       type: "counterOpponentsStack";
       /** Kadena's Silencer: "counter all abilities your opponents control": only the activated and triggered abilities already on the stack (rulings: not spells; mana abilities never are there, CR 605.3a). */
@@ -5186,7 +5218,7 @@ export type Effect =
    * this process until the tie is broken." A player who can't exile a card is out of it (rulings).
    */
   | { type: "timesifter" }
-  | { type: "extraTurn"; who: PlayerRef; /** "For each time vote, take an extra turn after this one" (Expropriate): counted as it resolves. */ n: Amount; loseAtEnd?: true; /** "Skip the untap step of that turn" (Savor the Moment). */ skipUntap?: true; /** "During that turn, power-up abilities can't be activated" (Kang the Conqueror). */ noPowerUp?: true }
+  | { type: "extraTurn"; who: PlayerRef; /** "For each time vote, take an extra turn after this one" (Expropriate): counted as it resolves. */ n: Amount; loseAtEnd?: true; /** "Skip the untap step of that turn" (Savor the Moment). */ skipUntap?: true; /** "During that turn, power-up abilities can't be activated" (Kang the Conqueror). */ noPowerUp?: true; /** "During that turn, damage can't be prevented" (Alchemist's Gambit, CR 615.12). */ noPrevention?: true }
   /**
    * "You control target player during that player's next turn" (CR 723): `controller` makes all of `who`'s choices and
    * decisions during the next turn `who` actually takes (723.1, 723.1b). `extraTurnAfter`: "After that turn, that player
@@ -5844,6 +5876,10 @@ export type TriggerEvent =
   /** "Whenever ~ phases in" (Warping Wurm), "Whenever ~ phases out" (Teferi's Imp, looking back in time, CR 603.10b): directly or indirectly (CR 702.26g). */
   | "selfPhasesIn"
   | "selfPhasesOut"
+  /** "Whenever one or more other permanents phase out" (The War Doctor): once for each phasing-out event that has another permanent, not if this one phases out with them (rulings, CR 603.2c). */
+  | "permanentsPhaseOut"
+  /** "Whenever ~ or another Spirit you control phases in" (King of the Oathbreakers): once for each such permanent phasing in (TriggeredAbility.subjectFilter, subjectOrSelf), the subject. */
+  | "permanentYouControlPhasesIn"
   /** "Whenever this Vehicle becomes crewed": whenever a crew ability of it resolves (CR 702.122e). */
   | "selfBecomesCrewed"
   /** "Whenever ~ crews a Vehicle" (CR 702.122d): it was tapped to pay a Vehicle's crew cost; the trigger's subject is that Vehicle. */
@@ -6273,6 +6309,12 @@ export interface TriggeredAbility {
   orLoseLife?: true;
   /** For "youGainLife" and "youLoseLife": "Whenever you gain life during your turn" (Vampire Scrivener): only while you're the active player. */
   onYourTurn?: true;
+  /**
+   * For "youGainLife": "Whenever a white instant or sorcery spell causes you to gain life" (Firesong and Sunspeaker): only
+   * life gained as such a spell resolves, by its own instructions or its damage with lifelink (rulings), whoever controls
+   * it; not a triggered ability of the card (rulings).
+   */
+  lifeFromSpell?: TargetSpec;
   /** "This ability triggers only once each turn": see GameObject.triggeredThisTurn. */
   oncePerTurn?: boolean;
   /** "This ability triggers only once." (Acrobatic Cheerleader): once ever for this object (rulings; a new object starts over, CR 400.7). See GameObject.triggeredEver. */
@@ -6767,7 +6809,7 @@ export interface BatchTrigger {
   dies?: true;
   notDies?: true;
   /** `notBattlefield`: "from anywhere other than the battlefield" (Syr Konrad). */
-  from?: "library" | "battlefield" | "notBattlefield";
+  from?: "library" | "battlefield" | "notBattlefield" | /** Desert Warfare: "from your hand or library". */ "handOrLibrary";
   to?: "exile";
   /** "Whenever a creature card leaves your graveyard" (not "one or more"): once for each card it moved (CR 603.2c). */
   each?: true;
@@ -7597,7 +7639,7 @@ export interface CompiledCard {
    * its controller's). "~" in them means this object (rulings). Only activated abilities: not triggered or static ones.
    * Abilities that work only from a hand or graveyard, equip and loyalty abilities aren't borrowed.
    */
-  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true; /** Conspicuous Snoop: the top card of your library, while it matches `filter`. */ top?: true; /** "You may spend mana as though it were mana of any color to activate those abilities" (Drana and Linvala, CR 609.4b). */ anyColor?: true; /** "All loyalty abilities" (Nicol Bolas, Dragon-God): only those. */ loyalty?: true; /** "All cards exiled with it" (Myr Welder, Dark Impostor, Patchwork Crawler): the cards matching `filter` still exiled with this object by its one exile ability (CR 607.2a, 400.7). */ linked?: true };
+  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true; /** Conspicuous Snoop: the top card of your library, while it matches `filter`. */ top?: true; /** "You may spend mana as though it were mana of any color to activate those abilities" (Drana and Linvala, CR 609.4b). */ anyColor?: true; /** "All loyalty abilities" (Nicol Bolas, Dragon-God): only those. */ loyalty?: true; /** "All cards exiled with it" (Myr Welder, Dark Impostor, Patchwork Crawler): the cards matching `filter` still exiled with this object by its one exile ability (CR 607.2a, 400.7). */ linked?: true; /** "All cards in exile with brain counters on them" (Rex, Cyber-Hound): every player's exiled cards with a counter of this kind, however they got it. */ exiledWithCounter?: CounterKind };
   spell?: AbilityBody; // instants and sorceries
   /**
    * "As this creature transforms into Sephiroth, One-Winged Angel, you get an emblem with ..." (a back face's): done while
@@ -8327,6 +8369,13 @@ export interface CompiledCard {
   lifeGainPlus?: number;
   /** "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): that number. */
   lifeFloor?: number;
+  /**
+   * Deification: "As long as you control a creature, if damage dealt to a planeswalker you control of the chosen type would
+   * result in all loyalty counters on it being removed, instead all but one of those counters are removed" (damage.ts, CR
+   * 120.3c, 614.1): `filter` the planeswalkers (its controller's, the chosen type bound), while its controller controls a
+   * `whileControl` permanent.
+   */
+  keepsLastLoyalty?: { filter: TargetSpec; whileControl: TargetSpec };
   /** "If you control a creature, damage that would ..." (Serra the Benevolent's emblem): `lifeFloor` only while this holds. */
   lifeFloorIf?: StaticCondition;
   /** "As long as you're the monarch, damage doesn't cause you to lose life" (Archon of Coronation): the damage is still

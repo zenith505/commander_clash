@@ -148,6 +148,7 @@ import {
   plotProblem,
   discardAnyTimeProblem,
   plotCost,
+  freeCastable,
   plottedCast,
   compileCard,
   kickerName,
@@ -5168,6 +5169,11 @@ function Controls({
               <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> from the command zone without paying its mana cost?
               {commanderTax(s.players[HUMAN]!, o, d) ? <> You still pay the commander tax, <ManaCost cost={`{${commanderTax(s.players[HUMAN]!, o, d)}}`} size="sm" />.</> : commanderTaxLife(s.players[HUMAN]!, o, d) ? <> You still pay the commander tax, {commanderTaxLife(s.players[HUMAN]!, o, d)} life.</> : null}
             </>
+          ) : pending.must ? (
+            <>
+              {/* Omen Machine, Wild Evocation: "casts it without paying its mana cost if able" (rulings: not optional). */}
+              <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> {o.zone === "hand" ? "from your hand " : o.zone === "exile" ? "from exile " : ""}without paying its mana cost. You must cast it if you can.
+            </>
           ) : (
             <>
               <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> without paying its mana cost?
@@ -5195,9 +5201,12 @@ function Controls({
             {face === s.cards[o.cardId]!.faces!.length ? " (fused)" : ""}
           </button>
         ))}
-        <button className="ghost" onClick={() => dispatch([{ type: "chooseMay", player: HUMAN, yes: false }])}>
-          Don't
-        </button>
+        {/* A "must cast if able" can be declined only while it can't be cast, such as an additional cost in mana not in the pool (rulings). */}
+        {!(pending.must && freeCastable(s, HUMAN, pending.objectId, false, true)) && (
+          <button className="ghost" onClick={() => dispatch([{ type: "chooseMay", player: HUMAN, yes: false }])}>
+            {pending.must ? "Don't (can't pay)" : "Don't"}
+          </button>
+        )}
       </div>
     );
   }

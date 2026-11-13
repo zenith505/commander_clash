@@ -645,6 +645,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           ...(e.toHand ? { toHand: true as const } : {}),
           ...(e.counter ? { counter: e.counter } : {}),
           ...(e.alt ? { alt: e.alt } : {}),
+          ...(e.loyalty ? { loyalty: e.loyalty } : {}),
           ...(ctx.x ? { x: ctx.x } : {}),
         });
       return;

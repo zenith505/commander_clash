@@ -52,6 +52,8 @@ import { runRound333Effect } from "./run-round333";
 import { runRound339Effect } from "./run-round339";
 import { runRound344Effect } from "./run-round344";
 import { runRound345Effect } from "./run-round345";
+import { runRound349Effect } from "./run-round349";
+import { runRound350Effect } from "./run-round350";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
 import { ringBearer } from "./run-ring";
@@ -442,6 +444,17 @@ export function subjectColors(s: GameState, ctx: ResolveCtx): Color[] | undefine
 
 export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
   if (ref.ref === "castSpell") return []; // only counted (amounts.ts)
+  // Dack Fayden's emblem: the permanents the triggering spell targets, on the stack now or as it was cast (as Orvar's
+  // "one of those permanents"), each still that object (CR 400.7).
+  if (ref.ref === "causeTargets") {
+    const item = ctx.cause !== undefined ? (s.stack.find((x) => x.id === ctx.cause) ?? s.castItems?.[ctx.cause]) : undefined;
+    const ids = new Set<ObjectId>();
+    for (const t of item?.targets ?? []) {
+      const o = t.kind === "object" ? s.objects[t.id] : undefined;
+      if (o?.zone === "battlefield" && (t.kind !== "object" || t.zc === undefined || (o.zoneChanges ?? 0) === t.zc) && objectMatches(s, ref.filter, o, ctx.controller, false)) ids.add(o.id);
+    }
+    return [...ids].map((id) => s.objects[id]!);
+  }
   if (ref.ref === "ringBearer") {
     const b = ringBearer(s, ctx.controller);
     return b ? [b] : [];
@@ -1845,6 +1858,12 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runRound344Effect(s, e, ctx, src);
     case "handChooseCast":
       return runRound345Effect(s, e, ctx, src);
+    case "exileTopAsIt":
+    case "castItIfAble":
+      return runRound349Effect(s, e, ctx, src);
+    case "linkSubjectCardToCreated":
+    case "putAtYourNextEndStep":
+      return runRound350Effect(s, e, ctx);
     case "flipCoin":
       return runCoinEffect(s, e, ctx, src);
     case "flipCoinEach":

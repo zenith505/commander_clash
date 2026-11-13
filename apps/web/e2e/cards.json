@@ -4695,6 +4695,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a41e632f-9d36-44d2-b1dd-e17df0d2486e",
+  "name": "Breathkeeper Seraph",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Creature — Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flying, soulbond (You may pair this creature with another unpaired creature when either enters. They remain paired for as long as you control both of them.)\nAs long as Breathkeeper Seraph is paired with another creature, each of those creatures has \"When this creature dies, you may return it to the battlefield under its owner's control at the beginning of your next upkeep.\"",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Soulbond"
+  ],
+  "commanderLegal": "legal",
+  "set": "voc",
+  "releasedAt": "2021-11-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "482889f4-6cf5-457f-9f52-a3f841e038b5",
   "name": "Bribe Taker",
   "manaCost": "{5}{G}",
@@ -8565,6 +8598,32 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2025-02-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8c8f93d7-d89a-401b-8764-76be71ad16e3",
+  "name": "Deification",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "As this enchantment enters, choose a planeswalker type.\nPlaneswalkers you control of the chosen type have hexproof.\nAs long as you control a creature, if damage dealt to a planeswalker you control of the chosen type would result in all loyalty counters on it being removed, instead all but one of those counters are removed.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mat",
+  "releasedAt": "2023-05-12",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -13269,6 +13328,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a03ab63a-83f3-4dd6-926d-08d09ce2e696",
+  "name": "Gate to the Aether",
+  "manaCost": "{6}",
+  "cmc": 6,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of each player's upkeep, that player reveals the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the battlefield.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9f6d6e90-7462-46e5-bf2f-725b4badc394",
   "name": "Gathering Stone",
   "manaCost": "{4}",
@@ -13289,6 +13370,86 @@
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "c05c5375-d0d7-4cf2-92e6-76f86cd0febf",
+  "name": "Gatstaf Shepherd // Gatstaf Howler",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Werewolf // Creature — Werewolf",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Werewolf"
+  ],
+  "oracleText": "At the beginning of each upkeep, if no spells were cast last turn, transform this creature.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Transform",
+   "Intimidate"
+  ],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
+  "rarity": "uncommon",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Gatstaf Shepherd",
+    "manaCost": "{1}{G}",
+    "typeLine": "Creature — Human Werewolf",
+    "supertypes": [],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Human",
+     "Werewolf"
+    ],
+    "oracleText": "At the beginning of each upkeep, if no spells were cast last turn, transform this creature.",
+    "power": "2",
+    "toughness": "2",
+    "colors": [
+     "G"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/5/7/57f0907f-74f4-4d86-93df-f2e50c9d0b2f.jpg?1783940925",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/5/7/57f0907f-74f4-4d86-93df-f2e50c9d0b2f.jpg?1783940925"
+   },
+   {
+    "name": "Gatstaf Howler",
+    "manaCost": "",
+    "typeLine": "Creature — Werewolf",
+    "supertypes": [],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Werewolf"
+    ],
+    "oracleText": "Intimidate (This creature can't be blocked except by artifact creatures and/or creatures that share a color with it.)\nAt the beginning of each upkeep, if a player cast two or more spells last turn, transform this creature.",
+    "power": "3",
+    "toughness": "3",
+    "colors": [
+     "G"
+    ],
+    "colorIndicator": [
+     "G"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/5/7/57f0907f-74f4-4d86-93df-f2e50c9d0b2f.jpg?1783940925",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/5/7/57f0907f-74f4-4d86-93df-f2e50c9d0b2f.jpg?1783940925"
+   }
+  ]
  },
  {
   "oracleId": "716a3bb8-04bd-41f5-a568-131f175e00a6",
@@ -24195,6 +24356,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dbf05c40-7274-4aaa-94d7-1f28cbe15e09",
+  "name": "Omen Machine",
+  "manaCost": "{6}",
+  "cmc": 6,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Players can't draw cards.\nAt the beginning of each player's draw step, that player exiles the top card of their library. If it's a land card, the player puts it onto the battlefield. Otherwise, the player casts it without paying its mana cost if able.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "nph",
+  "releasedAt": "2011-05-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "26445dc7-8363-4205-aee8-1cafeb4ba4c0",
   "name": "Omnath, Locus of All",
   "manaCost": "{W}{U}{B/P}{R}{G}",
@@ -27780,6 +27963,32 @@
   "set": "mom",
   "releasedAt": "2023-04-21",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9a664735-6e38-407f-9d2f-a6d279cd6309",
+  "name": "Repeated Reverberation",
+  "manaCost": "{2}{R}{R}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "When you next cast an instant spell, cast a sorcery spell, or activate a loyalty ability this turn, copy that spell or ability twice. You may choose new targets for the copies.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m20",
+  "releasedAt": "2019-07-12",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -36057,6 +36266,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "35d07ac9-b184-4b5f-8192-34b1db042f69",
+  "name": "Timber Wolves",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Creature — Wolf",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wolf"
+  ],
+  "oracleText": "Banding (Any creatures with banding, and up to one without, can attack in a band. Bands are blocked as a group. If any creatures with banding you control are blocking or being blocked by a creature, you divide that creature's combat damage, not its controller, among any of the creatures it's being blocked by or is blocking.)",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Banding"
+  ],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3c307122-bc18-41f1-87d5-ae6b3ca9b8b9",
   "name": "Timeline Culler",
   "manaCost": "{B}{B}",
@@ -36087,6 +36328,41 @@
   "set": "eoe",
   "releasedAt": "2025-08-01",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "82e03151-3990-451c-99cc-c7d386872df2",
+  "name": "Timothar, Baron of Bats",
+  "manaCost": "{4}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Vampire Noble",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vampire",
+   "Noble"
+  ],
+  "oracleText": "Ward—Discard a card.\nWhenever another nontoken Vampire you control dies, you may pay {1} and exile it. If you do, create a 1/1 black Bat creature token with flying. It gains \"When this token deals combat damage to a player, sacrifice it and return the exiled card to the battlefield tapped.\"",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "voc",
+  "releasedAt": "2021-11-19",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -36507,6 +36783,98 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "45d49831-548a-4a0e-9a18-9f7397913895",
+  "name": "Tovolar, Dire Overlord // Tovolar, the Midnight Scourge",
+  "manaCost": "{1}{R}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Werewolf // Legendary Creature — Werewolf",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Werewolf"
+  ],
+  "oracleText": "Whenever a Wolf or Werewolf you control deals combat damage to a player, draw a card.\nAt the beginning of your upkeep, if you control three or more Wolves and/or Werewolves, it becomes night. Then transform any number of Human Werewolves you control.\nDaybound",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [
+   "Daybound",
+   "Transform",
+   "Nightbound"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "rare",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Tovolar, Dire Overlord",
+    "manaCost": "{1}{R}{G}",
+    "typeLine": "Legendary Creature — Human Werewolf",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Human",
+     "Werewolf"
+    ],
+    "oracleText": "Whenever a Wolf or Werewolf you control deals combat damage to a player, draw a card.\nAt the beginning of your upkeep, if you control three or more Wolves and/or Werewolves, it becomes night. Then transform any number of Human Werewolves you control.\nDaybound",
+    "power": "3",
+    "toughness": "3",
+    "colors": [
+     "G",
+     "R"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/3/d/3d7b401f-79aa-4584-b42b-e81e15c7065b.jpg?1783924338",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/3/d/3d7b401f-79aa-4584-b42b-e81e15c7065b.jpg?1783924338"
+   },
+   {
+    "name": "Tovolar, the Midnight Scourge",
+    "manaCost": "",
+    "typeLine": "Legendary Creature — Werewolf",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Werewolf"
+    ],
+    "oracleText": "Whenever a Wolf or Werewolf you control deals combat damage to a player, draw a card.\n{X}{R}{G}: Target Wolf or Werewolf you control gets +X/+0 and gains trample until end of turn.\nNightbound",
+    "power": "4",
+    "toughness": "4",
+    "colors": [
+     "G",
+     "R"
+    ],
+    "colorIndicator": [
+     "G",
+     "R"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/3/d/3d7b401f-79aa-4584-b42b-e81e15c7065b.jpg?1783924338",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/3/d/3d7b401f-79aa-4584-b42b-e81e15c7065b.jpg?1783924338"
+   }
+  ]
  },
  {
   "oracleId": "c1aecc8a-db3a-4158-b1f1-bfe06d782482",
@@ -39371,6 +39739,32 @@
   "set": "mom",
   "releasedAt": "2023-04-21",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9cf1af53-ab9f-4cce-bdb5-2c13b805523d",
+  "name": "Wild Evocation",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of each player's upkeep, that player reveals a card at random from their hand. If it's a land card, the player puts it onto the battlefield. Otherwise, the player casts it without paying its mana cost if able.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m11",
+  "releasedAt": "2010-07-16",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

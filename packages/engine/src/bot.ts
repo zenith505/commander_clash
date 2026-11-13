@@ -665,6 +665,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const keep = player(s, pid).life - pend.cards.length > 10 ? pend.cards.filter((id) => usefulInGraveyard(s, id)) : [];
       return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => !keep.includes(id)).slice(0, pend.max) }];
     }
+    // The Aesir Escape Valhalla: the exiled card's mana value is life now, counters later, and the card comes back to our
+    // hand: the dearest one.
+    const linkedYard = pend.kind === "searchLibrary" && pend.fromGraveyard === "exile" && s.resolving ? s.resolving.body.effects.slice(s.resolving.next ?? 0).some((x) => x.type === "chooseFromGraveyard" && x.linked && x.dest === "exile") && s.resolving.body.effects.some((x) => x.type === "gainLife" && JSON.stringify(x.n).includes('"chosenFromYard"')) : false;
+    if (pend.kind === "searchLibrary" && linkedYard) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, Math.max(pend.min, Math.min(1, pend.max))) }];
     // Exiling cards from our own graveyard: the ones we have no use for there, the cheapest first.
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile")
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => Number(usefulInGraveyard(s, a)) - Number(usefulInGraveyard(s, b)) || mv(s, a) - mv(s, b)).slice(0, pend.min) }];

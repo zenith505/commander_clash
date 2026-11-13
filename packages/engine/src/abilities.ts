@@ -4546,6 +4546,12 @@ export type Effect =
    * chooses as it enters that it could enchant (CR 303.4f, not targeted); with none it stays in the graveyard (303.4g).
    */
   | { type: "returnAsAura"; enchant: TargetSpec; ability: string; loseOthers?: true }
+  /**
+   * Extract Brain: "Target opponent chooses X cards from their hand. Look at those cards. You may cast a spell from among
+   * them without paying its mana cost.": `who` chooses `n` cards in their hand (all of them with fewer), you look at them,
+   * and may cast one of them from that hand as this resolves (castFromAmong `fromHand`, limited to those cards).
+   */
+  | { type: "handChooseCast"; who: PlayerRef; n: Amount }
   | {
       type: "counterOpponentsStack";
       /** Kadena's Silencer: "counter all abilities your opponents control": only the activated and triggered abilities already on the stack (rulings: not spells; mana abilities never are there, CR 605.3a). */
@@ -5208,6 +5214,8 @@ export type Effect =
       thatCombat?: { effects: Effect[]; text: string };
       /** "Only land creatures can attack during that combat phase" (Bumi, Unleashed): the added combat phase only (rulings). */
       onlyAttack?: TargetSpec;
+      /** "Only the chosen creatures can attack during that combat phase" (Last Night Together): only the objects this ability's targets `index` (`n` of them) were chosen as, in the added combat phase only. */
+      onlyAttackTargets?: { index: number; n: number };
       /**
        * Illusionist's Gambit: "Each of those creatures attacks that combat if able. They can't attack you or planeswalkers
        * you control that combat." Those are the creatures it removed from combat (ref "created"), in the added combat only.
@@ -6796,6 +6804,8 @@ export interface ActivatedAbility {
   orExile?: true;
   /** With `orExile`: only from exile, not the graveyard (Torrent Elemental, CR 113.6m). */
   onlyExile?: true;
+  /** With `onlyExile`, Greater Gargadon: "Activate only if ~ is suspended": in exile with suspend and a time counter on it (CR 702.62b). */
+  suspendedOnly?: true;
   /** "Discard this card" is part of the cost (cycling, transmute). */
   discardSelf?: boolean;
   /** "This ability costs {1} less to activate for each legendary creature you control" (CR 602.2b, 601.2f): generic mana only. */
@@ -6965,7 +6975,7 @@ export type ManaProduce =
    * (two colors, `min` 1, as removing none adds nothing). How many are removed is chosen as it's activated (CR 107.3a,
    * 601.2b, 602.2b): each way to do it is a combination, numbered as for "combos" (`removeXCombos`).
    */
-  | { kind: "removeX"; counter: CounterKind; colors: ManaType[]; min: number; /** The Mana Batteries: "Add {G}, then add an additional {G} for each charge counter removed this way": this much more, of the one color. */ base?: number; /** "Add X mana of any one color" (Petalmane Baku): all X of one of `colors`, not a mix. */ oneColor?: true }
+  | { kind: "removeX"; counter: CounterKind; colors: ManaType[]; min: number; /** The Mana Batteries: "Add {G}, then add an additional {G} for each charge counter removed this way": this much more, of the one color. */ base?: number; /** "Add X mana of any one color" (Petalmane Baku): all X of one of `colors`, not a mix. */ oneColor?: true; /** "Add X mana in any combination of colors" (Crucible of the Spirit Dragon): any multiset of X of `colors`. */ mix?: true }
   /**
    * Metalworker: "Reveal any number of artifact cards in your hand. Add {C}{C} for each card revealed this way." How many
    * are revealed is chosen as it's activated (rulings: zero too); each number is a combination, numbered as for "combos"
@@ -8529,6 +8539,8 @@ export interface CompiledCard {
    * total becomes equal to your starting life total" (40, CR 903.7).
    */
   loseGameExileSelf?: true | "startingLife";
+  /** Enduring Angel: "If your life total would be reduced to 0 or less, instead transform this creature and your life total becomes 3. Then if this creature didn't transform this way, you lose the game." (game.ts lifeZeroReplaced) */
+  lifeZeroTransform?: true;
   /**
    * "You may activate abilities of creatures you control as though those creatures had haste" (Thousand-Year Elixir,
    * CR 302.6): {T} abilities of creatures that came under your control this turn. They don't gain haste (rulings).

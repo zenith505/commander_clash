@@ -167,11 +167,17 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "addPhases": {
       // "At the beginning of that combat, ...": a delayed trigger for this added combat phase only (CR 603.7; rulings on
       // Moraug: not the turn's regular combat).
-      const key = e.thatCombat || e.onlyAttack || e.thoseAttack ? (s.combatKeys = (s.combatKeys ?? 0) + 1) : undefined;
+      const key = e.thatCombat || e.onlyAttack || e.onlyAttackTargets || e.thoseAttack ? (s.combatKeys = (s.combatKeys ?? 0) + 1) : undefined;
       const item = s.resolving?.item;
       const me = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const added = addPhases(s, e.phases, e.after, key);
       if (added && e.onlyAttack && key !== undefined) (s.combatAttackOnly ??= {})[key] = e.onlyAttack;
+      // Last Night Together: the creatures chosen as its targets, still those objects (CR 400.7). The restriction is on every
+      // other creature; one that's no longer a legal target is only left alone by the spell (CR 608.2b), so it may attack.
+      if (added && e.onlyAttackTargets && key !== undefined) {
+        const { index, n } = e.onlyAttackTargets;
+        (s.combatAttackOnlyIds ??= {})[key] = ctx.targets.slice(index, index + n).flatMap((t) => (t.kind === "object" ? [`${t.id}@${t.zc ?? s.objects[t.id]?.zoneChanges ?? 0}`] : []));
+      }
       // Illusionist's Gambit: those creatures must attack in that combat, not you or your planeswalkers (CR 508.1c-d).
       const those = added && e.thoseAttack && key !== undefined ? objects(s, { ref: "created" }, ctx).map((o) => o.id) : [];
       if (those.length) {

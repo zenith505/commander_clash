@@ -198,6 +198,7 @@ import {
   COLORS,
   anyColorsCount,
   colorCombos,
+  removeXCombos,
   type Color,
   FACE_DOWN,
   FACE_DOWN_WARD,
@@ -1796,9 +1797,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               s={s}
               objectId={menu}
               onUse={useAbility}
-              onMix={(ability, n, extra, colors) => {
+              onMix={(ability, n, extra, colors, offset) => {
                 setMenu(null);
-                setMixPick({ objectId: menu, ability, n, ...(extra ? { extra } : {}), ...(colors ? { colors } : {}), label: cardOf(s, menu).name, counts: {} });
+                setMixPick({ objectId: menu, ability, n, ...(extra ? { extra } : {}), ...(colors ? { colors } : {}), ...(offset ? { offset } : {}), label: cardOf(s, menu).name, counts: {} });
               }}
               onMana={(x, to) => {
                 setMenu(null);
@@ -1984,8 +1985,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 setMixPick(null);
                 // The combination these counts are, numbered as the engine numbers them (ManaProduce "anyColors").
                 const want = COLORS.flatMap((c) => Array<Color>(mixPick.counts[c] ?? 0).fill(c));
+                // A storage land's mix (Crucible of the Spirit Dragon): its combinations for this X come after the smaller X's.
                 const combo = colorCombos(mixPick.n, mixPick.colors).findIndex((c) => c.join() === want.join());
-                const plan = combo >= 0 ? planManaAbility(s, HUMAN, mixPick.objectId, mixPick.ability, want[0] ?? "W", undefined, mixPick.extra, combo) : null;
+                const plan = combo >= 0 ? planManaAbility(s, HUMAN, mixPick.objectId, mixPick.ability, want[0] ?? "W", undefined, mixPick.extra, combo + (mixPick.offset ?? 0)) : null;
                 if (plan) dispatch(plan);
               }}
             />
@@ -2560,6 +2562,8 @@ interface MixPick {
   counts: Partial<Record<Color, number>>;
   /** "In any combination of {U} and/or {R}" (Vivi Ornitier): only these colors. */
   colors?: Color[];
+  /** A storage land's mix (Crucible of the Spirit Dragon): the number of the first combination that removes `n` counters. */
+  offset?: number;
 }
 
 function ManaMixBar({ pick, onChange, onDone, onCancel }: { pick: Pick<MixPick, "n" | "label" | "counts" | "colors">; onChange: (counts: Partial<Record<Color, number>>) => void; onDone: () => void; onCancel?: () => void }) {
@@ -4372,6 +4376,8 @@ function LibrarySearch({
                 ? `${pending.source}: ${pending.min ? "reveal" : "you may reveal"} ${pending.what} from your hand${pending.revealFor !== undefined ? `; ${pending.revealFor === HUMAN ? "you choose" : `${s.players[pending.revealFor]!.name} chooses`} one of them for you to discard` : ""}`
                 : pending.bottom
                 ? `${pending.source}: put ${pending.what} from your hand on the bottom of your library`
+                : pending.fromHand && pending.handFor !== undefined
+                ? `${pending.source}: choose ${pending.what}`
                 : pending.fromHand && pending.shuffle
                 ? `${pending.source}: shuffle ${pending.what} from your hand into your library`
                 : pending.fromHand && pending.exile
@@ -4688,7 +4694,7 @@ function AbilityMenu({
   onUse: (id: string, index: number, modes?: number[], x?: number, pick?: ManaPick) => void;
   onMana: (x: ManaOption, to?: PlayerId) => void;
   /** "Add X mana in any combination of colors" (Selvala): choose the colors (`n` mana in all). */
-  onMix: (ability: number, n: number, extra?: ManaType[], colors?: Color[]) => void;
+  onMix: (ability: number, n: number, extra?: ManaType[], colors?: Color[], offset?: number) => void;
   /** For a card in hand: cast it, or play it if it's a land (`untapped`: pay life or reveal so it enters untapped). */
   onPlay: (untapped?: boolean) => void;
   /** For a card in your graveyard: cast it with flashback, escape, ... */
@@ -4998,6 +5004,18 @@ function AbilityMenu({
             return (
               <button key={`mix-${x.ability}`} className="ghost" data-mix={x.ability} onClick={() => onMix(x.ability, n, x.extra, ab.produces.kind === "anyColors" ? ab.produces.colors : undefined)}>
                 <RulesText text={ab.text.slice(0, ab.text.indexOf(": Add")).replace(/~/g, "it")} />: add {n} mana in any combination of colors…
+              </button>
+            );
+          }
+          // Crucible of the Spirit Dragon: "Remove X storage counters: Add X mana in any combination of colors": a button for
+          // each X, then a choice of how much of each color.
+          if (ab.produces.kind === "removeX" && ab.produces.mix) {
+            if (all.findIndex((y) => y.ability === x.ability && y.removes === x.removes) !== i || !x.removes) return null;
+            const k = ab.produces.counter;
+            const offset = removeXCombos(o, ab.produces).findIndex((c) => c.length === x.removes);
+            return (
+              <button key={`mix-${x.ability}-${x.removes}`} className="ghost" data-mix={x.ability} data-removes={x.removes} onClick={() => onMix(x.ability, x.removes!, x.extra, undefined, offset)}>
+                <RulesText text={`${ab.text.slice(0, ab.text.indexOf(", Remove X")).replace(/~/g, "it")}, Remove ${x.removes === 1 ? `a ${k} counter` : `${x.removes} ${k} counters`}`} />: add {x.removes} mana in any combination of colors…
               </button>
             );
           }

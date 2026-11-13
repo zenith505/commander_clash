@@ -263,6 +263,11 @@ export function parseCopyExcept(text: string, round?: "up" | "down"): CopyExcept
   // subtypes of other card types gone (CR 205.1a, rulings), and crew N its own (CR 702.122a).
   const mech = /^it's a Vehicle artifact with crew (\d+) and it loses all other card types$/.exec(text);
   if (mech) return { setTypes: ["Artifact"], addSubtypes: ["Vehicle"], text: [`Crew ${mech[1]}`] };
+  // Shelob, Child of Ungoliant: "except it's a Food artifact with "{2}, {T}, Sacrifice this token: You gain 3 life," and it
+  // loses all other card types": an artifact only, a Food (CR 205.3g), its subtypes of other card types gone (CR 205.1a,
+  // rulings), with that ability its own (CR 707.9b); the comma before the closing quote is Oracle's punctuation.
+  const food = /^it's a Food artifact with "([^"]+?),?" and it loses all other card types$/.exec(text);
+  if (food) return { setTypes: ["Artifact"], addSubtypes: ["Food"], text: [`${food[1]!.replace(/[.,]$/, "")}.`.replaceAll(QUOTED_SOURCE_NAME, "~")] };
   // Myrkul, Lord of Bones: "except it's an enchantment and loses all other card types": its only card type, keeping its
   // supertypes and enchantment subtypes (CR 205.1a, as for Machine God's Effigy below).
   if (/^it's an enchantment and (?:it )?loses all other card types$/.test(text)) return { setTypes: ["Enchantment"] };

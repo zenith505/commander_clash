@@ -301,7 +301,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       type Pass = { left: number; step?: number; keep: string[]; gathered?: ObjectId[]; order?: PlayerId[] };
       const first = (): Pass => {
         if (!e.forEach) return { left: amountNow(s, e.n, ctx), keep: Object.keys(sc) };
-        const o = order(players(s, e.forEach, ctx));
+        const o = e.apnapOrder ? apnap(s, players(s, e.forEach, ctx)) : order(players(s, e.forEach, ctx));
         return { left: o.length, keep: Object.keys(sc), order: o };
       };
       const st = (sc.repeat ??= first());
@@ -595,6 +595,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // "a nonland card" only if it isn't a land card (CR 603.12).
       const exiled = e.xExiledMv && s.resolving!.exiledTop ? s.objects[s.resolving!.exiledTop.id] : undefined;
       if (e.xExiledMv && (!exiled || exiled.zone !== "exile" || (exiled.zoneChanges ?? 0) !== s.resolving!.exiledTop!.zc || (e.xExiledMv === "nonland" && characteristics(s, exiled).types.includes("Land")))) return;
+      // Espers to Magicite: "When you do, choose up to one target creature card exiled this way": only if cards were exiled
+      // from graveyards this way, its target one of them still in exile (CR 603.12, 400.7).
+      const exiledThisWay = e.exiledThisWay ? (s.resolving!.exiledCards ?? []).flatMap((id) => (s.objects[id]?.zone === "exile" ? [{ id, zc: s.objects[id]!.zoneChanges ?? 0 }] : [])) : undefined;
+      if (exiledThisWay && !exiledThisWay.length) return;
+      const body = exiledThisWay ? { ...e.body, targets: e.body.targets.map((t, i) => (i === 0 ? { ...t, among: exiledThisWay } : t)) } : e.body;
       const put = e.putThisWay ? (s.resolving!.created ?? []).flatMap((id) => (s.objects[id]?.zone === "battlefield" ? [{ id, zc: s.objects[id]!.zoneChanges ?? 0 }] : [])) : undefined;
       if (put && !put.length) return;
       // "Create a Food token. When you do, ...": once for each of them created (CR 603.12a).
@@ -608,7 +613,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         sourceCardId: cardId,
         controller: ctx.controller,
         index: -1,
-        body: e.body,
+        body,
         ...(sourceZc !== undefined ? { sourceZc } : {}),
         ...(subject ? { subject } : {}),
         ...(spell ? { fromSpell: true as const } : {}),

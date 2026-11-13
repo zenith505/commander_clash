@@ -2975,6 +2975,14 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     const picks = to ? onUs.filter((id) => controllerOf(s, obj(s, id)) !== to.id).slice(0, slots) : [];
     return [{ kind: "player", id: target.id }, ...Array.from({ length: slots }, (_, k): TargetChoice => (picks[k] ? { kind: "object", id: picks[k]! } : { kind: "none" }))];
   }
+  // Espers to Magicite: a token copy of one of the creature cards it exiled, an artifact only: the costliest card (its
+  // abilities are what's left of it), none only if there's none.
+  const copyCard = body.targets.length === 1 && body.targets[0]!.kind === "card" && body.targets[0]!.among && body.effects.length === 1 && body.effects[0]!.type === "createTokenCopy" && body.effects[0]!.who.ref === "you" && body.effects[0]!.what.ref === "target" ? body.targets[0]! : undefined;
+  if (copyCard) {
+    const all = legalTargets(s, copyCard, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const pick = [...all].sort((a, b) => (b.kind === "object" ? defMv(defOf(s, obj(s, b.id))) : 0) - (a.kind === "object" ? defMv(defOf(s, obj(s, a.id))) : 0))[0];
+    return pick ? [pick] : forced ? [{ kind: "none" }] : null;
+  }
   // Halfdane: "~'s base power and toughness become equal to the power and toughness of another target creature": the
   // biggest one there is, whoever controls it.
   const copyPt = body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "continuous" && body.effects[0]!.what.ref === "self" && body.effects[0]!.mods.length === 1 ? body.effects[0]!.mods[0]! : undefined;

@@ -1,7 +1,7 @@
 # Roadmap
 
-31,209 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,865 of
+31,214 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,870 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2489,6 +2489,32 @@ line blocks.
    costs of ~'s abilities": abilities gained from a permanent for a while, and a mana rule for one source's abilities);
    Sudden Substitution (control of a spell exchanged with a creature's, then new targets chosen by the spell's new
    controller).
+   Round 354 went on down `npm run popular` and the "Out after round N" lists, most played first, to copies of dying or
+   exiled creatures and searches for other players: Vincent's Limit Break's tiers that are only a base power and toughness
+   for "has the chosen base power and toughness" (each mode the spell's sentence with its tier's numbers, CR 702.183a; the
+   setting overwrites earlier ones, counters still apply, CR 613.4b-c; the granted "When this creature dies, return it to
+   the battlefield tapped under its owner's control" brings back a new object, not a token, rulings), with a browser test of
+   the tier; Hofri Ghostforge's "exile it. If you do, create a token that's a copy of that creature, except it's a Spirit
+   ... and it has "When this token leaves the battlefield, return the exiled card to its owner's graveyard."" (Effect exile
+   `setsDid`: not if the card had left the graveyard, rulings; the card linked to each token this resolution created,
+   returnLinked `createdLink`; a copy of the Spirit isn't linked, rulings); Espers to Magicite's "Exile each opponent's
+   graveyard. When you do, choose up to one target creature card exiled this way. Create a token that's a copy of that card,
+   except it's an artifact and it loses all other card types." (reflexive `exiledThisWay`, TargetSpec `among`: only the
+   cards it exiled, still in exile, CR 603.12, 400.7), with a browser test of the picker; Shelob, Child of Ungoliant's
+   "Whenever another creature dealt damage this turn by a Spider you controlled dies, create a token that's a copy of that
+   creature, except it's a Food artifact with "..." and it loses all other card types" (GameObject.damagedByKinds: the
+   source's subtypes and controller as it dealt the damage; a Food only, its creature types gone, CR 205.1a, rulings);
+   Rootweaver Druid's "each opponent may search their library for up to three basic land cards. They each put one of those
+   cards onto the battlefield tapped under your control and the rest onto the battlefield tapped under their control"
+   (repeat `apnapOrder`: one opponent at a time from the active player, each searching and putting their lands before the
+   next decides, rulings; the first card found is yours, so finding one gives it to you, rulings), with a browser test of
+   being asked. +5, 31,214 of 31,936 with rounds 352 and 353 and B192 to B196. The compiled text of every other card is
+   unchanged. Bots copy the costliest creature card Espers to Magicite exiled.
+   Out after round 354 (looked at, not done): Coram, the Undertaker ("cast a spell from among cards in graveyards that
+   were put there from libraries this turn": a play-from-graveyards permission for any player's cards, and "+X/+0 where X
+   is the greatest power among creature cards in all graveyards"); Emergent Ultimatum (an opponent chooses one of the cards
+   found, then the others are cast free as it resolves, rulings); Brutal Hordechief (still out: you choose how opponents'
+   creatures block).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

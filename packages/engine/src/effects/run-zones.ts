@@ -2023,12 +2023,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         log(s, `${src} has left the battlefield, so nothing is exiled.`);
         return;
       }
+      // Hofri Ghostforge: "exile it. If you do": only if it went to exile (not if it had left the graveyard, CR 400.7).
+      if (e.setsDid && s.resolving) s.resolving.did = false;
       for (const o of objects(s, e.what, ctx)) {
         log(s, `${src} exiles ${defOf(s, o).name}${e.until === "sourceLeaves" ? ` until ${src} leaves the battlefield` : e.until === "targetLeaves" && me ? ` until ${defOf(s, me).name} leaves the battlefield` : e.until === "opponentMonarch" ? " until an opponent becomes the monarch" : ""}.`);
         // As it last existed, for "for each nontoken creature exiled this way" (CR 608.2h).
         const before = o.zone === "battlefield" ? { o: structuredClone(o), ch: structuredClone(characteristics(s, o)), controller: controllerOf(s, o) } : undefined;
         const fromYard = o.zone === "graveyard";
         moveObject(s, o.id, "exile");
+        if (e.setsDid && o.zone === "exile" && s.resolving) s.resolving.did = true;
         if (before && o.zone === "exile" && s.resolving) (s.resolving.exiled ??= []).push(before);
         if (fromYard && o.zone === "exile" && s.resolving) (s.resolving.exiledCards ??= []).push(o.id);
         // A merged permanent's cards are all exiled with it, and found by what returns it (CR 730.3c).

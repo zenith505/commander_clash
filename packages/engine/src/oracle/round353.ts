@@ -4,6 +4,7 @@
 import type { CompiledCard, Effect, TargetSpec } from "../abilities";
 import { addTarget, type Ctx } from "./body";
 import { parseTrigger } from "./triggers";
+import { round354Sentence } from "./round354";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -12,6 +13,9 @@ const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 const INSTANT_OR_SORCERY_SPELL: TargetSpec = { kind: "spell", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "target instant or sorcery spell" };
 
 export function round353Sentence(s: string, sentences: string[], si: number, ctx: Ctx, _effects: Effect[]): Found {
+  // Round 354's sentences first (oracle/round354.ts).
+  const r354 = round354Sentence(s, sentences, si, ctx, _effects);
+  if (r354) return r354;
   const line = plain(s);
   // Tempt with Mayhem: "Choose target instant or sorcery spell. Each opponent may copy that spell and may choose new
   // targets for the copy they control. You copy that spell once plus an additional time for each opponent who copied the

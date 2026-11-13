@@ -1139,6 +1139,7 @@ export function moveObject(
   o.tapped = false;
   o.damage = 0;
   o.damagedBy = undefined;
+  o.damagedByKinds = undefined;
   o.shroudWaivedFor = undefined;
   o.wasDealtDamage = undefined;
   o.wasDealtNoncombatDamage = undefined;
@@ -4635,6 +4636,7 @@ function finishCleanup(s: GameState) {
     // CR 514.2, phased-out permanents too; not from a permanent whose damage isn't removed (Ancient Adamantoise).
     if (!(o.zone === "battlefield" && abilitiesOf(s, o).keepsDamage)) o.damage = 0;
     o.damagedBy = undefined;
+    o.damagedByKinds = undefined;
     o.shroudWaivedFor = undefined;
     o.wasDealtDamage = undefined;
     o.wasDealtNoncombatDamage = undefined;

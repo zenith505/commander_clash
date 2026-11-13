@@ -41,6 +41,8 @@ import { roundB187Line } from "./laneb187";
 import { roundB188Line } from "./laneb188";
 import { roundB192Line } from "./laneb192";
 import { roundB194Line, roundB194Spell } from "./laneb194";
+import { roundB197Line } from "./laneb197";
+import { roundB198Line } from "./laneb198";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2088,6 +2090,10 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB192Line(line, raw, out, isSpell)) continue;
     // Surtland Flinger, Cephalid Constable (round B194).
     if (roundB194Line(line, raw, out, isSpell)) continue;
+    // Chandra's Phoenix, Abby, Jocasta, Phyrexian Devourer (round B197).
+    if (roundB197Line(line, raw, out, isSpell)) continue;
+    // Boneyard Mycodrax, Templar Knight, Sea Gate Stormcaller, Dream Chisel, Obscuring Aether, Kadena, Goblin Maskmaker (round B198).
+    if (roundB198Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -7976,7 +7982,8 @@ function checkCastingLinks(out: CompiledCard) {
     if (o.ref === "sacrificed" && o.revealedCost && !revealCost) bad = true;
     // "The exiled card" of an "Exile a nonland card from your hand" cost (Jhoira of the Ghitu): that ability's own cost.
     // Primordial Mist: "that card" of an "Exile a face-down permanent you control" cost, likewise.
-    if (o.ref === "costExiled" && !handExileCost && !permExileCost && !yardCostCard) bad = true;
+    // Phyrexian Devourer: "the exiled card" of an "Exile the top card of your library" cost, the ability's only cost.
+    if (o.ref === "costExiled" && !handExileCost && !permExileCost && !yardCostCard && !libTopCost) bad = true;
     // "Cards exiled with ~" by its cost (Mechtitan Core): an activated ability that exiles other permanents as its cost.
     if (o.type === "returnExiled" && o.fromCost && !exileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
@@ -8023,6 +8030,7 @@ function checkCastingLinks(out: CompiledCard) {
   // Tawnos, Solemn Survivor: "the exiled card" of an "Exile an artifact or creature card from your graveyard" cost, the
   // ability's only cost that exiles anything (game.ts payExtraCosts keeps it in StackItem.costExiled).
   let yardCostCard = false;
+  let libTopCost = false;
   const oneReveal = (costs: AdditionalCost[] | undefined) => !!costs?.some((c) => c.kind === "reveal" && c.n === 1) && !costs.some((c) => c.kind === "sacrifice" || c.kind === "forage");
   let revealCost = oneReveal(out.additionalCosts);
   const hasEmerge = !!out.altCosts?.some((a) => a.kind === "emerge");
@@ -8041,8 +8049,10 @@ function checkCastingLinks(out: CompiledCard) {
     permExileCost = ab.costs?.filter((c) => c.kind === "exileFromHand" || c.kind === "exileFromGraveyard" || c.kind === "sacrifice" || c.kind === "craft").length === 1 && !!ab.costs.some((c) => c.kind === "sacrifice" && c.exile && c.n === 1);
     revealCost = oneReveal(ab.costs);
     yardCostCard = ab.costs?.filter((c) => c.kind === "exileFromGraveyard" || c.kind === "exileFromHand" || c.kind === "craft" || (c.kind === "sacrifice" && c.exile) || (c.kind === "mill" && c.exile) || (c.kind === "reveal" && c.exile)).length === 1 && !!ab.costs.some((c) => c.kind === "exileFromGraveyard" && !c.top && !c.x && !c.linked && !c.process && c.n === 1);
+    libTopCost = ab.costs?.length === 1 && ab.costs[0]!.kind === "mill" && !!ab.costs[0]!.exile && ab.costs[0]!.n === 1;
     visit(ab);
   }
+  libTopCost = false;
   revealCost = false;
   yardCostCard = false;
   exileCost = false;

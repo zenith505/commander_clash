@@ -186,7 +186,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           if (o.zone !== "battlefield") continue;
           addDelayed(s, "leaves", ctx.controller, o, body, src ? cardIdOf(src) : cardIdOf(o));
           const d = s.delayed![s.delayed!.length - 1]!;
-          Object.assign(d, { to: ["graveyard"], dies: true, ...(e.thisTurn ? { thisTurn: s.turn } : {}), ...(e.underYourControl ? { underControl: true } : {}), ...(e.anyPermanent ? { anyPermanent: true } : {}), ...(e.intoYourGraveyard ? { ownedByController: true } : {}), ...(e.ifHadCounter ? { ifHadCounter: e.ifHadCounter } : {}), ...(e.lkiCounters ? { lkiCounters: true as const } : {}), ...(src ? { source: { id: src.id, zc: ctx.sourceZc ?? src.zoneChanges ?? 0 } } : {}) });
+          Object.assign(d, { to: ["graveyard"], dies: true, ...(e.thisTurn ? { thisTurn: s.turn } : {}), ...(e.underYourControl ? { underControl: true } : {}), ...(e.anyPermanent ? { anyPermanent: true } : {}), ...(e.intoYourGraveyard ? { ownedByController: true } : {}), ...(e.ifHadCounter ? { ifHadCounter: e.ifHadCounter } : {}), ...(e.ifCond ? { ifCond: e.ifCond } : {}), ...(e.lkiCounters ? { lkiCounters: true as const } : {}), ...(src ? { source: { id: src.id, zc: ctx.sourceZc ?? src.zoneChanges ?? 0 } } : {}) });
         }
         return;
       }

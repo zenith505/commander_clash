@@ -8312,10 +8312,13 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
       }
     }
   }
-  for (const at of incoming.filter((a) => (characteristics(s, a).mustBeBlocked || characteristics(s, a).allMustBlock) && !blocks.some((b) => b.attacker === a.id))) {
+  // Gorm the Great: "must be blocked by two or more creatures if able": two of ours, or the one that can (rulings).
+  const two = (a: GameObject) => !!characteristics(s, a).mustBeBlockedByTwo && !characteristics(s, a).maxOneBlocker;
+  for (const at of incoming.filter((a) => (characteristics(s, a).mustBeBlocked || characteristics(s, a).allMustBlock) && (!blocks.some((b) => b.attacker === a.id) || (two(a) && blocks.filter((b) => b.attacker === a.id).length < 2)))) {
     const able = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at)).sort((a, b) => toughness(s, b) - toughness(s, a));
-    const n = blockersNeeded(s, at);
-    if (able.length < n) continue;
+    const on = blocks.filter((b) => b.attacker === at.id).length;
+    const n = Math.max(blockersNeeded(s, at), two(at) ? 2 : 1) - on;
+    if (on + able.length < blockersNeeded(s, at)) continue;
     for (const b of able.slice(0, n)) {
       used.add(b.id);
       blocks.push({ blocker: b.id, attacker: at.id });

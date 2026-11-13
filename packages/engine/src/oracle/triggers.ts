@@ -4493,9 +4493,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // triggers only on its controller's opponents' turns; "that player" is the active player.
   // "At the beginning of combat on each opponent's turn, tap target creature that player controls" (Citadel Siege, CR 507.1).
   // "Each other player's" (Well of Ideas): with no teams, every other player is an opponent (CR 102.3).
+  // Lighthouse Chronologist: "if it's not your turn": every other player is an opponent here (CR 102.3), so the same.
   // Discordant Spirit: "At the beginning of each end step, if it's an opponent's turn, ...": the same (whose turn it is
   // can't change before it resolves).
-  const oppStep = /^At the beginning of each (?:opponent|other player)'s (upkeep|draw step|end step), (.+)$/.exec(line) ?? /^At the beginning of (combat) on each opponent's turn, (.+)$/.exec(line) ?? /^At the beginning of each (upkeep|end step), if it's an opponent's turn, (.+)$/.exec(line);
+  const oppStep = /^At the beginning of each (?:opponent|other player)'s (upkeep|draw step|end step), (.+)$/.exec(line) ?? /^At the beginning of (combat) on each opponent's turn, (.+)$/.exec(line) ?? /^At the beginning of each (upkeep|end step), if it's (?:an opponent's|not your) turn, (.+)$/.exec(line);
   if (oppStep) {
     const event = oppStep[1] === "upkeep" ? "eachUpkeep" : oppStep[1] === "draw step" ? "eachDrawStep" : oppStep[1] === "combat" ? "eachBeginCombat" : "eachEndStep";
     // "They lose 2 life", "~ deals 2 damage to them": that player.
@@ -5204,7 +5205,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     return body ? { event: "state", state: { kind: "control", who: "you", filter: { kind: "object", types: [], notTypes: [], notColors: [], counter: noCounters[1]!, text: `permanent with a ${noCounters[1]} counter on it` }, max: 0 }, body } : "fail";
   }
   // Mana Vortex: "When there are no lands on the battlefield, sacrifice ~", the same as for creatures (CR 603.8).
-  const st = new RegExp(`^When (you control no .+?|there are no creatures on the battlefield|there are no lands on the battlefield|no creatures are on the battlefield|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or (?:more|less) life|an opponent has ${NUM} or less life|a player has no cards in hand|(?:you|an opponent) controls? an? (?:[A-Z][a-z]+|creature with (?:power|toughness) ${NUM} or (?:greater|less))|~ has [a-z ]+), (.+)$`).exec(stLine);
+  // Phyrexian Devourer: "When ~'s power is 7 or greater, sacrifice it": its power as it is now (CR 603.8); once it has
+  // triggered, not again while the ability is on the stack, and it's sacrificed even if its power is lower by then
+  // (rulings).
+  const st = new RegExp(`^When (you control no .+?|there are no creatures on the battlefield|there are no lands on the battlefield|no creatures are on the battlefield|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or (?:more|less) life|an opponent has ${NUM} or less life|a player has no cards in hand|(?:you|an opponent) controls? an? (?:[A-Z][a-z]+|creature with (?:power|toughness) ${NUM} or (?:greater|less))|~ has [a-z ]+|~'s (?:power|toughness) is ${NUM} or (?:greater|less)), (.+)$`).exec(stLine);
   if (st) {
     const state = parseStaticCondition(st[1]!.replace(/^no creatures are on the battlefield$/, "there are no creatures on the battlefield"), { affects: { kind: "self" }, mods: [], text: "" });
     const body = state && parseBody(st[st.length - 1]!, { selfIt: true });

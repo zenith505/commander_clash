@@ -1094,6 +1094,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const subjLk = c.of.ref === "subject" && ctx.subject && c.kind !== "manaValue" ? s.lastKnown?.[ctx.subject.id] : undefined;
       if (subjLk && subjLk.zc === ctx.subject!.zc - 1) return subjLk[c.kind as "power" | "toughness"];
       const o = refObjects(s, c.of, ctx)[0];
+      // Phyrexian Devourer: the card its cost exiled, gone from exile since: as it last existed there (CR 608.2h), a card's
+      // mana value the same in exile and in any zone it went to face up.
+      const exiledCost = !o && c.of.ref === "costExiled" && c.kind === "manaValue" ? s.resolving?.item.costExiled?.[0] : undefined;
+      if (exiledCost && s.objects[exiledCost.id]) return defMv(defOf(s, s.objects[exiledCost.id]!));
       if (!o) {
         // Gone: as it last existed on the battlefield (CR 608.2h).
         // A trigger's subject that died ("whenever another creature dies, ... its power") too.

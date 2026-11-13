@@ -4,12 +4,16 @@
 // Deserts coming back at your next end step (Desert Warfare).
 import type { CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
+import { round351Sentence } from "./round351";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round350Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 351's sentences first (oracle/round351.ts).
+  const r351 = round351Sentence(s, sentences, si, ctx, effects);
+  if (r351) return r351;
   const line = plain(s);
   // Breathkeeper Seraph: "When this creature dies, you may return it to the battlefield under its owner's control at the
   // beginning of your next upkeep.": a delayed trigger (CR 603.7) about the card in the graveyard now, at the next upkeep of

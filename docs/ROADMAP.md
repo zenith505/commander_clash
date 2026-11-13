@@ -1,7 +1,7 @@
 # Roadmap
 
-31,137 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,851 of
+31,143 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,856 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2419,6 +2419,30 @@ line blocks.
    rulings); Archelos, Lagoon Mystic (still out: the entering permanent's controller chooses tapped or untapped when another
    "enters tapped" applies, rulings); Mairsil, the Pretender (borrowed abilities each usable only once each turn, and its
    exile "from your hand or graveyard" with a cage counter).
+   Round 351 went on down `npm run popular`, most played first, to copying the next loyalty ability, keywords of exiled
+   cards and phasing: Jaya's Phoenix's "copy the next loyalty ability you activate this turn when you activate it" and
+   Repeated Reverberation's "When you next cast an instant spell, cast a sorcery spell, or activate a loyalty ability this
+   turn, copy that spell or ability twice" (Effect nextCast `loyalty`: a delayed trigger, CR 603.7a, used up once, 603.7c,
+   by the loyalty ability as it's activated; its copies cost no loyalty and resolve first, rulings), with a browser test of
+   both copies' "Keep target"; Eater of Virtue's "As long as a card exiled with ~ has flying, equipped creature has flying.
+   The same is true for ..." (as Death-Mask Duplicant's, for the equipped creature: every hexproof and protection ability
+   among those cards, rulings; its "Whenever equipped creature dies, exile it" linked, CR 607.2a); Deification's "As ~
+   enters, choose a planeswalker type" (with a browser test of the picker), hexproof for that type, and "if damage dealt to
+   a planeswalker you control of the chosen type would result in all loyalty counters on it being removed, instead all but
+   one of those counters are removed" while you control a creature (CompiledCard.keepsLastLoyalty, damage.ts, CR 120.3c,
+   614.1; the damage is still dealt, rulings); The War Doctor's "Whenever one or more other permanents phase out and
+   whenever one or more other cards are put into exile from anywhere" (TriggerEvent `permanentsPhaseOut`, not if it phases
+   out with them, rulings; BatchTrigger `exiled` with `other`); King of the Oathbreakers's "Whenever ~ or another Spirit you
+   control becomes the target of a spell, it phases out" and "... phases in, create a tapped 1/1 white Spirit creature
+   token with flying" (TriggerEvent `permanentYouControlPhasesIn`, once for each, rulings). +6, 31,143 of 31,936 with rounds
+   348 to 350. An "of the chosen type" planeswalker filter with no type chosen now matches nothing, as the others do.
+   Out after round 351 (looked at, not done): Capricopian (only the player it's attacking may activate its ability, and it
+   reselects the player it attacks, rulings: no ability activated by a player who doesn't control it, and no way to change
+   an attacker's defender after attacks are declared); Flickerform (exiled Auras returned attached to the card that comes
+   back, those that can't enchant it staying exiled, rulings); Breath of Fury (the Aura attached to another creature after
+   its own is sacrificed, then an extra combat after this phase); Captain America, First Avenger ("Unattach an Equipment
+   from ~" as a cost, its mana value the damage divided among one to three targets); Filigree Vector (still out, as after
+   round 345).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

@@ -45,6 +45,7 @@ import { round347Line } from "./round347";
 import { round348Line } from "./round348";
 import { round349Line } from "./round349";
 import { round350Line } from "./round350";
+import { round351Line } from "./round351";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -5953,6 +5954,8 @@ export function compile(d: CardDef): CompiledCard {
     // Hot Pursuit: control of every goaded or suspected creature once two players have lost (round 349).
     if (round349Line(line, raw, out, isSpell)) continue;
     if (round350Line(line, raw, out, isSpell)) continue;
+    // Eater of Virtue, Deification, The War Doctor, King of the Oathbreakers (round 351).
+    if (round351Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,

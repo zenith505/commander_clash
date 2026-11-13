@@ -6389,6 +6389,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ad786230-4045-46af-bc89-078d45891e5b",
+  "name": "Colfenor's Plans",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, exile the top seven cards of your library face down.\nYou may look at the cards exiled with this enchantment, and you may play lands and cast spells from among those cards.\nSkip your draw step.\nYou can't cast more than one spell each turn.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lrw",
+  "releasedAt": "2007-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "920c4df3-9517-44cd-8304-28b1ef69d60e",
   "name": "Colfenor's Urn",
   "manaCost": "{3}",
@@ -15668,6 +15694,32 @@
   "commanderLegal": "legal",
   "set": "c18",
   "releasedAt": "2018-08-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9d5f712a-d46c-4d7e-8fea-45fdadb458df",
+  "name": "Hedonist's Trove",
+  "manaCost": "{5}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, exile target opponent's graveyard.\nYou may play lands from among cards exiled with this enchantment.\nYou may cast spells from among cards exiled with this enchantment. You can't cast more than one spell this way each turn.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dtk",
+  "releasedAt": "2015-03-27",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

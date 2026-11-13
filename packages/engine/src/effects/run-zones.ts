@@ -2514,7 +2514,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.dest === "hand") log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} exiled with ${src} into their hand.`);
       else log(s, `${cards.map((c) => defOf(s, c).name).join(", ")} ${cards.length === 1 ? "goes" : "go"} from exile to ${cards.length === 1 ? "its owner's graveyard" : "their owners' graveyards"} (${src}).`);
       for (const c of cards) moveObject(s, c.id, e.dest);
-      s.resolving!.movedLinked = cards.length;
+      // Pinnacle Starcage: "for each card put into a graveyard this way": not one a replacement sent elsewhere.
+      s.resolving!.movedLinked = e.countInGraveyard ? cards.filter((c) => obj(s, c.id).zone === "graveyard").length : cards.length;
       s.resolving!.movedLinkedIds = cards.map((c) => c.id);
       if (s.linkedExile?.[key]) s.linkedExile[key] = s.linkedExile[key]!.filter((l) => !cards.some((c) => c.id === l.id));
       return;

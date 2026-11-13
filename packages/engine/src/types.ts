@@ -1774,6 +1774,8 @@ export interface GameEvent {
 
 /** What happened this turn, for the Traps' alternative cost conditions (CR 601.2b). */
 export interface TurnLog {
+  /** Hedonist's Trove (CompiledCard.playLinkedSpellOnce): the sources ("id@zoneChanges") whose cards a spell was cast from this turn with that permission. */
+  linkedSpellOnce?: string[];
   /** Predatory Focus: the players whose creatures assign their combat damage this turn as though they weren't blocked (CR 510.1c). */
   unblockedDamage?: PlayerId[];
   /** Power Surge: the untapped lands the active player controlled as this turn began, before its untap step (CR 502.3); left out when none. */

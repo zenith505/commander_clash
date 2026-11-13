@@ -39,6 +39,7 @@ import { roundB185Line } from "./laneb185";
 import { roundB186Line } from "./laneb186";
 import { roundB187Line } from "./laneb187";
 import { roundB188Line } from "./laneb188";
+import { roundB192Line } from "./laneb192";
 import { round344Line } from "./round344";
 import { round345Chapter, round345Line } from "./round345";
 import { round346Line } from "./round346";
@@ -2060,6 +2061,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB187Line(line, raw, out, isSpell)) continue;
     // Round B188.
     if (roundB188Line(line, raw, out, isSpell)) continue;
+    // Colfenor's Plans (round B192).
+    if (roundB192Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -7554,6 +7557,22 @@ function linkExile(out: CompiledCard) {
     const picked = all.filter((e) => (e.type === "pick" && e.action === "exile" && e.linked) || (e.type === "chooseFromGraveyard" && e.dest === "exile" && e.linked));
     if (others || out.spell || tops.length + exiles.length + picked.length === 0) out.unsupported.push("(casts cards exiled with it that it can't link to its exile abilities)");
     else for (const e of [...tops, ...exiles]) e.linked = true;
+  } else if (out.playLinkedWhile && (out.playLinkedSpellOnce || out.playLinkedLandsOnly)) {
+    // Hedonist's Trove: "exile target opponent's graveyard" as it enters, its one exile (CR 607.2a), face up.
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const yards = all.filter((e): e is Extract<Effect, { type: "exileGraveyard" }> => e.type === "exileGraveyard");
+    const others = all.some((e) => e.type === "exile" || e.type === "exileTop" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "exileHand" || (e.type === "discard" && !!e.exile) || (e.type === "search" && e.dest.zone === "exile") || e.type === "castFromAmong" || e.type === "pick" || e.type === "chooseFromGraveyard");
+    if (others || out.spell || yards.length !== 1 || Object.keys(yards[0]!).some((k) => k !== "type" && k !== "who")) out.unsupported.push("(plays cards exiled with it that it can't link to one exile ability)");
+    else yards[0]!.linked = true;
+  } else if (out.playLinkedWhile && out.playLinkedLook) {
+    // Colfenor's Plans: "exile the top seven cards of your library face down", its one exile, linked as every face-down
+    // exile with a source is (CR 607.2a), its controller looking at them (CR 406.3).
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const faceDown = all.filter((e): e is Extract<Effect, { type: "exileFaceDown" }> => e.type === "exileFaceDown");
+    const others = all.some((e) => e.type === "exile" || e.type === "exileTop" || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileHand" || (e.type === "discard" && !!e.exile) || (e.type === "search" && e.dest.zone === "exile") || e.type === "castFromAmong" || e.type === "pick" || e.type === "chooseFromGraveyard");
+    const f = faceDown[0];
+    if (others || out.spell || faceDown.length !== 1 || f!.from !== "top" || f!.actor || f!.who || f!.pickOne || f!.foretold !== undefined) out.unsupported.push("(plays cards exiled with it that it can't link to one exile ability)");
+    else f!.look = true;
   } else if (out.playLinkedWhile) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     // Nightveil Specter: "that player exiles the top card of their library", the damaged player's card, linked the same.
@@ -7658,7 +7677,9 @@ function linkExile(out: CompiledCard) {
     // battlefield" (CR 607.2a), its only exile instruction; the ones chapter III moves are no longer there to return.
     // Sothera, the Supervoid: "each opponent chooses a creature they control and exiles it" is its one exile instruction.
     else if (!others && !exiles.length && !searches.length && ((picks) => picks.length === 1 && (picks[0]!.linked = true))(all.filter((e): e is Extract<Effect, { type: "pick" }> => e.type === "pick" && e.action === "exile"))) {}
-    else if (!others && !exiles.length && !tops.length && !searches.length && all.some((e) => e.type === "moveLinked" && e.exactly !== undefined)) {
+    // Pinnacle Starcage: "Put each card exiled with ~ into its owner's graveyard" is about its "exile all artifacts and
+    // creatures ... until ~ leaves the battlefield" the same way.
+    else if (!others && !exiles.length && !tops.length && !searches.length && all.some((e) => e.type === "moveLinked" && (e.exactly !== undefined || e.countInGraveyard))) {
       const until = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && e.until === "sourceLeaves");
       if (until.length === 1 && all.filter((e) => e.type === "exile").length === 1) until[0]!.linked = true;
       else out.unsupported.push("(refers to cards exiled with it that it can't link to its exile abilities)");

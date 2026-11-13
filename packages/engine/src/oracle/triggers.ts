@@ -2380,7 +2380,10 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Creatures you control with counters on them gain double strike" (Chocobo Knights): not about the attackers.
   // Within Range: "each opponent loses life equal to the number of creatures attacking them": each one's own attackers.
   // Roar of Resistance: "planeswalkers they control" after "your opponents" is about those players, not the creatures.
-  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(/^each opponent loses life equal to the number of creatures attacking them\.?$/, "").replace(/\bcreatures attacking your opponents and\/or planeswalkers they control\b/g, "").replace(/ with (?:[+-]1\/[+-]1 )?counters on them\b/g, "").replace(/ unless that creature's controller has ~ deal that much damage to them\.?$/, "").replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
+  // The Kingpin of Crime: "creatures you control with toughness greater than their power assign combat damage equal to
+  // their toughness rather than their power": each of those creatures' own, not the attackers'.
+  const kingpinTheir = / creatures you control with toughness greater than their power assign combat damage equal to their toughness rather than their power\.$/;
+  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(kingpinTheir, "").replace(/^each opponent loses life equal to the number of creatures attacking them\.?$/, "").replace(/\bcreatures attacking your opponents and\/or planeswalkers they control\b/g, "").replace(/ with (?:[+-]1\/[+-]1 )?counters on them\b/g, "").replace(/ unless that creature's controller has ~ deal that much damage to them\.?$/, "").replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
   let group: TargetSpec | undefined;
   if (phrase && !/^creatures$/.test(phrase)) {
     // "Creatures with counters on them" (Tidus, Yuna's Guardian): each with a counter on it.

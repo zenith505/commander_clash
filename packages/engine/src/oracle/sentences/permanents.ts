@@ -6,7 +6,7 @@ import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase, PE
 import { addTarget, parseBody } from "../body";
 import { parseCount } from "../counts";
 import { parseBecomes, parseChanges, parseSentence } from "../sentence";
-import { parseAffected, parseExtraBlocks, parseIsA, parseMostStat, parseStaticMods } from "../statics";
+import { parseAffected, parseExtraBlocks, parseIsA, parseMostStat, parseStatic, parseStaticMods } from "../statics";
 import type { Ctx } from "../body";
 import { canonicalKeyword, CREATURE_TYPES, SACRIFICED_LANDWALK } from "../../keywords";
 import { parseGrants } from "../grants";
@@ -2386,6 +2386,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^[Uu]ntil your next turn, (creatures your opponents control|each creature) attacks? each combat if able and attacks? a player other than you if able$/.exec(s))) {
     const affects = parseAffected(m[1] === "each creature" ? "Each creature" : "Creatures your opponents control");
     return affects ? [{ type: "groupRules", affects, text: m[1]!, mods: [{ kind: "goad", notGoaded: true }], duration: "yourNextTurn" }] : null;
+  }
+  // The Kingpin of Crime: "until end of turn, creatures you control with toughness greater than their power assign combat
+  // damage equal to their toughness rather than their power": a rule, not a change to the creatures' characteristics, so
+  // it's for whatever creatures you control fit it at any time this turn, those that enter later too (CR 611.2c), each
+  // one's power and toughness as combat damage is assigned (CR 510.1a).
+  if (/^[Uu]ntil end of turn, creatures you control with toughness greater than their power assign combat damage equal to their toughness rather than their power$/.test(s)) {
+    const st = parseStatic("Creatures you control with toughness greater than their power assign combat damage equal to their toughness rather than their power.");
+    const m0 = st?.mods.length === 1 ? st.mods[0] : undefined;
+    return st && m0?.kind === "assignsToughness" && m0.ifGreater && st.affects.kind === "filter" && !st.condition ? [{ type: "groupRules", affects: st.affects, text: "creatures you control with toughness greater than their power", mods: st.mods, duration: "endOfTurn" }] : null;
   }
   // The Akroan War: "Until your next turn, creatures your opponents control attack each combat if able": the same way,
   // every creature in the group at any time (CR 611.2c is only for characteristics), unless it can't (rulings).

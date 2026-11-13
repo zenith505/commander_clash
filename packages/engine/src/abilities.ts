@@ -2985,7 +2985,7 @@ export type Effect =
       /** With `filter`: where the other cards revealed go ("shuffle" if left out); "bottom" is in a random order. */
       rest?: "shuffle" | "bottom";
     }
-  | { type: "moveLinked"; /** Vault 13: "Return two cards exiled with ~": exactly this many, chosen as it resolves (all of them with fewer). */ exactly?: number; dest: "hand" | "graveyard" | "battlefield"; filter?: TargetSpec; gain?: string[]; /** Ghost Vacuum: "with a flying counter on it", "Each of them is a 1/1 Spirit in addition to its other types" (from then on, CR 611.2c). */ counters?: Record<string, number>; alsoMods?: Modification[]; one?: true; yours?: true; other?: true; /** "You may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (Mimic Vat): only if this resolution linked a card, and not those. */ ifLinkedNow?: true; /** Emperor of Bones: "It gains haste. Sacrifice it at the beginning of the next end step." for the permanent it became. */ haste?: "game" | /** Yggdrasil, Rebirth Engine: "It gains haste until end of turn." */ "endOfTurn"; atEndStep?: "sacrifice"; /** Safe Haven: "under its owner's control", not this ability's controller's. */ ownersControl?: true; /** With `one`: chosen at random (Skyship Weatherlight). */ random?: true; /** Omenpath Journey: "onto the battlefield tapped". */ tapped?: true; /** Bag of Devouring: "up to X cards from among" them, chosen as it resolves. */ upTo?: Amount; /** Clone Shell: "turn the exiled card face up" first: every card exiled with it, then `filter` picks the ones that move. */ turnFaceUp?: true; /** Death in Heaven: "onto the battlefield face down under your control. They're 2/2 Cyberman artifact creatures" (FaceDownKind "cyberman"). */ faceDown?: "cyberman"; /** The Grim Captain: "tapped and attacking", what it attacks chosen as it enters (CR 508.4); with `one`. */ attacking?: true }
+  | { type: "moveLinked"; /** Pinnacle Starcage: "for each card put into a graveyard this way": count only those now in a graveyard (ResolvingState.movedLinked). */ countInGraveyard?: true; /** Vault 13: "Return two cards exiled with ~": exactly this many, chosen as it resolves (all of them with fewer). */ exactly?: number; dest: "hand" | "graveyard" | "battlefield"; filter?: TargetSpec; gain?: string[]; /** Ghost Vacuum: "with a flying counter on it", "Each of them is a 1/1 Spirit in addition to its other types" (from then on, CR 611.2c). */ counters?: Record<string, number>; alsoMods?: Modification[]; one?: true; yours?: true; other?: true; /** "You may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (Mimic Vat): only if this resolution linked a card, and not those. */ ifLinkedNow?: true; /** Emperor of Bones: "It gains haste. Sacrifice it at the beginning of the next end step." for the permanent it became. */ haste?: "game" | /** Yggdrasil, Rebirth Engine: "It gains haste until end of turn." */ "endOfTurn"; atEndStep?: "sacrifice"; /** Safe Haven: "under its owner's control", not this ability's controller's. */ ownersControl?: true; /** With `one`: chosen at random (Skyship Weatherlight). */ random?: true; /** Omenpath Journey: "onto the battlefield tapped". */ tapped?: true; /** Bag of Devouring: "up to X cards from among" them, chosen as it resolves. */ upTo?: Amount; /** Clone Shell: "turn the exiled card face up" first: every card exiled with it, then `filter` picks the ones that move. */ turnFaceUp?: true; /** Death in Heaven: "onto the battlefield face down under your control. They're 2/2 Cyberman artifact creatures" (FaceDownKind "cyberman"). */ faceDown?: "cyberman"; /** The Grim Captain: "tapped and attacking", what it attacks chosen as it enters (CR 508.4); with `one`. */ attacking?: true }
   /**
    * Memory Jar: "At the beginning of the next end step, each player ... returns to their hand each card they exiled this
    * way": the cards the ability exiled face down (`cards`, filled in as the delayed trigger is made), if they're still
@@ -4247,6 +4247,12 @@ export type Effect =
    * ability's controller, until the turn ends (rulings; not face-down spells, GameState.lookFaceDownTurn).
    */
   | { type: "lookFaceDownThisTurn" }
+  /**
+   * Flameskull's rejuvenation: "exile it. If you do, exile the top card of your library. Until the end of your next turn,
+   * you may play one of those cards.": the dead card, while it's still the object in the graveyard (CR 400.7), then the top
+   * card; one permission shared by the two (GameObject.mayPlay oneOf).
+   */
+  | { type: "exileSelfAndTopOneOf" }
   /**
    * Temporal Aperture: "Shuffle your library, then reveal the top card. Until end of turn, for as long as that card remains
    * on top of your library, play with the top card of your library revealed and you may play that card without paying its
@@ -8987,6 +8993,16 @@ export interface CompiledCard {
    * exiled with ~": while this holds, with the usual costs and timing (rulings), no other mana.
    */
   playLinkedWhile?: StaticCondition;
+  /** With `playLinkedWhile`: "You may look at the cards exiled with ~, and you may play lands and cast spells from among those cards" (Colfenor's Plans): its one face-down exile, its controller looking at those cards. */
+  playLinkedLook?: true;
+  /** With `playLinkedWhile`: "You may play lands from among cards exiled with ~" (Hedonist's Trove): land cards only. */
+  playLinkedLandsOnly?: true;
+  /**
+   * With `playLinkedWhile`: Hedonist's Trove's "You may play lands from among cards exiled with ~" and "You may cast spells
+   * from among cards exiled with ~. You can't cast more than one spell this way each turn.": lands any number of times (as
+   * the usual land rules allow), one spell each turn for this object (rulings; TurnLog.linkedSpellOnce).
+   */
+  playLinkedSpellOnce?: true;
   /** With `playLinkedWhile`: "You may cast spells from among cards exiled with ~" (Rona, Disciple of Gix): spells only, not lands. */
   playLinkedCastOnly?: true;
   /** With `playLinkedWhile`: "and you may cast them as though they had flash" (Azula, Cunning Usurper, CR 702.8a). */

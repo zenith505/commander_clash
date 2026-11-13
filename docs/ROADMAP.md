@@ -1,7 +1,7 @@
 # Roadmap
 
-31,221 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,857 of
+31,235 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,870 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2443,6 +2443,78 @@ line blocks.
    its own is sacrificed, then an extra combat after this phase); Captain America, First Avenger ("Unattach an Equipment
    from ~" as a cost, its mana value the damage divided among one to three targets); Filigree Vector (still out, as after
    round 345).
+   Round 352 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards with four or
+   more card types among them, casualty X and imprinting for X: Nethergoyf's "Escape—{2}{B}, Exile any number of other
+   cards from your graveyard with four or more card types among them." (AdditionalCost exileFromGraveyard `cardTypes`:
+   any number of cards other than itself whose card types together number four or more, CR 205.2a, rulings; Done only
+   once they do, with a browser test); Winter, Cynical Opportunist's "At the beginning of your end step, you may exile any
+   number of cards from your graveyard with four or more card types among them. If you do, put a permanent card from among
+   them onto the battlefield with a finality counter on it." (chooseFromGraveyard `cardTypes`, none or four card types, then
+   the new effect putFromYardChosen, CR 608.2c, 122.1h; with a browser test of both pickers); Ob Nixilis, the Adversary's
+   "Casualty X. The copy isn't legendary and has starting loyalty X." (CompiledCard.casualtyX, casualty 0: X is the power of
+   the creature sacrificed, the greatest X it can pay for, StackItem.casualtyX; the copy's exceptions are copiable values,
+   CR 702.153a, 707.9b, 306.5b; with a browser test); Panoptic Mirror's "Imprint — {X}, {T}: You may exile an instant or
+   sorcery card with mana value X from your hand." (exactly X) and "At the beginning of your upkeep, you may copy a card
+   exiled with ~. If you do, you may cast the copy without paying its mana cost." (castLinkedCopy `choose`: one of the
+   cards exiled with it picked as it resolves, or none; one trigger, not one per card, rulings; with browser tests). +4,
+   31,171 of 31,936 with rounds 348 to 351 and B188 to B191. The compiled text of every other card is unchanged. Bots
+   escape Nethergoyf with the fewest cards making four card types, exile with Winter the best permanent card and the
+   fewest others, sacrifice for casualty X only a creature with power 2 or more, and imprint with Panoptic Mirror only for
+   an X matching an instant or sorcery in their hand.
+   Out after round 352 (looked at, not done): Fabrication Foundry ("Exile one or more other artifacts you control with
+   total mana value X: Return target artifact card with mana value X or less": the target chosen before the cost that sets
+   X is paid, no ruling on how it's checked); Celestial Reunion ("choose a creature type and behold two creatures of that
+   type" as an optional additional cost: a type chosen as it's cast and two beheld, neither modeled yet); Stalking Leonin
+   (an opponent chosen secretly, revealed as a cost); Bre of Clan Stoutarm (still out, as after round 345).
+   Round 353 went on down `npm run popular` and the "Out after round N" lists, most played first, to copies of a spell
+   for other players and the next spell or ability with {X} copied: Hive Mind's "Whenever a player casts an instant or
+   sorcery spell, each other player copies that spell. Each of those players may choose new targets for their copy." and
+   Curse of Echoes's "each other player may copy that spell and may choose new targets for the copy they control" (Effect
+   copyForPlayers: every player but its caster, in turn order from the active player, CR 101.4, each deciding if it may,
+   then copying and aiming that copy before the next one decides, so the last of them controls the copy that resolves
+   first, rulings; mandatory for Hive Mind), with a browser test of being asked; Tempt with Mayhem's "Each opponent may
+   copy that spell ... You copy that spell once plus an additional time for each opponent who copied the spell this way"
+   (`thenYou`: your copies after theirs, resolving first, rulings), with a browser test of your copies' targets; Spinerock
+   Tyrant's "Whenever you cast an instant or sorcery spell with a single target, you may copy it. If you do, those spells
+   gain wither." (cast trigger `singleTarget`, exactly one target as cast; copySpell `thoseGain`: the original, if still on
+   the stack, and the copy, CR 702.80a), with a browser test aiming the copy elsewhere; Magus Lucea Kane's mana ability
+   "{T}: Add {C}{C}. When you next cast a spell with {X} in its mana cost or activate an ability with {X} in its activation
+   cost this turn, copy that spell or ability." (nextCast `xAbility`: the mana symbol {X} only, rulings; a mana ability
+   with {X}, Wizard's Rockets, uses it up with nothing to copy, CR 605.3a), with a browser test. +5, 31,176 of 31,936 with
+   rounds 348 to 352 and B188 to B191 (31,209 with B192 to B196). The compiled text of every other card is unchanged.
+   Bots always copy when asked.
+   Out after round 353 (looked at, not done): Spectral Searchlight (still out: another player chooses the color of the
+   mana it adds, in the middle of a mana ability); Quicksilver Elemental ("gains all activated abilities of target
+   creature until end of turn" and "You may spend blue mana as though it were mana of any color to pay the activation
+   costs of ~'s abilities": abilities gained from a permanent for a while, and a mana rule for one source's abilities);
+   Sudden Substitution (control of a spell exchanged with a creature's, then new targets chosen by the spell's new
+   controller).
+   Round 354 went on down `npm run popular` and the "Out after round N" lists, most played first, to copies of dying or
+   exiled creatures and searches for other players: Vincent's Limit Break's tiers that are only a base power and toughness
+   for "has the chosen base power and toughness" (each mode the spell's sentence with its tier's numbers, CR 702.183a; the
+   setting overwrites earlier ones, counters still apply, CR 613.4b-c; the granted "When this creature dies, return it to
+   the battlefield tapped under its owner's control" brings back a new object, not a token, rulings), with a browser test of
+   the tier; Hofri Ghostforge's "exile it. If you do, create a token that's a copy of that creature, except it's a Spirit
+   ... and it has "When this token leaves the battlefield, return the exiled card to its owner's graveyard."" (Effect exile
+   `setsDid`: not if the card had left the graveyard, rulings; the card linked to each token this resolution created,
+   returnLinked `createdLink`; a copy of the Spirit isn't linked, rulings); Espers to Magicite's "Exile each opponent's
+   graveyard. When you do, choose up to one target creature card exiled this way. Create a token that's a copy of that card,
+   except it's an artifact and it loses all other card types." (reflexive `exiledThisWay`, TargetSpec `among`: only the
+   cards it exiled, still in exile, CR 603.12, 400.7), with a browser test of the picker; Shelob, Child of Ungoliant's
+   "Whenever another creature dealt damage this turn by a Spider you controlled dies, create a token that's a copy of that
+   creature, except it's a Food artifact with "..." and it loses all other card types" (GameObject.damagedByKinds: the
+   source's subtypes and controller as it dealt the damage; a Food only, its creature types gone, CR 205.1a, rulings);
+   Rootweaver Druid's "each opponent may search their library for up to three basic land cards. They each put one of those
+   cards onto the battlefield tapped under your control and the rest onto the battlefield tapped under their control"
+   (repeat `apnapOrder`: one opponent at a time from the active player, each searching and putting their lands before the
+   next decides, rulings; the first card found is yours, so finding one gives it to you, rulings), with a browser test of
+   being asked. +5, 31,214 of 31,936 with rounds 352 and 353 and B192 to B196. The compiled text of every other card is
+   unchanged. Bots copy the costliest creature card Espers to Magicite exiled.
+   Out after round 354 (looked at, not done): Coram, the Undertaker ("cast a spell from among cards in graveyards that
+   were put there from libraries this turn": a play-from-graveyards permission for any player's cards, and "+X/+0 where X
+   is the greatest power among creature cards in all graveyards"); Emergent Ultimatum (an opponent chooses one of the cards
+   found, then the others are cast free as it resolves, rulings); Brutal Hordechief (still out: you choose how opponents'
+   creatures block).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -2574,7 +2646,7 @@ line blocks.
    creatures is never worth it to them, even to save one).
    Out after round 344 (looked at, not done): Harold and Bob, First Numens (its granted mana ability gives rad counters,
    and "Harold and Bob loses all other abilities" as a separate sentence); Garth One-Eye (copies of cards named from
-   outside the game); Ob Nixilis, the Adversary (casualty X with a copy that "isn't legendary and has starting loyalty
+   outside the game); Ob Nixilis, the Adversary (done in round 352) (casualty X with a copy that "isn't legendary and has starting loyalty
    X"); Reap ("up to X target cards ..., where X is the number of black permanents target opponent controls as you cast
    this spell": a target count set by another target).
    Round 343 went on down the "Out after round N" lists, most played first, to casting a card as an instruction resolves
@@ -3962,7 +4034,7 @@ line blocks.
    Out after round 252 (looked at, not done): Cybership (the top two cards of a library, lands included, put onto the
    battlefield face down as Cybermen: needs a library-top face-down put); Kaervek, the Punisher (done in round 267; "You may cast the copy.
    If you do, you lose 2 life": the paid copy is there now, the "if you do" after casting a copy isn't; Nashi, Moon's
-   Legacy would follow); Ob Nixilis, the Adversary (casualty X: the copy's starting loyalty from the chosen X);
+   Legacy would follow); Ob Nixilis, the Adversary (done in round 352) (casualty X: the copy's starting loyalty from the chosen X);
    Mysterious Stranger and Zethi, Arcane Blademaster (a variable number of targets per graveyard / per kick).
    Out after round 251 (looked at, not done): Ill-Timed Explosion (done in round 273; "you may discard two cards. When you do": no ruling on
    whether you can do it with fewer than two cards in hand, as with Thrilling Discovery).
@@ -4033,7 +4105,7 @@ line blocks.
    Out after round 240 (looked at, not done): Geyadrone Dihada (protection from permanents with corruption counters
    on them: the protection quality would need the source's counters); Altar of the Wretched (done in round 334) and The Enigma Jewel (their
    back faces don't parse yet); Huatli, Poet of Unity (chapter II grants a static that works in layer 6, which granted
-   statics don't support); Nethergoyf and Winter, Cynical Opportunist (exile any number of cards with four or more card types
+   statics don't support); Nethergoyf and Winter, Cynical Opportunist (done in round 352) (exile any number of cards with four or more card types
    among them: a picker constraint on the cost); Repeated Reverberation (copy the next instant or sorcery spell OR the
    next loyalty ability, as before); Jon Irenicus, Shattered One and Strago and Relm (looked at,
    several new pieces each).
@@ -4072,7 +4144,7 @@ line blocks.
    has suspend": counters on the impulsed cards that already have suspend, without granting it); Knowledge Vault (done in round B129)
    ("{0}: Sacrifice ~. If you do, discard your hand, then ..." and its leaves trigger putting the cards into the
    graveyard); Yurlok of Scorch Thrash (mana burn, "each player adds {B}{R}{G}"); Tomik, Distinguished Advokist (done in round 325); Storm
-   Cauldron; Arlinn, the Pack's Hope (done in round 303); The Temporal Anchor; Chandra, Fire of Kaladesh; Panoptic Mirror; Crafty
+   Cauldron; Arlinn, the Pack's Hope (done in round 303); The Temporal Anchor; Chandra, Fire of Kaladesh; Panoptic Mirror (done in round 352); Crafty
    Cutpurse; Hydro-Man; Rootcoil Creeper (done in round 272); Zuko, Conflicted; Runo Stromkirk; Rootpath Purifier; Enduring Angel (not
    started; next candidates).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
@@ -8641,7 +8713,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   trigger on the new declare attackers step event, CR 603.7, attacking a player or planeswalker its controller chooses as
   it enters, CR 508.4, never having "attacked", rulings; the step now happens even with no attackers when such a trigger
   is due, CR 508.8; Noctis "can't be blocked that combat"; a token doesn't come back, CR 111.8). The punisher prompt for
-  "you" and "that player" now reads "If you do". +6, 31,221 of 31,936 with B189 to B198 and rounds 348 to 351.
+  "you" and "that player" now reads "If you do". +6, 31,235 of 31,936 with B189 to B198 and rounds 348 to 354.
 - Out after round B199 (looked at, not done): Over the Top (each player's revealed permanent cards onto the battlefield at
   once, Auras among them attached as they enter), Lich's Mirror (losing the game replaced by shuffling your hand, graveyard
   and every permanent you own, even ones others control, into your library), Mana Cache (a mana ability any player may

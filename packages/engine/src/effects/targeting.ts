@@ -795,6 +795,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (spec.milledThisTurn && o.milledTurn !== s.turn) return false;
     if (spec.discardedOrFromLibraryThisTurn && o.discardedTurn !== s.turn && o.fromLibraryTurn !== s.turn) return false;
     if (spec.fromBattlefieldThisTurn && o.fromBattlefieldTurn !== s.turn) return false;
+    // Espers to Magicite: one of the cards its exile took, still that card in exile (round 354).
+    if (spec.among && !spec.among.some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0))) return false;
     return printedMatches(spec, defOf(s, o));
   }
   if (spec.kind === "any") {

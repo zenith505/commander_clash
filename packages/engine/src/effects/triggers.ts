@@ -389,6 +389,7 @@ function diesMatches(
   if (d.orAttached && attachedTo !== undefined && attachedTo === dying.o.id) return true;
   if (d.damagedBySelf && !dying.o.damagedBy?.includes(damagedById ?? srcId)) return false;
   if (d.damagedByEquipped && (!attachedTo || !dying.o.damagedBy?.includes(attachedTo))) return false;
+  if (d.damagedByKindYours && !dying.o.damagedByKinds?.some((k) => k === `${you}|${d.damagedByKindYours}` || k === `${you}|*`)) return false;
   if (d.blockingSelf && !dying.o.blocking?.includes(srcId)) return false;
   // Thijarian Witness: attacking or blocking alone as it left (CR 506.5), noted then (LastKnown aloneIn).
   if (d.aloneInCombat && !s.lastKnown?.[dying.o.id]?.aloneIn) return false;
@@ -2457,6 +2458,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.sharesColorOrMvWithLinked && !sharesColorOrMvWithLinked(s, o, spell ? characteristics(s, spell).colors : ev.card.colors, item ? spellManaValue(s, item) : defMv(ev.card))) return false;
         // Voltaic Visionary: the spell's card was one its linked ability exiled, cast from there.
         if (t.cast.fromLinked && !(spell && !ev.copy && spell.castFrom === "exile" && playedFromLinked(s, o, spell, true))) return false;
+        // Spinerock Tyrant: "an instant or sorcery spell with a single target": exactly one target as it was cast (CR 115.1,
+        // 601.2c), as "target spell with a single target" reads it (TargetSpec.singleTarget).
+        if (t.cast.singleTarget && (item?.targets ?? []).filter((x) => x.kind !== "none").length !== 1) return false;
         // "A spell with {X} in its mana cost": the half cast, for a split card (CR 709.3b); a copy has the same mana cost.
         if (t.cast.xInCost && !(spell && parseManaCost(defOf(s, spell).manaCost).hasX)) return false;
         // Rage Extractor: "a spell with {H} in its mana cost": a Phyrexian mana symbol of any color, hybrid ones too (CR 107.4f).
@@ -2659,10 +2663,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "activated") {
     // Jaya's Phoenix, Repeated Reverberation: "copy the next loyalty ability you activate this turn" (a delayed trigger, CR
     // 603.7a), once (603.7c), for the loyalty ability just activated (CR 606.3), whose copy resolves first (rulings).
-    if (ev.loyalty && ev.stackId)
+    // Magus Lucea Kane: "or activate an ability with {X} in its activation cost": the mana symbol {X} (rulings). A mana
+    // ability with one (Wizard's Rockets) uses it up too, but isn't on the stack to be copied (CR 605.3a).
+    if ((ev.loyalty && ev.stackId) || ev.xCost)
       for (const d of [...(s.nextCast ?? [])]) {
-        if (!d.loyalty || d.controller !== ev.player || d.turn !== s.turn) continue;
+        if (!(ev.loyalty ? d.loyalty : d.xAbility) || d.controller !== ev.player || d.turn !== s.turn) continue;
         s.nextCast = s.nextCast!.filter((x) => x !== d);
+        if (!ev.stackId) continue;
         s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
       }
     // "Whenever an opponent activates an ability of a creature that isn't a mana ability" (its source as it was activated).

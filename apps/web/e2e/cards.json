@@ -3653,6 +3653,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0596920f-9946-42f4-a03b-24aab67f9f1b",
+  "name": "Blaze",
+  "manaCost": "{X}{R}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Blaze deals X damage to any target.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "p02",
+  "releasedAt": "1998-06-24",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ccba143d-ed9b-4044-bdad-f010a0e38e47",
   "name": "Blazing Shoal",
   "manaCost": "{X}{R}{R}",
@@ -7745,6 +7771,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c99bac4b-7eec-4fdf-b344-0cf9639ff073",
+  "name": "Curse of Echoes",
+  "manaCost": "{4}{U}",
+  "cmc": 5,
+  "typeLine": "Enchantment — Aura Curse",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura",
+   "Curse"
+  ],
+  "oracleText": "Enchant player\nWhenever enchanted player casts an instant or sorcery spell, each other player may copy that spell and may choose new targets for the copy they control.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "dka",
+  "releasedAt": "2012-02-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0bbeb0ee-647b-43d3-91b3-6869d5ccb8b8",
   "name": "Curse of Inertia",
   "manaCost": "{2}{U}",
@@ -10967,6 +11024,32 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2026-09-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "06f7ec6d-d70e-44d8-bf43-ae667d244ab4",
+  "name": "Espers to Magicite",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile each opponent's graveyard. When you do, choose up to one target creature card exiled this way. Create a token that's a copy of that card, except it's an artifact and it loses all other card types.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -21070,6 +21153,50 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ae9f5c80-bc96-4ab3-bb5b-e8bd470e9eab",
+  "name": "Magus Lucea Kane",
+  "manaCost": "{1}{G}{U}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Tyranid Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Tyranid",
+   "Wizard"
+  ],
+  "oracleText": "Spiritual Leader — At the beginning of combat on your turn, put a +1/+1 counter on target creature.\nPsychic Stimulus — {T}: Add {C}{C}. When you next cast a spell with {X} in its mana cost or activate an ability with {X} in its activation cost this turn, copy that spell or ability. You may choose new targets for the copy. (A copy of a permanent spell becomes a token.)",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Spiritual Leader",
+   "Psychic Stimulus"
+  ],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "44865261-16f8-42d2-a388-a57173142eb0",
   "name": "Magus of the Arena",
   "manaCost": "{4}{R}{R}",
@@ -23865,6 +23992,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "040cbd8a-a9e5-454b-a5ae-9b66bb66b8e9",
+  "name": "Nethergoyf",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Creature — Lhurgoyf",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Lhurgoyf"
+  ],
+  "oracleText": "Nethergoyf's power is equal to the number of card types among cards in your graveyard and its toughness is equal to that number plus 1.\nEscape—{2}{B}, Exile any number of other cards from your graveyard with four or more card types among them. (You may cast this card from your graveyard for its escape cost.)",
+  "power": "*",
+  "toughness": "1+*",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Escape"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ec4a1a8d-4071-40e9-812e-42c746180d99",
   "name": "Never Happened",
   "manaCost": "{2}{B}",
@@ -24387,6 +24546,41 @@
   "commanderLegal": "legal",
   "set": "c14",
   "releasedAt": "2014-11-07",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a6abb6af-7ea2-43f3-8718-2a077ad0c947",
+  "name": "Ob Nixilis, the Adversary",
+  "manaCost": "{1}{B}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Planeswalker — Nixilis",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Nixilis"
+  ],
+  "oracleText": "Casualty X. The copy isn't legendary and has starting loyalty X. (As you cast this spell, you may sacrifice a creature with power X. When you do, copy this spell. The copy becomes a token.)\n+1: Each opponent loses 2 life unless they discard a card. If you control a Demon or Devil, you gain 2 life.\n−2: Create a 1/1 red Devil creature token with \"When this token dies, it deals 1 damage to any target.\"\n−7: Target player draws seven cards and loses 7 life.",
+  "loyalty": "3",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Casualty"
+  ],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
@@ -25454,6 +25648,30 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "505cb78d-b292-4d16-b3f2-110164b4cc93",
+  "name": "Panoptic Mirror",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Imprint — {X}, {T}: You may exile an instant or sorcery card with mana value X from your hand.\nAt the beginning of your upkeep, you may copy a card exiled with this artifact. If you do, you may cast the copy without paying its mana cost.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Imprint"
+  ],
+  "commanderLegal": "legal",
+  "set": "slz",
+  "releasedAt": "2026-09-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": true
  },
  {
   "oracleId": "a4fa2afe-52fc-4ad0-a694-693cb9c88096",
@@ -29069,6 +29287,37 @@
   "set": "dbl",
   "releasedAt": "2022-01-28",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6c2e6447-c32b-4b92-a3e6-4d770e3dd250",
+  "name": "Rootweaver Druid",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Elf Druid",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Druid"
+  ],
+  "oracleText": "When this creature enters, each opponent may search their library for up to three basic land cards. They each put one of those cards onto the battlefield tapped under your control and the rest onto the battlefield tapped under their control. Then each player who searched their library this way shuffles.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -32951,6 +33200,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e35d4c62-5211-4785-b683-a83719195d87",
+  "name": "Spinerock Tyrant",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Creature — Dragon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "Flying\nWither (This deals damage to creatures in the form of -1/-1 counters.)\nWhenever you cast an instant or sorcery spell with a single target, you may copy it. If you do, those spells gain wither. You may choose new targets for the copy.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Wither"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9ad61841-9894-41da-bdd8-248c2ce21b00",
   "name": "Split the Party",
   "manaCost": "{3}{U}{U}",
@@ -34965,6 +35247,34 @@
   "commanderLegal": "legal",
   "set": "dmu",
   "releasedAt": "2022-09-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cbf64c58-664f-431f-987e-08ae70d23f2b",
+  "name": "Tempt with Mayhem",
+  "manaCost": "{1}{R}{R}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Tempting offer — Choose target instant or sorcery spell. Each opponent may copy that spell and may choose new targets for the copy they control. You copy that spell once plus an additional time for each opponent who copied the spell this way. You may choose new targets for the copies you control.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Tempting offer"
+  ],
+  "commanderLegal": "legal",
+  "set": "m3c",
+  "releasedAt": "2024-06-14",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -38752,6 +39062,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "814679b4-51bd-4b07-a7b8-d3375d36ff45",
+  "name": "Vincent's Limit Break",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Tiered (Choose one additional cost.)\nUntil end of turn, target creature you control gains \"When this creature dies, return it to the battlefield tapped under its owner's control\" and has the chosen base power and toughness.\n• Galian Beast — {0} — 3/2.\n• Death Gigas — {1} — 5/2.\n• Hellmasker — {3} — 7/2.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Hellmasker",
+   "Death Gigas",
+   "Tiered",
+   "Galian Beast"
+  ],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1c2d6b55-653a-41fd-8a5e-6463a992640b",
   "name": "Virtus's Maneuver",
   "manaCost": "{2}{B}",
@@ -40317,6 +40658,45 @@
   "set": "dft",
   "releasedAt": "2025-02-14",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e70a01dd-4dbe-4811-ac93-1c6d0142e06e",
+  "name": "Winter, Cynical Opportunist",
+  "manaCost": "{2}{B}{G}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warlock"
+  ],
+  "oracleText": "Deathtouch\nWhenever Winter attacks, mill three cards.\nDelirium — At the beginning of your end step, you may exile any number of cards from your graveyard with four or more card types among them. If you do, put a permanent card from among them onto the battlefield with a finality counter on it.",
+  "power": "2",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [
+   "Deathtouch",
+   "Delirium",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsc",
+  "releasedAt": "2024-09-27",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

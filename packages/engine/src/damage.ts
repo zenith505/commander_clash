@@ -354,6 +354,8 @@ export function dealDamage(
     }
     if (has(src, "Deathtouch")) o.deathtouchDamage = true;
     if (src.id && !o.damagedBy?.includes(src.id)) (o.damagedBy ??= []).push(src.id);
+    // Shelob, Child of Ungoliant: the source's subtypes and controller as it deals the damage (round 354).
+    for (const k of [...src.subtypes, ...(src.allCreatureTypes ? ["*"] : [])].map((t) => `${src.controller}|${t}`)) if (!o.damagedByKinds?.includes(k)) (o.damagedByKinds ??= []).push(k);
     o.wasDealtDamage = true;
     // Grisly Sigil: "If it was dealt noncombat damage this turn".
     if (!opts.combat) o.wasDealtNoncombatDamage = true;

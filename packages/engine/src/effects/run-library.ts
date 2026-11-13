@@ -1501,6 +1501,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const agent = !yardOnly && libOf(p.id) === p ? searchAgent(s, p.id) : undefined;
         if (agent?.exileFor !== undefined) sc.searchExileFor = agent.exileFor;
         const kind = (filter?.text ?? "card").replace(/~/g, src);
+        const underName = (d: SearchDest) => ((pid) => (pid === undefined || pid === p.id ? undefined : player(s, pid).name))(d.under ? players(s, d.under, ctx)[0] : undefined);
         const what = perName ? `up to one ${single} for each of these names: ${perName.map((f) => f.namedAny[0]).join(", ")}` : e.oneOfEach ? `up to a ${kind}` : `${e.upTo && n < 99 ? "up to " : ""}${n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${n >= 99 ? "any number of" : n} ${kind.replace(/\bcard\b/, "cards")}`}`;
         s.pending = {
           kind: "searchLibrary",
@@ -1513,7 +1514,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           max,
           ...(agent?.controller !== undefined ? { controlling: p.id } : {}),
           ...(agent?.exileFor !== undefined ? { foundExiled: true as const } : {}),
-          ...(e.others && agent?.exileFor === undefined ? { firstTo: describeDest(e.dest), othersTo: describeDest(e.others), ...(e.firstN ? { firstN: e.firstN } : {}) } : {}),
+          // Rootweaver Druid: the one found for another player's control says whose it becomes (round 354).
+          ...(e.others && agent?.exileFor === undefined ? { firstTo: `${describeDest(e.dest)}${underName(e.dest) !== undefined ? ` under ${underName(e.dest)}'s control` : ""}`, othersTo: `${describeDest(e.others)}${underName(e.dest) !== undefined && !e.others.under ? " under your control" : ""}`, ...(e.firstN ? { firstN: e.firstN } : {}) } : {}),
           ...(e.shareLandType ? { shareLandType: true as const } : {}),
           ...(e.oneName ? { oneName: true as const } : {}),
           ...(e.exactly ? { exactly: true as const } : {}),

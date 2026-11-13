@@ -54,6 +54,9 @@ import { round348Line } from "./round348";
 import { round349Line } from "./round349";
 import { round350Line } from "./round350";
 import { round351Line } from "./round351";
+import { round352Line } from "./round352";
+import { round353Line } from "./round353";
+import { round354Finish, round354Line, round354Tiered } from "./round354";
 import { roundB189Line } from "./laneb189";
 
 const cache = new Map<string, CompiledCard>();
@@ -1235,7 +1238,7 @@ export function compile(d: CardDef): CompiledCard {
         if (costKw.delve) out.delve = true;
         if (costKw.assist) out.assist = true;
         // Two of the same: each would work separately (CR 702.153b), which isn't modeled.
-        const twice = (costKw.madness && out.madness) || (costKw.miracle && out.miracle) || (costKw.suspend && out.suspend) || (costKw.casualty && out.casualty) || (costKw.dredge && out.dredge) || (costKw.plot && out.plot) || (costKw.foretell && out.foretell) || (costKw.alt && out.altCosts?.some((a) => a.kind === costKw.alt!.kind));
+        const twice = (costKw.madness && out.madness) || (costKw.miracle && out.miracle) || (costKw.suspend && out.suspend) || (costKw.casualty !== undefined && out.casualty !== undefined) || (costKw.dredge && out.dredge) || (costKw.plot && out.plot) || (costKw.foretell && out.foretell) || (costKw.alt && out.altCosts?.some((a) => a.kind === costKw.alt!.kind));
         if (twice) {
           out.unsupported.push(raw);
           continue;
@@ -1247,7 +1250,8 @@ export function compile(d: CardDef): CompiledCard {
         if (costKw.plot) out.plot = costKw.plot;
         if (costKw.foretell) out.foretell = costKw.foretell;
         if (costKw.suspend) out.suspend = costKw.suspend;
-        if (costKw.casualty) out.casualty = costKw.casualty;
+        if (costKw.casualty !== undefined) out.casualty = costKw.casualty;
+        if (costKw.casualtyX) out.casualtyX = true;
         if (costKw.dredge) out.dredge = costKw.dredge;
         if (costKw.impending) out.impending = costKw.impending;
         if (costKw.faceDown) {
@@ -5984,6 +5988,12 @@ export function compile(d: CardDef): CompiledCard {
     if (round350Line(line, raw, out, isSpell)) continue;
     // Eater of Virtue, Deification, The War Doctor, King of the Oathbreakers (round 351).
     if (round351Line(line, raw, out, isSpell)) continue;
+    // Winter, Cynical Opportunist, Ob Nixilis, the Adversary, Panoptic Mirror (round 352).
+    if (round352Line(line, raw, out, isSpell)) continue;
+    // Hive Mind, Curse of Echoes, Spinerock Tyrant (round 353).
+    if (round353Line(line, raw, out, isSpell)) continue;
+    // Hofri Ghostforge's Spirit tokens (round 354).
+    if (round354Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -7046,7 +7056,10 @@ export function compile(d: CardDef): CompiledCard {
     if (spellLines.length || paws.costs.length < 2 || spree || ascendSpell || modes.some((m) => !m)) out.unsupported.push(...paws.lines, ...spellLines);
     else out.spell = { targets: [], effects: [], text: paws.lines.join(" "), modal: { min: 0, max: paws.budget, modes: modes as AbilityBody[], pawprints: paws.costs, repeat: true } };
   } else if (spree) {
-    const modes = spree.texts.map((t) => parseBody(t, { spell: true }));
+    // Vincent's Limit Break: tiered modes that are only base power and toughness, for the one sentence of the spell that
+    // says "the chosen base power and toughness" (round 354).
+    const shown = round354Tiered(spree, spellLines);
+    const modes = spree.texts.map((t, i) => ((b) => (b && shown ? { ...b, text: shown[i]! } : b))(parseBody(t, { spell: true })));
     // Every mode has to work, and nothing else may be in the spell's text (it would be outside the modes).
     if (spellLines.length || spree.costs.length < 2 || ascendSpell || modes.some((m) => !m)) out.unsupported.push(...spree.lines, ...spellLines);
     else out.spell = { targets: [], effects: [], text: spree.lines.join(" "), modal: { min: 1, max: spree.tiered ? 1 : modes.length, modes: modes as AbilityBody[], costs: spree.costs } };
@@ -7514,8 +7527,10 @@ function linkExile(out: CompiledCard) {
   }
   // Isochron Scepter: "copy the exiled card" is linked to the one ability that exiles a card from the hand as it enters.
   const copies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].some((b) => allEffects(b.effects).some((e) => e.type === "castLinkedCopy"));
+  // Panoptic Mirror: the one activated ability that exiles a card from the hand, with no such enters trigger.
   if (copies) {
-    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
+    const entering = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
+    const imprints = entering.length ? entering : out.activated.flatMap((a) => allEffects(a.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
     if (imprints.length !== 1) out.unsupported.push("(copies an exiled card it can't link to one imprint ability)");
     else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
   }
@@ -7744,6 +7759,8 @@ function linkExile(out: CompiledCard) {
   }
   // Murktide Regent, Soulflayer: their delve's cards and no other exile (round B182).
   roundB182Finish(out, bodies.flatMap((b) => allEffects(b.effects)));
+  // Hofri Ghostforge: the card its trigger exiles, linked to the Spirit tokens it creates (round 354).
+  round354Finish(out);
   // Ethereal Forager: with delve and no exile instruction of its own, "cards exiled with ~" are those its delve exiled as
   // it was cast (rulings; linked to the permanent it becomes, CR 607.2q).
   if (out.delve && !out.spell && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "moveLinked"))) {
@@ -7775,7 +7792,8 @@ function linkExile(out: CompiledCard) {
     } else if (others || out.spell || exiles.length !== 1) out.unsupported.push("(copies a card exiled with it that it can't link to one exile ability)");
     else exiles[0]!.linked = true;
   }
-  const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked" || e.type === "linkedExileToken" || (e.type === "dig" && e.eachOf?.ref === "linkedExileOwners")));
+  // Hofri Ghostforge's Spirit token: its card is linked by the ability that created it (round354.ts), not by an exile of its own.
+  const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => (e.type === "returnLinked" && !e.createdLink) || e.type === "linkedExileToken" || (e.type === "dig" && e.eachOf?.ref === "linkedExileOwners")));
   if (!returns.length) return;
   // The Princess Takes Flight: a later chapter returns what an earlier one exiled, its only exile.
   if (returns.some((t) => t.event === "chapter")) {

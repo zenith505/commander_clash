@@ -44,6 +44,7 @@ import { round344Line } from "./round344";
 import { round345Chapter, round345Line } from "./round345";
 import { round346Line } from "./round346";
 import { round347Line } from "./round347";
+import { roundB189Line } from "./laneb189";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -2061,6 +2062,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB187Line(line, raw, out, isSpell)) continue;
     // Round B188.
     if (roundB188Line(line, raw, out, isSpell)) continue;
+    // Thought Prison, Soulcipher Board, Grimoire Thief (round B189).
+    if (roundB189Line(line, raw, out, isSpell)) continue;
     // Colfenor's Plans (round B192).
     if (roundB192Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
@@ -7426,6 +7429,14 @@ function linkExile(out: CompiledCard) {
     const others = all.filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.anyGraveyard));
     if (!yards.length || others.length) out.unsupported.push("(compares with exiled cards it can't link to one exile ability)");
     else for (const e of yards) e.linked = true;
+  }
+  // Thought Prison: "the exiled card" its cast trigger compares with is the one its imprint ability exiled as it entered,
+  // its only exile (CR 607.2a).
+  if (out.triggers.some((t) => t.cast?.sharesColorOrMvWithLinked)) {
+    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "takeFromHand" }> => e.type === "takeFromHand" && e.action === "exile");
+    const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileGraveyard" || e.type === "chooseFromGraveyard" || e.type === "exileTop");
+    if (imprints.length !== 1 || others.length !== 1) out.unsupported.push("(compares with an exiled card it can't link to one imprint ability)");
+    else imprints[0]!.linked = true;
   }
   // Mourner's Shield: "a source of your choice that shares a color with the exiled card" is about the card its imprint ability
   // exiled as it entered, its only exile (CR 607.2a).

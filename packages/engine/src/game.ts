@@ -22,6 +22,7 @@ import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { isSuspended } from "./effects/run-zones";
 import { canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
 import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
+import { watchExileLookers } from "./effects/run-laneb189";
 import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, enchantableBy, everyCreatureType, ignoredBy, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
@@ -13911,6 +13912,8 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
   if (s.resolving) return; // not while a spell or ability is partway through resolving (CR 704.3)
   // Temporal Aperture's grant, once its card isn't on top any more, never comes back (CR 611.2b).
   if (s.topFreePlays) endTopFreePlays(s);
+  // Grimoire Thief: its controller now may look at the cards exiled with it too (rulings).
+  if (s.exileLookWatch) watchExileLookers(s);
   if (!s.pending && askEntersChoice(s)) return;
   for (let guard = 0; guard < 100; guard++) {
     s.leftTogether = undefined; // each pass happens all at once (CR 704.3)

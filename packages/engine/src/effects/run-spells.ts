@@ -1336,7 +1336,7 @@ function spellNameOf(s: GameState, ctx: ResolveCtx, index: number): string | und
  * Guile: each card exiled instead of being countered (counterOnStack), which the counter effect's controller may cast now
  * without paying its mana cost, timing ignored (CR 608.2g), or never (rulings). "paused" while one is offered.
  */
-function offerGuileCasts(s: GameState, src: string): "paused" | void {
+export function offerGuileCasts(s: GameState, src: string): "paused" | void {
   const sc = s.resolving?.scratch;
   while (sc?.guileCasts?.length) {
     const next = sc.guileCasts.shift()!;
@@ -1350,7 +1350,7 @@ function offerGuileCasts(s: GameState, src: string): "paused" | void {
   if (sc) sc.guileCasts = undefined;
 }
 
-function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop" | "hand" | "librarySecond" | "libraryChoice" | "battlefield" | "libraryBottom", bounce?: true): "paused" | void {
+export function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop" | "hand" | "librarySecond" | "libraryChoice" | "battlefield" | "libraryBottom", bounce?: true): "paused" | void {
   const i = s.stack.findIndex((x) => x.id === stackId);
   const item = s.stack[i];
   if (!item) return; // it already left the stack

@@ -2375,6 +2375,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Face down: only its controller may look, if the ability says so or lets them play it (CR 406.3; rulings on
         // Gonti: "you may look at and play").
         o.hiddenExile = { by: ctx.sourceId ?? "", seen: e.look || e.play ? [p.id] : [], label: "Face down", at };
+        // Grimoire Thief: any later controller of the source may look as well (rulings; GameState.exileLookWatch).
+        if (e.lookControllers && ctx.sourceId) {
+          o.hiddenExile.watch = { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 };
+          s.exileLookWatch = true;
+        }
         if (ctx.sourceId) ((s.linkedExile ??= {})[key] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
         // The permission belongs to this object only (CR 400.7), and to the player who exiled it, whoever controls the
         // source later (rulings on Gonti).

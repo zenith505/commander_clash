@@ -5,6 +5,7 @@
 import type { Effect, TargetSpec } from "../abilities";
 import { parseBody, type Ctx } from "./body";
 import { parseSearchFilter } from "./search";
+import { round356Sentence } from "./round356";
 import { parseObject } from "./targets";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
@@ -12,6 +13,9 @@ type Found = { effect: Effect; next: number } | "fail" | null;
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round355Sentence(s: string, sentences: string[], si: number, ctx: Ctx, _effects: Effect[]): Found {
+  // Round 356's sentences first (oracle/round356.ts).
+  const r356 = round356Sentence(s, sentences, si, ctx, _effects);
+  if (r356) return r356;
   const line = plain(s);
   // Spelltwine: "Exile target instant or sorcery card from your graveyard and target instant or sorcery card from an
   // opponent's graveyard. Copy those cards. Cast the copies if able without paying their mana costs.": two targets, both

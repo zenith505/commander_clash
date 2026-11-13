@@ -3197,6 +3197,16 @@ export function compile(d: CardDef): CompiledCard {
       else (out.fromTop ??= []).push({ ...ifTop, if: cond });
       continue;
     }
+    // The Fourth Doctor: "Would You Like A...? — Once each turn, you may play a historic land or cast a historic spell from
+    // the top of your library. When you do, create a Food token." (FromTop.whenDo, a reflexive trigger, CR 603.12).
+    const whenDoTop = /^(?:[^—]+ — )?(Once each turn, you may .+? from the top of your library)\. When you do, ([a-z].+)$/.exec(line);
+    if (whenDoTop) {
+      const t = parseFromTop(whenDoTop[1]!);
+      const body = parseBody(`${whenDoTop[2]![0]!.toUpperCase()}${whenDoTop[2]!.slice(1)}`);
+      if (!t?.once || !body || body.targets.length || !body.effects.length) out.unsupported.push(raw);
+      else (out.fromTop ??= []).push({ ...t, whenDo: body });
+      continue;
+    }
     // Bolas's Citadel: "... If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost."
     const lifeTop = /^(.+?)\. If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost\.$/.exec(line);
     // Thundermane Dragon: "... If you cast a creature spell this way, it gains haste until end of turn."
@@ -7430,6 +7440,8 @@ function linkExile(out: CompiledCard) {
     // Living Lore: "you may cast the exiled card" is the card its "As ~ enters, exile ..." exiled (CR 607.2b).
     if (yardEntersLinkOnly(out, [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)])) {
       /* linked by the enters replacement */
+    } else if (!spells.length && others.length === 1 && others[0]!.type === "hideaway" && !out.spell) {
+      /* Smuggler's Buggy: "the exiled card" is the one its hideaway exiled (CR 702.75a, 607.2a), linked as it's exiled */
     } else if (spells.length !== 1 || others.length !== 1 || out.spell) out.unsupported.push("(casts an exiled card it can't link to one exile ability)");
     else spells[0]!.linked = true;
   }
@@ -8304,11 +8316,15 @@ export function parseFromTop(text: string): FromTop | null | undefined {
   // "You may play the top card of your library", "you may play cards from the top of your library": lands and spells.
   text = text.replace(/^(you may) play (?:the top card of your library|cards from the top of your library)$/i, "$1 play lands and cast spells from the top of your library");
   // "Play historic lands" (Crystal Skull): only lands of that kind.
+  // The Fourth Doctor: "play a historic land or cast a historic spell" is one land or one spell of those kinds.
+  text = text.replace(/^(Once each turn, you may) play an? ([a-z]+) land or cast an? ([a-z]+) spell from the top of your library$/, "$1 play $2 lands and cast $3 spells from the top of your library");
   const m = /^(Once each turn, )?[Yy]ou may (?:play (?:([a-z]+) )?lands(?: and cast (.+))?|cast (.+)) from the top of your library$/.exec(text);
   if (!m) return undefined;
   const lands = m[4] === undefined;
   const what = m[3] ?? m[4];
-  if (m[1] && (lands || !what)) return null; // only "once each turn, you may cast ..." is modeled
+  // "Once each turn, you may cast ...", and "... play a land or cast a spell ...": one land or spell each turn in all
+  // (topUsedTurn); a land-only one isn't modeled.
+  if (m[1] && !what) return null;
   const landFilter = m[2] ? parseSearchFilter(`${m[2]} land card`) : undefined;
   if (m[2] && !landFilter) return null;
   if (!what) return { lands, ...(landFilter ? { landFilter } : {}) };

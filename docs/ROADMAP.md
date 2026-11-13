@@ -8235,8 +8235,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Immovable Rod ("For as long as ~ remains tapped, another target permanent loses all abilities and can't attack or block":
   an Aura that loses its enchant ability goes to the graveyard, an Equipment stays attached, rulings, CR 702.5a, 704.5m).
   Merieke Ri Berit ("When ~ leaves the battlefield or becomes untapped, destroy that creature. It can't be regenerated.": the
-  first of either, once; another player taking ~ only ends the control, rulings, CR 603.7c). +7, 31,063 of 31,936 with B177
-  to B185 and rounds 336 to 337.
+  first of either, once; another player taking ~ only ends the control, rulings, CR 603.7c). +7, 31,103 of 31,936 with B177
+  to B185 and rounds 336 to 344.
 - Round B187 (least played first, from the Lane B skip lists): Bucolic Ranch ("If it's a Mount card, you may reveal it and
   put it into your hand. If you don't put it into your hand, you may put it on the bottom of your library": the bottom
   offered also when it's a Mount you don't take, rulings on Gathering Stone). Graceful Takedown ("Any number of target

@@ -53,6 +53,8 @@ export interface DamageRule {
   untilYourNextTurn?: true;
   /** "This combat" (Suppressor Skyguard): removed as the end of combat step ends (CR 511.3). */
   thisCombat?: true;
+  /** "For as long as ~ remains on the battlefield" (Old Fat Spider Can't See Me): it lasts, whatever the turn, while this object is still on the battlefield as the object it was (CR 611.2b, 400.7). */
+  whileSource?: { id: ObjectId; zc: number };
   /** Gloom Surgeon: "prevent that damage and exile that many cards from the top of your library" (CR 615.5): its controller exiles them, even if the damage can't be prevented (rulings, 615.12). */
   exileTop?: true;
   gainLife?: { colors?: Color[] };

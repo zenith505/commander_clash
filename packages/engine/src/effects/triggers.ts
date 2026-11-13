@@ -1932,6 +1932,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     addHosted(attacker, (e) => e === "selfAttacksAlone", undefined, attacker, that);
     for (const id of s.battlefield)
       if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e, t) => e === "creatureYouControlAttacksAlone" && (!t.subjectFilter || (t.subjectOrSelf && id === attacker.id) || objectMatches(s, t.subjectFilter, attacker, you, false)), undefined, undefined, attacker, undefined, undefined, undefined, that);
+    // The Last Ronin III: "Whenever a creature you control attacks alone this turn": a delayed trigger of its controller's
+    // (CR 603.7b, 603.7d), the creature its subject.
+    fromFloating((src, ctrl, triggers) => ctrl === you && add(src, ctrl, (e, t) => e === "creatureYouControlAttacksAlone" && !t.subjectFilter, triggers, undefined, attacker, undefined, undefined, undefined, that));
     causedBy = null;
   } else if (ev.type === "attacksPlayerAlone") {
     // "Whenever a creature you control attacks a player alone": the only creature attacking that player itself (rulings).

@@ -1075,8 +1075,9 @@ function singularPhrase(p: string): string {
   else {
     // A creature type: "two target Goblins", "up to two target Elves you control".
     const j = words.findIndex((w) => /^[A-Z]/.test(w) && CREATURE_TYPES.has(singular(w)) && w !== singular(w));
-    // A basic land type: "up to four target Forests" (Nissa, Worldwaker).
-    const land = j < 0 ? words.findIndex((w) => /^(?:Forests|Islands|Mountains|Swamps)$/.test(w)) : -1;
+    // A basic land type: "up to four target Forests" (Nissa, Worldwaker); an enchantment type: "any number of target Sagas
+    // you control" (Chong and Lily, Nomads).
+    const land = j < 0 ? words.findIndex((w) => /^(?:Forests|Islands|Mountains|Swamps|Sagas)$/.test(w)) : -1;
     if (land >= 0) words[land] = words[land]!.slice(0, -1);
     else if (j < 0) return p;
     else {

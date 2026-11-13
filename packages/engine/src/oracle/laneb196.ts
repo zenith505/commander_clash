@@ -3,6 +3,7 @@ import type { AbilityBody, Effect, TargetSpec } from "../abilities";
 import { addTarget, type Ctx } from "./body";
 import { parseSearchFilter } from "./search";
 import { stackSpec } from "./sentences/spells";
+import { roundB197Sentence, roundB197Spell } from "./laneb197";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -74,10 +75,10 @@ export function roundB196Sentence(s: string, sentences: string[], si: number, ct
       next: si + 1,
     };
   }
-  return null;
+  return roundB197Sentence(s, sentences, si, ctx, effects);
 }
 
 /** A whole spell's text read at once; undefined when it isn't one of these, null when it is but fails. */
-export function roundB196Spell(_text: string): AbilityBody | null | undefined {
-  return undefined;
+export function roundB196Spell(text: string): AbilityBody | null | undefined {
+  return roundB197Spell(text);
 }

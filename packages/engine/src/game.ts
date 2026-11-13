@@ -6676,6 +6676,9 @@ export function eminenceCommanders(s: GameState): GameObject[] {
   return s.players.filter((p) => !p.lost).flatMap((p) => p.command.map((id) => s.objects[id]!)).filter((o) => o?.zone === "command" && !o.emblem && !!compileCard(defOf(s, o)).costMods?.some((m) => m.eminence));
 }
 
+/** Is this what a spell cast face down is (CR 708.4): a 2/2 creature with no other characteristics, ward {2} with disguise? */
+const isFaceDownDef = (d: CardDef) => d.oracleId === FACE_DOWN.oracleId || d.oracleId === FACE_DOWN_WARD.oracleId;
+
 function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number, lifeFor?: ObjectId[], kicked = false): { more: number; less: number; moreColored: Color[]; lessColored: Color[]; lessColoredOrGeneric: Color[]; lifeOffers: { id: ObjectId; life: number }[] } {
   let [more, less] = [0, 0];
   const moreColored: Color[] = [];
@@ -6725,7 +6728,9 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       }
       // "The first creature spell you cast each turn": the creature spells you cast earlier this turn count, even before this permanent was on the battlefield (rulings).
       if (m.kicked && !kicked) continue;
-      if (m.nth && (s.castThisTurn ?? []).filter((c) => c.player === pid && (!m.kicked || c.kicked) && printedMatches(rest, s.cards[c.card]!)).length !== m.nth - 1) continue;
+      // Dream Chisel: only a spell cast face down (CR 708.4); Kadena counts the face-down spells cast earlier this turn.
+      if (m.faceDown && !isFaceDownDef(d)) continue;
+      if (m.nth && (s.castThisTurn ?? []).filter((c) => c.player === pid && (!m.kicked || c.kicked) && (!m.faceDown || c.faceDown) && printedMatches(rest, c.faceDown ? FACE_DOWN : s.cards[c.card]!)).length !== m.nth - 1) continue;
       // The Defilers: offered as an additional cost, and only then a reduction.
       if (m.payLife) {
         if (!lifeOffers.some((l) => l.id === src.id)) lifeOffers.push({ id: src.id, life: m.payLife });
@@ -6775,6 +6780,8 @@ function costModThisTurnApplies(s: GameState, c: NonNullable<GameState["costMods
   const m = c.mod;
   // "Spells with the chosen name" (Cheering Fanatic): anyone's.
   if (m.who === "opponents" ? c.player === pid || !opponents(s, c.player).includes(pid) : m.who !== "all" && c.player !== pid) return false;
+  // Goblin Maskmaker: "face-down spells you cast this turn" (CR 708.4).
+  if (m.faceDown && !isFaceDownDef(d)) return false;
   const { manaValue: range, ...rest } = m.filter;
   if (!printedMatches(rest, d)) return false;
   return !range || ((range.min === undefined || mv >= range.min) && (range.max === undefined || mv <= range.max));
@@ -7721,7 +7728,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     log(s, `${p.name} casts a creature spell: the effects lasting until then end.`);
   }
   const kickedNow = !!item.kicked?.length && isRealKicker(compileCard(d).kicker);
-  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, ...(o.faceDown ? {} : { name: d.name }), colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom, ...(castFrom === "graveyard" && o.owner === p.id ? { ownYard: true as const } : {}), ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv, ...(kickedNow ? { kicked: true as const } : {}) });
+  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, ...(o.faceDown ? {} : { name: d.name }), colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom, ...(castFrom === "graveyard" && o.owner === p.id ? { ownYard: true as const } : {}), ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv, ...(kickedNow ? { kicked: true as const } : {}), ...(o.faceDown ? { faceDown: true as const } : {}) });
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv, castColors: [...characteristics(s, o).colors], ...(o.colorsSpent?.length ? { castColorsSpent: o.colorsSpent.length } : {}), ...(o.faceDown ? {} : { castName: d.name }) };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
   if (o.preparedFrom) unprepareFor(s, o);
@@ -8942,7 +8949,9 @@ export function tapCostCandidates(s: GameState, pid: PlayerId, source: GameObjec
     const x = obj(s, id);
     // "Untap a tapped creature you control": tapped ones, but not one a stun counter would keep tapped (CR 122.1d).
     if (c.untap ? !x.tapped || (x.counters.stun ?? 0) > 0 : x.tapped) return false;
-    return controllerOf(s, x) === pid && !(c.other && id === source.id) && objectMatches(s, c.filter, x, pid, false);
+    // Templar Knight: "creatures you control named ~": with the source's name as it is now (CR 201.2).
+    const filter = c.filter.named === "~" ? { ...c.filter, named: source.zone === "battlefield" ? characteristics(s, source).name : defOf(s, source).name } : c.filter;
+    return controllerOf(s, x) === pid && !(c.other && id === source.id) && objectMatches(s, filter, x, pid, false);
   });
 }
 
@@ -13512,6 +13521,14 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
     if (!ac.allMustBlock && !ac.mustBeBlocked) continue;
     const blocked = blocks.some((b) => b.attacker === at.id);
     if (!blocked && could.some((b) => !full(b))) return `${ac.name} must be blocked if able`;
+    // Gorm the Great: "must be blocked by two or more creatures if able": a second requirement (CR 509.1c), obeyed when
+    // two of the creatures able to block it, ones not already obeying other requirements, could; with only one, that one
+    // blocking it is enough (rulings).
+    if (ac.mustBeBlockedByTwo && !ac.maxOneBlocker) {
+      const on = blocks.filter((b) => b.attacker === at.id).length;
+      const more = could.filter((b) => !full(b) && !blocks.some((x) => x.blocker === b.id && x.attacker === at.id)).length;
+      if (on < 2 && on + more >= 2) return `${ac.name} must be blocked by two or more creatures if able`;
+    }
   }
   return null;
 }

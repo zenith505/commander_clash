@@ -2937,6 +2937,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "386a6fa7-db5b-4e82-bd25-fd86d910ed0c",
+  "name": "Baral and Kari Zev",
+  "manaCost": "{1}{U}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human"
+  ],
+  "oracleText": "First strike, menace\nWhenever you cast your first instant or sorcery spell each turn, you may cast a spell with lesser mana value that shares a card type with it from your hand without paying its mana cost. If you don't, create First Mate Ragavan, a legendary 2/1 red Monkey Pirate creature token. It gains haste until end of turn.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "First strike",
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "151d9035-c8e8-4794-8405-dc7744eb99a2",
   "name": "Bargaining Table",
   "manaCost": "{5}",
@@ -32864,6 +32901,32 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2021-08-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "307e68e0-5095-474c-af02-bfcb2e463763",
+  "name": "Spelltwine",
+  "manaCost": "{5}{U}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile target instant or sorcery card from your graveyard and target instant or sorcery card from an opponent's graveyard. Copy those cards. Cast the copies if able without paying their mana costs. Exile Spelltwine.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m13",
+  "releasedAt": "2012-07-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

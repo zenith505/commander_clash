@@ -1762,7 +1762,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // The spell's mana value on the stack: the half or face cast (rulings on Invoke Calamity, CR 709.3, 712.11c).
           const cast = s.stack.find((x) => x.objectId === st.casting);
           if (st.budget !== undefined) st.budget -= cast ? spellManaValue(s, cast) : mvOf(st.casting);
-          if (e.exileCast && s.objects[st.casting]?.zone === "stack") s.objects[st.casting]!.exileIfToGraveyard = true;
+          // Bilbo: only an instant or sorcery spell, its types as it was cast (an Adventure's, CR 715.3).
+          if (e.exileCast && s.objects[st.casting]?.zone === "stack" && (!e.exileCastTypes || e.exileCastTypes.some((ty) => objIsType(s, obj(s, st.casting!), ty)))) s.objects[st.casting]!.exileIfToGraveyard = true;
           st.cast = (st.cast ?? 0) + 1;
           // Jetsam: one spell from each graveyard, so none more from this one's owner's.
           if (e.onePerOwner) (st.ownersCast ??= []).push(obj(s, st.casting).owner);
@@ -1866,7 +1867,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return runEffect(s, e, ctx);
       }
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
-      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name + (e.handAndYard ? ` (${obj(s, id).zone})` : e.anyYard ? ` (${player(s, obj(s, id).owner).name}'s graveyard)` : "")), "Done"], prompt: e.anyYard ? `cast ${e.filter ? `${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from ${e.onePerOwner ? "each opponent's graveyard (one from each)" : e.yardOf && options[0] ? `${player(s, obj(s, options[0]).owner).name}'s graveyard` : "a graveyard"} without paying its mana cost${st.maxMv !== undefined ? ` (mana value ${st.maxMv} or less)` : ""}?` : e.handAndYard ? `cast ${e.filter?.supertypes?.includes("Legendary") ? "a legendary" : e.pay && e.filter?.types?.length === 1 ? `${/^[AEIOU]/.test(e.filter.types[0]!) ? "an" : "a"} ${e.filter.types[0]!.toLowerCase()}` : "a"} spell from your hand${e.andExile ? ", graveyard or exile" : " or graveyard"} ${e.pay ? `${castPayText(e.pay)} rather than paying its mana cost` : "without paying its mana cost"}${left}?` : e.yourYard ? `cast ${e.filter ? `a ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from your graveyard without paying its mana cost?` : `${e.lands ? "play a land or " : ""}cast a spell from ${e.fromHand ? (obj(s, options[0]!).owner === you.id ? "your hand" : `among the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand`) : "among "}${e.fromHand ? "" : `the ${e.reveal ? "revealed" : "exiled"} cards`}${e.paid ? "" : e.pay ? ` ${castPayText(e.pay)} rather than paying its mana cost` : " without paying its mana cost"}${left}?` };
+      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name + (e.handAndYard ? ` (${obj(s, id).zone})` : e.anyYard ? ` (${player(s, obj(s, id).owner).name}'s graveyard)` : "")), "Done"], prompt: e.anyYard ? `cast ${e.filter ? `${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from ${e.onePerOwner ? "each opponent's graveyard (one from each)" : e.yardOf && options[0] ? `${player(s, obj(s, options[0]).owner).name}'s graveyard` : "a graveyard"} without paying its mana cost${st.maxMv !== undefined ? ` (mana value ${st.maxMv} or less)` : ""}?` : e.handAndYard ? `cast ${e.filter?.supertypes?.includes("Legendary") ? "a legendary" : e.pay && e.filter?.types?.length === 1 ? `${/^[AEIOU]/.test(e.filter.types[0]!) ? "an" : "a"} ${e.filter.types[0]!.toLowerCase()}` : "a"} spell from your hand${e.andExile ? ", graveyard or exile" : " or graveyard"} ${e.pay ? `${castPayText(e.pay)} rather than paying its mana cost` : "without paying its mana cost"}${left}?` : e.yourYard ? `cast ${e.filter ? `${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from your graveyard${e.paid ? "" : " without paying its mana cost"}?` : `${e.lands ? "play a land or " : ""}cast a spell from ${e.fromHand ? (obj(s, options[0]!).owner === you.id ? "your hand" : `among the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand`) : "among "}${e.fromHand ? "" : `the ${e.reveal ? "revealed" : "exiled"} cards`}${e.paid ? "" : e.pay ? ` ${castPayText(e.pay)} rather than paying its mana cost` : " without paying its mana cost"}${left}?` };
       return "paused";
     }
     case "exileCastEachType": {
@@ -2309,6 +2310,27 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const p = player(s, actor);
       const sc = (s.resolving!.scratch ??= {});
       // Clone Shell: the card is exiled; the rest go on the bottom in the order the actor chooses.
+      // Discover the Impossible: the exiled card, cast as this resolves or not (CR 608.2g); not cast, it's put into its
+      // owner's hand (the hidden card's name stays private).
+      const castOrHand = (): "paused" | undefined => {
+        const id = sc.faceDownCast;
+        if (!e.castOrHand || id === undefined) return;
+        if (!sc.faceDownCastAsked) {
+          sc.faceDownCastAsked = true;
+          s.pending = { kind: "castFree", player: p.id, objectId: id, source: src, how: "orHand", types: e.castOrHand.types, mv: { max: e.castOrHand.maxMv } };
+          if (freeCastable(s, p.id, id)) return "paused";
+          s.pending = null;
+        }
+        const o = s.objects[id];
+        if (o?.zone === "exile") {
+          moveObject(s, id, "hand");
+          log(s, `${p.name} puts the exiled card into their hand.`);
+          log(s, `You put ${defOf(s, obj(s, id)).name} into your hand.`, p.id);
+        }
+        sc.faceDownCast = undefined;
+        return;
+      };
+      if (sc.faceDownCast !== undefined) return castOrHand();
       if (sc.faceDownBottom) return toBottom(s, p.id, sc.faceDownBottom.filter((id) => obj(s, id).zone === "library"), src, false);
       let ids: ObjectId[];
       let restBottom: ObjectId[] = [];
@@ -2336,7 +2358,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
               sc.faceDownPick = true;
               sc.faceDownLooked = ids;
               delete sc.found;
-              s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card", cards: ids, min: e.optional ? 0 : 1, max: 1, dig: { looked: ids, to: "to exile face down", rest: e.optional ? "back on top of your library" : "on the bottom of that library" } };
+              s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card", cards: ids, min: e.optional ? 0 : 1, max: 1, dig: { looked: ids, to: "to exile face down", rest: e.optional ? "back on top of your library" : e.bottomRandom ? "on the bottom of your library in a random order" : "on the bottom of that library" } };
               return "paused";
             }
             sc.found = ids;
@@ -2349,11 +2371,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (e.optional) {
             if (!chosen.length) log(s, `${p.name} leaves the card on top of their library.`);
           } else if (e.bottomAnyOrder) restBottom = looked.filter((id) => !chosen.includes(id));
-          else for (const id of looked.filter((id) => !chosen.includes(id))) {
+          else for (const id of ((r) => (e.bottomRandom && shuffle(s, r), r))(looked.filter((id) => !chosen.includes(id)))) {
             const owner = player(s, obj(s, id).owner);
             owner.library = [...owner.library.filter((x) => x !== id), id];
           }
-          if (looked.length > chosen.length && !e.bottomAnyOrder && !e.optional) log(s, `${p.name} puts ${looked.length - chosen.length === 1 ? "a card" : `${looked.length - chosen.length} cards`} on the bottom of ${[...new Set(looked.map((id) => player(s, obj(s, id).owner).name))].join(" and ")}'s library.`);
+          if (looked.length > chosen.length && !e.bottomAnyOrder && !e.optional) log(s, `${p.name} puts ${looked.length - chosen.length === 1 ? "a card" : `${looked.length - chosen.length} cards`} on the bottom of ${[...new Set(looked.map((id) => player(s, obj(s, id).owner).name))].join(" and ")}'s library${e.bottomRandom && looked.length - chosen.length > 1 ? " in a random order" : ""}.`);
           ids = chosen;
         }
       }
@@ -2403,6 +2425,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (restBottom.length) {
         sc.faceDownBottom = restBottom;
         return toBottom(s, p.id, restBottom, src, false);
+      }
+      if (e.castOrHand && done.length === 1) {
+        sc.faceDownCast = done[0];
+        return castOrHand();
       }
       return;
     }
@@ -2523,7 +2549,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.dest === "hand") log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} exiled with ${src} into their hand.`);
       else log(s, `${cards.map((c) => defOf(s, c).name).join(", ")} ${cards.length === 1 ? "goes" : "go"} from exile to ${cards.length === 1 ? "its owner's graveyard" : "their owners' graveyards"} (${src}).`);
       for (const c of cards) moveObject(s, c.id, e.dest);
-      s.resolving!.movedLinked = cards.length;
+      // Pinnacle Starcage: "for each card put into a graveyard this way": not one a replacement sent elsewhere.
+      s.resolving!.movedLinked = e.countInGraveyard ? cards.filter((c) => obj(s, c.id).zone === "graveyard").length : cards.length;
       s.resolving!.movedLinkedIds = cards.map((c) => c.id);
       if (s.linkedExile?.[key]) s.linkedExile[key] = s.linkedExile[key]!.filter((l) => !cards.some((c) => c.id === l.id));
       return;
@@ -3288,7 +3315,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // Vehicle or a creature card is what the card is as it's put there.
           const also = e.alsoMods && (!e.alsoModsIfSubtype || characteristics(s, o).subtypes.includes(e.alsoModsIfSubtype)) && (!e.alsoModsIfCreature || objIsType(s, o, "Creature")) ? e.alsoMods : undefined;
           const entersAs = [...(e.entersAs && (ctx.x ?? 0) >= e.entersAs.x ? e.entersAs.mods : []), ...(also ?? [])];
-          moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(entersAs.length ? { entersAs, ...(also ? { entersAsBy: { controller: ctx.controller, source: src, ...(e.alsoModsWhileCounter ? { whileCounter: e.alsoModsWhileCounter } : {}) } } : {}) } : {}), ...(e.counters ? e.countersIfSubtype ? { countersIfSubtype: { subtype: e.countersIfSubtype, counters: e.counters } } : { [e.countersIfCreature ? "countersIfCreature" : "counters"]: e.counters } : {}), ...(e.countersFromLast ? { counters: { [e.countersFromLast.kind]: Math.max(0, (s.lastKnown?.[o.id]?.counters?.[e.countersFromLast.kind] ?? 0) + e.countersFromLast.plus) } } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
+          moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(entersAs.length ? { entersAs, ...(also ? { entersAsBy: { controller: ctx.controller, source: src, ...(e.alsoModsWhileCounter ? { whileCounter: e.alsoModsWhileCounter } : {}) } } : {}) } : {}), ...(e.counters ? e.countersIfSubtype ? { countersIfSubtype: { subtype: e.countersIfSubtype, counters: e.counters } } : { [e.countersIfCreature ? "countersIfCreature" : "counters"]: e.counters } : {}), ...(e.countersFromLast ? { counters: { [e.countersFromLast.kind]: Math.max(0, (s.lastKnown?.[o.id]?.counters?.[e.countersFromLast.kind] ?? 0) + e.countersFromLast.plus) } } : {}), ...(e.countersAmount ? { counters: { [e.countersAmount.kind]: Math.max(0, amountNow(s, e.countersAmount.n, ctx)) } } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
           // Attacking as it enters, before its enters abilities trigger (CR 508.4).
           if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
             o.attacking = attack!.player;

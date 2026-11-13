@@ -9499,7 +9499,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Otherwise (Smirking Spelljacker's, with nothing before it) it's the card a linked exile took (sentences/zones.ts).
     const keyLast = effects[effects.length - 1];
     if (/^You may cast the exiled card without paying its mana cost$/.test(s) && (effects.length || ctx.spell)) {
-      if (keyLast?.type !== "dig" || keyLast.into !== "exile" || keyLast.count !== 1 || keyLast.play || keyLast.castFree || keyLast.each || !keyLast.filter?.notTypes?.includes("Land")) return null;
+      if (keyLast?.type !== "dig" || keyLast.into !== "exile" || keyLast.count !== 1 || keyLast.play || keyLast.castFree || keyLast.each || !(keyLast.filter?.notTypes?.includes("Land") || (keyLast.filter?.types?.length && keyLast.filter.types.every((t) => t === "Instant" || t === "Sorcery")))) return null;
       keyLast.castFree = true;
       continue;
     }
@@ -9715,8 +9715,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Kassandra, Eagle Bearer: "search your graveyard, hand, and library for a card named The Spear of Leonidas, put it
     // onto the battlefield, then shuffle": one card from any of the three zones (CR 701.23); finding nothing is allowed,
-    // as the search is for a card with a stated quality (CR 701.23b).
-    const threeZones = /^[Ss]earch your graveyard, hand, and library for (a card named [^,]+), put it onto the battlefield, then shuffle$/.exec(s);
+    // as the search is for a card with a stated quality (CR 701.23b). Shaun & Rebecca, Agents: "... for a card named The
+    // Animus and put it onto the battlefield, then shuffle": the same.
+    const threeZones = /^[Ss]earch your graveyard, hand, and library for (a card named [^,]+?)(?:,| and) put it onto the battlefield, then shuffle$/.exec(s);
     if (threeZones) {
       const filter = parseSearchFilter(threeZones[1]!.replace(/^a /, ""));
       if (!filter?.named) return null;

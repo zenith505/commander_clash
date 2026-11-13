@@ -521,6 +521,10 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
   // Niko Defies Destiny: "to foretell cards" (the special action's {2}, CR 702.143a, 116.2h) "or cast spells that have
   // foretell", from anywhere (rulings).
   if (sentence === "Spend this mana only to foretell cards or cast spells that have foretell.") return { foretell: true, text: sentence };
+  // Karfell Harbinger: "Spend this mana only to foretell a card from your hand or cast an instant or sorcery spell": the
+  // foretell special action's cost (CR 702.143a, 116.2h), or an instant or sorcery spell however it's cast; not a foretold
+  // creature spell.
+  if (sentence === "Spend this mana only to foretell a card from your hand or cast an instant or sorcery spell.") return { foretellAction: true, spells: spellFilter("instant or sorcery")!, text: sentence };
   // Throne of Makindi: "Spend this mana only to cast kicked spells" (CR 702.33d).
   if (sentence === "Spend this mana only to cast kicked spells.") return { kickedSpells: true, text: sentence };
   // Volshe Tideturner: "only to cast an instant or sorcery spell or a kicked spell": either kind of spell.

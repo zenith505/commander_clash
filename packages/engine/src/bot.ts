@@ -1,4 +1,5 @@
 import { bindBound, cardPT, linkedCards, playerProtectedFrom, playerProtection } from "./effects/targeting";
+import { spellsGrimoireCounters } from "./effects/run-laneb189";
 import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
@@ -454,6 +455,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       if (wb) return [...wb.taps, { type: "payUnless", player: pid, pay: true, tap: wb.tapped }];
       return taps ? [...taps, { type: "payUnless", player: pid, pay: true }] : [{ type: "payUnless", player: pid, pay: false }];
     }
+    // Worldpurge: keep the cards most worth keeping, as many as allowed.
+    if (pend.kind === "discard" && pend.keep) return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, player(s, pid).hand.length).reverse().slice(0, pend.count) }];
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count, undefined, pend.filter, pend.upTo, pend.among) }];
     // Library of Leng: back on top go the spells we'd draw again, lands only while we're short of them; not a card
     // that wants the graveyard (madness, flashback and the like).
@@ -1236,6 +1239,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "nthPlayer") {
       const r = s.resolving;
       const next = r ? r.body.effects[r.next + 1] : undefined;
+      // Multiple Choice: the chosen player returns a creature they control to its owner's hand: an opponent who has to
+      // give up the most, the one with the fewest creatures (then the strongest), not us.
+      const flatAll = r ? allEffects(r.body.effects) : [];
+      const chooseAt = flatAll.findIndex((x) => x.type === "choosePlayer" && x.prompt === pend.prompt);
+      const after = chooseAt >= 0 ? flatAll[chooseAt + 1] : undefined;
+      if (after?.type === "pick" && after.action === "bounce") {
+        const count = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Creature")).length;
+        const might2 = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Creature")).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
+        const foes = pend.options.filter((x) => Number(x) !== pid);
+        const hit = foes.filter((x) => count(Number(x)) > 0).sort((a, b) => count(Number(a)) - count(Number(b)) || might2(Number(b)) - might2(Number(a)));
+        return [{ type: "chooseOption", player: pid, choice: hit[0] ?? foes[0] ?? pend.options[0]! }];
+      }
       const useful = next?.type !== "pick" || s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
       const might = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Creature")).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
       const others = pend.options.filter((x) => Number(x) !== pid).sort((a, b) => might(Number(a)) - might(Number(b)) || player(s, Number(a)).life - player(s, Number(b)).life);
@@ -1891,6 +1906,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const denial = body.effects.find((e) => e.type === "counterOpponentsStackUnless");
       if (denial?.type === "counterOpponentsStackUnless") return !canPayUnless(s, top.controller, denial.unless, pid, sourceId, x);
       if (countersTheirStack(body)) return true;
+      // Grimoire Thief: when their spell has the name of a card exiled with it, and none of ours does.
+      if (body.effects.some((e) => e.type === "faceUpLinkedCounterNamed")) {
+        const hit = spellsGrimoireCounters(s, obj(s, sourceId));
+        return hit.some((x) => x.id === top.id) && !hit.some((x) => x.controller === pid);
+      }
       const c = allEffects(body.effects).find((e) => e.type === "counterSpell" || e.type === "controlSpell");
       // Ertai's Trickery: only a kicked spell is countered.
       if (c?.type === "counterSpell" && c.ifKicked && !top.kicked?.length) return false;

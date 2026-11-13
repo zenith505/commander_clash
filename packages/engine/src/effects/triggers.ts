@@ -18,6 +18,7 @@ import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE, RAD } from "../oracle";
 import { isRingBearer, ringTrigger } from "./run-ring";
 import { kickedMatches } from "./run-spells";
+import { sharesColorOrMvWithLinked } from "./run-laneb189";
 import { hasSuspend, isSuspended } from "./run-zones";
 import { liveEmblems } from "../emblems";
 
@@ -1932,6 +1933,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     addHosted(attacker, (e) => e === "selfAttacksAlone", undefined, attacker, that);
     for (const id of s.battlefield)
       if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e, t) => e === "creatureYouControlAttacksAlone" && (!t.subjectFilter || (t.subjectOrSelf && id === attacker.id) || objectMatches(s, t.subjectFilter, attacker, you, false)), undefined, undefined, attacker, undefined, undefined, undefined, that);
+    // The Last Ronin III: "Whenever a creature you control attacks alone this turn": a delayed trigger of its controller's
+    // (CR 603.7b, 603.7d), the creature its subject.
+    fromFloating((src, ctrl, triggers) => ctrl === you && add(src, ctrl, (e, t) => e === "creatureYouControlAttacksAlone" && !t.subjectFilter, triggers, undefined, attacker, undefined, undefined, undefined, that));
     causedBy = null;
   } else if (ev.type === "attacksPlayerAlone") {
     // "Whenever a creature you control attacks a player alone": the only creature attacking that player itself (rulings).
@@ -2412,6 +2416,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         }
         // "If it shares a card type with the exiled card" (Cemetery Protector, CR 603.4), checked again as it resolves.
         if (t.cast.sharesTypeWithLinked && !sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, spell ? characteristics(s, spell).types : ev.card.types)) return false;
+        // Thought Prison: a color or the mana value the spell has as it's cast (CR 105.2, 202.3e) is one of the exiled card's.
+        if (t.cast.sharesColorOrMvWithLinked && !sharesColorOrMvWithLinked(s, o, spell ? characteristics(s, spell).colors : ev.card.colors, item ? spellManaValue(s, item) : defMv(ev.card))) return false;
         // Voltaic Visionary: the spell's card was one its linked ability exiled, cast from there.
         if (t.cast.fromLinked && !(spell && !ev.copy && spell.castFrom === "exile" && playedFromLinked(s, o, spell, true))) return false;
         // "A spell with {X} in its mana cost": the half cast, for a split card (CR 709.3b); a copy has the same mana cost.

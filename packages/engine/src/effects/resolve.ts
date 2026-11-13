@@ -42,6 +42,7 @@ import { runLaneB180Effect } from "./run-laneb180";
 import { runLaneB184Effect } from "./run-laneb184";
 import { runLaneB185Effect } from "./run-laneb185";
 import { runLaneB186Effect } from "./run-laneb186";
+import { runLaneB189Effect } from "./run-laneb189";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -672,11 +673,12 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     return s.battlefield.map((id) => obj(s, id)).filter((o) => all.has(`${o.id}@${o.zoneChanges ?? 0}`));
   }
   if (ref.ref === "blockHistory") {
-    const at = blockHistoryAt(s, ref, ctx);
-    if (!at) return [];
-    const key = `${at.id}@${at.zc}`;
-    const with_ = new Set((s.turnLog?.blocks ?? []).filter((b) => !ref.thisCombat || b.combat === (s.combatsThisTurn ?? 0)).flatMap((b) => [...(ref.blockers && b.attacker === key ? [b.blocker] : []), ...(ref.blocked && b.blocker === key ? [b.attacker] : [])]));
-    if (ref.andSelf) with_.add(key);
+    // Triton Tactics: several of them.
+    const ats = ref.ats ?? [blockHistoryAt(s, ref, ctx)].filter((a): a is { id: ObjectId; zc: number } => !!a);
+    if (!ats.length) return [];
+    const keys = new Set(ats.map((at) => `${at.id}@${at.zc}`));
+    const with_ = new Set((s.turnLog?.blocks ?? []).filter((b) => !ref.thisCombat || b.combat === (s.combatsThisTurn ?? 0)).flatMap((b) => [...(ref.blockers && keys.has(b.attacker) ? [b.blocker] : []), ...(ref.blocked && keys.has(b.blocker) ? [b.attacker] : [])]));
+    if (ref.andSelf) for (const key of keys) with_.add(key);
     return s.battlefield.map((id) => obj(s, id)).filter((o) => with_.has(`${o.id}@${o.zoneChanges ?? 0}`) && (!ref.stillBlocking || o.blocking !== undefined));
   }
   if (ref.ref === "blockingIt") {
@@ -1829,6 +1831,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "lookFaceDownThisTurn":
     case "shuffleRevealTopFree":
       return runLaneB186Effect(s, e, ctx, src);
+    case "keepUpToShuffleRest":
+    case "exileTopLandToHandElseCounter":
+    case "faceUpLinkedCounterNamed":
+      return runLaneB189Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

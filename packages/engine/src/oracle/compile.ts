@@ -36,13 +36,16 @@ import { roundB182Finish, roundB182Line } from "./laneb182";
 import { roundB183Line } from "./laneb183";
 import { roundB184Line } from "./laneb184";
 import { roundB185Line } from "./laneb185";
-import { round344Line } from "./round344";
 import { roundB186Line } from "./laneb186";
 import { roundB187Line } from "./laneb187";
+import { roundB188Line } from "./laneb188";
+import { round344Line } from "./round344";
+import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
 import { round345Chapter, round345Line } from "./round345";
 import { round346Line } from "./round346";
 import { round347Line } from "./round347";
+import { roundB189Line } from "./laneb189";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -2058,6 +2061,12 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB186Line(line, raw, out, isSpell)) continue;
     // Round B187.
     if (roundB187Line(line, raw, out, isSpell)) continue;
+    // Round B188.
+    if (roundB188Line(line, raw, out, isSpell)) continue;
+    // Thought Prison, Soulcipher Board, Grimoire Thief (round B189).
+    if (roundB189Line(line, raw, out, isSpell)) continue;
+    // Round B190.
+    if (roundB190Line(line, raw, out, isSpell)) continue;
     // Round B191 (Ward of Bones).
     if (roundB191Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
@@ -7191,10 +7200,11 @@ export function compile(d: CardDef): CompiledCard {
   // Lavabrink Venturer: protection "of the chosen quality" needs odd or even chosen as it enters (CR 614.12).
   if (JSON.stringify([out.statics, out.triggers, out.activated, out.spell]).includes(CHOSEN_NUMBER_EXCEPT_PROTECTION) && !out.entersChoose?.some((c) => c.what === "number")) out.unsupported.push("(protection from mana values but a chosen number with no number chosen as it enters)");
   if (JSON.stringify([out.statics, out.triggers, out.activated, out.spell]).includes(CHOSEN_PARITY_PROTECTION) && !out.entersChoose?.some((c) => c.what === "parity")) out.unsupported.push("(protection of a chosen quality with no odd or even chosen as it enters)");
-  // Grandeur's "Discard another card named ~": the card's own name (a copy has it too, CR 707.2).
+  // Grandeur's "Discard another card named ~": the card's own name (a copy has it too, CR 707.2); Say Its Name's "two other
+  // cards named ~" from your graveyard likewise.
   for (const ab of out.activated)
-    if (ab.costs?.some((c) => c.kind === "discard" && c.filter?.named === "~"))
-      ab.costs = ab.costs.map((c) => (c.kind === "discard" && c.filter?.named === "~" ? { ...c, filter: { ...c.filter, named: d.name, text: `card named ${d.name}` } } : c));
+    if (ab.costs?.some((c) => (c.kind === "discard" || c.kind === "exileFromGraveyard") && c.filter?.named === "~"))
+      ab.costs = ab.costs.map((c) => ((c.kind === "discard" || c.kind === "exileFromGraveyard") && c.filter?.named === "~" ? { ...c, filter: { ...c.filter, named: d.name, text: `card named ${d.name}` } } : c));
   // Overload (CR 702.96a-b): cast for that cost, the spell's text says "each" for "target", and it has no targets.
   const overload = out.altCosts?.find((a) => a.kind === "overload");
   if (overload && !d.oracleId.endsWith("|overloaded")) {
@@ -7424,6 +7434,14 @@ function linkExile(out: CompiledCard) {
     const others = all.filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.anyGraveyard));
     if (!yards.length || others.length) out.unsupported.push("(compares with exiled cards it can't link to one exile ability)");
     else for (const e of yards) e.linked = true;
+  }
+  // Thought Prison: "the exiled card" its cast trigger compares with is the one its imprint ability exiled as it entered,
+  // its only exile (CR 607.2a).
+  if (out.triggers.some((t) => t.cast?.sharesColorOrMvWithLinked)) {
+    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "takeFromHand" }> => e.type === "takeFromHand" && e.action === "exile");
+    const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileGraveyard" || e.type === "chooseFromGraveyard" || e.type === "exileTop");
+    if (imprints.length !== 1 || others.length !== 1) out.unsupported.push("(compares with an exiled card it can't link to one imprint ability)");
+    else imprints[0]!.linked = true;
   }
   // Mourner's Shield: "a source of your choice that shares a color with the exiled card" is about the card its imprint ability
   // exiled as it entered, its only exile (CR 607.2a).
@@ -7724,6 +7742,10 @@ function linkExile(out: CompiledCard) {
     const others = [...out.triggers.map((tr) => tr.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => ["exile", "exileTop", "exileFaceDown", "takeFromHand", "hideaway", "impulse", "exileHand", "exileGraveyard"].includes(e.type) || (e.type === "search" && e.dest.zone === "exile"));
     if (!others.length) return;
   }
+  // Induced Amnesia: "When ~ is put into a graveyard from the battlefield, return the exiled cards to their owner's hand":
+  // the cards its enters ability exiled face down, its only exile (CR 607.2a), linked by that ability's source as it was.
+  const faceDowns = [...out.triggers.map((tr) => tr.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => ["exile", "exileTop", "exileFaceDown", "takeFromHand", "hideaway", "impulse", "exileHand", "search", "pick", "discard"].includes(e.type));
+  if (!out.spell && faceDowns.length === 1 && faceDowns[0]!.type === "exileFaceDown" && faceDowns[0]!.from === "hand" && returns.length === 1 && returns[0]!.event === "selfToGraveyard" && out.triggers.some((tr) => tr.event === "selfEnters" && tr.body.effects.includes(faceDowns[0]!)) && allEffects(returns[0]!.body.effects).every((e) => e.type === "returnLinked" && e.dest === "hand")) return;
   // "When this creature is turned face up, exile ..." (Aurelia's Vindicator) is one of its exile abilities too (CR 607.2a).
   // Hoarding Dragon: "search your library for an artifact card, exile it, then shuffle" is its exile ability too.
   // Wormfang Newt, Crab and Drake: "exile a land you control", "an opponent chooses a permanent you control ... and exiles

@@ -16,12 +16,13 @@ import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
-import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
+import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { isSuspended } from "./effects/run-zones";
 import { canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
 import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
+import { watchExileLookers } from "./effects/run-laneb189";
 import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, enchantableBy, everyCreatureType, ignoredBy, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
@@ -4658,7 +4659,8 @@ function finishCleanup(s: GameState) {
   }
   s.preventCombatDamage = undefined;
   // Ascent of the Worthy's "until your next turn" ones stay until that turn begins (CR 611.2b).
-  const lasting = s.damageRules?.filter((r) => r.untilYourNextTurn);
+  // Old Fat Spider Can't See Me's last while its source is on the battlefield (CR 611.2b).
+  const lasting = s.damageRules?.filter((r) => r.untilYourNextTurn || whileSourceHolds(s, r));
   s.damageRules = lasting?.length ? lasting : undefined;
   // "Until end of turn" control ends: "when you lose control of the creature" triggers now (rulings on Ray of Command).
   checkLostControl(s);
@@ -12470,7 +12472,7 @@ export const blocksMayCostLife = (s: GameState): boolean => s.battlefield.some((
 
 /** Could blocking cost `pid` mana now: every block (Archangel of Tithes), or one of their creatures' own (Qal Sisma Behemoth, Hipparion)? */
 export function blocksMayCost(s: GameState, pid: PlayerId): boolean {
-  return !!blockCost(s, 1) || creaturesOf(s, pid).some((o) => characteristics(s, o).ownBlockTax > 0 || characteristics(s, o).ownBlockTaxVs.length > 0);
+  return !!blockCost(s, 1) || creaturesOf(s, pid).some((o) => characteristics(s, o).ownBlockTax > 0 || characteristics(s, o).ownBlockTaxVs.length > 0) || s.battlefield.some((id) => obj(s, id).attacking === pid && characteristics(s, obj(s, id)).blockedTax > 0);
 }
 
 /** Hipparion: what this creature blocking that attacker costs, "can't block creatures with power 3 or greater unless you pay {1}" (CR 509.1d). */
@@ -12479,7 +12481,8 @@ export function blockTaxVs(s: GameState, blocker: ObjectId, attacker: ObjectId):
   const a = s.objects[attacker];
   if (b?.zone !== "battlefield" || a?.zone !== "battlefield") return 0;
   const at = power(s, a);
-  return characteristics(s, b).ownBlockTaxVs.reduce((t, x) => t + (at >= x.minPower ? x.n : 0), 0);
+  // Awesome Presence: what blocking the attacker costs each creature blocking it.
+  return characteristics(s, b).ownBlockTaxVs.reduce((t, x) => t + (at >= x.minPower ? x.n : 0), 0) + characteristics(s, a).blockedTax;
 }
 
 /** The total attack tax for a declaration: how many mana symbols (generic mana, and {W/P} each for Norn's Annex). */
@@ -13903,6 +13906,8 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
   if (s.resolving) return; // not while a spell or ability is partway through resolving (CR 704.3)
   // Temporal Aperture's grant, once its card isn't on top any more, never comes back (CR 611.2b).
   if (s.topFreePlays) endTopFreePlays(s);
+  // Grimoire Thief: its controller now may look at the cards exiled with it too (rulings).
+  if (s.exileLookWatch) watchExileLookers(s);
   if (!s.pending && askEntersChoice(s)) return;
   for (let guard = 0; guard < 100; guard++) {
     s.leftTogether = undefined; // each pass happens all at once (CR 704.3)

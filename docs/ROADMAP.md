@@ -1,6 +1,6 @@
 # Roadmap
 
-31,224 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,239 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,876 of
 9,979 (98%).
 
@@ -50,7 +50,7 @@ line blocks.
    choice at token creation as Jinnie Fay); Sokrates, Athenian Teacher (a granted prevention whose draws count the
    damage prevented); Aminatou, the Fateshifter (−6: each player gains control of the next player's nonland permanents in
    a chosen direction); Sunken Palace (mana that copies the spell or ability it's spent on); Mathemagics ("target player draws 2ˣ cards":
-   no cap yet on a draw that size, for the engine or for bots); Dream Chisel and Kadena, Slinking Sorcerer (a face-down
+   no cap yet on a draw that size, for the engine or for bots); Dream Chisel (done in round B198) and Kadena, Slinking Sorcerer (done in round B198) (a face-down
    creature spell's cost reduction: the cost filters see the card, not the face-down spell, CR 708.4); Ronin, Shadow
    Stalker ("Sacrifice an Equipment attached to ~" as a cost); Ulalek, Fused Atrocity (copy each other spell and ability you control: a copy of every kind of
    stack object, abilities included); Surge to Victory (the trigger it grants for the turn has to remember the exiled
@@ -705,7 +705,7 @@ line blocks.
    (Knights of the Black Rose), "Whenever another player loses the game ... that player's life total as the turn began"
    (Sengir). No new prompts.
    Out after round 202 (looked at, not done): Masako the Humorless (done in round 324) (tapped creatures blocking: every blocker check reads
-   untapped), Sea Gate Stormcaller ("copy that spell twice instead" if kicked, inside the delayed trigger), Ramses,
+   untapped), Sea Gate Stormcaller (done in round B198) ("copy that spell twice instead" if kicked, inside the delayed trigger), Ramses,
    Assassin Lord (done in round 265), Kros, Defense Contractor (done in round 314) (no record of who put
    counters on a creature), Glorious Purpose (the sixth
    plan counter), Loot Dispute (done in round 299) (attacking the player who has the initiative), Rhys, the Evermore (done in round 276; remove any number of
@@ -2557,7 +2557,7 @@ line blocks.
    mana of any color to cast it. When you cast a spell this way, its owner loses life equal to its mana value." (impulse
    and MayPlay `castTrigger`, CR 603.2, the spell's mana value on the stack, X included, rulings); Monk Class's level 3
    "exile the top card of your library. For as long as it remains exiled, it has "You may cast this card from exile as long
-   as you've cast another spell this turn."" (MayPlay `castAnotherThisTurn`). +6, 31,224 of 31,936 with round 355. The
+   as you've cast another spell this turn."" (MayPlay `castAnotherThisTurn`). +6, 31,224 of 31,936 with round 355 (31,239 with B197 and B198). The
    compiled text of every other card is unchanged. "Your first spell during each of your turns" is a cast trigger now.
    Out after round 356 (looked at, not done): Commander Liara Portyr ("spells you cast from exile this turn cost {X} less
    to cast, where X is the number of players being attacked": a cost reduction for the turn by where a spell is cast from,
@@ -4001,7 +4001,7 @@ line blocks.
    sacrifice" restriction yet); Soovril, Patient Antiquarian ("target nonland card in exile that was put there from your
    graveyard this turn" and "it gains suspend").
    Out after round 271 (looked at, not done): Rootcoil Creeper (done in round 272); Mischievous Quanar ("When ~ is turned face up, copy target instant or sorcery
-   spell"); Obscuring Aether ("Face-down creature spells you cast cost {1} less": the cost filters see the card, not the
+   spell"); Obscuring Aether (done in round B198) ("Face-down creature spells you cast cost {1} less": the cost filters see the card, not the
    face-down spell); Backslide ("target creature with a morph ability", megamorph included, CR 702.37b, isn't a target
    filter yet); Ixidron and Illithid Harvester (turning other creatures face down as plain 2/2s or Horrors, as it enters).
    Out after round 270 (looked at, not done): Dauntless Bodyguard (done in round 298) (still no choice of a permanent as something enters);
@@ -4132,7 +4132,7 @@ line blocks.
    counters must be there as it enters); Daretti, Ingenious Iconoclast's −6 (a target that's an artifact card in a
    graveyard or an artifact on the battlefield); Vault 101: Birthday Party (put an Aura or Equipment from hand or
    graveyard, then may attach the Equipment); Expedited Inheritance ("its controller may exile that many cards ... They may
-   play those cards": an impulse for another player, counting the damage); Obscuring Aether (turning a permanent without
+   play those cards": an impulse for another player, counting the damage); Obscuring Aether (done in round B198) (turning a permanent without
    morph face down); Abandoned Sarcophagus (casting cards with cycling from the graveyard, and "it wasn't cycled").
    Out after round 243 (looked at, not done): Discerning Financier and Stiltzkin, Moogle Merchant (done in round
    272); Silverquill, the Disputant (done in round 299) (granted casualty 1: with a spell's printed casualty that's
@@ -4150,7 +4150,7 @@ line blocks.
    Out after round 241 (looked at, not done): Nuka-Nuke Launcher (done in round 321) ("until the end of defending player's next turn, that
    player gets two rad counters whenever they cast a spell": a floating trigger lasting until another player's turn
    ends); Psionic Ritual (done in round 304), Exterminate! (done in round 304) and Reiterating Bolt (done in round 304) (replicate with a cost that isn't mana, paid any number of
-   times); Nacatl War-Pride and Gorm the Great ("must be blocked by exactly one creature" / "by two or more creatures if
+   times); Nacatl War-Pride and Gorm the Great (done in round B198) ("must be blocked by exactly one creature" / "by two or more creatures if
    able": requirements on the number of blockers); Calamity, Galloping Inferno (token copies of the creatures that saddled
    it, chosen one by one).
    Out after round 240 (looked at, not done): Geyadrone Dihada (protection from permanents with corruption counters
@@ -5379,7 +5379,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   way"; "If it was dealt damage this turn"; "Surveil 3 if you have no cards in hand"; "Incubate X twice"; "8/8 Beast
   that's red, green, and white". +50 (26,098 with rounds 180 and 181, which also did Plague Wight, Battle-Scarred
   Goblin, Fire Juggler, Wall of Souls, Pious Warrior and Wall of Essence; the merge adds Valentina Allegra de Fontaine).
-- Skipped there, with reasons: Gorm the Great ("must be blocked by two or more" with a partner), Lo and Li (Lesson
+- Skipped there, with reasons: Gorm the Great (done in round B198) ("must be blocked by two or more" with a partner), Lo and Li (Lesson
   spells and lifelink), Dennick (graveyard cards that can't be targeted), Captain Mar-Vell ("an opponent cast a
   spell" condition), Centaur Omenreader (done in round B105) (a conditional cost reduction), Hercules (the first damage each turn), Ginger,
   Queen of Sweets (a token copy of the card Gingerbrute), Light of Judgment (done in round B156) ("up to one Equipment attached to it"),
@@ -6505,7 +6505,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B58 (looked at, not done): Divine Intervention (a trigger on removing counters), Soulgorger Orgg (the
   life it took, returned as it leaves), Blood Sun ("except mana abilities", and lands entering under it), Archangel of
   Strife (done in round B148) (a new choice for each player as it enters), Haktos the Unscarred (done in round B148) (protection from each mana value but one), plus
-  Summoning Trap, Moonlight Bargain, Wild Research, Random Encounter, Mordor on the March, Boneyard Mycodrax, Hibernation's
+  Summoning Trap, Moonlight Bargain, Wild Research, Random Encounter, Mordor on the March, Boneyard Mycodrax (done in round B198), Hibernation's
   End, Jeskai Infiltrator and Flash Foliage (done in round B137).
 - Round B59 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 15,000): "Until end of
   turn, if a nontoken creature would enter and it wasn't cast, exile it instead" (Mistcaller), "Double all damage that
@@ -8705,6 +8705,50 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   of Mount Doom ("When you play a card this way": a trigger on playing the card that one exile let you play), Light Up the
   Night (a flashback cost removing X loyalty counters from among your planeswalkers), Kaboom! (a reveal for each of any
   number of targets) and Delif's Cone stay out.
+- Round B197 (least played first, from the Lane B skip lists): Phyrexian Devourer ("When ~'s power is 7 or greater,
+  sacrifice it": a state trigger, not again while it's on the stack, sacrificed even if its power is lower by then, rulings,
+  CR 603.8; "Exile the top card of your library: Put X +1/+1 counters on ~, where X is the exiled card's mana value": the
+  card its cost exiled, a land 0, CR 202.3; no card, no activation, CR 118.3). Lighthouse Chronologist (level 7+: "At the
+  beginning of each end step, if it's not your turn, take an extra turn after this one": every other player is an opponent
+  here, CR 102.3; the extra turn after that player's, CR 500.7). Chandra's Phoenix ("Whenever an opponent is dealt damage
+  by a red instant or sorcery spell you control or by a red planeswalker you control, return ~ from your graveyard to your
+  hand": from the graveyard, CR 113.6m; a spell's damage and a planeswalker's damage are different events, so one trigger
+  for each kind of source, the planeswalker's colors and types as it dealt the damage, CR 113.7a; a red creature's damage
+  doesn't count). Abby, Merciless Soldier (a cast trigger's tokens "named Cordyceps Infected", one for each mana spent,
+  CR 111.4, 601.2h; it enters under an opponent's control as before). Jocasta, Automaton Avenger ("Whenever you attack with
+  your commander, if this card is in your graveyard, you may return it to the battlefield tapped and attacking": from the
+  graveyard, CR 113.6m, 508.4). Fight for the Throne ("When the creature an opponent controls dies this turn, if you control
+  your commander, you become the monarch": a delayed trigger about that target, CR 603.7c, with an intervening if checked
+  as it dies and as it resolves, CR 603.4; Effect delayed `ifCond`). Outmaneuver ("X target blocked creatures assign their
+  combat damage this turn as though they weren't blocked": decided as it resolves, all of it to the player or planeswalker
+  attacked even if the blockers are gone, rulings, CR 510.1c). +7, 31,207 of 31,936 with B189 to B196 and rounds 348 to 351.
+- Out after round B197 (looked at, not done): Battlefield Thaumaturge ("costs {1} less to cast for each creature it
+  targets": its ruling "{1} per target creature, even if the spell targets a creature more than once" doesn't settle whether
+  one creature targeted twice counts once or twice), Concerted Effort (landwalk and protection granted kind by kind),
+  Delaying Shield (a pay-or-lose-1-life choice for each delay counter removed) and Rootpath Purifier (land cards in your
+  library made basic, a characteristic of cards outside the battlefield) stay out.
+- Round B198 (least played first, from the Lane B skip lists): Boneyard Mycodrax ("~'s power and toughness are each equal to
+  the number of other creature cards in your graveyard": in every zone, not counting itself in the graveyard, its scavenge
+  that power as the cost exiles it, rulings, CR 604.3). Templar Knight ("{W}, Tap five untapped attacking creatures you
+  control named ~": ~ one of them, each with ~'s name now, CR 201.2, 602.2b; a browser test of the tap pick). Sea Gate
+  Stormcaller ("copy the next instant or sorcery spell with mana value 2 or less you cast this turn when you cast it. If ~
+  was kicked, copy that spell twice instead": made whether or not ~ is still there, rulings; the spell's mana value on the
+  stack, X counted, CR 202.3e, which every "when you next cast" filter now reads). Gorm the Great ("must be blocked if able,
+  and ~ must be blocked by two or more creatures if able": a second blocking requirement, CR 509.1c, one creature enough when
+  only one can block it, rulings; bots block it with two). Dream Chisel, Obscuring Aether ("Face-down creature spells you
+  cast cost {1} less to cast"), Kadena, Slinking Sorcerer ("The first face-down creature spell you cast each turn costs {3}
+  less to cast": earlier face-down spells this turn count, as each was cast) and Goblin Maskmaker ("Whenever ~ attacks,
+  face-down spells you cast this turn cost {1} less to cast"): a spell cast face down is a 2/2 creature spell and nothing
+  else (CR 708.4), its {3} reduced (CR 702.37c, 601.2f; CostMod.faceDown); "the first ... spell you cast each turn" counts a
+  face-down one by those characteristics only; the Cast face down button shows the cost now (a browser test with Kadena).
+  +8, 31,215 of 31,936 with B189 to B197 and rounds 348 to 351.
+- Out after round B198 (looked at, not done): Kodama of the Center Tree (soulshift X counted from the Spirits you controlled
+  just before it died, CR 603.10a, and kept for the target's mana value), Nacatl War-Pride ("must be blocked by exactly one
+  creature if able" and token copies attacking as many as the defending player's creatures), Hans Eriksson (a revealed
+  creature put onto the battlefield attacking that player or a planeswalker they control, then a reflexive fight), Grime
+  Gorger (one card of each card type: how a multi-type card counts isn't settled by its rulings), Spiteful Repossession
+  (each opponent's own difference, then the damage dealt this way) and Mirkwood Trapper ("that player chooses an attacking
+  creature") stay out.
 - Out after round B192 (looked at, not done): Garruk, Curse Breaker (its −4: how often "whenever one or more creatures
   attack one of your opponents" triggers when creatures attack two of them still isn't settled by rulings), Charmed
   Pendant (a hybrid symbol of the milled card adds one of its colors: a choice in the middle of a mana ability), Ulamog's
@@ -8766,8 +8810,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   battlefield is destroyed at end of combat, rulings: attachments as they last existed aren't kept), Oppressive Rays and
   Gloom (done in round B184) (the tax reaches mana abilities), Murktide Regent and Soulflayer (done in round B182) (which cards delve exiled aren't kept with the
   permanent), Heart of Kiran (a loyalty counter removed instead of crewing, still crewing for "crews" triggers), Crypsis (done in round B187)
-  ("protection from creatures your opponents control"), Gorm the Great ("must be blocked by two or more creatures if able"),
-  Phyrexian Devourer and Boneyard Mycodrax (their other lines) stay out.
+  ("protection from creatures your opponents control"), Gorm the Great (done in round B198) ("must be blocked by two or more creatures if able"),
+  Phyrexian Devourer and Boneyard Mycodrax (done in round B198) (their other lines) stay out.
 - Out after round B172 (looked at, not done): Titania's Song (its effect "continues until end of turn" once it leaves: whether
   that locks in the artifacts it applied to isn't settled by the rules or rulings), Swans of Bryn Argoll (see round B66).
   Eureka's cards make their "as it enters" choices (Clone's copy, a chosen creature type) once Eureka has resolved, as the
@@ -8801,7 +8845,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B163 (looked at, not done): Words of Waste and Words of Wind (an opponent's discard or each player's
   bounce chosen in the middle of a draw: a pause the draw sequence resumes from only for some replacements), Strax,
   Sontaran Nurse ("Choose a player at random. When you do, ~ fights another target creature that player controls": a
-  reflexive trigger's targets limited by the chosen player), Goblin Maskmaker (face-down spells as a cost reduction's
+  reflexive trigger's targets limited by the chosen player), Goblin Maskmaker (done in round B198) (face-down spells as a cost reduction's
   filter), Lantern Flare (a cleave cost with {X} on a card whose mana cost has none, X defined by its text otherwise),
   Saproling Burst (a token's power and toughness from the counters on the permanent that made it), Mana Cache (any player
   activating a mana ability of a permanent they don't control), Essence of the Wild (creatures entering as a copy of it,
@@ -8844,7 +8888,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   look held across the may decision), Graceful Takedown (done in round B187) (two target groups that must differ), Glass Asp and Nafs Asp
   (a payment any time before the draw step, as a special action), Noxious Vapors (keeping one card of each color in
   hand), Kodama of the Center Tree, Reflecting Mirror.
-- Out after round B150 (looked at, not done): Boneyard Mycodrax (its scavenge compiles now; its "other creature cards in
+- Out after round B150 (looked at, not done): Boneyard Mycodrax (done in round B198) (its scavenge compiles now; its "other creature cards in
   your graveyard" power doesn't yet), the never-examined names still left (Ring of Ma'rûf and the other wishes, Seafarer's
   Quay and the other banding grants, Cyclopean Tomb, False Orders, Mirror-Shield Hoplite, Chorus of the Conclave, Temporal
   Aperture, All Hallow's Eve, Idris, The Master, Alhammarret, Tazri, Sasaya, Nathan Drake, Feather, Rosheen, Ore-Rich
@@ -9114,7 +9158,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   number), Hide // Seek (the mana value of a card found by the search), Revival Experiment (one card of each permanent
   type, and a battle's protector on entering is unclear), Love on the Battlefield (a combat damage trigger granted until
   end of turn), Sharkey, Tyrant of the Shire, Woodcaller Automaton (done in round B158), Dancing Sword (done in round B153), Elemental Resonance, Bat Colony (done in round B166).
-- Out after round B86 (looked at, not done): Goblin Maskmaker (cost reduction for face-down spells), Bortuk
+- Out after round B86 (looked at, not done): Goblin Maskmaker (done in round B198) (cost reduction for face-down spells), Bortuk
   Bonerattle (a destination chosen by mana value against domain), Nick Fury (put onto the battlefield tapped and
   attacking from the hand), Oath of Mages (done in round B143) (a target chosen by another player), Glyph of Life (done in round B130), Mob Mentality,
   Breaking // Entering, Darigaaz, Grime Gorger, Naya Soulbeast.
@@ -9187,7 +9231,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   trigger inside a mana ability), Timecrafting (a permanent with time counters or a suspended card as one target),
   Stardew Valley ("another player of your choice may gain control of that permanent"), Merieke Ri Berit (done in round B186) (destroy the
   creature when ~ leaves the battlefield or becomes untapped), Fortune's Favor (an opponent splits the cards into two
-  piles, face down), Templar Knight (tap five untapped attacking creatures named ~ as a cost), Muse Vessel (the card its discard exiled isn't
+  piles, face down), Templar Knight (done in round B198) (tap five untapped attacking creatures named ~ as a cost), Muse Vessel (the card its discard exiled isn't
   linked yet; "choose a card exiled with ~, you may play it this turn"; done in round B152), Purgatory (pay {4} and 2 life at upkeep to
   return a card exiled with it, the exile from a "put into your graveyard" trigger not linked yet).
 - Out after round B71 (looked at, not done): Say Its Name ("Exile this card and two other cards named ~ from your

@@ -429,7 +429,7 @@ export function dealDamage(
     if (playerBatch) playerBatch.set(p.id, (playerBatch.get(p.id) ?? 0) + n);
     else fireEvent(s, { type: "playerDealtDamage", player: p.id, amount: n, combat: !!opts.combat });
     // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).
-    fireEvent(s, { type: "damagedPlayer", source: src.id ?? "", by: src.controller, player: p.id, amount: n, combat: !!opts.combat, colors: [...src.colors] });
+    fireEvent(s, { type: "damagedPlayer", source: src.id ?? "", by: src.controller, player: p.id, amount: n, combat: !!opts.combat, colors: [...src.colors], types: [...src.types] });
     fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, player: p.id, amount: n, ...(opts.combat ? { combat: true } : {}) });
     noteDealt(s, src, opts.combat, { player: p.id }, n);
     spellDealt(s, src, { player: p.id }, n);

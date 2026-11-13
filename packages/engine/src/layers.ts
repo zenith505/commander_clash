@@ -307,6 +307,8 @@ export interface Characteristics {
   /** "Creatures can't attack you" (Blazing Archon): these players, but not their planeswalkers. */
   cantAttackPlayersOnly: PlayerId[];
   mustBeBlocked: boolean;
+  /** Gorm the Great: "must be blocked by two or more creatures if able" too (CR 509.1c). */
+  mustBeBlockedByTwo?: true;
   allMustBlock: boolean;
   /** "All Walls able to block ~ do so" (Marble Priest): the blockers that must block it, if able (CR 509.1c). */
   allMustBlockBy?: TargetSpec[];
@@ -2030,6 +2032,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       if (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0)) return;
       if (m.by) c.mustBeBlockedBy = [...(c.mustBeBlockedBy ?? []), m.by];
       else c.mustBeBlocked = true;
+      if (m.twoOrMore && !m.by) c.mustBeBlockedByTwo = true;
       return;
     case "attacksIfAble":
       if (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0)) return;

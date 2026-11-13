@@ -117,9 +117,9 @@ const faceDown = (s: GameState, id: string) => {
 describe("round 156 cards", () => {
   it("are fully supported", () => supported(ultron, portal, dust, tannuk, bitter, mastery, vats, evil, role, jeska, serpent, cleaver, marisi, liliana, breakOpen, alarmist, rose, wojek, skirmisher));
   it("and these, from the same pieces", () => supported(ixidor, nosy, whisperer, threats, glitch, militant, vargus, fastForward, bertha, hulk, morlun, jirina, pipes, fontOfMagic));
-  it("but not a face-down creature spell's cost reduction yet (Dream Chisel)", () => {
+  it("and a face-down creature spell's cost reduction since Lane B round B198 (Dream Chisel)", () => {
     const chisel = card("Dream Chisel", "Artifact", "{2}", { cmc: 2, oracleText: "Face-down creature spells you cast cost {1} less to cast." });
-    expect(isFullySupported(chisel)).toBe(false);
+    expect(isFullySupported(chisel)).toBe(true);
   });
 });
 

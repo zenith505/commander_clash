@@ -7,7 +7,7 @@ import { card, clickPlayer, controls, menu, modal, resolveUntil, seat } from "./
 
 test("Nethergoyf: escape from your graveyard, clicking cards until they have four card types among them", async ({ page }) => {
   const s = scene({ board: LANDS, yard: ["Nethergoyf", "Lightning Bolt", "Sol Ring", "Grizzly Bears", "Divination"] });
-  const [goyf, bolt, ring, bears, div] = ["Nethergoyf", "Lightning Bolt", "Sol Ring", "Grizzly Bears", "Divination"].map((n) => one(s, n));
+  const [goyf, bolt, ring, bears, div] = [one(s, "Nethergoyf"), one(s, "Lightning Bolt"), one(s, "Sol Ring"), one(s, "Grizzly Bears"), one(s, "Divination")];
   await open(page, s);
   await seat(page, 0).locator(".zone", { hasText: "Graveyard" }).click();
   await modal(page).locator(`.card.playable`).click();
@@ -27,7 +27,7 @@ test("Nethergoyf: escape from your graveyard, clicking cards until they have fou
 
 test("Winter, Cynical Opportunist: at your end step exile four card types, then put Grizzly Bears onto the battlefield with a finality counter", async ({ page }) => {
   const s = scene({ board: [...LANDS, "Winter, Cynical Opportunist"], yard: ["Lightning Bolt", "Sol Ring", "Grizzly Bears", "Divination"] }, [], { step: "main2" });
-  const [bolt, ring, bears, div] = ["Lightning Bolt", "Sol Ring", "Grizzly Bears", "Divination"].map((n) => one(s, n));
+  const [bolt, ring, bears, div] = [one(s, "Lightning Bolt"), one(s, "Sol Ring"), one(s, "Grizzly Bears"), one(s, "Divination")];
   await open(page, s);
   await resolveUntil(page, (st) => st.pending?.kind === "searchLibrary" && st.pending.player === 0 && !!st.pending.cardTypes);
   const pick = modal(page);

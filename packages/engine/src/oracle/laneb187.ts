@@ -2,9 +2,9 @@
 // its sentences, read at the end of round B186's.
 import type { CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
-import { roundB190Sentence } from "./laneb190";
 import { parseObject } from "./targets";
 import { parseTrigger } from "./triggers";
+import { roundB188Sentence } from "./laneb188";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -33,8 +33,6 @@ export function roundB187Line(line: string, raw: string, out: CompiledCard, isSp
 }
 
 export function roundB187Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void sentences;
-  void effects;
   // Graceful Takedown: "Any number of target enchanted creatures you control and up to one other target creature you
   // control each deal damage equal to their power to target creature you don't control."
   if (s === "Any number of target enchanted creatures you control and up to one other target creature you control each deal damage equal to their power to target creature you don't control") {
@@ -50,5 +48,5 @@ export function roundB187Sentence(s: string, sentences: string[], si: number, ct
     if (spec.many !== "any" || spec.kind !== "object" || spec.status !== "enchanted" || !spec.distinctFrom?.includes(one.index)) return "fail";
     return { effect: { type: "bite", a: { ref: "target", index: one.index, n: 2 }, b }, next: si + 1 };
   }
-  return roundB190Sentence(s, sentences, si, ctx, effects);
+  return roundB188Sentence(s, sentences, si, ctx, effects);
 }

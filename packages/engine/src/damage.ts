@@ -544,7 +544,9 @@ interface PlanShield {
 // Damage rules (GameState.damageRules): prevention and redirection effects of resolved spells and abilities that
 // aren't a shield on one permanent or player.
 
-const live = (s: GameState) => (s.damageRules ?? []).filter((r) => r.turn === s.turn || r.untilYourNextTurn);
+/** A "for as long as ~ remains on the battlefield" rule's source is still there, as the object it was (CR 611.2b, 400.7). */
+export const whileSourceHolds = (s: GameState, r: DamageRule) => !!r.whileSource && s.objects[r.whileSource.id]?.zone === "battlefield" && (s.objects[r.whileSource.id]!.zoneChanges ?? 0) === r.whileSource.zc;
+const live = (s: GameState) => (s.damageRules ?? []).filter((r) => (r.whileSource ? whileSourceHolds(s, r) : r.turn === s.turn || r.untilYourNextTurn));
 
 /**
  * The damage rules permanents' static abilities make for this damage (CR 615.1a), worked out as it would be dealt: Cover

@@ -42,6 +42,7 @@ import { runLaneB180Effect } from "./run-laneb180";
 import { runLaneB184Effect } from "./run-laneb184";
 import { runLaneB185Effect } from "./run-laneb185";
 import { runLaneB186Effect } from "./run-laneb186";
+import { runLaneB189Effect } from "./run-laneb189";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -1817,6 +1818,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "lookFaceDownThisTurn":
     case "shuffleRevealTopFree":
       return runLaneB186Effect(s, e, ctx, src);
+    case "keepUpToShuffleRest":
+    case "exileTopLandToHandElseCounter":
+    case "faceUpLinkedCounterNamed":
+      return runLaneB189Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

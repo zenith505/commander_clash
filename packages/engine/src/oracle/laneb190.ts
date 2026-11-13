@@ -1,5 +1,5 @@
-// Lane B round B190's lines, read by compileCard before its triggers and activated abilities (after round B187's), and
-// its sentences, read at the end of round B187's.
+// Lane B round B190's lines, read by compileCard before its triggers and activated abilities (after round B189's), and
+// its sentences, read at the end of round B189's.
 import type { CompiledCard, Effect, ObjRef } from "../abilities";
 import { reflexiveBody, type Ctx } from "./body";
 import { parseStaticCondition } from "./statics";

@@ -1205,7 +1205,10 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever you cast a spell with {X} in its mana cost, put X +1/+1 counters on ~" (Nev, the Practical Dean, Zaxara):
   // the X that spell was cast with (CR 107.3a), not one of this ability's own.
   const spellX = !!xM && !thatMuch && !short && /\bX\b/.test(text) && !/\bwhere X is\b/.test(text);
-  let body = parseBody(text, { castSpell: true, eventPlayer: true, ...(subjectRef ? { subject: true } : {}), ...(spellX ? { ownX: true } : {}) });
+  // Dack Fayden's emblem: "Whenever you cast a spell that targets one or more permanents, gain control of those
+  // permanents.": the permanents it targets, for the rest of the game (rulings); its trigger resolves before the spell.
+  const those = tg?.[1] === "one or more permanents" && targets?.length === 1 && targets[0] !== "you" && /^gain control of those permanents\.?$/.test(text) ? targets[0] : undefined;
+  let body = those ? { targets: [], effects: [{ type: "continuous" as const, what: { ref: "causeTargets" as const, filter: those }, mods: [{ kind: "control" as const }], duration: "game" as const }], text } : parseBody(text, { castSpell: true, eventPlayer: true, ...(subjectRef ? { subject: true } : {}), ...(spellX ? { ownX: true } : {}) });
   if (!body) return "fail";
   if (spellX) body = { ...replaceX(body, { count: { kind: "castSpellX" } }), text: body.text };
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };

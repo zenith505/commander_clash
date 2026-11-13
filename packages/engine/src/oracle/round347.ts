@@ -3,13 +3,16 @@
 // controller may play.
 import type { CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
+import { round348Sentence } from "./round348";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round347Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void effects;
+  // Round 348's sentences first (oracle/round348.ts).
+  const r348 = round348Sentence(s, sentences, si, ctx, effects);
+  if (r348) return r348;
   const line = plain(s);
   // Urianger Augurelt's Draw Arcanum: "Look at the top card of your library. You may exile it face down.": the card is
   // looked at, then exiled face down or left on top, its controller's choice; having looked at it, they may go on looking

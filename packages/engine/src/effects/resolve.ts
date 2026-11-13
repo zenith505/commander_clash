@@ -50,6 +50,7 @@ import { runRound333Effect } from "./run-round333";
 import { runRound339Effect } from "./run-round339";
 import { runRound344Effect } from "./run-round344";
 import { runRound345Effect } from "./run-round345";
+import { runRound349Effect } from "./run-round349";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
 import { ringBearer } from "./run-ring";
@@ -1847,6 +1848,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runRound344Effect(s, e, ctx, src);
     case "handChooseCast":
       return runRound345Effect(s, e, ctx, src);
+    case "exileTopAsIt":
+    case "castItIfAble":
+      return runRound349Effect(s, e, ctx, src);
     case "flipCoin":
       return runCoinEffect(s, e, ctx, src);
     case "flipCoinEach":

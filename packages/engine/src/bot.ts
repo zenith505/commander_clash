@@ -229,7 +229,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "castFree") {
       // Prototyped when it can't be cast whole (CR 718.3): "the same mana value" may allow only that (Powerbalance).
       const plan = facePlan(s, pid, pend.objectId, true, "first") ?? castPlan(s, pid, pend.objectId, true) ?? facePlan(s, pid, pend.objectId, true, "after") ?? (altCost(defOf(s, obj(s, pend.objectId)), "prototype") ? castPlan(s, pid, pend.objectId, true, undefined, "prototype") : null);
-      return plan ?? [{ type: "chooseMay", player: pid, yes: false }];
+      // Omen Machine, Wild Evocation: one we must cast if able goes on the stack even when we'd rather not.
+      return plan ?? (pend.must ? forcedFreeCast(s, pid, pend.objectId) : null) ?? [{ type: "chooseMay", player: pid, yes: false }];
     }
     if (pend.kind === "drawLook" && pend.keep) {
       // Underrealm Lich: keep the card we'd most like to draw (what scry would keep, the most expensive of those).
@@ -4219,6 +4220,20 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
     if (plan) return plan;
   }
   return null;
+}
+
+/**
+ * A card we must cast "if able" (PendingDecision "castFree" `must`: Omen Machine, Wild Evocation) that no plan of ours
+ * wants to cast: any modes and targets that are legal (CR 601.2b-c), paid for as usual (an additional cost included).
+ */
+function forcedFreeCast(s: GameState, pid: PlayerId, id: ObjectId): Action[] | null {
+  const printed = castingBody(defOf(s, obj(s, id)));
+  const modes = printed?.modal ? chooseModes(s, pid, printed, true, id)?.modes : undefined;
+  if (printed?.modal && !modes) return null;
+  const body = printed && withModes(printed, modes);
+  const targets = body?.targets.length ? chooseTargets(s, pid, body, true, id) : [];
+  if (!targets) return null;
+  return planCast(s, pid, id, targets, modes, "auto");
 }
 
 function castPlanWithModes(s: GameState, pid: PlayerId, id: string, free: boolean, x: number | undefined, via: CastFromGraveyardKind | undefined, alt: AltCostKind | undefined, modes: number[] | undefined, teamwork?: ObjectId[]): Action[] | null {

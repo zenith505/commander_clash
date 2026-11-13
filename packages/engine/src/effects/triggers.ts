@@ -7,7 +7,7 @@ import { checkAscend, isEmerge, sharesTypeWithLinked, creatureTypesOf, describeT
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, modeRange, withModes } from "../modes";
 import { compileCard, compileGranted } from "../oracle";
-import type { CardDef, Color, GameObject, ManaType, SpentMana, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, StackItem, TriggerEventInfo, ZoneMove, ZoneName } from "../types";
+import type { CardDef, Color, DelayedTrigger, GameObject, ManaType, SpentMana, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, StackItem, TriggerEventInfo, ZoneMove, ZoneName } from "../types";
 import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
@@ -32,6 +32,18 @@ const STEP_TRIGGERS: Partial<Record<Extract<TriggerSourceEvent, { type: "step" }
   main1: ["yourFirstMain", "eachFirstMain"], // CR 505.1a
   main2: ["yourPostcombatMain", "eachPostcombatMain"],
 };
+
+/**
+ * Meandering Towershell, Noctis (DelayedTrigger "playersNextDeclareAttackers"): is this `d.player`'s declare attackers step
+ * the next one since it was made? With `laterTurn` ("on your next turn"), one on a later turn; otherwise this turn's, if it
+ * was made before this combat's declare attackers step began (an earlier step, or an earlier combat).
+ */
+export function declareAttackersDue(s: GameState, d: DelayedTrigger): boolean {
+  if (d.when !== "playersNextDeclareAttackers" || s.activePlayer !== d.player) return false;
+  if (d.turn < s.turn) return true;
+  if (d.laterTurn || d.turn !== s.turn) return false;
+  return (s.combatsThisTurn ?? 0) > (d.combat ?? 0) || STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf("declareAttackers");
+}
 
 /** See `causedBy` in fireEvent. */
 type Cause = { event: "enters" | "dies" | /** Left the battlefield, not dying. */ "leaves" | "attacks" | "combatDamage"; objs: { o: GameObject; c?: Characteristics; controller: PlayerId }[] } | { event: "castOrCopy"; caster: PlayerId; objs?: undefined } | /** A player drawing a card (Krang, the All-Powerful). */ { event: "draws"; player: PlayerId; objs?: undefined };
@@ -309,7 +321,7 @@ export type TriggerSourceEvent =
   | { type: "votesDone"; votes: { voter: PlayerId; choice: string }[] }
   /** A source dealt damage: everything it dealt at once is one event (CR 120.3, 603.2c). */
   | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean; /** Some of this combat damage went to a blocking creature (Arashin War Beast). */ toBlocker?: true }
-  | { type: "step"; step: "upkeep" | "draw" | "main1" | "main2" | "end" | "beginCombat" | "endCombat" | "cleanup"; active: PlayerId }
+  | { type: "step"; step: "upkeep" | "draw" | "main1" | "main2" | "end" | "beginCombat" | /** After attackers are declared, or none were (CR 508.1, 508.2). */ "declareAttackers" | "endCombat" | "cleanup"; active: PlayerId }
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
   | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean; /** The mana spent to cast it (increment, CR 702.191a). */ manaSpent?: number; /** How much of it Treasures made (CR 106.3). */ treasureSpent?: number; /** What was spent, by type (CR 601.2h). */ spent?: SpentMana; /** The permanents whose kept-apart mana was spent on it ("id#zoneChanges", ManaLot.source). */ manaSources?: string[] }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
@@ -2857,7 +2869,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         continue;
       }
       const due =
-        d.when === "thatCombat"
+        d.when === "playersNextDeclareAttackers"
+          ? ev.step === "declareAttackers" && declareAttackersDue(s, d)
+          : d.when === "thatCombat"
           ? ev.step === "beginCombat" && s.thatCombat === d.combat
           : d.when === "nextCleanup"
           ? ev.step === "cleanup"

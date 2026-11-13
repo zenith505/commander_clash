@@ -302,6 +302,10 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   // CR 702.18a: not even its controller can target it; Autumn Willow: unless shroud is waived for that player this turn.
   if (targeting && objHasKeyword(s, o, "Shroud") && !o.shroudWaivedFor?.includes(controller)) return false;
   if (targeting && c.untargetable?.some((u) => untargetableBy(u, controller, src))) return false;
+  // Wall of Shadows: "can't be the target of spells that can target only Walls or of abilities that can target only Walls":
+  // the targets of such a spell or ability all carry `onlyWalls` (compileCard); a modal one with a mode that can target a
+  // non-Wall doesn't (rulings).
+  if (targeting && spec.onlyWalls && c.untargetable?.some((u) => u.onlyWalls)) return false;
   // Protection from the source's color: it can't be targeted (CR 702.16b), enchanted or equipped (702.16c-d). From a
   // player: not by what that player controls (702.16k); the one targeting controls the spell or ability.
   const holder = { controller: c.controller, chosenPlayer: o.chosen?.player };
@@ -346,6 +350,7 @@ function seesOpponents(s: GameState, pid: PlayerId): boolean {
  * no source given (the UI's highlights), only who controls it is checked, as with protection; casting checks it all.
  */
 function untargetableBy(u: Untargetable & { of: PlayerId }, controller: PlayerId, src?: SourceQuality): boolean {
+  if (u.onlyWalls) return false; // by the spell's or ability's targets, checked in objectMatches
   if (u.opponents && u.of === controller) return false;
   if (!src) return !u.spells && !u.abilities && !u.colors && !u.notColors && !u.sourceTypes;
   if (u.spells && !src.spell) return false;

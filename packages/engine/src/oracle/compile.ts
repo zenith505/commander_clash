@@ -50,6 +50,7 @@ import { round349Line } from "./round349";
 import { round350Line } from "./round350";
 import { round351Line } from "./round351";
 import { round352Line } from "./round352";
+import { round353Line } from "./round353";
 import { roundB189Line } from "./laneb189";
 
 const cache = new Map<string, CompiledCard>();
@@ -5972,6 +5973,8 @@ export function compile(d: CardDef): CompiledCard {
     if (round351Line(line, raw, out, isSpell)) continue;
     // Winter, Cynical Opportunist, Ob Nixilis, the Adversary, Panoptic Mirror (round 352).
     if (round352Line(line, raw, out, isSpell)) continue;
+    // Hive Mind, Curse of Echoes, Spinerock Tyrant (round 353).
+    if (round353Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,

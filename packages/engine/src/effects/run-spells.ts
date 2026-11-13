@@ -99,6 +99,15 @@ function putAbilityCopy(s: GameState, orig: StackItem, controller: PlayerId, tar
   fireEvent(s, { type: "targeted", stackId: id });
 }
 
+/** Spinerock Tyrant: a spell on the stack gains these until it leaves it (GameObject.spellGains; its damage, CR 702.80a). */
+function thoseGain(s: GameState, mods: Modification[], item: StackItem, controller: PlayerId, src: string) {
+  const o = item.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+  if (!o || o.zone !== "stack") return;
+  (o.spellGains ??= []).push({ mods, timestamp: s.nextTimestamp++, controller, source: src });
+  invalidateCharacteristics(s);
+  log(s, `${item.description} gains ${mods.flatMap((m) => (m.kind === "addKeywords" ? m.keywords : [])).join(", ").toLowerCase()}.`);
+}
+
 /** Twinning Staff: how many additional copies a player gets when they copy a spell (one per permanent with it, rulings). */
 /** Whether `pid` could cast this card as a pending free cast of it (PendingDecision "castFree") now, mana for its additional costs (the commander tax) aside. */
 function freeCastableFor(s: GameState, pid: PlayerId, id: ObjectId, src: string): boolean {
@@ -582,7 +591,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const one = c.each?.[c.each.length - c.left];
         const aimed = one !== undefined ? (orig.targets ?? []).map((t): TargetChoice => (t.kind === "object" ? { kind: "object", id: one } : t)) : undefined;
         if (orig.kind === "ability") putAbilityCopy(s, orig, ctx.controller, c.targets ?? orig.targets);
-        else putSpellCopy(s, orig, c.by ?? ctx.controller, aimed ?? c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, except, countered?.card);
+        else {
+          putSpellCopy(s, orig, c.by ?? ctx.controller, aimed ?? c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, except, countered?.card);
+          if (e.thoseGain) thoseGain(s, e.thoseGain, s.stack[s.stack.length - 1]!, ctx.controller, src);
+        }
         c.targets = undefined;
         c.left--;
       }
@@ -595,6 +607,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         putSpellCopy(s, orig, c.by ?? ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, except, countered?.card);
         c.targets = undefined;
         c.extra--;
+      }
+      // Spinerock Tyrant: "those spells gain wither": the original too, if it's still that spell on the stack (CR 400.7).
+      if (orig && e.thoseGain && !c.gained) {
+        const there = s.stack.find((x) => x.id === orig.id);
+        if (there) thoseGain(s, e.thoseGain, there, ctx.controller, src);
+        c.gained = true;
       }
       if (orig && e.demonstrate && !c.oppDone) {
         // Demonstrate (CR 702.144a): you copied it, so choose an opponent, who copies it too; their copy goes on the

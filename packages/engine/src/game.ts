@@ -5674,7 +5674,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Yuna, Grand Summoner: "When you next cast a creature spell this turn, ..." (a delayed trigger, CR 603.7a).
   if (ab.nextCast) {
     const e = ab.nextCast;
-    (s.nextCast ??= []).push({ controller: p.id, filter: e.filter, sourceId: o.id, sourceCardId: cardIdOf(o), body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." }, turn: s.turn, ...(e.uncounterable ? { uncounterable: true as const } : {}), ...(e.fromHand ? { fromHand: true as const } : {}) });
+    (s.nextCast ??= []).push({ controller: p.id, filter: e.filter, sourceId: o.id, sourceCardId: cardIdOf(o), body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." }, turn: s.turn, ...(e.uncounterable ? { uncounterable: true as const } : {}), ...(e.fromHand ? { fromHand: true as const } : {}), ...(e.xAbility ? { xAbility: true as const } : {}) });
   }
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
   // Undiscovered Paradise: returned during its activator's next untap step, if it's still this permanent then (rulings).
@@ -5693,7 +5693,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   }
   if (ab.selfDamage && (!ab.selfDamageIf || staticConditionNow(s, ab.selfDamageIf, o.id, p.id)) && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
   // Vazi: "if mana from a Treasure was spent to ... activate it" counts mana abilities too.
-  fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}), ...(ab.exhaust ? { exhaust: true as const } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}) });
+  // Wizard's Rockets: {X} in its activation cost (Magus Lucea Kane's delayed trigger is used up by it, with nothing to copy).
+  fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}), ...(ab.exhaust ? { exhaust: true as const } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}) });
 }
 
 /** What mana casting it can spend (CR 106.6): Security Rhox's alternative cost only mana from Treasures (CR 106.3). */

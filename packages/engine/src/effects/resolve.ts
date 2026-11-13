@@ -54,6 +54,7 @@ import { runRound345Effect } from "./run-round345";
 import { runRound349Effect } from "./run-round349";
 import { runRound350Effect } from "./run-round350";
 import { runRound352Effect } from "./run-round352";
+import { runRound353Effect } from "./run-round353";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
 import { ringBearer } from "./run-ring";
@@ -1864,6 +1865,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runRound350Effect(s, e, ctx);
     case "putFromYardChosen":
       return runRound352Effect(s, e, ctx, src);
+    case "copyForPlayers":
+      return runRound353Effect(s, e, ctx, src);
     case "flipCoin":
       return runCoinEffect(s, e, ctx, src);
     case "flipCoinEach":

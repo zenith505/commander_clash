@@ -3596,6 +3596,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0596920f-9946-42f4-a03b-24aab67f9f1b",
+  "name": "Blaze",
+  "manaCost": "{X}{R}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Blaze deals X damage to any target.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "p02",
+  "releasedAt": "1998-06-24",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ccba143d-ed9b-4044-bdad-f010a0e38e47",
   "name": "Blazing Shoal",
   "manaCost": "{X}{R}{R}",
@@ -7657,6 +7683,37 @@
   "commanderLegal": "legal",
   "set": "isd",
   "releasedAt": "2011-09-30",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c99bac4b-7eec-4fdf-b344-0cf9639ff073",
+  "name": "Curse of Echoes",
+  "manaCost": "{4}{U}",
+  "cmc": 5,
+  "typeLine": "Enchantment — Aura Curse",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura",
+   "Curse"
+  ],
+  "oracleText": "Enchant player\nWhenever enchanted player casts an instant or sorcery spell, each other player may copy that spell and may choose new targets for the copy they control.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "dka",
+  "releasedAt": "2012-02-03",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -20780,6 +20837,50 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ae9f5c80-bc96-4ab3-bb5b-e8bd470e9eab",
+  "name": "Magus Lucea Kane",
+  "manaCost": "{1}{G}{U}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Tyranid Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Tyranid",
+   "Wizard"
+  ],
+  "oracleText": "Spiritual Leader — At the beginning of combat on your turn, put a +1/+1 counter on target creature.\nPsychic Stimulus — {T}: Add {C}{C}. When you next cast a spell with {X} in its mana cost or activate an ability with {X} in its activation cost this turn, copy that spell or ability. You may choose new targets for the copy. (A copy of a permanent spell becomes a token.)",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Spiritual Leader",
+   "Psychic Stimulus"
+  ],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "44865261-16f8-42d2-a388-a57173142eb0",
   "name": "Magus of the Arena",
   "manaCost": "{4}{R}{R}",
@@ -32589,6 +32690,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e35d4c62-5211-4785-b683-a83719195d87",
+  "name": "Spinerock Tyrant",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Creature — Dragon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "Flying\nWither (This deals damage to creatures in the form of -1/-1 counters.)\nWhenever you cast an instant or sorcery spell with a single target, you may copy it. If you do, those spells gain wither. You may choose new targets for the copy.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Wither"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9ad61841-9894-41da-bdd8-248c2ce21b00",
   "name": "Split the Party",
   "manaCost": "{3}{U}{U}",
@@ -34570,6 +34704,34 @@
   "commanderLegal": "legal",
   "set": "dmu",
   "releasedAt": "2022-09-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cbf64c58-664f-431f-987e-08ae70d23f2b",
+  "name": "Tempt with Mayhem",
+  "manaCost": "{1}{R}{R}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Tempting offer — Choose target instant or sorcery spell. Each opponent may copy that spell and may choose new targets for the copy they control. You copy that spell once plus an additional time for each opponent who copied the spell this way. You may choose new targets for the copies you control.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Tempting offer"
+  ],
+  "commanderLegal": "legal",
+  "set": "m3c",
+  "releasedAt": "2024-06-14",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

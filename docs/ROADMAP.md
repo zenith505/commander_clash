@@ -1,7 +1,7 @@
 # Roadmap
 
-31,171 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,860 of
+31,176 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,864 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2466,6 +2466,28 @@ line blocks.
    X is paid, no ruling on how it's checked); Celestial Reunion ("choose a creature type and behold two creatures of that
    type" as an optional additional cost: a type chosen as it's cast and two beheld, neither modeled yet); Stalking Leonin
    (an opponent chosen secretly, revealed as a cost); Bre of Clan Stoutarm (still out, as after round 345).
+   Round 353 went on down `npm run popular` and the "Out after round N" lists, most played first, to copies of a spell
+   for other players and the next spell or ability with {X} copied: Hive Mind's "Whenever a player casts an instant or
+   sorcery spell, each other player copies that spell. Each of those players may choose new targets for their copy." and
+   Curse of Echoes's "each other player may copy that spell and may choose new targets for the copy they control" (Effect
+   copyForPlayers: every player but its caster, in turn order from the active player, CR 101.4, each deciding if it may,
+   then copying and aiming that copy before the next one decides, so the last of them controls the copy that resolves
+   first, rulings; mandatory for Hive Mind), with a browser test of being asked; Tempt with Mayhem's "Each opponent may
+   copy that spell ... You copy that spell once plus an additional time for each opponent who copied the spell this way"
+   (`thenYou`: your copies after theirs, resolving first, rulings), with a browser test of your copies' targets; Spinerock
+   Tyrant's "Whenever you cast an instant or sorcery spell with a single target, you may copy it. If you do, those spells
+   gain wither." (cast trigger `singleTarget`, exactly one target as cast; copySpell `thoseGain`: the original, if still on
+   the stack, and the copy, CR 702.80a), with a browser test aiming the copy elsewhere; Magus Lucea Kane's mana ability
+   "{T}: Add {C}{C}. When you next cast a spell with {X} in its mana cost or activate an ability with {X} in its activation
+   cost this turn, copy that spell or ability." (nextCast `xAbility`: the mana symbol {X} only, rulings; a mana ability
+   with {X}, Wizard's Rockets, uses it up with nothing to copy, CR 605.3a), with a browser test. +5, 31,176 of 31,936 with
+   rounds 348 to 352 and B188 to B191. The compiled text of every other card is unchanged. Bots always copy when asked.
+   Out after round 353 (looked at, not done): Spectral Searchlight (still out: another player chooses the color of the
+   mana it adds, in the middle of a mana ability); Quicksilver Elemental ("gains all activated abilities of target
+   creature until end of turn" and "You may spend blue mana as though it were mana of any color to pay the activation
+   costs of ~'s abilities": abilities gained from a permanent for a while, and a mana rule for one source's abilities);
+   Sudden Substitution (control of a spell exchanged with a creature's, then new targets chosen by the spell's new
+   controller).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

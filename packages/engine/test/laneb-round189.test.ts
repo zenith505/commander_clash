@@ -106,7 +106,7 @@ describe("Worldpurge: everything back to hand, each player keeps up to seven, th
     expect(s.players[ap]!.library).not.toContain(ids[0]); // Worldpurge itself is in the graveyard
     expect(s.players[others[0]!]!.hand.length).toBeLessThanOrEqual(7);
     expect(s.players[others[0]!]!.hand.length + s.players[others[0]!]!.library.length).toBe(libs[others[0]!]! + s0.players[others[0]!]!.hand.length + 1);
-    for (const p of s.turnOrder) expect(Object.values(s.players[p]!.manaPool).every((n) => n === 0), p).toBe(true);
+    for (const p of s.turnOrder) expect(Object.values(s.players[p]!.manaPool).every((n) => n === 0), String(p)).toBe(true);
   });
 
   it("keeping none shuffles the whole hand in; a player with no cards in hand isn't asked", () => {
@@ -125,7 +125,7 @@ describe("Worldpurge: everything back to hand, each player keeps up to seven, th
     const { s: s0, ap, ids } = setup([worldpurge()]);
     let s = settle(run(s0, castPlan(s0, ap, ids[0]!)));
     s = settleBots(s);
-    for (const p of s.turnOrder) expect(s.players[p]!.hand.length, p).toBe(7);
+    for (const p of s.turnOrder) expect(s.players[p]!.hand.length, String(p)).toBe(7);
   });
 });
 

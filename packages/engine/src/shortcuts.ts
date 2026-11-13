@@ -403,6 +403,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     toGraveyardFromLibrary: capped(t.toGraveyardFromLibrary ?? {}),
     landPlayedNotFromHand: t.landPlayedNotFromHand,
     playedFromExile: t.playedFromExile,
+    linkedSpellOnce: t.linkedSpellOnce ? [...t.linkedSpellOnce].sort() : undefined,
     lorePut: t.lorePut ? [...t.lorePut].sort() : undefined,
     tokenEvents: t.tokenEvents ? [...t.tokenEvents].sort() : undefined,
     counterPutOn: t.counterPutOn ? [...t.counterPutOn].sort() : undefined,

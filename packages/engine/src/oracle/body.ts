@@ -9715,8 +9715,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Kassandra, Eagle Bearer: "search your graveyard, hand, and library for a card named The Spear of Leonidas, put it
     // onto the battlefield, then shuffle": one card from any of the three zones (CR 701.23); finding nothing is allowed,
-    // as the search is for a card with a stated quality (CR 701.23b).
-    const threeZones = /^[Ss]earch your graveyard, hand, and library for (a card named [^,]+), put it onto the battlefield, then shuffle$/.exec(s);
+    // as the search is for a card with a stated quality (CR 701.23b). Shaun & Rebecca, Agents: "... for a card named The
+    // Animus and put it onto the battlefield, then shuffle": the same.
+    const threeZones = /^[Ss]earch your graveyard, hand, and library for (a card named [^,]+?)(?:,| and) put it onto the battlefield, then shuffle$/.exec(s);
     if (threeZones) {
       const filter = parseSearchFilter(threeZones[1]!.replace(/^a /, ""));
       if (!filter?.named) return null;

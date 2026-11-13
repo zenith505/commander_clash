@@ -41,6 +41,7 @@ import { roundB187Line } from "./laneb187";
 import { roundB188Line } from "./laneb188";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
+import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
 import { round345Chapter, round345Line } from "./round345";
 import { round346Line } from "./round346";
 import { round347Line } from "./round347";
@@ -582,7 +583,7 @@ export function compile(d: CardDef): CompiledCard {
   // 607.2): the tokens created with ~, of which there is only that one.
   const oneToken = /^When ~ enters, create a token that's a copy of [^\n]+$/m.test(normalizeSelf(d)) && (normalizeSelf(d).match(/\bcreate\b/g) ?? []).length === 1;
   const all = joinModes(
-    normalizeSelf(d)
+    roundB191Text(normalizeSelf(d))
       .replace(/^When ~ leaves the battlefield, exile the token\.$/m, (l) => (oneToken ? "When ~ leaves the battlefield, exile all tokens created with ~." : l))
       .replace(/^When the token leaves the battlefield, sacrifice ~\.$/m, (l) => (oneToken ? "Whenever a token created with ~ leaves the battlefield, sacrifice ~." : l))
       // "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each ..." (Banner of Kinship):
@@ -2066,6 +2067,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB189Line(line, raw, out, isSpell)) continue;
     // Round B190.
     if (roundB190Line(line, raw, out, isSpell)) continue;
+    // Round B191 (Ward of Bones).
+    if (roundB191Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -7040,7 +7043,9 @@ export function compile(d: CardDef): CompiledCard {
     // is of that type (CostChoices.creatureType, CastHow.castType).
     const ofYourChoice = " of the creature type of your choice";
     const typeChoice = !floatingFirst && tail === undefined && spellLines.length === 1 && spellLines[0]!.split(ofYourChoice).length === 2 && /\btarget creatures?(?: cards?)?$/.test(spellLines[0]!.split(ofYourChoice)[0]!) && !spellLines[0]!.includes("•");
-    const body0 = floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(typeChoice ? spellLines[0]!.replace(ofYourChoice, "") : spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}), ...(costTappedX ? { costTappedX } : {}) }) : null;
+    // Round B191 (Multiple Choice): a whole spell read at once.
+    const b191 = !floatingFirst && tail === undefined ? roundB191Spell(spellLines.join(" ")) : undefined;
+    const body0 = b191 !== undefined ? b191 : floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(typeChoice ? spellLines[0]!.replace(ofYourChoice, "") : spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}), ...(costTappedX ? { costTappedX } : {}) }) : null;
     // "Up to three target creature cards" is three target specs alike: each one of that type.
     const typed = typeChoice && body0 && !body0.modal && body0.targets.length > 0 && body0.targets.every((t) => (t.kind === "object" || t.kind === "card") && !t.chosen && t.types?.length === 1 && t.types[0] === "Creature" && !t.subtypes?.length && t.text === body0.targets[0]!.text);
     const body = typeChoice ? (typed ? { ...body0, targets: body0.targets.map((t) => ({ ...t, chosen: "type" as const, text: `${t.text} of the chosen type` })) } : null) : body0;

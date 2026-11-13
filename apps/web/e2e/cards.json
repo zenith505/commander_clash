@@ -22725,6 +22725,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b4d23acf-ff1f-4a6a-9ede-2667a99e9665",
+  "name": "Multiple Choice",
+  "manaCost": "{X}{U}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "If X is 1, scry 1, then draw a card.\nIf X is 2, you may choose a player. They return a creature they control to its owner's hand.\nIf X is 3, create a 4/4 blue and red Elemental creature token.\nIf X is 4 or more, do all of the above.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Scry"
+  ],
+  "commanderLegal": "legal",
+  "set": "stx",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "17770eeb-ecbf-4510-af2d-acececfbe146",
   "name": "Multiversal Passage",
   "manaCost": "",
@@ -38492,6 +38520,28 @@
   "commanderLegal": "legal",
   "set": "moc",
   "releasedAt": "2023-04-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c3ea1497-63ac-46bb-95e9-d98b93a880b3",
+  "name": "Ward of Bones",
+  "manaCost": "{6}",
+  "cmc": 6,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Each opponent who controls more creatures than you can't cast creature spells. The same is true for artifacts and enchantments.\nEach opponent who controls more lands than you can't play lands.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "slz",
+  "releasedAt": "2026-09-02",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

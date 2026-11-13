@@ -8080,6 +8080,10 @@ export interface CompiledCard {
   defendingCantCastWhileAttacking?: true;
   /** "Each opponent who attacked with a creature this turn can't cast spells" (Angelic Arbiter): one who declared an attacker this turn (rulings). */
   opponentsWhoAttackedCantCast?: true;
+  /** Ward of Bones: "Each opponent who controls more creatures than you can't cast creature spells. The same is true for artifacts and enchantments.": for each of these card types, an opponent who controls more permanents of that type than this permanent's controller can't cast a spell of that type (rulings), while it's on the battlefield. */
+  opponentsWithMoreCantCast?: string[];
+  /** Ward of Bones: "Each opponent who controls more lands than you can't play lands." (rulings), while it's on the battlefield. */
+  opponentsWithMoreLandsCantPlay?: true;
   /** Sandswirl Wanderglyph: "Each opponent who attacked you or a planeswalker you control this turn can't cast spells": one who declared an attacker against its controller or their planeswalker this turn (Player.attackedPlayersOrWalkers), even before it was there; only while it's on the battlefield (rulings). */
   opponentsWhoAttackedYouCantCast?: true;
   /** "As long as ~ is attached to a creature, your opponents can't cast spells during your turn" (Conqueror's Flail): only while this holds. */

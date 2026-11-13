@@ -1235,6 +1235,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "nthPlayer") {
       const r = s.resolving;
       const next = r ? r.body.effects[r.next + 1] : undefined;
+      // Multiple Choice: the chosen player returns a creature they control to its owner's hand: an opponent who has to
+      // give up the most, the one with the fewest creatures (then the strongest), not us.
+      const flatAll = r ? allEffects(r.body.effects) : [];
+      const chooseAt = flatAll.findIndex((x) => x.type === "choosePlayer" && x.prompt === pend.prompt);
+      const after = chooseAt >= 0 ? flatAll[chooseAt + 1] : undefined;
+      if (after?.type === "pick" && after.action === "bounce") {
+        const count = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Creature")).length;
+        const might2 = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Creature")).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
+        const foes = pend.options.filter((x) => Number(x) !== pid);
+        const hit = foes.filter((x) => count(Number(x)) > 0).sort((a, b) => count(Number(a)) - count(Number(b)) || might2(Number(b)) - might2(Number(a)));
+        return [{ type: "chooseOption", player: pid, choice: hit[0] ?? foes[0] ?? pend.options[0]! }];
+      }
       const useful = next?.type !== "pick" || s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
       const might = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Creature")).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
       const others = pend.options.filter((x) => Number(x) !== pid).sort((a, b) => might(Number(a)) - might(Number(b)) || player(s, Number(a)).life - player(s, Number(b)).life);

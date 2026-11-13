@@ -924,6 +924,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // "Remove a lore counter from each of any number of Sagas you control. Put a +1/+1 counter on ~ for each lore counter
     // removed this way" (Garnet): each of ours that has one, for the counters, and its chapter comes again.
     const removing = pend.kind === "pickPermanents" && pend.action === "choose" && pend.anyNumber ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
+    // Tovolar, Dire Overlord: "transform any number of Human Werewolves you control": all of ours, a werewolf's other face
+    // being its stronger one (one that can't transform stays as it is).
+    if (pend.kind === "pickPermanents" && removing?.type === "transform" && removing.what.ref === "created") return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid) }];
     if (pend.kind === "pickPermanents" && removing?.type === "removeCounters" && removing.what.ref === "created")
       // Chandra, Legacy of Fire (loyalty counters, a card each): only planeswalkers that keep one, so none of ours dies.
       return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid && (obj(s, id).counters[removing.counter] ?? 0) > (removing.counter === "loyalty" ? 1 : 0)) }];

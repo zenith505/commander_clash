@@ -41,6 +41,7 @@ import { roundB186Line } from "./laneb186";
 import { round345Chapter, round345Line } from "./round345";
 import { round346Line } from "./round346";
 import { round347Line } from "./round347";
+import { round348Line } from "./round348";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -5937,6 +5938,8 @@ export function compile(d: CardDef): CompiledCard {
     // Greater Gargadon: "...: Remove a time counter from ~. Activate only if ~ is suspended." (round 346).
     if (round346Line(line, raw, out, isSpell)) continue;
     if (round347Line(line, raw, out, isSpell)) continue;
+    // Firesong and Sunspeaker: spells of one color with lifelink, and life gained because such a spell resolves (round 348).
+    if (round348Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,

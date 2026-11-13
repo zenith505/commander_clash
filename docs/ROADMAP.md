@@ -1,7 +1,7 @@
 # Roadmap
 
-31,115 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,843 of
+31,120 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,845 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2398,6 +2398,28 @@ line blocks.
    They're 5/5 artifact creatures." (CR 708.2, a face-down instant or sorcery stays face down), with a browser test.
    +4, 30,978 of 31,936 with B173 through B176. Bots activate Sasaya only when the flip happens, cast The Master with an exile only when one of
    their creatures has an enters trigger worth copying, and put all of their hand onto the battlefield with Tezzeret.
+   Round 348 went on down the "Out after round N" lists and `npm run popular`, most played first: Dack Fayden's emblem,
+   "Whenever you cast a spell that targets one or more permanents, gain control of those permanents." (ObjRef
+   causeTargets: the permanents the spell targets, on the stack or as it was cast, each still that object, CR 400.7; for
+   the rest of the game, rulings; its trigger resolves before the spell); Everquill Phoenix's "create a red artifact token
+   named Feather with "{1}, Sacrifice this token: Return target Phoenix card from your graveyard to the battlefield
+   tapped."" (named artifact tokens may now have a color, CR 111.4); Firesong and Sunspeaker's "Red instant and sorcery
+   spells you control have lifelink." (Soulfire Grand Master's spellsHaveKeywords, one color) and "Whenever a white
+   instant or sorcery spell causes you to gain life, ~ deals 3 damage to target creature or player." (the lifeGained event
+   now carries the spell resolving as the life is gained, by its instructions or its damage with lifelink, whoever
+   controls it; a triggered ability of the card isn't the spell; "target creature or player" can't be a planeswalker or
+   battle, rulings); Tovolar, Dire Overlord's "At the beginning of your upkeep, if you control three or more Wolves and/or
+   Werewolves, it becomes night. Then transform any number of Human Werewolves you control." ("it becomes night" after a
+   trigger's condition; a pick of any number, none too, then transform: a daybound one, or a card that isn't double-faced,
+   doesn't transform, CR 702.145b, 701.27c; with browser tests); Hollow Marauder's "When ~ enters, any number of target
+   opponents each discard a card. For each of those opponents who didn't discard a card with mana value 4 or greater, draw
+   a card." (Count playersDidntDiscard: the legal target players none of whose discarded cards matches, one with an empty
+   hand too, CR 701.9b). +5, 31,120 of 31,936. Bots transform all of their Human Werewolves with Tovolar and target
+   their opponents with Hollow Marauder.
+   Out after round 348 (looked at, not done): Gift of Doom ("Morph—Sacrifice another creature": no morph cost that
+   sacrifices another permanent yet; "As this Aura is turned face up, you may attach it to a creature": a choice made as
+   part of turning it face up, a special action, or in the middle of an effect that turns it face up); Monstrous Emergence
+   (still out, as after round 320).
    Round 347 went on down the "Out after round N" lists and `npm run popular`, most played first, to cards exiled with a
    permanent or spell that its controller may play: Lobelia, Defender of Bag End's "When ~ enters, look at the top card of
    each opponent's library and exile those cards face down." (looked at, so its controller may go on looking at them, CR

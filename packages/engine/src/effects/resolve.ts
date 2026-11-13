@@ -440,6 +440,17 @@ export function subjectColors(s: GameState, ctx: ResolveCtx): Color[] | undefine
 
 export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
   if (ref.ref === "castSpell") return []; // only counted (amounts.ts)
+  // Dack Fayden's emblem: the permanents the triggering spell targets, on the stack now or as it was cast (as Orvar's
+  // "one of those permanents"), each still that object (CR 400.7).
+  if (ref.ref === "causeTargets") {
+    const item = ctx.cause !== undefined ? (s.stack.find((x) => x.id === ctx.cause) ?? s.castItems?.[ctx.cause]) : undefined;
+    const ids = new Set<ObjectId>();
+    for (const t of item?.targets ?? []) {
+      const o = t.kind === "object" ? s.objects[t.id] : undefined;
+      if (o?.zone === "battlefield" && (t.kind !== "object" || t.zc === undefined || (o.zoneChanges ?? 0) === t.zc) && objectMatches(s, ref.filter, o, ctx.controller, false)) ids.add(o.id);
+    }
+    return [...ids].map((id) => s.objects[id]!);
+  }
   if (ref.ref === "ringBearer") {
     const b = ringBearer(s, ctx.controller);
     return b ? [b] : [];

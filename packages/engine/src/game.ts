@@ -2142,7 +2142,10 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
   if (first) gained.push(pid);
   const total = (s.turnLog.lifeGained ??= {});
   total[pid] = (total[pid] ?? 0) + n;
-  fireEvent(s, { type: "lifeGained", player: pid, amount: n, first });
+  // Firesong and Sunspeaker: a spell causes the life gain its resolution makes, by its instructions or by its damage with
+  // lifelink (rulings); a mana ability resolving inside it is its own item, not the spell.
+  const spell = s.resolving?.item.kind === "spell" ? s.resolving.item : undefined;
+  fireEvent(s, { type: "lifeGained", player: pid, amount: n, first, ...(spell ? { spell } : {}) });
 }
 
 /** `pid` pays or loses `n` energy counters (CR 107.14, 122.1), counted for the turn (Blaster Hulk). */

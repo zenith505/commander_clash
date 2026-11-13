@@ -529,6 +529,12 @@ export type Count =
   | { kind: "castSpellManaSymbols"; color: Color }
   /** "Draw that many cards" after "a spell with one or more targets" (Voracious Bibliophile): how many targets it was cast with. */
   | { kind: "castSpellTargets" }
+  /**
+   * Hollow Marauder: "For each of those opponents who didn't discard a card with mana value 4 or greater" after "any number
+   * of target opponents each discard a card": the target players (`who`, still legal targets, CR 608.2b) none of whose
+   * cards discarded while this resolves matches `filter`, one with nothing to discard too (CR 701.9b).
+   */
+  | { kind: "playersDidntDiscard"; who: PlayerRef; filter: TargetSpec }
   /** "The number of times it's been cast from the command zone this game" (Study Hall): the commander spell cast's. */
   | { kind: "castSpellCommanderCasts" }
   /**
@@ -1506,6 +1512,12 @@ export type ObjRef =
   | { ref: "ringBearer" } // "your Ring-bearer" (CR 701.54a): the controller's, if they have one
   /** "That spell" in a cast trigger (Monstrous Vortex): the spell whose casting triggered it, as it was cast. Counts only. */
   | { ref: "castSpell" }
+  /**
+   * "Those permanents" after "Whenever you cast a spell that targets one or more permanents" (Dack Fayden's emblem): the
+   * permanents the spell whose cast triggered this ability targets (on the stack, or as it was cast once it has left), each
+   * still that object on the battlefield (CR 400.7) and matching `filter`.
+   */
+  | { ref: "causeTargets"; filter: TargetSpec }
   /** "Each creature dealt damage this way" (Aurelia's Fury): `filter` for the kind of permanent. */
   | { ref: "damagedThisWay"; filter?: TargetSpec }
   /** The card a "whenever a creature dies" trigger was about, in the zone it went to, while it's still that object (CR 400.7). */
@@ -6241,6 +6253,12 @@ export interface TriggeredAbility {
   orLoseLife?: true;
   /** For "youGainLife" and "youLoseLife": "Whenever you gain life during your turn" (Vampire Scrivener): only while you're the active player. */
   onYourTurn?: true;
+  /**
+   * For "youGainLife": "Whenever a white instant or sorcery spell causes you to gain life" (Firesong and Sunspeaker): only
+   * life gained as such a spell resolves, by its own instructions or its damage with lifelink (rulings), whoever controls
+   * it; not a triggered ability of the card (rulings).
+   */
+  lifeFromSpell?: TargetSpec;
   /** "This ability triggers only once each turn": see GameObject.triggeredThisTurn. */
   oncePerTurn?: boolean;
   /** "This ability triggers only once." (Acrobatic Cheerleader): once ever for this object (rulings; a new object starts over, CR 400.7). See GameObject.triggeredEver. */

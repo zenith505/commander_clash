@@ -2980,6 +2980,38 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // The Eighth Doctor: "Once during each of your turns, you may play a historic land or cast a historic permanent spell
+    // from your graveyard. If you do, it gains "If this permanent would leave the battlefield, exile it instead of putting
+    // it anywhere else."": Serra Paragon's one use each turn for either, only for a historic card (an artifact, legendary
+    // or Saga, CR 700.6), and the permanent it becomes has that replacement effect of its own for good (CR 614.1a, 400.7).
+    if (/^Once during each of your turns, you may play a historic land or cast a historic permanent spell from your graveyard\. If you do, it gains "If (?:this permanent|~) would leave the battlefield, exile it instead of putting it anywhere else\."$/.test(line)) {
+      const filter = parseTargetPhrase("historic permanent card from a graveyard");
+      const lands = parseTargetPhrase("historic land card from a graveyard");
+      if (filter?.kind !== "card" || lands?.kind !== "card" || !filter.anyOf || !lands.anyOf) out.unsupported.push(raw);
+      else {
+        const { owner: _, ...f } = filter;
+        const { owner: _o, ...l } = lands;
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: "historic permanent cards" }, way: { kind: "turnPermission", costs: [], exile: false }, yourTurn: true, once: [""], gains: "If this permanent would leave the battlefield, exile it instead of putting it anywhere else." });
+        out.landFromGraveyardOnce = "shared";
+        out.landFromGraveyardFilter = { ...l, text: "historic land cards" };
+      }
+      continue;
+    }
+    // Arcade Gannon: "Once during each of your turns, you may cast an artifact or Human spell from your graveyard with mana
+    // value less than or equal to the number of quest counters on ~": Karador's once-each-turn permission (rulings: costs
+    // paid, timing followed, another permission doesn't use it up, a new Arcade Gannon is a new permission), the spell's
+    // mana value with its X (CR 202.3e) against the counters on this permanent as it's cast.
+    const gannon = /^Once during each of your turns, you may cast an? (artifact or Human) spell from your graveyard with mana value less than or equal to (the number of [a-z]+ counters on ~)\.$/.exec(line);
+    if (gannon) {
+      const filter = parseTargetPhrase(`${gannon[1]} card from a graveyard`);
+      const count = parseCount(gannon[2]!, null);
+      if (filter?.kind !== "card" || filter.manaValue || filter.bound || !count) out.unsupported.push(raw);
+      else {
+        const { owner: _, ...f } = filter;
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${gannon[1]} cards` }, way: { kind: "turnPermission", costs: [], exile: false }, yourTurn: true, once: [""], maxMvCount: count });
+      }
+      continue;
+    }
     // Kagha, Shadow Archdruid: "Once during each of your turns, you may play a land or cast a permanent spell from among
     // cards in your graveyard that were put there from your library this turn": one use each turn for either (as Serra
     // Paragon's), only for a card that came from the library this turn. Banon, the Returners' Leader: "... cast a

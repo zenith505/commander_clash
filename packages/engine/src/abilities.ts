@@ -9060,6 +9060,8 @@ export interface CompiledCard {
     once?: string[];
     /** "A permanent spell with mana value 2 or less" (Lurrus): the spell's, its X counted (CR 202.3e), as it's cast. */
     maxMv?: number;
+    /** Arcade Gannon: "with mana value less than or equal to the number of quest counters on ~": the same, counted for this permanent as the spell is cast. */
+    maxMvCount?: Amount;
     /** Serra Paragon: "If you do, it gains '...'": the permanent the land or spell becomes has this ability (GameObject.entersGaining). */
     gains?: string;
     /** Edgar, Master Machinist: "If you cast a spell this way, that artifact enters tapped" (CR 614.1c). */
@@ -9075,6 +9077,8 @@ export interface CompiledCard {
   }[];
   /** Muldrotha: "you may play a land ... from your graveyard" once during each of your turns. "shared": the same use as its once-each-turn spell permission (Serra Paragon's "a land ... or a permanent spell"). */
   landFromGraveyardOnce?: true | "shared";
+  /** The Eighth Doctor: "play a historic land ... from your graveyard": only a land card matching this (its printed characteristics there). */
+  landFromGraveyardFilter?: TargetSpec;
   /** Kagha, Shadow Archdruid: that land only if it was put into the graveyard from a library this turn. */
   landFromGraveyardArrived?: "fromLibrary";
   /**

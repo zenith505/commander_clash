@@ -8,12 +8,16 @@ import type { Ctx } from "./body";
 import { parseCount } from "./counts";
 import { parseGrants } from "./grants";
 import { parsePlayer } from "./targets";
+import { round357Sentence } from "./round357";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round356Sentence(s: string, sentences: string[], si: number, ctx: Ctx, _effects: Effect[]): Found {
+  // Round 357's sentences first (oracle/round357.ts).
+  const r357 = round357Sentence(s, sentences, si, ctx, _effects);
+  if (r357) return r357;
   const line = plain(s);
   // Smuggler's Buggy: "you may cast the exiled card without paying its mana cost. If you do, return ~ to its owner's
   // hand.": the card its hideaway exiled (CR 702.75a, 607.2a), cast as this resolves or not at all (CR 608.2g), a land

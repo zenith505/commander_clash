@@ -5299,6 +5299,9 @@ function landPermit(s: GameState, pid: PlayerId, o?: GameObject): string | undef
     if (!once) continue;
     const arrived = abilitiesOf(s, p).landFromGraveyardArrived;
     if (arrived && (!o || !arrivedThisTurn(s, o, arrived))) continue;
+    // The Eighth Doctor: a historic land only (CR 700.6).
+    const landFilter = abilitiesOf(s, p).landFromGraveyardFilter;
+    if (landFilter && (!o || !printedMatches(landFilter, defOf(s, o)))) continue;
     // Serra Paragon: the one use it shares with its spell permission.
     const key = `${p.id}@${p.zoneChanges ?? 0}:${once === "shared" ? "" : "Land"}`;
     if (!used.includes(key)) return key;
@@ -7982,6 +7985,8 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
       if (g.arrived && !arrivedThisTurn(s, o, g.arrived)) continue;
       // Lurrus: a card that can be cast with mana value that low (X counted as it's cast, see permitsForMv).
       if (g.maxMv !== undefined && defMv(d) > g.maxMv) continue;
+      // Arcade Gannon: "less than or equal to the number of quest counters on ~", counted now.
+      if (g.maxMvCount !== undefined && defMv(d) > evalAmount(s, g.maxMvCount, { controller: o.owner, sourceId: p.id })) continue;
       // Once each turn (Karador, Muldrotha's permanent types): the permissions not used yet, from every such permanent.
       if (g.once) {
         const used = s.turnLog?.gravePermits ?? [];
@@ -8053,7 +8058,8 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
 export function permitsForMv(s: GameState, permits: string[], mv: number): string[] {
   return permits.filter((k) => {
     const src = s.objects[k.split("@")[0]!];
-    const max = src ? abilitiesOf(s, src).graveyardGrants?.find((g) => g.once)?.maxMv : undefined;
+    const g = src ? abilitiesOf(s, src).graveyardGrants?.find((g) => g.once) : undefined;
+    const max = g?.maxMv ?? (g?.maxMvCount !== undefined ? evalAmount(s, g.maxMvCount, { controller: controllerOf(s, src!), sourceId: src!.id }) : undefined);
     return max === undefined || mv <= max;
   });
 }

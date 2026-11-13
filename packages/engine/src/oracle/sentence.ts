@@ -184,11 +184,17 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       // permission is the sentence after (see parseBody).
       Object.assign(dig, { count: 1, upTo: m[1] === "You may exile", into: "exile" });
       if (m[2]) Object.assign(dig, restOf(m[2]));
-    } else if ((m = /^You may exile (an? .+? card) from among them$/.exec(s))) {
+    } else if ((m = /^You may exile (an? .+? card(?: with mana value X or less)?) from among them$/.exec(s))) {
       // "You may exile a nonland card from among them" (The Key to the Vault): what's done with it is the sentence after the
       // rest go to the bottom (see parseBody).
-      const filter = parseSearchFilter(m[1]!.replace(/^an? /, ""));
+      // Keldon Flamesage: "You may exile an instant or sorcery card with mana value X or less from among them", the X the
+      // look's "where X is ~'s power" defined, counted as it resolves (TargetSpec.bound; its power as it last existed if
+      // it's gone, rulings, CR 608.2h).
+      const mvX = / with mana value X or less$/.exec(m[1]!);
+      if (mvX && !whereX) return null;
+      const filter = parseSearchFilter((mvX ? m[1]!.slice(0, mvX.index) : m[1]!).replace(/^an? /, ""));
       if (!filter) return null;
+      if (mvX) Object.assign(filter, { bound: { key: "manaValue", at: "most", amount: whereX }, text: `${filter.text} with mana value X or less` });
       Object.assign(dig, { count: 1, upTo: true, filter, into: "exile" });
     // Voda Sea Scavenger: "You may put one of those cards on top of your library": the same, up to one of them.
     } else if (/^You may put one of (?:them|those cards) (?:back )?on top of your library$/.test(s)) {

@@ -9181,6 +9181,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1c2a3f13-6bcb-42ad-98f6-642151ad54f1",
+  "name": "Discover the Impossible",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at the top five cards of your library. Exile one of them face down and put the rest on the bottom of your library in a random order. You may cast the exiled card without paying its mana cost if it's an instant spell with mana value 2 or less. If you don't, put that card into your hand.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a7e97fa9-4b72-4548-b854-5be5f18a6f1a",
   "name": "Disenchant",
   "manaCost": "{1}{W}",

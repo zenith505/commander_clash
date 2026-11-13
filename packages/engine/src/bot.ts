@@ -648,6 +648,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Hideaway: the most expensive card, to play for free later.
     if (pend.kind === "searchLibrary" && pend.dig && /hideaway/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, 1) }];
     // Urianger Augurelt: the top card exiled, to be played later for {2} less (and 2 life).
+    // Discover the Impossible: a card it could cast free now (an instant of small enough mana value), else the best card for
+    // the hand, where it goes otherwise.
+    const castOrHand = pend.kind === "searchLibrary" && pend.dig?.to === "to exile face down" && s.resolving ? allEffects(s.resolving.body.effects).find((x): x is Extract<Effect, { type: "exileFaceDown" }> => x.type === "exileFaceDown" && !!x.castOrHand)?.castOrHand : undefined;
+    if (pend.kind === "searchLibrary" && castOrHand && pend.cards.length) {
+      const free = (id: ObjectId) => castOrHand.types.some((ty) => isType(defOf(s, obj(s, id)), ty)) && defMv(defOf(s, obj(s, id))) <= castOrHand.maxMv;
+      const best = [...pend.cards].sort((a, b) => Number(free(b)) - Number(free(a)) || handWorth(s, b) - handWorth(s, a))[0]!;
+      return [{ type: "searchLibrary", player: pid, found: [best] }];
+    }
     if (pend.kind === "searchLibrary" && pend.dig?.to === "to exile face down" && pend.min === 0 && pend.cards.length === 1 && s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "exileFaceDown" && !!x.optional)) return [{ type: "searchLibrary", player: pid, found: [...pend.cards] }];
     if (pend.kind === "searchLibrary" && pend.dig && /face down/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: chooseManifest(s, pid, pend.cards, pend.max) }];
     // "Exile a card from a graveyard" (Cemetery Prowler): an opponent's card if there is one, the one sharing the most card

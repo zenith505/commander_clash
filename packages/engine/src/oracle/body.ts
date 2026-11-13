@@ -9499,7 +9499,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Otherwise (Smirking Spelljacker's, with nothing before it) it's the card a linked exile took (sentences/zones.ts).
     const keyLast = effects[effects.length - 1];
     if (/^You may cast the exiled card without paying its mana cost$/.test(s) && (effects.length || ctx.spell)) {
-      if (keyLast?.type !== "dig" || keyLast.into !== "exile" || keyLast.count !== 1 || keyLast.play || keyLast.castFree || keyLast.each || !keyLast.filter?.notTypes?.includes("Land")) return null;
+      if (keyLast?.type !== "dig" || keyLast.into !== "exile" || keyLast.count !== 1 || keyLast.play || keyLast.castFree || keyLast.each || !(keyLast.filter?.notTypes?.includes("Land") || (keyLast.filter?.types?.length && keyLast.filter.types.every((t) => t === "Instant" || t === "Sorcery")))) return null;
       keyLast.castFree = true;
       continue;
     }

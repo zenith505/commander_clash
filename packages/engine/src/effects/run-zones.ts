@@ -2310,6 +2310,27 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const p = player(s, actor);
       const sc = (s.resolving!.scratch ??= {});
       // Clone Shell: the card is exiled; the rest go on the bottom in the order the actor chooses.
+      // Discover the Impossible: the exiled card, cast as this resolves or not (CR 608.2g); not cast, it's put into its
+      // owner's hand (the hidden card's name stays private).
+      const castOrHand = (): "paused" | undefined => {
+        const id = sc.faceDownCast;
+        if (!e.castOrHand || id === undefined) return;
+        if (!sc.faceDownCastAsked) {
+          sc.faceDownCastAsked = true;
+          s.pending = { kind: "castFree", player: p.id, objectId: id, source: src, how: "orHand", types: e.castOrHand.types, mv: { max: e.castOrHand.maxMv } };
+          if (freeCastable(s, p.id, id)) return "paused";
+          s.pending = null;
+        }
+        const o = s.objects[id];
+        if (o?.zone === "exile") {
+          moveObject(s, id, "hand");
+          log(s, `${p.name} puts the exiled card into their hand.`);
+          log(s, `You put ${defOf(s, obj(s, id)).name} into your hand.`, p.id);
+        }
+        sc.faceDownCast = undefined;
+        return;
+      };
+      if (sc.faceDownCast !== undefined) return castOrHand();
       if (sc.faceDownBottom) return toBottom(s, p.id, sc.faceDownBottom.filter((id) => obj(s, id).zone === "library"), src, false);
       let ids: ObjectId[];
       let restBottom: ObjectId[] = [];
@@ -2337,7 +2358,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
               sc.faceDownPick = true;
               sc.faceDownLooked = ids;
               delete sc.found;
-              s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card", cards: ids, min: e.optional ? 0 : 1, max: 1, dig: { looked: ids, to: "to exile face down", rest: e.optional ? "back on top of your library" : "on the bottom of that library" } };
+              s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card", cards: ids, min: e.optional ? 0 : 1, max: 1, dig: { looked: ids, to: "to exile face down", rest: e.optional ? "back on top of your library" : e.bottomRandom ? "on the bottom of your library in a random order" : "on the bottom of that library" } };
               return "paused";
             }
             sc.found = ids;
@@ -2350,11 +2371,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (e.optional) {
             if (!chosen.length) log(s, `${p.name} leaves the card on top of their library.`);
           } else if (e.bottomAnyOrder) restBottom = looked.filter((id) => !chosen.includes(id));
-          else for (const id of looked.filter((id) => !chosen.includes(id))) {
+          else for (const id of ((r) => (e.bottomRandom && shuffle(s, r), r))(looked.filter((id) => !chosen.includes(id)))) {
             const owner = player(s, obj(s, id).owner);
             owner.library = [...owner.library.filter((x) => x !== id), id];
           }
-          if (looked.length > chosen.length && !e.bottomAnyOrder && !e.optional) log(s, `${p.name} puts ${looked.length - chosen.length === 1 ? "a card" : `${looked.length - chosen.length} cards`} on the bottom of ${[...new Set(looked.map((id) => player(s, obj(s, id).owner).name))].join(" and ")}'s library.`);
+          if (looked.length > chosen.length && !e.bottomAnyOrder && !e.optional) log(s, `${p.name} puts ${looked.length - chosen.length === 1 ? "a card" : `${looked.length - chosen.length} cards`} on the bottom of ${[...new Set(looked.map((id) => player(s, obj(s, id).owner).name))].join(" and ")}'s library${e.bottomRandom && looked.length - chosen.length > 1 ? " in a random order" : ""}.`);
           ids = chosen;
         }
       }
@@ -2404,6 +2425,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (restBottom.length) {
         sc.faceDownBottom = restBottom;
         return toBottom(s, p.id, restBottom, src, false);
+      }
+      if (e.castOrHand && done.length === 1) {
+        sc.faceDownCast = done[0];
+        return castOrHand();
       }
       return;
     }
@@ -3290,7 +3315,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // Vehicle or a creature card is what the card is as it's put there.
           const also = e.alsoMods && (!e.alsoModsIfSubtype || characteristics(s, o).subtypes.includes(e.alsoModsIfSubtype)) && (!e.alsoModsIfCreature || objIsType(s, o, "Creature")) ? e.alsoMods : undefined;
           const entersAs = [...(e.entersAs && (ctx.x ?? 0) >= e.entersAs.x ? e.entersAs.mods : []), ...(also ?? [])];
-          moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(entersAs.length ? { entersAs, ...(also ? { entersAsBy: { controller: ctx.controller, source: src, ...(e.alsoModsWhileCounter ? { whileCounter: e.alsoModsWhileCounter } : {}) } } : {}) } : {}), ...(e.counters ? e.countersIfSubtype ? { countersIfSubtype: { subtype: e.countersIfSubtype, counters: e.counters } } : { [e.countersIfCreature ? "countersIfCreature" : "counters"]: e.counters } : {}), ...(e.countersFromLast ? { counters: { [e.countersFromLast.kind]: Math.max(0, (s.lastKnown?.[o.id]?.counters?.[e.countersFromLast.kind] ?? 0) + e.countersFromLast.plus) } } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
+          moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(entersAs.length ? { entersAs, ...(also ? { entersAsBy: { controller: ctx.controller, source: src, ...(e.alsoModsWhileCounter ? { whileCounter: e.alsoModsWhileCounter } : {}) } } : {}) } : {}), ...(e.counters ? e.countersIfSubtype ? { countersIfSubtype: { subtype: e.countersIfSubtype, counters: e.counters } } : { [e.countersIfCreature ? "countersIfCreature" : "counters"]: e.counters } : {}), ...(e.countersFromLast ? { counters: { [e.countersFromLast.kind]: Math.max(0, (s.lastKnown?.[o.id]?.counters?.[e.countersFromLast.kind] ?? 0) + e.countersFromLast.plus) } } : {}), ...(e.countersAmount ? { counters: { [e.countersAmount.kind]: Math.max(0, amountNow(s, e.countersAmount.n, ctx)) } } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
           // Attacking as it enters, before its enters abilities trigger (CR 508.4).
           if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
             o.attacking = attack!.player;

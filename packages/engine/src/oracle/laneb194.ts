@@ -3,6 +3,7 @@
 import { allEffects, type AbilityBody, type CompiledCard, type Effect } from "../abilities";
 import { parseBody, reflexiveBody, type Ctx } from "./body";
 import { parseTrigger } from "./triggers";
+import { roundB195Sentence, roundB195Spell } from "./laneb195";
 
 /** One line of a card's text, compiled into `out` (an unsupported one reported as `raw`); false when it isn't one of these. */
 export function roundB194Line(line: string, raw: string, out: CompiledCard, isSpell: boolean): boolean {
@@ -62,7 +63,7 @@ export function roundB194Spell(text: string): AbilityBody | null | undefined {
     if (!plain || !more || plain.targets.length || more.targets.length || plain.modal || more.modal) return null;
     return { targets: [], effects: [{ type: "if", cond: { kind: "bargained" }, effects: more.effects, otherwise: plain.effects }], text };
   }
-  return undefined;
+  return roundB195Spell(text);
 }
 
 type Found = { effect: Effect; next: number } | "fail" | null;
@@ -91,5 +92,5 @@ export function roundB194Sentence(s: string, sentences: string[], si: number, ct
     if (top?.type !== "exileTop" || top.who.ref !== "you" || top.n !== 1 || top.linked || dmg?.type !== "damage" || !JSON.stringify(dmg.amount).includes('"ref":"exiledTop"')) return "fail";
     return { effect: { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: [{ type: "mayCastFromGraveyard", what: { ref: "exiledTop" }, inExile: true, play: true }] }, next: si + 1 };
   }
-  return null;
+  return roundB195Sentence(s, sentences, si, ctx, effects);
 }

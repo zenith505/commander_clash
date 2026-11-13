@@ -1,7 +1,7 @@
 # Roadmap
 
-31,107 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,976 of 4,988 (99%), top 10,000: 9,836 of
+31,115 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,843 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2398,6 +2398,32 @@ line blocks.
    They're 5/5 artifact creatures." (CR 708.2, a face-down instant or sorcery stays face down), with a browser test.
    +4, 30,978 of 31,936 with B173 through B176. Bots activate Sasaya only when the flip happens, cast The Master with an exile only when one of
    their creatures has an enters trigger worth copying, and put all of their hand onto the battlefield with Tezzeret.
+   Round 347 went on down the "Out after round N" lists and `npm run popular`, most played first, to cards exiled with a
+   permanent or spell that its controller may play: Lobelia, Defender of Bag End's "When ~ enters, look at the top card of
+   each opponent's library and exile those cards face down." (looked at, so its controller may go on looking at them, CR
+   406.3; nobody else may, rulings) and "• Until end of turn, you may play a card exiled with ~ without paying its mana
+   cost." (one of them, any, for free, CR 118.9, with the usual timing, rulings; each activation allows one more, a
+   `oneOf` group for that Lobelia and turn; with a browser test); Gandalf, Goblins' Bane's Flameshape, "Look at the top
+   two cards of your library and exile them face down. For as long as they remain exiled, you may play them if you control
+   a Wizard." (FaceDownPlay.ifControl, as Possibility Technician's, rulings); Urianger Augurelt's Draw Arcanum, "Look at
+   the top card of your library. You may exile it face down." (exileFaceDown `optional`: the card shown in the dig picker,
+   exiled or left on top, with browser tests for each) and Play Arcanum, "Until end of turn, you may play cards exiled with
+   ~. Spells you cast this way cost {2} less to cast." (every card exiled with it as this resolves; generic mana only, CR
+   601.2f, rulings; GameObject.mayPlay.less; with a browser test); The Temporal Anchor's "Whenever you choose to put one
+   or more cards on the bottom of your library while scrying, exile that many cards from the bottom of your library."
+   (a new trigger event, youScryToBottom, once for each scry that put one or more there, CR 701.22a; exileTop `bottom`)
+   and "During your turn, you may play cards exiled with ~." (with the usual costs and timing, rulings). +4, 31,115 of
+   31,936. The compiled text of every other card is unchanged but Petty Larceny's and Rev, Tithe Extractor's, whose
+   face-down exiles now also say they were looked at (no change in play: they could be looked at already). Bots take
+   Lobelia's free play in their main phase when a card exiled with it could be played now (else the life drain), use
+   Urianger's Draw Arcanum in their second main phase and exile the card, and Play Arcanum in their main phase when a card
+   exiled with it could be played. Still simplified: Play Arcanum and Lobelia's first mode give the permission to the
+   cards exiled with it as the ability resolves (as King Narfi's Betrayal), not to cards exiled with it later that turn.
+   Out after round 347 (looked at, not done): Firesong and Sunspeaker (lifelink given to red instant and sorcery spells,
+   and "a white instant or sorcery spell causes you to gain life", which needs the spell that caused a life gain);
+   Hollow Marauder ("any number of target opponents each discard a card", still out with the other "any number of target
+   players" cards); Everquill Phoenix (the Feather token's quoted "Sacrifice this token" ability); Monstrous Emergence
+   (still out, as after round 320).
    Round 346 went on down the "Out after round N" lists and `npm run popular`, most played first: Crucible of the Spirit
    Dragon's "{T}, Remove X storage counters from this land: Add X mana in any combination of colors. Spend this mana only
    to cast Dragon spells or activate abilities of Dragons." (removeX with `mix`, every multiset of the five colors, CR

@@ -47,6 +47,10 @@ import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
 import { round345Chapter, round345Line } from "./round345";
 import { round346Line } from "./round346";
 import { round347Line } from "./round347";
+import { round348Line } from "./round348";
+import { round349Line } from "./round349";
+import { round350Line } from "./round350";
+import { round351Line } from "./round351";
 import { roundB189Line } from "./laneb189";
 
 const cache = new Map<string, CompiledCard>();
@@ -935,6 +939,11 @@ export function compile(d: CardDef): CompiledCard {
     if (borrowLinked && !out.borrows) {
       const kind = borrowLinked[1] ? capital(borrowLinked[1]) : undefined;
       out.borrows = { filter: { kind: "card", ...(kind ? { types: [kind], notTypes: [], notColors: [] } : {}), text: `${borrowLinked[1] ? `${borrowLinked[1]} ` : ""}cards exiled with ~` }, linked: true };
+      continue;
+    }
+    // Rex, Cyber-Hound: "all cards in exile with brain counters on them" (round 350).
+    if (borrow && !out.borrows && !borrow[2] && !borrow[3] && borrow[1] === "all cards in exile with brain counters on them") {
+      out.borrows = { filter: { kind: "card", types: [], notTypes: [], notColors: [], text: "cards" }, exiledWithCounter: "brain" };
       continue;
     }
     if (borrow && !out.borrows) {
@@ -5958,6 +5967,13 @@ export function compile(d: CardDef): CompiledCard {
     // Greater Gargadon: "...: Remove a time counter from ~. Activate only if ~ is suspended." (round 346).
     if (round346Line(line, raw, out, isSpell)) continue;
     if (round347Line(line, raw, out, isSpell)) continue;
+    // Firesong and Sunspeaker: spells of one color with lifelink, and life gained because such a spell resolves (round 348).
+    if (round348Line(line, raw, out, isSpell)) continue;
+    // Hot Pursuit: control of every goaded or suspected creature once two players have lost (round 349).
+    if (round349Line(line, raw, out, isSpell)) continue;
+    if (round350Line(line, raw, out, isSpell)) continue;
+    // Eater of Virtue, Deification, The War Doctor, King of the Oathbreakers (round 351).
+    if (round351Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,

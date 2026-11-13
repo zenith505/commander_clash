@@ -831,6 +831,18 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const o = item?.objectId ? s.objects[item.objectId] : undefined;
       return o ? manaSymbolsOf(defOf(s, o).manaCost, [c.color]) : 0;
     }
+    case "playersDidntDiscard": {
+      // The legal target players of the resolving ability (CR 608.2b) who discarded no such card while it resolves.
+      const r = s.resolving;
+      if (!r || c.who.ref !== "target") return 0;
+      const who: PlayerId[] = [];
+      for (let i = c.who.index; i < c.who.index + (c.who.n ?? 1); i++) {
+        const t = r.item.targets?.[i];
+        if (r.legal[i] && t?.kind === "player" && !s.players[t.id]!.lost) who.push(t.id);
+      }
+      const done = r.discardedAll ?? [];
+      return who.filter((pid) => !done.some((id) => s.objects[id]?.owner === pid && printedMatches(c.filter, defOf(s, s.objects[id]!)))).length;
+    }
     case "castSpellTargets": {
       // Each target it was cast with (CR 115.1), an "up to" slot left empty not counting; fixed once it's cast.
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;

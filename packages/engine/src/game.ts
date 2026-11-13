@@ -2143,7 +2143,10 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
   if (first) gained.push(pid);
   const total = (s.turnLog.lifeGained ??= {});
   total[pid] = (total[pid] ?? 0) + n;
-  fireEvent(s, { type: "lifeGained", player: pid, amount: n, first });
+  // Firesong and Sunspeaker: a spell causes the life gain its resolution makes, by its instructions or by its damage with
+  // lifelink (rulings); a mana ability resolving inside it is its own item, not the spell.
+  const spell = s.resolving?.item.kind === "spell" ? s.resolving.item : undefined;
+  fireEvent(s, { type: "lifeGained", player: pid, amount: n, first, ...(spell ? { spell } : {}) });
 }
 
 /** `pid` pays or loses `n` energy counters (CR 107.14, 122.1), counted for the turn (Blaster Hulk). */
@@ -2195,7 +2198,8 @@ export function canGainLife(s: GameState, pid: PlayerId): boolean {
 
 /** Can damage be prevented now, or does a "damage can't be prevented" effect stop prevention effects (CR 615.12)? */
 export function canPreventDamage(s: GameState): boolean {
-  return s.noPreventionTurn !== s.turn && !s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).damageCantBePrevented);
+  // Alchemist's Gambit: an extra turn during which damage can't be prevented.
+  return s.noPreventionTurn !== s.turn && !s.extraTurn?.noPrevention && !s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).damageCantBePrevented);
 }
 
 /** A player loses life (CR 119.3): from damage (119.2), an effect, or paying life (119.4). One life-loss event. */
@@ -5770,14 +5774,14 @@ export function commanderTaxLife(p: Player, o: GameObject, d: CardDef): number {
  * card's half or another face (CR 709.3, 712.11b, 715.3), or prototyped (CR 718.3). `manaOk`: a problem with mana alone
  * (an additional cost) doesn't count.
  */
-export function freeCastable(s: GameState, pid: PlayerId, id: ObjectId, manaOk = false): boolean {
+export function freeCastable(s: GameState, pid: PlayerId, id: ObjectId, manaOk = false, /** Only with nothing to pay but what the mana pool holds (castProblem checks the pool): a "must cast if able" (PendingDecision "castFree" `must`, rulings on Wild Evocation). */ poolOnly = false): boolean {
   const o = s.objects[id];
   if (!o) return false;
   const ways: CostChoices[] = [{}, ...castableFaces(s, o).filter((f) => !isType(s.cards[registerFace(s, o, f)]!, "Land")).map((face) => ({ face })), ...(altCost(defOf(s, o), "prototype") ? [{ alt: "prototype" as const }] : [])];
   return ways.some((how) => {
     const problem = castProblem(s, pid, id, undefined, undefined, undefined, undefined, undefined, how);
     // Under Trinisphere a free spell can cost mana too (CR 601.2f), paid as it's cast.
-    return problem === null || ((manaOk || costFloorInPlay(s)) && /^not enough mana/.test(problem));
+    return problem === null || (!poolOnly && (manaOk || costFloorInPlay(s)) && /^not enough mana/.test(problem));
   });
 }
 
@@ -12095,6 +12099,8 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
   const pend = s.pending;
   const r = s.resolving;
   if (pend?.kind === "castFree" && pend.player === p.id && r && !yes) {
+    // "Casts it ... if able" (Omen Machine, Wild Evocation): not while it can be cast (rulings).
+    if (pend.must && freeCastable(s, p.id, pend.objectId, false, true)) throw new RulesError(`${nameOf(s, pend.objectId)} must be cast if able`);
     // Declining cascade's free cast; casting it is a castSpell action instead.
     log(s, `${p.name} chooses not to cast ${nameOf(s, pend.objectId)}.`);
     s.pending = null;

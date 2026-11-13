@@ -297,7 +297,18 @@ export function dealDamage(
     // Damage to a planeswalker removes that many loyalty counters (CR 120.3c, 306.8); one that's also a creature is
     // dealt damage as a creature too (CR 120.3d-e).
     if (walker) {
-      const removed = Math.min(n, o.counters.loyalty ?? 0);
+      const had = o.counters.loyalty ?? 0;
+      // Deification: "if damage dealt to a planeswalker you control of the chosen type would result in all loyalty counters
+      // on it being removed, instead all but one of those counters are removed" (CR 614.1), while its controller controls a
+      // creature, checked as the damage is dealt (rulings).
+      const keepOne = n >= had && had > 0 && s.battlefield.some((id) => {
+        const k = obj(s, id);
+        const rule = abilitiesOf(s, k).keepsLastLoyalty;
+        const you = controllerOf(s, k);
+        if (!rule || controllerOf(s, o) !== you || !objectMatches(s, bindChosen(rule.filter, k.chosen), o, you, false)) return false;
+        return s.battlefield.some((c) => controllerOf(s, obj(s, c)) === you && objectMatches(s, rule.whileControl, obj(s, c), you, false));
+      });
+      const removed = keepOne ? had - 1 : Math.min(n, had);
       if (removed) o.counters.loyalty = (o.counters.loyalty ?? 0) - removed;
       countersRemoved(s, o, "loyalty", removed);
       invalidateCharacteristics(s);

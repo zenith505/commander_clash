@@ -157,7 +157,7 @@ export type TriggerSourceEvent =
   /** A player gained life (one life-gain event, CR 119.9). */
   /** A player paid life (CR 119.4): "whenever you pay life" (Font of Agonies). */
   | { type: "lifePaid"; player: PlayerId; amount: number }
-  | { type: "lifeGained"; player: PlayerId; amount: number; /** The player's first life gain this turn. */ first?: boolean }
+  | { type: "lifeGained"; player: PlayerId; amount: number; /** The player's first life gain this turn. */ first?: boolean; /** The spell resolving as the life was gained (Firesong and Sunspeaker), its stack item. */ spell?: StackItem }
   /** The active player's permanents untapped by their untap step's turn-based action (CR 502.3), how many. */
   | { type: "untapStepUntapped"; player: PlayerId; amount: number }
   /** A player lost life: from damage, an effect, or paying life (one life-loss event, CR 119.2-119.4). */
@@ -1194,12 +1194,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       // Cat Collector: "for the first time during each of your turns".
-      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youGainLife" && (!t.firstOnTheirTurn || (!!ev.first && s.activePlayer === ev.player)) && (!t.firstEachTurn || !!ev.first) && (!t.orLoseLife || s.activePlayer === ev.player) && (!t.onYourTurn || s.activePlayer === ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youGainLife" && (!t.firstOnTheirTurn || (!!ev.first && s.activePlayer === ev.player)) && (!t.firstEachTurn || !!ev.first) && (!t.orLoseLife || s.activePlayer === ev.player) && (!t.onYourTurn || s.activePlayer === ev.player) && (!t.lifeFromSpell || (!!ev.spell && spellMatches(s, t.lifeFromSpell, ev.spell))), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
     fromEmblems((o, owner) => owner === ev.player && add(o, ev.player, (e) => e === "youGainLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
     // Deathless Knight: "When you gain life for the first time each turn, return ~ from your graveyard to your hand": from
     // its owner's graveyard, only if it's there as the life is gained (rulings).
-    fromGraveyards((o, owner) => owner === ev.player && add(o, owner, (e, t) => e === "youGainLife" && (!t.firstEachTurn || !!ev.first) && !t.firstOnTheirTurn && !t.orLoseLife && !t.onYourTurn, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
+    fromGraveyards((o, owner) => owner === ev.player && add(o, owner, (e, t) => e === "youGainLife" && (!t.firstEachTurn || !!ev.first) && !t.firstOnTheirTurn && !t.orLoseLife && !t.onYourTurn && !t.lifeFromSpell, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
     // "Whenever you gain life this turn, ..." (Vizkopa Guildmage): a delayed trigger of its controller's (CR 603.7b, d).
     fromFloating((o, ctrl, triggers) => ctrl === ev.player && add(o, ctrl, (e) => e === "youGainLife", triggers, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
     // False Cure: "Until end of turn, whenever a player gains life, ...": any player's, "that player" the one who gained it.
@@ -1580,6 +1580,24 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       add(o, controllerOf(s, o), (e) => e === (ev.how === "in" ? "selfPhasesIn" : "selfPhasesOut"));
     }
+    // The War Doctor: "Whenever one or more other permanents phase out": once for the event (CR 603.2c), before they're
+    // gone (CR 603.10b), not if it phases out with them (rulings).
+    if (ev.how === "out")
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        if (!ev.ids.includes(w.id) && ev.ids.some((x) => x !== w.id)) add(w, controllerOf(s, w), (e) => e === "permanentsPhaseOut");
+      }
+    // King of the Oathbreakers: "Whenever ~ or another Spirit you control phases in": once for each of them (rulings).
+    if (ev.how === "in")
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        const you = controllerOf(s, w);
+        for (const pid of ev.ids) {
+          const o = s.objects[pid];
+          if (!o || o.zone !== "battlefield" || controllerOf(s, o) !== you) continue;
+          add(w, you, (e, t) => e === "permanentYouControlPhasesIn" && ((!!t.subjectOrSelf && o.id === w.id) || !t.subjectFilter || objectMatches(s, t.subjectFilter, o, you, false)), undefined, undefined, o);
+        }
+      }
   } else if (ev.type === "becameMonstrous") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfBecomesMonstrous", undefined, undefined, undefined, undefined, ev.x);
@@ -2268,7 +2286,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "When you next cast ... this turn": once, for the first such spell (CR 603.7c).
     let nextCastCascade = false;
     for (const d of ev.copy ? [] : [...(s.nextCast ?? [])]) {
-      if (d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(d.filter, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
+      if (d.loyalty === "only" || d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(d.filter, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
       // Zevlor, Elturel Exile: a spell that doesn't target only one opponent or one opponent's permanent doesn't use it up.
       if (d.onlyOpponentOrTheirs && opponentOrTheirsTarget(s, item?.targets ?? [], d.controller) === undefined) continue;
       // Yidris, Maelstrom Wielder: each spell cast from your hand this turn gains cascade; the effect isn't used up.
@@ -2512,7 +2530,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const id of s.battlefield) {
         const w = obj(s, id);
         const wc = controllerOf(s, w);
-        add(w, wc, (e, tr) => e === "permanentBecomesTarget" && fits(tr, wc) && !tr.targeted?.onlyYou && !tr.targeted?.once && !(tr.targeted?.other && w.id === o.id) && (!tr.subjectFilter || objectMatches(s, tr.subjectFilter, o, wc, false)), undefined, ev.stackId, o, undefined, undefined, undefined, that);
+        add(w, wc, (e, tr) => e === "permanentBecomesTarget" && fits(tr, wc) && !tr.targeted?.onlyYou && !tr.targeted?.once && !(tr.targeted?.other && w.id === o.id) && (!tr.subjectFilter || (!!tr.subjectOrSelf && w.id === o.id) || objectMatches(s, tr.subjectFilter, o, wc, false)), undefined, ev.stackId, o, undefined, undefined, undefined, that);
       }
     }
     // Surrak, Elusive Hunter: "or a creature spell you control" (TriggeredAbility.targeted.orSpell): a spell the item
@@ -2620,6 +2638,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (card && card.zone !== "battlefield" && card.zone !== "hand")
       add(card, card.owner, (e, t) => e === "selfDiscarded" && (!t.discardedByOpponent || byOpp), compileCard(defOf(s, card)).triggers, undefined, undefined, undefined, undefined, undefined, byOpp ? { player: ev.cause! } : undefined);
   } else if (ev.type === "activated") {
+    // Jaya's Phoenix, Repeated Reverberation: "copy the next loyalty ability you activate this turn" (a delayed trigger, CR
+    // 603.7a), once (603.7c), for the loyalty ability just activated (CR 606.3), whose copy resolves first (rulings).
+    if (ev.loyalty && ev.stackId)
+      for (const d of [...(s.nextCast ?? [])]) {
+        if (!d.loyalty || d.controller !== ev.player || d.turn !== s.turn) continue;
+        s.nextCast = s.nextCast!.filter((x) => x !== d);
+        s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
+      }
     // "Whenever an opponent activates an ability of a creature that isn't a mana ability" (its source as it was activated).
     // `o` the object with the trigger, `you` its controller.
     const activatedMatch = (o: GameObject, you: PlayerId) => (e: string, t: TriggeredAbility): boolean => {
@@ -3358,13 +3384,14 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
   if (b.what === "leavesGraveyard") return m.from === "graveyard" && m.to !== "graveyard" && whose(m.owner) && (!b.to || m.to === b.to);
   if (b.what === "exiledFromLibraryOrGraveyard") return m.to === "exile" && (m.from === "library" || m.from === "graveyard") && whose(m.owner);
   if (b.what === "exiledFromGraveyardsOrBattlefield") return m.to === "exile" && (m.from === "battlefield" || m.from === "graveyard");
-  if (b.what === "exiled") return m.to === "exile" && m.from !== "exile";
+  // The War Doctor: "one or more other cards": not this card, if it's exiled with them.
+  if (b.what === "exiled") return m.to === "exile" && m.from !== "exile" && !(b.other && m.id === w.id);
   if (b.what === "toLibrary") return m.to === "library" && m.from !== "library";
   // Hushbringer: a creature dying doesn't cause "put into a graveyard from anywhere" abilities to trigger either, but those
   // look at the game after the event (they aren't leaves-the-battlefield abilities, CR 603.10a), so a Hushbringer that left
   // at the same time, or is the card, doesn't stop them (rulings).
   if (b.what === "toGraveyard" && m.from === "battlefield" && m.to === "graveyard" && m.chars?.types.includes("Creature") && dyingLocked(s, false)) return false;
-  if (b.what === "toGraveyard") return m.to === "graveyard" && m.from !== "graveyard" && !(b.other && m.id === w.id) && whose(m.owner) && (!b.milled || !!m.milled) && (!b.from || (b.from === "notBattlefield" ? m.from !== "battlefield" : m.from === b.from));
+  if (b.what === "toGraveyard") return m.to === "graveyard" && m.from !== "graveyard" && !(b.other && m.id === w.id) && whose(m.owner) && (!b.milled || !!m.milled) && (!b.from || (b.from === "notBattlefield" ? m.from !== "battlefield" : b.from === "handOrLibrary" ? m.from === "hand" || m.from === "library" : m.from === b.from));
   return m.discardedBy !== undefined && whose(m.discardedBy);
 }
 

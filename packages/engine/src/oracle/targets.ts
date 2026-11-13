@@ -48,6 +48,9 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
   const pw = /^(up to one )?target (player|opponent) or planeswalker$/i.exec(p);
   if (pw) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Planeswalker"], ...(pw[2]!.toLowerCase() === "opponent" ? { opponent: true } : {}), ...(pw[1] ? { optional: true } : {}), text: p.toLowerCase().replace(/^up to one /, "") }) };
   // Coalborn Entity: "target creature token, player, or planeswalker": a player, a planeswalker, or a creature that's a token.
+  // Firesong and Sunspeaker: "target creature or player": a player, or a creature permanent; not a planeswalker or battle
+  // (rulings).
+  if (/^target creature or player$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Creature"], text: p.toLowerCase() }) };
   if (/^target creature token, player, or planeswalker$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Creature", "Planeswalker"], creatureTokens: true, text: p.toLowerCase() }) };
   // Cautery Sliver: "target player, planeswalker, or Sliver creature": a player, a planeswalker, or a creature only if it
   // has that creature type (rulings: "the second ability can affect only Slivers").

@@ -1110,7 +1110,9 @@ const LIVING_DEATH = /^Each player exiles all (creature|artifact) cards from the
 // graveyard." (Mulch): the dig for the second sentence, undefined when it isn't one, null when it fails.
 function revealPutAll(count: string, next: string): Effect | null | undefined {
   // Marina Vendrell: "Put all enchantment cards from among them into your hand and the rest ..." the same.
-  const putAll = /^Put all (.+?) cards (?:revealed this way|from among them) into your hand and the rest (into your graveyard|on the bottom of your library in any order|on the bottom of your library in a random order)$/.exec(next.replace(/\.$/, ""));
+  // Brass Herald: "Put all creature cards of the chosen type revealed this way into your hand ...": the type chosen as its
+  // source entered (a changeling card has every creature type, CR 702.73a); none chosen, none matches.
+  const putAll = /^Put all (.+?) cards( of the chosen type)? (?:revealed this way|from among them) into your hand and the rest (into your graveyard|on the bottom of your library in any order|on the bottom of your library in a random order)$/.exec(next.replace(/\.$/, ""));
   // Glint Raker: "Put an artifact card revealed this way into your hand and the rest into your graveyard": one of them, the
   // player's pick if there are several (none if there's none).
   const putOne = !putAll ? /^Put an? ([a-z]+) card revealed this way into your hand and the rest into your graveyard$/.exec(next.replace(/\.$/, "")) : null;
@@ -1121,12 +1123,15 @@ function revealPutAll(count: string, next: string): Effect | null | undefined {
     return { type: "dig", n, count: 1, upTo: false, filter, into: "hand", rest: "graveyard", reveal: true, required: true };
   }
   if (!putAll) return undefined;
-  const filter = parseSearchFilter(`${putAll[1]!.replace(/\band\/or\b|,? and /g, " or ").replace(/  +/g, " ").replace(/ cards\b/g, " card")} card`);
+  const filter0 = parseSearchFilter(`${putAll[1]!.replace(/\band\/or\b|,? and /g, " or ").replace(/  +/g, " ").replace(/ cards\b/g, " card")} card`);
   const n = count === "X" ? X : num(count);
-  if (!filter || (typeof n === "number" && !Number.isInteger(n))) return null;
-  const rest = putAll[2] === "into your graveyard" ? "graveyard" : "bottom";
+  if (!filter0 || (typeof n === "number" && !Number.isInteger(n))) return null;
+  if (putAll[2] && (filter0.chosen || filter0.anyOf || filter0.subtypes?.length || filter0.types?.join() !== "Creature")) return null;
+  const filter: TargetSpec = putAll[2] ? { ...filter0, chosen: "type", text: `${filter0.text} of the chosen type` } : filter0;
+  const where = putAll[3]!;
+  const rest = where === "into your graveyard" ? "graveyard" : "bottom";
   // Every match is taken, however many.
-  return { type: "dig", n, count: typeof n === "number" ? n : 1000, upTo: false, filter, into: "hand", rest, reveal: true, required: true, ...(/random/.test(putAll[2]!) ? { random: true as const } : {}) };
+  return { type: "dig", n, count: typeof n === "number" ? n : 1000, upTo: false, filter, into: "hand", rest, reveal: true, required: true, ...(/random/.test(where) ? { random: true as const } : {}) };
 }
 
 function splitOutsideQuotes(text: string, re: RegExp): string[] {

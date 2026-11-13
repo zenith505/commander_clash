@@ -2398,6 +2398,27 @@ line blocks.
    They're 5/5 artifact creatures." (CR 708.2, a face-down instant or sorcery stays face down), with a browser test.
    +4, 30,978 of 31,936 with B173 through B176. Bots activate Sasaya only when the flip happens, cast The Master with an exile only when one of
    their creatures has an enters trigger worth copying, and put all of their hand onto the battlefield with Tezzeret.
+   Round 346 went on down the "Out after round N" lists and `npm run popular`, most played first: Crucible of the Spirit
+   Dragon's "{T}, Remove X storage counters from this land: Add X mana in any combination of colors. Spend this mana only
+   to cast Dragon spells or activate abilities of Dragons." (removeX with `mix`, every multiset of the five colors, CR
+   106.1b, trimmed to one- and two-color mixes past 126 ways as other mixes are; the spend restriction as Dragon spells
+   or abilities of Dragon permanents, rulings; a browser test for the "remove N" buttons and the mix picker); Greater
+   Gargadon's "Sacrifice an artifact, creature, or land: Remove a time counter from this card. Activate only if this card
+   is suspended." (activated from exile by its owner only while suspended, CR 702.62b, 602.1; the counter on the card in
+   exile, ObjRef selfCard; the last counter casts it for free with haste, as any removal of it does, rulings; with a
+   browser test from the exile pile); Detective's Phoenix's "Bestow—{R}, Collect evidence 6" (an alternative cost with
+   an added cost, CR 702.103a, 701.59a; the Phoenix itself can't be evidence, it's on the stack) and "You may cast this
+   card from your graveyard using its bestow ability." (a graveyard permission for the bestow cost only, CR 702.103a; a
+   2/2 creature again after its host leaves, CR 702.103f; with a browser test); Festival of Embers's "During your turn,
+   you may cast instant and sorcery spells from your graveyard by paying 1 life in addition to their other costs." (a
+   graveyard grant on your turn with a life cost, as Noctis's and Hades's, CR 601.2f, h; the spells keep their timing).
+   +4, 31,111 of 31,936 with B185 and B186. The compiled text of every other card is unchanged. Bots sacrifice to Greater Gargadon only
+   what the usual sacrifice-cost rule lets them spare (no lands below eight, no creatures but cheap tokens).
+   Out after round 346 (looked at, not done): Mastermind's Acquisition (outside-the-game wishes stay out on purpose);
+   Tamiyo, Inquisitive Student and Nephalia Academy (their discard replacements cut across every discard path); Sokrates,
+   Athenian Teacher and Swans of Bryn Argoll (draws in the middle of damage, and the damage code can't pause for draw
+   replacements such as dredge); Sunken Palace (mana that copies the ability it's spent on); Spectral Searchlight
+   (another player chooses the color during a mana ability); Obsidian Charmaw (left to Lane B).
    Round 345 went on down the "Out after round N" lists and `npm run popular`, most played first: Last Night Together's
    "Choose two target creatures. Untap them. ... After this main phase, there is an additional combat phase. Only the
    chosen creatures can attack during that combat phase." (the added combat phase only, as the rulings on Bumi, Unleashed

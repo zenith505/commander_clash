@@ -19,6 +19,7 @@ import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTarg
 import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
+import { isSuspended } from "./effects/run-zones";
 import { canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
 import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
 import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
@@ -9352,6 +9353,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if ((o.zone !== "graveyard" && !exiled) || o.owner !== pid) return ab.onlyExile ? `${ab.text} works only from exile` : `${ab.text} works only from your graveyard${ab.orExile ? " or from exile" : ""}`;
     // Torrent Elemental: only from exile (CR 113.6m).
     if (ab.onlyExile && !exiled) return `${ab.text} works only from exile`;
+    // Greater Gargadon: only while it's suspended (CR 702.62b).
+    if (ab.suspendedOnly && !isSuspended(s, o)) return `${d.name} isn't suspended`;
     // Ashes of the Abhorrent: no activated abilities of cards in graveyards (embalm, unearth, scavenge, ...; rulings).
     const ashes = s.battlefield.find((b) => abilitiesOf(s, obj(s, b)).noGraveyardActivations);
     if (ashes) return `${characteristics(s, obj(s, ashes)).name}: players can't activate abilities of cards in graveyards`;

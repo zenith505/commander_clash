@@ -172,13 +172,15 @@ function eachColorAmong(s: GameState, o: GameObject, monocolored = false, linked
 
 /**
  * The ways to activate a storage land's ability (ManaProduce "removeX"), numbered as `combo`: each number of counters
- * from `min` to how many are on it, and for two colors each split of that much mana between them (CR 107.3a).
+ * from `min` to how many are on it, and for two colors each split of that much mana between them (CR 107.3a); for a
+ * `mix`, each multiset of that many of its colors (colorCombos), all of one X before the next.
  */
 export function removeXCombos(o: GameObject, p: Extract<ManaProduce, { kind: "removeX" }>): ManaType[][] {
   const out: ManaType[][] = [];
   const [a, b] = p.colors;
   for (let x = p.min; x <= (o.counters[p.counter] ?? 0); x++)
-    if (p.oneColor) for (const c of x ? p.colors : p.colors.slice(0, 1)) out.push(Array<ManaType>(x + (p.base ?? 0)).fill(c));
+    if (p.mix) out.push(...colorCombos(x + (p.base ?? 0), p.colors as Color[]));
+    else if (p.oneColor) for (const c of x ? p.colors : p.colors.slice(0, 1)) out.push(Array<ManaType>(x + (p.base ?? 0)).fill(c));
     else for (let i = x; i >= (b ? 0 : x); i--) out.push([...Array<ManaType>(i + (p.base ?? 0)).fill(a!), ...Array<ManaType>(x - i).fill(b ?? a!)]);
   return out;
 }
@@ -483,7 +485,8 @@ export function manaOptions(s: GameState, o: GameObject): ManaOption[] {
   return manaAbilitiesOn(s, o).flatMap((ab, ability) => {
     const combos = manaCombos(s, o, ab);
     // "X mana in any combination of colors" with a big X: for planning a payment, the ways using one or two colors.
-    const few = ab.produces.kind === "anyColors" && combos && combos.length > 126;
+    // A storage land's mix (Crucible of the Spirit Dragon) the same way.
+    const few = (ab.produces.kind === "anyColors" || (ab.produces.kind === "removeX" && ab.produces.mix)) && combos && combos.length > 126;
     const picks: { mana: ManaType; combo?: number }[] = combos ? combos.flatMap((c, combo) => (few && new Set(c).size > 2 ? [] : [{ mana: c[0] ?? manaChoices(s, o, ab)[0]!, combo }])) : manaChoices(s, o, ab).map((mana) => ({ mana }));
     return picks.flatMap(({ mana, combo }) => {
       const adds = manaProduced(s, o, ab, mana, combo);

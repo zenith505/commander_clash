@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, toughness } from "../cards";
 import { nameLandBan } from "../names";
-import { castPayText, nearestOpponent, faceDownExileGroup, hiddenInExile, adventureExileCards, graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, payLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
+import { cardTypesAmong, castPayText, nearestOpponent, faceDownExileGroup, hiddenInExile, adventureExileCards, graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, payLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { countersRemoved, putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -3525,6 +3525,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // "If you don't" after a card from among the milled ones (Ainok Wayfarer): whether one was put into your hand.
         if (e.milled) s.resolving!.did = false;
         if (!max) return;
+        // Winter, Cynical Opportunist: nothing to choose if the cards don't have that many card types among them.
+        if (e.cardTypes && cardTypesAmong(s, cards) < e.cardTypes) return;
         const kind = filter?.text ?? "card";
         const what = e.oneOfEach
           ? `up to one ${kind}`
@@ -3537,7 +3539,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           : count === 1
             ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`
             : e.upTo && count >= 99
-            ? `any number of ${kind.replace(/\bcard\b/, "cards")}${e.totalMv !== undefined ? ` with total mana value ${e.totalMv} or less` : ""}`
+            ? `any number of ${kind.replace(/\bcard\b/, "cards")}${e.totalMv !== undefined ? ` with total mana value ${e.totalMv} or less` : ""}${e.cardTypes ? ` with ${e.cardTypes} or more card types among them` : ""}`
             : `${e.upTo ? "up to " : ""}${count} ${kind.replace(/\bcard\b/, "cards")}${e.totalMv !== undefined ? ` with total mana value ${e.totalMv} or less` : ""}`;
         // Realmbreaker: you choose from their graveyard. O-Kagachi Made Manifest: another player chooses from yours, for you.
         const chooser = e.chooser ? players(s, e.chooser, ctx).find((pid) => !player(s, pid).lost) : undefined;
@@ -3547,7 +3549,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Seek Thrills: "put all cards that have an Adventure from among the milled cards": every one, no choice.
         if (e.all) sc.found = cards.slice(0, max);
         else {
-          s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : (chooser ?? p.id), source: src, what: e.youChoose || chooser !== undefined ? `${what} in ${p.name}'s graveyard` : what, ...under, ...(chooser !== undefined && chooser !== p.id ? { forPlayer: p.id, ...(e.dest === undefined || e.dest === "battlefield" ? { helps: true as const } : {}) } : {}), cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}), ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}) };
+          s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : (chooser ?? p.id), source: src, what: e.youChoose || chooser !== undefined ? `${what} in ${p.name}'s graveyard` : what, ...under, ...(chooser !== undefined && chooser !== p.id ? { forPlayer: p.id, ...(e.dest === undefined || e.dest === "battlefield" ? { helps: true as const } : {}) } : {}), cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}), ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(e.cardTypes ? { cardTypes: e.cardTypes } : {}) };
           return "paused";
         }
       }

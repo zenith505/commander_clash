@@ -23504,6 +23504,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "040cbd8a-a9e5-454b-a5ae-9b66bb66b8e9",
+  "name": "Nethergoyf",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Creature — Lhurgoyf",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Lhurgoyf"
+  ],
+  "oracleText": "Nethergoyf's power is equal to the number of card types among cards in your graveyard and its toughness is equal to that number plus 1.\nEscape—{2}{B}, Exile any number of other cards from your graveyard with four or more card types among them. (You may cast this card from your graveyard for its escape cost.)",
+  "power": "*",
+  "toughness": "1+*",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Escape"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ec4a1a8d-4071-40e9-812e-42c746180d99",
   "name": "Never Happened",
   "manaCost": "{2}{B}",
@@ -24026,6 +24058,41 @@
   "commanderLegal": "legal",
   "set": "c14",
   "releasedAt": "2014-11-07",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a6abb6af-7ea2-43f3-8718-2a077ad0c947",
+  "name": "Ob Nixilis, the Adversary",
+  "manaCost": "{1}{B}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Planeswalker — Nixilis",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Nixilis"
+  ],
+  "oracleText": "Casualty X. The copy isn't legendary and has starting loyalty X. (As you cast this spell, you may sacrifice a creature with power X. When you do, copy this spell. The copy becomes a token.)\n+1: Each opponent loses 2 life unless they discard a card. If you control a Demon or Devil, you gain 2 life.\n−2: Create a 1/1 red Devil creature token with \"When this token dies, it deals 1 damage to any target.\"\n−7: Target player draws seven cards and loses 7 life.",
+  "loyalty": "3",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Casualty"
+  ],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
@@ -25061,6 +25128,30 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "505cb78d-b292-4d16-b3f2-110164b4cc93",
+  "name": "Panoptic Mirror",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Imprint — {X}, {T}: You may exile an instant or sorcery card with mana value X from your hand.\nAt the beginning of your upkeep, you may copy a card exiled with this artifact. If you do, you may cast the copy without paying its mana cost.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Imprint"
+  ],
+  "commanderLegal": "legal",
+  "set": "slz",
+  "releasedAt": "2026-09-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": true
  },
  {
   "oracleId": "a4fa2afe-52fc-4ad0-a694-693cb9c88096",
@@ -39831,6 +39922,45 @@
   "set": "dft",
   "releasedAt": "2025-02-14",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e70a01dd-4dbe-4811-ac93-1c6d0142e06e",
+  "name": "Winter, Cynical Opportunist",
+  "manaCost": "{2}{B}{G}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warlock"
+  ],
+  "oracleText": "Deathtouch\nWhenever Winter attacks, mill three cards.\nDelirium — At the beginning of your end step, you may exile any number of cards from your graveyard with four or more card types among them. If you do, put a permanent card from among them onto the battlefield with a finality counter on it.",
+  "power": "2",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [
+   "Deathtouch",
+   "Delirium",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsc",
+  "releasedAt": "2024-09-27",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

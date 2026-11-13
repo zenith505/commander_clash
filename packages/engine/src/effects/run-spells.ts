@@ -402,9 +402,21 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         return;
       }
       const key = ctx.sourceId ? `${ctx.sourceId}@${ctx.sourceZc ?? 0}` : undefined;
-      const card = (key ? (s.linkedExile?.[key] ?? []) : []).map((l) => ({ o: s.objects[l.id], zc: l.zc })).find(({ o, zc }) => o?.zone === "exile" && (o.zoneChanges ?? 0) === zc)?.o;
-      if (!card) return;
+      const linked = (key ? (s.linkedExile?.[key] ?? []) : []).map((l) => ({ o: s.objects[l.id], zc: l.zc })).filter(({ o, zc }) => o?.zone === "exile" && (o.zoneChanges ?? 0) === zc).map(({ o }) => o!);
       const p = player(s, ctx.controller);
+      // Panoptic Mirror: "a card exiled with ~": with several, the one to copy is chosen as it resolves (or none: copying
+      // is optional, rulings).
+      let card = linked[0];
+      if (e.choose && linked.length > 1) {
+        if (!sc.found) {
+          const cards = linked.map((o) => o.id);
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card exiled with it", cards, min: 0, max: 1, exiled: true, dig: { looked: cards, to: "to copy (you may cast the copy without paying its mana cost)", rest: "stay in exile" } };
+          return "paused";
+        }
+        card = linked.find((o) => sc.found!.includes(o.id));
+        sc.found = undefined;
+      }
+      if (!card) return;
       const copy = newObject(s, defOf(s, card), p.id, "exile");
       copy.spellCopy = true;
       p.exile.push(copy.id);
@@ -545,6 +557,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const countered = r.counteredCopy?.item.id === c.of ? r.counteredCopy : undefined;
       const orig = countered?.item ?? s.stack.find((x) => x.id === c.of) ?? s.castItems?.[c.of] ?? s.epics?.[c.of] ?? (r.item.id === c.of ? r.item : undefined);
       const specs = orig?.body?.targets ?? [];
+      // Ob Nixilis, the Adversary: "The copy isn't legendary and has starting loyalty X" (CR 707.9b), X from its casualty.
+      const except = e.casualtyLoyalty && orig?.casualtyX !== undefined ? { ...e.except, loyalty: orig.casualtyX } : e.except;
       while (orig && c.left > 0) {
         if (e.newTargets && specs.length && c.targets === undefined) {
           s.pending = { kind: "copyTargets", player: c.by ?? ctx.controller, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.left };
@@ -568,7 +582,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const one = c.each?.[c.each.length - c.left];
         const aimed = one !== undefined ? (orig.targets ?? []).map((t): TargetChoice => (t.kind === "object" ? { kind: "object", id: one } : t)) : undefined;
         if (orig.kind === "ability") putAbilityCopy(s, orig, ctx.controller, c.targets ?? orig.targets);
-        else putSpellCopy(s, orig, c.by ?? ctx.controller, aimed ?? c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, e.except, countered?.card);
+        else putSpellCopy(s, orig, c.by ?? ctx.controller, aimed ?? c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, except, countered?.card);
         c.targets = undefined;
         c.left--;
       }
@@ -578,7 +592,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           s.pending = { kind: "copyTargets", player: c.by ?? ctx.controller, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.extra };
           return "paused";
         }
-        putSpellCopy(s, orig, c.by ?? ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, e.except, countered?.card);
+        putSpellCopy(s, orig, c.by ?? ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, except, countered?.card);
         c.targets = undefined;
         c.extra--;
       }

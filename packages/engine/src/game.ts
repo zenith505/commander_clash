@@ -7600,7 +7600,10 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (choices.casualty) {
     // Each instance paid sacrifices its own creature, all at once (CR 702.153b, 601.2h).
     const victims = [choices.casualty, ...(choices.casualtyMore ?? [])];
-    log(s, `${p.name} sacrifices ${victims.map((v) => nameOf(s, v)).join(" and ")} (casualty).`);
+    // Casualty X (Ob Nixilis, the Adversary): X is the power of the creature that pays for the card's own casualty, its
+    // first instance (casualtyInstances), as it's sacrificed.
+    if (compileCard(d).casualtyX) item.casualtyX = Math.max(0, power(s, obj(s, choices.casualty)));
+    log(s, `${p.name} sacrifices ${victims.map((v) => nameOf(s, v)).join(" and ")} (casualty${item.casualtyX !== undefined ? ` ${item.casualtyX}` : ""}).`);
     for (const v of victims) moveObject(s, v, "graveyard", { sacrificed: true, cost: true });
     if (victims.length > 1) item.casualtyTimes = victims.length;
     item.casualty = true;
@@ -8706,6 +8709,18 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       if (!yard || chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !yard.includes(id) || !fit(id))) return `choose ${what} to exile`;
       continue;
     }
+    // Nethergoyf's escape: any number of other cards from your graveyard with four or more card types among them.
+    if (c.kind === "exileFromGraveyard" && c.cardTypes) {
+      const yard = p.graveyard.filter((id) => id !== o.id);
+      const what = `cards from your graveyard with ${c.cardTypes} or more card types among them`;
+      const chosen = choices?.exileCards;
+      if (!chosen) {
+        if (cardTypesAmong(s, yard) < c.cardTypes) return `you need to exile ${what} to ${doing}`;
+        continue;
+      }
+      if (!chosen.length || new Set(chosen).size !== chosen.length || chosen.some((id) => !yard.includes(id)) || cardTypesAmong(s, chosen) < c.cardTypes) return `choose ${what} to exile`;
+      continue;
+    }
     const pool =
       c.kind === "sacrifice"
         ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(c.other && id === o.id && !(c.selfIf && objectMatches(s, c.selfIf, o, pid, false))) && objectMatches(s, c.filter, obj(s, id), pid, false) && (c.exile || canSacrificeForCost(s, obj(s, id))))
@@ -8791,6 +8806,34 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if ((c.kind === "sacrifice" || c.kind === "discard") && c.differentNames && !namesDiffer(s, chosen)) return `choose ${full}${c.kind === "discard" ? " with different names" : ""} to ${verb}`;
   }
   return null;
+}
+
+/**
+ * How many card types there are among these cards (CR 205.2a: artifact, battle, creature, enchantment, instant, kindred,
+ * land, planeswalker, sorcery; supertypes and subtypes aren't card types, rulings on Nethergoyf): each card's own types
+ * where it is (a split card both halves', a double-faced card off the battlefield its front face's).
+ */
+export function cardTypesAmong(s: GameState, ids: ObjectId[]): number {
+  return new Set(ids.flatMap((id) => defOf(s, obj(s, id)).types)).size;
+}
+
+/**
+ * A pick of cards with at least `n` card types among them (Nethergoyf's escape, Winter, Cynical Opportunist), for bots:
+ * `keep` first if given (a card to have among them), then whichever card adds the most new card types, lands and
+ * cheaper cards first on a tie. Null if the cards don't have that many.
+ */
+export function cardTypesPick(s: GameState, pool: ObjectId[], n: number, keep?: ObjectId): ObjectId[] | null {
+  if (cardTypesAmong(s, pool) < n) return null;
+  const picked: ObjectId[] = keep !== undefined && pool.includes(keep) ? [keep] : [];
+  const have = () => new Set(picked.flatMap((id) => defOf(s, obj(s, id)).types));
+  while (cardTypesAmong(s, picked) < n) {
+    const got = have();
+    const gain = (id: ObjectId) => defOf(s, obj(s, id)).types.filter((t) => !got.has(t)).length;
+    const next = pool.filter((id) => !picked.includes(id) && gain(id) > 0).sort((a, b) => gain(b) - gain(a) || Number(isType(defOf(s, obj(s, b)), "Land")) - Number(isType(defOf(s, obj(s, a)), "Land")) || defMv(defOf(s, obj(s, a))) - defMv(defOf(s, obj(s, b))))[0];
+    if (next === undefined) return null;
+    picked.push(next);
+  }
+  return picked;
 }
 
 /**
@@ -10619,6 +10662,7 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
     throw new RulesError("choose cards with different mana values");
   if (pend.distinctPowers && new Set(found.map((id) => characteristics(s, obj(s, id)).power)).size !== found.length) throw new RulesError("choose cards with different powers");
   if (pend.totalMv !== undefined && found.reduce((n, id) => n + defMv(defOf(s, obj(s, id))), 0) > pend.totalMv) throw new RulesError(`choose cards with total mana value ${pend.totalMv} or less`);
+  if (pend.cardTypes && found.length && cardTypesAmong(s, found) < pend.cardTypes) throw new RulesError(`choose cards with ${pend.cardTypes} or more card types among them, or none`);
   if (pend.shareLandType && !shareLandType(found.map((id) => defOf(s, obj(s, id)))))
     throw new RulesError("choose cards that share a land type");
   if (pend.oneName && found.some((id) => !sameName(defOf(s, obj(s, id)).name, defOf(s, obj(s, found[0]!)).name))) throw new RulesError("choose cards with the same name");

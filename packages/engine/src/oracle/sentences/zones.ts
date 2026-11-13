@@ -1303,7 +1303,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Imprint: "You may exile a nonartifact, nonland card from your hand" (Chrome Mox), "... an instant card with mana value 2
   // or less ..." (Isochron Scepter): one card of your own hand, chosen as it resolves; linked to the ability that refers
   // to "the exiled card" (CR 607.2a, compile.ts).
-  if ((m = /^(You may )?[Ee]xile (?:a|an) (.+? card(?: with mana value \d+ or (?:less|greater))?) from your hand$/.exec(s)) && !ctx.spell) {
+  // Panoptic Mirror: "{X}, {T}: You may exile an instant or sorcery card with mana value X from your hand": exactly the X
+  // paid for it (CR 107.3a, 602.2b; rulings).
+  if ((m = /^(You may )?[Ee]xile (?:a|an) (.+? card(?: with mana value (?:\d+ or (?:less|greater)|X))?) from your hand$/.exec(s)) && !ctx.spell) {
     const filter = parseSearchFilter(m[2]!);
     if (filter === null) return null;
     return [{ type: "takeFromHand", who: { ref: "you" }, ...(filter ? { filter } : {}), action: "exile", ...(m[1] ? { optional: true as const } : {}) }];

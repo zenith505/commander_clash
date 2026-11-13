@@ -49,6 +49,7 @@ import { round348Line } from "./round348";
 import { round349Line } from "./round349";
 import { round350Line } from "./round350";
 import { round351Line } from "./round351";
+import { round352Line } from "./round352";
 import { roundB189Line } from "./laneb189";
 
 const cache = new Map<string, CompiledCard>();
@@ -1229,7 +1230,7 @@ export function compile(d: CardDef): CompiledCard {
         if (costKw.delve) out.delve = true;
         if (costKw.assist) out.assist = true;
         // Two of the same: each would work separately (CR 702.153b), which isn't modeled.
-        const twice = (costKw.madness && out.madness) || (costKw.miracle && out.miracle) || (costKw.suspend && out.suspend) || (costKw.casualty && out.casualty) || (costKw.dredge && out.dredge) || (costKw.plot && out.plot) || (costKw.foretell && out.foretell) || (costKw.alt && out.altCosts?.some((a) => a.kind === costKw.alt!.kind));
+        const twice = (costKw.madness && out.madness) || (costKw.miracle && out.miracle) || (costKw.suspend && out.suspend) || (costKw.casualty !== undefined && out.casualty !== undefined) || (costKw.dredge && out.dredge) || (costKw.plot && out.plot) || (costKw.foretell && out.foretell) || (costKw.alt && out.altCosts?.some((a) => a.kind === costKw.alt!.kind));
         if (twice) {
           out.unsupported.push(raw);
           continue;
@@ -1241,7 +1242,8 @@ export function compile(d: CardDef): CompiledCard {
         if (costKw.plot) out.plot = costKw.plot;
         if (costKw.foretell) out.foretell = costKw.foretell;
         if (costKw.suspend) out.suspend = costKw.suspend;
-        if (costKw.casualty) out.casualty = costKw.casualty;
+        if (costKw.casualty !== undefined) out.casualty = costKw.casualty;
+        if (costKw.casualtyX) out.casualtyX = true;
         if (costKw.dredge) out.dredge = costKw.dredge;
         if (costKw.impending) out.impending = costKw.impending;
         if (costKw.faceDown) {
@@ -5968,6 +5970,8 @@ export function compile(d: CardDef): CompiledCard {
     if (round350Line(line, raw, out, isSpell)) continue;
     // Eater of Virtue, Deification, The War Doctor, King of the Oathbreakers (round 351).
     if (round351Line(line, raw, out, isSpell)) continue;
+    // Winter, Cynical Opportunist, Ob Nixilis, the Adversary, Panoptic Mirror (round 352).
+    if (round352Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -7497,8 +7501,10 @@ function linkExile(out: CompiledCard) {
   }
   // Isochron Scepter: "copy the exiled card" is linked to the one ability that exiles a card from the hand as it enters.
   const copies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].some((b) => allEffects(b.effects).some((e) => e.type === "castLinkedCopy"));
+  // Panoptic Mirror: the one activated ability that exiles a card from the hand, with no such enters trigger.
   if (copies) {
-    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
+    const entering = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
+    const imprints = entering.length ? entering : out.activated.flatMap((a) => allEffects(a.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
     if (imprints.length !== 1) out.unsupported.push("(copies an exiled card it can't link to one imprint ability)");
     else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
   }

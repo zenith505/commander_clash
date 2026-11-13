@@ -10976,6 +10976,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "566533af-5e67-463f-ac33-dfcf1ec735c9",
+  "name": "Ether",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}, Exile this artifact: Add {U}. When you next cast an instant or sorcery spell this turn, copy that spell. You may choose new targets for the copy.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "dbba75f5-2404-4bd5-982b-f6c4effa5316",
   "name": "Ethereal Armor",
   "manaCost": "{W}",
@@ -18710,6 +18739,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "133f5d30-d883-493e-93a1-cf9583db460b",
+  "name": "Kazandu Blademaster",
+  "manaCost": "{W}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Soldier Ally",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier",
+   "Ally"
+  ],
+  "oracleText": "First strike, vigilance\nWhenever this creature or another Ally you control enters, you may put a +1/+1 counter on this creature.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Vigilance",
+   "First strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "zen",
+  "releasedAt": "2009-10-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2ac1c95c-2a9d-40bc-9cad-9cadfa3f19f7",
   "name": "Kazandu Mammoth // Kazandu Valley",
   "manaCost": "{1}{G}{G}",
@@ -23078,6 +23142,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4d5da73a-f22a-4446-b5f9-504dfabf1d52",
+  "name": "Munda, Ambush Leader",
+  "manaCost": "{2}{R}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Kor Ally",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Kor",
+   "Ally"
+  ],
+  "oracleText": "Haste\nRally — Whenever Munda or another Ally you control enters, you may look at the top four cards of your library. If you do, reveal any number of Ally cards from among them, then put those cards on top of your library in any order and the rest on the bottom in any order.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Rally",
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "bfz",
+  "releasedAt": "2015-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "938b4e2c-88d9-4637-bc00-e228920c9a78",
   "name": "Murder",
   "manaCost": "{1}{B}{B}",
@@ -24448,6 +24550,38 @@
   "set": "fdn",
   "releasedAt": "2024-11-15",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f4232466-dd6a-49bf-be6c-95905c3ded17",
+  "name": "Ondu Cleric",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Kor Cleric Ally",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Kor",
+   "Cleric",
+   "Ally"
+  ],
+  "oracleText": "Whenever this creature or another Ally you control enters, you may gain life equal to the number of Allies you control.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "zen",
+  "releasedAt": "2009-10-02",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

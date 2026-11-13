@@ -1,6 +1,6 @@
 # Roadmap
 
-31,192 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,200 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,857 of
 9,979 (98%).
 
@@ -100,7 +100,7 @@ line blocks.
    "up to three lore counters", chapter IV's mana and exile-and-return), Balefang (a token named Baneslayer Angel),
    Rendmaw ("play a card with two or more card types"), Historian's Boon (the "triggers" variant), Hero of Bretagard
    (an exile trigger counting cards and permanents), Kid Loki (a static for each creature), Abby, Merciless Soldier
-   (named tokens plus entering under an opponent's control), Wurmquake (corrupted, then "another one of those tokens"). Out after round 166:
+   (named tokens plus entering under an opponent's control), Wurmquake (done in round B196) (corrupted, then "another one of those tokens"). Out after round 166:
    The Everflowing Well (a permanent becomes a copy of a spell), Summon: Esper Valigarmanda (cast a card exiled with ~
    with mana of any type), Zurzoth, Chaos Rider (done in round 266), Ashling, Rekindled (mana spendable only on spells with mana value 4 or greater), Gideon's Sacrifice (all
    damage redirected to one permanent), Expand the Sphere (proliferate "the difference" times), Kellan, the Kid ("from
@@ -4294,7 +4294,7 @@ line blocks.
    Smaller gaps from round 116: bots never use "target creature it's
    blocking" abilities (Tinder Wall, Wall of Corpses, Goblin Snowman; bots activate abilities in their own main phase
    only); bots stop paying Lim-Dûl's Vault life after four looks; round 115's Assault
-   Suit, Brass Herald, Vigean Intuition, Sages of the Anima (done in round B139) and Serra's Emissary (kindred) are
+   Suit, Brass Herald (done in round B196), Vigean Intuition, Sages of the Anima (done in round B139) and Serra's Emissary (kindred) are
    still out.
    Smaller gaps from round 114: "target player adds two mana in any combination
    of colors" (another player adding it) is out; Quicksilver Fountain (each player floods a land of
@@ -4346,7 +4346,7 @@ line blocks.
    Spiteful Repossession; an exile ability that can't be told apart from the card's other exiles keeps the card out
    ("returns exiled cards it can't link"); bots casting Pitiless Carnage may sacrifice nothing; the bot removing chosen
    counters takes helpful kinds off others' permanents and harmful ones off its own, and never plays around time or
-   lore counters. Smaller gaps from round 100: Muck Drubb ("a spell that targets only a single creature"); Forge Anew's free equip only for equip costs that are all mana, and always taken when it
+   lore counters. Smaller gaps from round 100: Muck Drubb (done in round B196) ("a spell that targets only a single creature"); Forge Anew's free equip only for equip costs that are all mana, and always taken when it
    applies; Kambal copies only the tokens still on the battlefield as its trigger resolves; two grants of "Toxic 1" may
    count once; K'rrik gives no explicit choice to pay life with lands untapped (autopay prefers mana); Notion Thief's
    order against the player's own draw replacements, and several Thieves at once; Trostani Discordant, Not of This
@@ -6436,7 +6436,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Mazzy (an Aura put into a graveyard, cast until your next turn), Saheeli's Lattice, Paleontologist's Pick-Axe and Throne
   of the Grim Captain (all but the Pick-Axe done in round 334) ("craft with one or more"), Seifer (blocked by two or more), Distended Mindbender (done in round B158) (a choice of two
   cards by different rules), plus Shaun & Rebecca, Wild Shape (done in round B191), Bridge from Below, Aetherborn Marauder (done in round 315), Sigardian Zealot (done in round B187),
-  Rhuk (done in round B70), Alpha Brawl, Brain in a Jar (done in round B158), Sita Varma (done in round B114), Munda and Hans Eriksson.
+  Rhuk (done in round B70), Alpha Brawl, Brain in a Jar (done in round B158), Sita Varma (done in round B114), Munda (done in round B196) and Hans Eriksson.
 - Round B61 (the unlisted ones from EDHREC rank about 19,700 up, and from the B10/B11 lists below): "gets +2/+2 until
   end of turn if its power is 2" (Savage Swipe), "costs {2} less if a creature is attacking you" and "If a Hero enters
   this way, it enters with two additional +1/+1 counters" (Heroic Return; the same condition lets Confront the Assault
@@ -6464,7 +6464,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Magus of the Abyss (done in round B110) (a target "of their choice": the upkeep player chooses it), Abuelo's Awakening (a returned
   artifact that's also a 1/1 Spirit creature with X more counters), Faith's Shield (done in round B173) (fateful hour: you and your
   permanents gain protection), Chandra's Phoenix (damage dealt by a red instant or sorcery spell or red planeswalker you
-  control), Heart-Shaped Herb, Meticulous Excavation (unearth check), Culmination of Studies, Psychotic Episode,
+  control), Heart-Shaped Herb, Meticulous Excavation (done in round B196) (unearth check), Culmination of Studies, Psychotic Episode,
   Lochmere Serpent (done in round B182).
 - Round B62 (the unlisted ones from EDHREC rank about 19,700 up): affinity for historic permanents (Banish to Another
   Universe), "Activate only during your turn" on every player's spells and abilities (City of Solitude: you can't cast
@@ -6510,7 +6510,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Refraction Trap (trap cost and a chosen source), Intermediate Chirography (a modified creature that died this
   turn), Churning Reservoir (oil counters put this turn), Dutiful Knowledge Seeker (cards put into a library from
   anywhere), Simic Manipulator (done in round 315) and Arcee (remove one or more counters as a variable cost), Benalish Commander and
-  Detritivore (suspend X), Darigaaz Reincarnated, Sekki, Seasons' Guide, Fugitive Codebreaker, Reroute, Serum Powder,
+  Detritivore (suspend X), Darigaaz Reincarnated, Sekki, Seasons' Guide, Fugitive Codebreaker, Reroute (done in round B196), Serum Powder,
   Delaying Shield, Immortal Coil, Fires of Mount Doom.
 - Round B64 (the unlisted ones from EDHREC rank about 19,700 up to 15,000): "return to the battlefield target creature
   card in your graveyard that was put there from the battlefield this turn" (Moira, Urborg Haunt), "Whenever you put a
@@ -8561,6 +8561,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   exiled with ~ to its owner's hand": neither form is read yet), Cemetery Desecrator (a reflexive modal trigger with the
   exiled card's mana value) and Kaya, Ghost Assassin ("Exile ~ or up to one target creature", chosen as it resolves) stay
   out.
+- Round B196 (least played first, from the Lane B skip lists): Brass Herald ("Put all creature cards of the chosen type
+  revealed this way into your hand and the rest on the bottom of your library in any order": the type chosen as it
+  entered, a changeling card of every type, CR 702.73a, 401.4). Ether ("{T}, Exile this artifact: Add {U}. When you next
+  cast an instant or sorcery spell this turn, copy that spell.": still a mana ability, the delayed trigger a separate
+  ability, CR 605.1a, 603.7; the next such spell copied whether or not its mana paid for it, rulings; never used by autopay
+  or bots; a browser test). Munda, Ambush Leader (rally: "you may look at the top four cards of your library. If you do,
+  reveal any number of Ally cards from among them, then put those cards on top of your library in any order and the rest
+  on the bottom in any order": both groups in their owner's order, CR 401.4; a browser test). Wurmquake ("where X is the
+  amount of mana spent to cast this spell. Then for each opponent with three or more poison counters, you create another
+  one of those tokens": the first token entering before the rest, rulings; 10/10 with flashback). Tunnel Vision (reveal
+  until the named card: the cards above it into the graveyard and it left on top; none found, the whole library revealed,
+  nothing into the graveyard, then a shuffle, rulings, CR 701.20a). Reroute ("Change the target of target activated
+  ability with a single target", CR 115.7a). Muck Drubb ("change the target of target spell that targets only a single
+  creature to ~": every target the same creature, ~ a legal target for each, rulings). Meticulous Excavation ("If it has
+  unearth, instead exile it, then return that card to its owner's hand": unearth as it resolves, CR 702.84a; an unearthed
+  creature ends up in its owner's hand, rulings). +8, 31,200 of 31,936 with B189 to B195 and rounds 348 to 351.
+- Out after round B196 (looked at, not done): Druid of the Emerald Grove (the basic lands searched for and revealed wait
+  for a d20 that splits them between the battlefield and the hand: no search keeps its cards for a later roll yet), Fires
+  of Mount Doom ("When you play a card this way": a trigger on playing the card that one exile let you play), Light Up the
+  Night (a flashback cost removing X loyalty counters from among your planeswalkers), Kaboom! (a reveal for each of any
+  number of targets) and Delif's Cone stay out.
 - Out after round B192 (looked at, not done): Garruk, Curse Breaker (its −4: how often "whenever one or more creatures
   attack one of your opponents" triggers when creatures attack two of them still isn't settled by rulings), Charmed
   Pendant (a hybrid symbol of the milled card adds one of its colors: a choice in the middle of a mana ability), Ulamog's
@@ -9050,12 +9071,12 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   graveyard" as a cost), Valleymaker (done in round B139) ("Choose a player. That player adds {G}{G}{G}" is a mana ability with a sacrifice
   cost, which would use the stack here, see the mana abilities gap below), Sewers of Estark ("If it's blocking, prevent
   all combat damage that would be dealt this combat by it and each creature it's blocking"), Benevolent Blessing (only
-  the Auras and Equipment you control already attached), Tunnel Vision (reveal until a named card, then the rest into the
+  the Auras and Equipment you control already attached), Tunnel Vision (done in round B196) (reveal until a named card, then the rest into the
   graveyard and that card on top).
 - Known gaps from round B71: bots always search the library too when "and/or library" lets them skip it, even with
   Psychic Surgery or Cosi's Trickster watching.
 - Out after round B70 (looked at, not done): Shell of the Last Kappa and Gale's Redirection (exiling a spell from the
-  stack), Munda, Ambush Leader (cards from the top revealed and put back on top in any order), Krang & Shredder
+  stack), Munda, Ambush Leader (done in round B196) (cards from the top revealed and put back on top in any order), Krang & Shredder
   (each opponent exiles until a nonland card, then a free cast among them under a Disappear condition).
 - Known gaps from round B69: War Cadence with X = 0 lets creatures block free, but a cost of {0} still has to be chosen
   (rulings: a block requirement can't make a player pay it); with Ravenous Slime and another "exile it instead" (two

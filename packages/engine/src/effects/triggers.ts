@@ -12,7 +12,7 @@ import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount, manaSymbolsOf } from "../amounts";
-import { opponentOrTheirsTarget, objectMatches, bindBound, manyX, bindChosen, legalTargets, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
+import { inRange, opponentOrTheirsTarget, objectMatches, bindBound, manyX, bindChosen, legalTargets, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE, RAD } from "../oracle";
@@ -2290,7 +2290,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "When you next cast ... this turn": once, for the first such spell (CR 603.7c).
     let nextCastCascade = false;
     for (const d of ev.copy ? [] : [...(s.nextCast ?? [])]) {
-      if (d.loyalty === "only" || d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(d.filter, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
+      // "With mana value 2 or less" (Sea Gate Stormcaller): the spell's on the stack, its X counted (CR 202.3e).
+      const { manaValue: mvRange, ...rest } = d.filter;
+      if (mvRange && !inRange(item ? spellManaValue(s, item) : defMv(ev.card), mvRange)) continue;
+      if (d.loyalty === "only" || d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(rest, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
       // Zevlor, Elturel Exile: a spell that doesn't target only one opponent or one opponent's permanent doesn't use it up.
       if (d.onlyOpponentOrTheirs && opponentOrTheirsTarget(s, item?.targets ?? [], d.controller) === undefined) continue;
       // Yidris, Maelstrom Wielder: each spell cast from your hand this turn gains cascade; the effect isn't used up.

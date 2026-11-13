@@ -896,7 +896,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         // "Tap an untapped creature you control": click what to tap (CR 602.2b).
         if (d.tap !== undefined) continue;
         // "Untap a tapped creature you control" (Halo Fountain) likewise, or one to tap for mana first.
-        return setCostPick({ activate: d, kind: "tap", ...(c.untap ? { untap: true as const } : {}), ...(c.shareCreatureType ? { share: c } : {}), label: cardOf(s, d.objectId).name, what: `${c.untap ? "untap" : "tap"} ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.n === 1 ? c.filter.text : c.filter.text.replace(/([^s])( you control)$/, "$1s$2")}${c.shareCreatureType ? " that share a creature type" : ""}`, n: c.n, candidates: [...tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c), ...(c.untap ? untapViaMana(s, HUMAN, s.objects[d.objectId]!, c) : [])].filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
+        return setCostPick({ activate: d, kind: "tap", ...(c.untap ? { untap: true as const } : {}), ...(c.shareCreatureType ? { share: c } : {}), label: cardOf(s, d.objectId).name, what: `${c.untap ? "untap" : "tap"} ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${(c.n === 1 ? c.filter.text : c.filter.text.replace(/([^s])( you control)$/, "$1s$2")).replace(/~/g, cardOf(s, d.objectId).name)}${c.shareCreatureType ? " that share a creature type" : ""}`, n: c.n, candidates: [...tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c), ...(c.untap ? untapViaMana(s, HUMAN, s.objects[d.objectId]!, c) : [])].filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
       }
       if (c.kind === "exileFromHand" && c.toLibrary) {
         // "Put a card from your hand on top of your library" (Penance): click the cards in your hand.
@@ -4922,7 +4922,7 @@ function AbilityMenu({
           title={castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { faceDown: true }) ?? `A 2/2 that only you can see. Turn it face up later for ${faceDownCast.cost}.`}
           onClick={onCastFaceDown}
         >
-          Cast face down <ManaCost cost="{3}" size="sm" /> ({faceDownCast.kind})
+          Cast face down <ManaCost cost={faceDownCostText(s, o)} size="sm" /> ({faceDownCast.kind})
         </button>
       )}
       {[0, 1].flatMap((door) => {
@@ -6710,4 +6710,11 @@ function PlayerName({ s, pid, waiting }: { s: GameState; pid: PlayerId; waiting:
         )}
     </span>
   );
+}
+
+/** A face-down spell's total cost as you'd pay it now: {3} (CR 702.37c) with cost changes (Dream Chisel, Kadena, CR 601.2f). */
+function faceDownCostText(s: GameState, o: GameObject): string {
+  const { cost, extra } = spellCost(s, HUMAN, o, 0, [], { faceDown: true });
+  if (!cost.symbols.every((y) => y.kind === "generic")) return "{3}";
+  return `{${cost.symbols.reduce((n, y) => n + (y.kind === "generic" ? y.amount : 0), 0) + extra}}`;
 }

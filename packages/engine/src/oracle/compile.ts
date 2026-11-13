@@ -42,6 +42,7 @@ import { roundB188Line } from "./laneb188";
 import { roundB192Line } from "./laneb192";
 import { roundB194Line, roundB194Spell } from "./laneb194";
 import { roundB197Line } from "./laneb197";
+import { roundB198Line } from "./laneb198";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2087,6 +2088,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB194Line(line, raw, out, isSpell)) continue;
     // Chandra's Phoenix, Abby, Jocasta, Phyrexian Devourer (round B197).
     if (roundB197Line(line, raw, out, isSpell)) continue;
+    // Boneyard Mycodrax, Templar Knight, Sea Gate Stormcaller, Dream Chisel, Obscuring Aether, Kadena, Goblin Maskmaker (round B198).
+    if (roundB198Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

@@ -658,6 +658,30 @@
   "gameChanger": false
  },
  {
+  "oracleId": "967e8b3f-8266-4d9a-a38b-d0e10184e1e4",
+  "name": "Akroma's Memorial",
+  "manaCost": "{7}",
+  "cmc": 7,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Creatures you control have flying, first strike, vigilance, trample, haste, and protection from black and from red.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "spg",
+  "releasedAt": "2024-11-15",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "fd949f82-fc10-4e37-8aa9-6c7569fe3c55",
   "name": "Akroma's Will",
   "manaCost": "{3}{W}",
@@ -18350,6 +18374,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4da13eb8-ca18-43f1-b54b-d3ddceb980d2",
+  "name": "Kadena, Slinking Sorcerer",
+  "manaCost": "{1}{B}{G}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Snake Wizard Sorcerer",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Snake",
+   "Wizard",
+   "Sorcerer"
+  ],
+  "oracleText": "The first face-down creature spell you cast each turn costs {3} less to cast.\nWhenever a face-down creature you control enters, draw a card.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c19",
+  "releasedAt": "2019-08-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7d69be1e-701a-4bcb-a83e-38b4174f7828",
   "name": "Kaervek's Spite",
   "manaCost": "{B}{B}{B}",
@@ -34709,6 +34771,39 @@
   "commanderLegal": "legal",
   "set": "usg",
   "releasedAt": "1998-10-12",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f9453fe2-fadf-4cd4-8d2c-0eaa0e2d78d6",
+  "name": "Templar Knight",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "Vigilance\n{W}, Tap five untapped attacking creatures you control named Templar Knight: Search your library for a legendary artifact card, put it onto the battlefield, then shuffle.\nA deck can have any number of cards named Templar Knight.",
+  "power": "3",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "acr",
+  "releasedAt": "2024-07-05",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

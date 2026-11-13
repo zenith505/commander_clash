@@ -2186,7 +2186,7 @@ export type Modification =
   /** Tetravus's tokens: "This token can't be enchanted": by no Aura at all (an Aura attached to it is put into its owner's graveyard, CR 704.5m). */
   | { kind: "cantBeEnchanted" }
   /** Blocking requirements (CR 509.1c): "must be blocked if able", "all creatures able to block ~ do so". */
-  | { kind: "mustBeBlocked"; /** "Must be blocked this combat if able" (Neyith of the Dire Hunt): in that combat only, as for attacksIfAble. */ combat?: number | "this"; /** "Must be blocked by an Eldrazi if able" (Slayer's Cleaver): by at least one creature that fits this, if one is able to block it (CR 509.1c). */ by?: TargetSpec }
+  | { kind: "mustBeBlocked"; /** "Must be blocked this combat if able" (Neyith of the Dire Hunt): in that combat only, as for attacksIfAble. */ combat?: number | "this"; /** "Must be blocked by an Eldrazi if able" (Slayer's Cleaver): by at least one creature that fits this, if one is able to block it (CR 509.1c). */ by?: TargetSpec; /** Gorm the Great: "and ~ must be blocked by two or more creatures if able": a second requirement beside being blocked (CR 509.1c). */ twoOrMore?: true }
   | { kind: "allMustBlock"; /** "All Walls able to block ~ do so" (Marble Priest): only blockers that fit this (CR 509.1c). */ by?: TargetSpec }
   /**
    * Doran: "assigns combat damage equal to its toughness rather than its power" (CR 510.1a as modified); `ifGreater`
@@ -7341,6 +7341,8 @@ export interface CostMod {
   nth?: number;
   /** "The first kicked spell you cast each turn" (Vine Gecko): only a spell cast with its kicker paid (CR 702.33d); `nth` counts kicked ones. */
   kicked?: true;
+  /** "Face-down creature spells you cast" (Dream Chisel, Kadena, Slinking Sorcerer): only a spell cast face down, a 2/2 creature spell with no other characteristics (CR 708.4, 708.2a); `nth` counts face-down ones. */
+  faceDown?: true;
   /** Only while this holds: a Class level's (CR 716.2a). */
   if?: StaticCondition;
   /** "... for each experience counter you have" (Mizzix): `n` that many times, for the permanent's controller. */

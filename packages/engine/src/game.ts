@@ -5433,6 +5433,11 @@ export function handPlayBanned(s: GameState, pid: PlayerId): string | undefined 
   return id ? characteristics(s, obj(s, id)).name : undefined;
 }
 
+/** How many permanents of this card type the player controls (Ward of Bones). */
+function controlledOfType(s: GameState, pid: PlayerId, type: string): number {
+  return s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), type)).length;
+}
+
 /** One land a turn, plus one for each "you may play an additional land on each of your turns" (CR 305.2, 305.2a). */
 export function landsAllowed(s: GameState, pid: PlayerId): number {
   // "Can't play lands this turn" wins over anything that lets them (CR 101.2).
@@ -5441,6 +5446,8 @@ export function landsAllowed(s: GameState, pid: PlayerId): number {
   if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).playersCantPlayLands)) return 0;
   // Damping Engine: "A player who controls more permanents than each other player can't play lands".
   if (mostPermanentsBan(s, pid)) return 0;
+  // Ward of Bones: "Each opponent who controls more lands than you can't play lands."
+  if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).opponentsWithMoreLandsCantPlay && controllerOf(s, obj(s, id)) !== pid && controlledOfType(s, pid, "Land") > controlledOfType(s, controllerOf(s, obj(s, id)), "Land"))) return 0;
   // Aggressive Mining: "You can't play lands."
   if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).youCantPlayLands && controllerOf(s, obj(s, id)) === pid)) return 0;
   // Rock Jockey: "You can't play lands if ~ was cast this turn".
@@ -7756,6 +7763,12 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number, 
     // Angelic Arbiter: an opponent who declared an attacking creature this turn (rulings).
     if (abilitiesOf(s, o).opponentsWhoAttackedCantCast && o.zone === "battlefield" && controllerOf(s, o) !== pid && player(s, pid).attackedTurn === s.turn)
       return `${characteristics(s, o).name}: opponents who attacked with a creature this turn can't cast spells`;
+    // Ward of Bones: a spell of a card type its caster controls more permanents of than its controller does (rulings).
+    const more = abilitiesOf(s, o).opponentsWithMoreCantCast;
+    if (more && o.zone === "battlefield" && controllerOf(s, o) !== pid) {
+      const type = more.find((t) => isType(d, t) && controlledOfType(s, pid, t) > controlledOfType(s, controllerOf(s, o), t));
+      if (type) return `${characteristics(s, o).name}: opponents who control more ${type.toLowerCase()}s than ${player(s, controllerOf(s, o)).name} can't cast ${type.toLowerCase()} spells`;
+    }
     // Sandswirl Wanderglyph: an opponent who attacked its controller or a planeswalker they controlled this turn.
     if (abilitiesOf(s, o).opponentsWhoAttackedYouCantCast && o.zone === "battlefield" && controllerOf(s, o) !== pid && ((a) => a?.turn === s.turn && a.players.includes(controllerOf(s, o)))(player(s, pid).attackedPlayersOrWalkers))
       return `${characteristics(s, o).name}: opponents who attacked ${player(s, controllerOf(s, o)).name} or their planeswalkers this turn can't cast spells`;

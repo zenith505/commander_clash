@@ -1,7 +1,7 @@
 # Roadmap
 
-31,103 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,976 of 4,988 (99%), top 10,000: 9,832 of
+31,107 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,976 of 4,988 (99%), top 10,000: 9,836 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2398,6 +2398,28 @@ line blocks.
    They're 5/5 artifact creatures." (CR 708.2, a face-down instant or sorcery stays face down), with a browser test.
    +4, 30,978 of 31,936 with B173 through B176. Bots activate Sasaya only when the flip happens, cast The Master with an exile only when one of
    their creatures has an enters trigger worth copying, and put all of their hand onto the battlefield with Tezzeret.
+   Round 345 went on down the "Out after round N" lists and `npm run popular`, most played first: Last Night Together's
+   "Choose two target creatures. Untap them. ... After this main phase, there is an additional combat phase. Only the
+   chosen creatures can attack during that combat phase." (the added combat phase only, as the rulings on Bumi, Unleashed
+   say; the targets as they were chosen, still those objects, CR 400.7; one no longer a legal target isn't kept out, CR
+   608.2b); Enduring Angel's "If your life total would be reduced to 0 or less, instead transform this creature and your
+   life total becomes 3. Then if this creature didn't transform this way, you lose the game." (a replacement in loseLife,
+   game.ts lifeZeroReplaced, applied after replacements that make the loss bigger, CR 616.1; the total set to 3, CR 119.5,
+   so from less than 3 it's a life gain other replacements can change; life lost at the same time, several creatures'
+   combat damage, is one event replaced once; a token or single-faced copy can't transform, so you lose, rulings); Extract
+   Brain's "Target opponent chooses X cards from their hand. Look at those cards. You may cast a spell from among them
+   without paying its mana cost." (all of them with fewer, no prompt; cast from that hand as it resolves, with a browser
+   test for each side of the choice: the opponent's pick from their hand is a new searchLibrary prompt, `handFor`); The
+   Aesir Escape Valhalla's chapters linked by "the exiled card" (CR 607.2a, 607.3: chapter I's exile from your graveyard,
+   its mana value as life, then +1/+1 counters, then the Saga and the card back to their owner's hand; round345Chapter).
+   +4, 31,107 of 31,936 with B185 and B186. The compiled text of every other card is unchanged. Bots exile the dearest permanent card for
+   The Aesir Escape Valhalla and give Extract Brain the cards least useful to its caster. Bot gap: a bot holding Extract
+   Brain with mana to spare didn't cast it in a scripted check (it cast its commander and passed).
+   Out after round 345 (looked at, not done): Filigree Vector (still out: "on each of any number of target creatures and
+   ... each of any number of target artifacts" is two variable target groups in one ability, and a flat target list
+   (fitMany) can't say where the first ends; the UI, bots and fitMany need group boundaries first); Bre of Clan Stoutarm
+   (still out: no ruling says whether "Otherwise, put it into your hand" applies when you decline to cast); Pulmonic
+   Sliver and Archelos, Lagoon Mystic (still out, as after round 338 and 322).
    Round 344 went on down the "Out after round N" lists, most played first: Brimaz, Blight of Oreskos ("a Phyrexian
    creature or artifact creature spell" in a cast trigger, and "if a Phyrexian died under your control this turn", an
    intervening if, CR 603.4); The Foretold Soldier's "Whenever this creature deals damage, exile it face down. It becomes

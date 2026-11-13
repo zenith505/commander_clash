@@ -4530,6 +4530,12 @@ export type Effect =
    * chooses as it enters that it could enchant (CR 303.4f, not targeted); with none it stays in the graveyard (303.4g).
    */
   | { type: "returnAsAura"; enchant: TargetSpec; ability: string; loseOthers?: true }
+  /**
+   * Extract Brain: "Target opponent chooses X cards from their hand. Look at those cards. You may cast a spell from among
+   * them without paying its mana cost.": `who` chooses `n` cards in their hand (all of them with fewer), you look at them,
+   * and may cast one of them from that hand as this resolves (castFromAmong `fromHand`, limited to those cards).
+   */
+  | { type: "handChooseCast"; who: PlayerRef; n: Amount }
   | {
       type: "counterOpponentsStack";
       /** Kadena's Silencer: "counter all abilities your opponents control": only the activated and triggered abilities already on the stack (rulings: not spells; mana abilities never are there, CR 605.3a). */
@@ -5192,6 +5198,8 @@ export type Effect =
       thatCombat?: { effects: Effect[]; text: string };
       /** "Only land creatures can attack during that combat phase" (Bumi, Unleashed): the added combat phase only (rulings). */
       onlyAttack?: TargetSpec;
+      /** "Only the chosen creatures can attack during that combat phase" (Last Night Together): only the objects this ability's targets `index` (`n` of them) were chosen as, in the added combat phase only. */
+      onlyAttackTargets?: { index: number; n: number };
       /**
        * Illusionist's Gambit: "Each of those creatures attacks that combat if able. They can't attack you or planeswalkers
        * you control that combat." Those are the creatures it removed from combat (ref "created"), in the added combat only.
@@ -8513,6 +8521,8 @@ export interface CompiledCard {
    * total becomes equal to your starting life total" (40, CR 903.7).
    */
   loseGameExileSelf?: true | "startingLife";
+  /** Enduring Angel: "If your life total would be reduced to 0 or less, instead transform this creature and your life total becomes 3. Then if this creature didn't transform this way, you lose the game." (game.ts lifeZeroReplaced) */
+  lifeZeroTransform?: true;
   /**
    * "You may activate abilities of creatures you control as though those creatures had haste" (Thousand-Year Elixir,
    * CR 302.6): {T} abilities of creatures that came under your control this turn. They don't gain haste (rulings).

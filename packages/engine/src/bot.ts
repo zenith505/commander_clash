@@ -96,6 +96,7 @@ import {
   topPlayable,
   castDef,
   casualtyCandidates,
+  cardTypesPick,
   bargainCandidates,
   offeringCandidates,
   autoEvidence,
@@ -680,6 +681,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // hand: the dearest one.
     const linkedYard = pend.kind === "searchLibrary" && pend.fromGraveyard === "exile" && s.resolving ? s.resolving.body.effects.slice(s.resolving.next ?? 0).some((x) => x.type === "chooseFromGraveyard" && x.linked && x.dest === "exile") && s.resolving.body.effects.some((x) => x.type === "gainLife" && JSON.stringify(x.n).includes('"chosenFromYard"')) : false;
     if (pend.kind === "searchLibrary" && linkedYard) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, Math.max(pend.min, Math.min(1, pend.max))) }];
+    // Winter, Cynical Opportunist: cards with four or more card types among them, to put the best permanent card among
+    // them onto the battlefield: that card and the fewest others; none if there's no such pick.
+    if (pend.kind === "searchLibrary" && pend.cardTypes) {
+      const best = chooseSearch(s, pid, pend.cards.filter((id) => isPermanentCard(defOf(s, obj(s, id)))), 1)[0];
+      const pick = best === undefined ? null : cardTypesPick(s, pend.cards, pend.cardTypes, best);
+      return [{ type: "searchLibrary", player: pid, found: pick ?? [] }];
+    }
     // Exiling cards from our own graveyard: the ones we have no use for there, the cheapest first.
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile")
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => Number(usefulInGraveyard(s, a)) - Number(usefulInGraveyard(s, b)) || mv(s, a) - mv(s, b)).slice(0, pend.min) }];
@@ -4373,6 +4381,8 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
       .map((x) => obj(s, x))
       .filter((o) => !o.isCommander && !abilitiesOf(s, o).spellsHaveCasualty && !extra.sacrifice?.includes(o.id) && !(targets ?? []).some((t) => t.kind === "object" && t.id === o.id))
       .filter((o) => o.isToken || worth(s, pid, o) <= 3)
+      // Casualty X (Ob Nixilis, the Adversary): the copy's loyalty is the creature's power, so one with power 2 or more.
+      .filter((o) => !compileCard(castDef(s, id, alt)).casualtyX || power(s, o) >= 2)
       .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
     if (victim) extra.casualty = victim.id;
     // Bargain (CR 702.166a): a spare token for what being bargained adds.
@@ -4680,6 +4690,11 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       out.counterOn = [pick];
     } else if (c.kind === "payEnergy") {
       if ((player(s, pid).energy ?? 0) < c.n) return null;
+    } else if (c.kind === "exileFromGraveyard" && c.cardTypes) {
+      // Nethergoyf's escape: the fewest cards with four or more card types among them.
+      const pick = cardTypesPick(s, player(s, pid).graveyard.filter((x) => x !== id), c.cardTypes);
+      if (!pick) return null;
+      out.exileCards = pick;
     } else {
       const pool = player(s, pid).graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))));
       if (pool.length < c.n) return null;
@@ -6353,7 +6368,12 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Kaho, Minamo Historian: "cast a spell with mana value X from among cards exiled with ~": X matching one of them.
       const linkedMvX = cost.hasX && body.effects.some((e) => e.type === "castFromAmong" && e.fromLinked && e.exactMv !== undefined) ? [...new Set(linkedCards(s, id).map((l) => defMv(defOf(s, obj(s, l.id)))))].filter((v) => v <= availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost)).sort((a, b) => b - a) : undefined;
       if (linkedMvX && !linkedMvX.length) continue;
-      const xs = fixedX != null ? [fixedX] : linkedMvX ? linkedMvX : discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : counterX > 0 ? Array.from({ length: counterX }, (_, k) => counterX - k) : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
+      // Panoptic Mirror: "exile an instant or sorcery card with mana value X from your hand": X matching a card in our
+      // hand (the most expensive we can pay for), or not at all.
+      const imprintX = cost.hasX ? allEffects(body.effects).find((e) => e.type === "takeFromHand" && e.action === "exile" && e.filter?.bound?.key === "manaValue" && e.filter.bound.at === "exact") : undefined;
+      const handMvX = imprintX?.type === "takeFromHand" ? [...new Set(player(s, pid).hand.filter((h) => printedMatches(withoutBound(imprintX.filter!), defOf(s, obj(s, h)))).map((h) => defMv(defOf(s, obj(s, h)))))].filter((v) => v <= availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost)).sort((a, b) => b - a).slice(0, 1) : undefined;
+      if (handMvX && !handMvX.length) continue;
+      const xs = fixedX != null ? [fixedX] : linkedMvX ? linkedMvX : handMvX ? handMvX : discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : counterX > 0 ? Array.from({ length: counterX }, (_, k) => counterX - k) : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
       let plan: Action[] | null = null;
       for (const x of xs) {
         // Krumar Initiate: "Pay X life" too; keep at least 10 life.
@@ -8471,4 +8491,10 @@ function craftSlotPicks(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, 
   };
   picks = picks.slice(0, 12); // the cheapest few: the search stays small
   return go(0, []);
+}
+
+/** A card filter without its bound ("with mana value X"), for the cards it could match with some X. */
+function withoutBound(f: TargetSpec): TargetSpec {
+  const { bound: _bound, ...rest } = f;
+  return rest;
 }

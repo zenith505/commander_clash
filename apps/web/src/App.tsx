@@ -173,6 +173,7 @@ import {
   counterCostKinds,
   craftCandidates,
   craftSlotsFit,
+  cardTypesAmong,
   craftWhat,
   ringBearer,
   power,
@@ -502,6 +503,8 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; fac
   singleYard?: true;
   /** Throne of the Grim Captain: one of the picks for each of the craft cost's slots (craftSlotsFit). */
   craftSlots?: Extract<AdditionalCost, { kind: "craft" }>;
+  /** Nethergoyf's escape: the cards picked have at least this many card types among them (cardTypesAmong). */
+  cardTypes?: number;
   what: string;
   n: number;
   candidates: string[];
@@ -1181,6 +1184,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       }
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
+      // Nethergoyf's escape: any number of other cards from your graveyard with four or more card types among them.
+      if (c.kind === "exileFromGraveyard" && c.cardTypes) {
+        const candidates = s.players[HUMAN]!.graveyard.filter((id) => id !== d.objectId);
+        return setCostPick({ draft: d, kind: "exileCards", label: card.name, what: `exile any number of other cards from your graveyard with ${c.cardTypes} or more card types among them`, n: candidates.length, min: 1, candidates, chosen: [], cardTypes: c.cardTypes });
+      }
       // Processor Assault: a card an opponent owns in exile, into its owner's graveyard (a face-down one shows its back).
       if (c.kind === "exileFromGraveyard" && c.process)
         return setCostPick({ draft: d, kind: "exileCards", label: card.name, what: "put a card an opponent owns from exile into that player's graveyard", n: 1, candidates: processCandidates(s, HUMAN), chosen: [] });
@@ -1235,7 +1243,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           draft: d,
           kind: "casualty",
           label: card.name,
-          what: casualties.length === 1 ? `casualty ${casualties[0]}: you may sacrifice a creature with power ${casualties[0]} or greater to copy it` : `casualty ${ns} (instance ${casualtyPaid + 1} of ${casualties.length}): you may sacrifice ${casualtyPaid ? "another" : "a"} creature with enough power for another copy`,
+          what: compiled.casualtyX && casualties.length === 1 ? "casualty X: you may sacrifice a creature to copy it; X is its power (the copy isn't legendary and has starting loyalty X)" : casualties.length === 1 ? `casualty ${casualties[0]}: you may sacrifice a creature with power ${casualties[0]} or greater to copy it` : `casualty ${ns} (instance ${casualtyPaid + 1} of ${casualties.length}): you may sacrifice ${casualtyPaid ? "another" : "a"} creature with enough power for another copy`,
           n: 1,
           candidates,
           chosen: [],
@@ -2200,7 +2208,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               n={costPick.n}
               {...(costPick.min !== undefined ? { min: costPick.min } : {})}
               owners={!!costPick.singleYard}
-              valid={(!costPick.oneOf || costPick.chosen.some((id) => printedMatches(costPick.oneOf!, cardOf(s, id)))) && (!costPick.differentNames || namesDiffer(s, costPick.chosen)) && (!costPick.sameName || costPick.chosen.every((id) => sameName(cardOf(s, id).name, cardOf(s, costPick.chosen[0]!).name))) && (!costPick.share || costChoiceShares(s, costPick.share, costPick.chosen)) && (!costPick.singleYard || costPick.chosen.every((id) => s.objects[id]!.owner === s.objects[costPick.chosen[0]!]!.owner)) && (!costPick.craftSlots || craftSlotsFit(s, HUMAN, costPick.craftSlots, costPick.chosen))}
+              valid={(!costPick.oneOf || costPick.chosen.some((id) => printedMatches(costPick.oneOf!, cardOf(s, id)))) && (!costPick.differentNames || namesDiffer(s, costPick.chosen)) && (!costPick.sameName || costPick.chosen.every((id) => sameName(cardOf(s, id).name, cardOf(s, costPick.chosen[0]!).name))) && (!costPick.share || costChoiceShares(s, costPick.share, costPick.chosen)) && (!costPick.singleYard || costPick.chosen.every((id) => s.objects[id]!.owner === s.objects[costPick.chosen[0]!]!.owner)) && (!costPick.craftSlots || craftSlotsFit(s, HUMAN, costPick.craftSlots, costPick.chosen)) && (!costPick.cardTypes || cardTypesAmong(s, costPick.chosen) >= costPick.cardTypes)}
               onHover={setHover}
               onToggle={(id) =>
                 setCostPick({ ...costPick, chosen: costPick.chosen.includes(id) ? costPick.chosen.filter((x) => x !== id) : [...costPick.chosen, id].slice(-costPick.n) })
@@ -4435,6 +4443,8 @@ function LibrarySearch({
                 ? `Chosen ${found.length}; the first goes lowest.`
                 : pending.totalMv !== undefined
                   ? `Chosen ${found.length} of ${pending.max}, total mana value ${found.reduce((n, x) => n + mvOf(x), 0)} of at most ${pending.totalMv}.`
+                : pending.cardTypes
+                  ? `Chosen ${found.length}, with ${cardTypesAmong(s, found)} card type${cardTypesAmong(s, found) === 1 ? "" : "s"} among them: ${pending.cardTypes} or more, or none.`
                 : pending.exactly
                   ? `Found ${found.length}: exactly ${pending.max} or none.`
                 : pending.distinctManaValues
@@ -4450,7 +4460,7 @@ function LibrarySearch({
                     : `Found ${found.length} of ${pending.max}.${pending.distinctPowers ? " Each must have a different power." : ""}`}
             {pending.foundExiled ? (pending.controlling !== undefined ? " They're exiled, and you may play them." : " They're exiled, and an opponent may play them.") : ""}
           </span>
-          <button disabled={found.length < pending.min || (!!pending.exactly && found.length > 0 && found.length !== pending.max)} onClick={() => onDone(found)}>
+          <button disabled={found.length < pending.min || (!!pending.exactly && found.length > 0 && found.length !== pending.max) || (!!pending.cardTypes && found.length > 0 && cardTypesAmong(s, found) < pending.cardTypes)} onClick={() => onDone(found)}>
             {pending.piles ? (found.length ? "Done" : "Done (the first pile empty)") : pending.behold ? (found.length ? "Behold" : "Behold nothing") : pending.reveal ? (found.length ? "Reveal" : "Reveal none") : pending.bottom ? (found.length ? "Put on bottom" : "Keep them all") : pending.shuffle ? (found.length ? "Shuffle in" : "Keep them all") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
           </button>
         </header>

@@ -220,6 +220,7 @@ export function parseCostKeyword(
   plot?: string;
   foretell?: string;
   casualty?: number;
+  casualtyX?: true;
   dredge?: number;
   impending?: number;
 } | "fail" | null {
@@ -327,6 +328,17 @@ export function parseCostKeyword(
     return {
       casualty: Number(m[1]),
       trigger: { event: "selfCast", ifCasualty: true, body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true }], text: "Casualty: copy ~. You may choose new targets for the copy." } },
+    };
+  }
+  // Ob Nixilis, the Adversary: "Casualty X. The copy isn't legendary and has starting loyalty X.": X chosen as it's cast
+  // (CR 601.2b, rulings), a creature with power X or greater sacrificed (CR 702.153a); the copy's exceptions are copiable
+  // values (CR 707.9b): not legendary, and it enters with X loyalty counters (CR 306.5b). It becomes a token as it
+  // resolves (CR 608.3f).
+  if (/^Casualty X\. The copy isn't legendary and has starting loyalty X\.$/.test(line) && d.types.includes("Planeswalker")) {
+    return {
+      casualty: 0,
+      casualtyX: true,
+      trigger: { event: "selfCast", ifCasualty: true, body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true, except: { notLegendary: true }, casualtyLoyalty: true }], text: "Casualty X: copy ~. The copy isn't legendary and has starting loyalty X." } },
     };
   }
   if (/^Casualty\b/.test(line)) return "fail";
@@ -858,6 +870,11 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
   const isX = (w: string) => allowX && w === "X";
   const many = (w: string) => (isX(w) ? { n: 0, x: true as const } : { n: num(w) });
   if (/^forage$/i.test(text)) return { kind: "forage" }; // CR 701.61a
+  // Nethergoyf: "Exile any number of other cards from your graveyard with four or more card types among them" (as its
+  // escape cost): any number of cards, other than the card being cast (it's on the stack by then, CR 601.2a), whose card
+  // types together number four or more (CR 205.2a: artifact, battle, creature, enchantment, instant, kindred, land,
+  // planeswalker, sorcery; rulings).
+  if ((m = new RegExp(`^exile any number of (?:other )?cards from your graveyard with ${NUM} or more card types among them$`, "i").exec(text))) return { kind: "exileFromGraveyard", n: 1, cardTypes: num(m[1]!) };
   // Nahiri's Sacrifice: "sacrifice an artifact or creature with mana value X": X announced as it's cast, then one of
   // them with exactly that mana value (CR 107.3a, 601.2b, rulings), as Sidisi's ability does.
   if (allowX && (m = /^sacrifice an? (artifact or creature|artifact|creature) with mana value X$/i.exec(text))) {

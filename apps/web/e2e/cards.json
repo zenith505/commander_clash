@@ -3355,6 +3355,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "72a9a85d-7cfc-4b3c-82db-9d35be6c0982",
+  "name": "Bilbo, Thief in the Night",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Halfling Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Halfling",
+   "Rogue"
+  ],
+  "oracleText": "Spells you cast from anywhere other than your hand cost {1} less to cast.\nWhenever Bilbo attacks, you may cast an artifact, instant, or sorcery spell from your graveyard. If an instant or sorcery spell cast this way would be put into your graveyard, exile it instead.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "hob",
+  "releasedAt": "2026-08-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "86dc3a41-4fb9-4b1f-8279-2b5edbc7e170",
   "name": "Binding Negotiation",
   "manaCost": "{1}{B}",
@@ -6422,6 +6455,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ad786230-4045-46af-bc89-078d45891e5b",
+  "name": "Colfenor's Plans",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, exile the top seven cards of your library face down.\nYou may look at the cards exiled with this enchantment, and you may play lands and cast spells from among those cards.\nSkip your draw step.\nYou can't cast more than one spell each turn.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lrw",
+  "releasedAt": "2007-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "920c4df3-9517-44cd-8304-28b1ef69d60e",
   "name": "Colfenor's Urn",
   "manaCost": "{3}",
@@ -8603,6 +8662,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "eeb50bfc-8443-482b-bfc1-ea96b37809cd",
+  "name": "Demilich",
+  "manaCost": "{U}{U}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Skeleton Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Skeleton",
+   "Wizard"
+  ],
+  "oracleText": "This spell costs {U} less to cast for each instant and sorcery spell you've cast this turn.\nWhenever this creature attacks, exile up to one target instant or sorcery card from your graveyard. Copy it. You may cast the copy.\nYou may cast this card from your graveyard by exiling four instant and/or sorcery cards from your graveyard in addition to paying its other costs.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "53716e0b-4d4e-40b0-8370-38e11f73d195",
   "name": "Demon of Fate's Design",
   "manaCost": "{4}{B}{B}",
@@ -9087,6 +9177,32 @@
   "set": "ths",
   "releasedAt": "2013-09-27",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1c2a3f13-6bcb-42ad-98f6-642151ad54f1",
+  "name": "Discover the Impossible",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at the top five cards of your library. Exile one of them face down and put the rest on the bottom of your library in a random order. You may cast the exiled card without paying its mana cost if it's an instant spell with mana value 2 or less. If you don't, put that card into your hand.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -15829,6 +15945,32 @@
   "commanderLegal": "legal",
   "set": "c18",
   "releasedAt": "2018-08-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9d5f712a-d46c-4d7e-8fea-45fdadb458df",
+  "name": "Hedonist's Trove",
+  "manaCost": "{5}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, exile target opponent's graveyard.\nYou may play lands from among cards exiled with this enchantment.\nYou may cast spells from among cards exiled with this enchantment. You can't cast more than one spell this way each turn.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dtk",
+  "releasedAt": "2015-03-27",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -28888,6 +29030,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f35aa497-bd0f-4642-8713-820b9f014da5",
+  "name": "Rubble Rouser",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Dwarf Sorcerer",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dwarf",
+   "Sorcerer"
+  ],
+  "oracleText": "When this creature enters, you may discard a card. If you do, draw a card.\n{T}, Exile a card from your graveyard: Add {R}. When you do, this creature deals 1 damage to each opponent.",
+  "power": "1",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "sos",
+  "releasedAt": "2026-04-24",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6c922206-6e68-4dcd-9559-88da1074f2c4",
   "name": "Rugged Highlands",
   "manaCost": "",
@@ -32215,6 +32391,32 @@
   "set": "war",
   "releasedAt": "2019-05-03",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "22504fd0-0353-4ef0-baf4-4b7be28d1a66",
+  "name": "Spark of Creativity",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose target creature. Exile the top card of your library. You may have Spark of Creativity deal damage to that creature equal to the exiled card's mana value. If you don't, you may play that card until end of turn.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "kld",
+  "releasedAt": "2016-09-30",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

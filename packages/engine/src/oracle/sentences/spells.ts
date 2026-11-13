@@ -1101,7 +1101,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // permanents you control ...": exactly that, counted as it resolves.
   // Brain in a Jar: "an instant or sorcery spell with mana value equal to the number of charge counters on ~ from your hand":
   // exactly that, counted as it resolves (the counter just put on it too; as it last existed if it has left, rulings).
-  if ((m = /^(You may c|C)ast an? (.*?spell(?: with mana value (?:(?:\d+|X) or less|(?:less than or )?equal to .+?))?) from your hand( with mana value (?:(?:\d+|X) or less|(?:less than or )?equal to .+?))? without paying its mana cost$/.exec(s)) && (m[1] === "You may c" || ctx.mayNow) && !(m[3] && / with /.test(m[2]!))) {
+  // Founding the Third Path's I: "an instant or sorcery spell with mana value 1 or 2 from your hand": either (CR 202.3), X as 0
+  // (CR 107.3b, rulings).
+  if ((m = /^(You may c|C)ast an? (.*?spell(?: with mana value (?:(?:\d+|X) or less|\d+ or \d+|(?:less than or )?equal to .+?))?) from your hand( with mana value (?:(?:\d+|X) or less|(?:less than or )?equal to .+?))? without paying its mana cost$/.exec(s)) && (m[1] === "You may c" || ctx.mayNow) && !(m[3] && / with /.test(m[2]!))) {
     m.splice(1, 1);
     m[1] = `${m[1]!}${m[2] ?? ""}`;
     // With "where X is ...", X is that amount, counted as it resolves (TargetSpec.bound, replaced in body.ts).

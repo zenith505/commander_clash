@@ -3,6 +3,7 @@
 import type { CompiledCard, Effect, TargetSpec } from "../abilities";
 import { addTarget, type Ctx } from "./body";
 import { roundB187Sentence } from "./laneb187";
+import { roundB192Sentence } from "./laneb192";
 import { parseSentence } from "./sentence";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
@@ -64,5 +65,6 @@ export function roundB186Sentence(s: string, sentences: string[], si: number, ct
     if (!ctx.activated || ctx.spell || t === undefined || ctx.targets[t]?.kind !== "object" || ctx.targets[t]?.many || effects.length !== 1 || effects[0]!.type !== "continuous" || effects[0]!.duration !== "whileControlled") return "fail";
     return { effect: { type: "delayed", when: "leaves", of: { ref: "self" }, about: t, orUntaps: true, effects: [{ type: "destroy", what: { ref: "subject" }, noRegen: true }], text: "destroy that creature. It can't be regenerated" }, next: si + 2 };
   }
-  return roundB187Sentence(s, sentences, si, ctx, effects);
+  // Round B192's after round B187's.
+  return roundB187Sentence(s, sentences, si, ctx, effects) ?? roundB192Sentence(s, sentences, si, ctx, effects);
 }

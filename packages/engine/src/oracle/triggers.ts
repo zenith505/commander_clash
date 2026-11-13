@@ -2383,7 +2383,10 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Creatures you control with counters on them gain double strike" (Chocobo Knights): not about the attackers.
   // Within Range: "each opponent loses life equal to the number of creatures attacking them": each one's own attackers.
   // Roar of Resistance: "planeswalkers they control" after "your opponents" is about those players, not the creatures.
-  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(/^each opponent loses life equal to the number of creatures attacking them\.?$/, "").replace(/\bcreatures attacking your opponents and\/or planeswalkers they control\b/g, "").replace(/ with (?:[+-]1\/[+-]1 )?counters on them\b/g, "").replace(/ unless that creature's controller has ~ deal that much damage to them\.?$/, "").replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
+  // The Kingpin of Crime: "creatures you control with toughness greater than their power assign combat damage equal to
+  // their toughness rather than their power": each of those creatures' own, not the attackers'.
+  const kingpinTheir = / creatures you control with toughness greater than their power assign combat damage equal to their toughness rather than their power\.$/;
+  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(kingpinTheir, "").replace(/^each opponent loses life equal to the number of creatures attacking them\.?$/, "").replace(/\bcreatures attacking your opponents and\/or planeswalkers they control\b/g, "").replace(/ with (?:[+-]1\/[+-]1 )?counters on them\b/g, "").replace(/ unless that creature's controller has ~ deal that much damage to them\.?$/, "").replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
   let group: TargetSpec | undefined;
   if (phrase && !/^creatures$/.test(phrase)) {
     // "Creatures with counters on them" (Tidus, Yuna's Guardian): each with a counter on it.
@@ -2649,6 +2652,11 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   // with its normal timing (rulings).
   if (/^you may exile one of them from your graveyard\. If you do, you may cast it this turn\.?$/.test(rest) && batch.what === "discards" && batch.whose === "you" && !batch.first && !yourTurn)
     return { event: "batch", batch, body: { targets: [], effects: [{ type: "may", effects: [{ type: "chooseFromGraveyard", n: 1, eventGroup: true, ...(batch.filter ? { filter: batch.filter } : {}), dest: "exile", castExiledThisTurn: true }], text: "exile one of them from your graveyard (you may cast it this turn)" }], text: rest.replace(/\.$/, "") } };
+  // Toluz, Clever Conductor: "Whenever you discard one or more cards, exile them from your graveyard.": every card that
+  // event discarded that's still in your graveyard (CR 400.7; one gone elsewhere, a madness card, stays where it is), all
+  // at once, linked to Toluz (CR 607.2a) for its dies trigger.
+  if (/^exile them from your graveyard\.?$/.test(rest) && batch.what === "discards" && batch.whose === "you" && !batch.first && !batch.filter && !yourTurn)
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "exile", what: { ref: "eventGroup" }, linked: true }], text: rest.replace(/\.$/, "") } };
   // Captain Howler, Sea Scourge: "target creature gets +2/+0 until end of turn for each card discarded this way. Whenever
   // that creature deals combat damage to a player this turn, you draw a card.": how many cards the event discarded (all of
   // them, CR 603.2c, even those that left the graveyard since); "that creature" is the target.
@@ -4082,6 +4090,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (castSelfYard) {
     const t = parseTrigger(`${castSelfYard[1]}, draw a card.`);
     if (!t || t === "fail" || t.event !== "permanentDies" || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "draw" || t.body.targets.length || t.host || t.zone || t.ifCond) return "fail";
+    return { ...t, body: { targets: [], effects: [{ type: "castNow", what: { ref: "selfCard" } }], text: "you may cast ~ from your graveyard" }, zone: "graveyard" };
+  }
+  // Sproutback Trudge: "At the beginning of your end step, if you gained life this turn, you may cast ~ from your
+  // graveyard.": the same, from your graveyard (CR 113.6m), the life gained checked as the step begins and as it resolves
+  // (CR 603.4); its costs paid, its own cost reduction applied (rulings), as it resolves or not at all (CR 608.2g).
+  if (line === "At the beginning of your end step, if you gained life this turn, you may cast ~ from your graveyard.") {
+    const t = parseTrigger("At the beginning of your end step, if you gained life this turn, draw a card.");
+    if (!t || t === "fail" || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "draw" || t.body.targets.length || t.host || t.zone || !t.ifCond) return "fail";
     return { ...t, body: { targets: [], effects: [{ type: "castNow", what: { ref: "selfCard" } }], text: "you may cast ~ from your graveyard" }, zone: "graveyard" };
   }
   // Old One Eye: "you may discard two cards. If you do, ...": only with two cards in hand (see canDoNow).

@@ -1644,7 +1644,8 @@ function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string
     // To this ability's source, still on the battlefield as the same object, and only if it's a legal target for it.
     const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     const here = !!me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);
-    const to = here ? changeTargetOptions(s, item, spec, current).find((t) => t.kind === "object" && t.id === me!.id) : undefined;
+    // Muck Drubb: with `all`, ~ must be a legal target for each of them (rulings).
+    const to = here ? changeTargetOptions(s, item, spec, current).find((t) => t.kind === "object" && t.id === me!.id && (!all || slots.every((k) => !!specs[k] && changeTargetOptions(s, item, specs[k]!, current).some((x) => sameTarget(x, t))))) : undefined;
     if (!to) {
       log(s, `${by} can't become the target of ${item.description}, so its target stays the same.`);
       return;

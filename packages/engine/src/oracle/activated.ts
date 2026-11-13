@@ -864,7 +864,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const mana = extra.some((c) => c.kind === "mill") ? "stack" : manaAbilityKind(body);
   // "Remove X storage counters from ~: Add X mana ..." (Crucible of the Spirit Dragon, Petalmane Baku): an X for a mana
   // ability isn't announced anywhere yet.
-  if (mana === "fail" || (mana === "mana" && (water || fromHand || exileOwn || bounceOwn || bottomOwn || keyword || halfLife || untapSelf || removeCounters?.x))) return "fail";
+  // Ether: "{T}, Exile ~: Add {U}": the permanent exiled as the cost is paid (CR 602.2b), before the mana is added; an
+  // exile cost is never paid by autopay or by bots (payableActivatedMana).
+  if (mana === "fail" || (mana === "mana" && (water || fromHand || (exileOwn && !(tap && costs === "{T}, Exile ~")) || bounceOwn || bottomOwn || keyword || halfLife || untapSelf || removeCounters?.x))) return "fail";
   if (exileFromHand && (anyPlayer || sorcerySpeed || oncePerTurn || activateIf || extra.length || (mana === "mana" ? costs !== "Exile ~ from your hand" : !JSON.stringify(body.effects).includes('"type":"mayCastExiledSelf"')))) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
   if (usesX(body) && !symbols.includes("X") && !energyX && !removeCounters?.x && !extra.some((c) => ("x" in c && c.x) || ((c.kind === "discard" || c.kind === "sacrifice") && c.mvX))) return "fail";
@@ -937,7 +939,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
 /** Instructions that move a card to or from a library (CR 605.1a): an ability with one isn't a mana ability. */
 const LIBRARY_EFFECTS = new Set<Effect["type"]>(["draw", "mill", "putInLibrary", "exileTop", "revealTopToHand", "surveil", "handToTop", "shuffleIntoLibrary", "shuffleSpell", "taintedPact", "shuffleZones", "search", "dig", "impulse", "cascade", "discover", "ripple", "explore", "hideaway", "recruit", "connive", "orderTop", "scry", "clash", "revealTop", "putInGraveyard", "castFromAmong"]);
 /** Instructions that don't: what mana abilities do besides adding mana (Pristine Talisman's life, Glittering Stockpile's counter). */
-const MANA_RIDERS = new Set<Effect["type"]>(["reflexive", "addMana", "choose", "choosePlayer", "roll", "if", "may", "gainLife", "loseLife", "damage", "counters", "removeCounters", "removeSelfCounter", "delayed", "tap", "untap", "getEnergy", "poison", "skipUntap", "continuous", "sacrifice"]);
+const MANA_RIDERS = new Set<Effect["type"]>(["reflexive", "nextCast", "addMana", "choose", "choosePlayer", "roll", "if", "may", "gainLife", "loseLife", "damage", "counters", "removeCounters", "removeSelfCounter", "delayed", "tap", "untap", "getEnergy", "poison", "skipUntap", "continuous", "sacrifice"]);
 
 /**
  * Whether an activated ability's effect makes it a mana ability (CR 605.1a): no target, it could add mana, and it
@@ -947,7 +949,9 @@ const MANA_RIDERS = new Set<Effect["type"]>(["reflexive", "addMana", "choose", "
  */
 export function manaAbilityKind(body: AbilityBody): "mana" | "stack" | "fail" {
   const bodies = body.modal ? body.modal.modes : [body];
-  const effects = bodies.flatMap((b) => allEffects(b.effects));
+  // Ether: "Add {U}. When you next cast an instant or sorcery spell this turn, copy that spell.": the delayed trigger it
+  // creates is a separate ability (CR 603.7), so what that trigger does isn't this ability's (rulings: a mana ability).
+  const effects = bodies.flatMap((b) => allEffects(b.effects.map((e) => (e.type === "nextCast" ? { ...e, effects: [] } : e))));
   if (!effects.some((e) => e.type === "addMana")) return "stack";
   // A reflexive trigger it creates ("Add {R}. When you do, ...", Rubble Rouser) is a separate ability too (CR 603.12),
   // which uses the stack (CR 605.5a), so its targets and library moves aren't this ability's (rulings on Rubble Rouser).

@@ -5149,6 +5149,11 @@ function Controls({
             <>
               <strong>{pending.source}:</strong> discover. Cast <strong>{d.name}</strong> without paying its mana cost? If you don&apos;t, it goes to your hand.
             </>
+          ) : pending.how === "orHand" ? (
+            <>
+              {/* Discover the Impossible: the card it exiled face down, cast now or put into your hand. */}
+              <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> without paying its mana cost? If you don&apos;t, it goes to your hand.
+            </>
           ) : transformed ? (
             <>
               <strong>{pending.source}:</strong> it&apos;s defeated. Cast <strong>{s.cards[registerFace(s, o, 1)]!.name}</strong> transformed without paying its mana cost? If you don&apos;t, it stays in exile.

@@ -635,6 +635,15 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       effectText = effectText.replace(/ X is the mana value of (?:that|the exiled) card\.$/, "").replace(/^Create a token that's a copy of the exiled card\./, "Create a token that's a copy of a card exiled with ~.");
       found = true;
     }
+    // Elite Arcanist: "{X}, {T}: Copy the exiled card. You may cast the copy without paying its mana cost. X is the mana
+    // value of the exiled card.": X defined by the ability (CR 107.3c, rulings: not chosen), the card its "When ~ enters,
+    // you may exile an instant card from your hand" exiled (linked in compile.ts, CR 607.2a), a split card's combined
+    // mana value (rulings, CR 709.4); the copy made in exile and cast as this resolves or never (rulings, CR 707.12).
+    if (/ X is the mana value of the exiled card\.$/.test(effectText) && !xIs && costs === "{X}, {T}" && /^Copy the exiled card\. You may cast the copy without paying its mana cost\. X is/.test(effectText)) {
+      xIs = "linkedCardMv";
+      effectText = "You may cast a copy of the exiled card without paying its mana cost.";
+      found = true;
+    }
     // Voodoo Doll: "{X}{X}, {T}: ... X is the number of pin counters on ~.": X is defined by the ability (CR 107.3c), the
     // counters on it as it's activated (rulings).
     const xCounters = !xIs && /\{X\}/.test(costs) ? / X is the number of ([a-z]+) counters on ~\.$/.exec(effectText) : null;

@@ -1,6 +1,6 @@
 # Roadmap
 
-31,165 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,171 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,844 of
 9,979 (98%).
 
@@ -8451,6 +8451,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Repossession (Treasures "equal to the damage dealt this way", summed over opponents after prevention), Cultivator Drone
   ("or pay a cost that contains {C}": a cost paid as something resolves, Bearer of Silence's per its rulings, isn't known
   to the mana's restriction yet) and Jasmine Boreal of the Seven ("creature spells with no abilities") stay out.
+- Round B195 (least played first, from the Lane B skip lists): Roving Actuator (void: "exile up to one target instant or
+  sorcery card with mana value 2 or less from your graveyard. Copy it. You may cast the copy without paying its mana
+  cost.": the copy cast as the trigger resolves or never, X as 0, rulings, CR 608.2g, 707.12). Keldon Flamesage ("look at
+  the top X cards of your library, where X is ~'s power. You may exile an instant or sorcery card with mana value X or less
+  from among them ... You may cast the exiled card without paying its mana cost": its power as the trigger resolves, as it
+  last existed if it's gone, rulings, CR 608.2h). Discover the Impossible ("Exile one of them face down ... You may cast the
+  exiled card without paying its mana cost if it's an instant spell with mana value 2 or less. If you don't, put that card
+  into your hand.": one card must be exiled, only you may look at it, CR 406.3; cast only as an instant spell of mana value
+  2 or less, the spell it would be, rulings; not cast, it goes to your hand; a new "cast it or it goes to your hand" prompt
+  with a browser test; bots exile one they can cast). Abuelo's Awakening ("with X additional +1/+1 counters on it. It's a
+  1/1 Spirit creature with flying in addition to its other types": X as it was cast, CR 614.1c, 613.1). Unyielding
+  Gatekeeper ("When ~ is turned face up, exile another target nonland permanent. If you controlled it, return it to the
+  battlefield tapped. Otherwise, its controller creates a 2/2 white and blue Detective creature token.": who controlled it
+  as this resolves, a stolen permanent returning under your control, rulings, CR 110.2a). Elite Arcanist ("{X}, {T}: Copy
+  the exiled card. You may cast the copy without paying its mana cost. X is the mana value of the exiled card.": X defined,
+  not chosen, a split card's combined mana value, rulings, CR 107.3c, 709.4; nothing exiled, it can't be activated). +6,
+  31,171 of 31,936 with B189 to B194.
+- Out after round B195 (looked at, not done): Reversal of Fortune (the copy is made and cast from the opponent's hand,
+  rulings: copies of cards are made in exile here, so "cast from exile" would wrongly apply), Nyla, Shirshu Sleuth ("If you
+  do, you lose X life and create X Clue tokens, where X is that card's mana value" after an exile, and "return target card
+  exiled with ~ to its owner's hand": neither form is read yet), Cemetery Desecrator (a reflexive modal trigger with the
+  exiled card's mana value) and Kaya, Ghost Assassin ("Exile ~ or up to one target creature", chosen as it resolves) stay
+  out.
 - Out after round B192 (looked at, not done): Garruk, Curse Breaker (its −4: how often "whenever one or more creatures
   attack one of your opponents" triggers when creatures attack two of them still isn't settled by rulings), Charmed
   Pendant (a hybrid symbol of the milled card adds one of its colors: a choice in the middle of a mana ability), Ulamog's

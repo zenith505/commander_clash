@@ -152,6 +152,17 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Venomous Breath: "destroy all creatures that blocked or were blocked by it this turn": the target as it is now.
       for (const [i, x] of effects.entries())
         if ("what" in x && x.what && typeof x.what === "object" && "ref" in x.what && x.what.ref === "blockHistory" && !x.what.at) {
+          // Triton Tactics: "one of those creatures", each of the targets still legal (CR 608.2b).
+          const of = x.what.of;
+          if (of.ref === "target" && "n" in of && of.n) {
+            const ats: { id: ObjectId; zc: number }[] = [];
+            for (let j = of.index; j < of.index + of.n; j++) {
+              const t = ctx.targets[j];
+              if (t?.kind === "object" && ctx.legal?.[j] !== false) ats.push({ id: t.id, zc: t.zc ?? s.objects[t.id]?.zoneChanges ?? 0 });
+            }
+            effects[i] = { ...x, what: { ...x.what, ats } } as Effect;
+            continue;
+          }
           const at = blockHistoryAt(s, x.what, ctx);
           if (at) effects[i] = { ...x, what: { ...x.what, at } } as Effect;
         }
@@ -1337,7 +1348,7 @@ function spellNameOf(s: GameState, ctx: ResolveCtx, index: number): string | und
  * Guile: each card exiled instead of being countered (counterOnStack), which the counter effect's controller may cast now
  * without paying its mana cost, timing ignored (CR 608.2g), or never (rulings). "paused" while one is offered.
  */
-function offerGuileCasts(s: GameState, src: string): "paused" | void {
+export function offerGuileCasts(s: GameState, src: string): "paused" | void {
   const sc = s.resolving?.scratch;
   while (sc?.guileCasts?.length) {
     const next = sc.guileCasts.shift()!;
@@ -1351,7 +1362,7 @@ function offerGuileCasts(s: GameState, src: string): "paused" | void {
   if (sc) sc.guileCasts = undefined;
 }
 
-function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop" | "hand" | "librarySecond" | "libraryChoice" | "battlefield" | "libraryBottom", bounce?: true): "paused" | void {
+export function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop" | "hand" | "librarySecond" | "libraryChoice" | "battlefield" | "libraryBottom", bounce?: true): "paused" | void {
   const i = s.stack.findIndex((x) => x.id === stackId);
   const item = s.stack[i];
   if (!item) return; // it already left the stack

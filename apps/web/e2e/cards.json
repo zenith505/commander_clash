@@ -778,6 +778,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6591f243-f94c-4a83-bb16-1fb838d9eb14",
+  "name": "Altanak, the Thrice-Called",
+  "manaCost": "{5}{G}{G}",
+  "cmc": 7,
+  "typeLine": "Legendary Creature — Insect Beast",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Insect",
+   "Beast"
+  ],
+  "oracleText": "Trample\nWhenever Altanak becomes the target of a spell or ability an opponent controls, draw a card.\n{1}{G}, Discard this card: Return target land card from your graveyard to the battlefield tapped.",
+  "power": "9",
+  "toughness": "9",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c551f007-9740-4a2a-8ef5-7be1a7afe14b",
   "name": "Altar of the Wretched // Wretched Bonemass",
   "manaCost": "{2}{B}",
@@ -22851,6 +22886,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b4d23acf-ff1f-4a6a-9ede-2667a99e9665",
+  "name": "Multiple Choice",
+  "manaCost": "{X}{U}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "If X is 1, scry 1, then draw a card.\nIf X is 2, you may choose a player. They return a creature they control to its owner's hand.\nIf X is 3, create a 4/4 blue and red Elemental creature token.\nIf X is 4 or more, do all of the above.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Scry"
+  ],
+  "commanderLegal": "legal",
+  "set": "stx",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "17770eeb-ecbf-4510-af2d-acececfbe146",
   "name": "Multiversal Passage",
   "manaCost": "",
@@ -28164,6 +28227,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "913ec957-5f4e-46b4-a819-9448837f72a3",
+  "name": "Revival Experiment",
+  "manaCost": "{4}{B}{G}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "For each permanent type, return up to one card of that type from your graveyard to the battlefield. You lose 3 life for each card returned this way. Exile Revival Experiment.",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c21",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "60b2f991-47ef-4da3-ba61-0692695ea098",
   "name": "Revoke Privileges",
   "manaCost": "{2}{W}",
@@ -29267,6 +29358,34 @@
   "commanderLegal": "legal",
   "set": "a25",
   "releasedAt": "2018-03-16",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "474f0675-4088-4f77-8081-f9ed7d492837",
+  "name": "Say Its Name",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Mill three cards. Then you may return a creature or land card from your graveyard to your hand.\nExile this card and two other cards named Say Its Name from your graveyard: Search your graveyard, hand, and/or library for a card named Altanak, the Thrice-Called and put it onto the battlefield. If you search your library this way, shuffle. Activate only as a sorcery.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -38774,6 +38893,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c3ea1497-63ac-46bb-95e9-d98b93a880b3",
+  "name": "Ward of Bones",
+  "manaCost": "{6}",
+  "cmc": 6,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Each opponent who controls more creatures than you can't cast creature spells. The same is true for artifacts and enchantments.\nEach opponent who controls more lands than you can't play lands.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "slz",
+  "releasedAt": "2026-09-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ee2c8714-6e85-4eb5-9bd6-057b6abfb136",
   "name": "Warlord's Elite",
   "manaCost": "{2}{W}",
@@ -39857,6 +39998,34 @@
   "releasedAt": "2026-06-26",
   "rarity": "rare",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "285ecbd5-ff7c-4919-ab0b-7fc05e5a0a0a",
+  "name": "Worldpurge",
+  "manaCost": "{4}{W/U}{W/U}{W/U}{W/U}",
+  "cmc": 8,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Return all permanents to their owners' hands. Each player chooses up to seven cards in their hand, then shuffles the rest into their library. Each player loses all unspent mana.",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "rare",
+  "layout": "normal",
   "gameChanger": false
  },
  {

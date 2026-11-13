@@ -2,6 +2,7 @@
 // its sentences, read at the end of round B186's.
 import type { CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
+import { roundB190Sentence } from "./laneb190";
 import { parseObject } from "./targets";
 import { parseTrigger } from "./triggers";
 
@@ -49,5 +50,5 @@ export function roundB187Sentence(s: string, sentences: string[], si: number, ct
     if (spec.many !== "any" || spec.kind !== "object" || spec.status !== "enchanted" || !spec.distinctFrom?.includes(one.index)) return "fail";
     return { effect: { type: "bite", a: { ref: "target", index: one.index, n: 2 }, b }, next: si + 1 };
   }
-  return null;
+  return roundB190Sentence(s, sentences, si, ctx, effects);
 }

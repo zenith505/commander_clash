@@ -281,7 +281,7 @@ export type TriggerSourceEvent =
   | { type: "dealtDamageBySource"; id: ObjectId; amount: number; by: PlayerId; /** The permanent dealing it. */ srcId?: ObjectId; combat?: true; /** The source was a creature as it dealt the damage. */ creature?: true; /** The source was a spell (Tephraderm). */ spell?: true }
   /** A permanent dealt damage to a player, in combat or not. */
   /** `source` is the permanent dealing it, or "" for a spell or a gone permanent's ability (CR 120.3); `by` controls it. */
-  | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean; /** The source's colors as it dealt the damage (Circle of Affliction). */ colors?: Color[] }
+  | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean; /** The source's colors as it dealt the damage (Circle of Affliction). */ colors?: Color[]; /** Its card types then (Chandra's Phoenix, CR 113.7a). */ types?: string[] }
   /** A source (`source`: its object, "" if none) controlled by `by` dealt damage to a permanent (`id`) or a player. */
   | { type: "sourceDealtDamage"; source: ObjectId; by: PlayerId; id?: ObjectId; player?: PlayerId; amount: number; combat?: true; /** Damage to a creature: its toughness as the damage was dealt (Taii Wakeen). */ toughness?: number }
   /**
@@ -891,8 +891,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (d.underControl && ev.controller !== d.controller) continue;
       if (d.ownedByController && o.owner !== d.controller) continue;
       if (d.ifHadCounter && !((ev.counters[d.ifHadCounter] ?? 0) > 0)) continue;
+      // Fight for the Throne: "if you control your commander", as it dies (CR 603.4); checked again as it resolves.
+      if (d.ifCond && !staticConditionNow(s, d.ifCond, d.source?.id ?? ev.id, d.controller)) continue;
       if (d.to?.includes(ev.to) && !diesLocked)
-        s.triggerQueue.push({ sourceId: d.source?.id ?? ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.about ?? { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body, ...(d.source ? { sourceZc: d.source.zc } : {}), ...(d.lkiCounters ? { lki: { counters: { ...ev.counters } } } : {}) });
+        s.triggerQueue.push({ sourceId: d.source?.id ?? ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.about ?? { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body, ...(d.source ? { sourceZc: d.source.zc } : {}), ...(d.lkiCounters ? { lki: { counters: { ...ev.counters } } } : {}), ...(d.ifCond ? { ifCond: d.ifCond } : {}) });
     }
     // Its abilities as it last existed on the battlefield (CR 603.10a): a merged permanent's from all its cards (730.2a),
     // a copy's from what it copied.
@@ -2004,12 +2006,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // controller's permanents, once for each source and player.
     // "Whenever a source you control deals 5 or more damage to a player" (Dragonborn Champion): that much at once (rulings).
     if (ev.by !== undefined) {
+      // Chandra's Phoenix: "by a red planeswalker you control", the source as it dealt the damage (CR 113.7a).
+      const sourceIs = (t: TriggeredAbility) => !t.damageSourceIs || (t.damageSourceIs.colors.every((c) => !!ev.colors?.includes(c)) && t.damageSourceIs.types.every((x) => !!ev.types?.includes(x)));
       for (const id of s.battlefield) {
         const w = obj(s, id);
-        if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "sourceYouControlDamagesOpponent" && (ev.by !== ev.player || !!t.anyPlayer) && !(t.otherSource && ev.source === w.id) && !(t.noncombatOnly && ev.combat) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
+        if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "sourceYouControlDamagesOpponent" && sourceIs(t) && (ev.by !== ev.player || !!t.anyPlayer) && !(t.otherSource && ev.source === w.id) && !(t.noncombatOnly && ev.combat) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
       }
       // Asgardian Inspiration: watched from its owner's graveyard, "you" its owner (CR 113.6m, 109.5).
-      fromGraveyards((w, owner) => owner === ev.by && add(w, owner, (e, t) => e === "sourceYouControlDamagesOpponent" && t.zone === "graveyard" && ev.by !== ev.player && !t.anyPlayer && !t.otherSource && !(t.noncombatOnly && ev.combat) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info));
+      fromGraveyards((w, owner) => owner === ev.by && add(w, owner, (e, t) => e === "sourceYouControlDamagesOpponent" && t.zone === "graveyard" && sourceIs(t) && ev.by !== ev.player && !t.anyPlayer && !t.otherSource && !(t.noncombatOnly && ev.combat) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info));
     }
     // Pain Magnification: "Whenever an opponent is dealt 3 or more damage by a single source": every permanent whose
     // controller that player is an opponent of, once for each source (rulings).

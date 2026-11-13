@@ -1,6 +1,6 @@
 # Roadmap
 
-31,200 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,207 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,857 of
 9,979 (98%).
 
@@ -8582,6 +8582,28 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   of Mount Doom ("When you play a card this way": a trigger on playing the card that one exile let you play), Light Up the
   Night (a flashback cost removing X loyalty counters from among your planeswalkers), Kaboom! (a reveal for each of any
   number of targets) and Delif's Cone stay out.
+- Round B197 (least played first, from the Lane B skip lists): Phyrexian Devourer ("When ~'s power is 7 or greater,
+  sacrifice it": a state trigger, not again while it's on the stack, sacrificed even if its power is lower by then, rulings,
+  CR 603.8; "Exile the top card of your library: Put X +1/+1 counters on ~, where X is the exiled card's mana value": the
+  card its cost exiled, a land 0, CR 202.3; no card, no activation, CR 118.3). Lighthouse Chronologist (level 7+: "At the
+  beginning of each end step, if it's not your turn, take an extra turn after this one": every other player is an opponent
+  here, CR 102.3; the extra turn after that player's, CR 500.7). Chandra's Phoenix ("Whenever an opponent is dealt damage
+  by a red instant or sorcery spell you control or by a red planeswalker you control, return ~ from your graveyard to your
+  hand": from the graveyard, CR 113.6m; a spell's damage and a planeswalker's damage are different events, so one trigger
+  for each kind of source, the planeswalker's colors and types as it dealt the damage, CR 113.7a; a red creature's damage
+  doesn't count). Abby, Merciless Soldier (a cast trigger's tokens "named Cordyceps Infected", one for each mana spent,
+  CR 111.4, 601.2h; it enters under an opponent's control as before). Jocasta, Automaton Avenger ("Whenever you attack with
+  your commander, if this card is in your graveyard, you may return it to the battlefield tapped and attacking": from the
+  graveyard, CR 113.6m, 508.4). Fight for the Throne ("When the creature an opponent controls dies this turn, if you control
+  your commander, you become the monarch": a delayed trigger about that target, CR 603.7c, with an intervening if checked
+  as it dies and as it resolves, CR 603.4; Effect delayed `ifCond`). Outmaneuver ("X target blocked creatures assign their
+  combat damage this turn as though they weren't blocked": decided as it resolves, all of it to the player or planeswalker
+  attacked even if the blockers are gone, rulings, CR 510.1c). +7, 31,207 of 31,936 with B189 to B196 and rounds 348 to 351.
+- Out after round B197 (looked at, not done): Battlefield Thaumaturge ("costs {1} less to cast for each creature it
+  targets": its ruling "{1} per target creature, even if the spell targets a creature more than once" doesn't settle whether
+  one creature targeted twice counts once or twice), Concerted Effort (landwalk and protection granted kind by kind),
+  Delaying Shield (a pay-or-lose-1-life choice for each delay counter removed) and Rootpath Purifier (land cards in your
+  library made basic, a characteristic of cards outside the battlefield) stay out.
 - Out after round B192 (looked at, not done): Garruk, Curse Breaker (its −4: how often "whenever one or more creatures
   attack one of your opponents" triggers when creatures attack two of them still isn't settled by rulings), Charmed
   Pendant (a hybrid symbol of the milled card adds one of its colors: a choice in the middle of a mana ability), Ulamog's

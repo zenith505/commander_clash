@@ -1235,6 +1235,8 @@ export interface DelayedTrigger {
   ownedByController?: true;
   /** With `dies`: "if it has an egg counter on it" (Xira, the Golden Sting): only if it had one as it last existed (CR 603.4). */
   ifHadCounter?: string;
+  /** With `dies`: "if you control your commander" (Fight for the Throne), an intervening if (CR 603.4) checked as it dies and as it resolves. */
+  ifCond?: StaticCondition;
   /** With `dies`: the trigger knows the counters the creature had as it last existed (Heroic Sacrifice's "put its counters on", CR 608.2h). */
   lkiCounters?: true;
   /**

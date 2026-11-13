@@ -248,7 +248,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           if (s.resolving) s.resolving.exiledTopCards = all;
           continue;
         }
-        const ids = p.library.slice(0, Math.max(0, amountNow(s, e.n, { ...ctx, eachOne: pid })));
+        const want = Math.max(0, amountNow(s, e.n, { ...ctx, eachOne: pid }));
+        // The Temporal Anchor: "from the bottom of your library", as many as there are.
+        const ids = e.bottom ? (want ? p.library.slice(-want) : []) : p.library.slice(0, want);
         // Orcish Librarian: `n` of the top `randomOf` cards, picked at random.
         if (e.randomOf !== undefined) {
           const pool = p.library.slice(0, e.randomOf);
@@ -265,7 +267,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         allExiled.push(...ids);
         if (s.resolving) s.resolving.exiledTopCards = e.counters ? [...allExiled] : ids;
         // An empty library: nothing happens (ingest rulings).
-        if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, s.objects[id]!).name).join(", ")} from the top of their library.`);
+        if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, s.objects[id]!).name).join(", ")} from the ${e.bottom ? "bottom" : "top"} of their library.`);
         // Only permanent cards can be put onto the battlefield (CR 110.4b); they enter at the same time.
         const put = e.putAll ? ids.filter((id) => p.exile.includes(id) && printedMatches(e.putAll!, defOf(s, obj(s, id))) && isPermanentCard(defOf(s, obj(s, id)))) : [];
         if (put.length) {
@@ -962,7 +964,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         log(s, `${p.name} surveils ${looked.size}${names.length ? `, putting ${names.join(" and ")} into their graveyard` : ""}.`);
       }
       const first = noteScried(s, p.id, e.type);
-      fireEvent(s, { type: "scried", player: p.id, how: e.type, n: looked.size, ...(first ? { firstSurveil: true as const } : {}) });
+      fireEvent(s, { type: "scried", player: p.id, how: e.type, n: looked.size, ...(first ? { firstSurveil: true as const } : {}), ...(e.type === "scry" && arranged.away.length ? { bottom: arranged.away.length } : {}) });
       return;
     }
     case "revealDrawn": {

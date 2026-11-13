@@ -3,6 +3,7 @@ import type { AbilityBody, CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseSentence } from "./sentence";
 import { parsePlayer } from "./targets";
+import { round347Sentence } from "./round347";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -12,7 +13,9 @@ const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 const chosenTargets = new WeakMap<Ctx, { index: number; n: number }>();
 
 export function round345Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void effects;
+  // Round 347's sentences first (oracle/round347.ts).
+  const r347 = round347Sentence(s, sentences, si, ctx, effects);
+  if (r347 !== null) return r347;
   const line = plain(s);
   // Last Night Together: "Choose two target creatures. Untap them.": two different target creatures (CR 115.3), chosen as
   // it's cast (CR 601.2c), untapped as it resolves.

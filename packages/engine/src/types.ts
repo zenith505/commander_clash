@@ -492,6 +492,8 @@ export interface GameObject {
     cost?: string;
     /** "A spell cast this way costs {2} more to cast" (Soul Partition, Elite Spellbinder). */
     more?: number;
+    /** "Spells you cast this way cost {2} less to cast" (Urianger Augurelt): this much generic mana less (CR 601.2f). */
+    less?: number;
     /** Mavinda, Students' Advocate: "If that spell doesn't target a creature you control, it costs {8} more to cast this way" (a graveyard permission; CastFromGraveyard.moreUnlessTargets). */
     moreUnlessTargets?: { n: number; filter: TargetSpec };
     /** "You may play one of those cards" (Nashi): the cards of one group, of which only one may be played (GameState.oneOfUsed). */

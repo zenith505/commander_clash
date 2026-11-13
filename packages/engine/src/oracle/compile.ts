@@ -41,6 +41,7 @@ import { roundB186Line } from "./laneb186";
 import { roundB187Line } from "./laneb187";
 import { round345Chapter, round345Line } from "./round345";
 import { round346Line } from "./round346";
+import { round347Line } from "./round347";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -5938,6 +5939,7 @@ export function compile(d: CardDef): CompiledCard {
     if (round345Line(line, out, isSpell)) continue;
     // Greater Gargadon: "...: Remove a time counter from ~. Activate only if ~ is suspended." (round 346).
     if (round346Line(line, raw, out, isSpell)) continue;
+    if (round347Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -7387,8 +7389,11 @@ function linkExile(out: CompiledCard) {
     const fromHand = all.filter((e): e is Extract<Effect, { type: "discard" }> => e.type === "discard" && !!e.exile);
     // King Narfi's Betrayal: "you may exile a creature or planeswalker card from each graveyard", linked as it's parsed.
     const fromYards = all.filter((e) => e.type === "chooseFromGraveyard" && e.dest === "exile" && !!e.linked);
-    const others = all.filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong", "search", "chooseFromGraveyard", "pick"].includes(e.type) && !(e.type === "pick" && e.action !== "exile") && !fromYards.includes(e));
-    if (out.spell || fromHand.length + fromYards.length !== 1 || others.length) out.unsupported.push("(plays an exiled card it can't link to one exile ability)");
+    // Urianger Augurelt, Lobelia, Defender of Bag End: its one face-down exile from the top of libraries, which links the
+    // cards it exiles as it resolves (with no permission of its own).
+    const faceDown = all.filter((e) => e.type === "exileFaceDown" && e.from === "top" && !e.play && !e.foretold && !e.endStepHand && !e.upkeepGraveyard && (!e.pickOne || !!e.optional));
+    const others = all.filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong", "search", "chooseFromGraveyard", "pick"].includes(e.type) && !(e.type === "pick" && e.action !== "exile") && !fromYards.includes(e) && !faceDown.includes(e));
+    if (out.spell || fromHand.length + fromYards.length + faceDown.length !== 1 || others.length) out.unsupported.push("(plays an exiled card it can't link to one exile ability)");
     else if (fromHand[0]) fromHand[0].linked = true;
   }
   // Ugin's Labyrinth: "If a card is exiled with ~" and "Return the exiled card to its owner's hand" are about the card its

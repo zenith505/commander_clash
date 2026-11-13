@@ -463,18 +463,20 @@ function yardGranted(s: GameState, o: GameObject): CompiledCard["activated"] {
  * creature cards still exiled with that permanent as the object it is now (CR 607.2a, 400.7).
  */
 export function exiledLentTo(s: GameState, o: GameObject): CardDef[] {
-  // Agatha's Soul Cauldron lends them to creatures with +1/+1 counters, Hazel's Brewmaster to Foods: nothing to look
-  // for on anything else.
-  if (o.zone !== "battlefield" || !s.linkedExile || !((o.counters["+1/+1"] ?? 0) > 0 || characteristics(s, o).subtypes.includes("Food"))) return [];
+  // Agatha's Soul Cauldron lends them to creatures with +1/+1 counters, Hazel's Brewmaster to Foods, Steward of the
+  // Harvest to creatures: only from a permanent with cards linked to it, so those are the ones to look at.
+  if (o.zone !== "battlefield" || !s.linkedExile) return [];
   const out: CardDef[] = [];
   const you = characteristics(s, o).controller;
-  for (const id of s.battlefield) {
-    const p = s.objects[id]!;
+  for (const [key, links] of Object.entries(s.linkedExile)) {
+    const at = key.lastIndexOf("@");
+    const p = s.objects[key.slice(0, at)];
+    if (p?.zone !== "battlefield" || String(p.zoneChanges ?? 0) !== key.slice(at + 1)) continue;
     const pc = characteristics(s, p);
     if (pc.controller !== you || !pc.hasPrintedAbilities) continue;
     const lend = compileCard(defOf(s, p)).lendsExiled;
     if (!lend || !objectMatches(s, lend.to, o, you, false)) continue;
-    for (const l of s.linkedExile[`${p.id}@${p.zoneChanges ?? 0}`] ?? []) {
+    for (const l of links) {
       const card = s.objects[l.id];
       if (card?.zone === "exile" && (card.zoneChanges ?? 0) === l.zc && printedMatches(lend.cards, defOf(s, card))) out.push(defOf(s, card));
     }
@@ -521,6 +523,14 @@ export function lendersOf(s: GameState, o: GameObject, b: NonNullable<CompiledCa
         const card = s.objects[l.id];
         if (card?.zone === "exile" && (card.zoneChanges ?? 0) === l.zc && printedMatches(b.filter, defOf(s, card))) out.cards.push(defOf(s, card));
       }
+    } else if (b.exiledWithCounter) {
+      // Rex, Cyber-Hound: every exiled card with a brain counter on it, whoever owns it and however it got there; their
+      // printed activated abilities (rulings), "~" in them being this permanent.
+      for (const pid of s.turnOrder)
+        for (const id of s.players[pid]!.exile) {
+          const card = s.objects[id]!;
+          if ((card.counters[b.exiledWithCounter] ?? 0) > 0 && printedMatches(b.filter, defOf(s, card))) out.cards.push(defOf(s, card));
+        }
     } else if (b.top) {
       const top = s.objects[s.players[c.controller]!.library[0] ?? ""];
       if (top && printedMatches(b.filter, defOf(s, top))) out.cards.push(defOf(s, top));

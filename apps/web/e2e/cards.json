@@ -4627,6 +4627,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a41e632f-9d36-44d2-b1dd-e17df0d2486e",
+  "name": "Breathkeeper Seraph",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Creature — Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flying, soulbond (You may pair this creature with another unpaired creature when either enters. They remain paired for as long as you control both of them.)\nAs long as Breathkeeper Seraph is paired with another creature, each of those creatures has \"When this creature dies, you may return it to the battlefield under its owner's control at the beginning of your next upkeep.\"",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Soulbond"
+  ],
+  "commanderLegal": "legal",
+  "set": "voc",
+  "releasedAt": "2021-11-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "482889f4-6cf5-457f-9f52-a3f841e038b5",
   "name": "Bribe Taker",
   "manaCost": "{5}{G}",
@@ -35922,6 +35955,41 @@
   "set": "eoe",
   "releasedAt": "2025-08-01",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "82e03151-3990-451c-99cc-c7d386872df2",
+  "name": "Timothar, Baron of Bats",
+  "manaCost": "{4}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Vampire Noble",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vampire",
+   "Noble"
+  ],
+  "oracleText": "Ward—Discard a card.\nWhenever another nontoken Vampire you control dies, you may pay {1} and exile it. If you do, create a 1/1 black Bat creature token with flying. It gains \"When this token deals combat damage to a player, sacrifice it and return the exiled card to the battlefield tapped.\"",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "voc",
+  "releasedAt": "2021-11-19",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

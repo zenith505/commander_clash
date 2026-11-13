@@ -44,6 +44,7 @@ import { round346Line } from "./round346";
 import { round347Line } from "./round347";
 import { round348Line } from "./round348";
 import { round349Line } from "./round349";
+import { round350Line } from "./round350";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -931,6 +932,11 @@ export function compile(d: CardDef): CompiledCard {
     if (borrowLinked && !out.borrows) {
       const kind = borrowLinked[1] ? capital(borrowLinked[1]) : undefined;
       out.borrows = { filter: { kind: "card", ...(kind ? { types: [kind], notTypes: [], notColors: [] } : {}), text: `${borrowLinked[1] ? `${borrowLinked[1]} ` : ""}cards exiled with ~` }, linked: true };
+      continue;
+    }
+    // Rex, Cyber-Hound: "all cards in exile with brain counters on them" (round 350).
+    if (borrow && !out.borrows && !borrow[2] && !borrow[3] && borrow[1] === "all cards in exile with brain counters on them") {
+      out.borrows = { filter: { kind: "card", types: [], notTypes: [], notColors: [], text: "cards" }, exiledWithCounter: "brain" };
       continue;
     }
     if (borrow && !out.borrows) {
@@ -5946,6 +5952,7 @@ export function compile(d: CardDef): CompiledCard {
     if (round348Line(line, raw, out, isSpell)) continue;
     // Hot Pursuit: control of every goaded or suspected creature once two players have lost (round 349).
     if (round349Line(line, raw, out, isSpell)) continue;
+    if (round350Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,

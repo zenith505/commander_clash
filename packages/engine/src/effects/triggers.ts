@@ -3358,7 +3358,7 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
   // look at the game after the event (they aren't leaves-the-battlefield abilities, CR 603.10a), so a Hushbringer that left
   // at the same time, or is the card, doesn't stop them (rulings).
   if (b.what === "toGraveyard" && m.from === "battlefield" && m.to === "graveyard" && m.chars?.types.includes("Creature") && dyingLocked(s, false)) return false;
-  if (b.what === "toGraveyard") return m.to === "graveyard" && m.from !== "graveyard" && !(b.other && m.id === w.id) && whose(m.owner) && (!b.milled || !!m.milled) && (!b.from || (b.from === "notBattlefield" ? m.from !== "battlefield" : m.from === b.from));
+  if (b.what === "toGraveyard") return m.to === "graveyard" && m.from !== "graveyard" && !(b.other && m.id === w.id) && whose(m.owner) && (!b.milled || !!m.milled) && (!b.from || (b.from === "notBattlefield" ? m.from !== "battlefield" : b.from === "handOrLibrary" ? m.from === "hand" || m.from === "library" : m.from === b.from));
   return m.discardedBy !== undefined && whose(m.discardedBy);
 }
 

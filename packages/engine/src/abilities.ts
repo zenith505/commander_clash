@@ -4555,6 +4555,14 @@ export type Effect =
    * after this one (ResolvingInfo.revealed, the card as the object it is in exile, CR 400.7). An empty library, none.
    */
   | { type: "exileTopAsIt"; who: PlayerRef }
+  /** Timothar, Baron of Bats: "If you do, create a 1/1 black Bat creature token ... It gains "When this token deals combat
+   * damage to a player, sacrifice it and return the exiled card to the battlefield tapped."": the trigger's card, just
+   * exiled by this ability, becomes "the exiled card" of each token it created (GameState.linkedExile, CR 607.2a, rulings). */
+  | { type: "linkSubjectCardToCreated" }
+  /** Desert Warfare: "put that card onto the battlefield under your control at the beginning of your next end step": one
+   * delayed trigger (CR 603.7) for each of these cards as it is now, at this ability's controller's next end step; it comes
+   * back only if it's still in the graveyard then (rulings, CR 400.7). */
+  | { type: "putAtYourNextEndStep"; what: ObjRef }
   /**
    * Omen Machine, Wild Evocation: "the player casts it without paying its mana cost if able": the card "it" names
    * (ResolvingInfo.revealed, in a hand or in exile, still that object), cast by `who` as this resolves (CR 608.2g), for
@@ -6765,7 +6773,7 @@ export interface BatchTrigger {
   dies?: true;
   notDies?: true;
   /** `notBattlefield`: "from anywhere other than the battlefield" (Syr Konrad). */
-  from?: "library" | "battlefield" | "notBattlefield";
+  from?: "library" | "battlefield" | "notBattlefield" | /** Desert Warfare: "from your hand or library". */ "handOrLibrary";
   to?: "exile";
   /** "Whenever a creature card leaves your graveyard" (not "one or more"): once for each card it moved (CR 603.2c). */
   each?: true;
@@ -7593,7 +7601,7 @@ export interface CompiledCard {
    * its controller's). "~" in them means this object (rulings). Only activated abilities: not triggered or static ones.
    * Abilities that work only from a hand or graveyard, equip and loyalty abilities aren't borrowed.
    */
-  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true; /** Conspicuous Snoop: the top card of your library, while it matches `filter`. */ top?: true; /** "You may spend mana as though it were mana of any color to activate those abilities" (Drana and Linvala, CR 609.4b). */ anyColor?: true; /** "All loyalty abilities" (Nicol Bolas, Dragon-God): only those. */ loyalty?: true; /** "All cards exiled with it" (Myr Welder, Dark Impostor, Patchwork Crawler): the cards matching `filter` still exiled with this object by its one exile ability (CR 607.2a, 400.7). */ linked?: true };
+  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true; /** Conspicuous Snoop: the top card of your library, while it matches `filter`. */ top?: true; /** "You may spend mana as though it were mana of any color to activate those abilities" (Drana and Linvala, CR 609.4b). */ anyColor?: true; /** "All loyalty abilities" (Nicol Bolas, Dragon-God): only those. */ loyalty?: true; /** "All cards exiled with it" (Myr Welder, Dark Impostor, Patchwork Crawler): the cards matching `filter` still exiled with this object by its one exile ability (CR 607.2a, 400.7). */ linked?: true; /** "All cards in exile with brain counters on them" (Rex, Cyber-Hound): every player's exiled cards with a counter of this kind, however they got it. */ exiledWithCounter?: CounterKind };
   spell?: AbilityBody; // instants and sorceries
   /**
    * "As this creature transforms into Sephiroth, One-Winged Angel, you get an emblem with ..." (a back face's): done while

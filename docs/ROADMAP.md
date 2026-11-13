@@ -1,7 +1,7 @@
 # Roadmap
 
-31,132 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,846 of
+31,137 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,851 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2398,6 +2398,27 @@ line blocks.
    They're 5/5 artifact creatures." (CR 708.2, a face-down instant or sorcery stays face down), with a browser test.
    +4, 30,978 of 31,936 with B173 through B176. Bots activate Sasaya only when the flip happens, cast The Master with an exile only when one of
    their creatures has an enters trigger worth copying, and put all of their hand onto the battlefield with Tezzeret.
+   Round 350 went on down the "Out after round N" lists and `npm run popular`, most played first, to abilities linked to
+   cards in exile or a graveyard: Breathkeeper Seraph's soulbond-granted "When this creature dies, you may return it to the
+   battlefield under its owner's control at the beginning of your next upkeep." (a delayed trigger about the card in the
+   graveyard, CR 603.7, at the next upkeep of the player who controlled it as it died, the choice made as it resolves),
+   with a browser test; Timothar, Baron of Bats's "you may pay {1} and exile it. If you do, create a 1/1 black Bat ...
+   It gains "When this token deals combat damage to a player, sacrifice it and return the exiled card to the battlefield
+   tapped."" (the exiled card linked to each Bat it made, CR 607.2a, rulings; under the Bat's controller then; no payment
+   if the card has left the graveyard), with a browser test; Desert Warfare's two-event trigger "Whenever you sacrifice a
+   Desert and whenever a Desert card is put into your graveyard from your hand or library, put that card onto the
+   battlefield under your control at the beginning of your next end step." (BatchTrigger from `handOrLibrary`) and its
+   five-Desert Sand Warriors (an intervening if, CR 603.4; haste with no duration, CR 611.2a); Steward of the Harvest's
+   "Creatures you control have all activated abilities of all land cards exiled with ~." (CompiledCard.lendsExiled, a
+   basic land type's mana ability among them, CR 305.6, rulings; exiledLentTo now looks at the permanents with linked
+   cards, so any creature can be lent abilities); Rex, Cyber-Hound's "Choose target creature card in a graveyard. Exile it
+   with a brain counter on it." and "~ has all activated abilities of all cards in exile with brain counters on them."
+   (borrows `exiledWithCounter`, any player's exile). +5, 31,137 of 31,936 with rounds 348 and 349.
+   Out after round 350 (looked at, not done): Pulmonic Sliver (a granted optional "you may put it on top of its owner's
+   library instead" for every Sliver: moveObject can't stop to ask, and several dying at once are ordered by their owner,
+   rulings); Archelos, Lagoon Mystic (still out: the entering permanent's controller chooses tapped or untapped when another
+   "enters tapped" applies, rulings); Mairsil, the Pretender (borrowed abilities each usable only once each turn, and its
+   exile "from your hand or graveyard" with a cage counter).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

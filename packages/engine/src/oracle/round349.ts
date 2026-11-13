@@ -6,6 +6,7 @@ import type { CompiledCard, Effect, TargetSpec } from "../abilities";
 import type { Ctx } from "./body";
 import { parseSearchFilter } from "./search";
 import { parsePlayer } from "./targets";
+import { round350Sentence } from "./round350";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -14,6 +15,9 @@ const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 const LAND: TargetSpec = { kind: "card", types: ["Land"], notTypes: [], notColors: [], text: "land card" };
 
 export function round349Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 350's sentences first (oracle/round350.ts).
+  const r350 = round350Sentence(s, sentences, si, ctx, effects);
+  if (r350) return r350;
   const line = plain(s);
   // Gate to the Aether: "that player reveals the top card of their library. If it's an artifact, creature, enchantment, or
   // land card, the player may put it onto the battlefield.": the upkeep's player decides, and it enters under their control

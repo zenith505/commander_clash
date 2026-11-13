@@ -52,8 +52,9 @@ export function manaAbilitiesOn(s: GameState, o: GameObject): ManaAbility[] {
     }
     for (const d of cards) out.push(...d.subtypes.map(basicLandManaAbility).filter((x): x is ManaAbility => x !== null), ...compileCard(d).mana);
   }
-  // Agatha's Soul Cauldron: the exiled creature cards' mana abilities too.
-  if (c.hasPrintedAbilities) for (const d of exiledLentTo(s, o)) out.push(...compileCard(d).mana);
+  // Agatha's Soul Cauldron: the exiled creature cards' mana abilities too. Steward of the Harvest: a land card's basic land
+  // types' among them (CR 305.6, rulings).
+  if (c.hasPrintedAbilities) for (const d of exiledLentTo(s, o)) out.push(...(d.types.includes("Land") ? d.subtypes.map(basicLandManaAbility).filter((x): x is ManaAbility => x !== null) : []), ...compileCard(d).mana);
   // "If ~ has a luck counter on it, instead add one mana of any color" (Gemstone Caverns): what it makes now.
   const swapped = out.map((ab) => (ab.insteadIf && staticConditionNow(s, ab.insteadIf.cond, o.id, controllerOf(s, o)) ? { ...ab, produces: ab.insteadIf.produces } : ab));
   // Thran Portal: its own mana abilities cost life too, not those another permanent borrows from it (rulings).

@@ -73,9 +73,12 @@ test("Kaya the Inexorable's emblem: at your upkeep, cast Isamaru from your grave
   const ctl = controls(page);
   await expect(ctl).toContainText("cast a legendary spell from your hand, graveyard or exile without paying its mana cost?");
   await ctl.getByRole("button", { name: "Isamaru, Hound of Konda (graveyard)" }).click();
-  await resolveUntil(page, (st) => st.pending?.kind === "castFree");
+  // The cast comes as the emblem's upkeep trigger resolves: checked on the state that poll saw. Once Isamaru has resolved
+  // the app may auto-pass on into the draw step before the next poll, so the step isn't read after that (follow-up 7).
+  const asked = await resolveUntil(page, (st) => st.pending?.kind === "castFree");
+  expect([asked.step, asked.activePlayer]).toEqual(["upkeep", 0]);
   await ctl.getByRole("button", { name: "Cast it" }).click();
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && st.objects[isamaru]!.zone === "battlefield");
-  expect(after.step).toBe("upkeep");
+  expect([after.turn, after.activePlayer]).toEqual([asked.turn, 0]);
   expect(pageErrors(page)).toEqual([]);
 });

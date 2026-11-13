@@ -1,7 +1,7 @@
 # Roadmap
 
-31,235 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,870 of
+31,239 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,873 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2515,6 +2515,29 @@ line blocks.
    is the greatest power among creature cards in all graveyards"); Emergent Ultimatum (an opponent chooses one of the cards
    found, then the others are cast free as it resolves, rulings); Brutal Hordechief (still out: you choose how opponents'
    creatures block).
+   Round 355 went on down `npm run popular` and the "Out after round N" lists, most played first, to casts bound by
+   another spell and copies that must be cast: Spelltwine's "Exile target instant or sorcery card from your graveyard and
+   target instant or sorcery card from an opponent's graveyard. Copy those cards. Cast the copies if able without paying
+   their mana costs." (castFromAmong fromYard `alsoTarget` and `must`: either card still legal is exiled and copied,
+   rulings, CR 608.2b; the copies are cast from exile in the order you pick, rulings, each one that can be cast having to
+   be, castFree `must`, and no "Done"), with a browser test of the order and of the copy that can't be declined; Baral and
+   Kari Zev's "you may cast a spell with lesser mana value that shares a card type with it from your hand without paying
+   its mana cost. If you don't, create First Mate Ragavan, ..." (castFromHand `lesserSharingCast`: the triggering spell's
+   mana value as it was cast, X included, CR 202.3e, and its card types, both checked on the spell as it's cast through
+   castFree `mv` and `types`; cast as the trigger resolves, timing ignored, rulings), with a browser test; Chiss-Goria,
+   Forge Tyrant's "You may cast an artifact spell from among them this turn. If you do, it has affinity for artifacts."
+   (impulse and GameObject.mayPlay `affinity`: {1} less for each artifact its caster controls, generic mana only, CR
+   702.41a, 601.2f); Synthetic Destiny's "Exile all creatures you control. At the beginning of the next end step, reveal
+   cards from the top of your library until you reveal that many creature cards, ..." (a delayed trigger remembering how
+   many creatures were exiled as it resolved, tokens and a commander too, rulings). +4, 31,218 of 31,936 with round 354.
+   The compiled text of every other card is unchanged.
+   Out after round 355 (looked at, not done): Jon Irenicus, Shattered One (still out: "target opponent gains control of
+   up to one target creature you control", goaded "for the rest of the game", and "This creature can't be sacrificed"
+   granted to it; "a creature you own but don't control attacks" isn't a trigger filter yet); Altaïr Ibn-La'Ahad (memory
+   counters on exiled cards, and a tapped and attacking token copy of each one, each token's defender chosen separately,
+   rulings); Monstrous Emergence ("choose a creature you control or reveal a creature card from your hand" as an
+   additional cost, then that one's power); Arni Metalbrow ("attacks or enters attacking", then a creature card with
+   lesser mana value than that creature put onto the battlefield tapped and attacking).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -8713,7 +8736,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   trigger on the new declare attackers step event, CR 603.7, attacking a player or planeswalker its controller chooses as
   it enters, CR 508.4, never having "attacked", rulings; the step now happens even with no attackers when such a trigger
   is due, CR 508.8; Noctis "can't be blocked that combat"; a token doesn't come back, CR 111.8). The punisher prompt for
-  "you" and "that player" now reads "If you do". +6, 31,235 of 31,936 with B189 to B198 and rounds 348 to 354.
+  "you" and "that player" now reads "If you do". +6, 31,239 of 31,936 with B189 to B198 and rounds 348 to 355.
 - Out after round B199 (looked at, not done): Over the Top (each player's revealed permanent cards onto the battlefield at
   once, Auras among them attached as they enter), Lich's Mirror (losing the game replaced by shuffling your hand, graveyard
   and every permanent you own, even ones others control, into your library), Mana Cache (a mana ability any player may

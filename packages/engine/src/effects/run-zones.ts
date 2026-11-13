@@ -1398,11 +1398,18 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const zone = milled ?? (e.fromGraveyard ? p.graveyard : p.hand);
       // Twinning Glass: the names of the spells cast this turn, by anyone (rulings); a face-down spell has none (CR 708.2a).
       const names = e.sameNameCastThisTurn ? [...new Set((s.castThisTurn ?? []).flatMap((c) => c.name?.split(" // ") ?? []))] : undefined;
+      // Baral and Kari Zev: the triggering spell as it was cast (CR 202.3e, its X included), or as it last existed on the
+      // stack (CR 608.2h): a spell cast this way must have a lesser mana value and share one of its card types, both checked
+      // on the spell as it's cast (a split card's half, an Adventure, a modal double-faced card's face, CR 709.3, 715.3, 712.11).
+      const cause = e.lesserSharingCast && ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+      if (e.lesserSharingCast && !cause) return;
+      const causeObj = cause?.objectId ? s.objects[cause.objectId] : undefined;
+      const lesser = cause ? { mv: { max: spellManaValue(s, cause) - 1 }, types: [...(causeObj?.zone === "stack" ? characteristics(s, causeObj).types : causeObj ? defOf(s, causeObj).types : [])] } : undefined;
       const castable = (id: ObjectId) => {
-        s.pending = { kind: "castFree", player: p.id, objectId: id, source: src, ...(names ? { names } : {}) };
+        s.pending = { kind: "castFree", player: p.id, objectId: id, source: src, ...(names ? { names } : {}), ...(lesser ?? {}) };
         // With names: some way to cast it has one (a split card's half, an Adventure, a back face, CR 709.3, 715.3, 712.11).
         const d = defOf(s, obj(s, id));
-        const faces = names && d.faces?.length ? [undefined, ...d.faces.map((_, i) => i), ...(d.layout === "split" ? [d.faces.length] : [])] : [undefined];
+        const faces = (names || lesser) && d.faces?.length ? [undefined, ...d.faces.map((_, i) => i), ...(d.layout === "split" ? [d.faces.length] : [])] : [undefined];
         const ok = faces.some((face) => {
           const problem = castProblem(s, p.id, id, undefined, undefined, undefined, undefined, undefined, face === undefined ? undefined : { face });
           return problem === null || /^not enough mana/.test(problem);
@@ -1438,7 +1445,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       sc.castFromHandId = id;
       if (!s.objects[id] || (milled ? !milled.includes(id) : obj(s, id).zone !== (e.fromGraveyard ? "graveyard" : "hand")) || !castable(id)) return;
       if (e.fromGraveyard) sc.castFromYard = id;
-      s.pending = { kind: "castFree", player: p.id, objectId: id, source: src, ...(names ? { names } : {}) };
+      s.pending = { kind: "castFree", player: p.id, objectId: id, source: src, ...(names ? { names } : {}), ...(lesser ?? {}) };
       return "paused";
     }
     case "castFromAmong": {
@@ -1610,7 +1617,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       if (!sc.castAmong && e.fromYard) {
         // Mizzix's Mastery: the target card if it's still legal, or (overloaded) each one in your graveyard, all exiled.
-        const ids = e.fromYard.target !== undefined ? objects(s, { ref: "target", index: e.fromYard.target, ...(e.fromYard.many ? { n: e.fromYard.n ?? 1 } : {}) }, ctx).map((o) => o.id) : you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
+        // Spelltwine: both target cards, each still legal (rulings: one illegal target, the other is still exiled and copied).
+        const ids = e.fromYard.target !== undefined ? [e.fromYard.target, ...(e.fromYard.alsoTarget !== undefined ? [e.fromYard.alsoTarget] : [])].flatMap((index) => objects(s, { ref: "target", index, ...(e.fromYard!.many ? { n: e.fromYard!.n ?? 1 } : {}) }, ctx).map((o) => o.id)) : you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
         for (const id of ids) moveObject(s, id, "exile");
         const gone = ids.filter((id) => obj(s, id).zone === "exile");
         if (gone.length) log(s, `${you.name} exiles ${gone.map((id) => `${defOf(s, obj(s, id)).name}${obj(s, id).owner === you.id ? "" : ` (${player(s, obj(s, id).owner).name}'s)`}`).join(", ")} from ${gone.every((id) => obj(s, id).owner === you.id) ? "their" : "a"} graveyard.`);
@@ -1840,7 +1848,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, `${src} copies ${defOf(s, obj(s, pick)).name}${e.copyTimes ? ` (copy ${(st.copied?.[pick] ?? 0) + 1} of ${e.copyTimes})` : ""}.`);
           st.casting = copy.id;
           st.copyOf = pick;
-          s.pending = { kind: "castFree", player: you.id, objectId: copy.id, source: src, ...(mv ? { mv } : {}), ...(e.paid || e.pay?.kind === "mana" ? { how: "paid" as const } : {}), ...(e.pay ? { pay: e.pay } : {}) };
+          s.pending = { kind: "castFree", player: you.id, objectId: copy.id, source: src, ...(mv ? { mv } : {}), ...(e.paid || e.pay?.kind === "mana" ? { how: "paid" as const } : {}), ...(e.pay ? { pay: e.pay } : {}), ...(e.must ? { must: true as const } : {}) };
           return "paused";
         }
         s.pending = freeCast(pick);
@@ -1861,6 +1869,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         .filter((id) => !copiedOne.length || copiedOne.includes(id))
         .filter((id) => exiled(id) && !st.declined.includes(id) && id !== st.excluded && !st.ownersCast?.includes(obj(s, id).owner) && (isLand(id) && !e.handAndYard ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || e.handAndYard || e.asSpell || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
       if (!options.length || (maxCast !== undefined && (st.cast ?? 0) >= maxCast)) return finish();
+      // Spelltwine: "Cast the copies if able": no stopping while one can be cast; the order is its player's (rulings), so
+      // only a choice of which one first.
+      if (e.must && options.length === 1) {
+        st.pick = options[0];
+        return runEffect(s, e, ctx);
+      }
+      if (e.must) {
+        s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options, labels: options.map((id) => `${defOf(s, obj(s, id)).name}${obj(s, id).owner === you.id ? "" : ` (${player(s, obj(s, id).owner).name}'s)`}`), prompt: "cast a copy of which card first, without paying its mana cost? You cast the other copy after it, if able." };
+        return "paused";
+      }
       if (e.look && options.length === 1) {
         // Planetarium: the one card looked at is offered as the free cast itself (cast it, or decline).
         st.pick = options[0];
@@ -4766,7 +4784,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (e.castFilter && !printedMatches(e.castFilter, defOf(s, o))) continue;
         // Nahiri: free only if it's an Equipment card.
         const free = e.free && (!e.freeFor || printedMatches(e.freeFor, defOf(s, o)));
-        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.until === "whileControlled" && ctx.sourceId ? { source: { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 } } : {}), ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(oneOf && e.oneOfMax ? { oneOfMax: e.oneOfMax } : {}), ...(e.spellFilter ? { castFilter: e.spellFilter } : {}), ...(another ? { untilAnother: another } : {}), ...(free ? { free: true as const } : {}), ...(free && e.orPay ? { orPay: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.life ? { life: true as const } : {}), ...(e.attackedWithToken ? { attackedWithToken: true as const } : {}), ...(e.attackedWithCommander ? { attackedWithCommander: true as const } : {}), ...(e.attackedWithType ? { attackedWithType: e.attackedWithType } : {}), ...(e.attackedWithSource && ctx.sourceId ? { attackedWithSource: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0 } } : {}), ...(e.attackedWithAtLeast ? { attackedWithAtLeast: e.attackedWithAtLeast } : {}), ...(e.loreOnSource && ctx.sourceId ? { loreOn: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0 } } : {}), ...(e.ifControl ? { ifControl: e.ifControl } : {}) };
+        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.until === "whileControlled" && ctx.sourceId ? { source: { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 } } : {}), ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(oneOf && e.oneOfMax ? { oneOfMax: e.oneOfMax } : {}), ...(e.spellFilter ? { castFilter: e.spellFilter } : {}), ...(another ? { untilAnother: another } : {}), ...(free ? { free: true as const } : {}), ...(free && e.orPay ? { orPay: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.life ? { life: true as const } : {}), ...(e.attackedWithToken ? { attackedWithToken: true as const } : {}), ...(e.attackedWithCommander ? { attackedWithCommander: true as const } : {}), ...(e.attackedWithType ? { attackedWithType: e.attackedWithType } : {}), ...(e.attackedWithSource && ctx.sourceId ? { attackedWithSource: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0 } } : {}), ...(e.attackedWithAtLeast ? { attackedWithAtLeast: e.attackedWithAtLeast } : {}), ...(e.loreOnSource && ctx.sourceId ? { loreOn: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0 } } : {}), ...(e.ifControl ? { ifControl: e.ifControl } : {}), ...(e.affinity ? { affinity: e.affinity } : {}) };
         if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
       }
       if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };

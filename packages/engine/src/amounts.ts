@@ -6,7 +6,7 @@
 
 import type { Amount, AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "./abilities";
 import { ANY_COUNTER } from "./abilities";
-import { abilitiesOf, basePowerNow, defOf } from "./cards";
+import { abilitiesOf, basePowerNow, defOf, isType } from "./cards";
 import { compileCard } from "./oracle";
 import { bindChosen, cardPT, isSuspended, objectMatches, printedMatches, ringBearer, spellManaValue, spellPT } from "./effects";
 import { characteristics, controllerOf, staticConditionNow, type Characteristics } from "./layers";
@@ -596,6 +596,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "manifestedThisWay":
       return s.resolving?.manifestedThisWay ?? 0;
     case "parleyRevealed":
+      // Haunting Imitation: the creature cards among them, as they were revealed.
+      if (c.creature) return (s.resolving?.parley?.ids ?? []).filter((id) => s.objects[id] && isType(defOf(s, s.objects[id]!), "Creature")).length;
       return (c.mv ? s.resolving?.parley?.mv : c.land ? s.resolving?.parley?.land : s.resolving?.parley?.nonland) ?? 0;
     case "damageThisWay":
       return (c.capped ? s.resolving?.damageCappedThisWay : s.resolving?.damageThisWay) ?? 0;
@@ -1542,7 +1544,7 @@ function describeCount(c: Count): string {
     case "manifestedThisWay":
       return "#cards manifested";
     case "parleyRevealed":
-      return c.mv ? "the total mana value of the cards revealed" : c.land ? "#land cards revealed" : "#nonland cards revealed";
+      return c.mv ? "the total mana value of the cards revealed" : c.creature ? "#creature cards revealed" : c.land ? "#land cards revealed" : "#nonland cards revealed";
     case "damageThisWay":
       return "the damage dealt";
     case "excessThisWay":

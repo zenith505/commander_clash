@@ -170,7 +170,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         return;
       }
-      if (e.when === "leaves" && e.of && e.thisTurn) {
+      if (e.when === "leaves" && e.of && (e.thisTurn || e.orUntaps)) {
         // "When that creature leaves the battlefield this turn, sacrifice ~" (Kjeldoran Elite Guard): about that permanent as
         // it is now (CR 603.7c, 400.7), whatever zone it goes to (CR 603.6c); its instructions about this ability's source.
         const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -181,7 +181,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         for (const o of objects(s, e.of, ctx)) {
           if (o.zone !== "battlefield") continue;
           addDelayed(s, "leaves", ctx.controller, o, body, src ? cardIdOf(src) : cardIdOf(o));
-          Object.assign(s.delayed![s.delayed!.length - 1]!, { to: ["graveyard", "exile", "hand", "library", "command"], thisTurn: s.turn, ...(src ? { source: { id: src.id, zc: ctx.sourceZc ?? src.zoneChanges ?? 0 } } : {}), ...(about ? { about: { id: about.id, zc: about.zoneChanges ?? 0 } } : {}) });
+          // Merieke Ri Berit: "or becomes untapped", with no end (CR 603.7c).
+          Object.assign(s.delayed![s.delayed!.length - 1]!, { to: ["graveyard", "exile", "hand", "library", "command"], ...(e.thisTurn ? { thisTurn: s.turn } : {}), ...(e.orUntaps ? { orUntaps: true as const } : {}), ...(src ? { source: { id: src.id, zc: ctx.sourceZc ?? src.zoneChanges ?? 0 } } : {}), ...(about ? { about: { id: about.id, zc: about.zoneChanges ?? 0 } } : {}) });
         }
         return;
       }

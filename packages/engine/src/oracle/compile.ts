@@ -35,7 +35,9 @@ import { roundB179Line } from "./laneb179";
 import { roundB182Finish, roundB182Line } from "./laneb182";
 import { roundB183Line } from "./laneb183";
 import { roundB184Line } from "./laneb184";
+import { roundB185Line } from "./laneb185";
 import { round344Line } from "./round344";
+import { roundB186Line } from "./laneb186";
 import { round345Chapter, round345Line } from "./round345";
 import { round346Line } from "./round346";
 
@@ -2047,6 +2049,10 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB183Line(line, raw, out, isSpell)) continue;
     // Kathril, Curse of Inertia, Oppressive Rays, Gloom (round B184).
     if (roundB184Line(line, raw, out, isSpell)) continue;
+    // Prince of Thralls, Volcano Hellion (round B185).
+    if (roundB185Line(line, raw, out, isSpell)) continue;
+    // Round B186.
+    if (roundB186Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

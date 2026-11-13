@@ -7,7 +7,7 @@ import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana
 import { cantSearch } from "./effects/run-library";
 import { GUESS_PROMPT } from "./effects/run-round319";
 import { HOST_OR_NAMED_PROMPT } from "./effects/run-round321";
-import { abilitiesOf, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
+import { abilitiesOf, lethalLeft, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
 import { reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, modeRange, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
@@ -3713,6 +3713,11 @@ function freeAltPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     const plan = castPlan(s, pid, id, false, undefined, "nextFree");
     if (plan) return plan;
   }
+  // Temporal Aperture: the card it revealed on top of our library, for nothing.
+  if (o.zone === "library" && altCost(defOf(s, o), "topFree", s, pid)) {
+    const plan = castPlan(s, pid, id, false, undefined, "topFree");
+    if (plan) return plan;
+  }
   // Court of Locthwain: a card exiled with it, for nothing.
   if (linkedFreeGrant(s, o, pid) >= 0) {
     const plan = castPlan(s, pid, id, false, undefined, "linkedFree");
@@ -5511,6 +5516,16 @@ function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, 
       return controllerOf(s, o) !== pid && objIsType(s, o, "Creature") && power(s, o) >= 3;
     });
     return String(Math.max(r.min, Math.min(r.max, big ? 3 : 4)));
+  }
+  // Volcano Hellion: the chosen amount dealt to us and to its target creature: just enough to destroy an opponent's
+  // creature while that leaves us 10 life or more, else none (our own creature, or one damage can't destroy).
+  const toUs = s.resolving ? allEffects(s.resolving.body.effects).find((e) => e.type === "damage" && e.to.ref === "you" && typeof e.amount === "object" && "count" in e.amount && e.amount.count.kind === "chosenNumber") : undefined;
+  if (toUs && s.resolving) {
+    const t = s.resolving.item.targets?.[0];
+    const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+    if (!o || o.zone !== "battlefield" || !opponents(s, pid).includes(controllerOf(s, o)) || objHasKeyword(s, o, "Indestructible")) return String(r.min);
+    const lethal = Math.max(1, lethalLeft(s, o));
+    return String(player(s, pid).life - lethal >= 10 ? Math.max(r.min, Math.min(r.max, lethal)) : r.min);
   }
   // Scrying Glass: "exactly the chosen number of cards of the chosen color" in a hand we can't see: one is the likeliest.
   if (s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "choose" && !!e.maxHandOf)) return String(r.min);

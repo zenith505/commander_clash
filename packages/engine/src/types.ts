@@ -1221,6 +1221,8 @@ export interface DelayedTrigger {
   thisTurn?: number;
   /** `leaves`: only when it dies, a creature put into a graveyard from the battlefield (CR 700.4). */
   dies?: true;
+  /** `leaves`: "When ~ leaves the battlefield or becomes untapped" (Merieke Ri Berit): the first of either, once (CR 603.7c). */
+  orUntaps?: true;
   /** With `dies`: any permanent, not only a creature (Devouring Tendrils, CR 700.4). */
   anyPermanent?: true;
   /** With `dies`: "When it dies under your control this turn" (Desperate Measures): only while `controller` controlled it as it died. */
@@ -2183,6 +2185,14 @@ export interface GameState {
    * cost": one each, for `player`, from the cards linked to `source` ("id@zc", GameState.linkedExile), this turn only.
    */
   linkedFreeCasts?: { player: PlayerId; source: string; turn: number; sourceName: string; /** "A creature spell" (Idol of Endurance). */ filter?: TargetSpec }[];
+  /** Lumbering Laundry: the players who may look at face-down creatures they don't control until this turn ends (Effect lookFaceDownThisTurn). */
+  lookFaceDownTurn?: { player: PlayerId; turn: number }[];
+  /**
+   * Temporal Aperture: "for as long as that card remains on top of your library, play with the top card of your library
+   * revealed and you may play that card without paying its mana cost", this turn only: `card` is the card as the object it
+   * was (`zc`); the effect ends for good once it isn't on top or the library is shuffled (CR 611.2b, rulings).
+   */
+  topFreePlays?: { player: PlayerId; turn: number; card: ObjectId; zc: number; sourceName: string }[];
   /**
    * "Until end of turn, you may play a card exiled with ~" (Raphael, Most Attitude), "you may cast a creature spell from
    * among cards exiled with ~" (Serpent's Soul-Jar), "you may play cards you own exiled with ~" (Kayla's Music Box): for
@@ -3008,6 +3018,9 @@ export interface Resolving {
     /** Retriever Phoenix (chooseMay `insteadOfLearn`): the cards asked about so far, and the last answer for the last of them. */
     learnInstead?: { asked: ObjectId[]; yes?: boolean };
     found?: ObjectId[]; // the cards a library search found
+    /** Effect "opponentsChooseFromTop" (Manifold Insights): the cards revealed, the ones chosen so far, and the opponents still to choose. */
+    insights?: { revealed: ObjectId[]; chosen: ObjectId[]; left: PlayerId[]; asking?: PlayerId };
+    insightsMoved?: true;
     /** takeFromHand `reveal`: the cards that player revealed from their hand to choose among (Disciple of Phenax). */
     handRevealed?: ObjectId[];
     toughnessGained?: true; // Talara's Bane's life was gained before the discard waited on a choice

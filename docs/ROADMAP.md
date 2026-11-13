@@ -1,7 +1,7 @@
 # Roadmap
 
-31,117 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,976 of 4,988 (99%), top 10,000: 9,832 of
+31,129 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,843 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2398,6 +2398,75 @@ line blocks.
    They're 5/5 artifact creatures." (CR 708.2, a face-down instant or sorcery stays face down), with a browser test.
    +4, 30,978 of 31,936 with B173 through B176. Bots activate Sasaya only when the flip happens, cast The Master with an exile only when one of
    their creatures has an enters trigger worth copying, and put all of their hand onto the battlefield with Tezzeret.
+   Round 347 went on down the "Out after round N" lists and `npm run popular`, most played first, to cards exiled with a
+   permanent or spell that its controller may play: Lobelia, Defender of Bag End's "When ~ enters, look at the top card of
+   each opponent's library and exile those cards face down." (looked at, so its controller may go on looking at them, CR
+   406.3; nobody else may, rulings) and "• Until end of turn, you may play a card exiled with ~ without paying its mana
+   cost." (one of them, any, for free, CR 118.9, with the usual timing, rulings; each activation allows one more, a
+   `oneOf` group for that Lobelia and turn; with a browser test); Gandalf, Goblins' Bane's Flameshape, "Look at the top
+   two cards of your library and exile them face down. For as long as they remain exiled, you may play them if you control
+   a Wizard." (FaceDownPlay.ifControl, as Possibility Technician's, rulings); Urianger Augurelt's Draw Arcanum, "Look at
+   the top card of your library. You may exile it face down." (exileFaceDown `optional`: the card shown in the dig picker,
+   exiled or left on top, with browser tests for each) and Play Arcanum, "Until end of turn, you may play cards exiled with
+   ~. Spells you cast this way cost {2} less to cast." (every card exiled with it as this resolves; generic mana only, CR
+   601.2f, rulings; GameObject.mayPlay.less; with a browser test); The Temporal Anchor's "Whenever you choose to put one
+   or more cards on the bottom of your library while scrying, exile that many cards from the bottom of your library."
+   (a new trigger event, youScryToBottom, once for each scry that put one or more there, CR 701.22a; exileTop `bottom`)
+   and "During your turn, you may play cards exiled with ~." (with the usual costs and timing, rulings). +4, 31,122 of
+   31,936 with B187. The compiled text of every other card is unchanged but Petty Larceny's and Rev, Tithe Extractor's, whose
+   face-down exiles now also say they were looked at (no change in play: they could be looked at already). Bots take
+   Lobelia's free play in their main phase when a card exiled with it could be played now (else the life drain), use
+   Urianger's Draw Arcanum in their second main phase and exile the card, and Play Arcanum in their main phase when a card
+   exiled with it could be played. Still simplified: Play Arcanum and Lobelia's first mode give the permission to the
+   cards exiled with it as the ability resolves (as King Narfi's Betrayal), not to cards exiled with it later that turn.
+   Out after round 347 (looked at, not done): Firesong and Sunspeaker (lifelink given to red instant and sorcery spells,
+   and "a white instant or sorcery spell causes you to gain life", which needs the spell that caused a life gain);
+   Hollow Marauder ("any number of target opponents each discard a card", still out with the other "any number of target
+   players" cards); Everquill Phoenix (the Feather token's quoted "Sacrifice this token" ability); Monstrous Emergence
+   (still out, as after round 320).
+   Round 346 went on down the "Out after round N" lists and `npm run popular`, most played first: Crucible of the Spirit
+   Dragon's "{T}, Remove X storage counters from this land: Add X mana in any combination of colors. Spend this mana only
+   to cast Dragon spells or activate abilities of Dragons." (removeX with `mix`, every multiset of the five colors, CR
+   106.1b, trimmed to one- and two-color mixes past 126 ways as other mixes are; the spend restriction as Dragon spells
+   or abilities of Dragon permanents, rulings; a browser test for the "remove N" buttons and the mix picker); Greater
+   Gargadon's "Sacrifice an artifact, creature, or land: Remove a time counter from this card. Activate only if this card
+   is suspended." (activated from exile by its owner only while suspended, CR 702.62b, 602.1; the counter on the card in
+   exile, ObjRef selfCard; the last counter casts it for free with haste, as any removal of it does, rulings; with a
+   browser test from the exile pile); Detective's Phoenix's "Bestow—{R}, Collect evidence 6" (an alternative cost with
+   an added cost, CR 702.103a, 701.59a; the Phoenix itself can't be evidence, it's on the stack) and "You may cast this
+   card from your graveyard using its bestow ability." (a graveyard permission for the bestow cost only, CR 702.103a; a
+   2/2 creature again after its host leaves, CR 702.103f; with a browser test); Festival of Embers's "During your turn,
+   you may cast instant and sorcery spells from your graveyard by paying 1 life in addition to their other costs." (a
+   graveyard grant on your turn with a life cost, as Noctis's and Hades's, CR 601.2f, h; the spells keep their timing).
+   +4, 31,111 of 31,936 with B185 and B186. The compiled text of every other card is unchanged. Bots sacrifice to Greater Gargadon only
+   what the usual sacrifice-cost rule lets them spare (no lands below eight, no creatures but cheap tokens).
+   Out after round 346 (looked at, not done): Mastermind's Acquisition (outside-the-game wishes stay out on purpose);
+   Tamiyo, Inquisitive Student and Nephalia Academy (their discard replacements cut across every discard path); Sokrates,
+   Athenian Teacher and Swans of Bryn Argoll (draws in the middle of damage, and the damage code can't pause for draw
+   replacements such as dredge); Sunken Palace (mana that copies the ability it's spent on); Spectral Searchlight
+   (another player chooses the color during a mana ability); Obsidian Charmaw (left to Lane B).
+   Round 345 went on down the "Out after round N" lists and `npm run popular`, most played first: Last Night Together's
+   "Choose two target creatures. Untap them. ... After this main phase, there is an additional combat phase. Only the
+   chosen creatures can attack during that combat phase." (the added combat phase only, as the rulings on Bumi, Unleashed
+   say; the targets as they were chosen, still those objects, CR 400.7; one no longer a legal target isn't kept out, CR
+   608.2b); Enduring Angel's "If your life total would be reduced to 0 or less, instead transform this creature and your
+   life total becomes 3. Then if this creature didn't transform this way, you lose the game." (a replacement in loseLife,
+   game.ts lifeZeroReplaced, applied after replacements that make the loss bigger, CR 616.1; the total set to 3, CR 119.5,
+   so from less than 3 it's a life gain other replacements can change; life lost at the same time, several creatures'
+   combat damage, is one event replaced once; a token or single-faced copy can't transform, so you lose, rulings); Extract
+   Brain's "Target opponent chooses X cards from their hand. Look at those cards. You may cast a spell from among them
+   without paying its mana cost." (all of them with fewer, no prompt; cast from that hand as it resolves, with a browser
+   test for each side of the choice: the opponent's pick from their hand is a new searchLibrary prompt, `handFor`); The
+   Aesir Escape Valhalla's chapters linked by "the exiled card" (CR 607.2a, 607.3: chapter I's exile from your graveyard,
+   its mana value as life, then +1/+1 counters, then the Saga and the card back to their owner's hand; round345Chapter).
+   +4, 31,107 of 31,936 with B185 and B186. The compiled text of every other card is unchanged. Bots exile the dearest permanent card for
+   The Aesir Escape Valhalla and give Extract Brain the cards least useful to its caster. Bot gap: a bot holding Extract
+   Brain with mana to spare didn't cast it in a scripted check (it cast its commander and passed).
+   Out after round 345 (looked at, not done): Filigree Vector (still out: "on each of any number of target creatures and
+   ... each of any number of target artifacts" is two variable target groups in one ability, and a flat target list
+   (fitMany) can't say where the first ends; the UI, bots and fitMany need group boundaries first); Bre of Clan Stoutarm
+   (still out: no ruling says whether "Otherwise, put it into your hand" applies when you decline to cast); Pulmonic
+   Sliver and Archelos, Lagoon Mystic (still out, as after round 338 and 322).
    Round 344 went on down the "Out after round N" lists, most played first: Brimaz, Blight of Oreskos ("a Phyrexian
    creature or artifact creature spell" in a cast trigger, and "if a Phyrexian died under your control this turn", an
    intervening if, CR 603.4); The Foretold Soldier's "Whenever this creature deals damage, exile it face down. It becomes
@@ -8249,7 +8318,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cost {2} more to activate": mana abilities too, CR 605.1a). Sigardian Zealot ("choose any number of creatures with
   different powers. Each of them gets +X/+X and gains vigilance until end of turn, where X is ~'s power": X locked in as it
   resolves, CR 608.2h). Chong and Lily, Nomads ("Put a lore counter on each of any number of target Sagas you control": the
-  next chapter triggering, rulings, CR 714.2b; a browser test). +7, 31,070 of 31,936 with B177 to B186 and rounds 336 to 337.
+  next chapter triggering, rulings, CR 714.2b; a browser test). +7, 31,118 of 31,936 with B177 to B186 and rounds 336 to 346.
 - Round B188 (least played first, from the Lane B skip lists): Ral and the Implicit Maze (II: "You may discard a card. If
   you do, exile the top two cards of your library. You may play them until the end of your next turn": both only if you
   discarded, CR 608.2c, the permission ending with your next turn, CR 611.2b; III's Spellgorger Weird a named token).
@@ -8264,7 +8333,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   named Altanak, the Thrice-Called": the library only if you choose, then a shuffle, CR 701.23; a browser test for the
   cost pick, which now reads "2 cards named Say Its Name"). Revival Experiment ("For each permanent type, return up to one
   card of that type from your graveyard ... You lose 3 life for each card returned this way": the six permanent types, CR
-  110.4, a card of two types counting as one of them, rulings; a browser test). +7, 31,117 of 31,936 with B185 to B187 and rounds 338 to 344.
+  110.4, a card of two types counting as one of them, rulings; a browser test). +7, 31,129 of 31,936 with B185 to B187 and rounds 338 to 347.
 - Out after round B188 (looked at, not done): Kang Dynasty (chapters I and II goad creatures of each opponent's choosing
   and draw for their combat damage until your next turn; III is done), Drizzt Do'Urden (its short name "Drizzt" isn't read
   as ~), Long Rest, Time Reaper, Pulsemage Advocate, Heart of Kiran and Turf War stay out.

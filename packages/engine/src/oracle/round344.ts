@@ -4,13 +4,16 @@ import type { CardDef } from "../types";
 import { parseTargetPhrase } from "./targets";
 import type { Ctx } from "./body";
 import { parseSentence } from "./sentence";
+import { round345Sentence } from "./round345";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round344Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void effects;
+  // Round 345's sentences first (oracle/round345.ts).
+  const r345 = round345Sentence(s, sentences, si, ctx, effects);
+  if (r345 !== null) return r345;
   const line = plain(s);
   // The Foretold Soldier: "Whenever this creature deals damage, exile it face down. It becomes foretold." (CR 702.143a, d):
   // the permanent itself, still on the battlefield, castable by its owner on a later turn for its foretell cost.

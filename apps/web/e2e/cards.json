@@ -7341,6 +7341,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ecfbebc9-7fc7-474e-8c59-8ede800e082e",
+  "name": "Crucible of the Spirit Dragon",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{1}, {T}: Put a storage counter on this land.\n{T}, Remove X storage counters from this land: Add X mana in any combination of colors. Spend this mana only to cast Dragon spells or activate abilities of Dragons.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "C",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "frf",
+  "releasedAt": "2015-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e199e183-e857-4dc7-87f4-36b32c4dac96",
   "name": "Cruel Fate",
   "manaCost": "{4}{U}",
@@ -8786,6 +8816,42 @@
   "set": "spg",
   "releasedAt": "2024-04-19",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "52c3fe55-74ee-44cb-b62b-dc6c5dfdc33e",
+  "name": "Detective's Phoenix",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Enchantment Creature — Phoenix",
+  "supertypes": [],
+  "types": [
+   "Enchantment",
+   "Creature"
+  ],
+  "subtypes": [
+   "Phoenix"
+  ],
+  "oracleText": "Bestow—{R}, Collect evidence 6. (To pay this bestow cost, pay {R} and exile cards with total mana value 6 or greater from your graveyard.)\nFlying, haste\nEnchanted creature gets +2/+2 and has flying and haste.\nYou may cast this card from your graveyard using its bestow ability.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Collect evidence",
+   "Haste",
+   "Bestow"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -11392,6 +11458,34 @@
   "commanderLegal": "legal",
   "set": "mmq",
   "releasedAt": "1999-10-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "bb0eb9c2-c26d-452d-9e02-fc0bec2655c4",
+  "name": "Extract Brain",
+  "manaCost": "{X}{U}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target opponent chooses X cards from their hand. Look at those cards. You may cast a spell from among them without paying its mana cost.",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "otc",
+  "releasedAt": "2024-04-19",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -14432,6 +14526,38 @@
   "set": "lea",
   "releasedAt": "1993-08-05",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "406b4b1d-756b-4062-897d-3693832086a0",
+  "name": "Greater Gargadon",
+  "manaCost": "{9}{R}",
+  "cmc": 10,
+  "typeLine": "Creature — Beast",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Beast"
+  ],
+  "oracleText": "Suspend 10—{R}\nSacrifice an artifact, creature, or land: Remove a time counter from this card. Activate only if this card is suspended.",
+  "power": "9",
+  "toughness": "7",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Suspend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -20171,6 +20297,39 @@
   "commanderLegal": "legal",
   "set": "ecl",
   "releasedAt": "2026-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0f2e3e2e-9857-4be5-9bf0-62da1cc147fc",
+  "name": "Lobelia, Defender of Bag End",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Halfling Citizen",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Halfling",
+   "Citizen"
+  ],
+  "oracleText": "When Lobelia enters, look at the top card of each opponent's library and exile those cards face down.\n{T}, Sacrifice an artifact: Choose one —\n• Until end of turn, you may play a card exiled with Lobelia without paying its mana cost.\n• Each opponent loses 2 life and you gain 2 life.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ltc",
+  "releasedAt": "2023-06-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -36865,6 +37024,44 @@
   "set": "leg",
   "releasedAt": "1994-06-01",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7ca584e7-4621-4b4e-a381-a0051acbf66a",
+  "name": "Urianger Augurelt",
+  "manaCost": "{W}{U}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Elf Advisor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Advisor"
+  ],
+  "oracleText": "Whenever you play a land from exile or cast a spell from exile, you gain 2 life.\nDraw Arcanum — {T}: Look at the top card of your library. You may exile it face down.\nPlay Arcanum — {T}: Until end of turn, you may play cards exiled with Urianger Augurelt. Spells you cast this way cost {2} less to cast.",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Draw Arcanum",
+   "Play Arcanum"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

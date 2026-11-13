@@ -643,6 +643,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Hideaway: the most expensive card, to play for free later.
     if (pend.kind === "searchLibrary" && pend.dig && /hideaway/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, 1) }];
+    // Urianger Augurelt: the top card exiled, to be played later for {2} less (and 2 life).
+    if (pend.kind === "searchLibrary" && pend.dig?.to === "to exile face down" && pend.min === 0 && pend.cards.length === 1 && s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "exileFaceDown" && !!x.optional)) return [{ type: "searchLibrary", player: pid, found: [...pend.cards] }];
     if (pend.kind === "searchLibrary" && pend.dig && /face down/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: chooseManifest(s, pid, pend.cards, pend.max) }];
     // "Exile a card from a graveyard" (Cemetery Prowler): an opponent's card if there is one, the one sharing the most card
     // types with the cards in our hand (the exiled card's types matter to these cards), the dearest first.
@@ -662,6 +664,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const keep = player(s, pid).life - pend.cards.length > 10 ? pend.cards.filter((id) => usefulInGraveyard(s, id)) : [];
       return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => !keep.includes(id)).slice(0, pend.max) }];
     }
+    // The Aesir Escape Valhalla: the exiled card's mana value is life now, counters later, and the card comes back to our
+    // hand: the dearest one.
+    const linkedYard = pend.kind === "searchLibrary" && pend.fromGraveyard === "exile" && s.resolving ? s.resolving.body.effects.slice(s.resolving.next ?? 0).some((x) => x.type === "chooseFromGraveyard" && x.linked && x.dest === "exile") && s.resolving.body.effects.some((x) => x.type === "gainLife" && JSON.stringify(x.n).includes('"chosenFromYard"')) : false;
+    if (pend.kind === "searchLibrary" && linkedYard) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, Math.max(pend.min, Math.min(1, pend.max))) }];
     // Exiling cards from our own graveyard: the ones we have no use for there, the cheapest first.
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile")
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => Number(usefulInGraveyard(s, a)) - Number(usefulInGraveyard(s, b)) || mv(s, a) - mv(s, b)).slice(0, pend.min) }];
@@ -5369,7 +5375,7 @@ export function chooseModes(s: GameState, pid: PlayerId, body: AbilityBody, forc
     .map((mode, i) => {
       if (!legal[i]) return null;
       const targets = mode.targets.length ? chooseTargets(s, pid, mode, false, sourceId) : [];
-      return targets ? { i, value: modeValue(s, pid, mode, targets) } : null;
+      return targets ? { i, value: modeValue(s, pid, mode, targets, sourceId) } : null;
     })
     .filter((x): x is { i: number; value: number } => !!x && x.value > 0)
     .sort((a, b) => b.value - a.value);
@@ -5854,11 +5860,24 @@ function takeoverPick(s: GameState, pid: PlayerId, options?: ObjectId[]): Object
 }
 
 /** Rough value of one mode for a bot: removal and card advantage first. */
-function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: TargetChoice[]): number {
+function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: TargetChoice[], sourceId?: string): number {
   const harm = harmfulTargets(body);
   let v = groupValue(s, pid, body) ?? 0;
   for (const e of body.effects) {
     switch (e.type) {
+      // Lobelia, Defender of Bag End: one card exiled with it, free this turn: worth it in our main phase with the stack
+      // empty, for a card we could play right away (a land only with a land play left), the dearer the better.
+      case "mayPlayLinked": {
+        if (!e.all || !e.free || sourceId === undefined) break;
+        const now = s.activePlayer === pid && (s.step === "main1" || s.step === "main2") && !s.stack.length;
+        const best = linkedCards(s, sourceId).filter((l) => s.objects[l.id]?.zone === "exile").reduce((m, l) => {
+          const d = defOf(s, obj(s, l.id));
+          if (isType(d, "Land")) return player(s, pid).landsPlayedThisTurn < landsAllowed(s, pid) ? Math.max(m, 2) : m;
+          return Math.max(m, mv(s, l.id));
+        }, -1);
+        v += now && best >= 0 ? 2 + best : -1;
+        break;
+      }
       case "destroy":
       case "exile":
         v += e.what.ref === "target" ? 10 : 0;
@@ -6182,7 +6201,10 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // (CR 514.1), and take one back when there's room in the hand. Nothing else exiles our hand face down.
       const hand = player(s, pid).hand.length;
       const handRoom = maxHandSize(s, pid) - hand;
-      if (!necro && ab.body.effects.some((e) => e.type === "exileFaceDown" && (e.from !== "handCard" || handRoom >= 0))) continue;
+      // Urianger Augurelt's Draw Arcanum ("you may exile it face down"): in our second main phase, when its other {T} ability
+      // has had its chance in the first.
+      const lookExile = ab.body.effects.some((e) => e.type === "exileFaceDown" && !!e.optional) && s.activePlayer === pid && s.step === "main2" && !s.stack.length;
+      if (!necro && !lookExile && ab.body.effects.some((e) => e.type === "exileFaceDown" && (e.from !== "handCard" || handRoom >= 0))) continue;
       if (ab.body.effects.some((e) => e.type === "moveLinked" && (!linkedOwned(s, id, pid) || (e.dest === "hand" && handRoom <= 0)))) continue;
       // Muse Vessel: in our main phase with the stack empty, for an exiled card we could play now (a land with a land drop
       // left, or a spell we have the mana for after paying for this).

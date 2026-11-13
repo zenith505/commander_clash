@@ -27,6 +27,8 @@ export interface FaceDownPlay {
   free?: true;
   anyType?: true;
   castOnly?: true;
+  /** "You may play them if you control a Wizard" (Gandalf, Goblins' Bane's Flameshape): only while that player controls a permanent like this (GameObject.mayPlay.ifControl). */
+  ifControl?: TargetSpec;
 }
 
 /** What happens to permanents a player picks as an effect resolves: sacrificed, returned to hand, or given counters. */
@@ -2935,7 +2937,7 @@ export type Effect =
    * any order (rulings).
    */
   | { type: "vault"; n: number; life: number }
-  | { type: "exileFaceDown"; from: "top" | "hand" | "handCard"; n?: Amount; look?: true; who?: PlayerRef; /** "Its controller looks at ... and exiles it face down. They may play that card" (Gonti, Night Minister): who exiles, looks and may play; the ability's controller if unset. */ actor?: PlayerRef; play?: FaceDownPlay; upkeepGraveyard?: true; /** "Put that card into your hand at the beginning of your next end step" (Necropotence). */ endStepHand?: true; /** Ethereal Valkyrie: "It becomes foretold. Its foretell cost is its mana cost reduced by {2}.": foretold with that cost (CR 702.143), how much generic mana less. */ foretold?: number; /** "Look at the top two cards of target opponent's library. Exile one of them face down and put the other on the bottom of that library" (Siphon Insight): of the top `n`, the actor exiles the one they choose and the rest go to the bottom. */ pickOne?: true; /** With `pickOne` (Clone Shell): "then put the rest on the bottom of your library in any order", in the order the actor chooses. */ bottomAnyOrder?: true }
+  | { type: "exileFaceDown"; from: "top" | "hand" | "handCard"; n?: Amount; look?: true; who?: PlayerRef; /** "Its controller looks at ... and exiles it face down. They may play that card" (Gonti, Night Minister): who exiles, looks and may play; the ability's controller if unset. */ actor?: PlayerRef; play?: FaceDownPlay; upkeepGraveyard?: true; /** "Put that card into your hand at the beginning of your next end step" (Necropotence). */ endStepHand?: true; /** Ethereal Valkyrie: "It becomes foretold. Its foretell cost is its mana cost reduced by {2}.": foretold with that cost (CR 702.143), how much generic mana less. */ foretold?: number; /** "Look at the top two cards of target opponent's library. Exile one of them face down and put the other on the bottom of that library" (Siphon Insight): of the top `n`, the actor exiles the one they choose and the rest go to the bottom. */ pickOne?: true; /** With `pickOne` (Clone Shell): "then put the rest on the bottom of your library in any order", in the order the actor chooses. */ bottomAnyOrder?: true; /** With `pickOne` (Urianger Augurelt): "Look at the top card of your library. You may exile it face down.": the actor may exile none, and the cards not exiled stay where they are. */ optional?: true }
   /**
    * Cards exiled with ~ (CR 607.2a): "Put all cards exiled with ~ into their owner's graveyard", "Return a card you own
    * exiled with ~ to your hand" (`one`, `yours`), "put all other cards you own exiled with ~ into your hand" (`other`:
@@ -3037,7 +3039,7 @@ export type Effect =
   /** Dubious Challenge: "Target opponent may choose one of the exiled cards and put it onto the battlefield under their control. Put the rest onto the battlefield under your control.": the cards the dig before it exiled (CR 400.7), that player's pick first, then the rest. */
   | { type: "takeOneExiled"; who: PlayerRef }
   /** Muse Vessel: "Choose a card exiled with ~. You may play that card this turn.": one of the cards its exile ability exiled (CR 607.2a), chosen as this resolves; playing it follows the normal rules (timing, mana, a land drop). */
-  | { type: "mayPlayLinked"; /** King Narfi's Betrayal: "Until end of turn, you may cast spells from among cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells": every one of them, not one chosen, spells only, mana of any type (CR 609.4b). */ all?: true; castOnly?: true; anyType?: true }
+  | { type: "mayPlayLinked"; /** King Narfi's Betrayal: "Until end of turn, you may cast spells from among cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells": every one of them, not one chosen, spells only, mana of any type (CR 609.4b). */ all?: true; castOnly?: true; anyType?: true; /** With `all`, Lobelia, Defender of Bag End: "you may play a card exiled with ~ without paying its mana cost": for free (CR 118.9), and (`oneOf`) only one of them for each time this resolves. */ free?: true; oneOf?: true; /** With `all`, Urianger Augurelt: "Spells you cast this way cost {2} less to cast": this much generic mana less (CR 601.2f). */ less?: number }
   | { type: "playLinked"; /** "Play one of them" (Evercoat Ursine): of the cards exiled with it, the one its controller chooses. */ one?: true; /** Kinship's "you may play that card without paying its mana cost" (Leaf-Crowned Elder): the revealed card, from the library. */ revealed?: true; /** "You may cast the exiled card" (Smirking Spelljacker): cast only, never played as a land. */ castOnly?: true; /** "The exiled card's owner may cast that card" (Spell Queller): its owner casts it, not this ability's controller. */ byOwner?: true }
   /** Cipher's spell ability (CR 702.99a): if this spell is a card, you may exile it encoded on a creature you control. */
   | { type: "cipher" }
@@ -4151,7 +4153,7 @@ export type Effect =
   | { type: "returnDiedThisWay"; filter: TargetSpec; /** "Return each card put into a graveyard this way" (Sorin, Lord of Innistrad): all of them, not one. */ each?: true; alsoMods?: Modification[]; /** "Sacrifice it at the beginning of your next end step" (Come Back Wrong). */ atEndStep?: "nextEndStep" | "yourNextEndStep" }
   /** "For each nonland card exiled this way, put a number of time counters on that card equal to its mana value. If it doesn't have suspend, it gains suspend." (The Parting of the Ways): the cards the exileTop before it exiled. */
   | { type: "suspendExiledTop"; filter: TargetSpec }
-  | { type: "exileTop"; who: PlayerRef; n: Amount; /** "If two or more of those cards have the same name, repeat this process" (Scalpelexis): again while a batch has two with the same name. */ repeatSameName?: true; /** Orcish Librarian: "Look at the top eight cards of your library. Exile four of them at random": `n` of the top this many, at random. */ randomOf?: number; /** "If the last card exiled isn't a land card, repeat this process" (Rally the Horde): again while the last card of a batch isn't a land card; every batch's cards are "exiled this way". */ repeatUnlessLastLand?: true; /** The cards are linked to the source, for its "play cards exiled with ~" (CR 607.2a). */ linked?: true; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec; /** "And put a fetch counter on each of them" (Pako, Arcane Retriever): on each card exiled, in exile. */ counters?: Record<string, number> }
+  | { type: "exileTop"; who: PlayerRef; n: Amount; /** "If two or more of those cards have the same name, repeat this process" (Scalpelexis): again while a batch has two with the same name. */ repeatSameName?: true; /** Orcish Librarian: "Look at the top eight cards of your library. Exile four of them at random": `n` of the top this many, at random. */ randomOf?: number; /** "If the last card exiled isn't a land card, repeat this process" (Rally the Horde): again while the last card of a batch isn't a land card; every batch's cards are "exiled this way". */ repeatUnlessLastLand?: true; /** The cards are linked to the source, for its "play cards exiled with ~" (CR 607.2a). */ linked?: true; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec; /** "And put a fetch counter on each of them" (Pako, Arcane Retriever): on each card exiled, in exile. */ counters?: Record<string, number>; /** The Temporal Anchor: "exile that many cards from the bottom of your library": from the bottom instead. */ bottom?: true }
   /**
    * Dark Confidant: "reveal the top card of your library and put that card into your hand", then maybe "[you] lose
    * (gain) life equal to its mana value" (X is 0 in a library, CR 202.3e).
@@ -4532,6 +4534,12 @@ export type Effect =
    * chooses as it enters that it could enchant (CR 303.4f, not targeted); with none it stays in the graveyard (303.4g).
    */
   | { type: "returnAsAura"; enchant: TargetSpec; ability: string; loseOthers?: true }
+  /**
+   * Extract Brain: "Target opponent chooses X cards from their hand. Look at those cards. You may cast a spell from among
+   * them without paying its mana cost.": `who` chooses `n` cards in their hand (all of them with fewer), you look at them,
+   * and may cast one of them from that hand as this resolves (castFromAmong `fromHand`, limited to those cards).
+   */
+  | { type: "handChooseCast"; who: PlayerRef; n: Amount }
   | {
       type: "counterOpponentsStack";
       /** Kadena's Silencer: "counter all abilities your opponents control": only the activated and triggered abilities already on the stack (rulings: not spells; mana abilities never are there, CR 605.3a). */
@@ -5194,6 +5202,8 @@ export type Effect =
       thatCombat?: { effects: Effect[]; text: string };
       /** "Only land creatures can attack during that combat phase" (Bumi, Unleashed): the added combat phase only (rulings). */
       onlyAttack?: TargetSpec;
+      /** "Only the chosen creatures can attack during that combat phase" (Last Night Together): only the objects this ability's targets `index` (`n` of them) were chosen as, in the added combat phase only. */
+      onlyAttackTargets?: { index: number; n: number };
       /**
        * Illusionist's Gambit: "Each of those creatures attacks that combat if able. They can't attack you or planeswalkers
        * you control that combat." Those are the creatures it removed from combat (ref "created"), in the added combat only.
@@ -6023,6 +6033,8 @@ export type TriggerEvent =
   | "youFinalChapterResolves" // Narci, Fable Singer: the final chapter ability of a Saga you control finished resolving; the event's amount is the Saga's mana value
   /** "Whenever you scry", "whenever you surveil", "whenever you scry or surveil": after it's done (CR 701.22d, 701.25d). */
   | "youScry"
+  /** The Temporal Anchor: "Whenever you choose to put one or more cards on the bottom of your library while scrying" (CR 701.22a): a scry of yours that put one or more there, `eventAmount` how many. */
+  | "youScryToBottom"
   /** "Whenever you clash" (Entangling Trap): each time you clash, whoever started it (CR 701.30, rulings). */
   | "youClash"
   /** "Whenever you clash and win", "Whenever you win a clash" (Sylvan Echoes, Marvo): a clash you won (CR 701.30d). */
@@ -6782,6 +6794,8 @@ export interface ActivatedAbility {
   orExile?: true;
   /** With `orExile`: only from exile, not the graveyard (Torrent Elemental, CR 113.6m). */
   onlyExile?: true;
+  /** With `onlyExile`, Greater Gargadon: "Activate only if ~ is suspended": in exile with suspend and a time counter on it (CR 702.62b). */
+  suspendedOnly?: true;
   /** "Discard this card" is part of the cost (cycling, transmute). */
   discardSelf?: boolean;
   /** "This ability costs {1} less to activate for each legendary creature you control" (CR 602.2b, 601.2f): generic mana only. */
@@ -6951,7 +6965,7 @@ export type ManaProduce =
    * (two colors, `min` 1, as removing none adds nothing). How many are removed is chosen as it's activated (CR 107.3a,
    * 601.2b, 602.2b): each way to do it is a combination, numbered as for "combos" (`removeXCombos`).
    */
-  | { kind: "removeX"; counter: CounterKind; colors: ManaType[]; min: number; /** The Mana Batteries: "Add {G}, then add an additional {G} for each charge counter removed this way": this much more, of the one color. */ base?: number; /** "Add X mana of any one color" (Petalmane Baku): all X of one of `colors`, not a mix. */ oneColor?: true }
+  | { kind: "removeX"; counter: CounterKind; colors: ManaType[]; min: number; /** The Mana Batteries: "Add {G}, then add an additional {G} for each charge counter removed this way": this much more, of the one color. */ base?: number; /** "Add X mana of any one color" (Petalmane Baku): all X of one of `colors`, not a mix. */ oneColor?: true; /** "Add X mana in any combination of colors" (Crucible of the Spirit Dragon): any multiset of X of `colors`. */ mix?: true }
   /**
    * Metalworker: "Reveal any number of artifact cards in your hand. Add {C}{C} for each card revealed this way." How many
    * are revealed is chosen as it's activated (rulings: zero too); each number is a combination, numbered as for "combos"
@@ -8515,6 +8529,8 @@ export interface CompiledCard {
    * total becomes equal to your starting life total" (40, CR 903.7).
    */
   loseGameExileSelf?: true | "startingLife";
+  /** Enduring Angel: "If your life total would be reduced to 0 or less, instead transform this creature and your life total becomes 3. Then if this creature didn't transform this way, you lose the game." (game.ts lifeZeroReplaced) */
+  lifeZeroTransform?: true;
   /**
    * "You may activate abilities of creatures you control as though those creatures had haste" (Thousand-Year Elixir,
    * CR 302.6): {T} abilities of creatures that came under your control this turn. They don't gain haste (rulings).

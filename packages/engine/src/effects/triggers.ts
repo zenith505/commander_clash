@@ -194,7 +194,7 @@ export type TriggerSourceEvent =
   /** A player paid mana to cast a spell: what they had spent this turn on spells before and after (CR 700.14). */
   | { type: "expended"; player: PlayerId; before: number; after: number }
   /** A player scried or surveilled (CR 701.22d, 701.25d): `n`, how many cards they looked at. */
-  | { type: "scried"; player: PlayerId; how: "scry" | "surveil"; n: number; /** A surveil that was the player's first this turn (TurnLog.surveilled). */ firstSurveil?: true }
+  | { type: "scried"; player: PlayerId; how: "scry" | "surveil"; n: number; /** A surveil that was the player's first this turn (TurnLog.surveilled). */ firstSurveil?: true; /** A scry: how many of the cards its player chose to put on the bottom (The Temporal Anchor). */ bottom?: number }
   /** A player clashed (CR 701.30a), whether or not they started it; `won`, whether they won it (701.30d). */
   | { type: "clashed"; player: PlayerId; won: boolean }
   /** A spell was countered by a spell or ability `by` controls (CR 701.6a). */
@@ -1312,6 +1312,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // battlefield.
     const watch = (o: GameObject) => add(o, ev.player, (e, t) => (e === kind && (!t.firstEachTurn || !!ev.firstSurveil)) || e === "youScryOrSurveil", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.n });
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.player) watch(obj(s, id));
+    // The Temporal Anchor: "Whenever you choose to put one or more cards on the bottom of your library while scrying" (CR
+    // 701.22a), "that many" being how many went there.
+    if (ev.how === "scry" && ev.bottom) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.player) add(obj(s, id), ev.player, (e) => e === "youScryToBottom", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.bottom });
     // "Whenever you surveil, if ~ is in your graveyard" (Blood Operative): its owner's.
     fromGraveyards((o, owner) => owner === ev.player && watch(o));
   } else if (ev.type === "clashed") {

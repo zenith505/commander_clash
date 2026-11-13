@@ -788,7 +788,10 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
   const LIB = `(your|that player's|target player's|target opponent's|each opponent's|each player's${ctx.eventPlayer ? "|their" : ""})`;
   const head =
     new RegExp(`^[Ee]xile the top (card|${NUMX} cards) of ${LIB} library face down$`).exec(s) ??
-    new RegExp(`^(?:[Ll]ook at the top (card|${NUMX} cards) of ${LIB} library and exile (?:it|that card|those cards) face down)$`).exec(s);
+    new RegExp(`^(?:[Ll]ook at the top (card|${NUMX} cards) of ${LIB} library and exile (?:it|that card|those cards|them) face down)$`).exec(s);
+  // "Look at ... and exile ... face down": the player looked at them, so may go on looking at them in exile (CR 406.3;
+  // rulings on Lobelia, Defender of Bag End).
+  const lookedFirst = !!head && /^[Ll]ook at /.test(s);
   // "Exile the top card of your library face down and look at it" (Ugin, the Ineffable).
   const andLook = /^Exile the top (card) of (your) library face down and look at it$/.exec(s);
   if (andLook) return { effect: { type: "exileFaceDown", from: "top", look: true }, next: at + 1 };
@@ -819,7 +822,7 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
   const n = count === "card" ? 1 : amt(new RegExp(`^${NUMX} cards$`).exec(count)![1]!);
   // Not yet: whose library is read last, after the permission is known to be there (it may add a target).
   const whose = m ? (m[m.length - 1] === "your" ? "you" : m[m.length - 1] === "their" ? "that player" : m[m.length - 1]!.replace(/'s$/, "")) : they![1]!;
-  let seen = false;
+  let seen = lookedFirst;
   let play: FaceDownPlay | undefined;
   let upkeepGraveyard = false;
   let endStepHand = false;
@@ -830,8 +833,12 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
     if (t === undefined) break;
     // Dream-Thief's Bandana: "For as long as it remains exiled, you may play it, and mana of any type can be spent to cast
     // that spell", the same permission with the duration first.
-    const durFirst = /^For as long as (it remains|they remain) exiled, you may (play|cast) (it|that card|those cards|them)(, and .+)?$/.exec(t);
-    if (durFirst) t = `You may ${durFirst[2]} ${durFirst[3]} for as long as ${durFirst[1]} exiled${durFirst[4] ?? ""}`;
+    // Gandalf, Goblins' Bane's Flameshape: "For as long as they remain exiled, you may play them if you control a Wizard":
+    // only while that holds (CR 406.3a; rulings: you must control a Wizard to cast them).
+    const durFirst = /^For as long as (it remains|they remain) exiled, you may (play|cast) (it|that card|those cards|them)(?: if you control an? ([A-Z][a-z]+))?(, and .+)?$/.exec(t);
+    const ifControlType = durFirst?.[4];
+    if (ifControlType && (durFirst![5] || !CREATURE_TYPES.has(ifControlType))) return "fail";
+    if (durFirst) t = `You may ${durFirst[2]} ${durFirst[3]} for as long as ${durFirst[1]} exiled${durFirst[5] ?? ""}`;
     if (/^You may look at (?:it|that card|those cards|them) for as long as (?:it remains|they remain) exiled$/.test(t)) seen = true;
     else {
       const may = new RegExp(`^You may (look at and )?(play|cast) (?:it|that card|those cards|them|${lookPick ? "the exiled card" : "it"})( without paying (?:its mana cost|their mana costs))? (for as long as (?:it remains|they remain) exiled|this turn|for as long as ~ remains on the battlefield)(?:, and ${ANY})?$`).exec(t);
@@ -842,6 +849,7 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
         if (may?.[2] === "cast") play.castOnly = true;
         if (may?.[3]) play.free = true;
         if (may && new RegExp(ANY).test(t)) play.anyType = true;
+        if (ifControlType) play.ifControl = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [ifControlType], controller: "you", text: ifControlType };
         // "For as long as ~ remains on the battlefield": a permanent's ability only.
         if (play.until === "source" && ctx.spell) return "fail";
       } else if (play && /^(?:If you cast a spell this way, you may spend mana as though it were mana of any type to cast it|Mana of any type can be spent to cast (?:a spell this way|that spell|it))$/.test(t)) play.anyType = true;

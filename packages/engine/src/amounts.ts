@@ -1203,7 +1203,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "graveyardManaValues": {
       const mvs = new Set<number>();
-      for (const pid of refPlayers(s, c.who, ctx)) for (const id of s.players[pid]!.graveyard) if (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!))) mvs.add(defMv(defOf(s, s.objects[id]!)));
+      // Kianne: the face-up cards they own in exile with that kind of counter on them (rulings: whatever exiled them).
+      const among = (pid: PlayerId) => (c.exileCounter ? s.players[pid]!.exile.filter((id) => { const o = s.objects[id]!; return o.zone === "exile" && !o.faceDown && !o.hiddenExile && (o.counters[c.exileCounter!] ?? 0) > 0; }) : s.players[pid]!.graveyard);
+      for (const pid of refPlayers(s, c.who, ctx)) for (const id of among(pid)) if (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!))) mvs.add(defMv(defOf(s, s.objects[id]!)));
       return mvs.size;
     }
     case "greatestPower": {
@@ -1721,7 +1723,7 @@ function describeCount(c: Count): string {
     case "graveyardCardTypes":
       return c.permanent ? "#permanent types in graveyards" : "#card types in graveyards";
     case "graveyardManaValues":
-      return `#mana values${c.filter ? ` among ${c.filter.text}s` : ""} in your graveyard`;
+      return `#mana values${c.filter ? ` among ${c.filter.text}s` : ""} ${c.exileCounter ? `you own in exile with ${c.exileCounter} counters` : "in your graveyard"}`;
     case "greatestPower":
       return `the ${c.total ? "total" : c.least ? "least" : "greatest"} ${c.toughness ? "toughness" : "power"} ${c.total ? "of" : "among"} ${c.other ? "other " : ""}${c.filter.text}`;
     case "greatestMvInExile":

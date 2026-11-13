@@ -39209,6 +39209,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "285ecbd5-ff7c-4919-ab0b-7fc05e5a0a0a",
+  "name": "Worldpurge",
+  "manaCost": "{4}{W/U}{W/U}{W/U}{W/U}",
+  "cmc": 8,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Return all permanents to their owners' hands. Each player chooses up to seven cards in their hand, then shuffles the rest into their library. Each player loses all unspent mana.",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4216f9ce-bdd9-4213-8c3f-e2ef4cd848f9",
   "name": "Wormfang Crab",
   "manaCost": "{3}{U}",

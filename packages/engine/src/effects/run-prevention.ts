@@ -125,6 +125,16 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     ...(spec.untilYourNextTurn ? { untilYourNextTurn: true as const } : {}),
     ...(spec.thisCombat ? { thisCombat: true as const } : {}),
   };
+  // Old Fat Spider Can't See Me: "for as long as ~ remains on the battlefield": its source as the object it is now (CR
+  // 400.7); none at all if it has already left (CR 611.2b).
+  if (spec.whileSourceOnBattlefield) {
+    const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) {
+      log(s, `${src}'s effect does nothing: it left the battlefield.`);
+      return;
+    }
+    rule.whileSource = { id: me.id, zc: me.zoneChanges ?? 0 };
+  }
   // The source of your choice, chosen as it resolves (CR 609.7a): asked first, then the rest is worked out.
   if (spec.by?.choose) {
     // Mourner's Shield: the colors of the card its imprint ability exiled, as the source is chosen; once chosen, it's that
@@ -249,5 +259,5 @@ export function describeRule(s: GameState, r: DamageRule): string {
   const to = who.length ? ` to ${who.join(" and ")}` : "";
   const what = r.left !== undefined ? `the next ${r.left} ${r.combat === "only" ? "combat " : ""}damage` : r.nextTime ? `the next ${r.combat === "only" ? "combat " : ""}damage` : `all ${r.combat === "only" ? "combat " : r.combat === "non" ? "noncombat " : ""}damage`;
   const dest = r.redirect ? ("sourceController" in r.redirect ? "its controller" : "player" in r.redirect ? player(s, r.redirect.player).name : defOf(s, obj(s, r.redirect.object)).name) : "";
-  return `${what}${by ? ` ${by} would deal` : " that would be dealt"}${to} ${r.thisCombat ? "this combat" : "this turn"} will be ${dest ? `dealt to ${dest} instead` : "prevented"}`;
+  return `${what}${by ? ` ${by} would deal` : " that would be dealt"}${to} ${r.thisCombat ? "this combat" : r.whileSource ? `for as long as ${defOf(s, obj(s, r.whileSource.id)).name} remains on the battlefield` : "this turn"} will be ${dest ? `dealt to ${dest} instead` : "prevented"}`;
 }

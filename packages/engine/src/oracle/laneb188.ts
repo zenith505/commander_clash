@@ -4,6 +4,7 @@ import type { CompiledCard, Effect } from "../abilities";
 import { parseOne, type Ctx } from "./body";
 import { parseSentence } from "./sentence";
 import { parseTrigger } from "./triggers";
+import { roundB189Sentence } from "./laneb189";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -104,5 +105,5 @@ export function roundB188Sentence(s: string, sentences: string[], si: number, ct
     const oneOfEach = PERMANENT_TYPES.map((t) => ({ kind: "card" as const, types: [t], notTypes: [], notColors: [], text: `${t.toLowerCase()} card` }));
     return { effect: { type: "chooseFromGraveyard", filter: { kind: "card", anyOf: oneOfEach, text: "card of each permanent type" }, n: oneOfEach.length, upTo: true, dest: "battlefield", oneOfEach, lifeEach: 3 }, next: si + 2 };
   }
-  return null;
+  return roundB189Sentence(s, sentences, si, ctx, effects);
 }

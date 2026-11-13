@@ -702,7 +702,7 @@ export interface GameObject {
    * Exiled face down by hideaway (CR 702.75a): only players who controlled `by`, the permanent that exiled it, may look
    * at it (`seen`). Gone when it changes zones.
    */
-  hiddenExile?: { by: ObjectId; seen: PlayerId[]; /** What its back says ("Face down"); hideaway's by default. */ label?: string; /** When: the cards one instruction exiled face down together share it, a group a processor chooses from (rulings on Ruin Processor). */ at?: number };
+  hiddenExile?: { by: ObjectId; seen: PlayerId[]; /** What its back says ("Face down"); hideaway's by default. */ label?: string; /** When: the cards one instruction exiled face down together share it, a group a processor chooses from (rulings on Ruin Processor). */ at?: number; /** Grimoire Thief: whoever controls this source (as this object, CR 400.7) may look too, and goes on being able to (rulings); see GameState.exileLookWatch. */ watch?: { id: ObjectId; zc: number } };
   /** Cards exiled encoded on this permanent with cipher (CR 702.99b-c), as they are in exile. Gone when it leaves. */
   encoded?: { id: ObjectId; zc: number }[];
   /**
@@ -1593,7 +1593,7 @@ export type PendingDecision =
   | { kind: "declareBlockers"; player: PlayerId; remaining: PlayerId[]; defender?: PlayerId }
   | { kind: "discardToHandSize"; player: PlayerId; count: number }
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
-  | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true; /** Up to `count` ("discard any number of cards"), none too. */ upTo?: true; /** Only these cards ("then discard one of them": the cards just drawn, Soldevi Sage). */ among?: ObjectId[] }
+  | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true; /** Up to `count` ("discard any number of cards"), none too. */ upTo?: true; /** Only these cards ("then discard one of them": the cards just drawn, Soldevi Sage). */ among?: ObjectId[]; /** Worldpurge: the cards clicked are the ones kept (up to `count`, with `upTo`); the rest are shuffled into the library. */ keep?: true }
   /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
   | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true; /** Shuffled into the library instead (See Beyond). */ shuffle?: true; /** Scroll Rack: any number up to `count`, exiled face down first and traded for as many from the top of the library. */ upTo?: true; /** Library of Leng: these cards are being discarded because of an effect, and any of them may go on top of the library instead of into the graveyard (`upTo`, the first pick ending on top). */ discarding?: ObjectId[] }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
@@ -2196,6 +2196,8 @@ export interface GameState {
    * revealed and you may play that card without paying its mana cost", this turn only: `card` is the card as the object it
    * was (`zc`); the effect ends for good once it isn't on top or the library is shuffled (CR 611.2b, rulings).
    */
+  /** Some face-down exiled card has `hiddenExile.watch` (Grimoire Thief): state-based checks add its source's controller to who has seen it. */
+  exileLookWatch?: true;
   topFreePlays?: { player: PlayerId; turn: number; card: ObjectId; zc: number; sourceName: string }[];
   /**
    * "Until end of turn, you may play a card exiled with ~" (Raphael, Most Attitude), "you may cast a creature spell from

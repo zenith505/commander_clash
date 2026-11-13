@@ -69,6 +69,10 @@ export function parseGraveyardKeyword(
   if (/^You may cast (?:~|this card) from exile\.?$/.test(line)) return { fromExile: true };
   // "You may cast this card from your graveyard using its warp ability" (Timeline Culler): a permission to cast it from
   // there only for its warp cost (CR 702.185a), so it's exiled at the next end step and may be cast from exile later.
+  // Detective's Phoenix: "You may cast this card from your graveyard using its bestow ability": the same, for its bestow
+  // cost (CR 702.103a); it's an Aura spell then, and a creature again if its target is illegal or it becomes unattached
+  // (CR 702.103e, f).
+  if (/^You may cast (?:~|this card) from your graveyard using its bestow ability\.?$/.test(line)) return /^Bestow—/m.test(d.oracleText) ? { fromGraveyard: { kind: "permission", costs: [], exile: false, alt: "bestow" } } : "fail";
   if (/^You may cast (?:~|this card) from your graveyard using its warp ability\.?$/.test(line)) return /^Warp—/m.test(d.oracleText) ? { fromGraveyard: { kind: "permission", costs: [], exile: false, alt: "warp" } } : "fail";
   // "You may cast this card from your graveyard using its blitz ability" (Tenacious Underdog): the same, for its blitz cost
   // (CR 702.152a); a blitzed creature is sacrificed at the next end step, so it may be cast this way again.
@@ -292,9 +296,12 @@ export function parseCostKeyword(
   // Mutate (CR 702.140a): cast for it, it's a mutating creature spell targeting a non-Human creature with the same owner
   // (see mutatingDef).
   if ((m = /^Mutate ((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[1]!) && d.types.includes("Creature") ? { alt: { kind: "mutate", mana: m[1]! } } : "fail";
-  // Bestow (CR 702.103a); "Bestow—{R}, Collect evidence 6" isn't modeled. (Cast bestowed, the card is an Aura: see bestowedDef.)
+  // Bestow (CR 702.103a). (Cast bestowed, the card is an Aura: see bestowedDef.)
   // A bestow cost with {X} (Nyxborn Hydra's {X}{G}{G}): X is announced and paid as for the mana cost (CR 107.3a), only when
   // the card's own mana cost has the X its text uses.
+  // Detective's Phoenix: "Bestow—{R}, Collect evidence 6.": the bestow cost is that mana and the evidence (CR 702.103a,
+  // 701.59a), all of it paid to cast it bestowed (CR 601.2f, h).
+  if ((m = /^Bestow—((?:\{[^}]+\})+), Collect evidence (\d+)\.?$/.exec(line))) return plainMana(m[1]!) ? { alt: { kind: "bestow", mana: m[1]!, costs: [{ kind: "collectEvidence", n: Number(m[2]) }] } } : "fail";
   if ((m = /^Bestow(?: |—)(.+?)\.?$/.exec(line))) return /^(\{[^}]+\})+$/.test(m[1]!) && (plainMana(m[1]!) || (plainMana(m[1]!.replace(/\{X\}/g, "")) && parseManaCost(m[1]!).supported && /\{X\}/.test(d.manaCost))) ? { alt: { kind: "bestow", mana: m[1]! } } : "fail";
   // Madness (CR 702.35a).
   // Miracle [cost] (CR 702.94a): a mana cost, without an X the mana cost doesn't have.

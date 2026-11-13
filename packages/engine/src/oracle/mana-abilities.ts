@@ -349,7 +349,7 @@ export function removeCounterCost(part: string): { counter: CounterKind; n: numb
 /**
  * What a storage land adds for the counters removed (ManaProduce "removeX"): "{B} for each storage counter removed this
  * way" after "Remove any number of", "X mana in any combination of {U} and/or {B}" after "Remove X". Null for the rest
- * ("X mana in any combination of colors": too many ways to pick from).
+ * ("X mana in any combination of colors": each multiset of colors, ManaProduce "removeX" `mix`).
  */
 function removedProduced(text: string, counter: CounterKind, any: boolean, oneOrMore = false): ManaProduce | null {
   // Rasputin, the Oneiromancer: "Remove one or more dream counters from ~: Add that much {C}": one {C} per counter.
@@ -369,6 +369,10 @@ function removedProduced(text: string, counter: CounterKind, any: boolean, oneOr
   if (any && plusOne && plusOne[1] === plusOne[2] && counterKind(plusOne[3]!) === counter) return { kind: "removeX", counter, colors: [plusOne[1] as ManaType], min: 0, base: 1 };
   const combo = /^X mana in any combination of \{([WUBRG])\} and\/or \{([WUBRG])\}$/.exec(text);
   if (!any && combo && combo[1] !== combo[2]) return { kind: "removeX", counter, colors: [combo[1] as ManaType, combo[2] as ManaType], min: 1 };
+  // Crucible of the Spirit Dragon: "Remove X storage counters from ~: Add X mana in any combination of colors": X chosen
+  // as it's activated (CR 107.3a, 602.2b), then each multiset of X colors (CR 106.1b, 605.3b), as an "anyColors" ability
+  // makes them; none removed adds nothing, so X is at least 1 here.
+  if (!any && text === "X mana in any combination of colors") return { kind: "removeX", counter, colors: ["W", "U", "B", "R", "G"], min: 1, mix: true };
   return null;
 }
 

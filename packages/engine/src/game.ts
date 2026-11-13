@@ -19,7 +19,8 @@ import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTarg
 import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
-import { canAttachTo, turnFaceDown } from "./effects/run-permanents";
+import { isSuspended } from "./effects/run-zones";
+import { canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
 import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
 import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
@@ -2207,6 +2208,12 @@ export function loseLife(s: GameState, pid: PlayerId, n: number) {
     n *= 2 ** doublers;
     log(s, `${player(s, pid).name} loses twice as much life${doublers > 1 ? `, ${doublers} times over` : ""}.`);
   }
+  if (player(s, pid).life - n <= 0 && lifeZeroReplaced(s, pid)) return;
+  lifeDown(s, pid, n);
+}
+
+/** The life is lost (CR 119.3): the total goes down, and "whenever a player loses life" sees it. */
+function lifeDown(s: GameState, pid: PlayerId, n: number) {
   player(s, pid).life -= n;
   const first = !(s.lostLifeThisTurn ??= []).includes(pid);
   if (first) s.lostLifeThisTurn.push(pid);
@@ -2214,6 +2221,36 @@ export function loseLife(s: GameState, pid: PlayerId, n: number) {
   lost[pid] = (lost[pid] ?? 0) + n;
   const batch = lifeBatch ?? (s.lifeLossEvents = (s.lifeLossEvents ?? 0) + 1);
   fireEvent(s, { type: "lifeLost", player: pid, amount: n, first, batch });
+}
+
+/**
+ * Enduring Angel: "If your life total would be reduced to 0 or less, instead transform this creature and your life total
+ * becomes 3. Then if this creature didn't transform this way, you lose the game." A replacement effect (CR 614.1a), after
+ * any that make the loss bigger (the player orders them, CR 616.1, and this order leaves them at 3): the life total is set
+ * to 3 (CR 119.5: the life lost or gained to get there, more life gained only by replacements of gaining, which haven't
+ * applied yet). A token or a single-faced permanent copying it can't transform, so its controller loses (rulings). Life
+ * lost at the same time (several sources' combat damage, CR 510.2) is one event, replaced once: the rest of it is
+ * replaced too. With several, the one that can transform (the player's choice, CR 616.1; one that can't would lose them
+ * the game), the oldest of those.
+ */
+function lifeZeroReplaced(s: GameState, pid: PlayerId): boolean {
+  const done = s.lifeToThree?.[pid];
+  if (done !== undefined && lifeBatch !== undefined && done === lifeBatch) return true;
+  const angels = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid && abilitiesOf(s, o).lifeZeroTransform);
+  const angel = angels.find((o) => canTransform(s, o)) ?? angels[0];
+  if (!angel) return false;
+  if (lifeBatch !== undefined) (s.lifeToThree ??= {})[pid] = lifeBatch;
+  const name = nameOf(s, angel.id);
+  const p = player(s, pid);
+  log(s, `${p.name}'s life total would be reduced to 0 or less; instead ${name} transforms and their life total becomes 3.`);
+  const turned = transformPermanent(s, angel);
+  if (p.life > 3) lifeDown(s, pid, p.life - 3);
+  else if (p.life < 3) gainLife(s, pid, 3 - p.life);
+  if (!turned) {
+    log(s, `${name} didn't transform.`);
+    playerLoses(s, pid, `${name} didn't transform`);
+  }
+  return true;
 }
 
 /**
@@ -4127,6 +4164,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.combatsThisTurn = undefined;
   s.mainPhasesThisTurn = undefined;
   s.combatAttackOnly = undefined;
+  s.combatAttackOnlyIds = undefined;
   s.blockersStep = undefined;
   s.addedPhases = undefined;
   s.afterSecondMain = undefined;
@@ -9315,6 +9353,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if ((o.zone !== "graveyard" && !exiled) || o.owner !== pid) return ab.onlyExile ? `${ab.text} works only from exile` : `${ab.text} works only from your graveyard${ab.orExile ? " or from exile" : ""}`;
     // Torrent Elemental: only from exile (CR 113.6m).
     if (ab.onlyExile && !exiled) return `${ab.text} works only from exile`;
+    // Greater Gargadon: only while it's suspended (CR 702.62b).
+    if (ab.suspendedOnly && !isSuspended(s, o)) return `${d.name} isn't suspended`;
     // Ashes of the Abhorrent: no activated abilities of cards in graveyards (embalm, unearth, scavenge, ...; rulings).
     const ashes = s.battlefield.find((b) => abilitiesOf(s, obj(s, b)).noGraveyardActivations);
     if (ashes) return `${characteristics(s, obj(s, ashes)).name}: players can't activate abilities of cards in graveyards`;
@@ -12301,6 +12341,8 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       !(s.cantAttackThisTurn ?? []).some((r) => (r.combat === undefined || r.combat === (s.combatsThisTurn ?? 0)) && objectMatches(s, r.filter, o, r.controller, false) && !(r.except && r.except.id === o.id && r.except.zc === (o.zoneChanges ?? 0))) &&
       // "Only land creatures can attack during that combat phase" (Bumi, Unleashed): an added combat phase's own rule.
       !(s.thatCombat !== undefined && s.combatAttackOnly?.[s.thatCombat] && !objectMatches(s, s.combatAttackOnly[s.thatCombat]!, o, pid, false)) &&
+      // "Only the chosen creatures can attack during that combat phase" (Last Night Together): those objects only (CR 400.7).
+      !(s.thatCombat !== undefined && s.combatAttackOnlyIds?.[s.thatCombat] && !s.combatAttackOnlyIds[s.thatCombat]!.includes(`${o.id}@${o.zoneChanges ?? 0}`)) &&
       (!(characteristics(s, o).attackUnless.length || characteristics(s, o).attackUnlessYard || characteristics(s, o).attackUnlessDefenderIs?.length || characteristics(s, o).attackIfNot?.length || characteristics(s, o).attackUnlessMore?.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackPlayersOnly.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),
   );
 }

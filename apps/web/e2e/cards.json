@@ -7306,6 +7306,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ecfbebc9-7fc7-474e-8c59-8ede800e082e",
+  "name": "Crucible of the Spirit Dragon",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{1}, {T}: Put a storage counter on this land.\n{T}, Remove X storage counters from this land: Add X mana in any combination of colors. Spend this mana only to cast Dragon spells or activate abilities of Dragons.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "C",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "frf",
+  "releasedAt": "2015-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e199e183-e857-4dc7-87f4-36b32c4dac96",
   "name": "Cruel Fate",
   "manaCost": "{4}{U}",
@@ -8751,6 +8781,42 @@
   "set": "spg",
   "releasedAt": "2024-04-19",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "52c3fe55-74ee-44cb-b62b-dc6c5dfdc33e",
+  "name": "Detective's Phoenix",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Enchantment Creature — Phoenix",
+  "supertypes": [],
+  "types": [
+   "Enchantment",
+   "Creature"
+  ],
+  "subtypes": [
+   "Phoenix"
+  ],
+  "oracleText": "Bestow—{R}, Collect evidence 6. (To pay this bestow cost, pay {R} and exile cards with total mana value 6 or greater from your graveyard.)\nFlying, haste\nEnchanted creature gets +2/+2 and has flying and haste.\nYou may cast this card from your graveyard using its bestow ability.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Collect evidence",
+   "Haste",
+   "Bestow"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -11357,6 +11423,34 @@
   "commanderLegal": "legal",
   "set": "mmq",
   "releasedAt": "1999-10-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "bb0eb9c2-c26d-452d-9e02-fc0bec2655c4",
+  "name": "Extract Brain",
+  "manaCost": "{X}{U}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target opponent chooses X cards from their hand. Look at those cards. You may cast a spell from among them without paying its mana cost.",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "otc",
+  "releasedAt": "2024-04-19",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -14397,6 +14491,38 @@
   "set": "lea",
   "releasedAt": "1993-08-05",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "406b4b1d-756b-4062-897d-3693832086a0",
+  "name": "Greater Gargadon",
+  "manaCost": "{9}{R}",
+  "cmc": 10,
+  "typeLine": "Creature — Beast",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Beast"
+  ],
+  "oracleText": "Suspend 10—{R}\nSacrifice an artifact, creature, or land: Remove a time counter from this card. Activate only if this card is suspended.",
+  "power": "9",
+  "toughness": "7",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Suspend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

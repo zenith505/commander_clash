@@ -1622,6 +1622,11 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // whenever that damage was dealt (rulings). Vampiric Embrace: "by enchanted creature", the same for an Aura.
   const damaged = / dealt damage by (~|equipped creature|enchanted creature) this turn$/.exec(phrase);
   if (damaged) phrase = phrase.slice(0, damaged.index);
+  // Shelob, Child of Ungoliant: "another creature dealt damage this turn by a Spider you controlled": by a source with that
+  // creature type, under the trigger's controller's control, as it dealt the damage (GameObject.damagedByKinds).
+  const kindDamaged = !damaged && / dealt damage this turn by an? ([A-Z][a-z]+) you controlled$/.exec(phrase);
+  if (kindDamaged && !CREATURE_TYPES.has(kindDamaged[1]!)) return "fail";
+  if (kindDamaged) phrase = phrase.slice(0, kindDamaged.index);
   // Baneclaw Marauder: "Whenever a creature blocking ~ dies": one that was blocking it as it last existed (CR 603.10a,
   // 509.1g), ~ dying at the same time too.
   const blockingSelf = !damaged && / blocking ~$/.exec(phrase);
@@ -1647,6 +1652,7 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
       ...(kind === "another" ? { other: true } : {}),
       ...(kind === "~ or another" ? { orSelf: true } : {}),
       ...(damaged ? (damaged[1] === "~" ? { damagedBySelf: true } : { damagedByEquipped: true as const }) : {}),
+      ...(kindDamaged ? { damagedByKindYours: kindDamaged[1]! } : {}),
       ...(blockingSelf ? { blockingSelf: true as const } : {}),
       ...(createdWithSelf ? { createdWithSelf: true as const } : {}),
       ...(leaves ? { leaves: true as const } : {}),

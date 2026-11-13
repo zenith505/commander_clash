@@ -8,6 +8,7 @@ import { canonicalKeyword, LINKED_CARD_KEYWORD } from "../keywords";
 import type { Ctx } from "./body";
 import { parseStatic } from "./statics";
 import { parseTrigger } from "./triggers";
+import { round353Sentence } from "./round353";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -16,6 +17,9 @@ const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 const COPY_CAUSE = (n: number): Effect => ({ type: "copySpell", spell: "cause", n, newTargets: true });
 
 export function round351Sentence(s: string, sentences: string[], si: number, _ctx: Ctx, _effects: Effect[]): Found {
+  // Round 353's sentences first (oracle/round353.ts).
+  const r353 = round353Sentence(s, sentences, si, _ctx, _effects);
+  if (r353) return r353;
   const line = plain(s);
   // Jaya's Phoenix: "copy the next loyalty ability you activate this turn when you activate it. You may choose new targets
   // for the copy.": a delayed triggered ability (CR 603.7a), triggering once (603.7c) as the next loyalty ability its

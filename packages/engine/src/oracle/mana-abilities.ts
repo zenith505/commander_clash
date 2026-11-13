@@ -111,7 +111,18 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   if (!produces || (removeCounters && removeX)) return null;
   const out: ManaAbility = { text: line0, manaCost, tap, ...(untapSelf ? { untapSelf: true as const } : {}), sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}), ...(discardHand ? { discardHand: true as const } : {}), ...(returnSelf ? { returnSelf: true as const } : {}), ...(exert ? { skipNextUntap: true } : {}), ...(putCost ? { putCounter: putCost } : {}) };
   let m2: RegExpExecArray | null;
-  for (const extra of (m[3] ?? "").split(/(?<=\.) /).map((x) => x.trim()).filter(Boolean)) {
+  // Magus Lucea Kane: "When you next cast a spell with {X} in its mana cost or activate an ability with {X} in its
+  // activation cost this turn, copy that spell or ability. You may choose new targets for the copy.": a delayed trigger
+  // made as the mana ability resolves (CR 603.7a, 605.3b), triggering once (CR 603.7c) for whichever comes first that
+  // turn, the mana symbol {X} only (rulings); the copy keeps X, modes and divisions (CR 707.10), even if the original was
+  // countered, and resolves first (rulings). Its mana needn't be spent on that spell (rulings).
+  const MAGUS = "When you next cast a spell with {X} in its mana cost or activate an ability with {X} in its activation cost this turn, copy that spell or ability. You may choose new targets for the copy.";
+  let rest = m[3] ?? "";
+  if (rest.includes(MAGUS)) {
+    rest = rest.replace(MAGUS, "");
+    out.nextCast = { type: "nextCast", filter: { kind: "spell", xInCost: true, text: "spell with {X} in its mana cost" }, effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true }], text: "copy that spell or ability. You may choose new targets for the copy", xAbility: true };
+  }
+  for (const extra of rest.split(/(?<=\.) /).map((x) => x.trim()).filter(Boolean)) {
     const dmg = new RegExp(`^~ deals ${NUM} damage to you\\.$`).exec(extra);
     if (dmg) out.selfDamage = num(dmg[1]!);
     else if ((m2 = new RegExp(`^~ deals ${NUM} damage to you if (you don't control an? [A-Z][a-z]+)\\.$`).exec(extra)) && !out.selfDamage) {

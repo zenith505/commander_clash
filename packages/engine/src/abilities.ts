@@ -3851,7 +3851,7 @@ export type Effect =
       type: "revealUntil";
       filter: TargetSpec;
       /** "Graveyard": "Put all creature cards revealed this way into your graveyard" (Old Stickfingers). */
-      found: "hand" | "battlefield" | "graveyard" | /** Nascent Metamorph: "~ becomes a copy of that card until end of turn" (CR 707.2, copied as printed, a double-faced card's front face, CR 712.8a); the card stays in the library and goes on the bottom with the rest (rulings). */ "copySelf";
+      found: "hand" | "battlefield" | "graveyard" | /** Tunnel Vision: "the player puts the rest of the revealed cards into their graveyard and puts the card with the chosen name on top of their library. Otherwise, the player shuffles.": the card stays on top, the cards above it go to the graveyard (`rest` "graveyard"); none found, nothing goes there and the library is shuffled. */ "top" | /** Nascent Metamorph: "~ becomes a copy of that card until end of turn" (CR 707.2, copied as printed, a double-faced card's front face, CR 712.8a); the card stays in the library and goes on the bottom with the rest (rulings). */ "copySelf";
       /** "You may put that card onto the battlefield. If you don't, put it into your hand." (Songbirds' Blessing): `found` is "battlefield", if its controller chooses and it can go there. */
       mayElseHand?: true;
       /** "You may put that card onto the battlefield. Then shuffle." (Hei Bai, Forest Guardian): `found` is "battlefield" if its controller chooses; if not, it stays in the library. */

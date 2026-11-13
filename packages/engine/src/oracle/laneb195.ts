@@ -3,6 +3,7 @@ import type { AbilityBody, Effect } from "../abilities";
 import { parseBody, parseOne, type Ctx } from "./body";
 import { parseObject } from "./targets";
 import { X } from "./words";
+import { roundB196Sentence, roundB196Spell } from "./laneb196";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -36,7 +37,7 @@ export function roundB195Sentence(s: string, sentences: string[], si: number, ct
     _effects.pop();
     return { effect: { type: "if", cond: { kind: "targetWasYours", index: i }, effects: [{ type: "flicker", what: prev.what, under: "you", tapped: true }], otherwise: [prev, ...token] }, next: si + 2 };
   }
-  return null;
+  return roundB196Sentence(s, sentences, si, ctx, _effects);
 }
 
 const capital = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
@@ -68,7 +69,7 @@ export function roundB195Spell(text: string): AbilityBody | null | undefined {
     const { counters: _one, ...rest } = put;
     return { ...body, effects: [{ ...rest, countersAmount: { kind: "+1/+1", n: X } }], text };
   }
-  return undefined;
+  return roundB196Spell(text);
 }
 
 const NUM: Record<string, number> = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7 };

@@ -219,6 +219,19 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (hit) s.resolving!.revealedUntilMv = characteristics(s, obj(s, hit)).manaValue;
       else delete s.resolving!.revealedUntilMv;
       log(s, `${p.name} ${e.exile ? "exiles" : "reveals"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}${hit || !want ? "" : `, finding no ${filter.text}`}.`);
+      // Tunnel Vision: the card found stays where it is, the cards above it go to the graveyard, so it's on top; with none
+      // found (or no name chosen) nothing goes there and the library is shuffled (rulings).
+      if (found === "top") {
+        if (hit) {
+          const above = seen.filter((id) => id !== hit);
+          for (const id of above) moveObject(s, id, "graveyard");
+          log(s, above.length ? `${p.name} puts ${above.length} card${above.length === 1 ? "" : "s"} into their graveyard and leaves ${defOf(s, obj(s, hit)).name} on top of their library.` : `${defOf(s, obj(s, hit)).name} stays on top of ${p.name}'s library.`);
+        } else {
+          shuffleLibrary(s, p);
+          log(s, `${p.name} shuffles their library.`);
+        }
+        return;
+      }
       // Nascent Metamorph: the source, still the same object on the battlefield (CR 400.7), becomes a copy of the card found
       // until end of turn, its values as printed (CR 707.2); then that card goes on the bottom with the rest (rulings). With
       // none found, nothing is copied (rulings).

@@ -28704,6 +28704,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f35aa497-bd0f-4642-8713-820b9f014da5",
+  "name": "Rubble Rouser",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Dwarf Sorcerer",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dwarf",
+   "Sorcerer"
+  ],
+  "oracleText": "When this creature enters, you may discard a card. If you do, draw a card.\n{T}, Exile a card from your graveyard: Add {R}. When you do, this creature deals 1 damage to each opponent.",
+  "power": "1",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "sos",
+  "releasedAt": "2026-04-24",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6c922206-6e68-4dcd-9559-88da1074f2c4",
   "name": "Rugged Highlands",
   "manaCost": "",
@@ -32031,6 +32065,32 @@
   "set": "war",
   "releasedAt": "2019-05-03",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "22504fd0-0353-4ef0-baf4-4b7be28d1a66",
+  "name": "Spark of Creativity",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose target creature. Exile the top card of your library. You may have Spark of Creativity deal damage to that creature equal to the exiled card's mana value. If you don't, you may play that card until end of turn.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "kld",
+  "releasedAt": "2016-09-30",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

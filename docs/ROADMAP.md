@@ -1,6 +1,6 @@
 # Roadmap
 
-31,158 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,165 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,844 of
 9,979 (98%).
 
@@ -8430,6 +8430,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Soundwave, Sonic Spy (a target's mana value equal to the combat damage tokens dealt), Spelltwine ("Cast the copies if
   able": a cast that isn't optional), Swans of Bryn Argoll and Surge to Victory stay out for the reasons in the earlier
   lists.
+- Round B194 (least played first, from the Lane B skip lists): Rubble Rouser ("{T}, Exile a card from your graveyard: Add
+  {R}. When you do, this creature deals 1 damage to each opponent.") and Shaun & Rebecca, Agents ("{T}: Add {C}. When you
+  do, mill two cards."): still mana abilities, resolving at once; the reflexive trigger is a separate ability that uses the
+  stack, put there once the spell or ability being paid for is cast (rulings, CR 605.1a, 605.3b, 603.12), so its mill
+  isn't the mana ability's library move; a browser test. Shaun & Rebecca's "search your graveyard, hand, and library for a
+  card named The Animus and put it onto the battlefield, then shuffle" (Kassandra's search). Farsight Ritual (the top
+  four, or eight if it was bargained, two of them into your hand either way, rulings). Surtland Flinger ("If the
+  sacrificed creature was a Giant, this creature deals twice that much damage instead": its power and creature types as it
+  was sacrificed, a changeling a Giant, the target chosen after the sacrifice, rulings, CR 702.73a). Cephalid Constable
+  ("return up to that many target permanents that player controls": as many targets as the combat damage dealt, chosen as
+  it triggers, CR 603.3d). Spark of Creativity ("You may have ~ deal damage to that creature equal to the exiled card's
+  mana value. If you don't, you may play that card until end of turn.": the permission only without the damage, with the
+  card's usual timing and costs, X as 0, rulings; a browser test). Karfell Harbinger ("Spend this mana only to foretell a
+  card from your hand or cast an instant or sorcery spell": the foretell special action, not a foretold creature cast
+  later, CR 702.143a). +7, 31,165 of 31,936 with B189 to B193.
+- Out after round B194 (looked at, not done): Stitcher Geralf ("Exile up to two creature cards put into graveyards this
+  way" after each player mills: a pick among several players' milled cards, then an X/X for their total power), Moorland
+  Rescuer ("any number of other creature cards with total power X or less": a pick bounded by total power), Spiteful
+  Repossession (Treasures "equal to the damage dealt this way", summed over opponents after prevention), Cultivator Drone
+  ("or pay a cost that contains {C}": a cost paid as something resolves, Bearer of Silence's per its rulings, isn't known
+  to the mana's restriction yet) and Jasmine Boreal of the Seven ("creature spells with no abilities") stay out.
 - Out after round B192 (looked at, not done): Garruk, Curse Breaker (its −4: how often "whenever one or more creatures
   attack one of your opponents" triggers when creatures attack two of them still isn't settled by rulings), Charmed
   Pendant (a hybrid symbol of the milled card adds one of its colors: a choice in the middle of a mana ability), Ulamog's

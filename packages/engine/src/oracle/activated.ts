@@ -928,7 +928,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
 /** Instructions that move a card to or from a library (CR 605.1a): an ability with one isn't a mana ability. */
 const LIBRARY_EFFECTS = new Set<Effect["type"]>(["draw", "mill", "putInLibrary", "exileTop", "revealTopToHand", "surveil", "handToTop", "shuffleIntoLibrary", "shuffleSpell", "taintedPact", "shuffleZones", "search", "dig", "impulse", "cascade", "discover", "ripple", "explore", "hideaway", "recruit", "connive", "orderTop", "scry", "clash", "revealTop", "putInGraveyard", "castFromAmong"]);
 /** Instructions that don't: what mana abilities do besides adding mana (Pristine Talisman's life, Glittering Stockpile's counter). */
-const MANA_RIDERS = new Set<Effect["type"]>(["addMana", "choose", "choosePlayer", "roll", "if", "may", "gainLife", "loseLife", "damage", "counters", "removeCounters", "removeSelfCounter", "delayed", "tap", "untap", "getEnergy", "poison", "skipUntap", "continuous", "sacrifice"]);
+const MANA_RIDERS = new Set<Effect["type"]>(["reflexive", "addMana", "choose", "choosePlayer", "roll", "if", "may", "gainLife", "loseLife", "damage", "counters", "removeCounters", "removeSelfCounter", "delayed", "tap", "untap", "getEnergy", "poison", "skipUntap", "continuous", "sacrifice"]);
 
 /**
  * Whether an activated ability's effect makes it a mana ability (CR 605.1a): no target, it could add mana, and it
@@ -940,7 +940,9 @@ export function manaAbilityKind(body: AbilityBody): "mana" | "stack" | "fail" {
   const bodies = body.modal ? body.modal.modes : [body];
   const effects = bodies.flatMap((b) => allEffects(b.effects));
   if (!effects.some((e) => e.type === "addMana")) return "stack";
-  if (bodies.some((b) => b.targets.length) || body.targets.length || JSON.stringify(effects.filter((e) => e.type !== "delayed")).includes('"targets":[{')) return "stack";
+  // A reflexive trigger it creates ("Add {R}. When you do, ...", Rubble Rouser) is a separate ability too (CR 603.12),
+  // which uses the stack (CR 605.5a), so its targets and library moves aren't this ability's (rulings on Rubble Rouser).
+  if (bodies.some((b) => b.targets.length) || body.targets.length || JSON.stringify(effects.filter((e) => e.type !== "delayed" && e.type !== "reflexive")).includes('"targets":[{')) return "stack";
   if (effects.some((e) => LIBRARY_EFFECTS.has(e.type))) return "stack";
   return effects.every((e) => MANA_RIDERS.has(e.type)) ? "mana" : "fail";
 }

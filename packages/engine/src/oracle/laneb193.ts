@@ -3,6 +3,7 @@ import type { Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseObject } from "./targets";
+import { roundB194Sentence } from "./laneb194";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -39,5 +40,5 @@ export function roundB193Sentence(s: string, sentences: string[], si: number, ct
     if (filter?.kind !== "card" || filter.types?.length !== 3) return "fail";
     return { effect: { type: "castFromAmong", who: { ref: "you" }, n: 0, yourYard: true, asSpell: true, filter: { ...filter, text: "artifact, instant, or sorcery card" }, max: 1, paid: true, exileCast: true, exileCastTypes: ["Instant", "Sorcery"] }, next: si + 2 };
   }
-  return null;
+  return roundB194Sentence(s, sentences, si, ctx, _effects);
 }

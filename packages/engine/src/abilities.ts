@@ -7230,6 +7230,8 @@ export interface ManaSpend {
   powerUpAbilities?: true;
   /** "Only to foretell cards or cast spells that have foretell" (Niko Defies Destiny): ManaUse.foretell, or a spell with foretell. */
   foretell?: true;
+  /** "Only to foretell a card from your hand or cast an instant or sorcery spell" (Karfell Harbinger): the foretell special action (ManaUse.foretell) only, beside `spells`. */
+  foretellAction?: true;
   text: string;
 }
 

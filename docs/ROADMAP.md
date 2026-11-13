@@ -1,6 +1,6 @@
 # Roadmap
 
-31,146 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,158 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,977 of 4,988 (99%), top 10,000: 9,844 of
 9,979 (98%).
 

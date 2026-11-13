@@ -5,6 +5,7 @@ import type { CompiledCard, Effect } from "../abilities";
 import { parseBody, type Ctx } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseTargetPhrase } from "./targets";
+import { round349Sentence } from "./round349";
 import { singularWord } from "./words";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
@@ -12,6 +13,9 @@ type Found = { effect: Effect; next: number } | "fail" | null;
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round348Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 349's sentences first (oracle/round349.ts).
+  const r349 = round349Sentence(s, sentences, si, ctx, effects);
+  if (r349) return r349;
   const line = plain(s);
   // Tovolar, Dire Overlord: "Then transform any number of Human Werewolves you control.": any of them, none too, chosen as
   // it resolves, not targeted (CR 701.27a); a daybound one, or one that isn't a double-faced card, doesn't transform

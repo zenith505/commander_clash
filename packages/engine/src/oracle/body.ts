@@ -20045,7 +20045,7 @@ function scaleEffect(e: Effect, per: AmountExpr): Effect | null {
     case "preventNext":
     case "extraTurn":
     case "pick": {
-      if ((e.type === "counters" && (e.perLastKnownCounter || e.double)) || (e.type === "extraTurn" && (e.n !== 1 || e.loseAtEnd || e.noPowerUp))) return null;
+      if ((e.type === "counters" && (e.perLastKnownCounter || e.double)) || (e.type === "extraTurn" && (e.n !== 1 || e.loseAtEnd || e.noPowerUp || e.noPrevention))) return null;
       const n = sc(e.n);
       return n === null ? null : ({ ...e, n } as Effect);
     }

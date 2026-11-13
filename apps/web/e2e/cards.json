@@ -13153,6 +13153,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a03ab63a-83f3-4dd6-926d-08d09ce2e696",
+  "name": "Gate to the Aether",
+  "manaCost": "{6}",
+  "cmc": 6,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of each player's upkeep, that player reveals the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the battlefield.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9f6d6e90-7462-46e5-bf2f-725b4badc394",
   "name": "Gathering Stone",
   "manaCost": "{4}",
@@ -24128,6 +24150,28 @@
   "commanderLegal": "legal",
   "set": "ecc",
   "releasedAt": "2026-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "dbf05c40-7274-4aaa-94d7-1f28cbe15e09",
+  "name": "Omen Machine",
+  "manaCost": "{6}",
+  "cmc": 6,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Players can't draw cards.\nAt the beginning of each player's draw step, that player exiles the top card of their library. If it's a land card, the player puts it onto the battlefield. Otherwise, the player casts it without paying its mana cost if able.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "nph",
+  "releasedAt": "2011-05-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -39373,6 +39417,32 @@
   "set": "mom",
   "releasedAt": "2023-04-21",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9cf1af53-ab9f-4cce-bdb5-2c13b805523d",
+  "name": "Wild Evocation",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of each player's upkeep, that player reveals a card at random from their hand. If it's a land card, the player puts it onto the battlefield. Otherwise, the player casts it without paying its mana cost if able.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m11",
+  "releasedAt": "2010-07-16",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

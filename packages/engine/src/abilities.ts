@@ -4574,6 +4574,18 @@ export type Effect =
    * and may cast one of them from that hand as this resolves (castFromAmong `fromHand`, limited to those cards).
    */
   | { type: "handChooseCast"; who: PlayerRef; n: Amount }
+  /**
+   * Omen Machine: "that player exiles the top card of their library": that card, exiled, is "it" for the instructions
+   * after this one (ResolvingInfo.revealed, the card as the object it is in exile, CR 400.7). An empty library, none.
+   */
+  | { type: "exileTopAsIt"; who: PlayerRef }
+  /**
+   * Omen Machine, Wild Evocation: "the player casts it without paying its mana cost if able": the card "it" names
+   * (ResolvingInfo.revealed, in a hand or in exile, still that object), cast by `who` as this resolves (CR 608.2g), for
+   * free (CR 118.9), its card type's timing ignored (CR 601.2, rulings); they must cast it if they can (PendingDecision
+   * "castFree" `must`), and if they can't, it stays where it is (rulings).
+   */
+  | { type: "castItIfAble"; who: PlayerRef }
   | {
       type: "counterOpponentsStack";
       /** Kadena's Silencer: "counter all abilities your opponents control": only the activated and triggered abilities already on the stack (rulings: not spells; mana abilities never are there, CR 605.3a). */
@@ -5190,7 +5202,7 @@ export type Effect =
    * this process until the tie is broken." A player who can't exile a card is out of it (rulings).
    */
   | { type: "timesifter" }
-  | { type: "extraTurn"; who: PlayerRef; /** "For each time vote, take an extra turn after this one" (Expropriate): counted as it resolves. */ n: Amount; loseAtEnd?: true; /** "Skip the untap step of that turn" (Savor the Moment). */ skipUntap?: true; /** "During that turn, power-up abilities can't be activated" (Kang the Conqueror). */ noPowerUp?: true }
+  | { type: "extraTurn"; who: PlayerRef; /** "For each time vote, take an extra turn after this one" (Expropriate): counted as it resolves. */ n: Amount; loseAtEnd?: true; /** "Skip the untap step of that turn" (Savor the Moment). */ skipUntap?: true; /** "During that turn, power-up abilities can't be activated" (Kang the Conqueror). */ noPowerUp?: true; /** "During that turn, damage can't be prevented" (Alchemist's Gambit, CR 615.12). */ noPrevention?: true }
   /**
    * "You control target player during that player's next turn" (CR 723): `controller` makes all of `who`'s choices and
    * decisions during the next turn `who` actually takes (723.1, 723.1b). `extraTurnAfter`: "After that turn, that player

@@ -2557,7 +2557,7 @@ line blocks.
    mana of any color to cast it. When you cast a spell this way, its owner loses life equal to its mana value." (impulse
    and MayPlay `castTrigger`, CR 603.2, the spell's mana value on the stack, X included, rulings); Monk Class's level 3
    "exile the top card of your library. For as long as it remains exiled, it has "You may cast this card from exile as long
-   as you've cast another spell this turn."" (MayPlay `castAnotherThisTurn`). +6, 31,224 of 31,936 with round 355. The
+   as you've cast another spell this turn."" (MayPlay `castAnotherThisTurn`). +6, 31,224 of 31,936 with round 355 (31,239 with B197 and B198). The
    compiled text of every other card is unchanged. "Your first spell during each of your turns" is a cast trigger now.
    Out after round 356 (looked at, not done): Commander Liara Portyr ("spells you cast from exile this turn cost {X} less
    to cast, where X is the number of players being attacked": a cost reduction for the turn by where a spell is cast from,
@@ -2582,8 +2582,8 @@ line blocks.
    Doctor's "Once during each of your turns, you may play a historic land or cast a historic permanent spell from your
    graveyard. If you do, it gains "If this permanent would leave the battlefield, exile it instead of putting it anywhere
    else."" (Serra Paragon's shared use, `landFromGraveyardFilter` for historic lands, CR 700.6). No new prompt: each
-   uses the existing may, free-cast, copy-target and graveyard-cast paths. +6, 31,245 of 31,936 with round 356 and Lane B's B198. The
-   compiled text of every other card is unchanged.
+   uses the existing may, free-cast, copy-target and graveyard-cast paths. +6, 31,245 of 31,936 with round 356 and Lane
+   B's B197 and B198. The compiled text of every other card is unchanged.
    Out after round 357 (looked at, not done): Open the Omenpaths ("Add two mana of any one color and two mana of any
    other color. Spend this mana only to cast creature or enchantment spells.": two different colors picked as it
    resolves, then a spend restriction, still out); Glorious Purpose ("When the sixth plan counter is put on ~": a trigger

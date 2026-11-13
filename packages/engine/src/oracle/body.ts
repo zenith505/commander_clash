@@ -741,9 +741,9 @@ function parseRevealedIf(sentences0: string[], at: number, ctx: Ctx): { effect: 
   // when it isn't one, or when you choose not to.
   // Gathering Stone: "If it's a card of the chosen type, you may reveal it and put it into your hand. If you don't put the
   // card into your hand, you may put it into your graveyard": also when it is one and you don't reveal it (rulings).
-  const notPut = !other && /^If you (?:don't put the card onto the battlefield|didn't put a card onto the battlefield this way|don't put the card into your hand), (.+)$/.exec(sentences[next] ?? "");
+  const notPut = !other && /^If you (?:don't put the card onto the battlefield|didn't put a card onto the battlefield this way|don't put (?:the card|it) into your hand), (.+)$/.exec(sentences[next] ?? "");
   if (notPut) {
-    const toHand = /^If you don't put the card into your hand, /.test(sentences[next] ?? "");
+    const toHand = /^If you don't put (?:the card|it) into your hand, /.test(sentences[next] ?? "");
     const one = then.length === 1 && then[0]!.type === "may" && !then[0]!.otherwise && !then[0]!.pay ? then[0]! : null;
     const may = one && (toHand ? one.effects.length === 2 && one.effects[0]!.type === "revealRevealed" && one.effects[1]!.type === "bounce" : one.effects.length === 1 && one.effects[0]!.type === "putOntoBattlefield") ? one : null;
     const before = ctx.targets.length;
@@ -2184,6 +2184,15 @@ function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell
   // of turn.": anyone's creatures, chosen as it resolves, not targeted, no two with the same power (rulings); one alone is
   // a set too.
   if (/^[Cc]hoose any number of creatures with different powers$/.test(s)) {
+    // Sigardian Zealot: "Each of them gets +X/+X and gains vigilance until end of turn, where X is ~'s power.": X is ~'s
+    // power as this resolves, or as it last existed (CR 608.2h), the same for each of them, locked in (CR 611.2c).
+    if (/^Each of them gets \+X\/\+X and gains vigilance until end of turn, where X is ~'s power\.?$/.test(sentences[si + 1] ?? "")) {
+      const x: AmountExpr = { count: { kind: "power", of: { ref: "self" } } };
+      return { effects: [
+        { type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, n: 0, action: "choose", anyNumber: true, anyController: true, differentPowers: true, prompt: "click any number of creatures with different powers (anyone's), then choose them: each gets +X/+X and gains vigilance until end of turn, X being ~'s power" },
+        { type: "continuous", what: { ref: "created" }, mods: [{ kind: "modifyPT", power: x, toughness: x }, { kind: "addKeywords", keywords: ["Vigilance"] }], duration: "endOfTurn" },
+      ], skip: 1 };
+    }
     const then = /^Those creatures gain ([a-z ]+) until end of turn\.?$/.exec(sentences[si + 1] ?? "");
     const gains = then ? parseOne(`~ gains ${then[1]} until end of turn`, ctx) : null;
     const g = gains?.length === 1 ? gains[0] : undefined;

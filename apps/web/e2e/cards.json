@@ -6004,6 +6004,40 @@
   ]
  },
  {
+  "oracleId": "faffc9fb-32b3-4015-8c3f-e6b45002c050",
+  "name": "Chong and Lily, Nomads",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Bard Ally",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Bard",
+   "Ally"
+  ],
+  "oracleText": "Whenever one or more Bards you control attack, choose one —\n• Put a lore counter on each of any number of target Sagas you control.\n• Creatures you control get +1/+0 until end of turn for each lore counter among Sagas you control.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tle",
+  "releasedAt": "2025-11-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "54421e69-d79e-4c2e-8ce6-96994d168835",
   "name": "Cinder Strike",
   "manaCost": "{R}",
@@ -14345,6 +14379,32 @@
   "set": "ltr",
   "releasedAt": "2023-06-23",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b580c6d8-f501-4623-843a-5bb2b638a339",
+  "name": "Graceful Takedown",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Any number of target enchanted creatures you control and up to one other target creature you control each deal damage equal to their power to target creature you don't control.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "woe",
+  "releasedAt": "2023-09-08",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

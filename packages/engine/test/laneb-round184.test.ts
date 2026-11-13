@@ -4,10 +4,11 @@
 // Inertia ("that attacking player may tap or untap target permanent of their choice"), Kathril, Aspect Warper (keyword
 // counters for the keywords of creature cards in your graveyard), Feral Encounter ("You may cast the exiled card this
 // turn. At the beginning of the next combat phase this turn, ..."), and activation taxes that reach mana abilities too
-// (Oppressive Rays, Gloom).
+// (Oppressive Rays, Gloom). The Fugitive Doctor: "target instant or sorcery card in your graveyard gains flashback
+// {2}{R}{G} until end of turn" (round 340's fixed-cost flashback grant).
 
 import { describe, expect, it } from "vitest";
-import { act, putOnBattlefield, setup } from "./helpers";
+import { act, passUntil, putOnBattlefield, setup } from "./helpers";
 import { botActions, characteristics, invalidateCharacteristics, isFullySupported, planActivate, planCast, planManaAbility, waitingOn, type Action, type CardDef, type CostChoices, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 // Real card data (Scryfall).
@@ -25,6 +26,9 @@ const mesa = (): CardDef => ({"oracleId":"8776d14f-a5a2-4ef3-98d0-e1148e579e4d",
 const sorcerer = (): CardDef => ({"oracleId":"5e961d15-5972-4e4b-9385-1cd7cd7c6bbe","name":"Prodigal Sorcerer","manaCost":"{2}{U}","cmc":3,"typeLine":"Creature — Human Wizard Sorcerer","supertypes":[],"types":["Creature"],"subtypes":["Human","Wizard","Sorcerer"],"oracleText":"{T}: This creature deals 1 damage to any target.","power":"1","toughness":"1","colors":["U"],"colorIdentity":["U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/5/0/50aef269-55f9-4d84-8bc5-29e794297f11.jpg?1783937607","artUrl":"https://cards.scryfall.io/art_crop/front/5/0/50aef269-55f9-4d84-8bc5-29e794297f11.jpg?1783937607","commanderLegal":"legal","set":"ema","releasedAt":"2016-06-10","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
 const bears = (): CardDef => ({"oracleId":"14c8f55d-d177-4c25-a931-ebeb9e6062a0","name":"Grizzly Bears","manaCost":"{1}{G}","cmc":2,"typeLine":"Creature — Bear","supertypes":[],"types":["Creature"],"subtypes":["Bear"],"oracleText":"","power":"2","toughness":"2","colors":["G"],"colorIdentity":["G"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/2/4/24a5e5fb-d1d4-4f09-9593-f2b25d0dcabf.jpg?1787745798","artUrl":"https://cards.scryfall.io/art_crop/front/2/4/24a5e5fb-d1d4-4f09-9593-f2b25d0dcabf.jpg?1787745798","commanderLegal":"legal","set":"slz","releasedAt":"2026-09-02","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
 const arbor = (): CardDef => ({"oracleId":"e996cd67-739c-40f4-b276-0042acf26c71","name":"Dryad Arbor","manaCost":"","cmc":0,"typeLine":"Land Creature — Forest Dryad","supertypes":[],"types":["Land","Creature"],"subtypes":["Forest","Dryad"],"oracleText":"(This land isn't a spell, it's affected by summoning sickness, and it has \"{T}: Add {G}.\")","power":"1","toughness":"1","colors":["G"],"colorIdentity":["G"],"keywords":[],"producedMana":["G"],"imageUrl":"https://cards.scryfall.io/normal/front/5/c/5c4fb7f9-a551-4253-a46e-f6284d355388.jpg?1783904262","artUrl":"https://cards.scryfall.io/art_crop/front/5/c/5c4fb7f9-a551-4253-a46e-f6284d355388.jpg?1783904262","commanderLegal":"legal","set":"sld","releasedAt":"2026-02-02","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const doctor = (): CardDef => ({"oracleId":"b3a03768-7676-4b33-a813-cc69dea77c4d","name":"The Fugitive Doctor","manaCost":"{3}{R}{G}","cmc":5,"typeLine":"Legendary Creature — Time Lord Doctor","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Time Lord","Doctor"],"oracleText":"When The Fugitive Doctor enters, investigate.\nWhenever The Fugitive Doctor attacks, you may sacrifice a Clue. When you do, target instant or sorcery card in your graveyard gains flashback {2}{R}{G} until end of turn. (You may cast that card from your graveyard for its flashback cost. Then exile it.)","power":"4","toughness":"4","colors":["G","R"],"colorIdentity":["G","R"],"keywords":["Investigate"],"imageUrl":"https://cards.scryfall.io/normal/front/f/e/fea8bd29-80a4-463f-b3bd-e15f4bd5f5ce.jpg?1783914637","artUrl":"https://cards.scryfall.io/art_crop/front/f/e/fea8bd29-80a4-463f-b3bd-e15f4bd5f5ce.jpg?1783914637","commanderLegal":"legal","set":"who","releasedAt":"2023-10-13","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const divination = (): CardDef => ({"oracleId":"273b339c-964b-4a18-8eb5-ceb8abcdfd9e","name":"Divination","manaCost":"{2}{U}","cmc":3,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Draw two cards.","colors":["U"],"colorIdentity":["U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/c/7/c7f9daf0-dbfd-45b2-be35-9c2de9d1a56e.jpg?1783935025","artUrl":"https://cards.scryfall.io/art_crop/front/c/7/c7f9daf0-dbfd-45b2-be35-9c2de9d1a56e.jpg?1783935025","commanderLegal":"legal","set":"dom","releasedAt":"2018-04-27","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
+const fireball = (): CardDef => ({"oracleId":"aa7714b0-2bfb-458a-8ebf-37ec2c53383e","name":"Fireball","manaCost":"{X}{R}","cmc":1,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"This spell costs {1} more to cast for each target beyond the first.\nFireball deals X damage divided evenly, rounded down, among any number of targets.","colors":["R"],"colorIdentity":["R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/8/2/82a97aae-d8a7-4451-a47e-ea878dea6e4c.jpg?1783922638","artUrl":"https://cards.scryfall.io/art_crop/front/8/2/82a97aae-d8a7-4451-a47e-ea878dea6e4c.jpg?1783922638","commanderLegal":"legal","set":"clb","releasedAt":"2022-06-10","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -389,5 +393,62 @@ describe("Oppressive Rays and Gloom: activated abilities cost {3} more, mana abi
     const elf = putOnBattlefield(s, ap, elves());
     const after = run(s, planManaAbility(s, ap, elf, 0, "G"));
     expect(after.players[ap]!.manaPool.G).toBe(1);
+  });
+});
+
+describe("The Fugitive Doctor: a sacrificed Clue gives an instant or sorcery card flashback {2}{R}{G} this turn", () => {
+  it("is fully supported", () => supported(doctor()));
+  /** Casts the Doctor (investigate: a Clue), puts `card` in your graveyard, attacks and answers the "may"; stops at the target. */
+  const attackWith = (card: CardDef, sacrifice: boolean) => {
+    const { s: s0, ap, ids, opp } = setup([doctor()]);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    const doc = ids[0]!;
+    const clue = s.battlefield.find((id) => characteristics(s, s.objects[id]!).subtypes.includes("Clue"));
+    expect(clue).toBeDefined();
+    s.objects[doc]!.controlledSinceTurn = -1;
+    const yard = place(s, ap, card, "graveyard");
+    s = act(passUntil(s, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: doc, defender: opp }] });
+    for (let i = 0; i < 50 && s.pending?.kind !== "chooseMay"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap, prompt: "sacrifice a Clue" });
+    s = act(s, { type: "chooseMay", player: ap, yes: sacrifice });
+    if (s.pending?.kind === "pickPermanents") s = act(s, { type: "pickPermanents", player: ap, ids: [clue!] });
+    return { s, ap, opp, yard, clue: clue! };
+  };
+  /** Everyone passes and nobody blocks until `ap`'s second main phase. */
+  const toMain2 = (s: GameState, ap: PlayerId) =>
+    passTill(s, (x) => x.step === "main2" && x.activePlayer === ap && !x.stack.length && !x.pending && waitingOn(x) === ap);
+  it("sacrificing the Clue: the target gains flashback {2}{R}{G}; cast for that cost from the graveyard, then exiled", () => {
+    let { s, ap, yard, clue } = attackWith(divination(), true);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: yard }] }));
+    expect(s.objects[clue]?.zone ?? "gone").not.toBe("battlefield");
+    expect(s.log.some((l) => /Divination gains flashback \{2\}\{R\}\{G\} until end of turn/.test(l.text))).toBe(true);
+    s = toMain2(s, ap);
+    const lands = () => s.battlefield.filter((id) => s.objects[id]!.controller === ap && !s.objects[id]!.tapped && characteristics(s, s.objects[id]!).types.includes("Land"));
+    const before = lands().length;
+    const hand = s.players[ap]!.hand.length;
+    s = settle(run(s, planCast(s, ap, yard, undefined, undefined, undefined, undefined, { via: "grantedFlashback" })));
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect(zone(s, yard)).toBe("exile");
+    // {2}{R}{G}, not Divination's {2}{U}: four lands, a Mountain and a Forest among them.
+    expect(lands().length).toBe(before - 4);
+  });
+  it("an {X} card cast with this flashback has X 0 (rulings)", () => {
+    let { s, ap, opp, yard } = attackWith(fireball(), true);
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: yard }] }));
+    s = toMain2(s, ap);
+    const life = s.players[opp]!.life;
+    // No X can be chosen: the cost paid has no {X}.
+    const withX = planCast(s, ap, yard, [{ kind: "player", id: opp }], undefined, undefined, undefined, { via: "grantedFlashback", x: 5 } as CostChoices);
+    expect(() => run(s, withX)).toThrow(/X is 0/);
+    s = settle(run(s, planCast(s, ap, yard, [{ kind: "player", id: opp }], undefined, undefined, undefined, { via: "grantedFlashback" })));
+    expect(zone(s, yard)).toBe("exile");
+    expect(s.players[opp]!.life).toBe(life);
+  });
+  it("declining keeps the Clue, and the card gains nothing", () => {
+    const { s, ap, yard, clue } = attackWith(divination(), false);
+    expect(s.pending?.kind === "chooseTargets" && s.pending.player === ap).toBe(false);
+    expect(zone(s, clue)).toBe("battlefield");
+    expect(planCast(s, ap, yard, undefined, undefined, undefined, undefined, { via: "grantedFlashback" })).toBeNull();
   });
 });

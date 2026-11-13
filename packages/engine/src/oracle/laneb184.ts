@@ -4,6 +4,7 @@ import type { CompiledCard, Effect, TargetSpec } from "../abilities";
 import type { Ctx } from "./body";
 import { reflexiveBody } from "./body";
 import { roundB185Sentence } from "./laneb185";
+import { parseSentence } from "./sentence";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -73,6 +74,15 @@ export function roundB184Sentence(s: string, sentences: string[], si: number, ct
     // The pick puts each player's chosen creature in Resolving.created; each copy is its controller's.
     effects.push({ type: "pick", who: { ref: "choseWord", option: copy[1]! }, filter: CREATURE, n: 1, action: "choose" });
     return { effect: { type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "created" }, each: true, eachController: true }, next: si + 1 };
+  }
+  // The Fugitive Doctor: "target instant or sorcery card in your graveyard gains flashback {2}{R}{G} until end of turn":
+  // flashback with this cost, not the card's mana cost (CR 702.34a; round 340's grant), so with it X is 0 (rulings).
+  const fixed = /^(target instant or sorcery card in your graveyard) gains flashback ((?:\{[0-9WUBRGC]\})+) until end of turn$/i.exec(plain(s));
+  if (fixed && !ctx.spell) {
+    const fx = parseSentence(`${fixed[1]} gains flashback with its mana cost until end of turn`, ctx);
+    const grant = fx?.length === 1 && fx[0]!.type === "grantFlashback" && fx[0]!.what?.ref === "target" ? fx[0]! : undefined;
+    if (grant?.type !== "grantFlashback") return "fail";
+    return { effect: { ...grant, mana: fixed[2]!.toUpperCase() }, next: si + 1 };
   }
   // Feral Encounter: "You may cast the exiled card this turn" after looking at the top cards and exiling a creature card
   // from among them: cast only (CR 601.3), the usual timing rules applying.

@@ -1,4 +1,5 @@
 import { parseFromTop } from "./compile";
+import { parseCastPay } from "./round343";
 import { ANY_COUNTER, NON_AURA_ENCHANTMENT, allEffects, refCovers, type SearchDest, type AbilityBody, type TokenSpec, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type PunisherOption, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification, type DamageRuleSpec, type CounterKind, type TriggeredAbility } from "../abilities";
 import { substituteX } from "../amounts";
 import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS, plainMana, BASIC_TYPES } from "./words";
@@ -966,7 +967,7 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
   const exile = !shuffleFirst && /^[Ee]xile cards from the top of your library until you exile a nonland card$/.test(s);
   // "They exile cards ... until they exile a nonland card" in a villainous choice's option (Ensnared by the Mara): the
   // player facing it, the event player as it runs.
-  const they = shuffleFirst ? null : (/^(Target opponent|Target player) exiles cards from the top of their library until they exile a nonland card$/.exec(s) ?? (ctx.eventPlayer ? /^(They|That player) exiles? cards from the top of their library until they exile a nonland card$/.exec(s) : null));
+  const they = shuffleFirst ? null : (/^(Target opponent|Target player) exiles cards from the top of their library until they exile a nonland card$/.exec(s) ?? (ctx.eventPlayer ? /^([Tt]hey|[Tt]hat player) exiles? cards from the top of their library until they exile a nonland card$/.exec(s) : null));
   const flourish = !shuffleFirst && /^If that (?:permanent|creature) is destroyed this way, its controller exiles cards from the top of their library until they exile a nonland card, then they may cast that card without paying its mana cost$/.test(s);
   if (!reveal && !exile && !they && !flourish) return null;
   if (flourish) {
@@ -1015,6 +1016,15 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
     next++;
   }
   const cast = sentences[next] ?? "";
+  // The Infamous Cruelclaw: "You may cast that card by discarding a card rather than paying its mana cost."; Bismuth
+  // Mindrender: "... by paying life equal to the spell's mana value ..."; Amped Raptor: "... by paying an amount of {E}
+  // equal to its mana value ...". Cast as this resolves, for that alternative cost (CR 608.2g, 118.9; rulings).
+  const payWay = parseCastPay(cast);
+  if (payWay) {
+    const payer = they ? (/^(?:[Tt]hey|[Tt]hat player)$/.test(they[1]!) ? ({ ref: "eventPlayer" } as const) : parsePlayer(they[1]!, ctx)) : undefined;
+    if (they && !payer) return "fail";
+    return { effect: { type: "exileUntilNonland", ...(payer ? { who: payer } : {}), ...(reveal ? { reveal: true as const } : {}), ...(shuffleFirst ? { shuffleFirst: true as const } : {}), then: "castFree", pay: payWay }, next: next + 1 };
+  }
   const then: Extract<Effect, { type: "exileUntilNonland" }>["then"] | undefined = /^You may cast (?:that card|it|the exiled card) without paying its mana cost$/.test(cast)
     ? "castFree"
     : /^Until end of turn, you may cast that card without paying its mana cost$/.test(cast)
@@ -1028,7 +1038,7 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
   if (suspend && /^If it doesn't have suspend, it gains suspend$/.test(sentences[next + 1] ?? ""))
     return { effect: { type: "exileUntilNonland", then: "suspend", suspend: Number(amt(suspend[1]!)) }, next: next + 2 };
   if (!then) return null;
-  const who = they ? (/^(?:They|That player)$/.test(they[1]!) ? ({ ref: "eventPlayer" } as const) : parsePlayer(they[1]!, ctx)) : undefined;
+  const who = they ? (/^(?:[Tt]hey|[Tt]hat player)$/.test(they[1]!) ? ({ ref: "eventPlayer" } as const) : parsePlayer(they[1]!, ctx)) : undefined;
   if (they && !who) return "fail";
   return { effect: { type: "exileUntilNonland", ...(who ? { who } : {}), ...(reveal ? { reveal: true as const } : {}), ...(shuffleFirst ? { shuffleFirst: true as const } : {}), then }, next: next + 1 };
 }
@@ -2888,6 +2898,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Field-Tested Frying Pan: "create a Food token, then create a 1/1 white Halfling creature token and attach ~ to it": the
   // Halfling, created second.
   text = text.replace(/(create an? [^.,]+ token), then (create an? [^.,]+ creature token) and (attach ~ to it\.)/, (_, a: string, b: string, c: string) => `${a}. ${b.charAt(0).toUpperCase()}${b.slice(1)}, then ${c}`);
+  // Sin, Unending Cataclysm: "put its counters on target creature you control, then shuffle ~ into its owner's library":
+  // two instructions in order, the card shuffled in only if it's still where it went (CR 400.7); with the target illegal
+  // the ability doesn't resolve at all (CR 608.2b, rulings).
+  text = text.replace(/^([Pp]ut its counters on target creature you control), then (shuffle ~ into its owner's library\.)$/, (_, a: string, b: string) => `${a}. ${b.charAt(0).toUpperCase()}${b.slice(1)}`);
   // Fractal Harness: "create a 0/0 green and blue Fractal creature token. Put X +1/+1 counters on it and attach ~ to it":
   // two instructions about the token, in that order.
   text = text.replace(/(create an? [^.]+ creature token\. Put (?:X|\w+) \+1\/\+1 counters? on it) and attach (~ to it\.)/, "$1. Attach $2");
@@ -3554,6 +3568,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Heirloom Mirror: "Draw a card, mill a card, then put a ritual counter on ~": three instructions in order. Its "Then if it
   // has three or more ritual counters on it, remove them and transform it" is Brass's Tunnel-Grinder's below.
   text = text.replace(/^Draw a card, mill a card, then put an? ([a-z]+) counter on ~\. /, "Draw a card. Mill a card. Put a $1 counter on ~. ");
+  // Hostile Hostel: "Then if there are three or more soul counters on it, remove those counters, transform it, then untap
+  // it.": the three instructions in order, all under the condition (as Brass's Tunnel-Grinder's below).
+  text = text.replace(/(Then if there are [a-z]+ or more [a-z]+ counters on it), remove those counters, transform it, then untap it\.$/, "$1, remove those counters, transform ~, and untap ~.");
   // Brass's Tunnel-Grinder: "Then if there are three or more bore counters on it, remove those counters and transform it."
   // Primal Amulet: "..., you may remove those counters and transform it."
   // Edgar Markov's Coffin: "create a 1/1 ... token with lifelink and put a bloodline counter on ~. Then if ..." too.

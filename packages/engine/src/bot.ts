@@ -118,6 +118,7 @@ import {
   spliceCandidates,
   madnessCastOf,
   auraHostFor,
+  auraHelps,
   auraHostKey,
   payableLife,
   halfLifeCost,
@@ -440,8 +441,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // A tax whose penalty is only a card or a Treasure for its controller (Rhystic Study, Smothering Tithe, Mystic Remora):
       // {1} is worth paying, more only with plenty of mana to spare.
       const pu = s.resolving?.scratch?.punish;
+      // Overencumbered: "If they don't, creatures can't attack this combat": worth paying only with a creature that could
+      // attack.
+      const noAttacks = pu && s.resolving ? allEffects(s.resolving.body.effects).some((x) => x.type === "punisher" && x.effects.some((y) => y.type === "cantAttackRule" && !!y.combat)) : false;
+      if (noAttacks && !potentialAttackers(s, pid).length) return [{ type: "payUnless", player: pid, pay: false }];
       const generic = [...pend.cost.matchAll(/\{(\d+)\}|\{[^}]+\}/g)].reduce((n, x) => n + (x[1] ? Number(x[1]) : 1), 0);
-      if (pu && pu.lose === undefined && generic >= 2 && !planMana(s, pid, parseManaCost(`{${generic + 3}}`))) return [{ type: "payUnless", player: pid, pay: false }];
+      if (pu && !noAttacks && pu.lose === undefined && generic >= 2 && !planMana(s, pid, parseManaCost(`{${generic + 3}}`))) return [{ type: "payUnless", player: pid, pay: false }];
       const taps = planMana(s, pid, parseManaCost(pend.cost));
       // Ward—Waterbend: mana first, then artifacts and creatures for the rest (CR 701.67a).
       const wb = !taps && pend.waterbend ? autoWaterbend(s, pid, parseManaCost(pend.cost), 0, pend.waterbend, []) : null;
@@ -739,7 +744,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     if (pend.kind === "manaMix") return [{ type: "manaMix", player: pid, counts: chooseManaMix(s, pid, pend.n, pend.colors) }];
     if (pend.kind === "divideDamage") return [{ type: "divideDamage", player: pid, parts: chooseDamageDivision(s, pid, pend.by, pend.options, pend.total) }];
-    if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.remove ? chooseCounterRemoval(s, pid, pend.options, pend.total, pend.has ?? {}) : pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
+    if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.remove ? chooseCounterRemoval(s, pid, pend.options, pend.total, pend.has ?? {}) : pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter, !!pend.upTo) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     // Malik, Grim Manipulator: their best creature goes; of our own, the least useful one (the other choice is hidden).
     // The Caves of Androzani: ours with a counter that helps, others' with one that hurts (as proliferate decides), and
@@ -816,6 +821,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         if (discardKeywordKinds(s, rex, [...ids, id]).length > discardKeywordKinds(s, rex, ids).length) ids.push(id);
       return [{ type: "pickPermanents", player: pid, ids }];
     }
+    // Sin, Unending Cataclysm: every opponent's permanent with counters, and ours only when all their counters hurt us.
+    if (pend.kind === "pickPermanents" && pend.action === "choose" && pend.objectId && s.objects[pend.objectId] && compileCard(defOf(s, obj(s, pend.objectId))).entersRemoveCounters) {
+      const bad = new Set(["-1/-1", "stun"]);
+      const ids = pend.options.filter((id) => {
+        const x = obj(s, id);
+        return controllerOf(s, x) !== pid || Object.entries(x.counters).every(([k, n]) => n <= 0 || bad.has(k));
+      });
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
     // Amplify: reveal everything that counts, for the most counters (CR 702.38a).
     if (pend.kind === "pickPermanents" && pend.action === "reveal") return [{ type: "pickPermanents", player: pid, ids: pend.options }];
     // Champion: exile our least useful one (it comes back when the champion leaves), unless the champion is gone already.
@@ -828,6 +842,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Cipher: encode it on the creature most likely to deal combat damage to a player.
     if (pend.kind === "pickPermanents" && pend.action === "encode") return [{ type: "pickPermanents", player: pid, ids: chooseEncode(s, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "untap") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "untap") }];
+    // Reservoir Kraken: the creature we tap for it is the one we'd miss least, the weakest.
+    if (pend.kind === "pickPermanents" && pend.action === "tap" && s.resolving?.scratch?.punish?.options.some((o) => "tap" in o)) return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0]!] }];
     if (pend.kind === "pickPermanents" && pend.action === "tap") {
       // Exactly that many ("you may tap three untapped creatures you control", Aziza, once we said yes): creatures that
       // could still attack too, if it takes them.
@@ -955,6 +971,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Armed and Armored: the Equipment to put on the Dwarf just chosen.
     const toChosen = pend.kind === "pickPermanents" && pend.action === "attach" ? s.resolving?.body.effects[s.resolving.next] : undefined;
     if (pend.kind === "pickPermanents" && toChosen?.type === "attachAny" && toChosen.toChosen) return [{ type: "pickPermanents", player: pid, ids: attachPicks(s, pid, pend.options) }];
+    // Godsend: "you may exile one of those creatures": an opponent's, the one worth the most; never our own.
+    if (pend.kind === "pickPermanents" && pend.action === "exile" && pend.min === 0 && pend.count === 1 && allEffects(s.resolving?.body.effects ?? []).some((e) => e.type === "pick" && e.fromGroup && e.action === "exile")) {
+      const theirs = pend.options.filter((id) => opponents(s, pid).includes(controllerOf(s, obj(s, id)))).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+      return [{ type: "pickPermanents", player: pid, ids: theirs.slice(0, 1) }];
+    }
     if (pend.kind === "pickPermanents" && pend.min !== undefined && pend.action !== "keep") return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     // Stick Together: for this slot of the party, the creature the most valuable whole party (this slot and the ones still
     // to come, each creature once) uses, or none.
@@ -1045,6 +1066,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const k = pend.counterKind ?? "";
       const keyword = ["shield", "flying", "first strike", "double strike", "deathtouch", "hexproof", "indestructible", "lifelink", "menace", "reach", "trample", "vigilance"].includes(k);
       return [{ type: "chooseOption", player: pid, choice: keyword && pend.options.includes("kind") ? "kind" : "plus" }];
+    }
+    // Kusari-Gama: the defending player whose creatures would take the most of the damage, never ourselves.
+    if (pend.kind === "chooseOption" && pend.what === "defendingPlayer") {
+      const theirs = (q: string) => (Number(q) === pid ? -1 : s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === Number(q) && objIsType(s, obj(s, id), "Creature")).length);
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => theirs(b) - theirs(a))[0]! }];
     }
     // Exotic Pets: helpful counters stack up on the first token, harmful ones go to the second.
     if (pend.kind === "chooseOption" && pend.what === "eitherToken") {
@@ -1581,6 +1607,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "clash") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Damage shields: the options come in the order we'd pick them (damage.ts shieldPreference).
     if (pend.kind === "chooseOption" && pend.what === "damageShield") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+    // Jinnie Fay, Esix: what the engine judged worth more, the tokens as they are or one replacement (counters.ts tokenWorth).
+    if (pend.kind === "chooseOption" && pend.what === "tokenInstead") return [{ type: "chooseOption", player: pid, choice: pend.botChoice && pend.options.includes(pend.botChoice) ? pend.botChoice : "none" }];
     if (pend.kind === "chooseOption" && pend.what === "venture") return [{ type: "chooseOption", player: pid, choice: chooseRoom(s, pid, pend.options) }];
     // Friend or foe (Pir's Whim): a friend is the bot itself, every other player a foe.
     if (pend.kind === "chooseOption" && pend.what === "word" && pend.options.join() === "friend,foe") return [{ type: "chooseOption", player: pid, choice: pend.of === pid ? "friend" : "foe" }];
@@ -1917,6 +1945,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   if (dial) return dial;
   const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid);
   if (regen) return regen;
+  const silencer = chooseSilencerFaceUp(s, pid);
+  if (silencer) return silencer;
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
     if (land) return [land];
@@ -3132,6 +3162,8 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     const reanimate = reanimators.length > 0 || allEffects(body.effects).some((e) => e.type === "animateDead" && e.target === i);
     // "Under its owner's control" (Bilbo): only our own cards do us good.
     const forOwner = reanimators.some((e) => e.owner);
+    // Nomad Mythmaker, One Last Job: an Aura that enters on a creature of ours only if it helps it.
+    const onOurs = reanimators.some((e) => e.attachToYours);
     // "Becomes a copy of target creature": the best one anywhere, but not a legendary one of ours (the legend rule
     // would cost us one of them) or the source itself; what becomes the copy is our weakest.
     const copies = allEffects(body.effects).filter((e): e is Extract<Effect, { type: "becomeCopy" }> => e.type === "becomeCopy");
@@ -3144,7 +3176,7 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
       : copied
       ? all.filter((t) => t.kind !== "object" || (t.id !== sourceId && !(isMine(s, pid, t) && objIsLegendary(s, t.id))))
       : reanimate
-        ? forOwner ? all.filter((t) => t.kind === "object" && obj(s, t.id).owner === pid) : all
+        ? forOwner ? all.filter((t) => t.kind === "object" && obj(s, t.id).owner === pid) : onOurs ? all.filter((t) => t.kind === "object" && (!defOf(s, obj(s, t.id)).subtypes.includes("Aura") || auraHelps(defOf(s, obj(s, t.id))))) : all
         : all.filter((t) => (harm[i] ? !isMine(s, pid, t) : isMine(s, pid, t)) && !isBattleTarget(s, t));
     // Provoke: a creature ours kills without dying (wantsMay then says yes), else anything (and it says no).
     const provoke = allEffects(body.effects).some((e) => e.type === "mustBlockSource" && e.what.ref === "target" && e.what.index === i);
@@ -3927,8 +3959,13 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
   const rat = quiet && s.resolving?.item.sourceId ? s.objects[s.resolving.item.sourceId] : undefined;
   const ratThreat = rat?.zone === "battlefield" ? (rat.attacking === pid || (rat.blocking !== undefined && [rat.blocking].flat().some((b) => s.objects[b] && controllerOf(s, obj(s, b)) === pid)) ? Math.max(1, power(s, rat)) : 0) : 0;
   const penalty = quiet ? (controller === pid || settled ? 0 : ratThreat) : mode && pu.losesSource ? sourceWorth : mode ? (controller === pid ? buys : controller === undefined || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.hurts ? hurtCost : doomed ? (doomed.zone === "battlefield" && !objHasKeyword(s, doomed, "Indestructible") ? worth(s, pid, doomed) : 0) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
+  // Reservoir Kraken: tapping one of ours to tap its source (and hand its controller a Fish) is worth it only while the
+  // source would attack (its controller's turn) or could block our attack (our turn), and no one has tapped it already.
+  const tapOpt = pu.options.some((o) => "tap" in o);
+  const tapSource = tapOpt && s.resolving?.item.sourceId ? s.objects[s.resolving.item.sourceId] : undefined;
+  const tapThreat = tapSource?.zone === "battlefield" && !tapSource.tapped && controller !== pid && !settled ? (s.activePlayer === controller ? Math.max(1, power(s, tapSource)) : s.activePlayer === pid ? 3 : 0) : 0;
   const cost = (o: string): number => {
-    if (o === "none") return penalty;
+    if (o === "none") return tapOpt ? tapThreat : penalty;
     const w = pu.options[Number(o)];
     if (!w) return Infinity;
     if ("discard" in w) return handCost(w.discard, w.filter);
@@ -3942,6 +3979,11 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
       return worths.length < takenSacs + n ? Infinity : worths.slice(takenSacs, takenSacs + n).reduce((a, b) => a + b, 0);
     }
     if ("damage" in w) return lifeCost(typeof w.damage === "number" ? w.damage : 3);
+    // The creature we'd tap: its attack if it's our turn and it could still attack, little otherwise; and the Fish.
+    if ("tap" in w) {
+      const costs = pickOptions(s, { filter: w.tap }, pid).map((id) => obj(s, id)).map((x) => (s.activePlayer === pid && objIsType(s, x, "Creature") && x.controlledSinceTurn < s.turn && (s.step === "beginCombat" || s.step === "main1" || s.step === "upkeep" || s.step === "draw") ? Math.max(1, power(s, x)) + 1 : 0.5)).sort((a, b) => a - b);
+      return costs.length ? costs[0]! + 1 : Infinity;
+    }
     // Sin Prodder: the revealed card's mana value in damage to us, rather than that card in its controller's hand.
     if ("allow" in w && s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "punisher" && x.firstOnly)) {
       const rv = s.resolving.revealed && s.objects[s.resolving.revealed.id];
@@ -3985,6 +4027,27 @@ function chooseEncode(s: GameState, options: ObjectId[]): ObjectId[] {
   const evasive = (id: ObjectId) => (["Flying", "Shadow", "Horsemanship", "Fear", "Intimidate", "Menace", "Trample"].some((k) => objHasKeyword(s, obj(s, id), k)) ? 10 : 0);
   const best = [...options].sort((a, b) => evasive(b) + power(s, obj(s, b)) - evasive(a) - power(s, obj(s, a)))[0];
   return best ? [best] : [];
+}
+
+/**
+ * Kadena's Silencer: turned face up (a special action, CR 702.37e) with an opponent's activated or triggered ability on
+ * the stack, its "counter all abilities your opponents control" trigger then answers it.
+ */
+function chooseSilencerFaceUp(s: GameState, pid: PlayerId): Action[] | null {
+  if (!s.stack.some((it) => it.kind !== "spell" && opponents(s, pid).includes(it.controller))) return null;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (!o.faceDown || controllerOf(s, o) !== pid) continue;
+    const real = compileCard(realDefOf(s, o));
+    if (!real.triggers.some((tr) => tr.event === "selfTurnedFaceUp" && tr.body.effects.some((e) => e.type === "counterOpponentsStack" && e.abilitiesOnly))) continue;
+    const ways = faceUpWays(s, o);
+    for (let i = 0; i < ways.length; i++) {
+      if (ways[i]!.costs) continue;
+      const plan = planTurnFaceUp(s, pid, id, i, faceUpX(s, pid, o, i), undefined, botFaceUpForm(s, o));
+      if (plan) return plan;
+    }
+  }
+  return null;
 }
 
 /** A creature we can tap for a cost without losing an attack or a block: it can't attack this turn, or combat is over. */
@@ -4678,7 +4741,12 @@ function chooseDamageDivision(s: GameState, pid: PlayerId, by: ObjectId, options
   return parts;
 }
 
-function chooseDistribution(s: GameState, pid: PlayerId, options: ObjectId[], total: number, counter: CounterKind): Record<ObjectId, number> {
+function chooseDistribution(s: GameState, pid: PlayerId, options0: ObjectId[], total: number, counter: CounterKind, upTo = false): Record<ObjectId, number> {
+  // Counters that help, with some of ours among the options (Stumpsquall Hydra's commanders): only ours; with none of ours
+  // and none required, none at all.
+  const ours = options0.filter((id) => controllerOf(s, obj(s, id)) === pid);
+  if (!harmfulCounter(counter) && upTo && !ours.length) return {};
+  const options = !harmfulCounter(counter) && ours.length ? ours : options0;
   // Counters that help, onto opponents' creatures only (Sheltering Ancient): all on the weakest one.
   if (!harmfulCounter(counter) && options.length && options.every((id) => controllerOf(s, obj(s, id)) !== pid)) return { [[...options].sort((a, b) => power(s, obj(s, a)) - power(s, obj(s, b)))[0]!]: total };
   const byWorth = [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
@@ -4949,6 +5017,15 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     const spell = s.stack.find((x) => x.id === r.item.cause && x.kind === "spell");
     const o = spell?.objectId ? s.objects[spell.objectId] : undefined;
     return !!o && !o.spellCopy && !o.isCommander && defMv(defOf(s, o)) <= 2 && player(s, pid).library.some((id) => !isType(defOf(s, obj(s, id)), "Land"));
+  }
+  // Identity Thief: "you may exile another target nontoken creature. If you do, ~ becomes a copy of that creature until end
+  // of turn": an opponent's creature, gone until the end step, never one of ours.
+  const thiefExile = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "flicker" && e.effects[0]!.at && e.effects[0]!.what.ref === "target" ? e.effects[0]! : undefined;
+  const thiefCopy = r?.body.effects[r.next + 1];
+  if (r && thiefExile?.type === "flicker" && thiefExile.what.ref === "target" && thiefCopy?.type === "if" && thiefCopy.effects.some((x) => x.type === "becomeCopy")) {
+    const t = r.item.targets?.[thiefExile.what.index];
+    const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+    return !!o && o.zone === "battlefield" && controllerOf(s, o) !== pid;
   }
   // Puca's Mischief: "you may exchange control of ...": only for one of theirs clearly worth more than ours.
   const exch = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "exchangeControl" ? e.effects[0]! : undefined;
@@ -6027,7 +6104,13 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // permanent is given up for a target with mana value 3 or more, paid for in energy (see energyTargetX).
       const xTarget = !!ab.energyX && ab.body.targets.some((t) => t.xRange?.key === "manaValue");
       const energyTargetX = xTarget ? Math.min(player(s, pid).energy ?? 0, 15) : 0;
-      if (((ab.sacrificeSelf && !cashIn && !flips && !voidPlay) || ab.returnSelf) && !(energyTargetX >= 3)) continue;
+      // Hoarder's Overflow: "Discard your hand, then draw cards equal to the number of stash counters on ~": in our second
+      // main phase with the stack empty, once that's at least two more cards than the hand we'd give up.
+      const fx = ab.body.effects;
+      const hoard = ab.sacrificeSelf && fx.length === 2 && fx[0]!.type === "discard" && fx[0]!.hand && fx[0]!.who.ref === "you" && fx[1]!.type === "draw" && fx[1]!.who.ref === "you" && typeof fx[1]!.n === "object" && "count" in fx[1]!.n && fx[1]!.n.count.kind === "counters" && fx[1]!.n.count.of?.ref === "self"
+        ? ((n) => s.activePlayer === pid && s.step === "main2" && !s.stack.length && (o.counters[n.count.kind === "counters" ? n.count.counter : ""] ?? 0) >= player(s, pid).hand.length + 2)(fx[1]!.n)
+        : false;
+      if (((ab.sacrificeSelf && !cashIn && !flips && !voidPlay && !hoard) || ab.returnSelf) && !(energyTargetX >= 3)) continue;
       // "Sacrifice Blazing Torch" in an ability the Equipment gives: keep the Equipment too.
       if (ab.grantSourceCost?.action === "sacrifice") continue;
       // Mechtitan Core: itself and four others exiled for a 10/10, in our main phase with the stack empty (and only when
@@ -7090,6 +7173,11 @@ function spareCounters(s: GameState, pid: PlayerId, source: GameObject, c: Extra
     .filter((x) => rank(x.kind) < 9)
     .flatMap((x) => Array.from({ length: x.kind === "+1/+1" ? x.n - 1 : x.n }, () => ({ id: x.id, kind: x.kind })))
     .sort((a, b) => rank(a.kind) - rank(b.kind));
+  // Moxite Refinery: all from one permanent, the first that has enough to spare.
+  if (c.one) {
+    const id = [...new Set(pool.map((x) => x.id))].find((x) => pool.filter((p) => p.id === x).length >= c.n);
+    return id === undefined ? (c.n ? null : []) : pool.filter((p) => p.id === id).slice(0, c.n);
+  }
   return pool.length < c.n ? null : pool.slice(0, c.n);
 }
 

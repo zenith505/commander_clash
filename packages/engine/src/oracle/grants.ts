@@ -27,6 +27,15 @@ export function compileQuoted(text: string): boolean {
   return c.unsupported.length === 0;
 }
 
+/**
+ * Hellish Rebuke's granted 'When this permanent deals damage to the player who cast Hellish Rebuke, ...': "the player who
+ * cast ⟪source⟫", fixed as the spell resolves to that player ("⟪caster 2⟫"), or to no one ("⟪caster none⟫") for a copy
+ * that wasn't cast (rulings).
+ */
+// (QUOTED_SOURCE_NAME spelled out: compile.ts isn't initialized yet when this module loads.)
+export const CAST_BY_SOURCE = "the player who cast \u27easource\u27eb";
+export const casterMark = (p: number | undefined, name: string) => `\u27eacaster ${p ?? "none"}|${name}\u27eb`;
+
 const grantedCache = new Map<string, CompiledCard>();
 /** A granted ability's name for the permanent that gave it, bound to that object: "⟪source t12 3⟫" (see bindGrantSource). */
 const BOUND_SOURCE = /\u27easource (\S+) (\d+)\|([^\u27eb]*)\u27eb/g;
@@ -37,7 +46,7 @@ const BOUND_SOURCE = /\u27easource (\S+) (\d+)\|([^\u27eb]*)\u27eb/g;
  */
 export const bindGrantSource = (text: string, id: string, zc: number, name: string) => text.replaceAll(QUOTED_SOURCE_NAME, `\u27easource ${id} ${zc}|${name}\u27eb`);
 /** A granted ability's text as players read it: the permanent that gave it by its name. */
-export const showGrantSource = (text: string) => text.replace(BOUND_SOURCE, "$3");
+export const showGrantSource = (text: string) => text.replace(BOUND_SOURCE, "$3").replace(/\u27eacaster (?:\d|none)\|([^\u27eb]*)\u27eb/g, "the player who cast $1");
 /** Fills in `id` and `zc` of each ObjRef grantSource in a compiled granted ability, and its name in the text it shows. */
 function bindRefs<T>(x: T, id: string, zc: number, name: string, key?: string): T {
   if (typeof x === "string") return (key === "text" ? x.replaceAll(QUOTED_SOURCE_NAME, name) : x) as T;
@@ -112,6 +121,7 @@ export const grantedStaticOk = (mods: Modification[]) => mods.every((m) => (m.ki
  * ("When this creature enters or leaves the battlefield" compiles to two triggers), or a static ability of the kinds above.
  */
 function grantable(text: string): boolean {
+  if (text.includes(CAST_BY_SOURCE)) return grantable(text.replaceAll(CAST_BY_SOURCE, casterMark(0, "")));
   const c = compileGranted(text);
   // Naming the permanent that gives it ("Sacrifice Blazing Torch"): only where each mention became a reference to it.
   if (text.includes(QUOTED_SOURCE_NAME) && !namesGrantSource(c)) return false;

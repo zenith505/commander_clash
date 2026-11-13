@@ -101,7 +101,9 @@ export function spendAllows(s: GameState, pid: PlayerId, only: ManaSpend, use: M
   // cost is one, CR 702.37b) or a manifested creature's mana cost (CR 701.40b), not a disguise cost or a cloaked one's.
   if ("ability" in use && use.faceUp) return !!only.faceUp?.includes(use.faceUp) || !!only.other;
   // Niko Defies Destiny: "to foretell cards", the special action (CR 702.143a).
-  if ("ability" in use && use.foretell) return !!only.foretell || !!only.other;
+  // Karfell Harbinger: "to foretell a card from your hand", the special action only (foretelling is always from a hand,
+  // CR 702.143a), not casting a foretold card.
+  if ("ability" in use && use.foretell) return !!only.foretell || !!only.foretellAction || !!only.other;
   // "Or cast spells that have foretell": a spell with the keyword, wherever it's cast from and whatever cost is paid (rulings).
   if ("spell" in use && only.foretell && compileCard(use.spell).foretell) return true;
   // Adarkar Unicorn: "to pay cumulative upkeep costs" (CR 702.24a), a cost paid as the upkeep trigger resolves.

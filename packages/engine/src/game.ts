@@ -4989,7 +4989,9 @@ function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false
     // Evendo Brushrazer's: while its condition holds, paying as usual.
     // Rona, Disciple of Gix: spells only, so not a land card.
     // Intrepid Paleontologist: only cards of its kind that `pid` owns.
-    const plain = !!a.playLinkedWhile && !(a.playLinkedCastOnly && isType(defOf(s, o), "Land")) && !(a.playLinkedOnly && (o.owner !== pid || o.faceDown || !printedMatches(a.playLinkedOnly.filter, defOf(s, o)))) && staticConditionNow(s, a.playLinkedWhile, id, pid);
+    // Hedonist's Trove: lands only with its lands line; with both lines, one spell a turn for this object.
+    const land = isType(defOf(s, o), "Land");
+    const plain = !!a.playLinkedWhile && !(a.playLinkedCastOnly && land) && !(a.playLinkedLandsOnly && !land) && !(a.playLinkedSpellOnce && !land && (s.turnLog?.linkedSpellOnce ?? []).includes(`${id}@${p.zoneChanges ?? 0}`)) && !(a.playLinkedOnly && (o.owner !== pid || o.faceDown || !printedMatches(a.playLinkedOnly.filter, defOf(s, o)))) && staticConditionNow(s, a.playLinkedWhile, id, pid);
     if (!life && !plain && !a.playLinked && !(a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) continue;
     if (!(s.linkedExile[`${id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0))) continue;
     if (a.playLinked || (a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) return "anyType";
@@ -5138,6 +5140,23 @@ export function linkedPlayGrant(s: GameState, o: GameObject, pid: PlayerId): num
   if (o.zone !== "exile" || !s.linkedPlays?.length) return -1;
   const d = defOf(s, o);
   return s.linkedPlays.findIndex((g) => g.player === pid && g.turn === s.turn && (!g.castOnly || !isType(d, "Land")) && (!g.owned || o.owner === pid) && (!g.filter || printedMatches(g.filter, d)) && (s.linkedExile?.[g.source] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0)));
+}
+
+/**
+ * Hedonist's Trove: casting a spell from among the cards a once-a-turn source exiled, with no permission of the card's own,
+ * uses up that source's spell for this turn (CompiledCard.playLinkedSpellOnce). A card is linked to the one object that
+ * exiled it (CR 607.2a), so that's the permission it was cast with.
+ */
+function useLinkedSpellOnce(s: GameState, o: GameObject, pid: PlayerId): void {
+  if (o.zone !== "exile" || !s.linkedExile || isType(defOf(s, o), "Land") || ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || linkedPlayGrant(s, o, pid) >= 0) return;
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== pid || !abilitiesOf(s, p).playLinkedSpellOnce) continue;
+    const key = `${id}@${p.zoneChanges ?? 0}`;
+    if (!(s.linkedExile[key] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0))) continue;
+    ((s.turnLog ??= {}).linkedSpellOnce ??= []).push(key);
+    return;
+  }
 }
 
 /** Playing this exiled card with a one-card GameState.linkedPlays grant (no other permission of its) uses the grant up. */
@@ -7438,6 +7457,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const linkedRider = castFrom === "exile" && choices.alt !== "linkedFree" && isType(d, "Creature") ? linkedEntersWith(s, o, p.id) : undefined;
   if (linkedRider) o.extraCounters = { ...o.extraCounters, [linkedRider.counter]: (o.extraCounters?.[linkedRider.counter] ?? 0) + linkedRider.n };
   if (choices.alt !== "linkedFree") useLinkedPlay(s, o, p.id);
+  if (choices.alt !== "linkedFree") useLinkedSpellOnce(s, o, p.id);
   useOneOf(s, o, p.id, choices.asType);
   // Court of Locthwain: one spell for each time its ability resolved.
   if (choices.alt === "linkedFree") s.linkedFreeCasts!.splice(linkedFreeGrant(s, o, p.id), 1);

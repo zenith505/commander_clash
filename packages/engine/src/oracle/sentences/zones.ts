@@ -1735,7 +1735,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // Fear of Abduction: "When ~ leaves the battlefield, put each card exiled with it into its owner's hand": the card its
   // enters ability exiled and the one exiled to pay its cost (CR 607.2a, 607.2q; compile() links them).
-  if (/^Put each card exiled with (?:it|~) into its owner's hand$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "hand" }];
+  // Toluz, Clever Conductor: "When ~ dies, put the cards exiled with it into their owner's hand": the same, every card its
+  // discard trigger exiled while it was on the battlefield (CR 607.2a).
+  if (/^Put (?:each card exiled with (?:it|~) into its|the cards exiled with (?:it|~) into their) owner's hand$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "hand" }];
   // Watcher for Tomorrow: "When ~ leaves the battlefield, put the exiled card into its owner's hand."
   if (/^Put the exiled card into its owner's hand$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "hand" }];
   // Isochron Scepter: "You may copy the exiled card. If you do, you may cast the copy without paying its mana cost." (one

@@ -43,6 +43,7 @@ import { runLaneB184Effect } from "./run-laneb184";
 import { runLaneB185Effect } from "./run-laneb185";
 import { runLaneB186Effect } from "./run-laneb186";
 import { runLaneB189Effect } from "./run-laneb189";
+import { runLaneB192Effect } from "./run-laneb192";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -1837,6 +1838,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileTopLandToHandElseCounter":
     case "faceUpLinkedCounterNamed":
       return runLaneB189Effect(s, e, ctx, src);
+    case "exileSelfAndTopOneOf":
+      return runLaneB192Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

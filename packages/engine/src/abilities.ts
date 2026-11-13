@@ -3709,7 +3709,7 @@ export type Effect =
   /** "When you next cast an instant or sorcery spell this turn, ...": a delayed trigger on that cast (CR 603.7). */
   /** `cascade`: "the next noncreature spell you cast this turn has cascade" (Dark Apostle): that spell's own cascade. */
   /** `who`: "the next spell they cast": that player's (a target player), not the controller's. */
-  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; /** Zevlor, Elturel Exile: "that targets only a single opponent or a single permanent an opponent controls": every target of the spell that one player or permanent (rulings), checked as it's cast (GameState.nextCast `onlyOpponentOrTheirs`). */ onlyOpponentOrTheirs?: true; cascade?: true; /** Yidris, Maelstrom Wielder: "as you cast spells from your hand this turn, they gain cascade": every such spell this turn, not only the next one (never used up). */ allTurn?: true; /** "The next instant or sorcery spell you cast this turn has storm" (Crackling Spellslinger). */ storm?: true; who?: PlayerRef; /** "When you next cast an instant or sorcery spell from your hand this turn" (Narset Transcendent). */ fromHand?: true; /** "The next spell you cast this turn can't be countered" (Mistrise Village). */ uncounterable?: true; /** "The next spell of the chosen type you cast this turn can be cast as though it had flash" (Progenitor's Icon; CR 702.8a): used up by that spell, whenever it's cast. */ flash?: true; /** Soulfire Grand Master: "put that card into your hand instead of into your graveyard as it resolves" (GameObject.toHandOnResolve). */ toHand?: true; /** Savage Summoning: "That creature enters with an additional +1/+1 counter on it" (CR 614.1c): the counter it enters with. */ counter?: string; /** "The next red or green creature spell you cast this turn can be cast without paying its mana cost" (World War Hulk, `free`) and "Rather than pay the mana cost of the next spell you cast this turn, you may pay life equal to that spell's mana value" (Marshland Bloodcaster, `life`): an alternative cost (CR 118.9) offered to that spell only, used up by it whichever cost is paid (rulings). */ alt?: "free" | "life" }
+  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; /** "Copy the next loyalty ability you activate this turn" (Jaya's Phoenix, `only`), "When you next cast an instant spell, cast a sorcery spell, or activate a loyalty ability this turn" (Repeated Reverberation, `also`): a loyalty ability its controller activates uses it up too (CR 606.3), and with `only` no spell does. */ loyalty?: "also" | "only"; /** Zevlor, Elturel Exile: "that targets only a single opponent or a single permanent an opponent controls": every target of the spell that one player or permanent (rulings), checked as it's cast (GameState.nextCast `onlyOpponentOrTheirs`). */ onlyOpponentOrTheirs?: true; cascade?: true; /** Yidris, Maelstrom Wielder: "as you cast spells from your hand this turn, they gain cascade": every such spell this turn, not only the next one (never used up). */ allTurn?: true; /** "The next instant or sorcery spell you cast this turn has storm" (Crackling Spellslinger). */ storm?: true; who?: PlayerRef; /** "When you next cast an instant or sorcery spell from your hand this turn" (Narset Transcendent). */ fromHand?: true; /** "The next spell you cast this turn can't be countered" (Mistrise Village). */ uncounterable?: true; /** "The next spell of the chosen type you cast this turn can be cast as though it had flash" (Progenitor's Icon; CR 702.8a): used up by that spell, whenever it's cast. */ flash?: true; /** Soulfire Grand Master: "put that card into your hand instead of into your graveyard as it resolves" (GameObject.toHandOnResolve). */ toHand?: true; /** Savage Summoning: "That creature enters with an additional +1/+1 counter on it" (CR 614.1c): the counter it enters with. */ counter?: string; /** "The next red or green creature spell you cast this turn can be cast without paying its mana cost" (World War Hulk, `free`) and "Rather than pay the mana cost of the next spell you cast this turn, you may pay life equal to that spell's mana value" (Marshland Bloodcaster, `life`): an alternative cost (CR 118.9) offered to that spell only, used up by it whichever cost is paid (rulings). */ alt?: "free" | "life" }
   /**
    * "Until end of turn, whenever you cast a spell, ~ deals 2 damage to up to one target creature" (CR 603.7b): a delayed
    * triggered ability that triggers each time its event happens until `until` ends (see GameState.floatingTriggers).
@@ -5868,6 +5868,10 @@ export type TriggerEvent =
   /** "Whenever ~ phases in" (Warping Wurm), "Whenever ~ phases out" (Teferi's Imp, looking back in time, CR 603.10b): directly or indirectly (CR 702.26g). */
   | "selfPhasesIn"
   | "selfPhasesOut"
+  /** "Whenever one or more other permanents phase out" (The War Doctor): once for each phasing-out event that has another permanent, not if this one phases out with them (rulings, CR 603.2c). */
+  | "permanentsPhaseOut"
+  /** "Whenever ~ or another Spirit you control phases in" (King of the Oathbreakers): once for each such permanent phasing in (TriggeredAbility.subjectFilter, subjectOrSelf), the subject. */
+  | "permanentYouControlPhasesIn"
   /** "Whenever this Vehicle becomes crewed": whenever a crew ability of it resolves (CR 702.122e). */
   | "selfBecomesCrewed"
   /** "Whenever ~ crews a Vehicle" (CR 702.122d): it was tapped to pay a Vehicle's crew cost; the trigger's subject is that Vehicle. */
@@ -8355,6 +8359,13 @@ export interface CompiledCard {
   lifeGainPlus?: number;
   /** "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): that number. */
   lifeFloor?: number;
+  /**
+   * Deification: "As long as you control a creature, if damage dealt to a planeswalker you control of the chosen type would
+   * result in all loyalty counters on it being removed, instead all but one of those counters are removed" (damage.ts, CR
+   * 120.3c, 614.1): `filter` the planeswalkers (its controller's, the chosen type bound), while its controller controls a
+   * `whileControl` permanent.
+   */
+  keepsLastLoyalty?: { filter: TargetSpec; whileControl: TargetSpec };
   /** "If you control a creature, damage that would ..." (Serra the Benevolent's emblem): `lifeFloor` only while this holds. */
   lifeFloorIf?: StaticCondition;
   /** "As long as you're the monarch, damage doesn't cause you to lose life" (Archon of Coronation): the damage is still

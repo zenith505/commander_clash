@@ -8544,6 +8544,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8c8f93d7-d89a-401b-8764-76be71ad16e3",
+  "name": "Deification",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "As this enchantment enters, choose a planeswalker type.\nPlaneswalkers you control of the chosen type have hexproof.\nAs long as you control a creature, if damage dealt to a planeswalker you control of the chosen type would result in all loyalty counters on it being removed, instead all but one of those counters are removed.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mat",
+  "releasedAt": "2023-05-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8d57dadb-c689-4691-b331-aba15daf46ff",
   "name": "Delina, Wild Mage",
   "manaCost": "{3}{R}",
@@ -27795,6 +27821,32 @@
   "set": "mom",
   "releasedAt": "2023-04-21",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9a664735-6e38-407f-9d2f-a6d279cd6309",
+  "name": "Repeated Reverberation",
+  "manaCost": "{2}{R}{R}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "When you next cast an instant spell, cast a sorcery spell, or activate a loyalty ability this turn, copy that spell or ability twice. You may choose new targets for the copies.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m20",
+  "releasedAt": "2019-07-12",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

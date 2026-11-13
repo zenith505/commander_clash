@@ -2214,13 +2214,20 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // resolves (CR 608.2d); its controller may play that one this turn, paying for it as usual.
       // King Narfi's Betrayal: every card still exiled with it, spells only, this turn, with mana of any type (CR 609.4b);
       // each with its usual timing (rulings), not again once it's a new object (CR 400.7).
+      // Urianger Augurelt: every one of them, played (lands too), each spell {2} less (`less`).
+      // Lobelia, Defender of Bag End: one of them, any, for free (`free`, `oneOf`): a group for this source and turn, one more
+      // card of it allowed each time this resolves (GameObject.mayPlay.oneOfMax; GameState.oneOfUsed counts the plays).
       if (e.all) {
         const ids = linkedCards(s, ctx.sourceId, ctx.sourceZc).map((l) => l.id).filter((id) => s.objects[id]?.zone === "exile");
+        const group = e.oneOf ? `linked:${ctx.sourceId}@${ctx.sourceZc ?? 0}:${s.turn}` : undefined;
         for (const id of ids) {
           const o = obj(s, id);
-          o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}) };
+          const before = group && o.mayPlay?.oneOf === group && o.mayPlay.zc === (o.zoneChanges ?? 0) ? (o.mayPlay.oneOfMax ?? 1) : 0;
+          o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.free ? { free: true as const } : {}), ...(e.less ? { less: e.less } : {}), ...(group ? { oneOf: group, oneOfMax: before + 1 } : {}) };
         }
-        return void log(s, ids.length ? `Until end of turn, ${player(s, ctx.controller).name} may cast ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}${e.anyType ? ", spending mana as though it were mana of any color" : ""}.` : `There's no card exiled with ${src}.`);
+        const verb = e.castOnly ? "cast" : "play";
+        const what = e.oneOf ? `one of the cards exiled with ${src}` : ids.map((id) => (s.objects[id]?.hiddenExile ? "a face-down card" : defOf(s, obj(s, id)).name)).join(", ");
+        return void log(s, ids.length ? `Until end of turn, ${player(s, ctx.controller).name} may ${verb} ${what}${e.free ? " without paying its mana cost" : ""}${e.less ? `, spells for {${e.less}} less` : ""}${e.anyType ? ", spending mana as though it were mana of any color" : ""}.` : `There's no card exiled with ${src}.`);
       }
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.impulseChoice) {
@@ -2322,13 +2329,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (e.pickOne) {
           // Siphon Insight: the actor looks at the cards and exiles the one they choose; the others go to the bottom of
           // their owner's library (one card left, so no order to choose). Nobody else learns which went where (rulings).
+          // Urianger Augurelt (`optional`): "You may exile it face down": none at all, and the card left stays on top.
           if (!sc.faceDownPick) {
             if (!ids.length) return;
-            if (ids.length > 1) {
+            if (ids.length > 1 || e.optional) {
               sc.faceDownPick = true;
               sc.faceDownLooked = ids;
               delete sc.found;
-              s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card", cards: ids, min: 1, max: 1, dig: { looked: ids, to: "to exile face down", rest: "on the bottom of that library" } };
+              s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card", cards: ids, min: e.optional ? 0 : 1, max: 1, dig: { looked: ids, to: "to exile face down", rest: e.optional ? "back on top of your library" : "on the bottom of that library" } };
               return "paused";
             }
             sc.found = ids;
@@ -2338,12 +2346,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const looked = (sc.faceDownLooked ?? ids).filter((id) => obj(s, id).zone === "library");
           sc.faceDownLooked = undefined;
           const chosen = (sc.found ?? []).filter((id) => looked.includes(id));
-          if (e.bottomAnyOrder) restBottom = looked.filter((id) => !chosen.includes(id));
+          if (e.optional) {
+            if (!chosen.length) log(s, `${p.name} leaves the card on top of their library.`);
+          } else if (e.bottomAnyOrder) restBottom = looked.filter((id) => !chosen.includes(id));
           else for (const id of looked.filter((id) => !chosen.includes(id))) {
             const owner = player(s, obj(s, id).owner);
             owner.library = [...owner.library.filter((x) => x !== id), id];
           }
-          if (looked.length > chosen.length && !e.bottomAnyOrder) log(s, `${p.name} puts ${looked.length - chosen.length === 1 ? "a card" : `${looked.length - chosen.length} cards`} on the bottom of ${[...new Set(looked.map((id) => player(s, obj(s, id).owner).name))].join(" and ")}'s library.`);
+          if (looked.length > chosen.length && !e.bottomAnyOrder && !e.optional) log(s, `${p.name} puts ${looked.length - chosen.length === 1 ? "a card" : `${looked.length - chosen.length} cards`} on the bottom of ${[...new Set(looked.map((id) => player(s, obj(s, id).owner).name))].join(" and ")}'s library.`);
           ids = chosen;
         }
       }
@@ -3508,7 +3518,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (e.milled) s.resolving!.did = false;
         if (!max) return;
         const kind = filter?.text ?? "card";
-        const what = e.distinctManaValues && !e.upTo
+        const what = e.oneOfEach
+          ? `up to one ${kind}`
+          : e.distinctManaValues && !e.upTo
           ? `one ${kind} of each mana value`
           : e.distinctManaValues
           ? `any number of ${kind.replace(/\bcard\b/, "cards")} with different mana values`
@@ -3527,7 +3539,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Seek Thrills: "put all cards that have an Adventure from among the milled cards": every one, no choice.
         if (e.all) sc.found = cards.slice(0, max);
         else {
-          s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : (chooser ?? p.id), source: src, what: e.youChoose || chooser !== undefined ? `${what} in ${p.name}'s graveyard` : what, ...under, ...(chooser !== undefined && chooser !== p.id ? { forPlayer: p.id, ...(e.dest === undefined || e.dest === "battlefield" ? { helps: true as const } : {}) } : {}), cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
+          s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : (chooser ?? p.id), source: src, what: e.youChoose || chooser !== undefined ? `${what} in ${p.name}'s graveyard` : what, ...under, ...(chooser !== undefined && chooser !== p.id ? { forPlayer: p.id, ...(e.dest === undefined || e.dest === "battlefield" ? { helps: true as const } : {}) } : {}), cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}), ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}) };
           return "paused";
         }
       }
@@ -3551,6 +3563,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // Drana, the Last Bloodchief: "The creature is a Vampire in addition to its other types", as it enters (CR 614.12) and for good.
           ids.forEach((id) => moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.countersN === undefined ? { ...e.counters } : Object.fromEntries(Object.keys(e.counters).map((k) => [k, Math.max(0, amountNow(s, e.countersN!, ctx))])) } : {}), ...(e.alsoMods ? { entersAs: e.alsoMods, entersAsBy: { controller: ctx.controller, source: src } } : {}), ...hosts.get(id) }));
         });
+        // Revival Experiment: "You lose 3 life for each card returned this way": the cards now on the battlefield.
+        if (e.lifeEach) {
+          const n = ids.filter((id) => obj(s, id).zone === "battlefield").length;
+          if (n) loseLife(s, p.id, n * e.lifeEach);
+        }
         return;
       }
       if (e.dest === "castThisTurn") {
@@ -3689,9 +3706,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const { xRange, ...rest } = bindChosen(e.filter.named === "~" ? { ...e.filter, named: ctx.sourceDef.name } : e.filter, ctx.chosen);
         const x = ctx.x ?? 0;
         const filter: TargetSpec = xRange ? { ...rest, manaValue: xRange.at === "exact" ? { min: x, max: x } : xRange.at === "least" ? { min: x } : { max: x } } : rest;
+        // Cleansing Meditation: only the cards the destroy before this put there, still there as those cards (CR 400.7).
+        const destroyed = e.destroyedThisWay ? new Set((s.resolving?.destroyed ?? []).filter((x) => x.died && s.objects[x.o.id]?.zone === "graveyard" && (s.objects[x.o.id]!.zoneChanges ?? 0) === (x.o.zoneChanges ?? 0) + 1).map((x) => x.o.id)) : undefined;
         // The active player chooses for their Auras first, then the others in turn order (APNAP, Open the Vaults rulings).
         for (const pid of apnap(s, players(s, e.who, ctx)))
           for (const id of player(s, pid).graveyard) {
+            if (destroyed && !destroyed.has(id)) continue;
             const d = defOf(s, s.objects[id]!);
             if (isPermanentCard(d) && printedMatches(filter, d) && (name === undefined || sameName(d.name, name)) && (!filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn) && (!filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn) && !(e.notSacrificedThisWay && s.resolving!.sacrificedThisWay?.some((k) => k.id === id))) sc.found.push(id);
           }

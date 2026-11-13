@@ -16,7 +16,7 @@ import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
-import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
+import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { isSuspended } from "./effects/run-zones";
@@ -4659,7 +4659,8 @@ function finishCleanup(s: GameState) {
   }
   s.preventCombatDamage = undefined;
   // Ascent of the Worthy's "until your next turn" ones stay until that turn begins (CR 611.2b).
-  const lasting = s.damageRules?.filter((r) => r.untilYourNextTurn);
+  // Old Fat Spider Can't See Me's last while its source is on the battlefield (CR 611.2b).
+  const lasting = s.damageRules?.filter((r) => r.untilYourNextTurn || whileSourceHolds(s, r));
   s.damageRules = lasting?.length ? lasting : undefined;
   // "Until end of turn" control ends: "when you lose control of the creature" triggers now (rulings on Ray of Command).
   checkLostControl(s);
@@ -5031,7 +5032,7 @@ function linkedFlash(s: GameState, o: GameObject, pid: PlayerId): boolean {
  * How `pid` may play this exiled card now: its own permission, or a "play cards exiled with ~" one (any color of mana;
  * Valgavoth's for life equal to its mana value, `life`).
  */
-function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "free" | "orPay" | "cost" | "more"> & { life?: true }) | undefined {
+function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "free" | "orPay" | "cost" | "more" | "less"> & { life?: true }) | undefined {
   if (ownExilePermission(s, o, pid)) return o.mayPlay;
   const how = linkedPlayPermission(s, o, pid);
   return how === "anyType" ? { anyType: true } : how === "life" ? { life: true } : how === "plain" || linkedPlayGrant(s, o, pid) >= 0 ? {} : undefined;
@@ -6541,6 +6542,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const freeFromExile = !!exiled?.free && !how.faceDown && !realAlt && !(exiled.orPay && x > 0 && parseManaCost(d.manaCost).hasX);
   // "A spell cast this way costs {2} more" (Soul Partition): an increase (CR 601.2f).
   if (exiled?.more && !madness && freeCastOf(s, pid) !== o.id) mods.more += exiled.more;
+  // "Spells you cast this way cost {2} less to cast" (Urianger Augurelt): generic mana only (CR 601.2f, rulings).
+  if (exiled?.less && !madness && freeCastOf(s, pid) !== o.id) mods.less += exiled.less;
   // A "Kicker {X}" is still paid, with its X (CR 118.9d).
   if ((freeCastOf(s, pid) === o.id && !madness) || (!how.faceDown && !realAlt && plottedCast(s, pid, o)) || freeFromExile) {
     const kicked = anyType(lessColored(parseManaCost(kickCost + moreMana)));

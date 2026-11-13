@@ -53,6 +53,8 @@ export interface DamageRule {
   untilYourNextTurn?: true;
   /** "This combat" (Suppressor Skyguard): removed as the end of combat step ends (CR 511.3). */
   thisCombat?: true;
+  /** "For as long as ~ remains on the battlefield" (Old Fat Spider Can't See Me): it lasts, whatever the turn, while this object is still on the battlefield as the object it was (CR 611.2b, 400.7). */
+  whileSource?: { id: ObjectId; zc: number };
   /** Gloom Surgeon: "prevent that damage and exile that many cards from the top of your library" (CR 615.5): its controller exiles them, even if the damage can't be prevented (rulings, 615.12). */
   exileTop?: true;
   gainLife?: { colors?: Color[] };
@@ -492,6 +494,8 @@ export interface GameObject {
     cost?: string;
     /** "A spell cast this way costs {2} more to cast" (Soul Partition, Elite Spellbinder). */
     more?: number;
+    /** "Spells you cast this way cost {2} less to cast" (Urianger Augurelt): this much generic mana less (CR 601.2f). */
+    less?: number;
     /** Mavinda, Students' Advocate: "If that spell doesn't target a creature you control, it costs {8} more to cast this way" (a graveyard permission; CastFromGraveyard.moreUnlessTargets). */
     moreUnlessTargets?: { n: number; filter: TargetSpec };
     /** "You may play one of those cards" (Nashi): the cards of one group, of which only one may be played (GameState.oneOfUsed). */

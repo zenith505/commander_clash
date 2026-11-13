@@ -36,10 +36,13 @@ import { roundB182Finish, roundB182Line } from "./laneb182";
 import { roundB183Line } from "./laneb183";
 import { roundB184Line } from "./laneb184";
 import { roundB185Line } from "./laneb185";
-import { round344Line } from "./round344";
 import { roundB186Line } from "./laneb186";
+import { roundB187Line } from "./laneb187";
+import { roundB188Line } from "./laneb188";
+import { round344Line } from "./round344";
 import { round345Chapter, round345Line } from "./round345";
 import { round346Line } from "./round346";
+import { round347Line } from "./round347";
 import { roundB189Line } from "./laneb189";
 
 const cache = new Map<string, CompiledCard>();
@@ -2054,6 +2057,10 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB185Line(line, raw, out, isSpell)) continue;
     // Round B186.
     if (roundB186Line(line, raw, out, isSpell)) continue;
+    // Round B187.
+    if (roundB187Line(line, raw, out, isSpell)) continue;
+    // Round B188.
+    if (roundB188Line(line, raw, out, isSpell)) continue;
     // Thought Prison, Soulcipher Board, Grimoire Thief (round B189).
     if (roundB189Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
@@ -5938,6 +5945,7 @@ export function compile(d: CardDef): CompiledCard {
     if (round345Line(line, out, isSpell)) continue;
     // Greater Gargadon: "...: Remove a time counter from ~. Activate only if ~ is suspended." (round 346).
     if (round346Line(line, raw, out, isSpell)) continue;
+    if (round347Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -7184,10 +7192,11 @@ export function compile(d: CardDef): CompiledCard {
   // Lavabrink Venturer: protection "of the chosen quality" needs odd or even chosen as it enters (CR 614.12).
   if (JSON.stringify([out.statics, out.triggers, out.activated, out.spell]).includes(CHOSEN_NUMBER_EXCEPT_PROTECTION) && !out.entersChoose?.some((c) => c.what === "number")) out.unsupported.push("(protection from mana values but a chosen number with no number chosen as it enters)");
   if (JSON.stringify([out.statics, out.triggers, out.activated, out.spell]).includes(CHOSEN_PARITY_PROTECTION) && !out.entersChoose?.some((c) => c.what === "parity")) out.unsupported.push("(protection of a chosen quality with no odd or even chosen as it enters)");
-  // Grandeur's "Discard another card named ~": the card's own name (a copy has it too, CR 707.2).
+  // Grandeur's "Discard another card named ~": the card's own name (a copy has it too, CR 707.2); Say Its Name's "two other
+  // cards named ~" from your graveyard likewise.
   for (const ab of out.activated)
-    if (ab.costs?.some((c) => c.kind === "discard" && c.filter?.named === "~"))
-      ab.costs = ab.costs.map((c) => (c.kind === "discard" && c.filter?.named === "~" ? { ...c, filter: { ...c.filter, named: d.name, text: `card named ${d.name}` } } : c));
+    if (ab.costs?.some((c) => (c.kind === "discard" || c.kind === "exileFromGraveyard") && c.filter?.named === "~"))
+      ab.costs = ab.costs.map((c) => ((c.kind === "discard" || c.kind === "exileFromGraveyard") && c.filter?.named === "~" ? { ...c, filter: { ...c.filter, named: d.name, text: `card named ${d.name}` } } : c));
   // Overload (CR 702.96a-b): cast for that cost, the spell's text says "each" for "target", and it has no targets.
   const overload = out.altCosts?.find((a) => a.kind === "overload");
   if (overload && !d.oracleId.endsWith("|overloaded")) {
@@ -7387,8 +7396,11 @@ function linkExile(out: CompiledCard) {
     const fromHand = all.filter((e): e is Extract<Effect, { type: "discard" }> => e.type === "discard" && !!e.exile);
     // King Narfi's Betrayal: "you may exile a creature or planeswalker card from each graveyard", linked as it's parsed.
     const fromYards = all.filter((e) => e.type === "chooseFromGraveyard" && e.dest === "exile" && !!e.linked);
-    const others = all.filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong", "search", "chooseFromGraveyard", "pick"].includes(e.type) && !(e.type === "pick" && e.action !== "exile") && !fromYards.includes(e));
-    if (out.spell || fromHand.length + fromYards.length !== 1 || others.length) out.unsupported.push("(plays an exiled card it can't link to one exile ability)");
+    // Urianger Augurelt, Lobelia, Defender of Bag End: its one face-down exile from the top of libraries, which links the
+    // cards it exiles as it resolves (with no permission of its own).
+    const faceDown = all.filter((e) => e.type === "exileFaceDown" && e.from === "top" && !e.play && !e.foretold && !e.endStepHand && !e.upkeepGraveyard && (!e.pickOne || !!e.optional));
+    const others = all.filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong", "search", "chooseFromGraveyard", "pick"].includes(e.type) && !(e.type === "pick" && e.action !== "exile") && !fromYards.includes(e) && !faceDown.includes(e));
+    if (out.spell || fromHand.length + fromYards.length + faceDown.length !== 1 || others.length) out.unsupported.push("(plays an exiled card it can't link to one exile ability)");
     else if (fromHand[0]) fromHand[0].linked = true;
   }
   // Ugin's Labyrinth: "If a card is exiled with ~" and "Return the exiled card to its owner's hand" are about the card its

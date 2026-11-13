@@ -778,6 +778,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6591f243-f94c-4a83-bb16-1fb838d9eb14",
+  "name": "Altanak, the Thrice-Called",
+  "manaCost": "{5}{G}{G}",
+  "cmc": 7,
+  "typeLine": "Legendary Creature — Insect Beast",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Insect",
+   "Beast"
+  ],
+  "oracleText": "Trample\nWhenever Altanak becomes the target of a spell or ability an opponent controls, draw a card.\n{1}{G}, Discard this card: Return target land card from your graveyard to the battlefield tapped.",
+  "power": "9",
+  "toughness": "9",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c551f007-9740-4a2a-8ef5-7be1a7afe14b",
   "name": "Altar of the Wretched // Wretched Bonemass",
   "manaCost": "{2}{B}",
@@ -6002,6 +6037,40 @@
     ]
    }
   ]
+ },
+ {
+  "oracleId": "faffc9fb-32b3-4015-8c3f-e6b45002c050",
+  "name": "Chong and Lily, Nomads",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Bard Ally",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Bard",
+   "Ally"
+  ],
+  "oracleText": "Whenever one or more Bards you control attack, choose one —\n• Put a lore counter on each of any number of target Sagas you control.\n• Creatures you control get +1/+0 until end of turn for each lore counter among Sagas you control.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tle",
+  "releasedAt": "2025-11-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "54421e69-d79e-4c2e-8ce6-96994d168835",
@@ -14349,6 +14418,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b580c6d8-f501-4623-843a-5bb2b638a339",
+  "name": "Graceful Takedown",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Any number of target enchanted creatures you control and up to one other target creature you control each deal damage equal to their power to target creature you don't control.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "woe",
+  "releasedAt": "2023-09-08",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "435c8d98-9fa3-40d8-9b7c-32474099e08e",
   "name": "Grave Consequences",
   "manaCost": "{1}{B}",
@@ -20202,6 +20297,39 @@
   "commanderLegal": "legal",
   "set": "ecl",
   "releasedAt": "2026-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0f2e3e2e-9857-4be5-9bf0-62da1cc147fc",
+  "name": "Lobelia, Defender of Bag End",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Halfling Citizen",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Halfling",
+   "Citizen"
+  ],
+  "oracleText": "When Lobelia enters, look at the top card of each opponent's library and exile those cards face down.\n{T}, Sacrifice an artifact: Choose one —\n• Until end of turn, you may play a card exiled with Lobelia without paying its mana cost.\n• Each opponent loses 2 life and you gain 2 life.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ltc",
+  "releasedAt": "2023-06-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -27862,6 +27990,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "913ec957-5f4e-46b4-a819-9448837f72a3",
+  "name": "Revival Experiment",
+  "manaCost": "{4}{B}{G}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "For each permanent type, return up to one card of that type from your graveyard to the battlefield. You lose 3 life for each card returned this way. Exile Revival Experiment.",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c21",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "60b2f991-47ef-4da3-ba61-0692695ea098",
   "name": "Revoke Privileges",
   "manaCost": "{2}{W}",
@@ -28965,6 +29121,34 @@
   "commanderLegal": "legal",
   "set": "a25",
   "releasedAt": "2018-03-16",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "474f0675-4088-4f77-8081-f9ed7d492837",
+  "name": "Say Its Name",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Mill three cards. Then you may return a creature or land card from your graveyard to your hand.\nExile this card and two other cards named Say Its Name from your graveyard: Search your graveyard, hand, and/or library for a card named Altanak, the Thrice-Called and put it onto the battlefield. If you search your library this way, shuffle. Activate only as a sorcery.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -36840,6 +37024,44 @@
   "set": "leg",
   "releasedAt": "1994-06-01",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7ca584e7-4621-4b4e-a381-a0051acbf66a",
+  "name": "Urianger Augurelt",
+  "manaCost": "{W}{U}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Elf Advisor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Advisor"
+  ],
+  "oracleText": "Whenever you play a land from exile or cast a spell from exile, you gain 2 life.\nDraw Arcanum — {T}: Look at the top card of your library. You may exile it face down.\nPlay Arcanum — {T}: Until end of turn, you may play cards exiled with Urianger Augurelt. Spells you cast this way cost {2} less to cast.",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Draw Arcanum",
+   "Play Arcanum"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

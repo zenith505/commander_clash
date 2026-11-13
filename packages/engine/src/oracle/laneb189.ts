@@ -1,5 +1,5 @@
-// Lane B round B189's lines, read by compileCard before its triggers and activated abilities (after round B186's), and
-// its sentences, read at the end of round B186's.
+// Lane B round B189's lines, read by compileCard before its triggers and activated abilities (after round B188's), and
+// its sentences, read at the end of round B188's.
 import type { CompiledCard, Effect } from "../abilities";
 import { addTarget, type Ctx } from "./body";
 import { parseSentence } from "./sentence";

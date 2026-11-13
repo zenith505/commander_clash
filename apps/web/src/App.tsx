@@ -546,9 +546,14 @@ const perOpponentRun = (specs: TargetSpec[], i: number) => {
   return end - i > 1 ? end : i;
 };
 
+/**
+ * The "up to" targets in a row from `i` that one phrase made ("up to two target creatures", "any number of target
+ * enchanted creatures you control"): the next phrase's are a choice of their own (CR 601.2c), so "Choose none" or "Done"
+ * leaves only these unchosen (Graceful Takedown: none for "up to one other target creature", then the enchanted ones).
+ */
 const optionalLeft = (specs: TargetSpec[], i: number) => {
   let n = 0;
-  while (specs[i + n]?.optional) n++;
+  while (specs[i + n]?.optional && specs[i + n]!.text === specs[i]!.text) n++;
   return n;
 };
 
@@ -753,7 +758,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (!targeting) return;
     if (inRun) return finishRun(targeting.ahead ?? []);
     const chosen = [...targeting.chosen];
-    while (chosen.length < targeting.specs.length && targeting.specs[chosen.length]!.optional) chosen.push({ kind: "none" });
+    const n = optionalLeft(targeting.specs, chosen.length);
+    for (let k = 0; k < n; k++) chosen.push({ kind: "none" });
     finishTargets(chosen);
   }
 
@@ -924,7 +930,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         const candidates = yards.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
         if (c.singleGraveyard) return setCostPick({ activate: d, kind: "exileCards", label: cardOf(s, d.objectId).name, what: `exile ${c.n} ${what}s from a single graveyard`, n: c.n, candidates, chosen: [], singleYard: true });
         if (c.toBottom) return setCostPick({ activate: d, kind: "exileCards", label: cardOf(s, d.objectId).name, what: `put ${c.n} cards from your graveyard on the bottom of your library`, n: c.n, candidates, chosen: [] });
-        return setCostPick({ activate: d, kind: "exileCards", label: cardOf(s, d.objectId).name, what: `exile from your graveyard ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
+        return setCostPick({ activate: d, kind: "exileCards", label: cardOf(s, d.objectId).name, what: `exile from your graveyard ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${c.n > 1 ? (/^card named /.test(what) ? what.replace(/^card/, "cards") : `${what}s`) : what}`, n: c.n, candidates, chosen: [] });
       }
       if (c.kind === "exileSpell") {
         // Nivmagus Elemental: click one of your spells on the stack (a copy too) to exile.

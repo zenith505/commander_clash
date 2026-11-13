@@ -2,6 +2,7 @@
 // spree branch), and the Spirit tokens of Hofri Ghostforge, each linked to the card exiled for it.
 import { allEffects, type CompiledCard, type Effect } from "../abilities";
 import type { Ctx } from "./body";
+import { round355Sentence } from "./round355";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -15,6 +16,9 @@ const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
  * subtypes of other card types gone (CR 205.1a, as Machine God's Effigy's), X in its mana cost 0 (rulings).
  */
 export function round354Sentence(s: string, sentences: string[], si: number, ctx: Ctx, _effects: Effect[]): Found {
+  // Round 355's sentences first (oracle/round355.ts).
+  const r355 = round355Sentence(s, sentences, si, ctx, _effects);
+  if (r355) return r355;
   const line = plain(s);
   if (ctx.spell && line === "Exile each opponent's graveyard" && plain(sentences[si + 1]) === "When you do, choose up to one target creature card exiled this way" && plain(sentences[si + 2]) === "Create a token that's a copy of that card, except it's an artifact and it loses all other card types" && sentences.length === si + 3 && !ctx.targets.length) {
     _effects.push({ type: "exileGraveyard", who: { ref: "eachOpponent" } });

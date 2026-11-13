@@ -35,7 +35,10 @@ const toHand = (s: GameState, pid: PlayerId, def: CardDef) => {
   return id;
 };
 /** The players in turn order after `pid`. */
-const after = (s: GameState, pid: PlayerId) => [1, 2, 3].map((k) => s.turnOrder[(s.turnOrder.indexOf(pid) + k) % 4]!);
+const after = (s: GameState, pid: PlayerId): [PlayerId, PlayerId, PlayerId] => {
+  const at = (k: number) => s.turnOrder[(s.turnOrder.indexOf(pid) + k) % 4]!;
+  return [at(1), at(2), at(3)];
+};
 
 // Real oracle text (Scryfall).
 const magus = (): CardDef => ({"oracleId":"ae9f5c80-bc96-4ab3-bb5b-e8bd470e9eab","name":"Magus Lucea Kane","manaCost":"{1}{G}{U}{R}","cmc":4,"typeLine":"Legendary Creature — Human Tyranid Wizard","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Tyranid","Wizard"],"oracleText":"Spiritual Leader — At the beginning of combat on your turn, put a +1/+1 counter on target creature.\nPsychic Stimulus — {T}: Add {C}{C}. When you next cast a spell with {X} in its mana cost or activate an ability with {X} in its activation cost this turn, copy that spell or ability. You may choose new targets for the copy. (A copy of a permanent spell becomes a token.)","power":"1","toughness":"1","colors":["G","R","U"],"colorIdentity":["G","R","U"],"keywords":["Spiritual Leader","Psychic Stimulus"],"producedMana":["C"],"commanderLegal":"legal","set":"40k","releasedAt":"2022-10-07","rarity":"mythic","layout":"normal","gameChanger":false}) as CardDef;

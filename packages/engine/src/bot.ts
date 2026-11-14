@@ -643,7 +643,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.fromHand) {
       const forName = pend.reveal && /"sameName":\{"revealed":true\}/.test(JSON.stringify(s.resolving?.body.effects ?? []));
       const copies = (id: ObjectId) => (forName && libraryCopies(s, pid, defOf(s, obj(s, id)).name) > 0 ? 1 : 0);
-      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => copies(b) - copies(a) || mv(s, b) - mv(s, a)).slice(0, pend.max) }];
+      // The First Tyrannic War: a card with {X} in its mana cost gets the +1/+1 counters.
+      const putting = s.resolving?.body.effects[s.resolving.next];
+      const withX = (id: ObjectId) => (putting?.type === "putFromHand" && putting.countersIfXCost && /\{X\}/.test(defOf(s, obj(s, id)).manaCost ?? "") ? 1 : 0);
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => copies(b) - copies(a) || withX(b) - withX(a) || mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     }
     // "Put any number of ... from exile onto the battlefield under your control" (Oblivion Sower): all of them.
     if (pend.kind === "searchLibrary" && pend.exiled && pend.max > 1 && pend.dig && /battlefield/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: pend.cards.slice(0, pend.max) }];
@@ -840,7 +843,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // at upkeep while tapped) until it has three.
     if (pend.kind === "pickPermanents" && pend.action === "keepTapped") {
       const saving = (id: string) => manaAbilitiesOn(s, obj(s, id)).some((ab) => ab.produces.kind === "removeX" && (obj(s, id).counters[ab.produces.counter] ?? 0) < 3);
-      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id) || saving(id)) }];
+      // Coffin Queen: kept tapped while the creature it returned would be exiled as it untaps.
+      const guarding = (id: string) => (s.delayed ?? []).some((d) => d.when === "lostControl" && d.orUntaps && d.subject.id === id && !!d.about && s.objects[d.about.id]?.zone === "battlefield");
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id) || saving(id) || guarding(id)) }];
     }
     // Winter Orb and the like: untap the most useful ones the limits allow (lands making a color we lack first).
     if (pend.kind === "pickPermanents" && pend.action === "untapLimited") return [{ type: "pickPermanents", player: pid, ids: chooseLimitedUntap(s, pid, pend.options) }];
@@ -5287,6 +5292,10 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   }
   // Obeka, Brute Chronologist: "the player whose turn it is may end the turn": bots don't end their own turn early.
   if (r && e?.type === "eachMay" && e.effects.some((x) => x.type === "endTurn")) return false;
+  // Expedited Inheritance: exile that many cards from the top of our library to play until the end of our next turn:
+  // only while enough cards stay in the library to keep drawing.
+  const impulseOwn = r && e?.type === "eachMay" && e.effects.length === 1 && e.effects[0]!.type === "impulse" && e.effects[0]!.theyPlay ? e.effects[0]! : undefined;
+  if (impulseOwn) return player(s, pid).library.length - (r!.item.event?.amount ?? 0) >= 5;
   // Farrel's Mantle, Gaze of Pain: our unblocked attacker deals its damage to the target creature instead of combat damage:
   // only to an opponent's creature it kills, and not when the combat damage would finish the player it's attacking.
   const instead = r && e?.type === "eachMay" && e.each && e.effects.some((x) => x.type === "noCombatDamage" && x.what.ref === "subject") ? e.effects.find((x) => x.type === "damage" && x.by === "subject") : undefined;

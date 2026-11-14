@@ -73,7 +73,7 @@ export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: numbe
  * the scratch key for the answer: the copied Aura's id. Undefined when it isn't an Aura, null when there's nothing it
  * could enchant, "paused" while the player chooses.
  */
-function auraCopyHost(s: GameState, pid: PlayerId, base: CardDef, except: CopyExcept | undefined, asked: ObjectId, src: string): AuraHost | null | undefined | "paused" {
+export function auraCopyHost(s: GameState, pid: PlayerId, base: CardDef, except: CopyExcept | undefined, asked: ObjectId, src: string): AuraHost | null | undefined | "paused" {
   const { key } = tokenCopyKey(s, base, except);
   const d = s.cards[key]!;
   if (!d.subtypes.includes("Aura") || !compileCard(d).enchant) return undefined;

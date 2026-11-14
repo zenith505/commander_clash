@@ -1,4 +1,4 @@
-import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
+import type { AbilityBody, Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, toughness } from "../cards";
 import { nameLandBan } from "../names";
 import { cardTypesAmong, castPayText, nearestOpponent, faceDownExileGroup, hiddenInExile, adventureExileCards, graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, payLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
@@ -3145,7 +3145,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const attacks = defender !== undefined && isType(defOf(s, o), "Creature") && fits(o);
           const tapped = e.tapped && fits(o);
           log(s, `${p.name} puts ${defOf(s, o).name} from ${from === p.id ? "their" : `${player(s, from).name}'s`} ${o.zone} onto the battlefield${tapped ? ", tapped" : ""}${attacks ? ` and attacking ${attack!.label}` : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}${equip ? ` attached to ${defOf(s, self!).name}` : e.attachToSelf && !host ? ", unattached" : ""}.`);
-          moveObject(s, o.id, "battlefield", { controller: p.id, ...(tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.counters } : {}), ...host, ...equip });
+          // The First Tyrannic War: the number counted now, as it resolves; the {X} judged as it enters (game.ts).
+          const ifX = e.countersIfXCost ? { countersIfXCost: { [e.countersIfXCost.counter]: Math.max(0, amountNow(s, e.countersIfXCost.n, ctx)) } } : {};
+          moveObject(s, o.id, "battlefield", { controller: p.id, ...(tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.counters } : {}), ...ifX, ...host, ...equip });
           if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
             o.attacking = defender;
             if (attack?.planeswalker) o.attackingPermanent = attackingPermanentOf(s, attack.planeswalker);
@@ -3190,8 +3192,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "putOntoBattlefield": {
       const list = objects(s, e.what, ctx);
       // Who controls ~ is watched from now on (CR 400.7): a ~ that has left by then never makes you sacrifice (Seraph rulings).
-      const watch = e.sacrificeOnLostControl === true ? (ctx.sourceId ? s.objects[ctx.sourceId] : undefined) : undefined;
-      const watched = e.sacrificeOnLostControl === true ? (watch?.zone === "battlefield" && (ctx.sourceZc === undefined || (watch.zoneChanges ?? 0) === ctx.sourceZc) ? { id: watch.id, zc: watch.zoneChanges ?? 0 } : undefined) : e.sacrificeOnLostControl;
+      // Coffin Queen: "When ~ becomes untapped or you lose control of ~, exile that creature" watches it the same way.
+      const watchSelf = e.sacrificeOnLostControl === true || !!e.exileOnUntapOrLostControl;
+      const watch = watchSelf ? (ctx.sourceId ? s.objects[ctx.sourceId] : undefined) : undefined;
+      const watched = watchSelf ? (watch?.zone === "battlefield" && (ctx.sourceZc === undefined || (watch.zoneChanges ?? 0) === ctx.sourceZc) ? { id: watch.id, zc: watch.zoneChanges ?? 0 } : undefined) : e.sacrificeOnLostControl === true ? undefined : e.sacrificeOnLostControl;
       if (e.atNextEndStep) {
         // Seraph: "put that card onto the battlefield under your control at the beginning of the next end step" (CR 603.7),
         // if it's still that card then.
@@ -3384,7 +3388,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // "Sacrifice it when you lose control of ~" (Krovikan Vampire): once you've controlled ~ since now (Seraph rulings).
           const w = watched && s.objects[watched.id];
           if (w && w.zone === "battlefield" && (w.zoneChanges ?? 0) === watched!.zc) {
-            const d = { when: "lostControl" as const, controller: ctx.controller, sourceCardId: cardIdOf(w), subject: watched!, about: { id: o.id, zc: o.zoneChanges ?? 0 }, ...(controllerOf(s, w) === ctx.controller ? { held: true as const } : {}), body: { targets: [], effects: [{ type: "sacrifice" as const, what: { ref: "subject" as const } }], text: `Sacrifice ${defOf(s, o).name}.` }, turn: s.turn, step: s.step };
+            // Coffin Queen: exiled instead, and the first time ~ becomes untapped too (CR 603.7c).
+            const body: AbilityBody = e.exileOnUntapOrLostControl ? { targets: [], effects: [{ type: "exile", what: { ref: "subject" } }], text: `Exile ${defOf(s, o).name}.` } : { targets: [], effects: [{ type: "sacrifice", what: { ref: "subject" } }], text: `Sacrifice ${defOf(s, o).name}.` };
+            const d = { when: "lostControl" as const, controller: ctx.controller, sourceCardId: cardIdOf(w), subject: watched!, about: { id: o.id, zc: o.zoneChanges ?? 0 }, ...(controllerOf(s, w) === ctx.controller ? { held: true as const } : {}), ...(e.exileOnUntapOrLostControl ? { orUntaps: true as const } : {}), body, turn: s.turn, step: s.step };
             (s.delayed ??= []).push(d);
           }
         }

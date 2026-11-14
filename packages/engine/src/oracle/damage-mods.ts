@@ -144,6 +144,19 @@ export function parseDamageMod(line: string): StaticAbility | null {
     const mod: DamageMod = { op: "counters", counter: toCounters[1], to: { self: true }, text: line };
     return { affects: { kind: "self" }, mods: [{ kind: "damageMod", mod }], text: line };
   }
+  // Soul-Scar Mage: "If a source you control would deal noncombat damage to a creature an opponent controls, put that many
+  // -1/-1 counters on that creature instead": a replacement, not prevention (rulings: damage that can't be prevented is
+  // replaced too), applied once to each source's damage (CR 614.5), the counters on the creature it would be dealt to; none
+  // of it is dealt (no lifelink, deathtouch or "is dealt damage" trigger, CR 614.1a). The creature's controller orders it
+  // with other replacement and prevention effects (CR 616.1, rulings).
+  const onThat = /^If (.+?) would deal (combat |noncombat )?damage to (a creature .+?), put that many (-1\/-1) counters on that creature instead\.?$/.exec(line);
+  if (onThat) {
+    const byP = parseBy(onThat[1]!, false);
+    const to = byP && parseTo(onThat[3], false);
+    if (!byP || byP.attached || !to?.objects || to.players || to.other || to.self || !to.objects.types?.includes("Creature")) return null;
+    const mod: DamageMod = { op: "counters", counter: onThat[4]!, onDamaged: true, ...(onThat[2] ? { combat: onThat[2] === "combat " ? ("only" as const) : ("non" as const) } : {}), ...(byP.by ? { by: byP.by } : {}), to, text: line };
+    return { affects: { kind: "self" }, mods: [{ kind: "damageMod", mod }], text: line };
+  }
   // Undead Alchemist: "If a Zombie you control would deal combat damage to a player, instead that player mills that many
   // cards"; Szadek, Lord of Secrets: "If ~ would deal combat damage to a player, instead put that many +1/+1 counters on ~
   // and that player mills that many cards". Replacements, not prevention (CR 614.1a): none of the damage is dealt (so no

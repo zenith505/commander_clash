@@ -6573,6 +6573,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c19ec6aa-aadd-4767-b695-384fd07b4ded",
+  "name": "Coffin Queen",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Creature — Zombie Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Wizard"
+  ],
+  "oracleText": "You may choose not to untap this creature during your untap step.\n{2}{B}, {T}: Put target creature card from a graveyard onto the battlefield under your control. When this creature becomes untapped or you lose control of this creature, exile that creature.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ad786230-4045-46af-bc89-078d45891e5b",
   "name": "Colfenor's Plans",
   "manaCost": "{2}{B}{B}",
@@ -19561,6 +19592,37 @@
   "set": "lrw",
   "releasedAt": "2007-10-12",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "61ad3299-474a-400f-a1c1-b86024aca3e8",
+  "name": "Knowledge Exploitation",
+  "manaCost": "{5}{U}{U}",
+  "cmc": 7,
+  "typeLine": "Kindred Sorcery — Rogue",
+  "supertypes": [],
+  "types": [
+   "Kindred",
+   "Sorcery"
+  ],
+  "subtypes": [
+   "Rogue"
+  ],
+  "oracleText": "Prowl {3}{U} (You may cast this for its prowl cost if you dealt combat damage to a player this turn with a Rogue.)\nSearch target opponent's library for an instant or sorcery card. You may cast that card without paying its mana cost. Then that player shuffles.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Prowl"
+  ],
+  "commanderLegal": "legal",
+  "set": "mor",
+  "releasedAt": "2008-02-01",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -290,6 +290,11 @@ export const LINKED_CARD_KEYWORD = "As long as a card exiled with it has it: ";
  * as LINKED_CARD_KEYWORD, but only a creature card among those its delve exiled counts (CR 607.2q).
  */
 export const LINKED_CREATURE_CARD_KEYWORD = "If a creature card exiled with it has it: ";
+/**
+ * Cairn Wanderer: "As long as a creature card with flying is in a graveyard, ~ has flying. The same is true for ...": each
+ * keyword written after this prefix is had while a creature card in any graveyard has that keyword itself (round 358).
+ */
+export const YARD_CREATURE_CARD_KEYWORD = "As long as a creature card in a graveyard has it: ";
 /** "Protection from creatures" and the like for each of these card types (CR 205.2a, 702.16a). */
 export function protectionFromCardTypes(types: readonly string[]): string[] {
   return Object.entries(PROTECTION_TYPES).filter(([, t]) => types.includes(t)).map(([q]) => `Protection from ${q}`);

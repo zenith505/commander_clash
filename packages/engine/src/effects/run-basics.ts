@@ -900,8 +900,11 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (e.chosenName && name === undefined) return;
       const named = name !== undefined ? { ...e.mod, filter: { ...e.mod.filter, named: name, text: `spells named ${name}` }, text: `Spells named ${name} cost {${-e.mod.n}} less to cast this turn.` } : e.mod;
       const mod = k === 1 ? named : { ...named, n: named.n * k };
-      (s.costModsThisTurn ??= []).push({ player: ctx.controller, mod, ...(e.untilYourNextTurn ? { untilYourNextTurn: true as const } : {}), ...(e.next ? { next: true as const } : {}) });
-      log(s, `${player(s, ctx.controller).name}: ${mod.text.replace(/ you cast this turn /, " they cast this turn ").replace(/\{X\}/, `{${k}}`)}`);
+      // Will Kenrith: "spells that player casts", the target player's, still in the game (CR 800.4a); until your next turn.
+      const who = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (who === undefined) return;
+      (s.costModsThisTurn ??= []).push({ player: who, mod, ...(e.untilYourNextTurn ? { untilYourNextTurn: true as const } : {}), ...(e.untilYourNextTurn && who !== ctx.controller ? { until: ctx.controller } : {}), ...(e.next ? { next: true as const } : {}) });
+      log(s, `${player(s, who).name}: ${mod.text.replace(/ you cast this turn /, " they cast this turn ").replace(/ that player casts /, " they cast ").replace(/\{X\}/, `{${k}}`)}`);
       return;
     }
     case "cantBlockRule": {

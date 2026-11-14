@@ -749,6 +749,8 @@ export function moveObject(
     countersIfSubtype?: { subtype: string; counters: Record<string, number> };
     /** "... and an additional loyalty counter on it if it's a planeswalker" (Semester's End): judged the same way. */
     countersIfPlaneswalker?: Record<string, number>;
+    /** "If its mana cost contains {X}, it enters with ..." (The First Tyrannic War): judged by the permanent it enters as, a copy's mana cost if it's a copy (CR 614.12, rulings). */
+    countersIfXCost?: Record<string, number>;
     /** For a land that may enter untapped by paying life or revealing a card: that was done (CR 614.12). */
     untapped?: boolean;
     /** The X of the spell it was, for "enters with X counters" and its enters triggers (CR 107.3m). */
@@ -1341,7 +1343,7 @@ export function moveObject(
     o.sunburstGained = undefined;
     const bloodthirstGained = fromZone === "stack" ? (o.bloodthirstGained ?? 0) : 0;
     o.bloodthirstGained = undefined;
-    const how: EnterOpts = { ...(sunburstGained ? { sunburstGained } : {}), ...(bloodthirstGained ? { bloodthirstGained } : {}), ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped || castTapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfSubtype ? { countersIfSubtype: opts.countersIfSubtype } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
+    const how: EnterOpts = { ...(sunburstGained ? { sunburstGained } : {}), ...(bloodthirstGained ? { bloodthirstGained } : {}), ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped || castTapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfSubtype ? { countersIfSubtype: opts.countersIfSubtype } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(opts.countersIfXCost ? { countersIfXCost: opts.countersIfXCost } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
     if (printed.entersAsCopy && (!printed.entersAsCopy.ifAttacked || player(s, o.controller).attackedTurn === s.turn) && copyCandidates(s, o, printed.entersAsCopy.filter).length >= (printed.entersAsCopy.exileTwo ? 2 : 1)) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
@@ -1474,7 +1476,7 @@ function scatterMerged(s: GameState, ids: ObjectId[], to: ZoneName, top: boolean
 }
 
 /** `fromStack`: it's a resolving spell becoming a permanent (sunburst, CR 702.44b). */
-type EnterOpts = { /** Sunburst the spell gained (Lux Artillery), each instance apart. */ sunburstGained?: number; /** Bloodthirst the spell gained (Bloodlord of Vaasgoth), its total N. */ bloodthirstGained?: number; x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; /** Counters only if it enters with that subtype (Heroic Return). */ countersIfSubtype?: { subtype: string; counters: Record<string, number> }; countersIfPlaneswalker?: Record<string, number>; escaped?: boolean; fromStack?: boolean; /** Its "enters under the control of an opponent of your choice" was applied. */ controlChosen?: boolean };
+type EnterOpts = { /** Sunburst the spell gained (Lux Artillery), each instance apart. */ sunburstGained?: number; /** Bloodthirst the spell gained (Bloodlord of Vaasgoth), its total N. */ bloodthirstGained?: number; x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; /** Counters only if it enters with that subtype (Heroic Return). */ countersIfSubtype?: { subtype: string; counters: Record<string, number> }; countersIfPlaneswalker?: Record<string, number>; countersIfXCost?: Record<string, number>; escaped?: boolean; fromStack?: boolean; /** Its "enters under the control of an opponent of your choice" was applied. */ controlChosen?: boolean };
 
 /**
  * The rest of entering the battlefield (CR 614.1c, 614.12): tapped or not, counters, "as it enters" choices,
@@ -1536,6 +1538,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (characteristics(s, o).types.includes("Creature")) for (const [k, n] of Object.entries(opts.countersIfCreature ?? {})) add(k, n);
   if (characteristics(s, o).types.includes("Planeswalker")) for (const [k, n] of Object.entries(opts.countersIfPlaneswalker ?? {})) add(k, n);
   if (opts.countersIfSubtype && characteristics(s, o).subtypes.includes(opts.countersIfSubtype.subtype)) for (const [k, n] of Object.entries(opts.countersIfSubtype.counters)) add(k, n);
+  // The First Tyrannic War: the mana cost of what it enters as (a copy's, CR 707.2; rulings).
+  if (opts.countersIfXCost && /\{X\}/.test(defOf(s, o).manaCost ?? "")) for (const [k, n] of Object.entries(opts.countersIfXCost)) add(k, n);
   // "And as a Mutant in addition to its other types" (Master Biomancer): a type it has from the moment it enters, for as
   // long as it's on the battlefield (CR 614.1c, 613.1d).
   const asTypes: string[] = [];
@@ -4064,7 +4068,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.cantPlayUntilTurn = s.cantPlayUntilTurn?.filter((c) => !began.has(c.player));
   if (!s.cantPlayUntilTurn?.length) s.cantPlayUntilTurn = undefined;
   // "Noncreature spells your opponents cast cost {2} more to cast until your next turn" (Elspeth Conquers Death).
-  s.costModsThisTurn = s.costModsThisTurn?.filter((c) => c.untilYourNextTurn && !began.has(c.player));
+  s.costModsThisTurn = s.costModsThisTurn?.filter((c) => c.untilYourNextTurn && !began.has(c.until ?? c.player));
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.filter((r) => !began.has(r.controller));
   // Arlinn, the Pack's Hope: "Until your next turn, each creature you control enters with an additional +1/+1 counter".
   s.entersWithCountersThisTurn = s.entersWithCountersThisTurn?.filter((r) => !(r.untilYourNextTurn && began.has(r.controller)));

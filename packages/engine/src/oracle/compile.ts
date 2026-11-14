@@ -67,6 +67,8 @@ import { round360Line } from "./round360";
 import { round361Line } from "./round361";
 import { round362Line } from "./round362";
 import { round363Line } from "./round363";
+import { round364Line } from "./round364";
+import { round365Line } from "./round365";
 import { roundB189Line } from "./laneb189";
 
 const cache = new Map<string, CompiledCard>();
@@ -6066,6 +6068,10 @@ export function compile(d: CardDef): CompiledCard {
     if (round362Line(line, raw, out, isSpell)) continue;
     // Round 363's whole lines (oracle/round363.ts).
     if (round363Line(line, raw, out, isSpell)) continue;
+    // Round 364's whole lines (oracle/round364.ts).
+    if (round364Line(line, raw, out, isSpell)) continue;
+    // Round 365's whole lines (oracle/round365.ts).
+    if (round365Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -7548,7 +7554,7 @@ function linkExile(out: CompiledCard) {
   }
   // Cemetery Prowler, Protector, Gatekeeper: "cards exiled with ~", "the exiled card" are the ones its "exile a card from a
   // graveyard" ability exiled (CR 607.2a); it has no other exile instruction.
-  if (out.costMods?.some((m) => m.perTypeSharedWithLinked) || out.triggers.some((t) => t.cast?.sharesTypeWithLinked)) {
+  if (out.costMods?.some((m) => m.perTypeSharedWithLinked) || out.triggers.some((t) => t.cast?.sharesTypeWithLinked) || out.fromTop?.some((f) => f.sharesTypeWithLinked)) {
     const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects));
     const yards = all.filter((e): e is Extract<Effect, { type: "chooseFromGraveyard" }> => e.type === "chooseFromGraveyard" && !!e.anyGraveyard);
     const others = all.filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.anyGraveyard));
@@ -8391,6 +8397,9 @@ function parseCostOr(text: string): CostOption[] | null {
  * using the turn's land play (rulings on Courser of Kruphix, Future Sight and Johann). Undefined if it isn't one.
  */
 export function parseFromTop(text: string): FromTop | null | undefined {
+  // Cemetery Illuminator: "Once each turn, you may cast a spell from the top of your library if it shares a card type with
+  // a card exiled with ~." (topPermission; the cards linked to its "exile a card from a graveyard" ability, below).
+  if (/^Once each turn, you may cast a spell from the top of your library if it shares a card type with a card exiled with ~$/.test(text)) return { lands: false, spells: "any", once: true, sharesTypeWithLinked: true };
   // "You may play the top card of your library", "you may play cards from the top of your library": lands and spells.
   text = text.replace(/^(you may) play (?:the top card of your library|cards from the top of your library)$/i, "$1 play lands and cast spells from the top of your library");
   // "Play historic lands" (Crystal Skull): only lands of that kind.

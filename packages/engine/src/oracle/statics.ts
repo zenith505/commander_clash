@@ -2483,6 +2483,10 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't attack a player it has already attacked this turn$/.test(rest)) return [{ kind: "cantAttackSamePlayer" }];
   if (/^can't block alone$/.test(rest)) return [{ kind: "cantBlockAlone" }];
   if (/^must be blocked if able$/.test(rest)) return [{ kind: "mustBeBlocked" }];
+  // Nacatl War-Pride: "must be blocked by exactly one creature if able": a single requirement (CR 509.1c): with a creature
+  // able to block it alone, exactly one blocks it; when no one creature can (menace), it may be blocked by several or none
+  // (rulings).
+  if (/^must be blocked by exactly one creature if able$/.test(rest)) return [{ kind: "mustBeBlocked", exactlyOne: true }];
   // Slayer's Cleaver: "must be blocked by an Eldrazi if able": one of its blockers is an Eldrazi whenever one is able to
   // block it (CR 509.1c).
   if ((m = /^must be blocked by an? ([A-Z][a-z]+) if able$/.exec(rest)) && CREATURE_TYPES.has(m[1]!)) return [{ kind: "mustBeBlocked", by: { kind: "object", types: ["Creature"], subtypes: [m[1]!], text: m[1]! } }];
@@ -3390,7 +3394,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|are artifacts in addition to their other types|(?:is|are) all colors|are the chosen color|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|attacks? an opponent with the most life among your opponents each combat if able|attack enchanted creature's controller each combat if able|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+| except mana abilities)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect|flying and islandwalk))$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|are artifacts in addition to their other types|(?:is|are) all colors|are the chosen color|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|must be blocked by exactly one creature if able|attacks? each combat if able(?:,? .+)?|attacks? an opponent with the most life among your opponents each combat if able|attack enchanted creature's controller each combat if able|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+| except mana abilities)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect|flying and islandwalk))$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

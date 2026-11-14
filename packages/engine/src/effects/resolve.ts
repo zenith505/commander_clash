@@ -30,6 +30,8 @@ import { runExileRandomTokenCopyEffect } from "./run-round359";
 import { runKinCountersEffect } from "./run-round361";
 import { runRedistributeLifeEffect } from "./run-round362";
 import { runMayCastExiledSpellEffect, runUntilLeavesToBottomEffect } from "./run-round363";
+import { runChooseSourceNowEffect } from "./run-round364";
+import { runAttachSelfToPlayerEffect } from "./run-round365";
 import { runAttackingNowEffect, runDiscardOrSacrificeEffect, runExileTopDamageEachEffect, runGuessTopKindEffect, runReturnSacrificedCardsEffect, runSacrificeTargetsRevealEffect } from "./run-round319";
 import { runRepeatIfDidEffect } from "./run-round320";
 import { runChooseHostOrNamedEffect, runPutMilledPairEffect, runSearchEachExileEffect } from "./run-round321";
@@ -1815,6 +1817,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runRedistributeLifeEffect(s, ctx, src);
     case "untilLeavesToBottom":
       return runUntilLeavesToBottomEffect(s, ctx, src);
+    case "chooseSourceNow":
+      return runChooseSourceNowEffect(s, e, ctx, src);
+    case "attachSelfToPlayer":
+      return runAttachSelfToPlayerEffect(s, e, ctx);
     case "mayCastExiledSpell":
       return runMayCastExiledSpellEffect(s, e, ctx);
     case "sacrificeTargetsReveal":

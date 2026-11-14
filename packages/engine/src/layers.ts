@@ -311,6 +311,8 @@ export interface Characteristics {
   mustBeBlocked: boolean;
   /** Gorm the Great: "must be blocked by two or more creatures if able" too (CR 509.1c). */
   mustBeBlockedByTwo?: true;
+  /** Nacatl War-Pride: "must be blocked by exactly one creature if able" (CR 509.1c). */
+  mustBeBlockedByOne?: true;
   allMustBlock: boolean;
   /** "All Walls able to block ~ do so" (Marble Priest): the blockers that must block it, if able (CR 509.1c). */
   allMustBlockBy?: TargetSpec[];
@@ -1008,6 +1010,9 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "eventPlayerHasUnattackedOpponent":
       // Suppressor Skyguard: an opponent of the attacking player other than you that no creature attacks itself (rulings).
       return eventPlayer !== undefined && s.turnOrder.some((p) => p !== you && p !== eventPlayer && !s.players[p]!.lost && !s.battlefield.some((id) => s.objects[id]!.attacking === p && !s.objects[id]!.attackingPermanent));
+    case "notAttackingYou":
+      // Mirkwood Trapper: a creature attacking your planeswalker or a battle you protect isn't attacking you (rulings, CR 506.3).
+      return !s.battlefield.some((id) => s.objects[id]!.attacking === you && !s.objects[id]!.attackingPermanent);
     case "attackedPlayerPoisoned":
       return s.players.some((p) => !p.lost && (p.poison ?? 0) > 0 && s.battlefield.some((id) => s.objects[id]!.attacking === p.id && !s.objects[id]!.attackingPermanent));
     case "eventPlayerMoreThanAnotherOpponent":
@@ -2062,6 +2067,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       if (m.by) c.mustBeBlockedBy = [...(c.mustBeBlockedBy ?? []), m.by];
       else c.mustBeBlocked = true;
       if (m.twoOrMore && !m.by) c.mustBeBlockedByTwo = true;
+      if (m.exactlyOne && !m.by) c.mustBeBlockedByOne = true;
       return;
     case "attacksIfAble":
       if (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0)) return;

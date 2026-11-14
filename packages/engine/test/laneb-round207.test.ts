@@ -149,8 +149,7 @@ describe("Nature's Wrath", () => {
     let s = act(s0, { type: "playLand", player: ap, objectId: sea });
     for (let i = 0; i < 400 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
       const p = s.pending;
-      if (p?.kind === "orderTriggers") s = act(s, { type: "orderTriggers", player: p.player, order: p.triggers.map((_, k) => k) } as Action);
-      else if (p) throw new Error(`unexpected ${p.kind}`);
+      if (p) throw new Error(`unexpected ${p.kind}`);
       else s = act(s, { type: "passPriority", player: waitingOn(s)! });
     }
     expect(zoneOf(s, sea)).toBe("graveyard");

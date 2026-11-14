@@ -91,6 +91,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     return who ? [{ type: "loseAllCounters", who, poison: true }] : null;
   }
+  // Survivor's Med Kit: "Target player loses all rad counters" (CR 122.1, 728): only those.
+  if ((m = /^(Target player) loses all rad counters$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    return who ? [{ type: "loseAllCounters", who, rad: true }] : null;
+  }
   // Suncleanser: "That player can't get counters for as long as ~ remains on the battlefield" (CR 611.2b).
   if ((m = /^(That player) can't get counters for as long as ~ remains on the battlefield$/.exec(s))) {
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);

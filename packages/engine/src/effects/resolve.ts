@@ -27,6 +27,7 @@ import { runNamesEffect } from "./run-names";
 import { runLibraryEffect } from "./run-library";
 import { runFaceDownPilesEffect } from "./run-round318";
 import { runExileRandomTokenCopyEffect } from "./run-round359";
+import { runKinCountersEffect } from "./run-round361";
 import { runAttackingNowEffect, runDiscardOrSacrificeEffect, runExileTopDamageEachEffect, runGuessTopKindEffect, runReturnSacrificedCardsEffect, runSacrificeTargetsRevealEffect } from "./run-round319";
 import { runRepeatIfDidEffect } from "./run-round320";
 import { runChooseHostOrNamedEffect, runPutMilledPairEffect, runSearchEachExileEffect } from "./run-round321";
@@ -1797,6 +1798,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runGuessTopKindEffect(s, e, ctx, src);
     case "exileRandomTokenCopy":
       return runExileRandomTokenCopyEffect(s, e, ctx, src);
+    case "kinCounters":
+      return runKinCountersEffect(s, e, ctx);
     case "sacrificeTargetsReveal":
       return runSacrificeTargetsRevealEffect(s, e, ctx);
     case "attackingNow":

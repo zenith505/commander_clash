@@ -15301,6 +15301,8 @@ function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = fal
   const forms = faceUpFormsOf(s, o);
   o.faceDown = undefined;
   o.turnedFaceUpTurn = s.turn;
+  // "You turned a permanent face up this turn" (Oblivious Bookworm): the player who did (CR 116.2b, 708.8).
+  if (by !== undefined && !(s.turnLog ??= {}).turnedFaceUp?.includes(by)) (s.turnLog.turnedFaceUp ??= []).push(by);
   lockIfRoom(s, o);
   // Aquamorph Entity: it's turned face up as the form chosen, part of its copiable values (CR 614.1e, 707.2), never the
   // printed 1/1 in between (rulings).

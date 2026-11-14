@@ -1170,6 +1170,9 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.lastTurn) return (s.lastTurn?.creaturesEntered ?? []).filter((e) => e.controller === you && !(cond.other && e.id === sourceId && e.zc === selfZc)).length >= cond.n;
       return (s.turnLog?.entered ?? []).filter((e) => e.controller === you && !(cond.other && e.id === sourceId && e.zc === selfZc) && cond.types.every((ty) => e.types.includes(ty)) && !cond.notTypes?.some((ty) => e.types.includes(ty)) && (!cond.flying || !!e.flying) && (!cond.faceDown || !!e.faceDown) && (!cond.subtype || has(e, cond.subtype) || (!!cond.orSubtype && has(e, cond.orSubtype))) && (!cond.anySubtype || cond.anySubtype.some((t) => has(e, t)))).length >= cond.n;
     }
+    // Oblivious Bookworm: a permanent turned face up this turn by you (the special action or an effect of yours).
+    case "youTurnedFaceUp":
+      return !!s.turnLog?.turnedFaceUp?.includes(you);
     case "destroyedByOpponent":
       return (s.turnLog?.destroyed ?? []).some((e) => e.controller === you && e.by !== you);
     case "creatureCounteredByOpponent":

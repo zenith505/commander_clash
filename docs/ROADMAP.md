@@ -3846,7 +3846,7 @@ line blocks.
    Ogre Battlecaster ({R}{R} added to the graveyard spell's costs, then +X/+0 as it's cast); Kylox's Voltstrider (spells
    from the cards its collect evidence exiled); Reversal of Fortune (a copy of a card in an opponent's hand, cast from
    there); Dubious Challenge (done in round B152); Evolving Door (a creature card exactly one color more); Storm Herald (Auras returned
-   attached, exiled if they'd leave); Livio, Oathsworn Sentinel (aegis counters); Vision Charm (done in round B155) (land type changes);
+   attached, exiled if they'd leave); Livio, Oathsworn Sentinel (done in round B200) (aegis counters); Vision Charm (done in round B155) (land type changes);
    Unpredictable Cyclone; Bell Borca, Spectral Sergeant (noted mana values); Mirror of Fate; Dack Fayden, Helping Hand;
    Sanar, Innovative First-Year; Mairsil, the Pretender (cage counters); Spellweaver Volute; Inniaz, the Gale Force.
    Out after round 291 (looked at, not done): Skyway Robber (escapes with a granted trigger about the cards its escape cost
@@ -3871,7 +3871,7 @@ line blocks.
    target); Gandalf, Westward Voyager (a copy if a revealed card shares a card type); Lagrella, the Magpie (any number of
    targets controlled by different players, counters when they return under your control); Metamorphic Alteration (an
    Aura's copy effect of a chosen creature); Nick Fury, Agent of S.H.I.E.L.D. (a double-faced card put onto the
-   battlefield transformed); The Day of the Doctor; Yannik, Scavenging Sentinel; The Spot, Living Portal.
+   battlefield transformed); The Day of the Doctor; Yannik, Scavenging Sentinel (done in round B200); The Spot, Living Portal.
    Out after round 289 (looked at, not done): Lara Croft, Tomb Raider ("You may play a card from exile with a discovery
    counter on it this turn": one card, not each); Filigree Vector (two "any number of target" groups in one ability);
    Sidequest: Play Blitzball (combat damage dealt to each player this turn, then transform and attach); Memory Vessel
@@ -4601,7 +4601,7 @@ line blocks.
    Thrasher, "target opponent exiles a card from their hand", "Cowards can't block Warriors", "target creature can't
    block ~ this turn", Electric Eel):
    - Exiling from hand still out: "you may play that card" or face down (Fiend of the Shadows, Kheru Mind-Eater,
-     Lightstall Inquisitor (done in round 298)), "until ~ leaves the battlefield" (Intellect Devourer (done in round 298)), Arcane Artisan, Ashiok's -3, Muse
+     Lightstall Inquisitor (done in round 298)), "until ~ leaves the battlefield" (Intellect Devourer (done in round 298)), Arcane Artisan (done in round B200), Ashiok's -3, Muse
      Vessel's second ability (done in round B152), Karn Liberated's -14, Ruthless Negotiation ("if ~ was cast from a graveyard"). Bots
      exile the cards they'd discard, without weighing that exile loses graveyard value they don't have anyway.
    - Bots decide Human Torch's and The Thing's "you may pay {R}{G}{W}{U}" with the usual "may pay" check, not by
@@ -4726,7 +4726,7 @@ line blocks.
    Balancing Act, exhaust and boast):
    - Distributing counters as it resolves works for "among any number of creatures you control"; still out: Crashing
      Wave (waterbend {X}, stun counters among tapped creatures your opponents control).
-   - "Becomes" without a duration works on ~ itself; still out: Tenth District Hero ("named Mileva").
+   - "Becomes" without a duration works on ~ itself; still out: Tenth District Hero (done in round B200) ("named Mileva").
    - Threaten's "untap ... and gain control of it" works; still out: Temporary Insanity's target filter, Spinal
      Embrace (sacrifice "if you do").
    - Exhaust and boast abilities work, exhaust mana abilities too (CR 702.177a, 702.142a), and Elvish Refueler; still
@@ -6419,7 +6419,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   another subject (Diminishing Returns), "That player puts all noncreature cards revealed this way into their graveyard,
   then you put the creature card onto the battlefield under your control" (Telemin Performance), "The tokens have ..."
   (Return of the Mole Man). +18 (28,436 of 31,936 with round 222).
-- Out after round B56 (looked at, not done): Sudden Salvation ("for each opponent who controls one or more of those
+- Out after round B56 (looked at, not done): Sudden Salvation (done in round B200) ("for each opponent who controls one or more of those
   permanents"), Jhoira, Weatherlight Corsair (life loss equal to the mana value of the card put onto the battlefield),
   Djinn of Wishes (done in round B158) (playing the revealed card from the library, else exiling it), The Kingpin of Crime (done in round B192) (a group "assign
   combat damage equal to their toughness" until end of turn), Yasova Dragonclaw ("gain control of target creature an
@@ -8557,7 +8557,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   battlefield attached to creatures you control" untargeted, each host chosen as they enter together, then exiled later and
   if they'd leave: no such pick yet), Meandering Towershell (done in round B199) (returns attacking "at the beginning of the declare attackers
   step on your next turn": no such delayed timing yet), Mana Cache (a mana ability any player may activate), Kodama of the
-  Center Tree, Arcane Artisan and Cleansing stay out for the reasons in the earlier lists.
+  Center Tree, Arcane Artisan (done in round B200) and Cleansing stay out for the reasons in the earlier lists.
 - Round B191 (least played first, from the Lane B skip lists): Wild Shape ("has that base power and toughness, becomes that
   creature type, and gains that ability" with "• 1/3 Turtle with hexproof." modes: base power and toughness in layer 7b,
   its creature types replaced and its other types kept, CR 205.1a, the keyword granted, until end of turn; mode and target
@@ -8745,6 +8745,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   activated abilities of opponents' lands except mana abilities, gained and stopped, paid with mana of any type), Spy Kit
   (every nonlegendary creature card's name at once) and Liberated Livestock (an Aura card from your hand or graveyard
   attached to each token it creates, extra tokens included, rulings) stay out.
+- Round B200 (least played first, from the Lane B skip lists): Tenth District Hero (its collect evidence 4 ability: if ~ is
+  a Detective as it resolves, it becomes a legendary 5/5 named Mileva, the Stalwart with "Other creatures you control have
+  indestructible" for as long as it stays on the battlefield, still a creature with its types, each part in its layer,
+  CR 205.1b, 611.2a, 613.1). Livio, Oathsworn Sentinel ("its controller may exile it with an aegis counter on it": asked of
+  the target's controller as it resolves, the counter on the card in exile, CR 122.1; "Return all exiled cards with aegis
+  counters on them" takes every such card from every exile zone, whoever exiled it, as new objects, CR 400.7, rulings).
+  Sudden Salvation (up to three permanent cards in any graveyards put there from the battlefield this turn, back under
+  their owners' control tapped, CR 108.3; you draw for each opponent who controls one of them). Fortunate Few (you choose
+  first, then each other player in turn order from the active player, a nonland permanent they don't control that nobody
+  has chosen yet, knowing the earlier choices; then every other nonland permanent is destroyed at once, CR 608.2d,
+  rulings; one choice left is made for that player; a browser test). Yannik, Scavenging Sentinel (another creature you
+  control exiled until ~ leaves, chosen as it resolves, nothing exiled if ~ already left, CR 610.3c; the reflexive trigger,
+  CR 603.12, divides X counters by that creature's last known power, CR 608.2h, among any number of targets, zero allowed,
+  which the divide check now permits for "any number", CR 115.6, 601.2d; a browser test). Arcane Artisan (target player
+  draws, then exiles a card from their hand; a creature card gives them a token copy of it, CR 707.2; when ~ leaves, every
+  token created with it is exiled at the next end step, the tokens of the permanent it was, CR 603.10a, 400.7; a browser
+  test). Livio also has a browser test. +6, 31,245 of 31,936 with B199.
+- Out after round B200 (looked at, not done): Divine Deflection (one prevention shield shared by you and every permanent you
+  control, with the prevented amount dealt back to any target chosen as damage is prevented) stays out.
 - Out after round B192 (looked at, not done): Garruk, Curse Breaker (its −4: how often "whenever one or more creatures
   attack one of your opponents" triggers when creatures attack two of them still isn't settled by rulings), Charmed
   Pendant (a hybrid symbol of the milled card adds one of its colors: a choice in the middle of a mana ability), Ulamog's
@@ -8813,15 +8832,15 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Eureka's cards make their "as it enters" choices (Clone's copy, a chosen creature type) once Eureka has resolved, as the
   engine does for every effect; a copy can't be of a card put after it, but a chosen type doesn't yet affect the cards put
   after it during the same Eureka.
-- Out after round B171 (looked at, not done): Yannik, Scavenging Sentinel (an exile until it leaves, then a reflexive
-  trigger dividing counters by the exiled creature's power), Arcane Artisan (a token copy of a card exiled from hand, and
+- Out after round B171 (looked at, not done): Yannik, Scavenging Sentinel (done in round B200) (an exile until it leaves, then a reflexive
+  trigger dividing counters by the exiled creature's power), Arcane Artisan (done in round B200) (a token copy of a card exiled from hand, and
   every token created with it exiled when it leaves, including later ones) stay out.
 - Out after round B170 (looked at, not done): Abby, Merciless Soldier (named tokens for the mana spent to cast it, and
   entering under the control of an opponent of your choice) stays out.
 - Out after round B169 (looked at, not done): Dimir Strandcatcher (an intervening "if three or more cards were put into
   your graveyard from anywhere other than the battlefield this turn": no turn count of those yet), Emrakul's Evangel
   (sacrificing any number of creatures as a cost) stay out.
-- Out after round B168 (looked at, not done): Sudden Salvation (targets in any graveyard, and "for each opponent who
+- Out after round B168 (looked at, not done): Sudden Salvation (done in round B200) (targets in any graveyard, and "for each opponent who
   controls one or more of those permanents"), Garruk, Curse Breaker's −4 ("whenever one or more creatures attack one of
   your opponents": how often that batched trigger fires when creatures attack two opponents isn't settled by rulings),
   Revival Experiment (one card of each permanent type) stay out.
@@ -9005,7 +9024,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   it resolved), Expel the Unworthy (a kicker that changes what the spell can target), Kill-Suit Cultist (done in round B135) and Goblin
   Psychopath (damage replaced by a destroy or redirected, ordered with other shields, CR 616.1, as Lichenthrope).
 - Out after round B114 (looked at, not done): Titania's Song (its effect continuing until end of turn after it leaves the
-  battlefield), Fortunate Few (each player in turn choosing a nonland permanent not already chosen), Magnetic Mountain (done in round B145)
+  battlefield), Fortunate Few (done in round B200) (each player in turn choosing a nonland permanent not already chosen), Magnetic Mountain (done in round B145)
   (paying {4} for each of any number of chosen creatures), Equipoise (phasing out the excess, one permanent type after
   another).
 - Out after round B113 (looked at, not done): Kaervek's Spite (done in round B131) (sacrificing all permanents you control as an additional
@@ -9063,7 +9082,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   its creature types as it blocked).
 - Out after round B101 (looked at, not done): Kang Dynasty (chapter I and II delayed triggers on goaded creatures), The Bears
   of Littjara (damage from each creature with power 4 or greater), Founding the Third Path (done in round B193) and Helmut Zemo (casting with mana
-  paid as something resolves), Jorn's Kaldring (playing a snow permanent card from a graveyard, entering tapped), Yannik,
+  paid as something resolves), Jorn's Kaldring (playing a snow permanent card from a graveyard, entering tapped), Yannik (done in round B200),
   Lucius the Eternal, Cemetery Desecrator and The Spot, Crumbling Sanctuary (damage to players replaced by exiling cards),
   Ancient Hellkite (done in round B112) ("defending player" in an activated ability's target), Alluring Siren ("attacks you if able"), Dreams of
   Steel and Oil (the chosen cards exiled at once), Jester's Mask (done in round B158), The Ruinous Wrecking Crew (done in round B187) (choose up to X).
@@ -9299,7 +9318,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   may" on resolution; still out: ward—collect evidence (Axebane Ferox), bestow with it (Detective's Phoenix), "collect
   evidence X" as a cost (Urgent Necropsy; Incinerator of the Guilty's done in round 313), "if evidence was collected, instead" (Analyze the Pollen,
   Extract a Confession), and cards blocked by other lines (Cryptex, Polygraph Orb, Hedge Whisperer (done in round B127), Lamplight Phoenix,
-  Memory Vampire, Tenth District Hero, Deadly Cover-Up).
+  Memory Vampire, Tenth District Hero (done in round B200), Deadly Cover-Up).
 - Mana from a Treasure (CR 106.3) is tracked; still out: Devour Intellect ("instead" with a choice), Kalain's
   "enters with an additional +1/+1 counter" (that static family isn't supported), Alchemist's Talent (Classes aren't
   supported), Coin of Mastery (mana from an artifact source).

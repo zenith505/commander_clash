@@ -7598,7 +7598,10 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Or in the alternative cost paid: "Foretell {X}{X}{W}", "Madness {X}{B}{B}" (CR 107.3a).
   const hasX = parseManaCost(d.manaCost).hasX || costsHaveX(d, choices) || !!choices?.kicks?.some((i) => parseManaCost(compileCard(d).kicker?.costs[i] ?? "").hasX) || (!!compileCard(d).kicker?.required && parseManaCost(compileCard(d).kicker!.costs[0]!).hasX) || parseManaCost(madness ?? (choices.alt ? (altCost(d, choices.alt, s, p.id)?.mana ?? "") : "")).hasX;
   const beholdCost = compileCard(d).kicker?.extraCosts?.[0];
-  const beheld = kicks?.includes(0) && beholdCost?.kind === "reveal" && beholdCost.orControl && choices.reveal?.length === 1 ? s.objects[choices.reveal[0]!] : undefined;
+  // Monstrous Emergence: or its one mandatory behold-like additional cost (compile.ts allows beheldPower only then).
+  const required = compileCard(d).additionalCosts;
+  const mustBehold = !compileCard(d).kicker && required?.length === 1 && required[0]!.kind === "reveal" && !!required[0]!.orControl;
+  const beheld = ((kicks?.includes(0) && beholdCost?.kind === "reveal" && beholdCost.orControl) || mustBehold) && choices.reveal?.length === 1 ? s.objects[choices.reveal[0]!] : undefined;
   s.stack.push({
     id: `s${s.nextId++}`,
     kind: "spell",
@@ -11513,6 +11516,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "skipChoice") {
     // Fatespinner: the step or phase that player skips each instance of this turn.
     (r.scratch ??= {}).skipPick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "redistribute") {
+    // Reverse the Sands: who gets which life total (see Effect "redistributeLife").
+    if (!pend.options.includes(choice)) throw new RulesError("choose one of the redistributions offered");
+    (r.scratch ??= {}).redistribute = choice;
     continueResolution(s);
     return;
   }

@@ -8,6 +8,7 @@ import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana
 import { cantSearch } from "./effects/run-library";
 import { GUESS_PROMPT } from "./effects/run-round319";
 import { HOST_OR_NAMED_PROMPT } from "./effects/run-round321";
+import { redistributions } from "./effects/run-round362";
 import { abilitiesOf, lethalLeft, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
 import { reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
@@ -1265,6 +1266,19 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const hitters = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid && objIsType(s, o, "Creature") && power(s, o) > 0 && !objHasKeyword(s, o, "Defender"));
       return [{ type: "chooseOption", player: pid, choice: hitters.length ? "draw" : "combat" }];
     }
+    // Reverse the Sands: the most life for us, then the least for the opponent with the most, then the fewest changes.
+    if (pend.kind === "chooseOption" && pend.what === "redistribute") {
+      const { order } = redistributions(s);
+      const lives = order.map((x) => player(s, x).life);
+      const me = order.indexOf(pid);
+      const score = (o: string) => {
+        const way = o.split(",").map(Number);
+        const got = way.map((from) => lives[from]!);
+        const top = Math.max(...got.filter((_, i) => i !== me), 0);
+        return (me >= 0 ? got[me]! : 0) * 1000 - top * 10 - way.filter((from, to) => lives[from] !== lives[to]).length;
+      };
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => score(b) - score(a))[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "giveLife") return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => player(s, Number(b)).life - player(s, Number(a)).life)[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "nthPlayer") {
       const r = s.resolving;
@@ -1747,6 +1761,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const theirs = t?.kind === "player" ? player(s, t.id).hand.length : 0;
         return [{ type: "chooseOption", player: pid, choice: String(Math.max(0, Math.min(pend.numberRange?.max ?? 0, p.life - 20, theirs))) }];
       }
+      // Plunge into Darkness: "look at that many cards ... Put one of those cards into your hand and exile the rest": a few
+      // looks for the one card, keeping 20 life.
+      const look = s.resolving && allEffects(s.resolving.body.effects).find((x) => x.type === "dig" && typeof x.n === "object" && "count" in x.n && x.n.count.kind === "x");
+      if (look) return [{ type: "chooseOption", player: pid, choice: String(Math.max(0, Math.min(pend.numberRange?.max ?? 0, p.life - 20, 4, p.library.length))) }];
       const n = Math.max(0, Math.min(pend.numberRange?.max ?? 0, p.life - 15, p.library.length - 2, 5 - p.hand.length));
       return [{ type: "chooseOption", player: pid, choice: String(n) }];
     }
@@ -6040,6 +6058,13 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
       case "loseLife":
         v += e.who.ref === "you" ? -estimate(e.n) / 2 : estimate(e.n);
         break;
+      case "redistributeLife": {
+        // Reverse the Sands: the most life among the players, ours to take (as we'd choose, see "redistribute").
+        const { order, ways } = redistributions(s);
+        const me = order.indexOf(pid);
+        if (me >= 0) v += (Math.max(...ways.map((w) => player(s, order[w[me]!]!).life)) - player(s, pid).life) / 2;
+        break;
+      }
       case "exchangeLife": {
         // The life we'd gain (or lose) by taking the other player's total.
         const who = (r: typeof e.a) => {

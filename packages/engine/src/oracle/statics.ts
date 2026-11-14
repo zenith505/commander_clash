@@ -3101,6 +3101,25 @@ function parseStaticLine(line: string): StaticAbility | null {
     const type = becomeLands[1] === "creatures" ? "Creature" : "Artifact";
     return { affects: { kind: "filter", types: [type], controller: "you", spec: { kind: "object", types: [type], token: false, text: `nontoken ${becomeLands[1]!.slice(0, -1)}` } }, mods: [{ kind: "addTypes", types: ["Land"], subtypes: becomeLands[2] ? [becomeLands[2]] : [] }], text: line };
   }
+  // Biotransference: "Creatures you control are artifacts in addition to their other types. The same is true for creature
+  // spells you control and creature cards you own that aren't on the battlefield"; Encroaching Mycosynth: "Nonland
+  // permanents you control are artifacts ... The same is true for permanent spells you control and nonland permanent
+  // cards you own that aren't on the battlefield": a card type added in layer 4 (CR 205.1b, 613.1d) to its controller's
+  // permanents, spells on the stack and its owner's cards in every other zone, hidden ones too (rulings).
+  const typesEverywhere = /^(Creatures|Nonland permanents) you control are artifacts in addition to their other types\. The same is true for (creature|permanent) spells you control and (creature|nonland permanent) cards you own that aren't on the battlefield$/.exec(text);
+  if (typesEverywhere) {
+    const creatures = typesEverywhere[1] === "Creatures";
+    if (creatures !== (typesEverywhere[2] === "creature") || creatures !== (typesEverywhere[3] === "creature")) return null;
+    const mods: Modification[] = [{ kind: "addTypes", types: ["Artifact"], subtypes: [] }];
+    if (creatures) return { affects: { kind: "filter", types: ["Creature"], controller: "you" }, mods, text: line, offField: true };
+    return { affects: { kind: "filter", types: [], controller: "you", spec: { kind: "object", notTypes: ["Land"], text: "nonland permanent" } }, mods, text: line, offFieldSpells: true, offFieldCards: "nonlandPermanent" };
+  }
+  // Rootpath Purifier: "Lands you control and land cards in your library are basic": the supertype in layer 4 (CR 205.4a,
+  // 613.1d), on the battlefield and in its controller's library, so a search for a basic land card may find any land card
+  // there; no basic land type comes with it (rulings). A "nonbasic lands" effect no longer applies to those lands (CR
+  // 613.8a: Blood Moon depends on it, rulings).
+  if (/^Lands you control and land cards in your library are basic$/.test(text))
+    return { affects: { kind: "filter", types: ["Land"], controller: "you" }, mods: [{ kind: "addTypes", types: [], subtypes: [], supertypes: ["Basic"] }], text: line, offFieldCards: "libraryLand" };
   // Secret Arcade: "Nonland permanents you control and permanent spells you control are enchantments in addition to their
   // other types" (layer 4, CR 613.1d): its controller's permanent spells on the stack too (offFieldSpells), not their
   // cards elsewhere.
@@ -3145,6 +3164,11 @@ function parseStaticLine(line: string): StaticAbility | null {
   // Ghostflame Sliver: "All Slivers are colorless": every permanent with that creature type, in layer 5.
   if (/^All Slivers are colorless$/.test(text)) return { affects: { kind: "filter", types: [], spec: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Sliver"], text: "all slivers" } }, mods: [{ kind: "setColors", colors: [] }], text: line };
   if (/^All permanents are colorless$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "setColors", colors: [] }], text: line };
+  // Painter's Servant: "All cards that aren't on the battlefield, spells, and permanents are the chosen color in addition
+  // to their other colors": the color chosen as it entered, added in layer 5 (CR 105.3, 613.1e) to every permanent,
+  // token and spell (copies too) and every card in every zone, whoever owns them (rulings); a colorless one is just that
+  // color, and a later color-setting effect overwrites it (CR 613.7).
+  if (/^All cards that aren't on the battlefield, spells, and permanents are the chosen color in addition to their other colors$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "addColors", colors: [], chosen: true }], text: line, offFieldAll: true };
   if (/^All cards that aren't on the battlefield, spells, and permanents are colorless$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "setColors", colors: [] }], text: line, offFieldAll: true };
   // Melting: "All lands are no longer snow": the supertype goes in layer 4 (CR 205.4a), lands that become snow later too.
   if (/^All lands are no longer snow$/.test(text)) return { affects: { kind: "filter", types: ["Land"] }, mods: [{ kind: "loseTypes", types: ["Snow"] }], text: line };

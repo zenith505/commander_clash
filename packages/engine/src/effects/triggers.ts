@@ -2,7 +2,7 @@ import { exiledWithNamed } from "../names";
 import { defMv, hasName, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import { isRealKicker, type AbilityBody, type BatchTrigger, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
-import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, pairedWith, power, toughness } from "../cards";
+import { abilitiesOf, cardIdOf, castCardAs, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, pairedWith, power, toughness } from "../cards";
 import { checkAscend, isEmerge, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, spellHasFlash, conspireGranted, casualtyGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, modeRange, withModes } from "../modes";
@@ -2424,11 +2424,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.selfAttacking && (o.zone !== "battlefield" || o.attacking === undefined)) return false;
         if (t.cast.opponentsTurn && ev.controller === s.activePlayer) return false;
         // Its caster's spells this turn, this one included (it was counted as it was cast).
-        if (t.cast.notFirst && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, s.cards[c.card]!)))).length < 2) return false;
+        if (t.cast.notFirst && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, castCardAs(s, c)!)))).length < 2) return false;
         // Sevinne, the Chronoclasm: the first instant or sorcery spell its caster cast from their own graveyard this turn (its
         // card types as it was cast).
         if (t.cast.nth && t.cast.nthFromOwnGraveyard && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && c.ownYard && !!s.cards[c.card] && printedMatches(t.cast!.spell, c.types ? { ...s.cards[c.card]!, types: c.types } : s.cards[c.card]!)).length !== t.cast.nth) return false;
-        if (t.cast.nth && !t.cast.nthFromOwnGraveyard && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, s.cards[c.card]!)))).length !== t.cast.nth) return false;
+        if (t.cast.nth && !t.cast.nthFromOwnGraveyard && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, castCardAs(s, c)!)))).length !== t.cast.nth) return false;
         // Nullstone Gargoyle: "the first noncreature spell of a turn", by any player (its card types as each was cast).
         if (t.cast.nth && t.cast.ofTurn && (ev.copy || (s.castThisTurn ?? []).filter((c) => !!s.cards[c.card] && (c.types ? printedMatches(t.cast!.spell, { ...s.cards[c.card]!, types: c.types }) : printedMatches(t.cast!.spell, s.cards[c.card]!))).length !== t.cast.nth)) return false;
         // Alania: the first spell of one of these kinds its caster has cast this turn, this one (a copy wasn't cast).

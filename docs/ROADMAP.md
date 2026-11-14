@@ -2875,6 +2875,25 @@ line blocks.
    cost picks the Equipment, no ruling); Spectral Searchlight (still out: another player choosing a color inside a mana
    ability); Sanctuary Blade and Psychic Paper (a choice made as the Equipment becomes attached); Rift Elemental (still
    out); Altaïr Ibn-La'Ahad (its short name now reads; memory counters on token copies still missing).
+   Round 369 went on down `npm run popular`, most played first, to card types, supertypes and colors of cards outside the
+   battlefield: Encroaching Mycosynth's "Nonland permanents you control are artifacts in addition to their other types. The
+   same is true for permanent spells you control and nonland permanent cards you own that aren't on the battlefield." and
+   Biotransference's "Creatures you control are artifacts in addition to their other types. The same is true for creature
+   spells you control and creature cards you own that aren't on the battlefield." (a card type in layer 4, CR 613.1d, for
+   cards in every zone, hidden ones too, so Fabricate finds a creature card and Etherium Sculptor makes a creature spell
+   cheaper, rulings; StaticAbility.offFieldCards; a creature entering under an "artifacts enter tapped" effect enters
+   tapped, CR 614.12, rulings); Rootpath Purifier's "Lands you control and land cards in your library are basic." (the
+   supertype in layer 4, CR 205.4a, so a search for a basic land card may find any land card in your library, with no basic
+   land type, rulings; Blood Moon depends on it and stops applying to those lands, CR 613.8a, rulings; offFieldTyped now
+   adds supertypes); Painter's Servant's "All cards that aren't on the battlefield, spells, and permanents are the chosen
+   color in addition to their other colors." (layer 5, CR 613.1e, for every card, spell and permanent whoever owns it, two
+   Servants adding both colors and a Mycosynth Lattice the later of the two winning, CR 613.7, rulings; addColors
+   `chosen`). Spells cast this turn are now judged by the card types they had as they were cast (castCardAs), so Ethersworn
+   Canonist lets a creature spell cast under Biotransference count as an artifact spell. No new prompts. +4, 31,366 of
+   31,936. The compiled text of every other card is unchanged.
+   Out after round 369 (looked at, not done): Hatchery Sliver (still out: a second replicate cost beside the spell's own
+   kicker or replicate); Jasmine Boreal of the Seven, Archelos, Lagoon Mystic, Tamiyo, Collector of Tales, Nephalia Academy,
+   Celestial Reunion and Stalking Leonin (still out, as in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

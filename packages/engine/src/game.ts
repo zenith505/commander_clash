@@ -4068,7 +4068,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.cantPlayUntilTurn = s.cantPlayUntilTurn?.filter((c) => !began.has(c.player));
   if (!s.cantPlayUntilTurn?.length) s.cantPlayUntilTurn = undefined;
   // "Noncreature spells your opponents cast cost {2} more to cast until your next turn" (Elspeth Conquers Death).
-  s.costModsThisTurn = s.costModsThisTurn?.filter((c) => c.untilYourNextTurn && !began.has(c.player));
+  s.costModsThisTurn = s.costModsThisTurn?.filter((c) => c.untilYourNextTurn && !began.has(c.until ?? c.player));
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.filter((r) => !began.has(r.controller));
   // Arlinn, the Pack's Hope: "Until your next turn, each creature you control enters with an additional +1/+1 counter".
   s.entersWithCountersThisTurn = s.entersWithCountersThisTurn?.filter((r) => !(r.untilYourNextTurn && began.has(r.controller)));

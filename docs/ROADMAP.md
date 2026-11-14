@@ -1,6 +1,6 @@
 # Roadmap
 
-31,269 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,275 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,879 of
 9,979 (98%).
 
@@ -2636,6 +2636,32 @@ line blocks.
    effects, CR 616.1, and it overrides every "put onto the battlefield tapped", rulings); Fumble (gaining control of the
    Auras and Equipment that were attached to the returned creature, then attaching all of them to one creature they could
    all be attached to, a new choice).
+   Round 360 went on down `npm run popular` and the "Out after round N" lists, most played first: Will Kenrith's "+2: Until
+   your next turn, up to two target creatures each have base power and toughness 0/3 and lose all abilities." (layers 6
+   and 7b, CR 611.2b, 613.4b; abilities gained later are kept, rulings) and "−2: Target player draws two cards. Until your
+   next turn, instant, sorcery, and planeswalker spells that player casts cost {2} less to cast." (a cost change for the
+   target player's spells, CostMod `who`, lasting until its controller's next turn: GameState.costModsThisTurn `until`);
+   Undercellar Sweep's "Whenever you attack, if you or a player you're attacking has the initiative, you create two 1/1
+   white Soldier creature tokens that are tapped and attacking." (an intervening if, CR 603.4: a player, not a planeswalker
+   or battle, a creature you control attacks, CR 506.3); Soul-Scar Mage's "If a source you control would deal noncombat
+   damage to a creature an opponent controls, put that many -1/-1 counters on that creature instead." (DamageMod
+   `onDamaged`: a replacement, not prevention, the creature's controller ordering it, CR 614.1a, 616.1, rulings); Concerted
+   Effort's "At the beginning of each upkeep, creatures you control gain flying until end of turn if a creature you control
+   has flying. The same is true for fear, first strike, double strike, landwalk, protection, trample, and vigilance."
+   (every landwalk and every protection any of them has, rulings); Coffin Queen's "Put target creature card from a
+   graveyard onto the battlefield under your control. When ~ becomes untapped or you lose control of ~, exile that
+   creature." (one delayed trigger watching ~, the first of the two, CR 603.7c; its leaving counts as losing control,
+   rulings on Seraph); Knowledge Exploitation's "Search target opponent's library for an instant or sorcery card. You may
+   cast that card without paying its mana cost. Then that player shuffles." (cast from that library as it resolves, CR
+   608.2g; it stays there if not). No new prompt: each uses the existing target, keep-tapped, attack, search and free-cast
+   paths, with browser tests for Knowledge Exploitation and Coffin Queen. Bots keep Coffin Queen tapped while the creature it
+   returned is on the battlefield. +6, 31,275 of 31,936 with Lane B's B199 and B200. The compiled text of every other card is unchanged.
+   Out after round 360 (looked at, not done): Rescue from the Underworld ("Return that card and the sacrificed card":
+   the card sacrificed for its cost, returned from whatever public zone it went to, rulings, with no ref for it yet);
+   Reap (still out: a target count set by another target); Choice of Damnations (an opponent chooses a number, a new
+   prompt, then life or "sacrifices all but that many permanents"); Helm of Obedience (mill one at a time until a creature
+   card or X cards, then sacrifice ~ and put one onto the battlefield); Infernal Offering (an opponent chosen for each
+   paragraph, each of them sacrificing and returning in turn, not targets, rulings).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

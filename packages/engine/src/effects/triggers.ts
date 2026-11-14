@@ -1442,8 +1442,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Merieke Ri Berit: "When ~ leaves the battlefield or becomes untapped, destroy that creature": the permanent watched,
     // as the object it was (CR 400.7), the first time it does either (CR 603.7c).
     for (const d of [...(s.delayed ?? [])]) {
-      if (d.when !== "leaves" || !d.orUntaps || d.subject.id !== ev.id || d.subject.zc !== (o.zoneChanges ?? 0)) continue;
+      // Coffin Queen: "When ~ becomes untapped or you lose control of ~", the same way (about the creature it returned).
+      if ((d.when !== "leaves" && d.when !== "lostControl") || !d.orUntaps || d.subject.id !== ev.id || d.subject.zc !== (o.zoneChanges ?? 0)) continue;
       s.delayed = s.delayed!.filter((x) => x !== d);
+      const about = d.about && s.objects[d.about.id];
+      if (d.when === "lostControl" && !(about && about.zone === "battlefield" && (about.zoneChanges ?? 0) === d.about!.zc)) continue;
       s.triggerQueue.push({ sourceId: d.source?.id ?? ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.about ?? { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body, ...(d.source ? { sourceZc: d.source.zc } : {}) });
     }
     add(o, controllerOf(s, o), (e, t) => e === "selfBecomesUntapped" && (!t.inYourUntapStep || (s.step === "untap" && s.activePlayer === controllerOf(s, o))));

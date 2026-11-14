@@ -3968,9 +3968,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Odric, Lunarch Marshal: each keyword creatures you control share, as it resolves (Modification sharedAmongYours).
   // Bleeding Effect: "if a creature card in your graveyard has flying", the cards there as it resolves (rulings).
   const odric = /^[Cc]reatures you control gain ([a-z ]+) until end of turn if a creature (you control|card in your graveyard) has \1\. The same is true for ([a-z ,]+), and ([a-z ]+)\.$/.exec(text.trim());
+  // Concerted Effort: "... The same is true for fear, first strike, double strike, landwalk, protection, trample, and
+  // vigilance.": "landwalk" and "protection" are each of those abilities the creatures have, every one of them (rulings).
   if (odric && !opts.spell) {
-    const keywords = [odric[1]!, ...odric[3]!.split(", "), odric[4]!].map((k) => canonicalKeyword(k));
-    if (keywords.some((k) => !k || /^(Protection|Hexproof from|Toxic)/.test(k) || k.includes("("))) return null;
+    const keywords = [odric[1]!, ...odric[3]!.split(", "), odric[4]!].map((k) => (k === "landwalk" ? "Landwalk" : k === "protection" ? "Protection" : canonicalKeyword(k)));
+    if (keywords.some((k) => !k || (k !== "Protection" && /^(Protection|Hexproof from|Toxic)/.test(k)) || k.includes("("))) return null;
     const yours: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creatures you control" };
     return { targets: [], effects: [{ type: "continuous", what: { ref: "each", filter: yours }, mods: [{ kind: "addKeywords", keywords: keywords as string[], sharedAmongYours: odric[2] === "you control" ? true : "graveyard" }], duration: "endOfTurn" }], text };
   }

@@ -902,6 +902,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.eventPlayer) return eventPlayer !== undefined && s.monarch === eventPlayer;
       return cond.opponent ? s.monarch !== undefined && s.monarch !== you : (s.monarch === you) !== !!cond.not;
     case "initiative":
+      // Undercellar Sweep: "or a player you're attacking": a player (not a planeswalker or battle, CR 506.3) a creature you
+      // control is attacking now.
+      if (cond.orAttacked && s.initiative !== undefined && s.initiative !== you)
+        return s.battlefield.some((id) => { const o = s.objects[id]!; return o.attacking === s.initiative && !o.attackingPermanent && controllerOf(s, o) === you; });
       return s.initiative === you;
     case "completedDungeon": {
       const done = s.players[you]?.completedDungeons ?? [];

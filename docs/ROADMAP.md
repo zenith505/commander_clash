@@ -1,6 +1,6 @@
 # Roadmap
 
-31,337 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,343 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,881 of
 9,979 (99%).
 
@@ -4079,7 +4079,7 @@ line blocks.
    spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (other players' graveyards as yours);
    Pygmy Hippo; Snowblind (Y counts the toughness the effect changes); Glyph of Delusion and Glyph of Reincarnation
    (creatures a Wall blocked this turn); Infernal Denizen; Drought and Brutal Suppression (sacrifices added to costs);
-   Delif's Cube and Acidic Dagger (triggers set up on a target for the turn); Worms of the Earth (lands can't enter the
+   Delif's Cube (done in round B207) and Acidic Dagger (triggers set up on a target for the turn); Worms of the Earth (lands can't enter the
    battlefield); The Prismatic Piper (a color chosen before the game); False Dawn; Tidal Flats (a payment for each attacking
    creature); Backdraft (damage dealt by each sorcery spell); Merseine ("pay enchanted creature's mana cost", activated only
    by that creature's controller); Frankenstein's Monster (done in round B171) (a counter chosen for each exiled card as it enters); Cyclopean
@@ -6040,8 +6040,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   +28 (27,186 of 31,936 with main and Lane A round 197).
 - Known limits there: a replacement effect that adds counters (Hardened Scales) can take a Clockwork past its cap;
   Scars of the Veteran's "If it's a creature" is checked at the end step; bots return or sacrifice only lands already
-  tapped for the Sweep spells and Landslide. Skipped there: Thelon's Chant, Tourach's Chant, Nature's Wrath and
-  Overburden ("the player who put it onto the battlefield", which the engine doesn't track and the rulings say isn't
+  tapped for the Sweep spells and Landslide. Skipped there: Thelon's Chant (done in round B207), Tourach's Chant (done in round B207), Nature's Wrath (done in round B207) and
+  Overburden (done in round B207) ("the player who put it onto the battlefield", which the engine doesn't track and the rulings say isn't
   always its controller).
 - Round B30 (harder skipped cards, least played first): "a card with the same name as ..." (CR 201.2), with the name
   read as the effect resolves or as the object last existed (CR 608.2h; a Clone's copied name counts, a face-down one
@@ -8926,7 +8926,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   for a d20 that splits them between the battlefield and the hand: no search keeps its cards for a later roll yet), Fires
   of Mount Doom ("When you play a card this way": a trigger on playing the card that one exile let you play), Light Up the
   Night (a flashback cost removing X loyalty counters from among your planeswalkers), Kaboom! (a reveal for each of any
-  number of targets) and Delif's Cone stay out.
+  number of targets) and Delif's Cone (done in round B207) stay out.
 - Round B197 (least played first, from the Lane B skip lists): Phyrexian Devourer ("When ~'s power is 7 or greater,
   sacrifice it": a state trigger, not again while it's on the stack, sacrificed even if its power is lower by then, rulings,
   CR 603.8; "Exile the top card of your library: Put X +1/+1 counters on ~, where X is the exiled card's mana value": the
@@ -9027,7 +9027,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   card, CR 702.62b, at once; the last ones removed trigger suspend and vanishing, CR 702.62a, 702.63a). Power of
   Persuasion (its d20 table's "Gain control of it until the end of your next turn", CR 611.2a, 514.2). +6, 31,263 of 31,936
   with B200.
-- Out after round B201 (looked at, not done): Thelon's Chant, Tourach's Chant, Nature's Wrath and Overburden still need
+- Out after round B201 (looked at, not done): Thelon's Chant (done in round B207), Tourach's Chant (done in round B207), Nature's Wrath (done in round B207) and Overburden (done in round B207) still need
   the player who put a permanent onto the battlefield (rulings: not its controller, and not always the controller of the
   spell or ability either: "each player may put", "target opponent may put"); Cleansing (a choice by every player for each
   land, with no rulings on whether the lands are destroyed one by one or at once); Peace Talks and Noxious Vapors stay
@@ -9114,6 +9114,20 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   rulings). Varchild's War-Riders (its cumulative upkeep: an opponent chosen for each age counter, the same one or
   different ones, each creating the Survivor token under their own control, rulings). +5, 31,337 of 31,936 with
   rounds 364 and 365.
+- Round B207 (least played first, from the Lane B skip lists): who puts a permanent onto the battlefield is now tracked
+  (GameObject.putter): the player it enters under (CR 110.2a), a spell's caster (CR 608.3), a land's player (CR 305), a
+  token's creator (CR 111.2), and the controller of the resolving spell or ability for "return it under its owner's
+  control" (Oblivion Ring, Path to Exile's land, persist and undying, Reincarnation, Planar Birth; rulings on Thelon's
+  Chant and Nature's Wrath). Tourach's Chant and Thelon's Chant (3 damage to that player unless they blight 1, CR
+  701.68a-b, nothing to choose without a creature). Nature's Wrath (an Island or blue permanent, a Swamp or black
+  permanent, either one; an Underground Sea triggers both, rulings). Overburden (nontoken creatures; the player who put
+  it there returns a land they control, even when it entered under another player's control). Delif's Cone and Delif's
+  Cube (a delayed "when target creature you control attacks and isn't blocked" for the rest of the turn, CR 603.7c,
+  triggering after blockers are declared, so none when activated later, rulings; "assigns no combat damage this turn",
+  CR 510.1a). +6, 31,343 of 31,936.
+- Out after round B207 (looked at, not done): Noxious Vapors and Grime Gorger (multicolored or multitype cards, no
+  rulings on how they count) and Cleansing (each land's destruction paid off by any player) stay out for the reasons in
+  the earlier lists.
 - Out after round B206 (looked at, not done): Filigree Vector (two "any number of target" sets in one ability: only one
   per ability is modeled), Reap (a target count set by another target as it's cast), Pulmonic Sliver (an optional
   granted "put it on top of its owner's library instead", with several Slivers ordered at once), Day of the Moon (the
@@ -9150,8 +9164,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B180 (looked at, not done): Strax, Sontaran Nurse (a reflexive trigger's target limited to the creatures
   of a player chosen at random), Battletide Alchemist ("you may prevent X of that damage" to any player: a choice for each
   player as each source's damage is dealt), Zethi, Arcane Blademaster (X targets by kicks, then copies of the kicked
-  cards cast), Back from the Brink (paying the mana cost of the card a cost exiled) stay out; Thelon's Chant, Tourach's
-  Chant, Nature's Wrath and Overburden still need who put a permanent onto the battlefield. A "Pay {1}" for Nafs Asp is
+  cards cast), Back from the Brink (paying the mana cost of the card a cost exiled) stay out; Thelon's Chant (done in round B207), Tourach's
+  Chant, Nature's Wrath (done in round B207) and Overburden (done in round B207) still need who put a permanent onto the battlefield. A "Pay {1}" for Nafs Asp is
   offered only while you have priority: in "auto" mode your upkeep doesn't stop for it.
 - Out after round B179 (looked at, not done): Soul Burn ("not more than the amount of {B} spent on X": which of the black
   mana went to X and which to the {2} is the payer's, not tracked), Emblazoned Golem (one mana of each color on its kicker
@@ -9212,7 +9226,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (what a {2/W} symbol adds isn't settled by its rulings), Charmed Pendant (a hybrid symbol's color chosen inside a mana
   ability after the mill), Cleansing (a punisher for each land in turn, any player paying for any land) stay out.
 - Out after round B165 (looked at, not done): Gloom (the tax reaches mana abilities), Twinning Glass, Yixlid Jailer,
-  Decaying Soil, Nature's Wrath, Graceful Takedown (done in round B187), Alpine Moon, Thought Prison (done in round B189), Grimoire Thief (done in round B189) and Kianne, Dean of Substance (done in round B189)
+  Decaying Soil, Nature's Wrath (done in round B207), Graceful Takedown (done in round B187), Alpine Moon, Thought Prison (done in round B189), Grimoire Thief (done in round B189) and Kianne, Dean of Substance (done in round B189)
   stay out for the reasons in the earlier lists. Protective Sphere and Imperiosaur, out after B162 and B67, are done.
 - Out after round B163 (looked at, not done): Words of Waste and Words of Wind (an opponent's discard or each player's
   bounce chosen in the middle of a draw: a pause the draw sequence resumes from only for some replacements), Strax,
@@ -9230,7 +9244,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Grime Gorger (multicolored or multitype cards, no rulings on how they count).
 - Out after round B161 (looked at, not done): Gloom again (activated abilities of white enchantments cost {3} more: the
   tax reaches mana abilities too, for instance a white enchantment creature given one by Cryptolith Rite, and mana
-  abilities take no cost increase here), Tourach's Chant and Thelon's Chant (the player who puts the land onto the
+  abilities take no cost increase here), Tourach's Chant (done in round B207) and Thelon's Chant (done in round B207) (the player who puts the land onto the
   battlefield, even if someone else controls it, rulings: not tracked apart from its controller).
 - Out after round B160 (looked at, not done): Whippoorwill ("can't be prevented or dealt instead to another permanent or
   player": no rule bans redirection of damage to one creature yet), Bösium Strip (casting from the top of a graveyard: a
@@ -9253,7 +9267,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   CR 614.5, 616.1), Selective Snare and Aphetto Dredging (a creature type chosen as it's cast, before targets).
 - Out after round B152 (looked at, not done): Peace Talks ("can't be the targets of spells or activated abilities":
   a triggered source isn't told apart from an activated one when targets are checked).
-- Out after round B151 (looked at, not done): Thelon's Chant and Tourach's Chant (the player who put a land onto the
+- Out after round B151 (looked at, not done): Thelon's Chant (done in round B207) and Tourach's Chant (done in round B207) (the player who put a land onto the
   battlefield isn't tracked), Gloom (the tax would apply to mana abilities too, which take no cost increase here), Spoils
   of War (X as you cast it from the cards in an opponent's graveyard), Selective Snare (a creature type chosen as it's
   cast), Sutured Ghoul (done in round B171) (a characteristic-defining power and toughness from the cards it exiled), Preferred Selection (a
@@ -9300,7 +9314,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   opponent as it's cast, then Fatal Lore's targets; the same wait could carry it).
 - Out after round B140 (looked at, not done): nothing new; the cards still on the B139 and earlier lists are out for the
   reasons given there.
-- Out after round B139 (looked at, not done): Tourach's Chant and Thelon's Chant (the player who put a land onto the
+- Out after round B139 (looked at, not done): Tourach's Chant (done in round B207) and Thelon's Chant (done in round B207) (the player who put a land onto the
   battlefield, not its controller, rulings: not tracked), Jötun Grunt (cumulative upkeep paid in pairs of cards from one
   graveyard), Meddle ("if target spell has only one target and that target is a creature": a condition on the spell's
   targets as it resolves), Drafna's Restoration (done in round B159), Sutured Ghoul (done in round B171), Twinning Glass and Pardic Dragon (done in round B152), still out for the
@@ -9344,7 +9358,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B125 (looked at, not done): Cut the Tethers (done in round B136) (a punisher for each Spirit paid by its owner, all returned
   at once: keepRest has no mana payment), Liquid Fire (done in round B136) (a number chosen as an additional cost as it's cast, CR 601.2b: no
   cast-time number choice yet), Preferred Selection (the two cards looked at are held across a "you may sacrifice ~ and
-  pay" choice), Thelon's Chant and Tourach's Chant (the player who put it onto the battlefield isn't tracked), Wand of Ith
+  pay" choice), Thelon's Chant (done in round B207) and Tourach's Chant (done in round B207) (the player who put it onto the battlefield isn't tracked), Wand of Ith
   and Tainted Specter (a payment or a library-top choice for the revealed or discarded card; both done in round B132).
 - Out after round B123 (looked at, not done): Misfortune (done in round B142), Library of Lat-Nam (done in round B142) and Fatal Lore (done in round B142) (an opponent chooses the mode
   as the spell is cast, CR 700.2e), Kheru Lich Lord (a returned card's abilities and its exile replacement), Fasting (done in round B136) (an
@@ -9451,7 +9465,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B99 (looked at, not done): Cultivator Drone (its mana may also pay a cost with {C} paid as something
   resolves, rulings; such costs don't say what they contain yet), C.A.M.P. (the color of the mana its land produced),
   Mischievous Quanar (turning itself face down), Revealing Wind (done in round B186) and Lumbering Laundry (done in round B186) (looking at face-down creatures),
-  Delif's Cone (a delayed "attacks and isn't blocked" with no combat damage), Winter's Chill (pay {1} or {2} per creature),
+  Delif's Cone (done in round B207) (a delayed "attacks and isn't blocked" with no combat damage), Winter's Chill (pay {1} or {2} per creature),
   Rhystic Cave (a mana ability with "unless any player pays {1}"), Booby Trap (revealed draws), Sasaya (flip by revealing
   seven lands).
 - Out after round B98 (looked at, not done): Teferi, Timeless Voyager (done in round B153) ("Until the end of your next turn, they can't phase

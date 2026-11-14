@@ -528,7 +528,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       s.resolving!.parley = { ...counts, ids: revealed };
       // Game Preserve: every card revealed a creature card, they all enter together under their owners' control.
       if (e.allCreaturesEnter && revealed.length && revealed.every((id) => isType(defOf(s, obj(s, id)), "Creature")))
-        enterTogether(s, () => revealed.forEach((id) => moveObject(s, id, "battlefield", { controller: obj(s, id).owner })));
+        enterTogether(s, () => revealed.forEach((id) => moveObject(s, id, "battlefield", { controller: obj(s, id).owner, putBy: ctx.controller })));
       return;
     }
     case "parleyToGraveyards": {
@@ -1680,7 +1680,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             const extra = to.counters ? Math.max(0, amountNow(s, to.counters.n, ctx)) : 0;
             // "Under target player's control" (Yavimaya Dryad).
             const under = to.under ? players(s, to.under, ctx)[0] : undefined;
-            moveObject(s, id, "battlefield", { controller: under ?? pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id), ...(extra ? { counters: { [to.counters!.counter]: extra } } : {}) });
+            moveObject(s, id, "battlefield", { controller: under ?? pid, putBy: pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id), ...(extra ? { counters: { [to.counters!.counter]: extra } } : {}) });
             if (r.created && obj(s, id).zone === "battlefield") r.created.push(id);
           } else moveObject(s, id, to.zone);
           // Myr Incubator: "Search your library for any number of artifact cards, exile them, then create that many ...":

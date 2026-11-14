@@ -67,7 +67,7 @@ export function returnFromExile(s: GameState, cards: GameObject[], under: (c: Ga
         continue;
       }
       log(s, `${src} returns ${d.name} to the battlefield${tapped ? " tapped" : ""}${transformed ? " transformed" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
-      moveObject(s, c.id, "battlefield", { controller: under(c), ...host, ...(counters ? { [counterIfCreature ? "countersIfCreature" : "counters"]: counters } : {}), ...(loyaltyIfPlaneswalker ? { countersIfPlaneswalker: { loyalty: 1 } } : {}), ...(tapped ? { tapped: true } : {}), ...(transformed ? { face: transformedFace(s, c) } : {}) });
+      moveObject(s, c.id, "battlefield", { controller: under(c), ...(s.resolving ? { putBy: s.resolving.item.controller } : {}), ...host, ...(counters ? { [counterIfCreature ? "countersIfCreature" : "counters"]: counters } : {}), ...(loyaltyIfPlaneswalker ? { countersIfPlaneswalker: { loyalty: 1 } } : {}), ...(tapped ? { tapped: true } : {}), ...(transformed ? { face: transformedFace(s, c) } : {}) });
     }
   });
 }
@@ -1250,7 +1250,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const c = s.objects[link.id];
       if (c?.zone !== "exile" || (c.zoneChanges ?? 0) !== link.zc) return;
       log(s, `${defOf(s, c).name} returns to the battlefield (${src}).`);
-      moveObject(s, c.id, "battlefield", { controller: c.owner });
+      moveObject(s, c.id, "battlefield", { controller: c.owner, putBy: ctx.controller });
       return;
     }
     case "soulbond":
@@ -1262,7 +1262,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const cards = [...(me && (me.zoneChanges ?? 0) === ctx.sourceZc ? [me] : []), ...foundWith(s, ctx.lki, ctx.sourceId)].filter((o) => o.zone === "graveyard");
       if (!cards.length) return;
       log(s, `${src} returns to the battlefield${e.counter ? ` with a ${e.counter} counter on it` : ""}${cards.length > 1 ? ` (${cards.map((o) => defOf(s, o).name).join(", ")})` : ""}.`);
-      enterTogether(s, () => cards.forEach((o) => moveObject(s, o.id, "battlefield", { controller: o.owner, ...(e.counter ? { counters: { [e.counter]: 1 } } : {}) })));
+      enterTogether(s, () => cards.forEach((o) => moveObject(s, o.id, "battlefield", { controller: o.owner, putBy: ctx.controller, ...(e.counter ? { counters: { [e.counter]: 1 } } : {}) })));
       return;
     }
     case "unearth": {
@@ -2587,7 +2587,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const ids = cards.map((c) => c.id);
         enterTogether(s, () => {
           for (const c of cards) {
-            moveObject(s, c.id, "battlefield", { controller: e.ownersControl ? c.owner : p.id, ...(e.counters ? { counters: { ...e.counters } } : {}), ...(e.faceDown ? { faceDown: e.faceDown } : {}), ...(e.tapped || e.attacking ? { tapped: true } : {}), ...(e.alsoMods ? { entersAs: e.alsoMods, entersAsBy: { controller: p.id, source: src } } : {}) }); // as it enters (CR 614.12)
+            moveObject(s, c.id, "battlefield", { controller: e.ownersControl ? c.owner : p.id, putBy: p.id, ...(e.counters ? { counters: { ...e.counters } } : {}), ...(e.faceDown ? { faceDown: e.faceDown } : {}), ...(e.tapped || e.attacking ? { tapped: true } : {}), ...(e.alsoMods ? { entersAs: e.alsoMods, entersAsBy: { controller: p.id, source: src } } : {}) }); // as it enters (CR 614.12)
             // Attacking as it enters, before its enters abilities trigger (CR 508.4).
             if (attack && (c.zone as string) === "battlefield" && objIsType(s, c, "Creature")) {
               c.attacking = attack.player;
@@ -3237,7 +3237,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         enterTogether(s, () => {
           for (const o of list) {
             log(s, e.faceDown === "cyberman" ? `${src} puts a card onto the battlefield face down under ${player(s, under(o)).name}'s control: it's a 2/2 Cyberman artifact creature.` : e.faceDown === "plain" ? `${src} returns a card to the battlefield face down under ${player(s, under(o)).name}'s control: it's a 2/2 creature.` : `${src} returns ${defOf(s, o).name} to the battlefield face down under ${player(s, under(o)).name}'s control: it's a Forest land.`);
-            moveObject(s, o.id, "battlefield", { controller: under(o), faceDown: e.faceDown === "plain" ? "morph" : e.faceDown });
+            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: ctx.controller, faceDown: e.faceDown === "plain" ? "morph" : e.faceDown });
             if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
           }
         });
@@ -3297,7 +3297,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
               continue;
             }
             log(s, `${src} returns ${d.name} to the battlefield${face ? " transformed" : ""} attached to ${auraHostName(s, host)}.`);
-            moveObject(s, o.id, "battlefield", { controller: under(o), ...(face ? { face } : {}), ...host });
+            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: ctx.controller, ...(face ? { face } : {}), ...host });
             continue;
           }
           if (e.attachToEnchanted) {
@@ -3346,7 +3346,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (equipHosts?.has(o.id)) {
             const host = equipHosts.get(o.id)!;
             log(s, `${src} returns ${d.name} to the battlefield${host ? ` attached to ${defOf(s, obj(s, host)).name}` : ", unattached"}.`);
-            moveObject(s, o.id, "battlefield", { controller: under(o), ...(host ? { attachTo: host } : {}) });
+            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: ctx.controller, ...(host ? { attachTo: host } : {}) });
             if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
             continue;
           }
@@ -3377,7 +3377,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // Vehicle or a creature card is what the card is as it's put there.
           const also = e.alsoMods && (!e.alsoModsIfSubtype || characteristics(s, o).subtypes.includes(e.alsoModsIfSubtype)) && (!e.alsoModsIfCreature || objIsType(s, o, "Creature")) ? e.alsoMods : undefined;
           const entersAs = [...(e.entersAs && (ctx.x ?? 0) >= e.entersAs.x ? e.entersAs.mods : []), ...(also ?? [])];
-          moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(entersAs.length ? { entersAs, ...(also ? { entersAsBy: { controller: ctx.controller, source: src, ...(e.alsoModsWhileCounter ? { whileCounter: e.alsoModsWhileCounter } : {}) } } : {}) } : {}), ...(e.counters ? e.countersIfSubtype ? { countersIfSubtype: { subtype: e.countersIfSubtype, counters: e.counters } } : { [e.countersIfCreature ? "countersIfCreature" : "counters"]: e.counters } : {}), ...(e.countersFromLast ? { counters: { [e.countersFromLast.kind]: Math.max(0, (s.lastKnown?.[o.id]?.counters?.[e.countersFromLast.kind] ?? 0) + e.countersFromLast.plus) } } : {}), ...(e.countersAmount ? { counters: { [e.countersAmount.kind]: Math.max(0, amountNow(s, e.countersAmount.n, ctx)) } } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
+          moveObject(s, o.id, "battlefield", { controller: under(o), putBy: ctx.controller, tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(entersAs.length ? { entersAs, ...(also ? { entersAsBy: { controller: ctx.controller, source: src, ...(e.alsoModsWhileCounter ? { whileCounter: e.alsoModsWhileCounter } : {}) } } : {}) } : {}), ...(e.counters ? e.countersIfSubtype ? { countersIfSubtype: { subtype: e.countersIfSubtype, counters: e.counters } } : { [e.countersIfCreature ? "countersIfCreature" : "counters"]: e.counters } : {}), ...(e.countersFromLast ? { counters: { [e.countersFromLast.kind]: Math.max(0, (s.lastKnown?.[o.id]?.counters?.[e.countersFromLast.kind] ?? 0) + e.countersFromLast.plus) } } : {}), ...(e.countersAmount ? { counters: { [e.countersAmount.kind]: Math.max(0, amountNow(s, e.countersAmount.n, ctx)) } } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
           // Attacking as it enters, before its enters abilities trigger (CR 508.4).
           if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
             o.attacking = attack!.player;
@@ -3662,7 +3662,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (ids.length) log(s, `${p.name} returns ${ids.map((id) => defOf(s, obj(s, id)).name + (hosts.has(id) ? ` (enchanting ${auraHostName(s, hosts.get(id)!)})` : "")).join(", ")} from their graveyard to the battlefield${e.tapped ? ", tapped" : ""}.`);
         enterTogether(s, () => {
           // Drana, the Last Bloodchief: "The creature is a Vampire in addition to its other types", as it enters (CR 614.12) and for good.
-          ids.forEach((id) => moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.countersN === undefined ? { ...e.counters } : Object.fromEntries(Object.keys(e.counters).map((k) => [k, Math.max(0, amountNow(s, e.countersN!, ctx))])) } : {}), ...(e.alsoMods ? { entersAs: e.alsoMods, entersAsBy: { controller: ctx.controller, source: src } } : {}), ...hosts.get(id) }));
+          ids.forEach((id) => moveObject(s, id, "battlefield", { controller: p.id, ...(e.chooser ? { putBy: ctx.controller } : {}), ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.countersN === undefined ? { ...e.counters } : Object.fromEntries(Object.keys(e.counters).map((k) => [k, Math.max(0, amountNow(s, e.countersN!, ctx))])) } : {}), ...(e.alsoMods ? { entersAs: e.alsoMods, entersAsBy: { controller: ctx.controller, source: src } } : {}), ...hosts.get(id) }));
         });
         // Revival Experiment: "You lose 3 life for each card returned this way": the cards now on the battlefield.
         if (e.lifeEach) {
@@ -3828,7 +3828,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // black Zombies ...". They are already that as they enter, before their enters abilities trigger (rulings on Chainer,
       // Dementia Master's like ability).
       enterTogether(s, () => {
-        ids.forEach((id) => moveObject(s, id, "battlefield", { controller: under(obj(s, id)), tapped: e.tapped, ...hosts.get(id), ...(e.counters ? { counters: e.counters } : {}), ...(e.alsoMods ? { entersAs: e.alsoMods, entersAsBy: { controller: ctx.controller, source: src } } : {}) }));
+        ids.forEach((id) => moveObject(s, id, "battlefield", { controller: under(obj(s, id)), ...(e.byYou ? { putBy: ctx.controller } : {}), tapped: e.tapped, ...hosts.get(id), ...(e.counters ? { counters: e.counters } : {}), ...(e.alsoMods ? { entersAs: e.alsoMods, entersAsBy: { controller: ctx.controller, source: src } } : {}) }));
       });
       const entered = ids.filter((id) => obj(s, id).zone === "battlefield");
       // "They gain haste until end of turn" (Wake the Past): the permanents they became.
@@ -4270,7 +4270,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         enterTogether(s, () => {
           for (const c of back) {
             log(s, `${src} returns a card to the battlefield face down under ${player(s, e.under === "owner" ? c.owner : ctx.controller).name}'s control.`);
-            moveObject(s, c.id, "battlefield", { controller: e.under === "owner" ? c.owner : ctx.controller, faceDown: "morph" });
+            moveObject(s, c.id, "battlefield", { controller: e.under === "owner" ? c.owner : ctx.controller, putBy: ctx.controller, faceDown: "morph" });
           }
         });
         s.resolving!.flickeredBack = back.filter((c) => c.zone === "battlefield").map((c) => c.id);

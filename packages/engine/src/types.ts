@@ -375,6 +375,13 @@ export interface GameObject {
    * onto the battlefield with this ability" (Kodama of the East Tree). Gone when it leaves (CR 400.7).
    */
   putBy?: { id: ObjectId; zc: number };
+  /**
+   * The player who put it onto the battlefield (Tourach's Chant, Nature's Wrath, Overburden: "whenever a player puts ...
+   * onto the battlefield, ... that player"), not always the player it entered under (rulings): the player following the
+   * instruction that put it there, the caster of a permanent spell (CR 608.3), the player playing a land (CR 305.1), a
+   * token's creator (CR 111.2). Set as it enters; gone when it leaves (CR 400.7).
+   */
+  putter?: PlayerId;
   /** A Class's level (CR 716.2a-b), a designation it keeps until it leaves the battlefield; unset is level 1 (716.2d). */
   classLevel?: number;
   /** A Case's solved designation (CR 719.3b), kept until it leaves the battlefield; not a copiable value. */
@@ -2446,7 +2453,7 @@ export interface GameState {
    */
   /** Palace Jailer: cards exiled "until an opponent becomes the monarch", an opponent of `controller` (CR 610.3). */
   exiledUntilMonarch?: { controller: PlayerId; source: string; cards: { id: ObjectId; zc: number }[] }[];
-  untilReturns?: { auras: { id: ObjectId; zc: number; under: PlayerId; source: string; asking?: true }[]; returned: ObjectId[] };
+  untilReturns?: { auras: { id: ObjectId; zc: number; under: PlayerId; source: string; asking?: true; /** Who puts it back: the controller of the exile effect (GameObject.putter). */ by?: PlayerId }[]; returned: ObjectId[] };
   /** Legends chosen to keep under the legend rule (CR 704.5j), until the state-based actions are next performed. */
   legendKeep?: ObjectId[];
   /** The replacement a player chose for the game loss they're about to have (CR 616.1): an option of loseReplacements. */

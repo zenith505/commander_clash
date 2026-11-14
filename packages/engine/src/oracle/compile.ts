@@ -50,6 +50,7 @@ import { roundB202Line } from "./laneb202";
 import { roundB204Line } from "./laneb204";
 import { roundB205Line } from "./laneb205";
 import { roundB206Chapter, roundB206Line } from "./laneb206";
+import { roundB207Line } from "./laneb207";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2128,6 +2129,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB205Line(line, raw, out, isSpell)) continue;
     // Kaya, Ghost Assassin, Drach'Nyen (round B206).
     if (roundB206Line(line, raw, out, isSpell)) continue;
+    // Tourach's Chant, Thelon's Chant, Nature's Wrath, Overburden, Delif's Cone, Delif's Cube (round B207).
+    if (roundB207Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

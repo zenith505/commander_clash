@@ -6,6 +6,7 @@ import { parseTrigger } from "./triggers";
 import { parseBody } from "./body";
 import type { Ctx } from "./body";
 import { roundB203Sentence } from "./laneb203";
+import { roundB204Spell } from "./laneb204";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -108,5 +109,5 @@ export function roundB201Spell(text: string): AbilityBody | null | undefined {
     const control: Effect = { type: "continuous", what: { ref: "target", index: 0 }, mods: [{ kind: "control" }], duration: "endOfYourNextTurn" };
     return { ...body, effects: [...body.effects.slice(0, 3), { ...last, effects: [control] }], text };
   }
-  return undefined;
+  return roundB204Spell(text);
 }

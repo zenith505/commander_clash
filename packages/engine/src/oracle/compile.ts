@@ -47,6 +47,7 @@ import { markOnlyWalls, roundB199Line } from "./laneb199";
 import { roundB200Line } from "./laneb200";
 import { roundB201Line } from "./laneb201";
 import { roundB202Line } from "./laneb202";
+import { roundB204Line } from "./laneb204";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2113,6 +2114,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB201Line(line, raw, out, isSpell)) continue;
     // Tide of War, Moorland Rescuer, Loki Laufeyson, Darigaaz Reincarnated (round B202).
     if (roundB202Line(line, raw, out, isSpell)) continue;
+    // Round B204.
+    if (roundB204Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

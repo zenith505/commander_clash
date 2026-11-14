@@ -308,7 +308,7 @@ line blocks.
    Vitu-Ghazi, Quiet Speculation, Breaking of the Fellowship (done in round 276), Stoic Farmer, See the Unwritten, Razorlash
    Transmogrant, Auntie Blyte, Nimble Trapfinder (done in round 324), Willie Lumpkin, Ajani Unrelenting, Kitt Kanto, Ellie, Azor, Oko the
    Ringleader, Fiery Annihilation, Spell Crumple (done in round 325); past rank 12,200: Academy Loremaster (done in round 326), Cait, Celebrate the Harvest (done in round 324),
-   Cephalid Constable, Choice of Damnations, Cut Propulsion and Wisecrack (done in round 276; "deals damage to itself equal to its
+   Cephalid Constable, Choice of Damnations (done in round B204), Cut Propulsion and Wisecrack (done in round 276; "deals damage to itself equal to its
    power"), Evin, Ghired (populate tapped and attacking), Last-Ditch Effort, Misfortune Teller (done in round 329), Peer Pressure (done in round 325), Reckless
    Blaze, Resplendent Marshal, Sporogenic Infection, Ward of Bones (done in round B191). Round 181 went down from rank 11,770 to about rank
    12,330 (Ugin's Conjurant and Polukranos, Unchained (damage prevented by removing +1/+1 counters), Hinder (top or
@@ -325,7 +325,7 @@ line blocks.
    Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order (done in round 324),
    Scheming Fence, Oath of Lieges (done in round B143), Helm of Obedience, Concerted Effort, Belbe's Portal (done in round 324), Edgewall Innkeeper, Simic
    Manipulator, Endless Whispers, Burn from Within (done in round 325), Skyfire Phoenix (done in round 276), Contagion (done in round 325), Gutter Grime, Coffin Queen, Genesis
-   Storm, Grim Return (done in round 326), Infernal Offering, Varolz, Undercellar Sweep, Wave of Vitriol, Martyrdom, Soul-Scar Mage,
+   Storm, Grim Return (done in round 326), Infernal Offering (done in round B204), Varolz, Undercellar Sweep, Wave of Vitriol, Martyrdom, Soul-Scar Mage,
    Remembrance, Spy Network (done in round B186), Dimir Doppelganger (done in round 362), Jailbreak, Inverter of Truth (done in round 329), Immovable Rod (done in round B186), Hypergenesis, Soul
    Transfer and the rest of the 222 still unsupported in that range; past it: Phytohydra (damage replaced by +1/+1
    counters even when it can't be prevented, which needs its controller's order against prevention shields), Intimidation
@@ -2170,7 +2170,7 @@ line blocks.
    Out after round 283 (looked at, not done): Squall, Gunblade Duelist (an intervening if over the creatures attacking
    one opponent and a chosen number); Barroom Brawl ("the opponent to your left", then that player may copy it with new
    targets); Vault 11: Voter's Dilemma (secret votes for up to one creature); Allure of the Unknown (an opponent exiles
-   one of the revealed cards and may cast it free); Hew the Entwood (sacrifice any number of lands as it resolves);
+   one of the revealed cards and may cast it free); Hew the Entwood (done in round B204) (sacrifice any number of lands as it resolves);
    Rory Williams and Sinister Concierge (exiling the spell or the dying card with time counters, gaining suspend);
    Aradesh, the Founder ("if it enlisted a creature this combat"); Tetsuo, Imperial Champion (the greatest mana value
    among attached Equipment); Kotose, the Silent Spider; The Toymaker's Trap; Expert-Level Safe (secret numbers).
@@ -2658,9 +2658,9 @@ line blocks.
    returned is on the battlefield. +6, 31,275 of 31,936 with Lane B's B199 and B200. The compiled text of every other card is unchanged.
    Out after round 360 (looked at, not done): Rescue from the Underworld ("Return that card and the sacrificed card":
    the card sacrificed for its cost, returned from whatever public zone it went to, rulings, with no ref for it yet);
-   Reap (still out: a target count set by another target); Choice of Damnations (an opponent chooses a number, a new
+   Reap (still out: a target count set by another target); Choice of Damnations (done in round B204) (an opponent chooses a number, a new
    prompt, then life or "sacrifices all but that many permanents"); Helm of Obedience (mill one at a time until a creature
-   card or X cards, then sacrifice ~ and put one onto the battlefield); Infernal Offering (an opponent chosen for each
+   card or X cards, then sacrifice ~ and put one onto the battlefield); Infernal Offering (done in round B204) (an opponent chosen for each
    paragraph, each of them sacrificing and returning in turn, not targets, rulings).
    Round 361 went on down `npm run popular` and the "Out after round N" lists, most played first: Survivor's Med Kit's
    "{1}, {T}: Choose one that hasn't been chosen — • Stimpak — Draw a card. • Fancy Lads Snack Cakes — Create a Food
@@ -3692,7 +3692,7 @@ line blocks.
    or sacrifice a permanent", mandatory, then the land cards put into graveyards this way); Detective's Phoenix (bestow
    with collect evidence, cast from the graveyard with bestow); Hand of Vecna (done in round 321) ("equipped creature or a creature you
    control named Vecna", chosen as it resolves, and a life-per-card equip cost); Saruman of Many Colors (its ward needs a
-   discard of a kind, but its second-spell trigger is the harder part); Infernal Offering (both modes choose an
+   discard of a kind, but its second-spell trigger is the harder part); Infernal Offering (done in round B204) (both modes choose an
    opponent first).
    Round 307 took cards back off the "Out after round N" lists, most played first: "−6: Choose left or right. Each player
    gains control of all nonland permanents other than ~ controlled by the next player in the chosen direction"
@@ -4103,7 +4103,7 @@ line blocks.
    exiled card cast free only if it's an instant with mana value 2 or less, else into your hand); Meeting of the Five
    (spells with exactly three colors, and mana only for them); Essence of the Wild (creatures entering as a copy of it,
    ordered with other copy effects, CR 616.1); Ice Cave (any other player may pay a spell's mana cost to counter it);
-   Journey to the Lost City (a d20 table over the four exiled cards); Ghastly Conscription (manifesting a shuffled
+   Journey to the Lost City (done in round B204) (a d20 table over the four exiled cards); Ghastly Conscription (manifesting a shuffled
    face-down pile); Soulflayer (done in round B182) and Rayami, First of the Fallen (keywords of cards exiled by delve or with blood counters,
    as Urborg Scavengers).
    Round 282 took earlier skips from the top: "choose left or right" and "each player may attack only the nearest
@@ -4915,7 +4915,7 @@ line blocks.
      Stick Together (done in round 302)'s party, Single Combat's "can't cast creature or planeswalker spells until the end of your next
      turn".
    - "Return a creature card from your graveyard to the battlefield" (chosen, not targeted) works, also for each player
-     (Exhume, Crypt Champion); still out: Infernal Offering (its other part), "at random"
+     (Exhume, Crypt Champion); still out: Infernal Offering (done in round B204) (its other part), "at random"
      (Tomb Tyrant), "with total mana value N or less" (Lively Dirge), "where X is ..." outside a
      spell's own count, and cards blocked on other lines (Tayam, Tyvar, Sauron).
    Left from the round after Cataclysm (distribute, step-by-step becomes, Cover of Winter, flavor words, Threaten,
@@ -6855,7 +6855,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Carrier of the Flame ("if a creature card left your graveyard this turn", and casting it from the graveyard as a
   trigger resolves), Rinoa, Angel Wing (returning one of the attacking creatures that died, from any owner's graveyard),
   Tide of War (done in round B202) ("Whenever one or more creatures block" and sacrifices by each controller), Countersculpt (done in round B179) ("behold a Jace
-  or pay {1}"), Druid of the Emerald Grove (a d20 that splits the searched cards), Sphinx's Approach ("exile ~ and four
+  or pay {1}"), Druid of the Emerald Grove (done in round B204) (a d20 that splits the searched cards), Sphinx's Approach ("exile ~ and four
   cards named ~"), Faces of the Past (done in round B154) (creatures that share a creature type with it), Diaochan, Artful Beauty (done in round B141) (a target
   of an opponent's choice).
 - Round B66 (eight from the B10 list, and Stormwild Capridor, Kentaro, the Smiling Cat, Majestic Myriarch and
@@ -8770,7 +8770,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ("If X is 1, ... If X is 4 or more, do all of the above.": the X it was cast with, 0 if cast without paying its mana cost,
   CR 107.3a, rulings; the player is chosen as it resolves, not targeted, and that player chooses which creature they return,
   none if they control none, CR 608.2d; a browser test). +6, 31,146 of 31,936 with B188 to B190.
-- Out after round B191 (looked at, not done): Filigree Vector, Lodestone Bauble, Infernal Offering and Open the Omenpaths (done in round 362)
+- Out after round B191 (looked at, not done): Filigree Vector, Lodestone Bauble, Infernal Offering (done in round B204) and Open the Omenpaths (done in round 362)
   stay out for the reasons in the earlier lists.
 - Round B192 (least played first, from the Lane B skip lists): The Kingpin of Crime ("Whenever you attack, you may pay 2
   life. If you do, until end of turn, creatures you control with toughness greater than their power assign combat damage
@@ -8868,7 +8868,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature to ~": every target the same creature, ~ a legal target for each, rulings). Meticulous Excavation ("If it has
   unearth, instead exile it, then return that card to its owner's hand": unearth as it resolves, CR 702.84a; an unearthed
   creature ends up in its owner's hand, rulings). +8, 31,200 of 31,936 with B189 to B195 and rounds 348 to 351.
-- Out after round B196 (looked at, not done): Druid of the Emerald Grove (the basic lands searched for and revealed wait
+- Out after round B196 (looked at, not done): Druid of the Emerald Grove (done in round B204) (the basic lands searched for and revealed wait
   for a d20 that splits them between the battlefield and the hand: no search keeps its cards for a later roll yet), Fires
   of Mount Doom ("When you play a card this way": a trigger on playing the card that one exile let you play), Light Up the
   Night (a flashback cost removing X loyalty counters from among your planeswalkers), Kaboom! (a reveal for each of any
@@ -9018,6 +9018,24 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   died from any owner's graveyard, "Do this only once each turn"), Sanctuary Blade ("As ~ becomes attached to a creature,
   choose a color": a choice in the middle of attaching, every way it can become attached) and Kodama of the Center Tree stay
   out for the reasons in the earlier lists.
+- Round B204 (least played first, from the Lane B skip lists): Journey to the Lost City (the four cards its upkeep trigger
+  exiles, then a d20: a land card from among them, a Wolf with a counter for each creature card among them, or every
+  permanent card exiled with it, CR 607.2a, 400.7, at once, then it's sacrificed). Lavabrink Floodgates (the upkeep's
+  player may put a doom counter on it or remove one, removing offered only with one there, CR 122.8; the check for three
+  as the trigger resolves; sacrificed by its controller only if still controlled, and only that sacrifice deals the 6
+  damage, CR 603.12, rulings; bots weigh the creatures that would die). Choice of Damnations (the target opponent chooses
+  the number, any number, rulings; you then choose life loss or "all but that many permanents of their choice"; bots pick
+  as much as their life safely allows, and as caster the worse for the target). Infernal Offering (two opponent choices,
+  the same one allowed; only those who sacrificed draw, CR 608.2c; your creature card returns first, then theirs, each
+  under its owner's control). Hew the Entwood (lands sacrificed as it resolves, not a cost, rulings; X revealed; the
+  artifact cards chosen enter, then the land cards tapped in a second event, artifact lands with the lands; the rest to the
+  bottom at random). Druid of the Emerald Grove (the basic lands found stay in the library, revealed, while the d20 is
+  rolled, CR 701.23, 706; then into your hand, one onto the battlefield tapped and the other into your hand by your
+  choice, asked only for two different names, one found alone entering as with Cultivate, rulings, or both tapped; "20+"
+  and "9 or less" count modified results). +6, 31,316 of 31,936 with rounds 362 and 363. `npm run typecheck` now gives tsc a 4 GB heap: the engine's
+  check had reached Node's default limit of about 2 GB (2.36 GB on main) and ran out in a fresh clone.
+- Out after round B204 (looked at, not done): Rinoa, Angel Wing, Sanctuary Blade and Kodama of the Center Tree stay out
+  for the reasons in the earlier lists.
 - Out after round B192 (looked at, not done): Garruk, Curse Breaker (its −4: how often "whenever one or more creatures
   attack one of your opponents" triggers when creatures attack two of them still isn't settled by rulings), Charmed
   Pendant (a hybrid symbol of the milled card adds one of its colors: a choice in the middle of a mana ability), Ulamog's
@@ -9465,7 +9483,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   batch event for damage), Cellar Door (done in round B137) ("the bottom card of their library into their graveyard"), Swallow Whole (done in round B113) (the
   creature tapped for the additional cost), Betrothed of Fire and Bloodfire Infusion (done in round B112) ("Sacrifice enchanted creature" as
   a cost), Rasputin, the Oneiromancer (done in round B122) (a mana ability whose X is the counters removed), Arcee, Sharpshooter (the back
-  face's "that many" targets), Lavabrink Floodgates (each player's own may), Lurebound Scarecrow (done in round B112) (a state trigger bound
+  face's "that many" targets), Lavabrink Floodgates (done in round B204) (each player's own may), Lurebound Scarecrow (done in round B112) (a state trigger bound
   to the chosen color), Grim Contest (done in round B113) (each deals damage equal to its toughness to the other: a fight by toughness).
 - Out after round B77 (looked at, not done): Consecrate Land (done in round B122) ("can't be enchanted by other Auras": no rule for it yet),
   Corpseweft (done in round B128) ("Exile one or more creature cards from your graveyard" as a cost, X from how many), Ruin in Their Wake

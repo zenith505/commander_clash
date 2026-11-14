@@ -880,6 +880,14 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "youAndEventPlayer":
       return s.turnOrder.filter((p) => (p === ctx.controller || p === ctx.event?.player) && !player(s, p).lost);
+    case "youAndChosenPlayer": {
+      const p = s.resolving?.chosen?.player;
+      return apnap(s, livingPlayers(s).filter((x) => x === ctx.controller || x === p));
+    }
+    case "sacrificedThisWay": {
+      const by = new Set((s.resolving?.sacrificedThisWay ?? []).map((x) => x.controller));
+      return apnap(s, livingPlayers(s).filter((x) => by.has(x)));
+    }
     case "youAndEventPlayers":
       return apnap(s, livingPlayers(s).filter((p) => p === ctx.controller || !!ctx.event?.players?.includes(p)));
     case "attackingPlayer":
@@ -1732,6 +1740,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileTop":
     case "suspendExiledTop":
     case "putFromExiledTop":
+    case "putSearchFound":
     case "returnDiedThisWay":
     case "revealTopToHand":
     case "duelReveal":

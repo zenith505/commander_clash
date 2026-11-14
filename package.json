@@ -9,7 +9,7 @@
   "scripts": {
     "build:cards": "tsx tools/build-cards.ts",
     "test": "npm run test -w @cc/engine",
-    "typecheck": "tsc -p packages/engine && tsc -p apps/web",
+    "typecheck": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc -p packages/engine && node --max-old-space-size=4096 node_modules/typescript/bin/tsc -p apps/web",
     "dev": "npm run dev -w @cc/web",
     "simulate": "tsx tools/simulate.ts",
     "coverage": "tsx tools/coverage.ts",

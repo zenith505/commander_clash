@@ -1199,7 +1199,7 @@ export function moveObject(
   // "Instead exile it with a void counter on it" (Dauthi Voidwalker).
   if (yardExile?.counter && to === "exile") o.counters[yardExile.counter] = 1;
   // Ravenloft Adventurer: "instead exile it and put a hit counter on it".
-  if (insteadOfDying?.x.counter && to === "exile") o.counters[insteadOfDying.x.counter] = (o.counters[insteadOfDying.x.counter] ?? 0) + 1;
+  if (insteadOfDying?.x.counter && to === "exile") o.counters[insteadOfDying.x.counter] = (o.counters[insteadOfDying.x.counter] ?? 0) + (insteadOfDying.x.counterN ?? 1);
   o.controller = opts.controller ?? o.owner;
   o.seenController = undefined;
   o.attacking = undefined;
@@ -10748,6 +10748,7 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
     throw new RulesError("choose cards with different mana values");
   if (pend.distinctPowers && new Set(found.map((id) => characteristics(s, obj(s, id)).power)).size !== found.length) throw new RulesError("choose cards with different powers");
   if (pend.totalMv !== undefined && found.reduce((n, id) => n + defMv(defOf(s, obj(s, id))), 0) > pend.totalMv) throw new RulesError(`choose cards with total mana value ${pend.totalMv} or less`);
+  if (pend.totalPower !== undefined && found.reduce((n, id) => n + characteristics(s, obj(s, id)).power, 0) > pend.totalPower) throw new RulesError(`choose cards with total power ${pend.totalPower} or less`);
   if (pend.cardTypes && found.length && cardTypesAmong(s, found) < pend.cardTypes) throw new RulesError(`choose cards with ${pend.cardTypes} or more card types among them, or none`);
   if (pend.shareLandType && !shareLandType(found.map((id) => defOf(s, obj(s, id)))))
     throw new RulesError("choose cards that share a land type");
@@ -11228,6 +11229,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const st = r.scratch?.alternate;
     if (!st) throw new RulesError("nothing to choose");
     st.pick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "liarGuess") {
+    // Liar's Pendulum: the guess is announced (rulings).
+    const st = r.scratch?.liarGuess;
+    if (!st || (choice !== "in" && choice !== "out")) throw new RulesError("nothing to choose");
+    st.guess = choice;
+    log(s, `${p.name} guesses ${pend.labels?.[pend.options.indexOf(choice)] ?? choice} (${pend.source}).`);
     continueResolution(s);
     return;
   }
@@ -13058,6 +13068,14 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     const best = Math.max(0, ...opps.filter((d) => free(o, d) || d === a.defender).map(obeyed));
     if ((a.planeswalker !== undefined ? 0 : obeyed(a.defender)) < best)
       throw new RulesError(`${defOf(s, o).name} is goaded: it must attack a player other than ${by.map((p) => player(s, p).name).join(" or ")} if able`);
+  }
+  // Nahiri, the Unforgiving: "attacks a player each combat if able": attacking a planeswalker or battle doesn't obey it, so
+  // one that could attack a player without a cost must attack a player (CR 508.1d). One that also has to attack a
+  // planeswalker (Gideon) obeys as many requirements either way.
+  for (const a of attacks) {
+    const o = obj(s, a.attacker);
+    if (a.planeswalker === undefined || !characteristics(s, o).attacksPlayerIfAble || walkers.get(o.id)?.length) continue;
+    if (opps.some((d) => free(o, d))) throw new RulesError(`${defOf(s, o).name} must attack a player if able`);
   }
   // "Attacks that opponent this turn if able" (encore): it attacks one of those players, not a planeswalker, if it can
   // (CR 508.1d). One that can't attack them, or only by paying a cost, needn't attack at all (encore rulings).

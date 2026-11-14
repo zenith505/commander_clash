@@ -665,7 +665,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           filter,
           sourceId: id ?? "",
           sourceCardId: o ? cardIdOf(o) : ctx.sourceDef.oracleId,
-          body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." },
+          body: { targets: e.targets ?? [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." },
           turn: s.turn,
           ...(e.cascade ? { cascade: true as const } : {}),
           ...(e.onlyOpponentOrTheirs ? { onlyOpponentOrTheirs: true as const } : {}),
@@ -679,6 +679,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           ...(e.alt ? { alt: e.alt } : {}),
           ...(e.loyalty ? { loyalty: e.loyalty } : {}),
           ...(ctx.x ? { x: ctx.x } : {}),
+          // Loki Laufeyson: its power as each spell is cast, the source as the object that activated it (round B202), even if
+          // it left the battlefield before this resolved.
+          ...(e.mvMaxSourcePower && o ? { mvMaxPowerOf: { id: o.id, zc: item?.kind !== "spell" && ctx.sourceZc !== undefined ? ctx.sourceZc : (o.zoneChanges ?? 0) } } : {}),
         });
       return;
     }

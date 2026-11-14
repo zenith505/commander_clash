@@ -9,6 +9,7 @@ import { parseSearchFilter } from "./search";
 import { parseCount } from "./counts";
 import { parseToken } from "./tokens";
 import { round318Trigger } from "./round318";
+import { parseChanges } from "./sentence";
 const capital = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
 const TRIGGERS: [RegExp, TriggerEvent][] = [
@@ -1211,7 +1212,12 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // Dack Fayden's emblem: "Whenever you cast a spell that targets one or more permanents, gain control of those
   // permanents.": the permanents it targets, for the rest of the game (rulings); its trigger resolves before the spell.
   const those = tg?.[1] === "one or more permanents" && targets?.length === 1 && targets[0] !== "you" && /^gain control of those permanents\.?$/.test(text) ? targets[0] : undefined;
-  let body = those ? { targets: [], effects: [{ type: "continuous" as const, what: { ref: "causeTargets" as const, filter: those }, mods: [{ kind: "control" as const }], duration: "game" as const }], text } : parseBody(text, { castSpell: true, eventPlayer: true, ...(subjectRef ? { subject: true } : {}), ...(spellX ? { ownX: true } : {}) });
+  // Storm, Windrider: "Whenever you cast a spell that targets one or more creatures, those creatures gain flying until end
+  // of turn": the creatures it targets, as the trigger resolves, before the spell (the same objects, CR 400.7).
+  const thoseGain = !those && tg?.[1] === "one or more creatures" && targets?.length === 1 && targets[0] !== "you" ? /^those creatures gain ([a-z]+(?:,? and [a-z]+)*) until end of turn\.?$/.exec(text) : null;
+  const gainMods = thoseGain ? parseChanges(`gains ${thoseGain[1]!}`) : null;
+  if (thoseGain && !gainMods) return "fail";
+  let body = those ? { targets: [], effects: [{ type: "continuous" as const, what: { ref: "causeTargets" as const, filter: those }, mods: [{ kind: "control" as const }], duration: "game" as const }], text } : gainMods && targets?.[0] && targets[0] !== "you" ? { targets: [], effects: [{ type: "continuous" as const, what: { ref: "causeTargets" as const, filter: targets[0] }, mods: gainMods, duration: "endOfTurn" as const }], text } : parseBody(text, { castSpell: true, eventPlayer: true, ...(subjectRef ? { subject: true } : {}), ...(spellX ? { ownX: true } : {}) });
   if (!body) return "fail";
   if (spellX) body = { ...replaceX(body, { count: { kind: "castSpellX" } }), text: body.text };
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };

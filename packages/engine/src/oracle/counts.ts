@@ -47,7 +47,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && ctx && !ctx.spell && /^creature that (crewed|saddled) (?:it|~) this turn$/.test(p)) return { count: { kind: "crewedSource", ...(/saddled/.test(p) ? { saddled: true as const } : {}) } };
   // Perrie, the Pulverizer: "the number of different kinds of counters among permanents you control"; each kind once, as
   // Hundred-Battle Veteran counts them.
-  if (!each && (m = /^the number of different kinds of counters among (creatures|permanents) you control$/i.exec(p))) {
+  // Storm of Forms (round B202): "copy it for each kind of counter among permanents you control", the same count.
+  if ((!each && (m = /^the number of different kinds of counters among (creatures|permanents) you control$/i.exec(p))) || (each && (m = /^kind of counter among (creatures|permanents) you control$/.exec(p)))) {
     const c = parseCount(`${m[1]} you control`, ctx);
     return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.other && !c.count.counter ? { count: { ...c.count, counterKinds: true } } : null;
   }
@@ -609,6 +610,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^(?:the number of )?(?:players|opponents) you attacked this combat$/i.test(p)) return { count: { kind: "opponentsAttacked" } };
   // "For each opponent you attacked [this turn]" (Rose, Cutthroat Raider).
   if (each && /^opponents? you attacked(?: this turn)?$/i.test(p)) return count({ kind: "players", opponents: true, attacked: true });
+  // Ellywick Tumblestrum's emblem: "for each differently named dungeon you've completed" (CR 309.7).
+  if (each && (m = /^(differently named )?dungeons? you've completed$/i.exec(p))) return count({ kind: "dungeonsCompleted", ...(m[1] ? { distinct: true as const } : {}) });
   // "For each opponent you have", "the number of opponents you have" (Inspired Sphinx).
   if (each && /^opponents?(?: you have)?$/i.test(p)) return count({ kind: "players", opponents: true });
   // "The number of opponents who control a creature with power 4 or greater" (Summon: Yojimbo), "for each opponent who

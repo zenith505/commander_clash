@@ -143,9 +143,10 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
     return { ...st, affects: { ...st.affects, spec: { kind: "object" as const, ...st.affects.spec, controllersLandsAtMost: ["one", "two", "three", "four", "five"].indexOf(perController[2]!) + 1, text: "basic lands each player controls" } }, text: line };
   }
   // Cocoon: "Enchanted creature doesn't untap during your untap step if ~ has a pupa counter on it."
-  const auraCounter = /^Enchanted creature doesn't untap during your untap step if ~ has an? ([a-z]+) counter on it\.$/.exec(line);
+  // Merseine (round B211): "during its controller's untap step", whoever controls the creature.
+  const auraCounter = /^Enchanted creature doesn't untap during (your|its controller's) untap step if ~ has an? ([a-z]+) counter on it\.$/.exec(line);
   if (auraCounter) {
-    const st = parseConditionalStatic(`As long as ~ has a ${auraCounter[1]} counter on it, enchanted creature doesn't untap during your untap step.`);
+    const st = parseConditionalStatic(`As long as ~ has a ${auraCounter[2]} counter on it, enchanted creature doesn't untap during ${auraCounter[1]} untap step.`);
     return st && { ...st, text: line };
   }
   const ifCounter = /^~ doesn't untap during your untap step if it has an? ([a-z]+|\+1\/\+1) counter on it\.$/.exec(line);

@@ -608,7 +608,12 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // from graveyards this way, its target one of them still in exile (CR 603.12, 400.7).
       const exiledThisWay = e.exiledThisWay ? (s.resolving!.exiledCards ?? []).flatMap((id) => (s.objects[id]?.zone === "exile" ? [{ id, zc: s.objects[id]!.zoneChanges ?? 0 }] : [])) : undefined;
       if (exiledThisWay && !exiledThisWay.length) return;
-      const body = exiledThisWay ? { ...e.body, targets: e.body.targets.map((t, i) => (i === 0 ? { ...t, among: exiledThisWay } : t)) } : e.body;
+      const body0 = exiledThisWay ? { ...e.body, targets: e.body.targets.map((t, i) => (i === 0 ? { ...t, among: exiledThisWay } : t)) } : e.body;
+      // Strax, Sontaran Nurse (round B211): "another target creature that player controls": the player chosen at random just
+      // before (CR 603.12), fixed now.
+      const chosenNow = s.resolving!.chosen?.player;
+      if (e.boundChosenPlayer && chosenNow === undefined) return;
+      const body = e.boundChosenPlayer ? { ...body0, targets: body0.targets.map((t) => (t.kind === "object" && t.controller === "chosenPlayer" ? (({ controller: _, ...rest }) => ({ ...rest, controlledBy: chosenNow! }))(t) : t)) } : body0;
       const put = e.putThisWay ? (s.resolving!.created ?? []).flatMap((id) => (s.objects[id]?.zone === "battlefield" ? [{ id, zc: s.objects[id]!.zoneChanges ?? 0 }] : [])) : undefined;
       if (put && !put.length) return;
       // "Create a Food token. When you do, ...": once for each of them created (CR 603.12a).
@@ -976,6 +981,16 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (chooser === undefined) return;
         s.pending = { kind: "chooseOption", player: chooser, source: src, what: e.choice, options: e.options ?? choiceOptions(e.choice, e.except), ...(e.choice === "landOrNonland" ? { labels: ["Land", "Nonland"], prompt: "choose land or nonland." } : e.choice === "direction" ? { labels: ["Left", "Right"], prompt: "choose left or right: each player may attack only the nearest opponent that way." } : e.choice === "planeswalkerType" ? { prompt: "choose a planeswalker type" } : {}) };
         return "paused";
+      }
+      // Chromatic Armor (round B211): "choose a color" in its {X} ability: kept on the Aura as the last chosen color, while
+      // it's still that object (CR 400.7).
+      if (e.keepOnSource && e.choice === "color" && r.chosen?.color) {
+        const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        if (me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc)) {
+          me.chosen = { ...me.chosen, color: r.chosen.color };
+          invalidateCharacteristics(s);
+          log(s, `${src}: the last chosen color is ${COLOR_NAMES[r.chosen.color].toLowerCase()}.`);
+        }
       }
       // Mystic Barrier (round B210): "the last chosen direction" is kept on the permanent, while it's still that object (CR 400.7).
       if (e.keepOnSource && e.choice === "direction" && r.chosen?.direction) {

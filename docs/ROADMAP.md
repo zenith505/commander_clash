@@ -1,7 +1,7 @@
 # Roadmap
 
-31,245 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,876 of
+31,251 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,878 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -268,7 +268,7 @@ line blocks.
    Recruitment, Carrion Grub, Curse of Thirst).
    Out after round 179: Smoldering Egg (counters equal to the mana spent on another spell), Cryptic Spires (circled
    colors), Jadzi, Oracle of Arcavios, Oskar, Rubbish Reclaimer (done in round 336), Strict Proctor and Kadena's Silencer (done in round 339) (countering
-   triggered abilities), Alacrian Armory, Deadly Cover-Up, Chandra, Fire Artisan (loyalty counters removed),
+   triggered abilities), Alacrian Armory (done in round 358), Deadly Cover-Up, Chandra, Fire Artisan (loyalty counters removed),
    Kusari-Gama (done in round 339), Reap (X targets set by another target), Fearless Swashbuckler (done in round 299) ("a Pirate and a Vehicle attacked"),
    Friendly Rivalry (two differently targeted creatures each dealing damage), Invoke Justice (done in round 304) (counters distributed
    among a target player's creatures), The Eagles Are Coming!, Thief of Blood (done in round 300), Eldrazi Mimic ("base power and
@@ -287,7 +287,7 @@ line blocks.
    Helix, Ian Malcolm, Chaotician, New Way Forward, Grenzo, Dungeon Warden, Trove Warden (done in round 314), The Nipton Lottery, Emergent
    Sequence, The Seventh Doctor, Lucy MacLean, Treacherous Greed ("a creature that dealt damage this
    turn"), Foggy Swamp Visions, Gate to the Afterlife (done in round B71), Galloping
-   Lizrog, Dimir Machinations (done in round B108) (exiling some of target player's top cards), Read the Runes (done in round 320), Liege of the Tangle, Sunder
+   Lizrog, Dimir Machinations (done in round B108) (exiling some of target player's top cards), Read the Runes (done in round 320), Liege of the Tangle (done in round 358), Sunder
    the Gateway (transform an Incubator you control), Myriad Construct (done in round 320), Zaffai, Thunder Conductor (an opponent chosen at
    random), All-Seeing Arbiter (done in round 320), Life's Finale (an opponent's library into their graveyard), Aerith Rescue Mission (done in round 320) (a
    stun counter on one of them), Stunning Reversal (done in round 329), Manabond (done in round 277), Glowcap Lantern (done in round B186) (granting "look at
@@ -1375,7 +1375,7 @@ line blocks.
    (28,787 of 31,936 with B67-B69).
    Out after round 232 (looked at, not done): Island Sanctuary (done in round 328) (skip the draw-step draw for "can't be attacked except by
    creatures with flying and/or islandwalk" until your next turn; Lane B's draw replacements are moving in B68/B69);
-   Cairn Wanderer (landwalk and protection as the creature cards in graveyards have them, by kind); Synthetic Destiny
+   Cairn Wanderer (done in round 358) (landwalk and protection as the creature cards in graveyards have them, by kind); Synthetic Destiny
    ("that many" carried into the delayed trigger at the next end step); Lorcan, Warlock Collector (pay life equal to the
    card's mana value from any zone into a graveyard, then a Warlock exile-instead replacement); Wild Pair (a search for the
    same total power and toughness, "if you cast it from your hand"); Vislor Turlough (an opponent gains control and it's
@@ -2590,6 +2590,24 @@ line blocks.
    on a counter count reached, then any number of spells cast free from four exiled cards); Spirit of Resilience
    ("Whenever one or more cards leave your graveyard": a batch trigger, then it becomes a copy of one of those cards until
    end of turn).
+   Round 358 went on down `npm run popular` and the "Out after round N" lists, most played first: Conqueror's Galleon's
+   "When ~ attacks, exile it at end of combat, then return it to the battlefield transformed under your control." (a
+   delayed trigger about ~ as it is now, nothing if it has left, CR 603.7, 400.7, 712.14a); The Ringhart Crest's "Spend
+   this mana only to cast a creature spell of the chosen type or a legendary creature spell." (an anyOf spell restriction
+   whose chosen type boundSpend binds; with none chosen, legendary creature spells still, rulings); Cairn Wanderer's "As
+   long as a creature card with flying is in a graveyard, ~ has flying. The same is true for ..." (YARD_CREATURE_CARD_KEYWORD
+   in layer 6, every graveyard, landwalk and protection by kind, rulings); Leonardo da Vinci's "If the discarded card was
+   an artifact card, exile it from your graveyard. If you do, create a token that's a copy of it, except it's a 0/2 Thopter
+   artifact creature with flying in addition to its other types." (CR 707.9b); Liege of the Tangle's "you may choose any
+   number of target lands you control and put an awakening counter on each of them. Each of those lands is an 8/8 green
+   Elemental creature for as long as it has an awakening counter on it. They're still lands." (whileCounter, CR 611.2b);
+   Alacrian Armory's "choose up to one target Mount or Vehicle you control. Until end of turn, that permanent becomes
+   saddled if it's a Mount and becomes an artifact creature if it's a Vehicle." No new prompt: each uses the existing
+   target, discard and creature-type paths. +6, 31,251 of 31,936. The compiled text of every other card is unchanged.
+   Out after round 358 (looked at, not done): Garland, Royal Kidnapper (control "for as long as they're the monarch"),
+   Urza Assembles the Titans (loyalty abilities twice this turn), Invisible Woman, Sue Storm (still no batched counters
+   event), Obsidian Charmaw ("each land your opponents control that could produce {C}": every mana ability of every land
+   read for {C}, conditional ones too).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -4103,7 +4121,7 @@ line blocks.
    deals damage to that creature": no damage event tells a spell's single target yet); Ziatora's Envoy ("You may play a
    land from the top of your library" as the trigger resolves, a land play of its own, or a free spell with mana value up
    to the damage dealt); Mizzix, Replica Rider (a copy of a permanent spell that gains haste and an end-step sacrifice);
-   Donal, Herald of Wings (done in round 337) (a copy of a creature spell "except the copy is a 1/1 Spirit", once each turn); Leonardo da Vinci
+   Donal, Herald of Wings (done in round 337) (a copy of a creature spell "except the copy is a 1/1 Spirit", once each turn); Leonardo da Vinci (done in round 358)
    (a token copy of the discarded card "except it's a 0/2 Thopter artifact creature with flying"); Optimus Prime, Hero //
    Autobot Leader ("The chosen creature" after bolster, and a delayed convert when it deals combat damage).
    Out after round 252 (looked at, not done): Cybership (the top two cards of a library, lands included, put onto the
@@ -4227,8 +4245,8 @@ line blocks.
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
    10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator (done in round 314), The Foretold Soldier, Radiant Scrollwielder (done in round 314), Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
    7, Grappling Hook (done in round 278), Otrimi, Zhao, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained (done in round 278), Identity
-   Thief, Mishra, Eminent One (done in round 337), Spell Queller (done in round 336), Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon, Grub, Storied Matriarch,
-   Taskmaster, Mercenary Mimic, Gideon Blackblade (done in round 296), Kolvori, God of Kinship, Fisher's Talent (done in round 318), Niko, Light of Hope,
+   Thief, Mishra, Eminent One (done in round 337), Spell Queller (done in round 336), Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon (done in round 358), Grub, Storied Matriarch,
+   Taskmaster, Mercenary Mimic, Gideon Blackblade (done in round 296), Kolvori, God of Kinship (done in round 358), Fisher's Talent (done in round 318), Niko, Light of Hope,
    Stick Together (done in round 302), Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
    Augurelt, Quintorius, Loremaster, Quantum Riddler (done in round 296), Model of Unity (done in round 302), The Flood of Mars, Sigarda's Vanguard (done in round 302), Master of
    the Wild Hunt, Audacious Reshapers, Kiora, Sovereign of the Deep, Quest for
@@ -5116,7 +5134,7 @@ line blocks.
      Heist), total mana value (Lively Dirge), "Mount or Vehicle" / "Aura or Equipment" (One Last Job, done in round 338), "half ... rounded up" (Rush of Dread), "exchange control of two target" (Shifting
      Grift), Smuggler's Surprise.
    - Saddle: "the creature that saddled it this turn" (Giant Beaver, Rambling Possum, Calamity, Fortune, The Gitrog),
-     effects that make a Mount saddled (Guidelight Matrix, Kolodin, Alacrian Armory), "is saddled" and "becomes
+     effects that make a Mount saddled (Guidelight Matrix, Kolodin, Alacrian Armory (done in round 358)), "is saddled" and "becomes
      saddled for the first time each turn" (Archmage's Newt (done in round 340), Caustic Bronco, Stubborn Burrowfiend (done in round B163)), "saddles a Mount
      or crews a Vehicle" triggers (Canyon Vaulter (done in round B174), Reckless Velocitaur (done in round B174)), "Mount or Vehicle" groups (Cloudspire Captain),
      Bounding Felidar, Guardian Sunmare, Lagorin, Ornery Tumblewagg. Bots only saddle Mounts that have an "attacks

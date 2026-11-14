@@ -56,6 +56,7 @@ import { runLaneB199Effect } from "./run-laneb199";
 import { runLaneB200Effect } from "./run-laneb200";
 import { runLaneB201Effect } from "./run-laneb201";
 import { runLaneB202Effect } from "./run-laneb202";
+import { runLaneB208Effect } from "./run-laneb208";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -1695,7 +1696,12 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "together":
       // Each kind of token at the same time (CR 608.2f): entering together, each sees the others enter.
       enterTogether(s, () => {
-        for (const x of e.effects) runEffect(s, x, ctx);
+        const all: ObjectId[] = [];
+        for (const x of e.effects) {
+          runEffect(s, x, ctx);
+          if (e.allCreated && s.resolving) all.push(...(s.resolving.created ?? []).filter((id) => !all.includes(id)));
+        }
+        if (e.allCreated && s.resolving) s.resolving.created = all;
       });
       return;
     case "myriad":
@@ -1901,6 +1907,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "yardTotalPower":
     case "removeCounterThenReturn":
       return runLaneB202Effect(s, e, ctx, src);
+    case "aurasFromYardToYourCreatures":
+    case "auraOntoEachCreated":
+    case "revealTopAttackingOrHand":
+      return runLaneB208Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

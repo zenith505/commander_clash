@@ -784,6 +784,13 @@ export function moveObject(
     face?: number;
     /** Melded with its counterpart `with` (in exile), as the combined back face `key` (CR 701.42a, 712.14c): meld.ts. */
     meld?: { with: ObjectId; key: string };
+    /**
+     * Who puts it onto the battlefield (GameObject.putter), when that isn't the player it enters under: "return it to the
+     * battlefield under its owner's control" is done by the player following the instruction (the resolving ability's
+     * controller), not the owner (rulings on Thelon's Chant, Nature's Wrath). Otherwise the player it enters under puts it
+     * there (CR 110.2a: an effect putting it onto the battlefield puts it under that player's control unless it says otherwise).
+     */
+    putBy?: PlayerId;
   } = {},
 ) {
   const o = obj(s, id);
@@ -1227,10 +1234,11 @@ export function moveObject(
       }
   }
   if (to === "battlefield") [o.controlledSinceTurn, o.enteredTurn] = [s.turn, s.turn];
-  // Arboria: who put a nontoken permanent onto the battlefield (rulings: the player, not whose control it entered under):
-  // the controller of the spell or ability resolving, or the player casting it or playing the land.
+  // Who put it onto the battlefield (rulings on Arboria, Thelon's Chant: the player, not whose control it entered under).
+  o.putter = to === "battlefield" ? (opts.putBy ?? o.controller) : undefined;
+  // Arboria: a nontoken permanent the active player put onto the battlefield.
   if (to === "battlefield" && !o.isToken) {
-    const putter = s.resolving?.item.controller ?? opts.controller ?? o.controller;
+    const putter = o.putter!;
     if (putter === s.activePlayer && s.players[putter]) s.players[putter]!.actedTurn = s.turn;
   }
   o.toGraveyardTurn = to === "graveyard" ? s.turn : undefined;
@@ -1423,7 +1431,7 @@ export function moveObject(
   // Darksteel Colossus: its own replacement ability shuffled it in, controlled by whoever controlled it (by its owner
   // from another zone, CR 113.8).
   if (shuffleIn && to === "library") shuffleLibrary(s, player(s, o.owner), fromZone === "battlefield" ? lastController : o.owner);
-  if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
+  if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name, undefined, lastController);
   if (fromZone === "battlefield" && s.phasedOut?.length) phaseInUntil(s, id, (o.zoneChanges ?? 1) - 1);
   // Cosmic Intervention: each card exiled this way gets its own delayed trigger (rulings); a token ceases to exist and
   // won't return (CR 111.7, rulings).
@@ -1751,7 +1759,7 @@ function finishEnteringAs(s: GameState, o: GameObject, opts: EnterOpts) {
  * the source leave is over (askAuraReturns), since a choice can't be asked partway through one. It can't enchant
  * anything that returned at the same time, and with nothing it can enchant it stays in exile (CR 303.4g).
  */
-export function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand?: true; graveyard?: true }[], source: string, why = `${source} left`) {
+export function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand?: true; graveyard?: true }[], source: string, why = `${source} left`, /** Who puts them back (GameObject.putter): the exile effect's controller, its source's as it left. */ by?: PlayerId) {
   const back = links.filter((l) => {
     const c = s.objects[l.id];
     return !!c && c.zone === "exile" && (c.zoneChanges ?? 0) === l.zc && !c.isToken;
@@ -1774,11 +1782,11 @@ export function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: numbe
       }
       const r = (s.untilReturns ??= { auras: [], returned: [] });
       if (d.subtypes.includes("Aura")) {
-        r.auras.push({ id: c.id, zc: c.zoneChanges ?? 0, under: c.owner, source });
+        r.auras.push({ id: c.id, zc: c.zoneChanges ?? 0, under: c.owner, source, ...(by !== undefined ? { by } : {}) });
         continue;
       }
       log(s, `${d.name} returns to the battlefield (${why}).`);
-      moveObject(s, c.id, "battlefield", { controller: c.owner });
+      moveObject(s, c.id, "battlefield", { controller: c.owner, ...(by !== undefined ? { putBy: by } : {}) });
       r.returned.push(c.id); // at the same time as the rest of this event's returns (CR 610.3d)
     }
   });
@@ -1806,7 +1814,7 @@ export function askAuraReturns(s: GameState): "asked" | "moved" | false {
       return "asked";
     }
     r.auras.shift();
-    returnAura(s, c, e.source, options[0]);
+    returnAura(s, c, e.source, options[0], e.by);
     moved = true;
   }
   s.untilReturns = undefined;
@@ -1817,17 +1825,17 @@ export function askAuraReturns(s: GameState): "asked" | "moved" | false {
 function auraReturnChosen(s: GameState, choice: string) {
   const e = s.untilReturns!.auras.shift()!;
   const c = s.objects[e.id];
-  if (c && c.zone === "exile" && (c.zoneChanges ?? 0) === e.zc) returnAura(s, c, e.source, auraHostOf(choice));
+  if (c && c.zone === "exile" && (c.zoneChanges ?? 0) === e.zc) returnAura(s, c, e.source, auraHostOf(choice), e.by);
 }
 
-function returnAura(s: GameState, c: GameObject, source: string, host: AuraHost | undefined) {
+function returnAura(s: GameState, c: GameObject, source: string, host: AuraHost | undefined, by?: PlayerId) {
   const d = defOf(s, c);
   if (!host) {
     log(s, `${d.name} stays in exile (nothing it can enchant).`);
     return;
   }
   log(s, `${d.name} returns to the battlefield (${source} left) attached to ${auraHostName(s, host)}.`);
-  moveObject(s, c.id, "battlefield", { controller: c.owner, ...host });
+  moveObject(s, c.id, "battlefield", { controller: c.owner, ...(by !== undefined ? { putBy: by } : {}), ...host });
 }
 
 /** Button labels for an Aura's possible hosts: "Grizzly Bears (Ana)", numbered when two read the same. */
@@ -11273,6 +11281,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const st = r.scratch?.alternate;
     if (!st) throw new RulesError("nothing to choose");
     st.pick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "auraForToken") {
+    // Liberated Livestock (round B208): the Aura card for this token, or none.
+    const st = r.scratch?.auraForToken;
+    if (!st) throw new RulesError("nothing to choose");
+    st.answer = choice;
+    log(s, `${p.name} chooses ${choice === "none" ? "no Aura" : defOf(s, obj(s, choice)).name} (${pend.source}).`);
     continueResolution(s);
     return;
   }

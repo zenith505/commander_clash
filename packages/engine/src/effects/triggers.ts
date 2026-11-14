@@ -841,7 +841,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e, t) => e === "castSpell" && ((!!t.cast?.orPermanentEntersFromExile && fromExile) || (!!t.cast?.orLandEntersNotFromHand && notFromHand)));
     // "Whenever a creature you control enters", "another Ally", "~ or another artifact": on every permanent,
     // the entering one too, which is the subject ("that creature"). It sees itself enter (CR 603.6a).
-    const entersWatch = (o: GameObject, ctrl: PlayerId) => add(o, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, o, entering, ctrl) && (!t.ifFromGraveyard || fromGraveyardMatches(s, t.ifFromGraveyard, entering, ctrl)), undefined, undefined, entering);
+    // Tourach's Chant: "whenever a player puts ... onto the battlefield", its player the one who put it there.
+    const putter = entering.putter ?? you;
+    const entersWatch = (o: GameObject, ctrl: PlayerId) => {
+      add(o, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && !t.enters.byPutter && entersMatches(s, t.enters, o, entering, ctrl) && (!t.ifFromGraveyard || fromGraveyardMatches(s, t.ifFromGraveyard, entering, ctrl)), undefined, undefined, entering);
+      if (abilitiesOf(s, o).triggers.some((t) => t.enters?.byPutter)) add(o, ctrl, (e, t) => e === "permanentEnters" && !!t.enters?.byPutter && entersMatches(s, t.enters, o, entering, ctrl), undefined, undefined, entering, undefined, undefined, undefined, { player: putter });
+    };
     for (const id of s.battlefield) entersWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(entersWatch);
     fromEmblems(entersWatch);
@@ -1135,6 +1140,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Gaze of Pain: "Until end of turn, whenever a creature you control attacks and isn't blocked, ..." (CR 603.7b).
         fromFloating((src, ctrl, triggers) => ctrl === you && add(src, ctrl, (e, t) => e === "creatureYouControlAttacksUnblocked" && !!t.attacker && objectMatches(s, t.attacker.filter, o, ctrl, false), triggers, undefined, o, undefined, undefined, undefined, { player: o.attacking }));
         add(o, you, (e, t) => e === "selfAttacksUnblocked" && (!t.attacksPlayer || !o.attackingPermanent), undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
+        // Delif's Cone: "This turn, when target creature you control attacks and isn't blocked, ...": a delayed trigger
+        // about that creature (CR 603.7b), "it" being the creature.
+        fromFloating((src, ctrl, triggers) => add(src, ctrl, (e) => e === "selfAttacksUnblocked", triggers, undefined, o, undefined, undefined, undefined, { player: o.attacking }), o);
         addHosted(o, (e) => e === "selfAttacksUnblocked", undefined, o, { player: o.attacking });
       }
       if (o.attacking !== undefined && o.blockedBy?.length) {

@@ -6885,6 +6885,49 @@
   "gameChanger": false
  },
  {
+  "oracleId": "67a9357c-4713-4e01-a60d-532bf0dd80b6",
+  "name": "Codie, Vociferous Codex",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Legendary Artifact Creature — Book Construct",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Book",
+   "Construct"
+  ],
+  "oracleText": "You can't cast permanent spells.\n{4}, {T}: Add {W}{U}{B}{R}{G}. When you next cast a spell this turn, exile cards from the top of your library until you exile an instant or sorcery card with lesser mana value. Until end of turn, you may cast that card without paying its mana cost. Put each other card exiled this way on the bottom of your library in a random order.",
+  "power": "1",
+  "toughness": "4",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "stx",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c19ec6aa-aadd-4767-b695-384fd07b4ded",
   "name": "Coffin Queen",
   "manaCost": "{2}{B}",
@@ -15566,6 +15609,41 @@
   "commanderLegal": "legal",
   "set": "ltr",
   "releasedAt": "2023-06-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "04238d49-941e-4298-8ef6-8e8e723f4034",
+  "name": "Gorex, the Tombshell",
+  "manaCost": "{6}{B}{B}",
+  "cmc": 8,
+  "typeLine": "Legendary Creature — Zombie Turtle",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Turtle"
+  ],
+  "oracleText": "As an additional cost to cast this spell, you may exile any number of creature cards from your graveyard. This spell costs {2} less to cast for each card exiled this way.\nDeathtouch\nWhenever Gorex attacks or dies, choose a card at random exiled with Gorex and put that card into its owner's hand.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "j25",
+  "releasedAt": "2024-11-15",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -38333,6 +38411,41 @@
   "set": "woe",
   "releasedAt": "2023-09-08",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cc504f00-f177-4def-956d-92a2217438bb",
+  "name": "Three Dog, Galaxy News DJ",
+  "manaCost": "{1}{R}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Bard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Bard"
+  ],
+  "oracleText": "Whenever you attack, you may pay {2} and sacrifice an Aura attached to Three Dog. When you sacrifice an Aura this way, for each other attacking creature you control, create a token that's a copy of that Aura attached to that creature.",
+  "power": "1",
+  "toughness": "5",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "pip",
+  "releasedAt": "2024-03-08",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

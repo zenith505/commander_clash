@@ -782,7 +782,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const other = e.notNamedAs !== undefined ? spellNameOf(s, ctx, e.notNamedAs) : undefined;
         // Treasure Keeper: "a nonland card with mana value 3 or less", an {X} in its cost counting 0 there (CR 202.3e).
         // Plargg: "a nonlegendary, nonland card"; Illuna: "a nonland permanent card" (not an artifact land).
+        // Codie, Vociferous Codex: less than the mana value of the spell that triggered it (none found without one).
+        const causeSpell = e.lesserThanCause && ctx.cause !== undefined ? (s.stack.find((x) => x.id === ctx.cause && x.kind === "spell") ?? s.castItems?.[ctx.cause]) : undefined;
+        const lessThan = e.lesserThanCause ? (causeSpell ? spellManaValue(s, causeSpell) : 0) : undefined;
         const fits = (id: ObjectId) =>
+          (lessThan === undefined || defMv(defOf(s, obj(s, id))) < lessThan) &&
           (e.untilTypes ? e.untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) && !(e.untilNonlandType && isType(defOf(s, obj(s, id)), "Land")) : !isType(defOf(s, obj(s, id)), "Land")) &&
           (e.untilMv === undefined || defMv(defOf(s, obj(s, id))) <= e.untilMv) &&
           (e.untilMvAtLeast === undefined || defMv(defOf(s, obj(s, id))) >= e.untilMvAtLeast) &&
@@ -874,6 +878,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           // "Until end of turn, you may cast that card (without paying its mana cost)": with its usual timing (rulings).
           const o = obj(s, hit);
           o.mayPlay = { player: caster, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, castOnly: true, ...(e.then === "freeThisTurn" ? { free: true as const } : {}) };
+          // Codie: "Put each other card exiled this way on the bottom of your library in a random order": not that one.
+          if (e.restBottom) bottomRest(s, (sc.untilNonland.seen ?? []).filter((id) => id !== hit));
           return;
         }
         // Cast as this resolves, so its card type's timing doesn't matter; it still needs legal targets and modes.

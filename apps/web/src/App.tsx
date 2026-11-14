@@ -1111,8 +1111,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const optional = compiled.additionalCosts?.find((c) => c.kind === "sacrifice" && c.optional);
       // Explosive Singularity, Burn at the Stake, Hierophant Bio-Titan: "tap any number of untapped creatures you control",
       // "remove any number of +1/+1 counters from among creatures you control", X the number.
-      const anyNumber = compiled.additionalCosts?.find((c) => (c.kind === "tap" || c.kind === "removeCounters") && c.x && !(c.kind === "removeCounters" && c.self));
-      const anyText = anyNumber?.kind === "tap" ? `tap X ${anyNumber.filter.text.replace(/(\w)( you control)$/, "$1s$2")}` : anyNumber?.kind === "removeCounters" ? `remove X ${anyNumber.counter ?? ""} counters from among ${anyNumber.filter.text}`.replace(/  +/g, " ") : undefined;
+      // Gorex, the Tombshell: "exile any number of creature cards from your graveyard".
+      const anyNumber = compiled.additionalCosts?.find((c) => (c.kind === "tap" || c.kind === "removeCounters" || (c.kind === "exileFromGraveyard" && compiled.sacrificedReduction)) && c.x && !(c.kind === "removeCounters" && c.self));
+      const anyText = anyNumber?.kind === "tap" ? `tap X ${anyNumber.filter.text.replace(/(\w)( you control)$/, "$1s$2")}` : anyNumber?.kind === "removeCounters" ? `remove X ${anyNumber.counter ?? ""} counters from among ${anyNumber.filter.text}`.replace(/  +/g, " ") : anyNumber?.kind === "exileFromGraveyard" ? `exile X ${anyNumber.filter?.text ?? "card"}s from your graveyard` : undefined;
       // Rottenmouth Viper: each one sacrificed makes it cheaper, so the X that can be paid runs from the fewest
       // sacrifices the mana allows to as many as there are; the fewest is offered (none payable: the engine says why).
       const range = compiled.sacrificedReduction ? xRange(plan) : undefined;
@@ -2436,7 +2437,7 @@ function reducingSacrifices(s: GameState, id: string): string[] {
  * The cost that makes it cheaper for each one paid, n of them: Rottenmouth Viper's sacrifices, Explosive Singularity's
  * tapped creatures (those that make no mana first), Hierophant Bio-Titan's removed +1/+1 counters.
  */
-function reducingChoices(s: GameState, id: string, n: number): Pick<CostChoices, "sacrifice" | "tap" | "counters"> {
+function reducingChoices(s: GameState, id: string, n: number): Pick<CostChoices, "sacrifice" | "tap" | "counters" | "exileCards"> {
   const costs = compileCard(cardOf(s, id)).additionalCosts ?? [];
   const tap = costs.find((x) => x.kind === "tap" && x.x);
   if (tap?.kind === "tap") {
@@ -2445,13 +2446,16 @@ function reducingChoices(s: GameState, id: string, n: number): Pick<CostChoices,
   }
   const counters = costs.find((x) => x.kind === "removeCounters" && x.x);
   if (counters?.kind === "removeCounters") return { counters: counterCostCandidates(s, HUMAN, s.objects[id]!, counters).flatMap((x) => Array.from({ length: x.n }, () => ({ id: x.id, kind: x.kind }))).slice(0, n) };
+  // Gorex, the Tombshell: "exile any number of creature cards from your graveyard", each making it cheaper.
+  const yard = costs.find((x) => x.kind === "exileFromGraveyard" && x.x);
+  if (yard?.kind === "exileFromGraveyard") return { exileCards: s.players[HUMAN]!.graveyard.filter((x) => x !== id && (!yard.filter || printedMatches(yard.filter, cardOf(s, x)))).slice(0, n) };
   return { sacrifice: reducingSacrifices(s, id).slice(0, n) };
 }
 
 /** How many of reducingChoices' there are to pay with. */
 function reducingRoom(s: GameState, id: string): number {
   const c = reducingChoices(s, id, Infinity);
-  return (c.tap ?? c.counters ?? c.sacrifice ?? []).length;
+  return (c.tap ?? c.counters ?? c.exileCards ?? c.sacrifice ?? []).length;
 }
 
 function canCastWithTaps(s: GameState, id: string, convoke?: string[], teamwork?: string[]) {

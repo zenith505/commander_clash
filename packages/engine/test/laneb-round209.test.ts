@@ -186,10 +186,10 @@ describe("Bill Potts", () => {
 
 describe("Beamsplitter Mage", () => {
   const withMage = (others: number) => {
-    const { s, ap, ids } = setup([growth()]);
+    const { s, ap, opp, ids } = setup([growth()]);
     const mage = putOnBattlefield(s, ap, beam());
     const mine = Array.from({ length: others }, (_, i) => putOnBattlefield(s, ap, bear({ name: `Bear ${i + 1}` })));
-    return { s, ap, mage, mine, g: ids[0]! };
+    return { s, ap, opp, mage, mine, g: ids[0]! };
   };
 
   it("copies a spell that targets only it onto another creature you control", () => {

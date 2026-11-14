@@ -490,6 +490,8 @@ export interface GameObject {
     ifControl?: TargetSpec;
     /** "Mana of any type can be spent to cast it" (CR 609.4b). */
     anyType?: true;
+    /** Gale's Redirection: "you may spend mana as though it were mana of any color to cast that spell" (CR 609.4b): any mana pays its colored symbols, but {C} still needs colorless mana. */
+    anyColor?: true;
     /** "If that spell would be put into a graveyard, exile it instead" (Dire Fleet Daredevil): see exileIfToGraveyard. */
     exileAfter?: true;
     /** "You may cast that card": not played as a land (rulings on Rev, Tithe Extractor). */
@@ -641,7 +643,7 @@ export interface GameObject {
    * `host`: for an Aura or Equipment that phased out directly, what it was attached to (702.26i).
    * `released`: `by` left the game and their next turn would have begun, so it phases in at the next untap step (702.26n).
    */
-  phased?: { by: PlayerId; indirect?: true; host?: { id: ObjectId; zc: number }; released?: true; /** Oubliette: it phases in (tapped) only when this object leaves the battlefield; Out of Time: `noTap`, not tapped. */ until?: { id: ObjectId; zc: number; noTap?: true }; /** Teferi, Timeless Voyager: it can't phase in until the end of `turnOf`'s next turn after turn `sinceTurn` (cleared in that cleanup step, CR 514.2, or once that player has left the game, CR 800.4m). */ lock?: { turnOf: PlayerId; sinceTurn: number } };
+  phased?: { by: PlayerId; indirect?: true; host?: { id: ObjectId; zc: number }; released?: true; /** Oubliette: it phases in (tapped) only when this object leaves the battlefield; Out of Time: `noTap`, not tapped. */ until?: { id: ObjectId; zc: number; noTap?: true }; /** Teferi, Timeless Voyager: it can't phase in until the end of `turnOf`'s next turn after turn `sinceTurn` (cleared in that cleanup step, CR 514.2, or once that player has left the game, CR 800.4m). */ lock?: { turnOf: PlayerId; sinceTurn: number }; /** The Phasing of Zhalfir: it can't phase in while `controller` controls `id` (as that object, CR 400.7); over for good once that stops (CR 611.2b; game.ts endWhileTapped). */ lockWhile?: { id: ObjectId; zc: number; controller: PlayerId } };
   /** As a spell: the zone it was cast from, how (flashback, escape, ...), and whether buyback was paid. */
   castFrom?: ZoneName;
   /** On the battlefield: it entered as a spell cast from its owner's hand ("if you cast it from your hand"). */
@@ -2698,6 +2700,8 @@ export interface Resolving {
   targetedAbilitySource?: { id: ObjectId; zc: number };
   /** "If that spell is countered this way, exile it instead": the card it became in exile (Transcendent Dragon, Spelljack). */
   counteredExiled?: { id: ObjectId; zc: number };
+  /** Gale's Redirection: the card a spell this resolution exiled from the stack without countering it was (counterSpell `exileSpell`), as it is in exile. */
+  exiledFromStack?: { id: ObjectId; zc: number };
   /** Psychic Rebuttal: the spell a counterSpell `copyCountered` countered, as it last was on the stack, its card's object then too (CR 707.10: a copy copies its choices). */
   counteredCopy?: { item: StackItem; card: GameObject };
   /** Counterlash: the card types of the spell a counterSpell with noteTypes targeted, as it was on the stack just before. */

@@ -1,7 +1,7 @@
 # Roadmap
 
-31,287 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,880 of
+31,292 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,881 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1383,7 +1383,7 @@ line blocks.
    Epic (tap creatures for an activation cost's mana, like convoke); Kaldring, the Rimestaff (play a snow permanent card
    from your graveyard this turn, entering tapped); Hostile Hostel (done in round 338) (soul counters, transform, then untap; Creeping Inn's
    "creature cards exiled with this creature"); Dawnbreak Reclaimer (an opponent chooses a card in your graveyard);
-   Cryptic Gateway (done in round 302), Mogg Assassin, Karplusan Minotaur (done in round 318), The Phasing of Zhalfir, Mirror of Life Trapping, Grasping Shadows
+   Cryptic Gateway (done in round 302), Mogg Assassin, Karplusan Minotaur (done in round 318), The Phasing of Zhalfir (done in round 363), Mirror of Life Trapping, Grasping Shadows
    ("transform it" is the enchantment, not the attacker).
    Round 233 (top of the list, now done): "you may pay one or more {E}. If you do, create an X/X ... Vehicle token"
    (Pia Nalaar, Chief Mechanic); "If a Hero enters this way, it enters with an additional +1/+1 counter" (Winter Soldier,
@@ -2708,6 +2708,32 @@ line blocks.
    Browser tests click through Open the Omenpaths's second color, Monstrous Emergence's cost and Reverse the Sands's
    choice. Bots take the most life with Reverse the Sands and pay up to four life (keeping 20) to look with Plunge into
    Darkness. +6, 31,287 of 31,936. The compiled text of every other card is unchanged.
+   Round 363 went on down the "Out after round N" lists and `npm run popular`, most played first, to copies of a revealed
+   card, phasing, a Saga's vote and a spell exiled from the stack: Vesuvan Drifter's "At the beginning of each combat,
+   you may reveal the top card of your library. If you reveal a creature card this way, ~ becomes a copy of that card
+   until end of turn, except it has flying." (the card as printed, its front face, CR 707.2, 712.8a, with flying as a
+   copiable value, CR 707.9b; becomeCopy of `revealed`) and Deceiver of Form's "At the beginning of combat on your turn,
+   reveal the top card of your library. If a creature card is revealed this way, you may have creatures you control other
+   than ~ become copies of that card until end of turn. You may put that card on the bottom of your library." (each keeps
+   its counters and noncopy effects, CR 613.7; the card may go to the bottom whatever it is, rulings); The Phasing of
+   Zhalfir's "Another target nonland permanent phases out. It can't phase in for as long as you control ~." (phaseOut
+   `lockWhileYouControlSource`: it skips its controller's untap steps while you control the Saga, then phases in as
+   usual, CR 611.2b, 702.26a; once you don't, never again); Trial of a Time Lord's "If guilty gets more votes, the owner
+   of each card exiled with ~ puts that card on the bottom of their library." (Effect untilLeavesToBottom: the cards its
+   chapters exiled until it leaves, CR 610.3; a tie leaves them to return); Gale's Redirection's table rows "You may cast
+   the exiled card for as long as it remains exiled, and you may spend mana as though it were mana of any color to cast
+   that spell." and "You may cast the exiled card without paying its mana cost for as long as it remains exiled." (Effect
+   mayCastExiledSpell on the card exiled from the stack, Resolving `exiledFromStack`; mayPlay `anyColor`: colored mana
+   symbols paid with any mana, {C} still needs colorless, CR 609.4b; a copy of a spell leaves no card, CR 707.10a).
+   Browser tests click through Deceiver of Form's and Vesuvan Drifter's prompts and cast the card Gale's Redirection
+   exiled. Bots copy a revealed creature only when it beats what they have, bottom a land when they have six or more and
+   a card they can't cast soon, and value Trial's guilty vote by the exiled cards. +5, 31,292 of 31,936. The compiled
+   text of every other card is unchanged.
+   Out after round 363 (looked at, not done): Ziatora's Envoy (playing a land from the top while the trigger resolves);
+   Durnan of the Yawning Portal (undaunted granted to a spell cast from exile); Decoy Gambit ("unless its controller has
+   you draw a card", one choice per opponent); Sphinx Ambassador (an opponent names a card after a hidden search);
+   Choreographed Sparks ("can't be copied", and a copy of a creature spell with granted text); Mirror of Life Trapping and
+   Archnemesis (not yet looked at closely); Fell Beast's Shriek and Riddles in the Dark (in Lane B's range).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -4201,7 +4227,7 @@ line blocks.
    Discerning Financier (done in round 272).
    Out after round 257 (looked at, not done): Vaevictis Asmadi, the Dire and Guff Rewrites History (one target for each
    player: no per-player target spec yet); Thieves' Auction (players draft exiled cards one by one until all are chosen);
-   Deceiver of Form (your other creatures become copies of the revealed card until end of turn); Monk Class (level 3 grants
+   Deceiver of Form (done in round 363) (your other creatures become copies of the revealed card until end of turn); Monk Class (level 3 grants
    an exiled card a cast-from-exile ability tied to another spell this turn); Sen Triplets (you play from an opponent's
    hand, which is revealed, while they can't cast or activate); Breath of Fury (the Aura moves after its creature is
    sacrificed, then an extra combat); Gollum, Scheming Guide (an opponent guesses land or nonland about your top card, then
@@ -4787,7 +4813,7 @@ line blocks.
      most votes), Split Decision ("Choose target spell", then "the spell"), Messenger Jays ("for each card drawn this
      way"), Sail into the West (done in round 321), Galadriel, Expropriate, Fateful Tempest, Selvala's Stampede, Travel Through Caradhras;
      votes for a player (Mob Verdict, Círdan), Trap the Trespassers, Truth or Consequences ("an opponent at random");
-     the Sagas Vault 11 and Trial of a Time Lord; "whenever players finish voting" (Grudge Keeper (done in round 302), Model of Unity (done in round 302),
+     the Sagas Vault 11 and Trial of a Time Lord (done in round 363); "whenever players finish voting" (Grudge Keeper (done in round 302), Model of Unity (done in round 302),
      Erestor: an opponent counts only if none of their votes match yours, rulings); Elrond; the Planechase "Will of the
      Planeswalkers" cards.
    - Bots vote by a rough count of what each choice does for them (bot-votes.ts), and always take an optional extra
@@ -4924,7 +4950,7 @@ line blocks.
    - Gods still out on other lines: Athreos (both), Ephara, Keranos, Klothys, Phenax, Purphoros Bronze-Blooded.
    - "Reveal the top card of your library. If it's a X card, A. Otherwise, B" works for a card type filter and moves
      of "it"; still out: "you may reveal ... If a X card is revealed this way" (Elven Farsight, Galadriel, Isolated
-     Watchtower, Urza Assembles the Titans, Doors of Durin, Vesuvan Drifter), "with mana value 3 or less" (Kellan),
+     Watchtower, Urza Assembles the Titans, Doors of Durin, Vesuvan Drifter (done in round 363)), "with mana value 3 or less" (Kellan),
      "of the chosen type" (Bloodline Shaman), "it" meaning the source (Harsh Deceiver), amounts from the revealed card
      (Sapling of Colfenor, Baneful Omen), "repeat this process" (Countryside Crusher), casting it
      (Descendants' Path, Jadzi), several "If it's" lines (Druidic Satchel, done in round 277).
@@ -9427,7 +9453,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   graveyard and that card on top).
 - Known gaps from round B71: bots always search the library too when "and/or library" lets them skip it, even with
   Psychic Surgery or Cosi's Trickster watching.
-- Out after round B70 (looked at, not done): Shell of the Last Kappa and Gale's Redirection (exiling a spell from the
+- Out after round B70 (looked at, not done): Shell of the Last Kappa and Gale's Redirection (done in round 363) (exiling a spell from the
   stack), Munda, Ambush Leader (done in round B196) (cards from the top revealed and put back on top in any order), Krang & Shredder
   (each opponent exiles until a nonland card, then a free cast among them under a Disappear condition).
 - Known gaps from round B69: War Cadence with X = 0 lets creatures block free, but a cost of {0} still has to be chosen

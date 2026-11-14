@@ -8689,6 +8689,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "18c58328-518f-4228-bb1b-2433f3fb21f2",
+  "name": "Deceiver of Form",
+  "manaCost": "{6}{C}",
+  "cmc": 7,
+  "typeLine": "Creature — Eldrazi",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi"
+  ],
+  "oracleText": "({C} represents colorless mana.)\nAt the beginning of combat on your turn, reveal the top card of your library. If a creature card is revealed this way, you may have creatures you control other than this creature become copies of that card until end of turn. You may put that card on the bottom of your library.",
+  "power": "8",
+  "toughness": "8",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ogw",
+  "releasedAt": "2016-01-22",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0c0d6c7e-a7cc-49e0-bf84-3fc33dd10b90",
   "name": "Deepfathom Echo",
   "manaCost": "{2}{G}{U}",
@@ -13448,6 +13474,32 @@
   "set": "m11",
   "releasedAt": "2010-07-16",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8676f007-bf5f-4312-968c-59f4549f7d51",
+  "name": "Gale's Redirection",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile target spell, then roll a d20 and add that spell's mana value.\n1—14 | You may cast the exiled card for as long as it remains exiled, and you may spend mana as though it were mana of any color to cast that spell.\n15+ | You may cast the exiled card without paying its mana cost for as long as it remains exiled.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -39158,6 +39210,38 @@
   "set": "kld",
   "releasedAt": "2016-09-30",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "727ef984-1643-4a09-8283-a665508e85dd",
+  "name": "Vesuvan Drifter",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Shapeshifter",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Shapeshifter"
+  ],
+  "oracleText": "Flying\nYou may look at the top card of your library any time.\nAt the beginning of each combat, you may reveal the top card of your library. If you reveal a creature card this way, this creature becomes a copy of that card until end of turn, except it has flying.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "mat",
+  "releasedAt": "2023-05-12",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -2485,6 +2485,12 @@ export function endWhileTapped(s: GameState): boolean {
     const kept = e.affected.filter((id) => (s.objects[id]?.counters[e.whileCounter!] ?? 0) > 0);
     if (kept.length < e.affected.length) [e.affected, lost] = [kept, true];
   }
+  // The Phasing of Zhalfir: "It can't phase in for as long as you control ~": over for good once you don't control that
+  // object, even if you do again later (CR 611.2b); a phased-out Saga isn't controlled (rulings).
+  for (const id of s.phasedOut ?? []) {
+    const p = s.objects[id]!.phased;
+    if (p?.lockWhile && !whileControlledHolds(s, p.lockWhile)) p.lockWhile = undefined;
+  }
   // Rootwater Matriarch: "for as long as that creature is enchanted", the same once it has no Aura attached.
   for (const e of s.effects) {
     if (!e.whileEnchanted) continue;
@@ -5063,7 +5069,7 @@ function linkedFlash(s: GameState, o: GameObject, pid: PlayerId): boolean {
  * How `pid` may play this exiled card now: its own permission, or a "play cards exiled with ~" one (any color of mana;
  * Valgavoth's for life equal to its mana value, `life`).
  */
-function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "free" | "orPay" | "cost" | "more" | "less" | "affinity"> & { life?: true }) | undefined {
+function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "anyColor" | "free" | "orPay" | "cost" | "more" | "less" | "affinity"> & { life?: true }) | undefined {
   if (ownExilePermission(s, o, pid)) return o.mayPlay;
   const how = linkedPlayPermission(s, o, pid);
   return how === "anyType" ? { anyType: true } : how === "life" ? { life: true } : how === "plain" || linkedPlayGrant(s, o, pid) >= 0 ? {} : undefined;
@@ -6612,7 +6618,11 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // were mana of any color to cast that spell" (CR 609.4b).
   const grantAnyType = how.via === "turnPermission" && !!((k) => k && s.graveGrants?.find((g) => g.key === k)?.anyType)(castPermit(s, o.id, d, x, how.permit, pid));
   const anyTypeNow = !!exiled?.anyType || (pend?.kind === "castFree" && pend.player === pid && pend.objectId === o.id && !!pend.anyType) || creatureAnyType || grantAnyType;
-  const anyType = (c: ParsedCost): ParsedCost => (anyTypeNow ? { ...c, symbols: c.symbols.map((y) => (y.kind === "colored" || y.kind === "hybrid" || y.kind === "twoHybrid" ? { kind: "generic" as const, amount: 1 } : y)) } : c);
+  // Gale's Redirection: "as though it were mana of any color": the same for colored symbols, but {C} still takes colorless
+  // mana (CR 609.4b).
+  const anyColorNow = !anyTypeNow && !!exiled?.anyColor;
+  const anyType = (c: ParsedCost): ParsedCost =>
+    anyTypeNow || anyColorNow ? { ...c, symbols: c.symbols.map((y) => ((y.kind === "colored" && (anyTypeNow || y.color !== "C")) || y.kind === "hybrid" || y.kind === "twoHybrid" ? { kind: "generic" as const, amount: 1 } : y)) } : c;
   // "You may play that card without paying its mana cost" (Intet, CR 118.9): additional costs are still paid.
   // Prototyped isn't an alternative cost (CR 718.3): it's still free.
   const realAlt = how.alt && how.alt !== "prototype";
@@ -6693,9 +6703,10 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Increases first, then reductions, which only take off generic mana (CR 601.2f, 118.7a).
   const extra = Math.max(0, total.extra + mods.more + more + flashbackMore + wayMore - less);
   // Drain Life: "Spend only black mana on X": X's part of the generic mana, less the reductions (which may take off X,
-  // rulings), is paid with that type, as colored symbols (CR 601.2g-h). Not when mana of any type can be spent (CR 609.4b).
+  // rulings), is paid with that type, as colored symbols (CR 601.2g-h). Not when mana of any type (or as though of any
+  // color) can be spent (CR 609.4b).
   const onX = compileCard(d).spendOnlyOnX;
-  const xPaid = onX && !how.faceDown && !anyTypeNow ? Math.min(extra, Math.max(0, x * xCount(mana) - less)) : 0;
+  const xPaid = onX && !how.faceDown && !anyTypeNow && !anyColorNow ? Math.min(extra, Math.max(0, x * xCount(mana) - less)) : 0;
   if (xPaid) return costAtLeast(s, { cost: { ...reducedCost, symbols: [...reducedCost.symbols, ...Array.from({ length: xPaid }, () => ({ kind: "colored" as const, color: onX! }))] }, extra: extra - xPaid });
   return costAtLeast(s, { cost: reducedCost, extra });
 }

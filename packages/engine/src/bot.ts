@@ -5318,6 +5318,17 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     if (t?.kind === "player") return harmsChosenTarget(r.body) ? t.id !== pid && !player(s, t.id).lost : t.id === pid;
     return !!t && t.kind === "object" && !!s.objects[t.id] && isMine(s, pid, t) !== harmsChosenTarget(r.body);
   }
+  // Deceiver of Form: "You may put that card on the bottom of your library": a land we don't need any more, or a card we
+  // couldn't cast for a while; otherwise it's our next draw.
+  if (r && e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "topToBottom" && r.revealed && s.objects[r.revealed.id]?.zone === "library") {
+    const d = defOf(s, obj(s, r.revealed.id));
+    const have = lands(s, pid);
+    return isType(d, "Land") ? have >= 6 : defMv(d) > have + 2;
+  }
+  // Deceiver of Form: "If a creature card is revealed this way, you may have creatures you control other than ~ become copies
+  // of that card": the may inside the condition, only if they gain by it.
+  const innerCopy = e?.type === "if" && e.effects.length === 1 && e.effects[0]!.type === "may" && e.effects[0]!.effects.length === 1 ? e.effects[0]!.effects[0] : undefined;
+  if (r && innerCopy?.type === "becomeCopy" && innerCopy.of.ref === "revealed") return copyGain(s, pid, innerCopy) > 0;
   if (!r || e?.type !== "may") return true;
   // Phyrexian Dreadnought: keep it only by sacrificing other creatures worth less than it, together.
   const floor = e.keep && e.effects.length === 1 && e.effects[0]!.type === "pick" ? e.effects[0]!.minTotalPower : undefined;
@@ -5411,7 +5422,8 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
       continue;
     }
     if (inner.type === "becomeCopy") {
-      v += copyGain(s, pid, inner) >= 0 ? 1 : -2;
+      // Vesuvan Drifter: revealing is only for the copy, so a worse copy decides it.
+      v += copyGain(s, pid, inner) >= 0 ? 1 : inner.of.ref === "revealed" ? -10 : -2;
       continue;
     }
     const i = targetIndexOf(inner);
@@ -5463,17 +5475,30 @@ const defWorth = (d: CardDef) => (isType(d, "Creature") ? 3 * basePower(d) + bas
 function copyGain(s: GameState, pid: PlayerId, e: Extract<Effect, { type: "becomeCopy" }>): number {
   const item = s.resolving!.item;
   const me = item.sourceId ? s.objects[item.sourceId] : undefined;
-  if (e.what.ref !== "self" || me?.zone !== "battlefield") return 0;
+  if (me?.zone !== "battlefield") return 0;
+  // Vesuvan Drifter, Deceiver of Form: the card revealed from the top of the library, or about to be one we may look at
+  // (Drifter's "You may look at the top card of your library any time").
+  const rv = s.resolving!.revealed;
+  const top = s.players[pid]!.library[0];
+  const revealed = e.of.ref === "revealed" ? (rv && s.objects[rv.id] ? defOf(s, obj(s, rv.id)) : top && compileCard(defOf(s, me)).lookTop ? defOf(s, obj(s, top)) : undefined) : undefined;
+  if (revealed && !isType(revealed, "Creature")) return 0;
+  // Deceiver of Form: "creatures you control other than ~": what each of them gains, together.
+  if (revealed && e.what.ref === "each" && e.what.other) {
+    const mine = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== me.id && controllerOf(s, o) === pid && objIsType(s, o, "Creature"));
+    return mine.reduce((n, o) => n + defWorth(revealed) - defWorth(defOf(s, o)), 0);
+  }
+  if (e.what.ref !== "self") return 0;
   const t = e.of.ref === "target" ? item.targets?.[e.of.index] : undefined;
   const sub = item.subject && s.objects[item.subject.id];
   const d =
-    t?.kind === "object"
+    revealed ??
+    (t?.kind === "object"
       ? defOf(s, obj(s, t.id))
       : e.of.ref === "subject" && sub
         ? defOf(s, sub)
         : e.of.ref === "subjectCard" && item.lki?.copyKey
           ? s.cards[item.lki.copyKey]
-          : undefined;
+          : undefined);
   if (!d) return 0;
   const legend = d.supertypes.includes("Legendary") && s.battlefield.some((id) => id !== me.id && controllerOf(s, obj(s, id)) === pid && defOf(s, obj(s, id)).name === d.name);
   return legend ? -1 : defWorth(d) - defWorth(defOf(s, me));

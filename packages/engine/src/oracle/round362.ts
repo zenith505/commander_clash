@@ -7,12 +7,16 @@ import type { CompiledCard, Effect, TargetSpec } from "../abilities";
 import type { Ctx } from "./body";
 import { parseSentence } from "./sentence";
 import { parseCopyExcept } from "./tokens";
+import { round363Sentence } from "./round363";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round362Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 363's sentences first (oracle/round363.ts).
+  const r363 = round363Sentence(s, sentences, si, ctx, effects);
+  if (r363) return r363;
   const line = plain(s);
   const prev = effects[effects.length - 1];
   // Dimir Doppelganger: "{1}{U}{B}: Exile target creature card from a graveyard. ~ becomes a copy of that card, except it

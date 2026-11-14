@@ -1452,6 +1452,8 @@ export function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | 
     // included (rulings, CR 202.3e).
     const moved = item.objectId && s.objects[item.objectId];
     if (moved && item.x && s.resolving) (s.resolving.countered ??= {})[moved.id] = { zc: moved.zoneChanges ?? 0, x: item.x };
+    // Gale's Redirection: "the exiled card", the card the spell was (a copy ceases to exist, CR 707.10a).
+    if (instead === "exile" && moved && moved.zone === "exile" && !moved.spellCopy && !moved.isToken && item.kind === "spell" && s.resolving) s.resolving.exiledFromStack = { id: moved.id, zc: moved.zoneChanges ?? 0 };
     log(s, instead === "exile" ? `${by} exiles ${what}.` : `${by} returns ${what} to its owner's hand.`);
     return;
   }

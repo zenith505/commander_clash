@@ -3228,6 +3228,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fa09e18c-e7cf-4f08-9cc4-324e36594063",
+  "name": "Beamsplitter Mage",
+  "manaCost": "{U}{R}",
+  "cmc": 2,
+  "typeLine": "Creature — Vedalken Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vedalken",
+   "Wizard"
+  ],
+  "oracleText": "Whenever you cast an instant or sorcery spell that targets only this creature, if you control one or more other creatures that spell could target, choose one of those creatures. Copy that spell. The copy targets the chosen creature.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "grn",
+  "releasedAt": "2018-10-05",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a465f8a9-d5aa-4dfa-b674-7aa1798cb0bd",
   "name": "Beast Mode",
   "manaCost": "{1}{G}",
@@ -3559,6 +3592,40 @@
   "set": "hob",
   "releasedAt": "2026-08-14",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0ebe67ed-8a71-4bbc-8e58-cebbd7b2d83f",
+  "name": "Bill Potts",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human"
+  ],
+  "oracleText": "Whenever you cast an instant or sorcery spell that targets only Bill Potts or activate an ability that targets only Bill Potts, copy that spell or ability. You may choose new targets for the copy. This ability triggers only once each turn.\nDoctor's companion (You can have two commanders if the other is the Doctor.)",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Doctor's companion"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -16452,6 +16519,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "940909b2-f59e-4f87-a119-675efd60a5bc",
+  "name": "Hankyu",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature has \"{T}: Put an aim counter on Hankyu\" and \"{T}, Remove all aim counters from Hankyu: This creature deals damage to any target equal to the number of aim counters removed this way.\"\nEquip {4} ({4}: Attach to target creature you control. Equip only as a sorcery.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8a37ac5c-341b-48ab-9b0b-5ef8bf097aab",
   "name": "Hans Eriksson",
   "manaCost": "{2}{R}{G}",
@@ -19351,6 +19444,65 @@
   "commanderLegal": "legal",
   "set": "leg",
   "releasedAt": "1994-06-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "43fbfeec-bcaf-48b8-befe-b7346fec5a3a",
+  "name": "Jötun Grunt",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Giant Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Giant",
+   "Soldier"
+  ],
+  "oracleText": "Cumulative upkeep—Put two cards from a single graveyard on the bottom of their owner's library. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Cumulative upkeep"
+  ],
+  "commanderLegal": "legal",
+  "set": "csp",
+  "releasedAt": "2006-07-21",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c92802ff-484c-4d55-aba4-c3a000264113",
+  "name": "Kaboom!",
+  "manaCost": "{4}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose any number of target players or planeswalkers. For each of them, reveal cards from the top of your library until you reveal a nonland card, Kaboom! deals damage equal to that card's mana value to that player or planeswalker, then you put the revealed cards on the bottom of your library in any order.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -22680,6 +22832,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f6a6da20-52c8-4921-9884-29d3a3051b0d",
+  "name": "Martyrdom",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Until end of turn, target creature you control gains \"{0}: The next 1 damage that would be dealt to target creature, planeswalker, or player this turn is dealt to this creature instead.\" Only you may activate this ability.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bb9e77c0-eb94-4bba-9b71-1935be280b75",
   "name": "Masako the Humorless",
   "manaCost": "{2}{W}",
@@ -24877,6 +25055,32 @@
   "set": "clb",
   "releasedAt": "2022-06-10",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0caf42f5-abff-48aa-9bbf-df6cba169ef3",
+  "name": "Mystic Barrier",
+  "manaCost": "{4}{W}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters and at the beginning of your upkeep, choose left or right.\nEach player may attack only the nearest opponent in the last chosen direction and planeswalkers controlled by that opponent.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c13",
+  "releasedAt": "2013-11-01",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -32784,6 +32988,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c6e92e21-d3e7-4982-b9f3-af56d4014c07",
+  "name": "Shuriken",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature has \"{T}, Unattach Shuriken: Shuriken deals 2 damage to target creature. That creature's controller gains control of Shuriken unless it was unattached from a Ninja.\"\nEquip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "bok",
+  "releasedAt": "2005-02-04",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "728d2e30-2f36-4054-81db-29b01e376a82",
   "name": "Sickening Dreams",
   "manaCost": "{1}{B}",
@@ -38114,6 +38344,34 @@
   "set": "hob",
   "releasedAt": "2026-08-14",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "81fe7c5e-503e-488c-b06c-1615ed38e5a3",
+  "name": "Thought Lash",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Cumulative upkeep—Exile the top card of your library. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nWhen a player doesn't pay this enchantment's cumulative upkeep, that player exiles all cards from their library.\nExile the top card of your library: Prevent the next 1 damage that would be dealt to you this turn.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Cumulative upkeep"
+  ],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

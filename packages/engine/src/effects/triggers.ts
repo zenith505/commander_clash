@@ -17,7 +17,7 @@ import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE, RAD } from "../oracle";
 import { isRingBearer, ringTrigger } from "./run-ring";
-import { kickedMatches } from "./run-spells";
+import { eachOtherTargets, kickedMatches } from "./run-spells";
 import { sharesColorOrMvWithLinked } from "./run-laneb189";
 import { hasSuspend, isSuspended } from "./run-zones";
 import { sourcePowerNow } from "./run-laneb202";
@@ -206,6 +206,8 @@ export type TriggerSourceEvent =
   /** "Whenever you discover" (Curator of Sun's Creation): the discover value as `amount`. */
   | { type: "discovered"; player: PlayerId; amount: number }
   | { type: "cumulativeUpkeepPaid"; id: ObjectId }
+  /** Thought Lash (round B210): `player` didn't pay the cumulative upkeep of permanent `id` (CR 702.24a). */
+  | { type: "cumulativeUpkeepUnpaid"; id: ObjectId; player: PlayerId }
   /** A player paid mana to cast a spell: what they had spent this turn on spells before and after (CR 700.14). */
   | { type: "expended"; player: PlayerId; before: number; after: number }
   /** A player scried or surveilled (CR 701.22d, 701.25d): `n`, how many cards they looked at. */
@@ -1292,6 +1294,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "cumulativeUpkeepPaid") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfCumulativeUpkeepPaid");
+  } else if (ev.type === "cumulativeUpkeepUnpaid") {
+    // Thought Lash: "When a player doesn't pay ~'s cumulative upkeep, that player ...": the player who didn't pay.
+    const o = s.objects[ev.id];
+    if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfCumulativeUpkeepUnpaid", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
   } else if (ev.type === "gaveGift") {
     for (const id of s.battlefield) {
       const o = obj(s, id);
@@ -2453,6 +2459,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.hasTargets && !(item?.targets ?? []).some((x) => x.kind !== "none")) return false;
         // "That targets only ~" (Zada), "only a single Golem": every target it has names one permanent.
         if (t.cast.targetsOnly && !targetsOnlyOne(s, item?.targets ?? [], t.cast.targetsOnly, o, you)) return false;
+        // Beamsplitter Mage: "if you control one or more other creatures that spell could target" (CR 603.4).
+        if (t.cast.otherYoursCouldTarget && !(item && eachOtherTargets(s, item, { among: t.cast.otherYoursCouldTarget, self: true }, { sourceId: o.id, controller: you }).length)) return false;
         // Where it was cast from (CR 601.2a); a copy wasn't cast from anywhere.
         if (t.cast.from && !castFromMatches(t.cast.from, ev.copy ? undefined : spell, ev.controller)) return false;
         if (t.cast.notOwned && !(spell && !ev.copy && spell.owner !== ev.controller)) return false;
@@ -2720,6 +2728,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           const item = ev.stackId ? s.castItems?.[ev.stackId] : undefined;
           if (!item?.targets?.some((t) => t.kind === "player" || (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objIsType(s, s.objects[t.id]!, "Creature")))) return false;
         }
+        // Bill Potts: "an ability that targets only ~": every target it has, as activated, this permanent (rulings).
+        if (a.targetsOnlySelf && !targetsOnlyOne(s, (ev.stackId ? s.castItems?.[ev.stackId] : undefined)?.targets ?? [], "self", o, you)) return false;
         // Herald of Anafenza: "Whenever you activate ~'s outlast ability": this object's own.
         if (a.ownOutlast && (!ev.outlast || ev.source?.snapshot.id !== o.id || (ev.source.snapshot.zoneChanges ?? 0) !== (o.zoneChanges ?? 0))) return false;
         if (a.equipped) {

@@ -21,7 +21,7 @@ import { copyKey, type CopyExcept } from "../copies";
  * `eachOther`), in the order they're on the battlefield (the copies' controller then picks the order, see copySpell). Each must be one every target of the spell could name, as its
  * caster and with the spell as the source (rulings: shroud, protection and targeting restrictions leave one out).
  */
-function eachOtherTargets(s: GameState, orig: StackItem, eo: NonNullable<Extract<Effect, { type: "copySpell" }>["eachOther"]>, ctx: ResolveCtx): ObjectId[] {
+export function eachOtherTargets(s: GameState, orig: StackItem, eo: NonNullable<Extract<Effect, { type: "copySpell" }>["eachOther"]>, ctx: Pick<ResolveCtx, "sourceId" | "controller" | "sourceZc">): ObjectId[] {
   const chosen = (orig.targets ?? []).map((t, i) => ({ t, spec: orig.body?.targets[i] })).filter((x) => x.t.kind !== "none");
   const first = chosen[0]?.t;
   if (first?.kind !== "object" || chosen.some((x) => x.t.kind !== "object" || x.t.id !== first.id || !x.spec)) return [];
@@ -539,7 +539,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           const extra = extraSpellCopies(s, by);
           // Frontline Heroism: one copy, aimed at one of the tokens, its controller's choice if a replacement made more
           // than one it could target (CR 707.10e).
-          if (e.eachOther!.toCreated) sc.copies = { of: id!, left: 1, each, by, ...(each.length > 1 ? { pickOne: true as const } : {}), ...(extra ? { extra } : {}) };
+          // Beamsplitter Mage: one copy, aimed at the creature its controller chooses among them (rulings).
+          if (e.eachOther!.toCreated || e.eachOther!.chooseOne) sc.copies = { of: id!, left: 1, each, by, ...(each.length > 1 ? { pickOne: true as const } : {}), ...(extra ? { extra } : {}) };
           else sc.copies = { of: id!, left: each.length, each, by, ...(extra ? { extra } : {}) };
         } else {
         const n =
@@ -578,7 +579,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (c.each && c.pickOne && !c.picked) {
           const names = c.each.map((id) => characteristics(s, obj(s, id)).name);
           const labels = names.map((n, i) => (names.filter((x) => x === n).length > 1 ? `${n} ${names.slice(0, i + 1).filter((x) => x === n).length}` : n));
-          s.pending = { kind: "chooseOption", player: c.by ?? ctx.controller, source: src, what: "copyOrder", options: [...c.each], labels, prompt: `choose the token the copy of ${orig.description} targets` };
+          s.pending = { kind: "chooseOption", player: c.by ?? ctx.controller, source: src, what: "copyOrder", options: [...c.each], labels, prompt: `choose the ${e.n === "eachOther" && e.eachOther?.chooseOne ? "creature" : "token"} the copy of ${orig.description} targets` };
           return "paused";
         }
         if (c.each && c.left > 1 && !c.picked) {

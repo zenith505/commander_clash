@@ -23132,6 +23132,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f687a746-4807-41d5-848d-4053ddef6a76",
+  "name": "Moorland Rescuer",
+  "manaCost": "{5}{W}",
+  "cmc": 6,
+  "typeLine": "Creature — Human Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "When this creature dies, return any number of other creature cards with total power X or less from your graveyard to the battlefield, where X is this creature's power. Exile this card.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mic",
+  "releasedAt": "2021-09-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "87aa466e-7985-40ff-bef6-dcae35fe0106",
   "name": "Mossbridge Troll",
   "manaCost": "{5}{G}{G}",

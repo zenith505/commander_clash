@@ -1,6 +1,6 @@
 # Roadmap
 
-31,239 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,245 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,876 of
 9,979 (98%).
 
@@ -2566,6 +2566,30 @@ line blocks.
    Tamiyo, Collector of Tales ("Spells and abilities your opponents control can't cause you to discard cards or sacrifice
    permanents", every discard and sacrifice path); Share the Spoils (each player plays from cards exiled with it, "When
    they do, exile the top card of their library", and again whenever an opponent loses).
+   Round 357 went on down `npm run popular`, most played first, to cards cast from where a permission or trigger puts them:
+   Najal, the Storm Runner's "Whenever ~ attacks, you may pay {2}. If you do, when you next cast an instant or sorcery
+   spell this turn, copy it. You may choose new targets for the copy." ("copy it" read as Mercurial Spelldancer's "copy
+   that spell", CR 603.7); Ryan Sinclair's "exile cards from the top of your library until you exile a nonland card. You
+   may cast the exiled card without paying its mana cost if it's a spell with mana value less than or equal to ~'s power.
+   Put the exiled cards not cast this way on the bottom of your library in a random order." (exileUntilNonland
+   `mvLessThan` its power plus one, as the trigger resolves or last known, CR 608.2h, with `restBottom`); Scattering
+   Stroke's "If you win, at the beginning of your next main phase, you may add an amount of {C} equal to that spell's mana
+   value." (Mana Drain's delayed mana, all or none chosen as it resolves, rulings); Heaven Sent's chapter III "Then if an
+   opponent has 0 or less life, draw seven cards. Otherwise, exile this Saga and you may cast it this turn." (exile
+   `youMay` thisTurn on the Saga itself, CR 400.7; exiled, it isn't sacrificed, CR 714.4); Arcade Gannon's "Once during
+   each of your turns, you may cast an artifact or Human spell from your graveyard with mana value less than or equal to
+   the number of quest counters on ~." (graveyardGrants `maxMvCount`, the spell's X counted, CR 202.3e); The Eighth
+   Doctor's "Once during each of your turns, you may play a historic land or cast a historic permanent spell from your
+   graveyard. If you do, it gains "If this permanent would leave the battlefield, exile it instead of putting it anywhere
+   else."" (Serra Paragon's shared use, `landFromGraveyardFilter` for historic lands, CR 700.6). No new prompt: each
+   uses the existing may, free-cast, copy-target and graveyard-cast paths. +6, 31,245 of 31,936 with round 356 and Lane
+   B's B197 and B198. The compiled text of every other card is unchanged.
+   Out after round 357 (looked at, not done): Open the Omenpaths ("Add two mana of any one color and two mana of any
+   other color. Spend this mana only to cast creature or enchantment spells.": two different colors picked as it
+   resolves, then a spend restriction, still out); Glorious Purpose ("When the sixth plan counter is put on ~": a trigger
+   on a counter count reached, then any number of spells cast free from four exiled cards); Spirit of Resilience
+   ("Whenever one or more cards leave your graveyard": a batch trigger, then it becomes a copy of one of those cards until
+   end of turn).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

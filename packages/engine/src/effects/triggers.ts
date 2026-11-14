@@ -2315,7 +2315,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // Loki Laufeyson: "with mana value less than or equal to ~'s power", that power as the spell is cast (CR 603.2), as it
       // last existed on the battlefield once it has left (CR 113.7a, 608.2h).
       if (d.mvMaxPowerOf && (item ? spellManaValue(s, item) : defMv(ev.card)) > sourcePowerNow(s, d.mvMaxPowerOf)) continue;
-      if (d.loyalty === "only" || d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(rest, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
+      if (d.loyalty === "only" || d.exhaust || d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(rest, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
       // Zevlor, Elturel Exile: a spell that doesn't target only one opponent or one opponent's permanent doesn't use it up.
       if (d.onlyOpponentOrTheirs && opponentOrTheirsTarget(s, item?.targets ?? [], d.controller) === undefined) continue;
       // Yidris, Maelstrom Wielder: each spell cast from your hand this turn gains cascade; the effect isn't used up.
@@ -2679,6 +2679,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (!(ev.loyalty ? d.loyalty : d.xAbility) || d.controller !== ev.player || d.turn !== s.turn) continue;
         s.nextCast = s.nextCast!.filter((x) => x !== d);
         if (!ev.stackId) continue;
+        s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
+      }
+    // Pit Automaton: "When you next activate an exhaust ability that isn't a mana ability this turn, copy it": a delayed
+    // trigger (CR 603.7a), once (603.7c); an exhaust mana ability doesn't use it up (rulings: it isn't one that triggers
+    // it). Its copy resolves first (CR 707.10).
+    if (ev.exhaust && !ev.mana && ev.stackId)
+      for (const d of [...(s.nextCast ?? [])]) {
+        if (!d.exhaust || d.controller !== ev.player || d.turn !== s.turn) continue;
+        s.nextCast = s.nextCast!.filter((x) => x !== d);
         s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
       }
     // "Whenever an opponent activates an ability of a creature that isn't a mana ability" (its source as it was activated).

@@ -23,11 +23,12 @@ export interface SourceOption {
  * that fit `filter` now ("a red source of your choice"). Face-up objects in the command zone can be chosen too, but
  * they can't deal damage from there, so they aren't offered.
  */
-export function damageSourceOptions(s: GameState, filter: TargetSpec | undefined, controller: PlayerId, permanentOnly?: true): SourceOption[] {
+export function damageSourceOptions(s: GameState, filter: TargetSpec | undefined, controller: PlayerId, permanentOnly?: true, yours?: true): SourceOption[] {
   const out: SourceOption[] = [];
   const seen = new Set<string>();
   const add = (o: SourceOption) => {
-    if (seen.has(o.key)) return;
+    // "A source you control" (Desperate Gambit): its controller now, a spell's its caster's (CR 110.2, 112.2).
+    if (seen.has(o.key) || (yours && o.controller !== controller)) return;
     seen.add(o.key);
     out.push(o);
   };
@@ -60,10 +61,10 @@ export function damageSourceOptions(s: GameState, filter: TargetSpec | undefined
  * Asks the ability's controller for a source of damage (CR 609.7a) as it resolves, then gives the one chosen, as the
  * object it is; null when there's none to choose.
  */
-export function chooseDamageSource(s: GameState, ctx: ResolveCtx, filter: TargetSpec, src: string, permanentOnly?: true): "paused" | { id: ObjectId; zc: number; spell?: true } | null {
+export function chooseDamageSource(s: GameState, ctx: ResolveCtx, filter: TargetSpec, src: string, permanentOnly?: true, yours?: true): "paused" | { id: ObjectId; zc: number; spell?: true } | null {
   const sc = (s.resolving!.scratch ??= {});
   if (sc.damageSource === undefined) {
-    const options = damageSourceOptions(s, filter, ctx.controller, permanentOnly);
+    const options = damageSourceOptions(s, filter, ctx.controller, permanentOnly, yours);
     if (!options.length) {
       log(s, `${src}: there's no ${filter.text ? `${filter.text.replace(/^target /, "")} ` : ""}source to choose.`);
       return null;

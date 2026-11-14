@@ -5713,6 +5713,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "14fe4531-96cd-415b-aa4a-b41fd271d902",
+  "name": "Cemetery Illuminator",
+  "manaCost": "{1}{U}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit"
+  ],
+  "oracleText": "Flying\nWhenever this creature enters or attacks, exile a card from a graveyard.\nYou may look at the top card of your library any time.\nOnce each turn, you may cast a spell from the top of your library if it shares a card type with a card exiled with this creature.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "fa53cc50-f06f-44b0-850f-cfa6e0caa4c5",
   "name": "Cemetery Prowler",
   "manaCost": "{1}{G}{G}",
@@ -9197,6 +9229,34 @@
   "set": "spg",
   "releasedAt": "2024-04-19",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d8328d27-e27f-4c84-8ab5-cabb80a34f54",
+  "name": "Desperate Gambit",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose a source you control and flip a coin. If you win the flip, the next time that source would deal damage this turn, it deals double that damage instead. If you lose the flip, the next time it would deal damage this turn, prevent that damage.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Double"
+  ],
+  "commanderLegal": "legal",
+  "set": "wth",
+  "releasedAt": "1997-06-09",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -24080,6 +24140,37 @@
   "set": "dmr",
   "releasedAt": "2023-01-13",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "692fdca7-0eff-4d2d-b744-213b6f6e18fb",
+  "name": "Nacatl War-Pride",
+  "manaCost": "{3}{G}{G}{G}",
+  "cmc": 6,
+  "typeLine": "Creature — Cat Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Cat",
+   "Warrior"
+  ],
+  "oracleText": "This creature must be blocked by exactly one creature if able.\nWhenever this creature attacks, create X tokens that are copies of it and that are tapped and attacking, where X is the number of creatures defending player controls. Exile the tokens at the beginning of the next end step.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

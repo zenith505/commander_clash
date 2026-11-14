@@ -4,6 +4,7 @@ import type { CompiledCard, Effect, TargetSpec } from "../abilities";
 import type { Ctx } from "./body";
 import { parseTrigger } from "./triggers";
 import { parseCopyExcept } from "./tokens";
+import { round364Sentence } from "./round364";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -11,6 +12,9 @@ const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 const creatureCard: TargetSpec = { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" };
 
 export function round363Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 364's sentences first (oracle/round364.ts).
+  const r364 = round364Sentence(s, sentences, si, ctx, effects);
+  if (r364) return r364;
   const line = plain(s);
   const next = plain(sentences[si + 1]);
   // Vesuvan Drifter: "At the beginning of each combat, you may reveal the top card of your library. If you reveal a

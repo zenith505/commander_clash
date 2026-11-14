@@ -311,6 +311,8 @@ export interface Characteristics {
   mustBeBlocked: boolean;
   /** Gorm the Great: "must be blocked by two or more creatures if able" too (CR 509.1c). */
   mustBeBlockedByTwo?: true;
+  /** Nacatl War-Pride: "must be blocked by exactly one creature if able" (CR 509.1c). */
+  mustBeBlockedByOne?: true;
   allMustBlock: boolean;
   /** "All Walls able to block ~ do so" (Marble Priest): the blockers that must block it, if able (CR 509.1c). */
   allMustBlockBy?: TargetSpec[];
@@ -2062,6 +2064,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       if (m.by) c.mustBeBlockedBy = [...(c.mustBeBlockedBy ?? []), m.by];
       else c.mustBeBlocked = true;
       if (m.twoOrMore && !m.by) c.mustBeBlockedByTwo = true;
+      if (m.exactlyOne && !m.by) c.mustBeBlockedByOne = true;
       return;
     case "attacksIfAble":
       if (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0)) return;

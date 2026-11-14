@@ -528,8 +528,14 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (!o || o.zone !== "battlefield") return;
         mod.to = { ...mod.to, chosen: { id: o.id, zc: o.zoneChanges ?? 0 } };
       }
+      // Desperate Gambit: "that source", chosen earlier in this resolution; none chosen, nothing happens.
+      if (e.chosenSource) {
+        const c = s.resolving?.chosenSource;
+        if (!c) return;
+        mod.by = { ...mod.by, chosen: c };
+      }
       if (e.choose) {
-        const chosen = chooseDamageSource(s, ctx, e.choose, src);
+        const chosen = chooseDamageSource(s, ctx, e.choose, src, e.choosePermanent);
         if (chosen === "paused") return "paused";
         if (!chosen) return;
         mod.by = { ...mod.by, chosen };

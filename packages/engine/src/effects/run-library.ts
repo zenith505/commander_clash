@@ -283,6 +283,40 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (o?.zone === "exile" && printedMatches(e.filter, defOf(s, o))) suspendExiled(s, o, defMv(defOf(s, o)));
       }
       return;
+    case "putSearchFound": {
+      // Druid of the Emerald Grove: the basic lands found and revealed, still in the library after the roll.
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      const p = player(s, ctx.controller);
+      const ids = (r.searchFound ?? []).filter((id) => s.objects[id]?.zone === "library");
+      if (!ids.length) return;
+      const nameOfId = (id: ObjectId) => defOf(s, obj(s, id)).name;
+      // "Put one of those cards onto the battlefield tapped and the other into your hand": which one is the searcher's
+      // choice, asked only when it matters (two cards with different names). With one card, it goes to `dest`, as with
+      // Cultivate (rulings).
+      if (e.others && !sc.impulseChoice) {
+        sc.impulseChoice = { ids };
+        if (ids.length > 1 && new Set(ids.map(nameOfId)).size > 1) {
+          s.pending = { kind: "chooseOption", player: p.id, source: src, what: "impulseChoice", options: ids, labels: ids.map(nameOfId), prompt: `choose the card to put onto the battlefield${e.dest.tapped ? " tapped" : ""} (the other goes into your hand)` };
+          return "paused";
+        }
+      }
+      const first = e.others ? (sc.impulseChoice?.pick && ids.includes(sc.impulseChoice.pick) ? sc.impulseChoice.pick : ids[0]!) : undefined;
+      sc.impulseChoice = undefined;
+      const to = (id: ObjectId) => (e.others && id !== first ? e.others : e.dest);
+      const put = (id: ObjectId) => {
+        const d = to(id);
+        if (d.zone === "battlefield") moveObject(s, id, "battlefield", { controller: p.id, ...(d.tapped ? { tapped: true } : {}) });
+        else if (d.zone === "hand") moveObject(s, id, "hand");
+      };
+      const onto = ids.filter((id) => to(id).zone === "battlefield");
+      const toHand = ids.filter((id) => to(id).zone === "hand");
+      if (onto.length) log(s, `${p.name} puts ${onto.map(nameOfId).join(", ")} onto the battlefield${e.dest.tapped || e.others?.tapped ? " tapped" : ""}.`);
+      if (toHand.length) log(s, `${p.name} puts ${toHand.map(nameOfId).join(", ")} into their hand.`);
+      enterTogether(s, () => onto.forEach(put));
+      toHand.forEach(put);
+      return;
+    }
     case "putFromExiledTop": {
       const sc = (s.resolving!.scratch ??= {});
       if (e.any || e.may) {
@@ -2257,8 +2291,13 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         r.dugToHand = found.length;
         r.dugToHandCards = [...found];
       }
+      // Hew the Entwood: "Put all nonland cards chosen this way onto the battlefield, then put all land cards chosen this
+      // way onto the battlefield tapped": two events, one after the other (CR 608.2c).
+      const isLandCard = (id: ObjectId) => isType(defOf(s, obj(s, id)), "Land");
+      const batches = e.nonlandFirst ? [found.filter((id) => !isLandCard(id)), found.filter(isLandCard)] : [found];
+      for (const batch of batches)
       enterTogether(s, () => {
-        for (const id of found) {
+        for (const id of batch) {
           if (e.landsOnto && ontoField(id)) {
             moveObject(s, id, "battlefield", { controller: p.id, tapped: true });
             if (obj(s, id).zone === "battlefield") r.created!.push(id);
@@ -2284,7 +2323,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           }
           else if (e.into === "battlefield") {
             const extra = e.countersIfMv && manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost)) <= e.countersIfMv.max ? e.countersIfMv : e.counters;
-            moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(extra ? { counters: { [extra.counter]: extra.n } } : {}), ...hosts.get(id) });
+            moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped || (e.nonlandFirst && isLandCard(id)) ? { tapped: true } : {}), ...(extra ? { counters: { [extra.counter]: extra.n } } : {}), ...hosts.get(id) });
             const o = obj(s, id);
             if (attack && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
               o.attacking = attack.player;

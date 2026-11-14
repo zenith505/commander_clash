@@ -243,7 +243,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             r.did = false;
             return;
           }
-          s.pending = { kind: "chooseMay", player: decider, prompt: prompt.replace(/~/g, src), source: src, ...(card ? { card: card.id } : {}), ...(pay ? { pay } : {}), ...(e.keep ? { keep: true } : {}), ...(e.cumulativeUpkeep && ctx.sourceId ? { upkeepOf: ctx.sourceId } : {}) };
+          // Choice of Damnations: "{n}", the number chosen as it resolves.
+          s.pending = { kind: "chooseMay", player: decider, prompt: prompt.replace(/~/g, src).replace(/\{n\}/g, String(r.chosen?.number ?? 0)), source: src, ...(card ? { card: card.id } : {}), ...(pay ? { pay } : {}), ...(e.keep ? { keep: true } : {}), ...(e.cumulativeUpkeep && ctx.sourceId ? { upkeepOf: ctx.sourceId } : {}) };
           return "paused";
         }
       }
@@ -873,9 +874,12 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           }
           return;
         }
+        // Choice of Damnations: "target opponent chooses a number": that player (none still in the game: no number, 0).
+        const numberChooser = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+        if (numberChooser === undefined) return;
         const bound = e.maxHandOf ?? e.maxLibraryOf;
         const range = bound ? { min: e.range.min, max: Math.max(e.range.min, ...players(s, bound, ctx).map((x) => player(s, x)[e.maxHandOf ? "hand" : "library"].length)) } : e.range;
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: [String(range.min)], numberRange: range, prompt: e.prompt ?? (bound ? `choose a number greater than ${e.range.min - 1} (up to ${range.max}, the cards in that player's ${e.maxHandOf ? "hand" : "library"})` : `choose a number between ${range.min} and ${range.max}`) };
+        s.pending = { kind: "chooseOption", player: numberChooser, source: src, what: "number", options: [String(range.min)], numberRange: range, prompt: e.prompt ?? (bound ? `choose a number greater than ${e.range.min - 1} (up to ${range.max}, the cards in that player's ${e.maxHandOf ? "hand" : "library"})` : `choose a number between ${range.min} and ${range.max}`) };
         return "paused";
       }
       if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "colors" ? "colors" : e.choice === "basicLandType" || e.choice === "landType" ? "landType" : e.choice === "keyword" ? "keyword" : e.choice === "parity" ? "parity" : e.choice === "direction" ? "direction" : e.choice === "landOrNonland" ? "landOrNonland" : e.choice === "planeswalkerType" ? "planeswalkerType" : "type"] === undefined) {

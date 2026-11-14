@@ -424,6 +424,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && mayFx.some((x) => x.type === "pick" && x.action === "exile" && !!x.exiledCounter)) return [{ type: "chooseMay", player: pid, yes: !!takeoverPick(s, pid) }];
     // Stromgald Spy: a revealed hand tells a bot nothing it uses; the combat damage is worth more.
     if (pend.kind === "chooseMay" && mayFx.some((x) => x.type === "revealHandWhile")) return [{ type: "chooseMay", player: pid, yes: false }];
+    // Choice of Damnations: the life loss when it kills them or costs them more than the permanents they'd sacrifice (the
+    // ones they'd keep being their best), else the sacrifice.
+    if (pend.kind === "chooseMay" && s.resolving && mayFx.some((x) => x.type === "loseLife" && typeof x.n === "object" && "count" in x.n && x.n.count.kind === "chosenNumber") && allEffects(s.resolving.body.effects).some((e) => e.type === "choose" && !!e.damnation)) {
+      const t = s.resolving.item.targets?.[0];
+      const who = t?.kind === "player" ? t.id : undefined;
+      if (who === undefined) return [{ type: "chooseMay", player: pid, yes: true }];
+      const n = s.resolving.chosen?.number ?? 0;
+      const theirs = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === who).map((o) => worth(s, who, o)).sort((a, b) => a - b);
+      const lost = theirs.slice(0, Math.max(0, theirs.length - n)).reduce((a, v) => a + v, 0);
+      return [{ type: "chooseMay", player: pid, yes: n >= player(s, who).life || n * 0.75 >= lost }];
+    }
     // Retriever Phoenix back on the battlefield rather than learning (discarding a card to draw one): always.
     if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.insteadOfLearn ? true : pend.card ? (revealedMay(s, pend.card) ?? millExplored(s, pid, pend.card)) : wantsMay(s, pid) }];
     // Perplex: discard the whole hand to keep the spell only when that hand is one card or none.
@@ -1138,6 +1149,23 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "addOrRemoveCounter") {
       const o = pend.about ? s.objects[pend.about] : undefined;
       const k = pend.counterKind ?? "";
+      // Lavabrink Floodgates: toward its 6 damage to each creature when the wipe hurts our opponents (on average) more than
+      // us, away from it (or left alone) otherwise.
+      const wipe = s.resolving ? allEffects(s.resolving.body.effects).find((x) => x.type === "counterKindsAddOrRemove" && !!x.wipeAt && x.kind === k) : undefined;
+      if (o && wipe?.type === "counterKindsAddOrRemove" && wipe.wipeAt) {
+        const opps = livingPlayers(s).filter((x) => x !== pid);
+        let mine = 0;
+        let theirs = 0;
+        for (const id of s.battlefield) {
+          const c = obj(s, id);
+          if (!objIsType(s, c, "Creature") || objHasKeyword(s, c, "indestructible") || lethalLeft(s, c) > wipe.wipeAt.damage) continue;
+          if (controllerOf(s, c) === pid) mine += worth(s, pid, c);
+          else theirs += worth(s, pid, c);
+        }
+        const good = theirs / Math.max(1, opps.length) > mine + 2;
+        const choice = good ? "add" : pend.options.includes("remove") ? "remove" : "none";
+        return [{ type: "chooseOption", player: pid, choice: pend.options.includes(choice) ? choice : pend.options[pend.options.length - 1]! }];
+      }
       const helpful = k !== "-1/-1" && k !== "stun" && k !== "age" && k !== "time" && k !== "fade";
       const mine = !!o && controllerOf(s, o) === pid;
       // Clockspinning, Jhoira's Timebug: a time counter on a suspended card (CR 702.62b), its owner's, comes off for our
@@ -1207,6 +1235,20 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       if (next?.type === "chooseFromGraveyard" && next.who?.ref === "chosenPlayer" && !next.dest && opps.length) {
         const fewest = [...opps].sort((a, b) => player(s, Number(a)).graveyard.length - player(s, Number(b)).graveyard.length)[0]!;
         return [{ type: "chooseOption", player: pid, choice: fewest }];
+      }
+      // Infernal Offering: "You and that player each sacrifice a creature" (each who does draws two): the opponent whose
+      // least creature costs them more than two cards are worth to them; "that player returns a creature card from their
+      // graveyard to the battlefield": the one whose best creature card there is the weakest (none at all, ideally).
+      if (next?.type === "pick" && next.who.ref === "youAndChosenPlayer" && opps.length) {
+        const loss = (x: PlayerId) => {
+          const least = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === x && objIsType(s, o, "Creature")).map((o) => worth(s, x, o)).sort((a, b) => a - b)[0];
+          return least === undefined ? 0 : least - 4;
+        };
+        return [{ type: "chooseOption", player: pid, choice: [...opps].sort((a, b) => loss(Number(b)) - loss(Number(a)))[0]! }];
+      }
+      if (r && pend.what === "opponent" && opps.length && r.body.effects.slice(r.next + 1).some((e) => e.type === "chooseFromGraveyard" && e.who?.ref === "chosenPlayer" && e.dest === "battlefield")) {
+        const best = (x: PlayerId) => Math.max(0, ...player(s, x).graveyard.map((id) => defOf(s, obj(s, id))).filter((d) => isType(d, "Creature")).map((d) => 1 + (Number(d.power) || 0) + (Number(d.toughness) || 0)));
+        return [{ type: "chooseOption", player: pid, choice: [...opps].sort((a, b) => best(Number(a)) - best(Number(b)))[0]! }];
       }
       // Boreas Charger: "an opponent who controls more lands than you. Search ... for a number of Plains cards equal to the
       // difference": the one with the most lands.
@@ -5608,6 +5650,15 @@ function chooseKeyword(s: GameState, pid: PlayerId, options: string[]): string {
  */
 function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, options: string[], card?: CardDef): string {
   const r = (s.pending?.kind === "chooseOption" && s.pending.numberRange) || { min: Number(options[0] ?? 0), max: Number(options[0] ?? 0) };
+  // Choice of Damnations, as its target: the caster then makes us lose that much life or keep only that many permanents.
+  // As many as we control while losing that much life leaves us a quarter of our life (then nothing is sacrificed), else
+  // the most life we can spare that way.
+  if (s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "choose" && e.choice === "number" && !!e.damnation)) {
+    const me = player(s, pid);
+    const perms = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid).length;
+    const spare = Math.max(0, me.life - Math.max(1, Math.ceil(me.life / 4)));
+    return String(Math.max(r.min, Math.min(r.max, perms, spare)));
+  }
   // Rites of Initiation: cards discarded at random for +1/+0 each, so all of a small hand (three or fewer) while our creatures
   // are attacking, else none.
   if (s.resolving && /^Discard any number of cards at random\./.test(card?.oracleText ?? "")) {

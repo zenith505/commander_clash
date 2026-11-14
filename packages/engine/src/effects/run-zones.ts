@@ -677,7 +677,8 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
       const k0 = e.keep[kr.slot]!;
       const options0 = among(pid).filter((id) => objectMatches(s, { ...k0.filter, controller: "you" }, obj(s, id), pid, false));
       // "Unless they pay X life": as many as they can pay for, any number with X 0 (CR 119.4).
-      const k = k0.fewest ? { ...k0, n: kr.fewest ?? 0 } : k0.maxTotalPower !== undefined ? { ...k0, n: options0.length } : e.payLife !== undefined ? { ...k0, n: lifeEach > 0 ? Math.floor(payableLife(s, pid) / lifeEach) : options0.length } : k0;
+      // Choice of Damnations: "all but that many", the number chosen as it resolves.
+      const k = k0.nChosen ? { ...k0, n: Math.max(0, s.resolving?.chosen?.number ?? 0) } : k0.fewest ? { ...k0, n: kr.fewest ?? 0 } : k0.maxTotalPower !== undefined ? { ...k0, n: options0.length } : e.payLife !== undefined ? { ...k0, n: lifeEach > 0 ? Math.floor(payableLife(s, pid) / lifeEach) : options0.length } : k0;
       // Stick Together: a creature already in the party fills no second slot (CR 700.8b).
       const options = k.notKept ? options0.filter((id) => !kept.includes(id)) : options0;
       const max = Math.min(k.n, options.length);

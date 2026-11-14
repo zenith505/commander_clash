@@ -725,14 +725,18 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "counterKindsAddOrRemove": {
       // Quarry Hauler, Dramatist's Puppet: the target's kinds of counter as this resolves, each its own choice (rulings),
       // made one after another; then the counters are put and removed together.
-      const you = ctx.controller;
+      // Lavabrink Floodgates: "that player may put a doom counter on ~ or remove a doom counter from it": the upkeep's
+      // player chooses (rulings), whoever controls it.
+      const you = e.chooser ? players(s, e.chooser, ctx)[0] : ctx.controller;
+      if (you === undefined) return;
       const sc = (s.resolving!.scratch ??= {});
       // Clockspinning, Jhoira's Timebug: the target may be a suspended card in exile (TargetSpec.orSuspended), which
       // must still be suspended as it resolves; a permanent with no counter on it is left as it is (rulings).
       const here = (x: GameObject) => x.zone === "battlefield" || (x.zone === "exile" && isSuspended(s, x));
       if (!sc.addOrRemove) {
         const o = objects(s, e.what, ctx).find(here);
-        let kinds = o ? Object.keys(o.counters).filter((k) => (o.counters[k] ?? 0) > 0 && (e.kind === undefined || k === e.kind)) : [];
+        // Lavabrink Floodgates: asked with none of that kind on it too, the only choices then putting one on or not.
+        let kinds = o ? (e.evenNone && e.kind !== undefined ? [e.kind] : Object.keys(o.counters).filter((k) => (o.counters[k] ?? 0) > 0 && (e.kind === undefined || k === e.kind))) : [];
         if (!o || !kinds.length) return;
         // Clockspinning: one kind of counter it has, chosen as it resolves (rulings).
         if (e.one && kinds.length > 1) {
@@ -755,16 +759,18 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const kind = st.kinds.find((k) => st.picks[k] === undefined);
       if (kind !== undefined) {
         const n = o.counters[kind] ?? 0;
+        // With none to remove, removing isn't offered (CR 122.8: a counter that isn't there can't be removed).
+        const canRemove = removableCounters(s, o, kind) > 0;
         s.pending = {
           kind: "chooseOption",
           player: you,
           source: src,
           what: "addOrRemoveCounter",
-          options: ["add", "remove", ...(e.may ? ["none"] : [])],
-          labels: [`Put another ${kind} counter on it`, `Remove a ${kind} counter from it`, ...(e.may ? ["Neither"] : [])],
+          options: ["add", ...(canRemove || !e.evenNone ? ["remove"] : []), ...(e.may ? ["none"] : [])],
+          labels: [`Put ${n ? "another" : "a"} ${kind} counter on it`, ...(canRemove || !e.evenNone ? [`Remove a ${kind} counter from it`] : []), ...(e.may ? ["Neither"] : [])],
           about: o.id,
           counterKind: kind,
-          prompt: `${name} has ${n} ${kind} counter${n === 1 ? "" : "s"}: put another or remove one`,
+          prompt: `${name} has ${n} ${kind} counter${n === 1 ? "" : "s"}: ${n ? "put another or remove one" : `put a ${kind} counter on it or not`}`,
         };
         return "paused";
       }

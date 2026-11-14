@@ -8813,7 +8813,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   which the divide check now permits for "any number", CR 115.6, 601.2d; a browser test). Arcane Artisan (target player
   draws, then exiles a card from their hand; a creature card gives them a token copy of it, CR 707.2; when ~ leaves, every
   token created with it is exiled at the next end step, the tokens of the permanent it was, CR 603.10a, 400.7; a browser
-  test). Livio also has a browser test. +6, 31,245 of 31,936 with B199.
+  test). Livio also has a browser test. +6, 31,257 of 31,936 with B199 and rounds 356, 357.
 - Out after round B200 (looked at, not done): Divine Deflection (one prevention shield shared by you and every permanent you
   control, with the prevented amount dealt back to any target chosen as damage is prevented) stays out.
 - Out after round B192 (looked at, not done): Garruk, Curse Breaker (its −4: how often "whenever one or more creatures

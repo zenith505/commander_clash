@@ -726,6 +726,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       }
       return [{ type: "searchLibrary", player: pid, found }];
     }
+    // "With total power X or less" (Moorland Rescuer, round B202): the best-ranked cards that still fit.
+    if (pend.kind === "searchLibrary" && pend.totalPower !== undefined) {
+      const found: string[] = [];
+      let left = pend.totalPower;
+      const pow = (id: string) => characteristics(s, s.objects[id]!).power;
+      for (const id of chooseSearch(s, pid, pend.cards, pend.cards.length)) {
+        if (found.length >= pend.max || pow(id) > left) continue;
+        found.push(id);
+        left -= pow(id);
+      }
+      return [{ type: "searchLibrary", player: pid, found }];
+    }
     // "Basic land cards that share a land type" (Myriad Landscape): as many as we can of one type, the best-ranked first.
     if (pend.kind === "searchLibrary" && pend.shareLandType) {
       const ranked = chooseSearch(s, pid, pend.cards, pend.cards.length);

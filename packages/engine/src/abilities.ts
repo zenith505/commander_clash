@@ -2374,7 +2374,7 @@ export type StaticCondition =
   /** "If ~ is in your graveyard" (`creatureAbove`: "with a creature card directly above it", Krovikan Horror). */
   | { kind: "selfInGraveyard"; creatureAbove?: true; /** Nether Spirit: "if ~ is the only creature card in your graveyard". */ onlyCreature?: true; /** Nether Shadow: "with three or more creature cards above it" (put there after it, rulings). */ creaturesAbove?: number }
   /** "If this card is exiled" (Senu): still that card, face up in its owner's exile (CR 603.4). */
-  | { kind: "selfInExile" }
+  | { kind: "selfInExile"; /** Darigaaz Reincarnated: "if this card is exiled with an egg counter on it": with one or more of these on it (round B202). */ counter?: CounterKind }
   /**
    * "If this card is suspended" (Deep-Sea Kraken, Pardic Dragon): the same card, face up in its owner's exile, with suspend
    * and a time counter on it (CR 702.62b, rulings), an intervening if (CR 603.4).
@@ -3725,7 +3725,7 @@ export type Effect =
   /** "When you next cast an instant or sorcery spell this turn, ...": a delayed trigger on that cast (CR 603.7). */
   /** `cascade`: "the next noncreature spell you cast this turn has cascade" (Dark Apostle): that spell's own cascade. */
   /** `who`: "the next spell they cast": that player's (a target player), not the controller's. */
-  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; /** Magus Lucea Kane: "When you next cast a spell with {X} in its mana cost or activate an ability with {X} in its activation cost this turn": an activated ability with the mana symbol {X} in its activation cost uses it up too (rulings), copied with `effects`. */ xAbility?: true; /** "Copy the next loyalty ability you activate this turn" (Jaya's Phoenix, `only`), "When you next cast an instant spell, cast a sorcery spell, or activate a loyalty ability this turn" (Repeated Reverberation, `also`): a loyalty ability its controller activates uses it up too (CR 606.3), and with `only` no spell does. */ loyalty?: "also" | "only"; /** Zevlor, Elturel Exile: "that targets only a single opponent or a single permanent an opponent controls": every target of the spell that one player or permanent (rulings), checked as it's cast (GameState.nextCast `onlyOpponentOrTheirs`). */ onlyOpponentOrTheirs?: true; cascade?: true; /** Yidris, Maelstrom Wielder: "as you cast spells from your hand this turn, they gain cascade": every such spell this turn, not only the next one (never used up). */ allTurn?: true; /** "The next instant or sorcery spell you cast this turn has storm" (Crackling Spellslinger). */ storm?: true; who?: PlayerRef; /** "When you next cast an instant or sorcery spell from your hand this turn" (Narset Transcendent). */ fromHand?: true; /** "The next spell you cast this turn can't be countered" (Mistrise Village). */ uncounterable?: true; /** "The next spell of the chosen type you cast this turn can be cast as though it had flash" (Progenitor's Icon; CR 702.8a): used up by that spell, whenever it's cast. */ flash?: true; /** Soulfire Grand Master: "put that card into your hand instead of into your graveyard as it resolves" (GameObject.toHandOnResolve). */ toHand?: true; /** Savage Summoning: "That creature enters with an additional +1/+1 counter on it" (CR 614.1c): the counter it enters with. */ counter?: string; /** "The next red or green creature spell you cast this turn can be cast without paying its mana cost" (World War Hulk, `free`) and "Rather than pay the mana cost of the next spell you cast this turn, you may pay life equal to that spell's mana value" (Marshland Bloodcaster, `life`): an alternative cost (CR 118.9) offered to that spell only, used up by it whichever cost is paid (rulings). */ alt?: "free" | "life" }
+  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; /** Magus Lucea Kane: "When you next cast a spell with {X} in its mana cost or activate an ability with {X} in its activation cost this turn": an activated ability with the mana symbol {X} in its activation cost uses it up too (rulings), copied with `effects`. */ xAbility?: true; /** "Copy the next loyalty ability you activate this turn" (Jaya's Phoenix, `only`), "When you next cast an instant spell, cast a sorcery spell, or activate a loyalty ability this turn" (Repeated Reverberation, `also`): a loyalty ability its controller activates uses it up too (CR 606.3), and with `only` no spell does. */ loyalty?: "also" | "only"; /** Zevlor, Elturel Exile: "that targets only a single opponent or a single permanent an opponent controls": every target of the spell that one player or permanent (rulings), checked as it's cast (GameState.nextCast `onlyOpponentOrTheirs`). */ onlyOpponentOrTheirs?: true; cascade?: true; /** Yidris, Maelstrom Wielder: "as you cast spells from your hand this turn, they gain cascade": every such spell this turn, not only the next one (never used up). */ allTurn?: true; /** "The next instant or sorcery spell you cast this turn has storm" (Crackling Spellslinger). */ storm?: true; who?: PlayerRef; /** "When you next cast an instant or sorcery spell from your hand this turn" (Narset Transcendent). */ fromHand?: true; /** "The next spell you cast this turn can't be countered" (Mistrise Village). */ uncounterable?: true; /** "The next spell of the chosen type you cast this turn can be cast as though it had flash" (Progenitor's Icon; CR 702.8a): used up by that spell, whenever it's cast. */ flash?: true; /** Soulfire Grand Master: "put that card into your hand instead of into your graveyard as it resolves" (GameObject.toHandOnResolve). */ toHand?: true; /** Savage Summoning: "That creature enters with an additional +1/+1 counter on it" (CR 614.1c): the counter it enters with. */ counter?: string; /** "The next red or green creature spell you cast this turn can be cast without paying its mana cost" (World War Hulk, `free`) and "Rather than pay the mana cost of the next spell you cast this turn, you may pay life equal to that spell's mana value" (Marshland Bloodcaster, `life`): an alternative cost (CR 118.9) offered to that spell only, used up by it whichever cost is paid (rulings). */ alt?: "free" | "life"; /** Loki Laufeyson: "with mana value less than or equal to ~'s power": the source's power as the spell is cast, as it last existed if it has left the battlefield (round B202). */ mvMaxSourcePower?: true }
   /**
    * "Until end of turn, whenever you cast a spell, ~ deals 2 damage to up to one target creature" (CR 603.7b): a delayed
    * triggered ability that triggers each time its event happens until `until` ends (see GameState.floatingTriggers).
@@ -4342,6 +4342,16 @@ export type Effect =
    * suspended cards (CR 702.62b), all at once; the last time counter removed triggers suspend and vanishing.
    */
   | { type: "timeCountersEach"; mode: "remove" | "add"; n: number }
+  /**
+   * Moorland Rescuer (round B202): "return any number of other creature cards with total power X or less from your
+   * graveyard to the battlefield, where X is ~'s power": `max` worked out as it resolves; each card's power in the graveyard.
+   */
+  | { type: "yardTotalPower"; max: Amount; filter: TargetSpec }
+  /**
+   * Darigaaz Reincarnated (round B202): "remove an egg counter from it. Then if ~ has no egg counters on it, return it to the
+   * battlefield": the card in exile, still that object, onto the battlefield under its owner's control.
+   */
+  | { type: "removeCounterThenReturn"; counter: CounterKind }
   /**
    * Crooked Scales: "Flip a coin. If you win the flip, destroy target creature an opponent controls [target 0]. If you lose
    * the flip, destroy target creature you control [target 1] unless you pay {3} and repeat this process.": the same targets
@@ -6269,6 +6279,8 @@ export type TriggerEvent =
   | "yourCreatureFights"
   /** "Whenever one or more creatures you control become blocked" (Hezrou): once when blockers are declared if one or more of yours became blocked (CR 509.3c). */
   | "yourCreaturesBecomeBlocked"
+  /** "Whenever one or more creatures block" (Tide of War): once as blockers are declared, if any player declared one or more blockers (CR 509.3a, rulings). */
+  | "creaturesBlock"
   /** "When you cycle ~" (CR 702.29c): it triggers from whatever zone the card went to, under its owner's control. */
   | "selfCycled"
   /** "When you discard ~" (Titanbones, Towering Heart): the card's ability, wherever it went (as with cycling). */
@@ -7805,6 +7817,8 @@ export interface CompiledCard {
     countersPower?: true;
     /** "Instead exile it and put a hit counter on it" (Ravenloft Adventurer): the card in exile gets one (CR 122.1). */
     counter?: CounterKind;
+    /** With `counter`, Darigaaz Reincarnated: "with three egg counters on it": this many, not one. */
+    counterN?: number;
     linked?: true;
     /** "Exile it instead. When you do, create a 1/1 green Saproling creature token." (Nemata, Primeval Warden): a reflexive trigger each time this replacement is applied (CR 603.12). */
     reflexive?: AbilityBody;

@@ -4366,7 +4366,8 @@ function LibrarySearch({
   // "Basic land cards that share a land type" (Myriad Landscape): a card joins only ones it shares a land type with.
   // "A Forest card and a Plains card" (Krosan Verge): a card joins only if each found card can still be a different one.
   // "With total mana value 4 or less" (Lively Dirge): a card joins only if the total stays within it.
-  const clashes = (id: string) => (pending.totalMv !== undefined && [...found, id].reduce((n, x) => n + mvOf(x), 0) > pending.totalMv) || (!!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id))) || (!!pending.distinctPowers && found.some((f) => powerOf(f) === powerOf(id))) || (!!pending.shareLandType && !shareLandType([...found, id].map((x) => cardOf(s, x)))) || (!!pending.oneName && found.some((f) => !sameName(cardOf(s, f).name, cardOf(s, id).name))) || (!!pending.oneOfEach && !oneOfEachFits(pending.oneOfEach, [...found, id].map((x) => cardOf(s, x))));
+  // "With total power X or less" (Moorland Rescuer): likewise with the cards' powers.
+  const clashes = (id: string) => (pending.totalMv !== undefined && [...found, id].reduce((n, x) => n + mvOf(x), 0) > pending.totalMv) || (pending.totalPower !== undefined && [...found, id].reduce((n, x) => n + powerOf(x), 0) > pending.totalPower) || (!!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id))) || (!!pending.distinctPowers && found.some((f) => powerOf(f) === powerOf(id))) || (!!pending.shareLandType && !shareLandType([...found, id].map((x) => cardOf(s, x)))) || (!!pending.oneName && found.some((f) => !sameName(cardOf(s, f).name, cardOf(s, id).name))) || (!!pending.oneOfEach && !oneOfEachFits(pending.oneOfEach, [...found, id].map((x) => cardOf(s, x))));
   const add = (ids: string[]) => {
     const next = ids.find((id) => !found.includes(id) && !clashes(id));
     if (next && found.length < pending.max) setFound([...found, next]);
@@ -4443,6 +4444,8 @@ function LibrarySearch({
                 ? `Chosen ${found.length}; the first goes lowest.`
                 : pending.totalMv !== undefined
                   ? `Chosen ${found.length} of ${pending.max}, total mana value ${found.reduce((n, x) => n + mvOf(x), 0)} of at most ${pending.totalMv}.`
+                : pending.totalPower !== undefined
+                  ? `Chosen ${found.length}, total power ${found.reduce((n, x) => n + powerOf(x), 0)} of at most ${pending.totalPower}.`
                 : pending.cardTypes
                   ? `Chosen ${found.length}, with ${cardTypesAmong(s, found)} card type${cardTypesAmong(s, found) === 1 ? "" : "s"} among them: ${pending.cardTypes} or more, or none.`
                 : pending.exactly
@@ -4530,7 +4533,7 @@ function LibrarySearch({
               const d = cardOf(s, ids[0]!);
               const can = left > 0 && found.length < pending.max && !clashes(ids[0]!);
               return (
-                <div key={name} className={`card big ${can ? "targetable" : "dim"}`} data-pick={ids[0]} onClick={() => can && add(ids)} {...hoverProps(d, onHover)} title={left > 0 && clashes(ids[0]!) ? (pending.oneOfEach ? "You already found a card of this kind" : pending.shareLandType ? "It doesn't share a land type with the cards you chose" : pending.oneName ? "It doesn't have the same name as the cards you chose" : pending.totalMv !== undefined ? "The total mana value would be too high" : "You already chose a card with this mana value") : undefined}>
+                <div key={name} className={`card big ${can ? "targetable" : "dim"}`} data-pick={ids[0]} onClick={() => can && add(ids)} {...hoverProps(d, onHover)} title={left > 0 && clashes(ids[0]!) ? (pending.oneOfEach ? "You already found a card of this kind" : pending.shareLandType ? "It doesn't share a land type with the cards you chose" : pending.oneName ? "It doesn't have the same name as the cards you chose" : pending.totalMv !== undefined ? "The total mana value would be too high" : pending.totalPower !== undefined ? "The total power would be too high" : "You already chose a card with this mana value") : undefined}>
                   <CardFace d={d} />
                   {ids.length > 1 && <span className="zone-count">×{left}</span>}
                   {zones && <span className="muted small" data-zone={name}>in {name}</span>}

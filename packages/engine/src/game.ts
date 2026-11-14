@@ -1197,7 +1197,7 @@ export function moveObject(
   // "Instead exile it with a void counter on it" (Dauthi Voidwalker).
   if (yardExile?.counter && to === "exile") o.counters[yardExile.counter] = 1;
   // Ravenloft Adventurer: "instead exile it and put a hit counter on it".
-  if (insteadOfDying?.x.counter && to === "exile") o.counters[insteadOfDying.x.counter] = (o.counters[insteadOfDying.x.counter] ?? 0) + 1;
+  if (insteadOfDying?.x.counter && to === "exile") o.counters[insteadOfDying.x.counter] = (o.counters[insteadOfDying.x.counter] ?? 0) + (insteadOfDying.x.counterN ?? 1);
   o.controller = opts.controller ?? o.owner;
   o.seenController = undefined;
   o.attacking = undefined;
@@ -10744,6 +10744,7 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
     throw new RulesError("choose cards with different mana values");
   if (pend.distinctPowers && new Set(found.map((id) => characteristics(s, obj(s, id)).power)).size !== found.length) throw new RulesError("choose cards with different powers");
   if (pend.totalMv !== undefined && found.reduce((n, id) => n + defMv(defOf(s, obj(s, id))), 0) > pend.totalMv) throw new RulesError(`choose cards with total mana value ${pend.totalMv} or less`);
+  if (pend.totalPower !== undefined && found.reduce((n, id) => n + characteristics(s, obj(s, id)).power, 0) > pend.totalPower) throw new RulesError(`choose cards with total power ${pend.totalPower} or less`);
   if (pend.cardTypes && found.length && cardTypesAmong(s, found) < pend.cardTypes) throw new RulesError(`choose cards with ${pend.cardTypes} or more card types among them, or none`);
   if (pend.shareLandType && !shareLandType(found.map((id) => defOf(s, obj(s, id)))))
     throw new RulesError("choose cards that share a land type");

@@ -47,7 +47,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && ctx && !ctx.spell && /^creature that (crewed|saddled) (?:it|~) this turn$/.test(p)) return { count: { kind: "crewedSource", ...(/saddled/.test(p) ? { saddled: true as const } : {}) } };
   // Perrie, the Pulverizer: "the number of different kinds of counters among permanents you control"; each kind once, as
   // Hundred-Battle Veteran counts them.
-  if (!each && (m = /^the number of different kinds of counters among (creatures|permanents) you control$/i.exec(p))) {
+  // Storm of Forms (round B202): "copy it for each kind of counter among permanents you control", the same count.
+  if ((!each && (m = /^the number of different kinds of counters among (creatures|permanents) you control$/i.exec(p))) || (each && (m = /^kind of counter among (creatures|permanents) you control$/.exec(p)))) {
     const c = parseCount(`${m[1]} you control`, ctx);
     return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.other && !c.count.counter ? { count: { ...c.count, counterKinds: true } } : null;
   }

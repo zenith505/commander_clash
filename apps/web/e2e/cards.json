@@ -1668,6 +1668,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7dbf5f59-1246-4156-bb21-090cfddd9111",
+  "name": "Arcane Artisan",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "{2}{U}, {T}: Target player draws a card, then exiles a card from their hand. If a creature card is exiled this way, that player creates a token that's a copy of that card.\nWhen this creature leaves the battlefield, exile all tokens created with it at the beginning of the next end step.",
+  "power": "0",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bbd",
+  "releasedAt": "2018-06-08",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ab1cc360-b9de-48d9-9983-4dfe4a7d2a37",
   "name": "Arcane Denial",
   "manaCost": "{1}{U}",
@@ -13080,6 +13111,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d732d9b8-dea0-41c4-8cff-67b2b3d36ecb",
+  "name": "Fortunate Few",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose a nonland permanent you don't control, then each other player chooses a nonland permanent they don't control that hasn't been chosen this way. Destroy all other nonland permanents.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c17",
+  "releasedAt": "2017-08-25",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "97b97728-bfe6-483a-a323-c758f41ff9dc",
   "name": "Fossil Find",
   "manaCost": "{R/G}",
@@ -13133,6 +13190,28 @@
   "commanderLegal": "legal",
   "set": "drk",
   "releasedAt": "1994-08-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b69d2bd6-3e99-4c51-89af-0acedd48739e",
+  "name": "Fraying Line",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "When this artifact enters, put a rope counter on target creature you control.\nAt the beginning of each player's upkeep, that player may pay {2}. If they do, they put a rope counter on a creature they control. Otherwise, exile this artifact and each creature without a rope counter on it, then remove all rope counters from all creatures.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -20780,6 +20859,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "53c6f2cf-ed3e-4c0c-ad42-56a6ce1622b6",
+  "name": "Livio, Oathsworn Sentinel",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Human Knight",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "{1}{W}: Choose another target creature. Its controller may exile it with an aegis counter on it.\n{2}{W}, {T}: Return all exiled cards with aegis counters on them to the battlefield under their owners' control.\nPartner (You can have two commanders if both have partner.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Partner"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "68954295-54e3-4303-a6bc-fc4547a4e3a3",
   "name": "Llanowar Elves",
   "manaCost": "{G}",
@@ -21740,6 +21854,39 @@
   "set": "rav",
   "releasedAt": "2005-10-07",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "45154dc6-ff0a-4e99-8528-689757d1778e",
+  "name": "Meandering Towershell",
+  "manaCost": "{3}{G}{G}",
+  "cmc": 5,
+  "typeLine": "Creature — Turtle",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Turtle"
+  ],
+  "oracleText": "Islandwalk (This creature can't be blocked as long as defending player controls an Island.)\nWhenever this creature attacks, exile it. Return it to the battlefield under your control tapped and attacking at the beginning of the declare attackers step on your next turn.",
+  "power": "5",
+  "toughness": "9",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Landwalk",
+   "Islandwalk"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2021-08-24",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -41242,6 +41389,45 @@
   "set": "c18",
   "releasedAt": "2018-08-10",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "81ab8947-8046-4944-ae58-006a6eefa08a",
+  "name": "Yannik, Scavenging Sentinel",
+  "manaCost": "{2}{G}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Hyena Beast",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Hyena",
+   "Beast"
+  ],
+  "oracleText": "Partner with Nikara, Lair Scavenger\nVigilance\nWhen Yannik enters, exile another creature you control until Yannik leaves the battlefield. When you do, distribute X +1/+1 counters among any number of target creatures, where X is the exiled creature's power.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [
+   "Partner with",
+   "Vigilance",
+   "Partner"
+  ],
+  "commanderLegal": "legal",
+  "set": "c20",
+  "releasedAt": "2020-04-17",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

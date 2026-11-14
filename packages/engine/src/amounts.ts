@@ -547,6 +547,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return new Set((ctx.sacrificed ?? []).flatMap((l) => l.types ?? [])).size;
     case "putThisWay":
       return (s.resolving?.created ?? []).filter((id) => s.objects[id]?.zone === "battlefield").length;
+    case "putThisWayOpponentControllers": {
+      const opps = opponents(s, ctx.controller);
+      return new Set((s.resolving?.created ?? []).filter((id) => s.objects[id]?.zone === "battlefield").map((id) => controllerOf(s, s.objects[id]!)).filter((p) => opps.includes(p))).size;
+    }
     case "handPutOnTopThisWay":
       return s.resolving?.handPutOnTop ?? 0;
     case "castSameNameAsFound": {
@@ -1527,6 +1531,8 @@ function describeCount(c: Count): string {
       return "the total power of those creatures";
     case "putThisWay":
       return "#put onto the battlefield";
+    case "putThisWayOpponentControllers":
+      return "#opponents who control one or more of those permanents";
     case "handPutOnTopThisWay":
       return "#cards put on top from their hand";
     case "castSameNameAsFound":

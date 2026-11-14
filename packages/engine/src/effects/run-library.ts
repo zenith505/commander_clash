@@ -684,6 +684,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             log(s, `${player(s, pid).name} exiles ${defOf(s, obj(s, id)).name} from their hand${untilMe ? ` until ${src} leaves the battlefield` : ""}.`);
             moveObject(s, id, "exile");
             const o = obj(s, id);
+            // Arcane Artisan: "If a creature card is exiled this way, that player creates a token that's a copy of that card".
+            if (o.zone === "exile") (s.resolving!.exiledFromHandCards ??= []).push({ id, zc: o.zoneChanges ?? 0 });
             // Intellect Devourer: back to its owner's hand when ~ leaves (CR 610.3), if it's still this object in exile.
             if (o.zone === "exile" && untilMe) (untilMe.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, hand: true });
             // Lightstall Inquisitor: its owner may play it while it stays exiled, a spell costing more, a land entering tapped.

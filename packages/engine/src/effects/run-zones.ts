@@ -49,7 +49,7 @@ export function suspendExiled(s: GameState, o: GameObject, n: number): void {
  * Put exiled cards onto the battlefield, all at once: an Aura's new controller chooses what it enchants as it enters,
  * and with nothing it can enchant it stays in exile (CR 303.4f-g, rulings on Flicker of Fate).
  */
-function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObject) => PlayerId, src: string, counter?: CounterKind | CounterKind[], tapped0?: boolean | "lands", transformed?: boolean, counterIfCreature?: boolean, loyaltyIfPlaneswalker?: boolean): "paused" | void {
+export function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObject) => PlayerId, src: string, counter?: CounterKind | CounterKind[], tapped0?: boolean | "lands", transformed?: boolean, counterIfCreature?: boolean, loyaltyIfPlaneswalker?: boolean): "paused" | void {
   const counters = counter === undefined || (Array.isArray(counter) && !counter.length) ? undefined : Object.fromEntries((Array.isArray(counter) ? counter : [counter]).map((k) => [k, 1]));
   // Returned transformed: only a double-faced card, with its back face up (CR 712.14a); anything else stays in exile.
   const back = cards.filter((c) => (transformed ? transformedFace(s, c) !== undefined : isPermanentCard(defOf(s, c))));
@@ -188,6 +188,12 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const here = o?.zone === "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc;
     const { notSubject: _, ...rest } = e.filter;
     e = { ...e, filter: { ...rest, ...(here ? { notId: o!.id } : {}) } };
+  }
+  // Yannik, Scavenging Sentinel: "until ~ leaves the battlefield" with ~ already gone exiles nothing (CR 610.3c, rulings).
+  const untilMe = e.untilSourceLeaves ? objects(s, { ref: "self" }, ctx)[0] : undefined;
+  if (e.untilSourceLeaves && untilMe?.zone !== "battlefield") {
+    log(s, `${src} has left the battlefield, so nothing is exiled.`);
+    return;
   }
   const sc = (r.scratch ??= {});
   let who = players(s, e.who, ctx);
@@ -403,6 +409,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)), controller: controllerOf(s, o) };
         moveObject(s, id, "exile");
         if (s.objects[id]?.zone === "exile" && s.resolving) (s.resolving.exiled ??= []).push(before);
+        if (untilMe && s.objects[id]?.zone === "exile" && !s.objects[id]!.isToken) (untilMe.exiledUntilLeaves ??= []).push({ id, zc: s.objects[id]!.zoneChanges ?? 0 });
         // The Master, Formed Anew: the counter goes on the card in exile (CR 122.1), not a token, which is gone (CR 111.7).
         const exiledCard = s.objects[id];
         if (e.exiledCounter && exiledCard?.zone === "exile" && !exiledCard.isToken) {

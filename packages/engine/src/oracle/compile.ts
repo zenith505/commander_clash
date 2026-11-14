@@ -43,6 +43,8 @@ import { roundB192Line } from "./laneb192";
 import { roundB194Line, roundB194Spell } from "./laneb194";
 import { roundB197Line } from "./laneb197";
 import { roundB198Line } from "./laneb198";
+import { markOnlyWalls, roundB199Line } from "./laneb199";
+import { roundB200Line } from "./laneb200";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -94,7 +96,8 @@ export function compileCard(card: CardDef): CompiledCard {
   const hit = cache.get(d.oracleId);
   if (hit) return hit;
   const doors = d.roomDoors ? roomDoorDefs(d) : undefined;
-  const out = doors ? roomAbilities(doors) : compile(d);
+  // Wall of Shadows: the targets of spells and abilities that can target only Walls are marked (TargetSpec.onlyWalls).
+  const out = markOnlyWalls(doors ? roomAbilities(doors) : compile(d));
   // An emblem's activated abilities work in the command zone, where it is (CR 114.4): its owner activates them there.
   if (d.typeLine === "Emblem") out.activated = out.activated.map((ab) => ({ ...ab, zone: "command" as const }));
   // A meld card's ability melds it with its counterpart into their combined back face (CR 701.42a): only if what that
@@ -2096,6 +2099,10 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB197Line(line, raw, out, isSpell)) continue;
     // Boneyard Mycodrax, Templar Knight, Sea Gate Stormcaller, Dream Chisel, Obscuring Aether, Kadena, Goblin Maskmaker (round B198).
     if (roundB198Line(line, raw, out, isSpell)) continue;
+    // Nazahn, Hall of Echoes, Wall of Shadows, Fraying Line, Meandering Towershell, Noctis (round B199).
+    if (roundB199Line(line, raw, out, isSpell)) continue;
+    // Tenth District Hero, Livio (round B200).
+    if (roundB200Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

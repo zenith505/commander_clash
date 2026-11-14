@@ -1183,6 +1183,31 @@
   "gameChanger": false
  },
  {
+  "oracleId": "23467047-6dba-4498-b783-1ebc4f74b8c2",
+  "name": "Ancient Tomb",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}{C}. This land deals 2 damage to you.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "zne",
+  "releasedAt": "2020-09-25",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": true
+ },
+ {
   "oracleId": "f4ce6078-8c7b-4f68-b324-13130c63a983",
   "name": "Angel of Serenity",
   "manaCost": "{4}{W}{W}{W}",
@@ -2098,39 +2123,6 @@
   "set": "khm",
   "releasedAt": "2021-02-05",
   "rarity": "uncommon",
-  "layout": "normal",
-  "gameChanger": false
- },
- {
-  "oracleId": "b4dbbf56-d7df-4183-bb48-cfc6b4d0468f",
-  "name": "Armored Skyhunter",
-  "manaCost": "{3}{W}",
-  "cmc": 4,
-  "typeLine": "Creature — Cat Knight",
-  "supertypes": [],
-  "types": [
-   "Creature"
-  ],
-  "subtypes": [
-   "Cat",
-   "Knight"
-  ],
-  "oracleText": "Flying\nWhenever this creature attacks, look at the top six cards of your library. You may put an Aura or Equipment card from among them onto the battlefield. If an Equipment is put onto the battlefield this way, you may attach it to a creature you control. Put the rest of those cards on the bottom of your library in a random order.",
-  "power": "3",
-  "toughness": "3",
-  "colors": [
-   "W"
-  ],
-  "colorIdentity": [
-   "W"
-  ],
-  "keywords": [
-   "Flying"
-  ],
-  "commanderLegal": "legal",
-  "set": "cmr",
-  "releasedAt": "2020-11-20",
-  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -4903,6 +4895,38 @@
   "commanderLegal": "legal",
   "set": "voc",
   "releasedAt": "2021-11-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "20283c4a-f1f0-42f0-bc08-6da87474426b",
+  "name": "Breeding Pool",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Forest Island",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Forest",
+   "Island"
+  ],
+  "oracleText": "({T}: Add {G} or {U}.)\nAs this land enters, you may pay 2 life. If you don't, it enters tapped.",
+  "colors": [],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G",
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "trk",
+  "releasedAt": "2026-11-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -16665,6 +16689,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ed9e39ad-996c-4a68-8d11-e1c7d35f556c",
+  "name": "Herald of Leshrac",
+  "manaCost": "{6}{B}",
+  "cmc": 7,
+  "typeLine": "Creature — Avatar",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Avatar"
+  ],
+  "oracleText": "Flying\nCumulative upkeep—Gain control of a land you don't control. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nThis creature gets +1/+1 for each land you control but don't own.\nWhen this creature leaves the battlefield, each player gains control of each land they own that you control.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Cumulative upkeep",
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "csp",
+  "releasedAt": "2006-07-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "76243b38-cab1-465f-aa7d-5bc617541753",
   "name": "Herigast, Erupting Nullkite",
   "manaCost": "{9}",
@@ -21900,6 +21957,28 @@
   "set": "slx",
   "releasedAt": "2023-09-08",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "82909ff4-f6f7-44f1-bbd0-6e54afa5ee6d",
+  "name": "Mana Web",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever a land an opponent controls is tapped for mana, tap all lands that player controls that could produce any type of mana that land could produce.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "wth",
+  "releasedAt": "1997-06-09",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -28300,6 +28379,32 @@
   ],
   "subtypes": [],
   "oracleText": "Choose one —\n• Counter target spell if it's blue.\n• Destroy target permanent if it's blue.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ss3",
+  "releasedAt": "2020-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "85845b6c-abb5-4591-b987-a375972cf25b",
+  "name": "Pyromancer Ascension",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever you cast an instant or sorcery spell that has the same name as a card in your graveyard, you may put a quest counter on this enchantment.\nWhenever you cast an instant or sorcery spell while this enchantment has two or more quest counters on it, you may copy that spell. You may choose new targets for the copy.",
   "colors": [
    "R"
   ],
@@ -39596,6 +39701,36 @@
   "releasedAt": "2013-05-03",
   "rarity": "rare",
   "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "77322d69-330e-4b00-b984-62c6d45c9540",
+  "name": "Vault 101: Birthday Party",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Create a 1/1 white Human Soldier creature token and a Food token. (A Food token is an artifact with \"{2}, {T}, Sacrifice this token: You gain 3 life.\")\nII, III — You may put an Aura or Equipment card from your hand or graveyard onto the battlefield. If an Equipment is put onto the battlefield this way, you may attach it to a creature you control.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Food"
+  ],
+  "commanderLegal": "legal",
+  "set": "pip",
+  "releasedAt": "2024-03-08",
+  "rarity": "rare",
+  "layout": "saga",
   "gameChanger": false
  },
  {

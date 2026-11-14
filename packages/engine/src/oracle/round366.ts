@@ -5,14 +5,16 @@ import type { AbilityBody, CompiledCard, DamageRuleSpec, Effect } from "../abili
 import { parseActivated } from "./activated";
 import { parseBody, type Ctx } from "./body";
 import { parseTrigger } from "./triggers";
+import { round367Sentence } from "./round367";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round366Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void sentences;
-  void effects;
+  // Round 367's sentences first (oracle/round367.ts).
+  const r367 = round367Sentence(s, sentences, si, ctx, effects);
+  if (r367) return r367;
   const line = plain(s);
   // Panoptic Projektor: "The next face-down creature spell you cast this turn costs {3} less to cast": a reduction for
   // only the next face-down spell its controller casts this turn (a 2/2 creature spell with no other characteristics, CR

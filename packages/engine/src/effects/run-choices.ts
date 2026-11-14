@@ -714,6 +714,25 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const [q, n] of each) gainLife(s, q, n);
         return runEffect(s, paid, ctx);
       }
+      // Herald of Leshrac: whether to pay first, then a different land you don't control for each age counter, chosen as it
+      // resolves (not targeted), and control of all of them gained at once, for as long as they stay (CR 611.2c). With
+      // fewer such lands than age counters it can't be paid, so it's sacrificed (rulings, CR 118.3); none to gain for no
+      // age counters.
+      if (e.gainControlCost) {
+        if (!sc.n) return runEffect(s, paid, ctx);
+        const filter = e.gainControlCost;
+        const can = s.battlefield.filter((id) => objectMatches(s, filter, obj(s, id), ctx.controller, false));
+        if (can.length < sc.n) {
+          log(s, `${player(s, ctx.controller).name} can't gain control of ${sc.n} ${filter.text}s (${can.length} on the battlefield).`);
+          return runEffect(s, { type: "sacrifice", what: { ref: "self" } }, ctx);
+        }
+        const gain: Effect[] = [
+          { type: "pick", who: { ref: "you" }, filter, n: sc.n, action: "choose", anyController: true, prompt: `choose ${sc.n === 1 ? `a ${filter.text}` : `${sc.n} ${filter.text}s`} to gain control of (cumulative upkeep for ~)` },
+          { type: "continuous", what: { ref: "created" }, mods: [{ kind: "control" }], duration: "game" },
+          paid,
+        ];
+        return runEffect(s, { type: "may", effects: gain, otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Gain control of ${sc.n === 1 ? `a ${filter.text}` : `${sc.n} ${filter.text}s`} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
+      }
       const pay = timesPay(e.pay, sc.n);
       // "If [cost] has choices ... either the entire set of costs is paid, or none of them is" (CR 702.24a).
       return runEffect(s, { type: "may", effects: [paid], pay, otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Pay ${describePay(pay)} to keep ~ (cumulative upkeep)`, keep: true, cumulativeUpkeep: true }, ctx);

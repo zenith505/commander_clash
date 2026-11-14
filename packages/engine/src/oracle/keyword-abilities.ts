@@ -443,6 +443,15 @@ export function parseCostKeyword(
           body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, oppCreatureCounter: "+1/+1" }], text: "Cumulative upkeep—put a +1/+1 counter on a creature an opponent controls: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you put a +1/+1 counter on a creature an opponent controls for each age counter on it." },
         },
       };
+    // Herald of Leshrac (round 367): "Cumulative upkeep—Gain control of a land you don't control": a different land for each
+    // age counter, chosen as it resolves, not targeted (rulings).
+    if (/^Cumulative upkeep—Gain control of a land you don't control\.?$/.test(line))
+      return {
+        trigger: {
+          event: "yourUpkeep",
+          body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, gainControlCost: { kind: "object", types: ["Land"], notTypes: [], notColors: [], controller: "opponent", text: "land you don't control" } }], text: "Cumulative upkeep—gain control of a land you don't control: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you gain control of a different land you don't control for each age counter on it." },
+        },
+      };
     // Wall of Shards: "Cumulative upkeep—An opponent gains 1 life": an opponent chosen for each age counter, the same one or
     // different ones (rulings), each able to gain life (CR 119.7), then all of it paid at once or none (CR 702.24a).
     if (/^Cumulative upkeep—An opponent gains 1 life\.?$/.test(line))

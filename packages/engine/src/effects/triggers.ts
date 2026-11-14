@@ -22,6 +22,7 @@ import { sharesColorOrMvWithLinked } from "./run-laneb189";
 import { hasSuspend, isSuspended } from "./run-zones";
 import { sourcePowerNow } from "./run-laneb202";
 import { liveEmblems } from "../emblems";
+import { landCouldProduce } from "../manaabilities";
 
 /** The trigger events for the beginning of a step: on your turn, and on every turn. */
 const STEP_TRIGGERS: Partial<Record<Extract<TriggerSourceEvent, { type: "step" }>["step"], [TriggerEvent, TriggerEvent]>> = {
@@ -1467,7 +1468,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever you tap ~ for mana", "whenever an opponent taps a Mountain for mana" (the land is the subject, "that
     // land"; "that player" is who tapped it).
     const o = obj(s, ev.id);
-    const info = { player: ev.player };
+    // Mana Web: what the land could produce as it was tapped (CR 106.7), for when it's gone by the time that resolves.
+    const info = { player: ev.player, ...(o.zone === "battlefield" && objIsType(s, o, "Land") ? { couldProduce: landCouldProduce(s, o) } : {}) };
     const byOk = (t: TriggeredAbility, you: PlayerId) => !!t.manaTap && (t.manaTap.by === "any" || (t.manaTap.by === "you") === (ev.player === you));
     add(o, controllerOf(s, o), (e, t) => e === "tappedForMana" && !t.manaTap?.filter && byOk(t, controllerOf(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, info);
     for (const id of s.battlefield) {

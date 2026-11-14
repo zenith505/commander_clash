@@ -43,6 +43,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Toil to Renown: "for each tapped artifact, creature, and land you control": each that's any of them, counted once.
   if (each) p = p.replace(/^(tapped |untapped )?(artifact|creature|land|enchantment), (artifact|creature|land|enchantment), and (artifact|creature|land|enchantment) you control$/, "$1$2, $3, or $4 you control");
   let m: RegExpExecArray | null;
+  // Obsidian Charmaw: "for each land your opponents control that could produce {C}": each one whose mana abilities would
+  // make that type if they resolved now, whether or not they could be activated (CR 106.7, rulings; landCouldProduce).
+  if (each && (m = /^(land (?:your opponents|you) control) that could produce \{([WUBRGC])\}$/.exec(p))) {
+    const c = parseCount(m[1]!, ctx, true);
+    return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && Object.keys(c).length === 1 ? { count: { ...c.count, filter: { ...c.count.filter, couldProduce: m[2] as "W" | "U" | "B" | "R" | "G" | "C", text: p } } } : null;
+  }
   // Luxurious Locomotive: "for each creature that crewed it this turn" (CR 702.122d), those gone since included (rulings).
   if (each && ctx && !ctx.spell && /^creature that (crewed|saddled) (?:it|~) this turn$/.test(p)) return { count: { kind: "crewedSource", ...(/saddled/.test(p) ? { saddled: true as const } : {}) } };
   // Perrie, the Pulverizer: "the number of different kinds of counters among permanents you control"; each kind once, as
@@ -172,8 +178,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^creature blocking (?:it|~)$/.test(p) && (ctx?.subjectIt || /~$/.test(p))) return { count: ctx?.subjectIt && !/~$/.test(p) ? { kind: "blockingIt", subject: true } : { kind: "blockingIt" } };
   // Guardian of the Gateless: "Whenever ~ blocks, it gets +1/+1 until end of turn for each creature it's blocking".
   if (each && /^creature (?:it's|~ is) blocking$/.test(p) && (ctx?.selfIt || /~/.test(p))) return { count: { kind: "itBlocks" } };
-  // Staff of Eden: "for each permanent you control but don't own" (CR 108.3); The Horus Heresy: "for each creature ...".
-  if (each && (p === "permanent you control but don't own" || p === "creature you control but don't own")) {
+  // Staff of Eden: "for each permanent you control but don't own" (CR 108.3); The Horus Heresy: "for each creature ...";
+  // Herald of Leshrac: "for each land ...".
+  if (each && (p === "permanent you control but don't own" || p === "creature you control but don't own" || p === "land you control but don't own")) {
     const filter = parseTargetPhrase(p);
     return filter?.kind === "object" ? { count: { kind: "permanents", filter: { ...filter, text: p } } } : null;
   }

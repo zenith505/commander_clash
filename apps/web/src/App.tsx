@@ -2408,6 +2408,8 @@ function exileOptions(s: GameState, id: string): boolean {
 }
 
 /** You may cast spells from other players' graveyards this turn (The Great Work; Locke, Treasure Hunter's milled cards). */
+/** Jötun Grunt's cumulative upkeep (searchLibrary `pairsPerYard`): an even number of the cards from each graveyard. */
+const evenPerYard = (s: GameState, ids: string[]) => ids.every((id) => ids.filter((x) => s.objects[x]!.owner === s.objects[id]!.owner).length % 2 === 0);
 const castsFromAnyGraveyard = (s: GameState) => !!s.graveyardTurn?.some((g) => g.anyGraveyard && g.player === HUMAN && g.turn === s.turn) || !!s.graveGrants?.some((g) => (g.cards || g.fromYardOf !== undefined) && g.player === HUMAN && g.turn === s.turn);
 
 /** Does this card in your graveyard (or another's, with The Great Work) have something you could do with it now (flashback, unearth, ...)? */
@@ -4416,6 +4418,8 @@ function LibrarySearch({
                   ? `${pending.source}: choose ${pending.what} in your graveyard; you may cast it this turn`
                   : pending.fromGraveyard === "libraryTop"
                   ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your graveyard on top of your library`
+                  : pending.fromGraveyard === "libraryBottom" && pending.pairsPerYard
+                  ? `${pending.source}: put ${pending.what} on the bottom of their owners' libraries`
                   : pending.fromGraveyard === "libraryBottom"
                   ? `${pending.source}: put ${pending.what} from your graveyard on the bottom of your library`
                   : pending.fromGraveyard === "shuffleIn"
@@ -4444,6 +4448,8 @@ function LibrarySearch({
                 ? `Revealing ${found.length}.`
                 : pending.bottom
                 ? `Chosen ${found.length}; the first goes lowest.`
+                : pending.pairsPerYard
+                  ? `Chosen ${found.length} of ${pending.max}. Two from a single graveyard for each age counter: an even number from each graveyard.`
                 : pending.totalMv !== undefined
                   ? `Chosen ${found.length} of ${pending.max}, total mana value ${found.reduce((n, x) => n + mvOf(x), 0)} of at most ${pending.totalMv}.`
                 : pending.totalPower !== undefined
@@ -4465,7 +4471,7 @@ function LibrarySearch({
                     : `Found ${found.length} of ${pending.max}.${pending.distinctPowers ? " Each must have a different power." : ""}`}
             {pending.foundExiled ? (pending.controlling !== undefined ? " They're exiled, and you may play them." : " They're exiled, and an opponent may play them.") : ""}
           </span>
-          <button disabled={found.length < pending.min || (!!pending.exactly && found.length > 0 && found.length !== pending.max) || (!!pending.cardTypes && found.length > 0 && cardTypesAmong(s, found) < pending.cardTypes)} onClick={() => onDone(found)}>
+          <button disabled={found.length < pending.min || (!!pending.pairsPerYard && !evenPerYard(s, found)) || (!!pending.exactly && found.length > 0 && found.length !== pending.max) || (!!pending.cardTypes && found.length > 0 && cardTypesAmong(s, found) < pending.cardTypes)} onClick={() => onDone(found)}>
             {pending.piles ? (found.length ? "Done" : "Done (the first pile empty)") : pending.behold ? (found.length ? "Behold" : "Behold nothing") : pending.reveal ? (found.length ? "Reveal" : "Reveal none") : pending.bottom ? (found.length ? "Put on bottom" : "Keep them all") : pending.shuffle ? (found.length ? "Shuffle in" : "Keep them all") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
           </button>
         </header>

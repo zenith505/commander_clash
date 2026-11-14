@@ -1,6 +1,6 @@
 # Roadmap
 
-31,358 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,364 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,885 of
 9,979 (99%).
 
@@ -189,7 +189,7 @@ line blocks.
    Kolaghan, Back for Seconds (done in round 295) (bargain's "instead"), Sanctuary Warden (removing a counter from a chosen permanent as a
    cost), Kamiz, Obscura Oculus (done in round 295), Commander Liara Portyr, Bre of Clan Stoutarm, Lich's Mastery (done in round 302), Thunderwave,
    Contamination, Amzu, Swarm's Hunger, Ravenous Rotbelly, Luxurious Locomotive and Subterranean Schooner ("crewed it"), Gwen Stacy ("for as long as you control ~"),
-   Relic Amulet ("that much"), Hankyu (a granted ability with its own counters), Topography Tracker (an explore
+   Relic Amulet ("that much"), Hankyu (done in round B209) (a granted ability with its own counters), Topography Tracker (an explore
    replacement). Round 174 went down the list from Myojin of Cryptic Dreams to Detention Sphere (rank 8,455), then took
    the easy cards from there to about rank 8,880 (Risk Factor, What Must Be Done, Necklace of Girion, Savor the
    Moment, Uglúk, Midnight Tilling, Tax Collector, Over the Edge), plus Jadelight Ranger and Defossilize ("explores,
@@ -4132,7 +4132,7 @@ line blocks.
    +10, 30,190 of 31,936 with B123 and B124. After it, every unsupported name has been looked at by some round.
    Out after round 294 (looked at, not done): Adventurers' Guildhouse, Mountain Stronghold, Unholy Citadel, Seafarer's
    Quay, Shelkin Brownie (done in round B161) ("bands with other"); Oracle en-Vec (chosen creatures attack next turn, the others can't); False
-   Orders, Balduvian Warlord, General Jarkeld (a blocker removed, then blocking another attacker); Takklemaggot; Jötun Grunt
+   Orders, Balduvian Warlord, General Jarkeld (a blocker removed, then blocking another attacker); Takklemaggot; Jötun Grunt (done in round B209)
    (cumulative upkeep paid with cards from a single graveyard each time); Soul Echo; Goblin Artisans; Ice Cauldron (noted
    mana); Illusionary Mask; Stand or Fall and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
    paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
@@ -5253,7 +5253,7 @@ line blocks.
    - Only cast, dies and combat-damage-to-a-player events can be such a trigger; still out: tapped for mana (High
      Tide, Bubbling Muck), attacks, blocks, life gain, other damage, Spiritualize (done in round B130) and the rest of the 11 unsupported ones.
    - "Whenever you cast a spell that targets ..." still out: "that targets only ..." (Loki,
-     Beamsplitter Mage, Feather), "targets ~" except heroic (Druid of Horns, Speedball), "an Equipment spell or a spell
+     Beamsplitter Mage (done in round B209), Feather), "targets ~" except heroic (Druid of Horns, Speedball), "an Equipment spell or a spell
      that targets" (Danitha, Sword of Hope (done in round B109)), and "those creatures" in the effect (Storm, Windrider (done in round B203); Dack's emblem).
    - Crush Underfoot ("choose a Giant creature you control") is out because its Kindred type isn't parsed.
    - "Choose one that hasn't been chosen" cards still out on other lines: Breeches, Captive Audience, Gandalf, Gollum,
@@ -6359,7 +6359,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   of permanents"), "If a card is put into exile this way" (Corpse Appraiser). +30 (27,742 of 31,936 with round 209 and B40).
 - Out after round B41: Nimble Hobbit (done in round B130) ("sacrifice a Food or pay {2}{W}": an either cost with a mana payment), Cadaverous
   Bloom and Rasputin (mana abilities with non-tap costs), Bullseye, Lava Burst (done in round B121), Sivvi's Valor, Treacherous Link,
-  Kitesail Skirmisher, Bill Ferny (done in round 272), Rayami, Hankyu, Boros Battleshaper (done in round B153), Aura Graft (done in round B153) (each needs a new mechanic).
+  Kitesail Skirmisher, Bill Ferny (done in round 272), Rayami, Hankyu (done in round B209), Boros Battleshaper (done in round B153), Aura Graft (done in round B153) (each needs a new mechanic).
 - Round B42 (harder skipped cards, least played first): the Dragons of Tarkir "you may reveal a Dragon card from your
   hand ... If you revealed a Dragon card or controlled a Dragon as you cast this spell" cycle (Draconic Roar,
   Dragonlord's Prerogative, Foul-Tongue Invocation, Orator of Ojutai, Silumgar's Scorn, Scaleguard Sentinels; control
@@ -6629,7 +6629,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Celestial Kirin (done in round B116), Skyfire Kirin (done in round B116), Lumaret's Favor (done in round B117), Definitely Not a Turtle (done in round B116), Advice from the Fae (done in round B116), Petals of Insight (done in round B116),
   Rowdy Crew (done in round B116), Thijarian Witness (done in round B131), Riptide Replicator (supported already), Teferi's Response (done in round B116), Dawn Evangel (done in round B116), Earthbind, plus the multi-line
   or new-mechanic cards in the same range (Oath of Scholars (done in round B143), Oath of Ghouls (done in round B143), Soul of Shandalar, Kenku Artificer, Harsh
-  Justice, Bill Potts and others).
+  Justice, Bill Potts (done in round B209) and others).
 - Round B53 (cards no earlier round wrote down, least played first, EDHREC rank about 22,000 to 19,700):
   "If this spell was kicked, you gain life equal to that card's mana value. Otherwise, you lose that much life"
   (Sheoldred's Restoration), "if it has greater power or toughness than Hulkling" (Hulkling, Burgeoning Bruiser: evolve's
@@ -9200,6 +9200,21 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Hans Eriksson (the revealed creature card onto the battlefield tapped and attacking the defending player or a
   planeswalker they control, CR 508.4, then a reflexive fight, CR 603.12, rulings). Browser tests for each. +5, 31,358 of
   31,936 with B207 and rounds 366 and 367.
+- Round B209 (least played first, from the Lane B skip lists): Laccolith Rig (when the enchanted creature becomes blocked,
+  however it became blocked, the Aura's controller may have it deal damage equal to its power to target creature, any
+  creature, choosing and deciding even on an opponent's creature; the creatures are fixed as it triggers, and then it
+  assigns no combat damage, CR 510.1, rulings). Bill Potts (a spell or an activated ability that targets only it, as cast
+  or activated: two triggers with one "only once each turn", CR 603.2h; the copy is made on the stack, new targets
+  allowed, CR 707.10). Beamsplitter Mage (an intervening if, CR 603.4, on another creature you control that every target of
+  the spell could name, checked as it's cast and again as it resolves; one copy aimed at the creature its controller
+  chooses, only while the spell is on the stack, rulings). Hankyu (its granted "Remove all aim counters from Hankyu": the
+  Equipment's counters, none included, the number for "removed this way"; bots wait for three). Shuriken (2 damage, then
+  the target's controller gains control of it for the rest of the game, layer 2, unless the creature its cost unattached
+  it from was a Ninja as that was paid). Jötun Grunt (its cumulative upkeep: two cards from a single graveyard for each
+  age counter, a different graveyard for each allowed, so an even number from each, rulings; paid all at once or not, CR
+  702.24a, unpayable with too few cards, CR 118.3; each owner orders theirs on the bottom, CR 401.4, before anything
+  moves). Browser tests for Jötun Grunt's pick, Beamsplitter Mage's choice, Bill Potts's new target, and Hankyu's and
+  Shuriken's granted abilities. +6, 31,364 of 31,936.
 - Out after round B208 (looked at, not done): Back from the Brink ("Exile a creature card from your graveyard and pay its
   mana cost": the activation's mana cost is set by the card the cost exiles, and activationCost doesn't see the cost's
   choices yet), Blood of the Martyr, Piracy, Mana Cache and Rhystic Cave stay out for the reasons in the earlier lists.
@@ -9262,7 +9277,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature targeted twice counts twice isn't settled by its rulings' wording), Kodama of the Center Tree (soulshift X counted
   from the Spirits as they last existed), Barbed Wire (done in round B182) (a "prevent the next damage dealt by ~" shield), Spiteful Repossession
   (each opponent's own difference, then "the damage dealt this way") stay out for these reasons.
-- Out after round B175 (looked at, not done): Chong and Lily (done in round B187), Threefold Signal, Hankyu and Time Reaper stay out for the
+- Out after round B175 (looked at, not done): Chong and Lily (done in round B187), Threefold Signal, Hankyu (done in round B209) and Time Reaper stay out for the
   reasons in the earlier lists.
 - Out after round B174 (looked at, not done): Demilich (done in round B193), Arcane Proxy (done in round B193) and Roving Actuator (a copy of a graveyard card cast
   while the ability resolves), Sproutback Trudge (done in round B193) (cast from the graveyard as its end step trigger resolves), Outmaneuver and
@@ -9390,7 +9405,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B140 (looked at, not done): nothing new; the cards still on the B139 and earlier lists are out for the
   reasons given there.
 - Out after round B139 (looked at, not done): Tourach's Chant (done in round B207) and Thelon's Chant (done in round B207) (the player who put a land onto the
-  battlefield, not its controller, rulings: not tracked), Jötun Grunt (cumulative upkeep paid in pairs of cards from one
+  battlefield, not its controller, rulings: not tracked), Jötun Grunt (done in round B209) (cumulative upkeep paid in pairs of cards from one
   graveyard), Meddle ("if target spell has only one target and that target is a creature": a condition on the spell's
   targets as it resolves), Drafna's Restoration (done in round B159), Sutured Ghoul (done in round B171), Twinning Glass and Pardic Dragon (done in round B152), still out for the
   reasons in the earlier lists.
@@ -9673,9 +9688,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Warchief, Vexing Sphinx (cumulative upkeep of discarding), Invoke the Ancients (a counter chosen for each token),
   Wolfbat, Ronin (sacrificing an attached Equipment as a cost), Tallowisp (an Aura with enchant creature in a search:
   next, it can reuse Rootwater Shaman's filter).
-- Out after round B74 (looked at, not done): Hankyu (remove all aim counters as a cost, damage equal to the number
+- Out after round B74 (looked at, not done): Hankyu (done in round B209) (remove all aim counters as a cost, damage equal to the number
   removed), Fishing Pole ("Tap Fishing Pole" as a cost of the granted ability), Hold for Ransom (the Aura's controller
-  as a player), Heliod's Punishment ("Then if it has no task counters on it, destroy Heliod's Punishment"), Shuriken
+  as a player), Heliod's Punishment ("Then if it has no task counters on it, destroy Heliod's Punishment"), Shuriken (done in round B209)
   (its controller gains control of it unless it was unattached from a Ninja), Nettlevine Blight, Animal Friend (done in round 328) and
   The Dominion Bracelet (granted abilities that move or recount the source), Gutter Grime and Saproling Burst (token
   abilities naming the permanent that made them), Earnest Fellowship and Pledge of Loyalty (done in round B112) (Lane A's round 236, now
@@ -9895,7 +9910,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Cycling: Astral Slide's "you may exile target creature. If you do, return that card at the beginning of the next end
   step", Decree of Justice's "you may pay {X}" when cycled, Gavi's alternative cycling cost (done in round 326).
 - "Assigns no combat damage" after a destroy or gain control (Floral Spuzzem, Goblin Vandal, Kukemssa Pirates) and on
-  Auras ("the first creature", Laccolith Rig, Farrel's Mantle (done in round B144)); Gaze of Pain (done in round B144).
+  Auras ("the first creature", Laccolith Rig (done in round B209), Farrel's Mantle (done in round B144)); Gaze of Pain (done in round B144).
 - Opening hand: revealing cards (the Chancellors, Gemstone Caverns' luck counter, CR 103.6b). Role tokens and Walker
   tokens (CR 111.10d, 111.10j-r). Shalai's "you, planeswalkers you control, and other creatures you control have
   hexproof"; protection or hexproof for players from a source other than "you have".

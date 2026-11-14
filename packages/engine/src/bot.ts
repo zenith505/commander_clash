@@ -702,6 +702,19 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const theirs = pend.cards.filter((id) => obj(s, id).owner !== pid).sort((a, b) => score(b) - score(a) || mv(s, b) - mv(s, a));
       return [{ type: "searchLibrary", player: pid, found: theirs.slice(0, pend.min) }];
     }
+    // Jötun Grunt's cumulative upkeep: pairs of cards from single graveyards to the bottom of their owners' libraries:
+    // from opponents' graveyards first, the ones they could use there and then the dearest; from ours last, the ones we
+    // have no use for there.
+    if (pend.kind === "searchLibrary" && pend.pairsPerYard) {
+      const owners = [...new Set(pend.cards.map((id) => obj(s, id).owner))].sort((a, b) => Number(a === pid) - Number(b === pid));
+      const found: ObjectId[] = [];
+      for (const q of owners) {
+        const theirs = pend.cards.filter((id) => obj(s, id).owner === q).sort((a, b) => (q === pid ? Number(usefulInGraveyard(s, a)) - Number(usefulInGraveyard(s, b)) || mv(s, a) - mv(s, b) : Number(usefulInGraveyard(s, b)) - Number(usefulInGraveyard(s, a)) || mv(s, b) - mv(s, a)));
+        const take = Math.min(Math.floor(theirs.length / 2) * 2, pend.max - found.length);
+        found.push(...theirs.slice(0, take - (take % 2)));
+      }
+      return [{ type: "searchLibrary", player: pid, found }];
+    }
     // The Three Seasons: three cards of a graveyard shuffled into their owner's library: from ours, the dearest ones we have
     // no use for there (they may be drawn again); from an opponent's, the ones they could use there, then the dearest.
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "shuffleIn") {
@@ -6390,6 +6403,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (((ab.sacrificeSelf && !cashIn && !flips && !voidPlay && !hoard) || ab.returnSelf) && !(energyTargetX >= 3)) continue;
       // "Sacrifice Blazing Torch" in an ability the Equipment gives: keep the Equipment too.
       if (ab.grantSourceCost?.action === "sacrifice") continue;
+      // Hankyu: "Remove all aim counters from Hankyu" for that much damage: only once three have built up.
+      if (ab.grantSourceCost?.action === "removeAllCounters" && ((ab.grantSourceCost.id ? s.objects[ab.grantSourceCost.id]?.counters[ab.grantSourceCost.counter ?? ""] : 0) ?? 0) < 3) continue;
       // Mechtitan Core: itself and four others exiled for a 10/10, in our main phase with the stack empty (and only when
       // those four have less total power than the token, below).
       const titan = makesTitan(ab) && s.activePlayer === pid && (s.step === "main1" || s.step === "main2") && !s.stack.length;

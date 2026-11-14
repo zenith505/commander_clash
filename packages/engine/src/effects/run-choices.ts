@@ -22,6 +22,7 @@ import { putCounters, removableCounters } from "../counters";
 import { CREATURE_TYPES, LAND_TYPES } from "../keywords";
 import { nextRandom } from "../rng";
 import { fireEvent } from "./triggers";
+import { yardPairsUpkeep } from "./run-laneb209";
 
 /** Choices while resolving: "you may", cumulative upkeep, choosing, "if". */
 export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -733,6 +734,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         ];
         return runEffect(s, { type: "may", effects: gain, otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Gain control of ${sc.n === 1 ? `a ${filter.text}` : `${sc.n} ${filter.text}s`} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
       }
+      // Jötun Grunt (round B209): two cards from a single graveyard for each age counter.
+      if (e.yardPairsToBottom) {
+        const done = yardPairsUpkeep(s, ctx, src, sc.n);
+        return done === "paused" ? done : runEffect(s, done === "paid" ? paid : { type: "sacrifice", what: { ref: "self" } }, ctx);
+      }
       // Varchild's War-Riders: whether to pay first, then an opponent for each age counter (the same or different ones,
       // rulings), each of whom creates the token; all of it is one payment (CR 702.24a), the tokens made together, each
       // player's under their own control (CR 111.2). With no opponent left it can't be paid (CR 118.3).
@@ -1208,6 +1214,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
               })((s.resolving!.discardedAll ?? []).filter((id) => !!s.objects[id]))
             : e.cond.kind === "discardedThisWayIs"
             ? ((f) => (s.resolving!.discardedAll ?? []).some((id) => !!s.objects[id] && printedMatches(f, defOf(s, s.objects[id]!))))(e.cond.filter)
+            : e.cond.kind === "unattachedFromNinja"
+            ? !!s.resolving!.item.unattachedFromNinja
             : e.cond.kind === "activatedTimes"
             ? ((src, index) => index !== undefined && !!src && (src.zoneChanges ?? 0) === s.resolving!.item.sourceZc && (src.activatedThisTurn ?? []).filter((n) => n === index).length >= (e.cond as { n: number }).n)(s.objects[s.resolving!.item.sourceId ?? ""], s.resolving!.item.activatedIndex)
             : e.cond.kind === "costExiledIs"

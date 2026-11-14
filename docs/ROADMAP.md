@@ -8849,6 +8849,10 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   CR 603.4; upkeep triggers now work from exile; as a commander it still always goes to the command zone, CR 903.9a, so it
   doesn't hatch there). Stitcher Geralf (up to two creature cards milled this way and still in a graveyard, a card a
   replacement exiled instead not among them, rulings; X the total power of the cards exiled). +6, 31,269 of 31,936 with B201.
+- Out after round B202 (looked at, not done): Long Rest ("X target cards with different mana values": no targeting rule
+  across a spell's targets yet), Song of Inspiration (no ruling settles whether a target that became illegal still adds its
+  mana value to the roll, CR 608.2b), Lodestone Bauble, Decoy Gambit and Coin of Fate stay out for the reasons in the
+  earlier lists.
 - Out after round B192 (looked at, not done): Garruk, Curse Breaker (its −4: how often "whenever one or more creatures
   attack one of your opponents" triggers when creatures attack two of them still isn't settled by rulings), Charmed
   Pendant (a hybrid symbol of the milled card adds one of its colors: a choice in the middle of a mana ability), Ulamog's

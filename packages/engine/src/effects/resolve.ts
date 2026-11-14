@@ -3,7 +3,7 @@ import { tokenChoicesPossible, TokenQuestionPause, withPutter, withTokenAnswers 
 import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
 import { addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, draw, endTheCombatPhase, endTheTurn, enterTogether, inCombatPhase, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
-import { CAST_BY_SOURCE, casterMark, compileCard } from "../oracle";
+import { CAST_BY_SOURCE, casterMark, compileCard, SPELL_CONTROLLER, playerMark } from "../oracle";
 import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LANDWALK, SACRIFICED_LANDWALK, landwalkLand, CHOSEN_SNOW_LANDWALK, chosenLandwalk, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, TARGET_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION, CAST_SPELL_COLORS_PROTECTION, isLandwalk } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, shieldChoicesPossible, ShieldQuestionPause, withShieldAnswers, type DamageSource } from "../damage";
@@ -58,6 +58,7 @@ import { runLaneB200Effect } from "./run-laneb200";
 import { runLaneB201Effect } from "./run-laneb201";
 import { runLaneB202Effect } from "./run-laneb202";
 import { runLaneB208Effect } from "./run-laneb208";
+import { runLaneB210Effect } from "./run-laneb210";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -1274,7 +1275,8 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
   const c = { ...amountCtx(s, ctx), ...(affected !== undefined ? { affected } : {}) };
   // Hellish Rebuke: "the player who cast ~" in the ability it gives is the player who cast this spell, fixed now (that
   // player even if another controls the spell; a copy no one cast names no one, rulings).
-  return mods.map((m) => (m.kind === "addAbility" && m.text.includes(CAST_BY_SOURCE) ? { ...m, text: m.text.replaceAll(CAST_BY_SOURCE, casterMark(spellCaster(s), resolvingSpellName(s))) } : m)).map((m) =>
+  // Martyrdom: "Only you may activate this ability": this spell's controller, fixed now (CR 109.5).
+  return mods.map((m) => (m.kind === "addAbility" && m.text.includes(CAST_BY_SOURCE) ? { ...m, text: m.text.replaceAll(CAST_BY_SOURCE, casterMark(spellCaster(s), resolvingSpellName(s))) } : m.kind === "addAbility" && m.text.includes(SPELL_CONTROLLER) ? { ...m, text: m.text.replaceAll(SPELL_CONTROLLER, playerMark(ctx.controller, s.players[ctx.controller]?.name ?? "")) } : m)).map((m) =>
     // "Attacks this combat if able": the combat going on as it resolves.
     m.kind === "attacksIfAble" && m.combat === "this"
       ? { kind: "attacksIfAble", combat: s.combatsThisTurn ?? 0 }
@@ -1914,6 +1916,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "auraOntoEachCreated":
     case "revealTopAttackingOrHand":
       return runLaneB208Effect(s, e, ctx, src);
+    case "cumulativeUpkeepUnpaid":
+    case "exileReturnWhenSourceLeaves":
+      return runLaneB210Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

@@ -1124,7 +1124,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "onBattlefield": {
       let n = 0;
-      for (const [id, c] of chars) if (!(cond.other && id === sourceId) && objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) n++;
+      for (const [id, c] of chars) if (!(cond.other && id === sourceId) && !(cond.otherThanSubject && id === subjectId) && objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) n++;
       return (cond.max === undefined || n <= cond.max) && (cond.min === undefined || n >= cond.min);
     }
     case "life": {

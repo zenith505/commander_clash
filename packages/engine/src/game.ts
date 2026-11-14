@@ -9571,6 +9571,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   } else if (o.zone !== "battlefield" || (controllerOf(s, o) !== pid && !ab.anyPlayer)) return "you don't control that permanent";
   else if (ab.ownerOnly && o.owner !== pid) return `only ${d.name}'s owner may activate that ability`;
   else if (ab.opponentsOnly && !opponents(s, controllerOf(s, o)).includes(pid)) return `only ${d.name}'s controller's opponents may activate that ability`;
+  // Martyrdom (round B210): only the player its "Only you may activate this ability" names.
+  else if (ab.onlyPlayer !== undefined && ab.onlyPlayer !== pid) return ab.onlyPlayer >= 0 && s.players[ab.onlyPlayer] ? `only ${player(s, ab.onlyPlayer).name} may activate that ability` : "no one may activate that ability";
   else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
   else if (ab.tap && characteristics(s, o).cantActivateTap) return `${d.name}'s activated abilities with {T} in their costs can't be activated`; // Serra Bestiary
   const banned = nameActivationBan(s, o, !!ab.mana) ?? abolisherBan(s, pid, o); // Pithing Needle, in any zone (rulings); Grand Abolisher
@@ -10171,9 +10173,16 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     loseEnergy(s, p.id, x);
     log(s, `${p.name} pays ${x} energy.`);
   }
-  const removedCount = ab.removeCounters?.all ? Math.max(0, o.counters[ab.removeCounters.counter] ?? 0) : ab.removeCounters?.x ? (x ?? 0) : undefined;
+  // Hankyu's granted "Remove all aim counters from Hankyu": from the Equipment that gave the ability, still that object.
+  const grantRemover = ab.grantSourceCost?.action === "removeAllCounters" && ab.grantSourceCost.id ? s.objects[ab.grantSourceCost.id] : undefined;
+  const grantRemoved = grantRemover && grantRemover.zone === "battlefield" && (grantRemover.zoneChanges ?? 0) === ab.grantSourceCost!.zc ? Math.max(0, grantRemover.counters[ab.grantSourceCost!.counter!] ?? 0) : undefined;
+  if (grantRemover && grantRemoved !== undefined) {
+    if (grantRemoved) removeCountersCost(s, grantRemover, { counter: ab.grantSourceCost!.counter!, n: grantRemoved });
+    log(s, `${p.name} removes ${grantRemoved} ${ab.grantSourceCost!.counter} counter${grantRemoved === 1 ? "" : "s"} from ${nameOf(s, grantRemover.id)}.`);
+  }
+  const removedCount = ab.removeCounters?.all ? Math.max(0, o.counters[ab.removeCounters.counter] ?? 0) : ab.removeCounters?.x ? (x ?? 0) : grantRemoved;
   if (ab.removeCounters) removeCountersCost(s, o, removedCount !== undefined ? { counter: ab.removeCounters.counter, n: removedCount } : ab.removeCounters);
-  if (removedCount !== undefined) log(s, `${p.name} removes ${removedCount} ${ab.removeCounters!.counter} counter${removedCount === 1 ? "" : "s"} from ${d.name}.`);
+  if (removedCount !== undefined && ab.removeCounters) log(s, `${p.name} removes ${removedCount} ${ab.removeCounters.counter} counter${removedCount === 1 ? "" : "s"} from ${d.name}.`);
   // "Put a -1/-1 counter on ~" (Devoted Druid): through the replacement effects on counters (Vizier of Remedies rulings).
   if (ab.putCounters) {
     const put = putCounters(s, o, ab.putCounters.counter, ab.putCounters.n);
@@ -10206,6 +10215,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // "Choose one that hasn't been chosen" (Three Bowls of Porridge): chosen as it's activated.
   if (ab.body.modal && modes) noteModesChosen(s, ab.body, o.id, modes);
   const granter = ab.grantSourceCost?.id ? s.objects[ab.grantSourceCost.id] : undefined;
+  let unattachedFromNinja = false;
   // The cost's taps happen at the same time (CR 602.2b): "one or more ... become tapped" triggers once.
   batchTaps(s, () => {
     if (ab.tap) tapPermanent(s, o);
@@ -10225,6 +10235,9 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     }
     // "Unattach Leonin Bola" (CR 701.3d); "Sacrifice Blazing Torch" comes with the other sacrifices below.
     if (ab.grantSourceCost?.action === "unattach" && granter?.attachedTo === o.id) {
+      // Shuriken: "unless it was unattached from a Ninja": the creature as it's unattached (CR 602.2b).
+      const types = creatureTypesOf(s, o);
+      if (types === "all" || types.has("Ninja")) unattachedFromNinja = true;
       log(s, `${p.name} unattaches ${nameOf(s, granter.id)} from ${d.name}.`);
       fireEvent(s, { type: "unattached", id: granter.id, host: o.id });
       granter.attachedTo = undefined;
@@ -10277,6 +10290,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(costCardNames.length ? { costCardNames } : {}),
     ...(costDiscarded.length ? { costDiscarded } : {}),
     ...(removedCount !== undefined ? { countersRemoved: removedCount } : {}),
+    ...(unattachedFromNinja ? { unattachedFromNinja: true as const } : {}),
     ...(scavengedPower !== undefined ? { scavengedPower } : {}),
     ...(costExiled.length ? { costExiled } : {}),
     ...(tappedKin.length ? { costTapped: tappedKin } : {}),
@@ -10805,6 +10819,7 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
     throw new RulesError("choose cards with different mana values");
   if (pend.distinctPowers && new Set(found.map((id) => characteristics(s, obj(s, id)).power)).size !== found.length) throw new RulesError("choose cards with different powers");
   if (pend.totalMv !== undefined && found.reduce((n, id) => n + defMv(defOf(s, obj(s, id))), 0) > pend.totalMv) throw new RulesError(`choose cards with total mana value ${pend.totalMv} or less`);
+  if (pend.pairsPerYard && [...new Set(found.map((id) => obj(s, id).owner))].some((q) => found.filter((id) => obj(s, id).owner === q).length % 2)) throw new RulesError("choose two cards from a single graveyard for each age counter: an even number from each graveyard");
   if (pend.totalPower !== undefined && found.reduce((n, id) => n + characteristics(s, obj(s, id)).power, 0) > pend.totalPower) throw new RulesError(`choose cards with total power ${pend.totalPower} or less`);
   if (pend.cardTypes && found.length && cardTypesAmong(s, found) < pend.cardTypes) throw new RulesError(`choose cards with ${pend.cardTypes} or more card types among them, or none`);
   if (pend.shareLandType && !shareLandType(found.map((id) => defOf(s, obj(s, id)))))

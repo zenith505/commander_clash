@@ -3,6 +3,7 @@
 import type { AbilityBody, CompiledCard, Effect, TargetSpec } from "../abilities";
 import { parseLoyalty } from "./activated";
 import { parseBody } from "./body";
+import { roundB210Spell } from "./laneb210";
 
 const CREATURE: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
 
@@ -58,7 +59,7 @@ export function roundB206Spell(text: string): AbilityBody | null | undefined {
     ];
     return { ...body, effects, text };
   }
-  return undefined;
+  return roundB210Spell(text);
 }
 
 /** Round B206's Saga chapters, read after round 345's: the body, null when it's one of these but can't be read, undefined when it isn't. */

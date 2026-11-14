@@ -1,7 +1,7 @@
 # Roadmap
 
-31,239 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,873 of
+31,251 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,876 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2538,6 +2538,58 @@ line blocks.
    rulings); Monstrous Emergence ("choose a creature you control or reveal a creature card from your hand" as an
    additional cost, then that one's power); Arni Metalbrow ("attacks or enters attacking", then a creature card with
    lesser mana value than that creature put onto the battlefield tapped and attacking).
+   Round 356 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards cast or played
+   with a permission that does something more: Smuggler's Buggy's "you may cast the exiled card without paying its mana
+   cost. If you do, return ~ to its owner's hand." (the card its hideaway exiled, CR 702.75a, 607.2a; playLinked
+   `setsDid`, a land never cast, CR 305.9); The Fourth Doctor's "Once each turn, you may play a historic land or cast a
+   historic spell from the top of your library. When you do, create a Food token." (FromTop `once` for a land too, one
+   use a turn for both, and `whenDo`, a reflexive trigger, CR 603.12, above the spell; used before another permission that
+   applies), with a browser test; Rashmi and Ragavan's "Whenever you cast your first spell during each of your turns,
+   exile the top card of target opponent's library and create a Treasure token. Then you may cast the exiled card without
+   paying its mana cost if it's a spell with mana value less than the number of artifacts you control. If you don't cast
+   it this way, you may cast it this turn." (castTargetFree `mvLessThan`, the artifacts counted as it resolves, the
+   Treasure too, rulings; `setsDid`, then a permission this turn with the usual timing and costs, rulings); Strago and
+   Relm's "Target opponent exiles cards from the top of their library until they exile an instant, sorcery, or creature
+   card. You may cast that card without paying its mana cost. If you cast a creature spell this way, it gains haste and
+   "At the beginning of the end step, sacrifice this creature."" (exileUntilNonland `creatureSpellGains`: the spell gains
+   both with no duration, kept by the creature, CR 400.7a); The Ruinous Powers's "choose an opponent at random. Exile the
+   top card of that player's library. Until end of turn, you may play that card and you may spend mana as though it were
+   mana of any color to cast it. When you cast a spell this way, its owner loses life equal to its mana value." (impulse
+   and MayPlay `castTrigger`, CR 603.2, the spell's mana value on the stack, X included, rulings); Monk Class's level 3
+   "exile the top card of your library. For as long as it remains exiled, it has "You may cast this card from exile as long
+   as you've cast another spell this turn."" (MayPlay `castAnotherThisTurn`). +6, 31,224 of 31,936 with round 355 (31,239 with B197 and B198). The
+   compiled text of every other card is unchanged. "Your first spell during each of your turns" is a cast trigger now.
+   Out after round 356 (looked at, not done): Commander Liara Portyr ("spells you cast from exile this turn cost {X} less
+   to cast, where X is the number of players being attacked": a cost reduction for the turn by where a spell is cast from,
+   then "exile the top X cards"); Bre of Clan Stoutarm (still out: whether "Otherwise" applies when you decline to cast,
+   rulings silent); Surge to Victory (still out: the trigger it grants for the turn has to remember the exiled card);
+   Tamiyo, Collector of Tales ("Spells and abilities your opponents control can't cause you to discard cards or sacrifice
+   permanents", every discard and sacrifice path); Share the Spoils (each player plays from cards exiled with it, "When
+   they do, exile the top card of their library", and again whenever an opponent loses).
+   Round 357 went on down `npm run popular`, most played first, to cards cast from where a permission or trigger puts them:
+   Najal, the Storm Runner's "Whenever ~ attacks, you may pay {2}. If you do, when you next cast an instant or sorcery
+   spell this turn, copy it. You may choose new targets for the copy." ("copy it" read as Mercurial Spelldancer's "copy
+   that spell", CR 603.7); Ryan Sinclair's "exile cards from the top of your library until you exile a nonland card. You
+   may cast the exiled card without paying its mana cost if it's a spell with mana value less than or equal to ~'s power.
+   Put the exiled cards not cast this way on the bottom of your library in a random order." (exileUntilNonland
+   `mvLessThan` its power plus one, as the trigger resolves or last known, CR 608.2h, with `restBottom`); Scattering
+   Stroke's "If you win, at the beginning of your next main phase, you may add an amount of {C} equal to that spell's mana
+   value." (Mana Drain's delayed mana, all or none chosen as it resolves, rulings); Heaven Sent's chapter III "Then if an
+   opponent has 0 or less life, draw seven cards. Otherwise, exile this Saga and you may cast it this turn." (exile
+   `youMay` thisTurn on the Saga itself, CR 400.7; exiled, it isn't sacrificed, CR 714.4); Arcade Gannon's "Once during
+   each of your turns, you may cast an artifact or Human spell from your graveyard with mana value less than or equal to
+   the number of quest counters on ~." (graveyardGrants `maxMvCount`, the spell's X counted, CR 202.3e); The Eighth
+   Doctor's "Once during each of your turns, you may play a historic land or cast a historic permanent spell from your
+   graveyard. If you do, it gains "If this permanent would leave the battlefield, exile it instead of putting it anywhere
+   else."" (Serra Paragon's shared use, `landFromGraveyardFilter` for historic lands, CR 700.6). No new prompt: each
+   uses the existing may, free-cast, copy-target and graveyard-cast paths. +6, 31,245 of 31,936 with round 356 and Lane
+   B's B197 and B198. The compiled text of every other card is unchanged.
+   Out after round 357 (looked at, not done): Open the Omenpaths ("Add two mana of any one color and two mana of any
+   other color. Spend this mana only to cast creature or enchantment spells.": two different colors picked as it
+   resolves, then a spend restriction, still out); Glorious Purpose ("When the sixth plan counter is put on ~": a trigger
+   on a counter count reached, then any number of spells cast free from four exiled cards); Spirit of Resilience
+   ("Whenever one or more cards leave your graveyard": a batch trigger, then it becomes a copy of one of those cards until
+   end of turn).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -8736,7 +8788,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   trigger on the new declare attackers step event, CR 603.7, attacking a player or planeswalker its controller chooses as
   it enters, CR 508.4, never having "attacked", rulings; the step now happens even with no attackers when such a trigger
   is due, CR 508.8; Noctis "can't be blocked that combat"; a token doesn't come back, CR 111.8). The punisher prompt for
-  "you" and "that player" now reads "If you do". +6, 31,239 of 31,936 with B189 to B198 and rounds 348 to 355.
+  "you" and "that player" now reads "If you do". +6, 31,251 of 31,936 with B189 to B198 and rounds 348 to 357.
 - Out after round B199 (looked at, not done): Over the Top (each player's revealed permanent cards onto the battlefield at
   once, Auras among them attached as they enter), Lich's Mirror (losing the game replaced by shuffling your hand, graveyard
   and every permanent you own, even ones others control, into your library), Mana Cache (a mana ability any player may

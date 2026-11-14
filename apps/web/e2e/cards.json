@@ -35913,6 +35913,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c19fdee3-5fbc-4e2d-ac23-85b46eacafdc",
+  "name": "The Fourth Doctor",
+  "manaCost": "{2}{G}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Time Lord Doctor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Time Lord",
+   "Doctor"
+  ],
+  "oracleText": "You may look at the top card of your library any time.\nWould You Like A...? — Once each turn, you may play a historic land or cast a historic spell from the top of your library. When you do, create a Food token. (Artifacts, legendaries, and Sagas are historic.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Food"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a68f41a2-37ee-46e1-bf3c-164c78b003ca",
   "name": "The Golden Throne",
   "manaCost": "{4}",

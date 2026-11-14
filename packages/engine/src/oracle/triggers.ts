@@ -945,12 +945,15 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // Vengevine: "Whenever you cast a spell, if it's the second creature spell you cast this turn": only that one, counting
   // the whole turn's spells (rulings), which stays true once it is, so the same as "your second creature spell each turn".
   line = line.replace(/^Whenever you cast a spell, if it's the (first|second|third|fourth) ((?:creature|noncreature|instant or sorcery) )?spell you cast this turn, /, "Whenever you cast your $1 $2spell each turn, ");
-  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second|third|fourth) (?:(.+?) )?spell( with \{X\} in its mana cost)? (each turn|in a turn|during their turn|during each opponent's turn), (.+)$/.exec(line);
+  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second|third|fourth) (?:(.+?) )?spell( with \{X\} in its mana cost)? (each turn|in a turn|during their turn|during each opponent's turn|during each of your turns), (.+)$/.exec(line);
   if (nth) {
     const parsed = nth[3] ? parseTargetPhrase(`${nth[3]} spell`) : { kind: "spell" as const, text: "spell" };
     const kind = parsed && { ...parsed, ...(nth[4] ? { xInCost: true as const } : {}), text: `${nth[3] ? `${nth[3]} spell` : "spell"}${nth[4] ?? ""}` };
     if (kind?.kind !== "spell") return "fail";
-    if ((nth[5] === "during their turn" && nth[1] === "you") || (nth[5] === "during each opponent's turn" && nth[1] !== "you")) return "fail";
+    if ((nth[5] === "during their turn" && nth[1] === "you") || (nth[5] === "during each opponent's turn" && nth[1] !== "you") || (nth[5] === "during each of your turns" && nth[1] !== "you")) return "fail";
+    // Rashmi and Ragavan: "your first spell during each of your turns" is the first one you cast in your own turn, as
+    // "their first spell during their turn" is (cast.ownTurn).
+    if (nth[5] === "during each of your turns") nth[5] = "during their turn";
     const spellX = !!nth[4] && /\bX\b/.test(nth[6]!) && !/\bwhere X is\b/.test(nth[6]!);
     // "That player" is the one who cast it, except when that's you: then it's the opponent whose turn it is (Blightwing
     // Bandit: "during each opponent's turn, look at the top card of that player's library"), or a player the text chose

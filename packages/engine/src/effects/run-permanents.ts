@@ -2695,7 +2695,7 @@ export function canAttachTo(s: GameState, me: GameObject, host: GameObject | Pla
 }
 
 /** Attach an Aura to a player (CR 701.3a): "enchant player" (CR 702.5d), with a new timestamp (701.3c). */
-function attachToPlayer(s: GameState, me: GameObject, pid: PlayerId) {
+export function attachToPlayer(s: GameState, me: GameObject, pid: PlayerId) {
   if (!canAttachTo(s, me, pid)) return;
   const was = me.attachedTo;
   me.attachedTo = undefined;

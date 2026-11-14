@@ -1037,7 +1037,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
       // "Prevent all damage that would be dealt to / by ~" uses up no shield, so it's applied first (CR 615.1, 616.1).
       // One with an additional effect ("you gain life equal to the damage prevented this way") is the one picked.
       const rules = prev(e) ? allRules.filter((r) => preventsAll(r) && !(e.applied ?? []).includes(r.id) && ruleCovers(s, r, to) && ruleTakes(s, r, e)) : [];
-      let rule = rules.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src)) || r.tokens || r.mill || r.counterOn || r.countersOn || r.dealTo || r.shuffleIn) ?? (preventedAll(s, e) ? undefined : rules[0]);
+      let rule = rules.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src)) || r.tokens || r.mill || r.counterOn || r.countersOn || r.dealTo || r.reflect || r.shuffleIn) ?? (preventedAll(s, e) ? undefined : rules[0]);
       // Weeping Angel's prevention shuffles the creature away: when another prevention effect, protection or a shield
       // counter would apply to the damage too, the creature's controller chooses which applies (CR 616.1); a bot (and the
       // default) takes the other one.
@@ -1048,7 +1048,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         if (other) {
           const i = choose({ player: chooserOf(to), prompt: `Damage from ${e.src.name} to ${toName}: which applies?`, labels: ["Prevent the damage another way", `${cardName(s, rule)}: prevent it and shuffle ${toName} into its owner's library`] });
           if (i === null) return { ask, ops, final, used: next };
-          if (i === 0) rule = others.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src)) || r.tokens || r.mill || r.counterOn || r.countersOn || r.dealTo) ?? (preventedAll(s, e) ? undefined : others[0]);
+          if (i === 0) rule = others.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src)) || r.tokens || r.mill || r.counterOn || r.countersOn || r.dealTo || r.reflect) ?? (preventedAll(s, e) ? undefined : others[0]);
         }
       }
       if (rule) {
@@ -1056,7 +1056,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         // controller life or deals that much back, they're applied first when that's who chooses, as the most it can be.
         let n = e.n;
         const boost = allMods.filter((m) => !m.mod.prevent && modApplies(s, m, e, true));
-        if ((rule.gainLife || rule.dealBack || rule.tokens || rule.countersOn || rule.dealTo) && boost.length && boost.length <= 6 && rule.controller === chooserOf(to))
+        if ((rule.gainLife || rule.dealBack || rule.tokens || rule.countersOn || rule.dealTo || rule.reflect) && boost.length && boost.length <= 6 && rule.controller === chooserOf(to))
           for (const order of permutations(boost)) n = Math.max(n, order.reduce((a, m) => (a > 0 ? modAmount(s, m, a) : 0), e.n));
         ops.push({ kind: "preventAll", srcName: e.src.name, toName, rule: rule.id, n, src: e.src, ...(rule.mill ? { card: cardName(s, rule) } : {}), ...toPlayer(to) });
         if (rule.mill) ops.push({ kind: "mill", by: rule.controller, n: n * (rule.millSelf ?? 1), card: cardName(s, rule), ...(rule.millSelf ? { self: true as const } : {}), ...(rule.exileTop ? { exile: true as const } : {}) });
@@ -1434,7 +1434,13 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     else if (r.countersOn && r.to?.object) ruleCountersLater.push({ ...r.to.object, counter: r.countersOn.counter, n, by: r.controller, card: cardName(s, r) });
     // Vengeful Archon deals that much damage to the target fixed as it resolved, right after (rulings).
     if (r.dealTo) back.push({ cardId: r.cardId, controller: r.controller, to: "player" in r.dealTo ? r.dealTo.player : r.controller, n, ...("object" in r.dealTo ? { toObject: r.dealTo } : {}) });
+    // New Way Forward: one reflexive trigger for all it prevented in this event (CR 603.12), about that source.
+    if (r.reflect) {
+      const was = ruleReflectLater.get(r.id);
+      ruleReflectLater.set(r.id, { r, n: (was?.n ?? 0) + n, src: was?.src ?? src });
+    }
   };
+  const ruleReflectLater = new Map<string, { r: DamageRule; n: number; src: DamageSource }>();
   const ruleCountersLater: { id: ObjectId; zc: number; counter: string; n: number; by: PlayerId; card: string }[] = [];
   // Vigor's +1/+1 counters, put once the damage is prevented.
   const plusOnesLater: { id: ObjectId; n: number; by: PlayerId }[] = [];
@@ -1569,6 +1575,13 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     if (put > 0) log(s, `${card}: ${defOf(s, o).name} gets ${put === 1 ? `${/^[aeiou]/.test(counter) ? "an" : "a"} ${counter}` : `${put} ${counter}`} counter${put === 1 ? "" : "s"}.`);
   }
   if (ruleCountersLater.length) invalidateCharacteristics(s);
+  for (const { r, n, src } of ruleReflectLater.values()) {
+    const from = r.reflect?.source ? s.objects[r.reflect.source.id] : undefined;
+    if (n <= 0 || !r.reflect || !from) continue;
+    // "That source's controller": whoever controls it as the trigger resolves while it's still that object, otherwise
+    // its controller as the damage was prevented (TriggerEventInfo.sourceOf).
+    s.triggerQueue.push({ sourceId: from.id, sourceCardId: r.cardId, controller: r.controller, index: -1, body: r.reflect.body, sourceZc: from.zoneChanges ?? 0, event: { amount: n, player: src.controller, ...(src.ref ? { sourceOf: { id: src.ref.object, zc: src.ref.zc } } : {}) } });
+  }
   for (const [id, { n, by, body }] of reflectLater) {
     const o = s.objects[id];
     if (!o) continue;

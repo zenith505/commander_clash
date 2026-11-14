@@ -2100,7 +2100,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   const dial = chooseEndTurnEscape(s, pid);
   if (dial) return dial;
-  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? choosePhaseAway(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid);
   if (regen) return regen;
   const silencer = chooseSilencerFaceUp(s, pid);
   if (silencer) return silencer;
@@ -2136,8 +2136,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const options = [...exilePlayable(s, pid), ...topPlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
       // A land with an Adventure can still go on its adventure (CR 715.3).
       .filter((id) => !isType(defOf(s, obj(s, id)), "Land") || castableFaces(s, obj(s, id)).length)
-      // Damage prevention waits for damage coming (chooseDamageShield).
-      .filter((id) => !shieldBody(compileCard(defOf(s, obj(s, id))).spell))
+      // Damage prevention waits for damage coming (chooseDamageShield); Desperate Gambit for an unblocked attacker (chooseGambit).
+      .filter((id) => !shieldBody(compileCard(defOf(s, obj(s, id))).spell) && !gambitBody(compileCard(defOf(s, obj(s, id))).spell))
       // Misleading Signpost waits for an attack to turn (chooseTimed); Windshaper Planetar is a creature worth casting anyway.
       .filter((id) => isType(defOf(s, obj(s, id)), "Creature") || !attackStepOnly(compileCard(defOf(s, obj(s, id)))))
       .map((id) => {
@@ -6435,6 +6435,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
       if (allEffects(ab.body.effects).some((e) => e.type === "endTurn")) continue; // Sundial of the Infinite, Obeka: bots don't end their turn early
       if (ab.body.effects.some((e) => e.type === "nextCast" && e.flash)) continue; // Progenitor's Icon: bots keep its mana instead
+      // Pit Automaton: only with an exhaust ability of ours still to activate this turn and the mana for both.
+      if (ab.body.effects.some((e) => e.type === "nextCast" && e.exhaust) && !exhaustReady(s, pid, id, manaValue(parseManaCost(ab.manaCost)))) continue;
       // Saving a creature with a flip (Frenetic Efreet, Viashino Sandswimmer) waits for something to save it from (chooseFlipEscape).
       if (flips && flipEscape(flips)) continue;
       // Gustha's Scepter: in our second main phase, hide a card from a hand we'd discard from in the cleanup step
@@ -6466,6 +6468,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
       if (ab.body.effects.some((e) => e.type === "redirectNext")) continue; // only in a combat it would lose (chooseRedirect)
       if (shieldBody(ab.body)) continue; // only when damage is coming (chooseDamageShield)
+      if (unblockedShield(ab.body)) continue; // Forcefield: only against unblocked attackers (chooseDamageShield)
       // Sworn Defender: its power and toughness set from a creature in combat with it, which bots don't weigh.
       if (ab.body.targets.some((t) => t.blockingSource) && ab.body.effects.some((e) => e.type === "continuous" && e.what.ref === "self" && e.mods.some((m) => (m.kind === "setPower" && typeof m.power === "object") || (m.kind === "setToughness" && typeof m.toughness === "object")))) continue;
       // Prairie Dog's "until end of turn, ... that many plus one +1/+1 counters": bots don't plan their counters ahead.
@@ -6482,6 +6485,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.body.effects.length && ab.body.effects.every((e) => e.type === "delayed" && e.when === "dies")) continue;
       // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.
       if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
+      // The Moment: our creature phased out until it leaves is kept for saving one from an opponent's spell (choosePhaseAway).
+      if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.untilSourceLeaves && e.what.ref === "target" && ab.body.targets[e.what.index]?.kind === "object" && (ab.body.targets[e.what.index] as { controller?: string }).controller === "you")) continue;
       // "Until your next upkeep, ~ can't phase out" (Ertai's Familiar): only to keep our own phasing permanent here, once;
       // Spatial Binding's "target permanent can't phase out" bots leave alone.
       const binds = ab.body.effects.length > 0 && ab.body.effects.every((e) => e.type === "continuous" && e.mods.every((m) => m.kind === "cantPhaseOut"));
@@ -7675,6 +7680,51 @@ function damageThreat(s: GameState, pid: PlayerId): DamageThreat | null {
   return toMe >= Math.min(4, player(s, pid).life) ? { kind: "combat", attackers, toMe, creatures: [] } : null;
 }
 
+/** Forcefield: an ability that's only "the next time an unblocked creature of your choice would deal combat damage to you" (Effect damageMod `choosePermanent`). */
+function unblockedShield(body: AbilityBody | undefined): boolean {
+  return !!body && body.effects.length === 1 && body.effects[0]!.type === "damageMod" && !!body.effects[0]!.choosePermanent && !!body.effects[0]!.mod.prevent;
+}
+
+/**
+ * Pit Automaton: an exhaust ability of ours (CR 702.177a), not a mana ability, not yet activated, that we could still pay
+ * for after `reserve` mana, not counting what `except` (the permanent copying it, tapped for that) could make.
+ */
+function exhaustReady(s: GameState, pid: PlayerId, except: ObjectId, reserve: number): boolean {
+  const room = availableMana(s, pid) - reserve - (abilitiesOf(s, obj(s, except)).mana.length ? 2 : 0);
+  return s.battlefield.some((id) => {
+    const o = obj(s, id);
+    if (id === except || controllerOf(s, o) !== pid) return false;
+    return abilitiesOf(s, o).activated.some((ab, i) => ab.keyword === "Exhaust" && !ab.mana && !o.activatedEver?.includes(i) && manaValue(parseManaCost(ab.manaCost)) <= room);
+  });
+}
+
+/** Desperate Gambit: a spell that chooses a source of its controller's first (Effect chooseSourceNow). */
+function gambitBody(body: AbilityBody | undefined): boolean {
+  return !!body && body.effects.some((e) => e.type === "chooseSourceNow");
+}
+
+/** Sources a next-time damage effect of this bot's already covers this turn (Forcefield, Dark Sphere): not chosen again. */
+function shieldedSources(s: GameState, pid: PlayerId): Set<ObjectId> {
+  return new Set((s.damageMods ?? []).flatMap((r) => (r.you === pid && r.turn === s.turn && r.mod.nextTime && r.mod.by?.chosen ? [r.mod.by.chosen.id] : [])));
+}
+
+/**
+ * Desperate Gambit: cast once blockers are declared in our own combat, for an unblocked attacker of ours with power 3 or
+ * more attacking an opponent: a coin flip to double its damage or lose it (chooseDamageSource picks it).
+ */
+function chooseGambit(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.step !== "declareBlockers" || s.stack.length || s.activePlayer !== pid) return null;
+  const covered = shieldedSources(s, pid);
+  const big = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid && o.attacking !== undefined && o.attacking !== pid && !o.blockedBy?.length && !covered.has(o.id) && power(s, o) >= 3);
+  if (!big.length) return null;
+  for (const id of player(s, pid).hand) {
+    if (!gambitBody(compileCard(defOf(s, obj(s, id))).spell)) continue;
+    const plan = castPlan(s, pid, id, false);
+    if (plan) return plan;
+  }
+  return null;
+}
+
 /** A body that only prevents or redirects damage this turn (and maybe gains life), which a bot keeps for when damage comes. */
 function shieldBody(body: AbilityBody | undefined): boolean {
   if (!body || body.modal) return false;
@@ -7770,6 +7820,16 @@ function chooseDamageShield(s: GameState, pid: PlayerId): Action[] | null {
     const abilities = abilitiesOf(s, o).activated;
     for (let i = 0; i < abilities.length; i++) {
       const ab = abilities[i]!;
+      // Forcefield: once for each unblocked attacker of ours that would deal us 2 or more, none already shielded.
+      if (t.kind === "combat" && !ab.mana && unblockedShield(ab.body) && !parseManaCost(ab.manaCost).hasX) {
+        const covered = shieldedSources(s, pid);
+        if (!t.attackers.some((a) => !covered.has(a.id) && !a.attackingPermanent && power(s, a) >= 2)) continue;
+        const problem = abilityProblem(s, pid, id, i);
+        if (problem && !/not enough mana/.test(problem)) continue;
+        const plan = planActivate(s, pid, id, i);
+        if (plan) return plan;
+        continue;
+      }
       if (ab.mana || !shieldBody(ab.body) || parseManaCost(ab.manaCost).hasX) continue;
       const v = shieldValue(s, pid, ab.body, t, o.chosen);
       // Sacrificing the permanent (or a creature) for it only against a lot of damage.
@@ -7787,18 +7847,28 @@ function chooseDamageShield(s: GameState, pid: PlayerId): Action[] | null {
   return null;
 }
 
-/** The source a bot's prevention effect is about (CR 609.7a): the newest opponent's spell or ability on the stack, else the biggest creature attacking it, else the biggest opposing creature. */
+/**
+ * The source a bot's prevention effect is about (CR 609.7a): the newest opponent's spell or ability on the stack, else the
+ * biggest creature attacking it, else the biggest opposing creature; not one a next-time effect of ours already covers.
+ * Choosing among its own sources only (Desperate Gambit): its biggest unblocked attacker, else its newest spell.
+ */
 function chooseDamageSource(s: GameState, pid: PlayerId, options: string[]): string {
+  const covered = shieldedSources(s, pid);
   const score = (key: string) => {
     const o = s.objects[key.split("@")[0]!];
     if (!o) return -1000;
     let onStack = -1;
     s.stack.forEach((x, i) => ((x.kind === "spell" && x.objectId === o.id) || (x.kind === "ability" && x.sourceId === o.id)) && (onStack = i));
     const ctrl = onStack >= 0 ? s.stack[onStack]!.controller : o.zone === "battlefield" ? controllerOf(s, o) : o.owner;
-    if (ctrl === pid) return -500;
+    if (ctrl === pid) {
+      // A spell resolving now (the one choosing) deals no more damage.
+      const resolving = s.resolving?.item.kind === "spell" && s.resolving.item.objectId === o.id;
+      const attacker = o.zone === "battlefield" && objIsType(s, o, "Creature") ? Math.max(0, power(s, o)) * (o.attacking !== undefined && !o.blockedBy?.length ? 10 : 1) : 0;
+      return -1000 + (resolving ? 0 : onStack >= 0 ? 100 + onStack : attacker);
+    }
     let v = onStack >= 0 ? 200 + onStack : 0;
     if (o.zone === "battlefield" && objIsType(s, o, "Creature")) v += Math.max(0, power(s, o)) * (o.attacking === pid ? 10 : 1);
-    return v;
+    return v - (covered.has(o.id) ? 150 : 0);
   };
   return [...options].sort((a, b) => score(b) - score(a))[0]!;
 }
@@ -7838,6 +7908,38 @@ function chooseProtection(s: GameState, pid: PlayerId): Action[] | null {
       const costs = targets && abilityCosts(s, pid, o, abilities[i]!, targets);
       const plan = targets && costs !== null && planActivate(s, pid, id, i, targets, undefined, undefined, undefined, costs ?? undefined);
       if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
+ * The Moment: "Untap target creature you control. It phases out until ~ leaves the battlefield.": in answer to an
+ * opponent's spell or ability on top of the stack aimed at one of our creatures (phased out, it's no longer a legal
+ * target, CR 702.26b, 608.2b), the one worth the most.
+ */
+function choosePhaseAway(s: GameState, pid: PlayerId): Action[] | null {
+  const top = s.stack[s.stack.length - 1];
+  if (!top || top.controller === pid) return null;
+  const aimed = (top.targets ?? []).flatMap((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && controllerOf(s, obj(s, t.id)) === pid && objIsType(s, obj(s, t.id), "Creature") ? [t.id] : []));
+  if (!aimed.length) return null;
+  aimed.sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      const e = ab.body.effects.find((x) => x.type === "phaseOut" && x.untilSourceLeaves && x.what.ref === "target");
+      if (e?.type !== "phaseOut" || e.what.ref !== "target" || ab.body.targets.length !== 1 || ab.mana) continue;
+      for (const want of aimed) {
+        if (want === id) continue;
+        const ok = legalTargets(s, ab.body.targets[0]!, pid, undefined, sourceQuality(s, id), id).find((t) => t.kind === "object" && t.id === want);
+        if (!ok) continue;
+        const costs = abilityCosts(s, pid, o, ab, [ok]);
+        const plan = costs !== null && planActivate(s, pid, id, i, [ok], undefined, undefined, undefined, costs ?? undefined);
+        if (plan) return plan;
+      }
     }
   }
   return null;
@@ -8529,6 +8631,17 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   // One that can't block alone doesn't block by itself (CR 506.5).
   const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
   if (blocks.length === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) blocks.length = 0;
+  // Nacatl War-Pride: "must be blocked by exactly one creature if able": a gang block on it is cut back to its first blocker
+  // when the extra ones break that requirement (CR 509.1c).
+  for (const at of incoming.filter((a) => characteristics(s, a).mustBeBlockedByOne)) {
+    const on = blocks.filter((b) => b.attacker === at.id);
+    if (on.length > 1 && blockRequirementProblem(s, pid, blocks)?.endsWith("must be blocked by exactly one creature if able")) {
+      const extra = new Set(on.slice(1));
+      const left = blocks.filter((b) => !extra.has(b));
+      blocks.length = 0;
+      blocks.push(...left);
+    }
+  }
   const kept = withCompany(s, blocks);
   return { type: "declareBlockers", player: pid, blocks: kept };
 }

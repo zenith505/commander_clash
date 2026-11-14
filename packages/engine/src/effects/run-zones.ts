@@ -2498,7 +2498,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const sc = (s.resolving!.scratch ??= {});
       const linked = (s.linkedExile?.[key] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc);
       if (e.ifLinkedNow && !s.resolving!.linkedNow?.length) return;
-      let cards = linked.map((l) => obj(s, l.id)).filter((c) => (!e.yours || c.owner === ctx.controller) && !(e.other && s.resolving!.faceDownExiled?.includes(c.id)) && !(e.ifLinkedNow && s.resolving!.linkedNow?.includes(c.id)));
+      let cards = linked.map((l) => obj(s, l.id)).filter((c) => (!e.yours || c.owner === ctx.controller) && !(e.other && s.resolving!.faceDownExiled?.includes(c.id)) && !((e.ifLinkedNow || e.exceptLinkedNow) && s.resolving!.linkedNow?.includes(c.id)));
       const p = player(s, ctx.controller);
       if (e.turnFaceUp)
         for (const c of cards.filter((c) => c.hiddenExile)) {

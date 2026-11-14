@@ -1,6 +1,6 @@
 # Roadmap
 
-31,327 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,337 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,881 of
 9,979 (99%).
 
@@ -2734,6 +2734,60 @@ line blocks.
    you draw a card", one choice per opponent); Sphinx Ambassador (an opponent names a card after a hidden search);
    Choreographed Sparks ("can't be copied", and a copy of a creature spell with granted text); Mirror of Life Trapping and
    Archnemesis (not yet looked at closely); Fell Beast's Shriek and Riddles in the Dark (in Lane B's range).
+   Round 364 went on down the "Out after round N" lists and `npm run popular`, most played first, to blocking requirements,
+   a copied exhaust ability, next-time damage effects for a chosen source and a permission from the top of the library:
+   Nacatl War-Pride's "~ must be blocked by exactly one creature if able." (one requirement, CR 509.1c: unblocked or blocked
+   by two is broken while one creature alone could block it; with menace, by several or none, rulings; Modification
+   mustBeBlocked `exactlyOne`) and "Whenever ~ attacks, create X tokens that are copies of it and that are tapped and
+   attacking, where X is the number of creatures defending player controls. Exile the tokens at the beginning of the next
+   end step." (each token attacking what its controller chooses, CR 508.4, rulings); Pit Automaton's "When you next activate
+   an exhaust ability that isn't a mana ability this turn, copy it." (Effect nextCast `exhaust`; an exhaust mana ability
+   doesn't use it up, rulings); Desperate Gambit's "Choose a source you control and flip a coin. If you win the flip, the
+   next time that source would deal damage this turn, it deals double that damage instead. If you lose the flip, the next
+   time it would deal damage this turn, prevent that damage." (Effect chooseSourceNow: the source chosen before the flip,
+   CR 609.7a, a spell or a gone ability source too, rulings; damageMod `chosenSource`); Cemetery Illuminator's "Once each
+   turn, you may cast a spell from the top of your library if it shares a card type with a card exiled with ~." (FromTop
+   `sharesTypeWithLinked`, the spell as cast, rulings, CR 607.2a); Forcefield's "The next time an unblocked creature of your
+   choice would deal combat damage to you this turn, prevent all but 1 of that damage." (only attacking creatures not
+   blocked then, so not a blocked trampler, rulings; damageMod `choosePermanent`). No new prompt: each uses the existing
+   attack-choice, source-choice and top-of-library paths, with browser tests for Nacatl War-Pride's tokens, Desperate
+   Gambit's choice and Cemetery Illuminator's cast. Bots block it with one creature, activate Pit Automaton only with an
+   exhaust ability left to use, cast Desperate Gambit for an unblocked attacker with power 3 or more, and use Forcefield
+   against an unblocked attacker dealing 2 or more. +5, 31,315 of 31,936. The compiled text of every other card is
+   unchanged.
+   Out after round 364 (looked at, not done): Tamiyo, Collector of Tales and Nephalia Academy (still out: who controls what
+   causes a discard or sacrifice, on every path); Stalking Leonin (still out: a secret choice); Celestial Reunion (still
+   out: a type chosen and two creatures beheld as an optional cost); Rootpath Purifier ("land cards in your library are
+   basic": searches read library cards' printed supertypes); Mysterious Stranger (still out: one target per graveyard);
+   Sala, Deck Boss (unranked, Lane B's range).
+   Round 365 went on down the "Out after round N" lists and `npm run popular`, most played first, to attack triggers about
+   who is attacked, a creature trap, a reflexive trigger on a prevention shield and phasing until a source leaves:
+   Archnemesis's "Whenever you attack enchanted player, that player loses 2 life. You draw a card and gain 2 life." (once
+   each combat you attack the player it enchants, not their planeswalkers or battles, CR 508.3e; TriggeredAbility
+   `attacksEnchanted`) and "Whenever a player attacks you, you may attach this Aura to that player." (only an opponent can,
+   CR 506.2; Effect attachSelfToPlayer, while it's still that object and could enchant them, CR 701.3b, 702.5d); Mirror of
+   Life Trapping's "Whenever a creature enters, if it was cast, exile it, then return all other permanent cards exiled with
+   this artifact to the battlefield under their owners' control." (anyone's creature spell, not a copy, CR 707.10, an
+   intervening if, CR 603.4; exiled linked to it, CR 607.2a; the others return even if the creature is gone; moveLinked
+   `exceptLinkedNow`); New Way Forward's "The next time a source of your choice would deal damage to you this turn,
+   prevent that damage. When damage is prevented this way, ~ deals that much damage to that source's controller and you
+   draw that many cards." (the source chosen as it resolves, rulings; DamageRuleSpec `reflect`: a reflexive trigger of the
+   spell, CR 603.12, "that source's controller" as it resolves while the source is still that object, otherwise as the
+   damage was prevented); Mirkwood Trapper's "Whenever a player attacks you, target attacking creature gets -2/-0 until
+   end of turn." and "Whenever a player attacks, if they aren't attacking you, that player chooses an attacking creature.
+   It gets +2/+0 until end of turn." (any player's attack, yours too, CR 508.3d; one attacking only your planeswalker or a
+   battle you protect isn't attacking you, rulings; StaticCondition `notAttackingYou`, checked as it triggers and as it
+   resolves); The Moment's "Untap target creature you control. It phases out until ~ leaves the battlefield." (it phases in
+   only right after The Moment leaves, as it was; with The Moment already gone, untapped but not phased out, rulings).
+   Browser tests click through Archnemesis's move, Mirkwood Trapper's choice of attacker and New Way Forward's source.
+   Bots move Archnemesis to whoever attacks them, pump their best attacker, cast New Way Forward against an attack of 4 or
+   more, and keep The Moment's phasing for an opponent's spell or ability aimed at one of their creatures. +5, 31,326 of
+   31,936 with Lane B's B204. The compiled text of every other card is unchanged.
+   Out after round 365 (looked at, not done): Archelos, Lagoon Mystic and Kraven the Hunter (still out, as in the earlier
+   lists); The Pandorica ("It can't phase in for as long as ~ remains tapped", then phasing in when it untaps or leaves:
+   a lock tied to the source's tapped state); Ashes of the Fallen (a chosen creature type for creature cards in your
+   graveyard only: the off-field type statics cover every zone outside the battlefield); Garland, Royal Kidnapper and Reap
+   (still out).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -4318,7 +4372,7 @@ line blocks.
    Out after round 241 (looked at, not done): Nuka-Nuke Launcher (done in round 321) ("until the end of defending player's next turn, that
    player gets two rad counters whenever they cast a spell": a floating trigger lasting until another player's turn
    ends); Psionic Ritual (done in round 304), Exterminate! (done in round 304) and Reiterating Bolt (done in round 304) (replicate with a cost that isn't mana, paid any number of
-   times); Nacatl War-Pride and Gorm the Great (done in round B198) ("must be blocked by exactly one creature" / "by two or more creatures if
+   times); Nacatl War-Pride (done in round 364) and Gorm the Great (done in round B198) ("must be blocked by exactly one creature" / "by two or more creatures if
    able": requirements on the number of blockers); Calamity, Galloping Inferno (token copies of the creatures that saddled
    it, chosen one by one).
    Out after round 240 (looked at, not done): Geyadrone Dihada (protection from permanents with corruption counters
@@ -4589,7 +4643,7 @@ line blocks.
    still out.
    Smaller gaps from round 114: "target player adds two mana in any combination
    of colors" (another player adding it) is out; Quicksilver Fountain (each player floods a land of
-   their choice) and Eluge (a cost reduction for each flooded land) are out; Cemetery Illuminator and the other "look at the top card, you may cast it if ..." cards are
+   their choice) and Eluge (a cost reduction for each flooded land) are out; Cemetery Illuminator (done in round 364) and the other "look at the top card, you may cast it if ..." cards are
    out; Lozhan ("any target that isn't a commander") is out; Moxite Refinery (Remove X counters as a cost) and Subversive
    Acolyte are out; bots never choose Aetheric Amplifier's "each kind of counter you have" mode. Smaller gaps from round
    113: autopay never exiles a creature to Food Chain (choosing what to exile is the player's; bots do use it);
@@ -5075,7 +5129,7 @@ line blocks.
      counters), Contested Game Ball (done in round B164) and War Elemental ("dealt combat damage", "its owner"). Split the Party works.
    - Damage amount replacements and per-source prevention work (double, triple, +N, half, "prevent N of that damage",
      "all but N", "can't be prevented"; the affected player orders them with shields, CR 616.1); still out: Neriv
-     (mana value of the source), Bitter Feud, Desperate Gambit and Forcefield (next-time doubling on a chosen or
+     (mana value of the source), Bitter Feud, Desperate Gambit and Forcefield (both done in round 364) (next-time doubling on a chosen or
      unblocked source), Quest for Pure Flame, Taii Wakeen, Goblin Goliath and Jeska (other lines), Rankle and Torbran
      (a "player or battle" trigger), the Ajani emblem, Lightning Surge, Arrow Storm, Banefire and Demonfire
      (conditional "can't be prevented"), Flames of the Blood Hand, Volcano Hellion, and prevention with extra effects
@@ -8911,7 +8965,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   face-down one by those characteristics only; the Cast face down button shows the cost now (a browser test with Kadena).
   +8, 31,215 of 31,936 with B189 to B197 and rounds 348 to 351.
 - Out after round B198 (looked at, not done): Kodama of the Center Tree (soulshift X counted from the Spirits you controlled
-  just before it died, CR 603.10a, and kept for the target's mana value), Nacatl War-Pride ("must be blocked by exactly one
+  just before it died, CR 603.10a, and kept for the target's mana value), Nacatl War-Pride (done in round 364) ("must be blocked by exactly one
   creature if able" and token copies attacking as many as the defending player's creatures), Hans Eriksson (a revealed
   creature put onto the battlefield attacking that player or a planeswalker they control, then a reflexive fight), Grime
   Gorger (one card of each card type: how a multi-type card counts isn't settled by its rulings), Spiteful Repossession
@@ -9058,7 +9112,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the total for several, 0 for a card with no printed power, rulings). The Three Seasons (chapter III: three cards you
   choose in each graveyard, all of one with three or fewer, shuffled in; a player with none chosen doesn't shuffle,
   rulings). Varchild's War-Riders (its cumulative upkeep: an opponent chosen for each age counter, the same one or
-  different ones, each creating the Survivor token under their own control, rulings). +5, 31,327 of 31,936.
+  different ones, each creating the Survivor token under their own control, rulings). +5, 31,337 of 31,936 with
+  rounds 364 and 365.
 - Out after round B206 (looked at, not done): Filigree Vector (two "any number of target" sets in one ability: only one
   per ability is modeled), Reap (a target count set by another target as it's cast), Pulmonic Sliver (an optional
   granted "put it on top of its owner's library instead", with several Slivers ordered at once), Day of the Moon (the
@@ -9316,7 +9371,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   attached to), Jandor's Ring (the last card you drew this turn isn't tracked).
 - Out after round B117 (looked at, not done): Price of Betrayal (done in round B156) (counters removed from a target that may be a player: no
   player counters as a target yet), Barroom Brawl (the copy's controller, the opponent to the left, "that player"),
-  Pit Automaton (a delayed trigger on the next exhaust ability activated).
+  Pit Automaton (done in round 364) (a delayed trigger on the next exhaust ability activated).
 - Out after round B116 (looked at, not done): Earthbind (an Aura gaining a static ability with the timestamp of the gain,
   CR 613.7a, after an intervening if on the enchanted creature), Goblin Test Pilot (done in round B136) (a target chosen at random as an
   activated ability is activated: activation always lets the player choose), Thijarian Witness (done in round B131) ("if it was attacking or

@@ -1778,7 +1778,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Desert Were-Worm: the first attack this turn with that much power (TurnLog.attackPower is from earlier ones).
         if (t.totalPowerFirst && (s.turnLog?.attackPower?.[ev.controller] ?? 0) >= (t.minTotalPower ?? 0)) continue;
         const amount = ev.type === "groupCombatDamage" ? hit.reduce((n, [, i]) => n + ev.amounts[i]!, 0) : undefined;
-        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.exactAttackers === !!t.exactAttackers && JSON.stringify(tt.allAttack) === JSON.stringify(t.allAttack) && tt.minTotalPower === t.minTotalPower && !!tt.totalPowerFirst === !!t.totalPowerFirst && !!tt.anyoneAttacks === anyone && !!tt.perPlayer === !!t.perPlayer && !!tt.selfOrCommander === !!t.selfOrCommander && !!tt.attacksPlayers === !!t.attacksPlayers;
+        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.exactAttackers === !!t.exactAttackers && JSON.stringify(tt.allAttack) === JSON.stringify(t.allAttack) && tt.minTotalPower === t.minTotalPower && !!tt.totalPowerFirst === !!t.totalPowerFirst && !!tt.anyoneAttacks === anyone && !!tt.perPlayer === !!t.perPlayer && !!tt.attacksEnchanted === !!t.attacksEnchanted && !!tt.selfOrCommander === !!t.selfOrCommander && !!tt.attacksPlayers === !!t.attacksPlayers;
         const group = hit.map(([x]) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
         if (t.attacksPlayers) {
           const attackedPlayers = s.turnOrder.filter((p) => hit.some(([x]) => obj(s, x).attacking === p));
@@ -1803,7 +1803,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "Whenever you attack a player": once for each player the matching creatures attack (CR 508.3e).
         if (t.perPlayer) {
           for (const p of s.turnOrder)
-            if ((!t.toInitiative || s.initiative === p) && hit.filter(([x]) => obj(s, x).attacking === p && !obj(s, x).attackingPermanent).length >= (t.minAttackers ?? 1))
+            // Archnemesis: "Whenever you attack enchanted player": the player it's attached to as attackers are declared.
+            if ((!t.toInitiative || s.initiative === p) && (!t.attacksEnchanted || o.attachedToPlayer === p) && hit.filter(([x]) => obj(s, x).attacking === p && !obj(s, x).attackingPermanent).length >= (t.minAttackers ?? 1))
               add(o, ev.controller, (_, tt) => same(tt), list, undefined, undefined, undefined, undefined, undefined, { player: p });
           // Rigo: each planeswalker attacked too, its controller as "that player".
           if (t.perWalker)
@@ -2315,7 +2316,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // Loki Laufeyson: "with mana value less than or equal to ~'s power", that power as the spell is cast (CR 603.2), as it
       // last existed on the battlefield once it has left (CR 113.7a, 608.2h).
       if (d.mvMaxPowerOf && (item ? spellManaValue(s, item) : defMv(ev.card)) > sourcePowerNow(s, d.mvMaxPowerOf)) continue;
-      if (d.loyalty === "only" || d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(rest, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
+      if (d.loyalty === "only" || d.exhaust || d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(rest, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
       // Zevlor, Elturel Exile: a spell that doesn't target only one opponent or one opponent's permanent doesn't use it up.
       if (d.onlyOpponentOrTheirs && opponentOrTheirsTarget(s, item?.targets ?? [], d.controller) === undefined) continue;
       // Yidris, Maelstrom Wielder: each spell cast from your hand this turn gains cascade; the effect isn't used up.
@@ -2679,6 +2680,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (!(ev.loyalty ? d.loyalty : d.xAbility) || d.controller !== ev.player || d.turn !== s.turn) continue;
         s.nextCast = s.nextCast!.filter((x) => x !== d);
         if (!ev.stackId) continue;
+        s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
+      }
+    // Pit Automaton: "When you next activate an exhaust ability that isn't a mana ability this turn, copy it": a delayed
+    // trigger (CR 603.7a), once (603.7c); an exhaust mana ability doesn't use it up (rulings: it isn't one that triggers
+    // it). Its copy resolves first (CR 707.10).
+    if (ev.exhaust && !ev.mana && ev.stackId)
+      for (const d of [...(s.nextCast ?? [])]) {
+        if (!d.exhaust || d.controller !== ev.player || d.turn !== s.turn) continue;
+        s.nextCast = s.nextCast!.filter((x) => x !== d);
         s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
       }
     // "Whenever an opponent activates an ability of a creature that isn't a mana ability" (its source as it was activated).

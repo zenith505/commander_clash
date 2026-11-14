@@ -5379,6 +5379,8 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" 
       // Bolas's Citadel's spells are cast for life (`way` "life"); the other permissions' for their mana costs.
       if (!land && way && !!top.payLife !== (way === "life")) continue;
       if ((top.if && !staticConditionNow(s, top.if, src.id, pid)) || !(land ? top.lands && (!top.landFilter || printedMatches(top.landFilter, d)) : top.spells === "any" || !!top.spells?.some((f) => printedMatches(bindChosen(f, src.chosen), d)))) continue;
+      // Cemetery Illuminator: only a spell sharing a card type with a card exiled with it (its face as cast, rulings; CR 607.2a).
+      if (top.sharesTypeWithLinked && (land || !linkedExileCards(s, src).some((x) => defOf(s, obj(s, x)).types.some((t) => d.types.includes(t))))) continue;
       if (top.costs?.length) {
         costly ??= { by: src, costs: top.costs };
         continue;
@@ -13633,6 +13635,16 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
       const on = blocks.filter((b) => b.attacker === at.id).length;
       const more = could.filter((b) => !full(b) && !blocks.some((x) => x.blocker === b.id && x.attacker === at.id)).length;
       if (on < 2 && on + more >= 2) return `${ac.name} must be blocked by two or more creatures if able`;
+    }
+    // Nacatl War-Pride: "must be blocked by exactly one creature if able": one requirement (CR 509.1c). Blocked by more
+    // than one when one alone could block it (no menace, rulings), it's broken; that's allowed only when taking the extra
+    // blockers away would break as many other requirements, those of two or more of its blockers bound to block it
+    // (provoked by it, its own "all creatures able to block it do so", "blocks each attacking creature", or "blocks this
+    // turn if able" with no other attacker to block).
+    if (ac.mustBeBlockedByOne && blockersNeeded(s, at) <= 1) {
+      const on = blocks.filter((b) => b.attacker === at.id).map((b) => obj(s, b.blocker));
+      const bound = on.filter((b) => ac.allMustBlock || lureBinds(s, at, b) || provokersOf(s, b).some((p) => p.id === at.id) || characteristics(s, b).mustBlockEach || (characteristics(s, b).mustBlock && !incoming.some((x) => x.id !== at.id && !cannot(b, x))));
+      if (on.length > 1 && bound.length <= 1) return `${ac.name} must be blocked by exactly one creature if able`;
     }
   }
   return null;

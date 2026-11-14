@@ -2,7 +2,7 @@ import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption
 import { coloredManaSymbols, manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool, mayPayUse, type ManaUse } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, evidenceCandidates, evidenceValue, livingPlayers, gainLife, inCombatPhase, loseEnergy, processCandidates, adventureExileCards, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, tapPermanent, whileControlledHolds } from "../game";
+import { autoEvidence, evidenceCandidates, evidenceValue, livingPlayers, gainLife, inCombatPhase, loseEnergy, processCandidates, adventureExileCards, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, enterTogether, payableLife, player, shareCreatureType, tapPermanent, whileControlledHolds } from "../game";
 import { abilitiesOf, realDefOf, canBeSacrificed, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import type { Color, GameObject, GameState, ObjectId, PlayerId } from "../types";
@@ -732,6 +732,42 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           paid,
         ];
         return runEffect(s, { type: "may", effects: gain, otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Gain control of ${sc.n === 1 ? `a ${filter.text}` : `${sc.n} ${filter.text}s`} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
+      }
+      // Varchild's War-Riders: whether to pay first, then an opponent for each age counter (the same or different ones,
+      // rulings), each of whom creates the token; all of it is one payment (CR 702.24a), the tokens made together, each
+      // player's under their own control (CR 111.2). With no opponent left it can't be paid (CR 118.3).
+      if (e.giveToken) {
+        if (!sc.n) return runEffect(s, paid, ctx);
+        const can = opponents(s, ctx.controller).filter((q) => !player(s, q).lost);
+        const token = e.giveToken;
+        if (sc.may === undefined) {
+          if (!can.length) sc.may = false;
+          else {
+            s.pending = { kind: "chooseMay", player: ctx.controller, prompt: `have opponents create ${sc.n === 1 ? `a ${token.name} token` : `${sc.n} ${token.name} tokens`} in all (one for each age counter) to keep ~ (cumulative upkeep)`.replace(/~/g, src), otherwise: `If you don't, sacrifice ${src}.`, source: src, keep: true };
+            return "paused";
+          }
+        }
+        if (!sc.may) return runEffect(s, { type: "sacrifice", what: { ref: "self" } }, ctx);
+        const picks = (sc.lifeTo ??= []);
+        while (picks.length < sc.n) {
+          if (can.length === 1) {
+            picks.push(can[0]!);
+            continue;
+          }
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "giveLife", options: can.map(String), labels: can.map((q) => player(s, q).name), prompt: `choose an opponent to create a ${token.power}/${token.toughness} ${token.name} token (${picks.length + 1} of ${sc.n})` };
+          return "paused";
+        }
+        const each = new Map<PlayerId, number>();
+        for (const q of picks) each.set(q, (each.get(q) ?? 0) + 1);
+        log(s, `${player(s, ctx.controller).name} has ${[...each].map(([q, n]) => `${player(s, q).name} create ${n === 1 ? "a token" : `${n} tokens`}`).join(", ")} to keep ${src}.`);
+        const r = s.resolving!;
+        const before = r.chosen;
+        r.chosen = { ...r.chosen, players: [...each.keys()] };
+        enterTogether(s, () => {
+          [...each.values()].forEach((n, nth) => runEffect(s, { type: "createToken", who: { ref: "chosenPlayer", nth }, n, token }, ctx));
+        });
+        r.chosen = before;
+        return runEffect(s, paid, ctx);
       }
       const pay = timesPay(e.pay, sc.n);
       // "If [cost] has choices ... either the entire set of costs is paid, or none of them is" (CR 702.24a).

@@ -9032,7 +9032,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   bottom at random). Druid of the Emerald Grove (the basic lands found stay in the library, revealed, while the d20 is
   rolled, CR 701.23, 706; then into your hand, one onto the battlefield tapped and the other into your hand by your
   choice, asked only for two different names, one found alone entering as with Cultivate, rulings, or both tapped; "20+"
-  and "9 or less" count modified results). +6, 31,305 of 31,936. `npm run typecheck` now gives tsc a 4 GB heap: the engine's
+  and "9 or less" count modified results). +6, 31,316 of 31,936 with rounds 362 and 363. `npm run typecheck` now gives tsc a 4 GB heap: the engine's
   check had reached Node's default limit of about 2 GB (2.36 GB on main) and ran out in a fresh clone.
 - Out after round B204 (looked at, not done): Rinoa, Angel Wing, Sanctuary Blade and Kodama of the Center Tree stay out
   for the reasons in the earlier lists.

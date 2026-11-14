@@ -1,6 +1,6 @@
 # Roadmap
 
-31,263 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,269 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,876 of
 9,979 (98%).
 
@@ -4122,7 +4122,7 @@ line blocks.
    prevention that puts a counter for each creature's damage prevented); Professor Hojo (done in round 330) (the first activated ability that
    targets a creature you control).
    Out after round 249 (looked at, not done): The Eleventh Hour (a copy with a new name: the copied text's self-references
-   and the rulings' loss of non-Alien subtypes); Stitcher Geralf ("exile up to two creature cards put into graveyards
+   and the rulings' loss of non-Alien subtypes); Stitcher Geralf (done in round B202) ("exile up to two creature cards put into graveyards
    this way" and their total power); Aragorn, Company Leader ("if you chose a creature other than ~ as your Ring-bearer"
    and "one of each of those kinds of counters"); Fervent Mastery ("If the {2}{R}{R} cost was paid": which alternative
    cost was paid, and an opponent discarding any number then drawing that many); Plunge into Darkness ("Pay any amount of
@@ -6505,7 +6505,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   requirement toward you or your planeswalkers), Viral Spawning (done in round B154) (a conditional flashback), Silver Surfer, Galactus's Herald
   ("attacks that player each combat"), Blue Dragon (done in round B154) (three targets until your next turn), Satyr Firedancer (a spell's damage
   to an opponent), Thrill-Kill Disciple (done in round B175) (squad with a discard), Magnigoth Treefolk and Diligent Zookeeper (both done in round B164) (counted
-  landwalk and creature types), Exotic Pets and Storm of Forms (each kind of counter), Sanctifier en-Vec (done in round B174) (a color filter on
+  landwalk and creature types), Exotic Pets and Storm of Forms (done in round B202) (each kind of counter), Sanctifier en-Vec (done in round B174) (a color filter on
   permanents, spells and cards going to graveyards), Greatbow Doyen, Ancestral Communion (done in round B179), The Book of Vile Darkness.
 - Round B58 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 15,000): "If that player
   can't, they discard a card, they lose 2 life, you draw a card, ..., then you sacrifice ~" (Doom Foretold: the whole list
@@ -6578,7 +6578,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Clergy and Knight of the Holy Nimbus; the UI offers the ability on an opponent's permanent only). +23 (28,512 of
   31,936).
 - Out after round B60 (looked at, not done): Mossbridge Troll (tapping creatures with total power 10 as a cost), Faces of
-  the Past (a group sharing a creature type with the dying creature), Loki Laufeyson (a mana value limit from its power on
+  the Past (a group sharing a creature type with the dying creature), Loki Laufeyson (done in round B202) (a mana value limit from its power on
   a delayed cast trigger), The Fugitive Doctor (done in round B184) and Filigree Racer (flashback or jump-start granted until end of turn),
   Mazzy (an Aura put into a graveyard, cast until your next turn), Saheeli's Lattice, Paleontologist's Pick-Axe and Throne
   of the Grim Captain (all but the Pick-Axe done in round 334) ("craft with one or more"), Seifer (blocked by two or more), Distended Mindbender (done in round B158) (a choice of two
@@ -6657,7 +6657,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Refraction Trap (trap cost and a chosen source), Intermediate Chirography (a modified creature that died this
   turn), Churning Reservoir (oil counters put this turn), Dutiful Knowledge Seeker (cards put into a library from
   anywhere), Simic Manipulator (done in round 315) and Arcee (remove one or more counters as a variable cost), Benalish Commander and
-  Detritivore (suspend X), Darigaaz Reincarnated, Sekki, Seasons' Guide, Fugitive Codebreaker, Reroute (done in round B196), Serum Powder,
+  Detritivore (suspend X), Darigaaz Reincarnated (done in round B202), Sekki, Seasons' Guide, Fugitive Codebreaker, Reroute (done in round B196), Serum Powder,
   Delaying Shield (done in round B201), Immortal Coil, Fires of Mount Doom.
 - Round B64 (the unlisted ones from EDHREC rank about 19,700 up to 15,000): "return to the battlefield target creature
   card in your graveyard that was put there from the battlefield this turn" (Moira, Urborg Haunt), "Whenever you put a
@@ -6686,7 +6686,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   delayed return), Mirkwood Trapper ("that player chooses an attacking creature"), Captain Marvel, Apex Avenger ("the
   same number and kind of counters"), Storyweave (lore counters and the next enchantment creatures entering), Lodestone
   Bauble (cards from one player's graveyard on top in any order), Ellywick Tumblestrum ("If it's legendary" in a dig,
-  and her emblem), Scythe Specter (the greatest mana value among the discarded cards), Moorland Rescuer (total power X
+  and her emblem), Scythe Specter (the greatest mana value among the discarded cards), Moorland Rescuer (done in round B202) (total power X
   or less), Nazahn, Revered Bladesmith (done in round B199), Liliana, the Necromancer (done in round B174) (creature cards from graveyards onto the battlefield).
 - Round B65 (the unlisted ones from EDHREC rank about 19,700 up, and Hollow One and Take Out the Trash from the B10 and
   B11 lists): "Whenever ~ is dealt damage, exile that many cards from the top of your library. Choose one of them. Until
@@ -6710,7 +6710,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B65 (looked at, not done): Kaya, Ghost Assassin ("Exile ~ or up to one target creature"), Syrix,
   Carrier of the Flame ("if a creature card left your graveyard this turn", and casting it from the graveyard as a
   trigger resolves), Rinoa, Angel Wing (returning one of the attacking creatures that died, from any owner's graveyard),
-  Tide of War ("Whenever one or more creatures block" and sacrifices by each controller), Countersculpt (done in round B179) ("behold a Jace
+  Tide of War (done in round B202) ("Whenever one or more creatures block" and sacrifices by each controller), Countersculpt (done in round B179) ("behold a Jace
   or pay {1}"), Druid of the Emerald Grove (a d20 that splits the searched cards), Sphinx's Approach ("exile ~ and four
   cards named ~"), Faces of the Past (done in round B154) (creatures that share a creature type with it), Diaochan, Artful Beauty (done in round B141) (a target
   of an opponent's choice).
@@ -8679,7 +8679,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   card's usual timing and costs, X as 0, rulings; a browser test). Karfell Harbinger ("Spend this mana only to foretell a
   card from your hand or cast an instant or sorcery spell": the foretell special action, not a foretold creature cast
   later, CR 702.143a). +7, 31,165 of 31,936 with B189 to B193.
-- Out after round B194 (looked at, not done): Stitcher Geralf ("Exile up to two creature cards put into graveyards this
+- Out after round B194 (looked at, not done): Stitcher Geralf (done in round B202) ("Exile up to two creature cards put into graveyards this
   way" after each player mills: a pick among several players' milled cards, then an X/X for their total power), Moorland
   Rescuer ("any number of other creature cards with total power X or less": a pick bounded by total power), Spiteful
   Repossession (Treasures "equal to the damage dealt this way", summed over opponents after prevention), Cultivator Drone
@@ -8834,6 +8834,21 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   spell or ability either: "each player may put", "target opponent may put"); Cleansing (a choice by every player for each
   land, with no rulings on whether the lands are destroyed one by one or at once); Peace Talks and Noxious Vapors stay
   out for the reasons in the earlier lists.
+- Round B202 (least played first, from the Lane B skip lists): Storm of Forms ("copy it for each kind of counter among
+  permanents you control": each kind once, counted as the cast trigger resolves, an opponent's counters not among them).
+  Tide of War ("Whenever one or more creatures block": once each combat, only if a blocker was declared, CR 509.3a, rulings;
+  its controller flips, CR 705.2; won, each blocking creature is sacrificed, lost, each blocked one, still blocked with its
+  blockers gone, CR 509.1h). Moorland Rescuer ("return any number of other creature cards with total power X or less from
+  your graveyard to the battlefield, where X is ~'s power": its power as it last existed, rulings, CR 608.2h; each card's
+  power in the graveyard, CR 604.3; returned even if ~ has left the graveyard, rulings; a browser test of the total-power
+  picker). Loki Laufeyson ("When you next cast an instant or sorcery spell with mana value less than or equal to ~'s power
+  this turn": its power as each spell is cast, CR 603.2, as it last existed once it's gone, CR 113.7a, 608.2h; a spell over
+  it doesn't use the trigger up). Darigaaz Reincarnated ("If ~ would die, instead exile it with three egg counters on it",
+  its own applied before another "exile it instead", rulings; "At the beginning of your upkeep, if this card is exiled with
+  an egg counter on it": a card's ability in exile, CR 113.6, its owner controlling it, CR 113.8, with an intervening if,
+  CR 603.4; upkeep triggers now work from exile; as a commander it still always goes to the command zone, CR 903.9a, so it
+  doesn't hatch there). Stitcher Geralf (up to two creature cards milled this way and still in a graveyard, a card a
+  replacement exiled instead not among them, rulings; X the total power of the cards exiled). +6, 31,269 of 31,936 with B201.
 - Out after round B192 (looked at, not done): Garruk, Curse Breaker (its −4: how often "whenever one or more creatures
   attack one of your opponents" triggers when creatures attack two of them still isn't settled by rulings), Charmed
   Pendant (a hybrid symbol of the milled card adds one of its colors: a choice in the middle of a mana ability), Ulamog's

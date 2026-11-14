@@ -680,6 +680,12 @@ export type Count =
 
 /** What a "target ..." phrase allows. CR 115 */
 export interface TargetSpec {
+  /**
+   * Set by the compiler on every target of a spell or ability all of whose targets, in every mode, can only be Walls ("Destroy
+   * target Wall"): Wall of Shadows can't be the target of such a spell or ability (Untargetable.onlyWalls); a modal spell
+   * with a mode that can target a non-Wall isn't one (rulings).
+   */
+  onlyWalls?: true;
   /** An "enchant player" Aura's target when the Aura helps the player it enchants (Paradox Haze): bots choose themselves. */
   helpsEnchanted?: true;
   /** An Aura's target when what the Aura does hurts the enchanted permanent's controller (Brand of Ill Omen): bots aim it at an opponent's. */
@@ -1912,6 +1918,8 @@ export interface Untargetable {
   subtype?: string;
   /** "Abilities from artifact sources" (Artifact Ward): from a source with one of these card types. */
   sourceTypes?: string[];
+  /** Wall of Shadows: "spells that can target only Walls or ... abilities that can target only Walls" (TargetSpec.onlyWalls). */
+  onlyWalls?: true;
 }
 
 /**
@@ -4290,6 +4298,22 @@ export type Effect =
    * card; one permission shared by the two (GameObject.mayPlay oneOf).
    */
   | { type: "exileSelfAndTopOneOf" }
+  /**
+   * Hall of Echoes: "The "legend rule" doesn't apply to permanents you control this turn." (CR 704.5j): until the cleanup
+   * step, when it ends with "until end of turn" effects (CR 514.2, rulings).
+   */
+  | { type: "noLegendRuleThisTurn" }
+  /**
+   * Meandering Towershell: "exile it. Return it to the battlefield under your control tapped and attacking at the beginning of
+   * the declare attackers step on your next turn." (`laterTurn`); Noctis, Heir Apparent: "Exile ~. Return it to the
+   * battlefield under its owner's control tapped and attacking at the beginning of that player's next declare attackers step.
+   * It can't be blocked that combat." (`unblockable`): the source, while it's the permanent it was (CR 400.7), then a delayed
+   * trigger (CR 603.7) at that player's declare attackers step, after attackers are declared, whether or not any were
+   * (rulings, CR 508.1, 508.8).
+   */
+  | { type: "exileReturnAttackingAtDeclare"; under: "you" | "owner"; laterTurn?: true; unblockable?: true }
+  /** The delayed trigger of exileReturnAttackingAtDeclare: the card, if it's still in exile, back tapped and attacking (CR 508.4). */
+  | { type: "returnExiledAttacking"; under: "you" | "owner"; unblockable?: true }
   /**
    * Temporal Aperture: "Shuffle your library, then reveal the top card. Until end of turn, for as long as that card remains
    * on top of your library, play with the top card of your library revealed and you may play that card without paying its

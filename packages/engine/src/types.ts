@@ -844,6 +844,8 @@ export type ManaSpentTrigger = {
 } & SpentFor;
 
 export interface Player {
+  /** Hall of Echoes: the turn "the legend rule doesn't apply to permanents you control this turn" (CR 704.5j); cleared in the cleanup step (CR 514.2). */
+  noLegendRuleTurn?: number;
   /** How many times their library has been shuffled (see rng.ts shuffleLibrary). */
   shuffles?: number;
   /** "You have no maximum hand size for the rest of the game" from a resolved spell or ability (CR 402.2). */
@@ -1220,9 +1222,11 @@ export interface DelayedTrigger {
   /** `thatCombat`: at the beginning of the added combat phase `combat` (GameState.addedPhases), this turn only. */
   /** `playersNextEndStep`: at the beginning of `player`'s next end step (The Eternal Wanderer: the exiled card's owner's). */
   /** `playersNextUpkeep`: at the beginning of `player`'s next upkeep (Phytotitan: the card's owner's). */
-  when: /** Vivien's Stampede: a later main phase of the turn it was made, never one on a later turn. */ "nextMainThisTurn" | "nextEndStep" | "yourNextEndStep" | "yourNextTurnEndStep" | "playersNextEndStep" | /** Suppress: the end step of `player`'s next turn, a later turn. */ "playersNextTurnEndStep" | "playersNextUpkeep" | /** Nafs Asp: at the beginning of `player`'s next draw step (this turn's, if it hasn't begun yet). */ "playersNextDraw" | /** "At the beginning of the next combat" (Legion's Initiative): the next beginning of combat step, any player's. */ "nextBeginCombat" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat" | /** With `thisTurn`: each time the subject becomes blocked this turn (Barreling Attack, CR 603.7b). */ "becomesBlocked" | /** With `thisTurn`: each time the subject attacks one of `controller`'s opponents this turn (Maeve, Insidious Singer). */ "attacksOpponent";
+  when: /** Vivien's Stampede: a later main phase of the turn it was made, never one on a later turn. */ "nextMainThisTurn" | "nextEndStep" | "yourNextEndStep" | "yourNextTurnEndStep" | "playersNextEndStep" | /** Suppress: the end step of `player`'s next turn, a later turn. */ "playersNextTurnEndStep" | "playersNextUpkeep" | /** Nafs Asp: at the beginning of `player`'s next draw step (this turn's, if it hasn't begun yet). */ "playersNextDraw" | /** "At the beginning of the next combat" (Legion's Initiative): the next beginning of combat step, any player's. */ "nextBeginCombat" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat" | /** With `thisTurn`: each time the subject becomes blocked this turn (Barreling Attack, CR 603.7b). */ "becomesBlocked" | /** With `thisTurn`: each time the subject attacks one of `controller`'s opponents this turn (Maeve, Insidious Singer). */ "attacksOpponent" | /** Meandering Towershell, Noctis: at the beginning of `player`'s next declare attackers step (with `laterTurn`, on a later turn), after attackers are declared (CR 508.1). */ "playersNextDeclareAttackers";
   player?: PlayerId;
   combat?: number;
+  /** With "playersNextDeclareAttackers": only on a later turn than the one it was made in ("on your next turn"). */
+  laterTurn?: true;
   /** What it remembers as its trigger event: the player "its controller" was, the amount "that spell's mana value" was (see the delayed effect). */
   event?: TriggerEventInfo;
   to?: ZoneName[];
@@ -2038,6 +2042,12 @@ export interface ZoneMove {
 }
 
 export interface GameState {
+  /**
+   * The declare attackers step goes on with no attackers declared, for a delayed trigger at its beginning (Meandering
+   * Towershell, CR 508.1, 508.8): the declare blockers and combat damage steps are skipped unless a creature is put onto the
+   * battlefield attacking.
+   */
+  attacklessDeclare?: true;
   /** The land being played right now (CR 305.1), while it moves onto the battlefield. */
   playingLand?: ObjectId;
   /** Phased-out permanents (CR 702.26b), which are treated as though they don't exist. */

@@ -4012,7 +4012,19 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
   const quiet = mode === "ifAny" && s.resolving ? allEffects(s.resolving.body.effects).find((x) => x.type === "punisher" && x.mode === "ifAny" && x.effects.length === 1 && x.effects[0]!.type === "noCombatDamage" && x.effects[0]!.what.ref === "self") : undefined;
   const rat = quiet && s.resolving?.item.sourceId ? s.objects[s.resolving.item.sourceId] : undefined;
   const ratThreat = rat?.zone === "battlefield" ? (rat.attacking === pid || (rat.blocking !== undefined && [rat.blocking].flat().some((b) => s.objects[b] && controllerOf(s, obj(s, b)) === pid)) ? Math.max(1, power(s, rat)) : 0) : 0;
-  const penalty = quiet ? (controller === pid || settled ? 0 : ratThreat) : mode && pu.losesSource ? sourceWorth : mode ? (controller === pid ? buys : controller === undefined || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.hurts ? hurtCost : doomed ? (doomed.zone === "battlefield" && !objHasKeyword(s, doomed, "Indestructible") ? worth(s, pid, doomed) : 0) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
+  // Fraying Line: "If they do, they put a rope counter on a creature they control. Otherwise, exile ~ and each creature
+  // without a rope counter on it": not paying costs our creatures without one, less a share of what our opponents lose.
+  const wipe = mode === "ifAny" && s.resolving ? allEffects(s.resolving.body.effects).find((x) => x.type === "punisher" && x.mode === "ifAny" && !!x.otherwise?.some((o) => o.type === "exile" && o.what.ref === "each" && !!o.what.filter.notCounter)) : undefined;
+  const wipeExile = wipe?.type === "punisher" ? wipe.otherwise!.find((o) => o.type === "exile" && o.what.ref === "each") : undefined;
+  const wipeCost = (() => {
+    if (wipeExile?.type !== "exile" || wipeExile.what.ref !== "each") return 0;
+    const filter = wipeExile.what.filter;
+    const hit = s.battlefield.map((id) => obj(s, id)).filter((o) => objectMatches(s, filter, o, pid, false));
+    const ours = hit.filter((o) => controllerOf(s, o) === pid).reduce((n, o) => n + worth(s, pid, o), 0);
+    const theirs = hit.filter((o) => opponents(s, pid).includes(controllerOf(s, o))).reduce((n, o) => n + worth(s, pid, o), 0);
+    return Math.max(0, ours - theirs / 3);
+  })();
+  const penalty = wipeExile ? wipeCost : quiet ? (controller === pid || settled ? 0 : ratThreat) : mode && pu.losesSource ? sourceWorth : mode ? (controller === pid ? buys : controller === undefined || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.hurts ? hurtCost : doomed ? (doomed.zone === "battlefield" && !objHasKeyword(s, doomed, "Indestructible") ? worth(s, pid, doomed) : 0) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
   // Reservoir Kraken: tapping one of ours to tap its source (and hand its controller a Fish) is worth it only while the
   // source would attack (its controller's turn) or could block our attack (our turn), and no one has tapped it already.
   const tapOpt = pu.options.some((o) => "tap" in o);

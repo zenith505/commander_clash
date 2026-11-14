@@ -14,7 +14,7 @@ import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCos
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
-import { legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
+import { legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
@@ -3779,6 +3779,11 @@ function emptyManaPools(s: GameState): void {
 
 function advanceStep(s: GameState): void {
   emptyManaPools(s);
+  // No attackers declared and none put onto the battlefield attacking: no declare blockers or combat damage step (CR 508.8).
+  if (s.step === "declareAttackers" && s.attacklessDeclare) {
+    s.attacklessDeclare = undefined;
+    if (!attackers(s).length) return beginStep(s, "endCombat");
+  }
   if (s.step === "cleanup" && s.cleanupAgain) {
     s.cleanupAgain = undefined;
     return beginStep(s, "cleanup"); // CR 514.3a
@@ -4471,6 +4476,12 @@ function beginStep(s: GameState, step: Step): void {
       // Which creatures could be declared as attackers this turn (CR 508.1a), for "except for creatures that couldn't attack".
       const able = opponents(s, ap).length ? potentialAttackers(s, ap) : [];
       for (const o of able) o.couldAttack = s.turn;
+      if (able.length === 0 && declareStepWanted(s)) {
+        // No attackers can be declared, but the step begins for its delayed trigger (CR 508.1, 508.8).
+        s.attacklessDeclare = true;
+        fireEvent(s, { type: "step", step: "declareAttackers", active: ap });
+        break;
+      }
       if (able.length === 0) return beginStep(s, "endCombat");
       s.pending = { kind: "declareAttackers", player: ap };
       return;
@@ -4629,6 +4640,7 @@ function finishCleanup(s: GameState) {
   s.topTurn = undefined; // Gwenom's "until end of turn" (CR 514.2)
   s.drawSteals = undefined; // Plagiarize's "until end of turn" (CR 514.2)
   s.manaTriggersThisTurn = undefined;
+  for (const q of s.players) q.noLegendRuleTurn = undefined; // Hall of Echoes' "this turn" (CR 514.2)
   endCopyEffects(s, (e) => e.until === "endOfTurn");
   invalidateCharacteristics(s);
   for (const id of [...s.battlefield, ...(s.phasedOut ?? [])]) {
@@ -4684,9 +4696,16 @@ function finishCleanup(s: GameState) {
       const m = obj(s, id).mayPlay;
       if (m?.until === "nextTurn" && s.activePlayer === m.player && s.turn > m.turn) obj(s, id).mayPlay = undefined;
     }
+  // State-based actions are checked now too (CR 514.3a): Hall of Echoes' "this turn" is over, so the legend rule applies
+  // again (rulings). If any are performed, or one asks a question, players get priority and there's another cleanup step.
+  const sbaSign = () => JSON.stringify([s.battlefield, s.players.map((q) => [q.lost, q.graveyard.length, q.exile.length, q.hand.length, q.library.length]), s.over]);
+  const before = sbaSign();
+  runStateBasedActions(s, true); // triggers wait in the queue, put on the stack as players get priority below
+  if (s.over) return;
+  const sbaDone = !!s.pending || sbaSign() !== before;
   // Abilities that triggered during cleanup (madness, from discarding down to hand size): players get priority, then
   // there's another cleanup step (CR 514.3a).
-  if (s.triggerQueue.length) {
+  if (s.triggerQueue.length || sbaDone) {
     s.cleanupAgain = true;
     s.priority = s.activePlayer;
     s.passedInSuccession = [];
@@ -13132,6 +13151,13 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   s.pending = null;
   if (attacks.length === 0) {
     log(s, `${p.name} declares no attackers.`);
+    // The step still begins for what triggers at its beginning (Noctis rulings: it returns even if no attackers are
+    // declared); the blockers and combat damage steps are skipped unless something is put onto the battlefield attacking.
+    if (declareStepWanted(s)) {
+      s.attacklessDeclare = true;
+      fireEvent(s, { type: "step", step: "declareAttackers", active: p.id });
+      return;
+    }
     beginStep(s, "endCombat"); // CR 508.8
     return;
   }
@@ -13272,6 +13298,14 @@ function finishAttacks(s: GameState) {
   }
   for (const [at, enlisted] of d.enlisted) fireEvent(s, { type: "enlists", id: at, enlisted });
   for (const id of d.exerted ?? []) fireEvent(s, { type: "exerted", id, attacking: true });
+  // "At the beginning of the declare attackers step" (Meandering Towershell's return): after attackers are declared, with
+  // the attack triggers (CR 508.1, 508.2b).
+  fireEvent(s, { type: "step", step: "declareAttackers", active: s.activePlayer });
+}
+
+/** A delayed trigger at the beginning of this declare attackers step is due (Meandering Towershell, Noctis). */
+function declareStepWanted(s: GameState): boolean {
+  return (s.delayed ?? []).some((d) => declareAttackersDue(s, d));
 }
 
 /** Exalted Dragon's cost to attack, paid with these permanents (CR 508.1i), if the costs still to pay can be paid without them. */
@@ -13983,6 +14017,8 @@ function legendGroups(s: GameState): ObjectId[][] {
     const o = obj(s, id);
     const c = characteristics(s, o);
     if (!c.supertypes.includes("Legendary") || twoNames.has(c.name) || exempt.some((x) => objectMatches(s, x.filter, o, x.you, false))) continue;
+    // Hall of Echoes: "The "legend rule" doesn't apply to permanents you control this turn."
+    if (player(s, c.controller).noLegendRuleTurn === s.turn) continue;
     const key = `${c.controller}:${c.name}`;
     groups.set(key, [...(groups.get(key) ?? []), id]);
   }

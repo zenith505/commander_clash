@@ -1,7 +1,7 @@
 # Roadmap
 
-31,233 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,873 of
+31,239 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,876 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2538,6 +2538,34 @@ line blocks.
    rulings); Monstrous Emergence ("choose a creature you control or reveal a creature card from your hand" as an
    additional cost, then that one's power); Arni Metalbrow ("attacks or enters attacking", then a creature card with
    lesser mana value than that creature put onto the battlefield tapped and attacking).
+   Round 356 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards cast or played
+   with a permission that does something more: Smuggler's Buggy's "you may cast the exiled card without paying its mana
+   cost. If you do, return ~ to its owner's hand." (the card its hideaway exiled, CR 702.75a, 607.2a; playLinked
+   `setsDid`, a land never cast, CR 305.9); The Fourth Doctor's "Once each turn, you may play a historic land or cast a
+   historic spell from the top of your library. When you do, create a Food token." (FromTop `once` for a land too, one
+   use a turn for both, and `whenDo`, a reflexive trigger, CR 603.12, above the spell; used before another permission that
+   applies), with a browser test; Rashmi and Ragavan's "Whenever you cast your first spell during each of your turns,
+   exile the top card of target opponent's library and create a Treasure token. Then you may cast the exiled card without
+   paying its mana cost if it's a spell with mana value less than the number of artifacts you control. If you don't cast
+   it this way, you may cast it this turn." (castTargetFree `mvLessThan`, the artifacts counted as it resolves, the
+   Treasure too, rulings; `setsDid`, then a permission this turn with the usual timing and costs, rulings); Strago and
+   Relm's "Target opponent exiles cards from the top of their library until they exile an instant, sorcery, or creature
+   card. You may cast that card without paying its mana cost. If you cast a creature spell this way, it gains haste and
+   "At the beginning of the end step, sacrifice this creature."" (exileUntilNonland `creatureSpellGains`: the spell gains
+   both with no duration, kept by the creature, CR 400.7a); The Ruinous Powers's "choose an opponent at random. Exile the
+   top card of that player's library. Until end of turn, you may play that card and you may spend mana as though it were
+   mana of any color to cast it. When you cast a spell this way, its owner loses life equal to its mana value." (impulse
+   and MayPlay `castTrigger`, CR 603.2, the spell's mana value on the stack, X included, rulings); Monk Class's level 3
+   "exile the top card of your library. For as long as it remains exiled, it has "You may cast this card from exile as long
+   as you've cast another spell this turn."" (MayPlay `castAnotherThisTurn`). +6, 31,224 of 31,936 with round 355 (31,239 with B197 and B198). The
+   compiled text of every other card is unchanged. "Your first spell during each of your turns" is a cast trigger now.
+   Out after round 356 (looked at, not done): Commander Liara Portyr ("spells you cast from exile this turn cost {X} less
+   to cast, where X is the number of players being attacked": a cost reduction for the turn by where a spell is cast from,
+   then "exile the top X cards"); Bre of Clan Stoutarm (still out: whether "Otherwise" applies when you decline to cast,
+   rulings silent); Surge to Victory (still out: the trigger it grants for the turn has to remember the exiled card);
+   Tamiyo, Collector of Tales ("Spells and abilities your opponents control can't cause you to discard cards or sacrifice
+   permanents", every discard and sacrifice path); Share the Spoils (each player plays from cards exiled with it, "When
+   they do, exile the top card of their library", and again whenever an opponent loses).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

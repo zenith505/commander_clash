@@ -531,6 +531,10 @@ export interface GameObject {
     tapped?: true;
     /** Lightstall Inquisitor: "Each land played this way enters tapped": a land played with this permission enters tapped (CR 614.1c); a spell doesn't. */
     landTapped?: true;
+    /** The Ruinous Powers: "When you cast a spell this way, ...": this triggers, from the ability's source, as a spell is cast with this permission (CR 603.2), about that spell (Effect impulse `castTrigger`). */
+    castTrigger?: { body: AbilityBody; sourceId: ObjectId; sourceZc: number; sourceCardId: string };
+    /** Monk Class: "as long as you've cast another spell this turn": only while `player` has cast a spell this turn (GameState.castThisTurn). */
+    castAnotherThisTurn?: true;
   };
   /**
    * Foretold (CR 702.143a, 702.143c): exiled face down with foretell, which only its owner may look at; still so as the
@@ -3114,6 +3118,8 @@ export interface Resolving {
     /** Guile: a counter effect over several spells already went through them, and only the casts are left. */
     guileLoop?: true;
     playLinkedPick?: true;
+    /** Smuggler's Buggy: the card playLinked offered to cast, for its "if you do" (round356.ts). */
+    playLinkedId?: ObjectId;
     /** Fiery Gambit: the flips won so far in a run one may stop, and whether "flip again?" was asked. */
     flipRun?: { wins: number; asked?: true };
     /** Krark's Thumb on an uncalled flip (Odds): heads and tails, the choice asked (chooseMay yes keeps heads). */

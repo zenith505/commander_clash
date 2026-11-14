@@ -3113,6 +3113,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "650bf82e-7f83-470c-bf4a-34281bfe9341",
+  "name": "Battlegrowth",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Put a +1/+1 counter on target creature.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b76d1ae6-ad1d-4bac-b4c3-2e03e0e84d9b",
   "name": "Bayou",
   "manaCost": "",
@@ -5469,6 +5495,46 @@
   "commanderLegal": "legal",
   "set": "m10",
   "releasedAt": "2009-07-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6d86d783-7116-4426-8c0f-718c2d904887",
+  "name": "Captain Marvel, Apex Avenger",
+  "manaCost": "{5}{R}{W}",
+  "cmc": 7,
+  "typeLine": "Legendary Creature — Human Kree Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Kree",
+   "Hero"
+  ],
+  "oracleText": "Flying, double strike, indestructible\nWhenever you put one or more counters on another creature, if it's not a Kree, you may put the same number and kind of counters on Captain Marvel.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Indestructible",
+   "Double strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -9737,6 +9803,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a4ae71c8-ea1b-4fa4-9e47-cf00ab60c5ee",
+  "name": "Don & Leo, Problem Solvers",
+  "manaCost": "{3}{W/U}{W/U}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Mutant Ninja Turtle",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Mutant",
+   "Ninja",
+   "Turtle"
+  ],
+  "oracleText": "Vigilance\nAt the beginning of your end step, exile up to one target artifact you control and up to one target creature you control. Then return them to the battlefield under their owners' control.",
+  "power": "4",
+  "toughness": "6",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "tmt",
+  "releasedAt": "2026-03-06",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "59e7f2ae-4535-4191-98be-3e65b6b2befa",
   "name": "Doom Blade",
   "manaCost": "{1}{B}",
@@ -10288,6 +10392,34 @@
   "set": "acr",
   "releasedAt": "2024-07-05",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2b87bcac-ec64-4012-9e75-f459d3640eb3",
+  "name": "Earth's Mightiest Heroes",
+  "manaCost": "{4}{G}{G}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Teamwork 5 (As an additional cost to cast this spell, you may tap any number of creatures you control with total power 5 or more.)\nReveal the top eight cards of your library. You may put a creature card from among them onto the battlefield. If this spell was cast using teamwork, put any number of creature cards from among them onto the battlefield instead. Put the rest into your graveyard.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Teamwork"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -37947,6 +38079,34 @@
   "set": "bok",
   "releasedAt": "2005-02-04",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e50fecff-8872-42f5-8882-41ad13d9d1ae",
+  "name": "Too Evil to Stay Dead",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Teamwork 4 (As an additional cost to cast this spell, you may tap any number of creatures you control with total power 4 or more.)\nChoose target creature card in your graveyard with mana value 4 or less. If this spell was cast using teamwork, instead choose target creature card in your graveyard. Return the chosen card to the battlefield.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Teamwork"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

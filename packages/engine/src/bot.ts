@@ -5193,7 +5193,10 @@ function linkedOwned(s: GameState, sourceId: ObjectId | undefined, pid: PlayerId
 function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
-  // Purgatory: "you may pay {4} and 2 life. If you do, return a card exiled with ~ to the battlefield": only with a card
+  // Captain Marvel, Apex Avenger: "you may put the same number and kind of counters on ~": not -1/-1, stun or the like.
+  const sameKind = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "counters" && e.effects[0]!.eventCounter ? r?.item.event?.counter : undefined;
+  if (sameKind !== undefined) return !harmfulCounter(sameKind);
+  // Purgatory:"you may pay {4} and 2 life. If you do, return a card exiled with ~ to the battlefield": only with a card
   // there to return (CR 607.2a).
   if (r && e?.type === "may" && e.effects.length && e.effects.every((x) => x.type === "moveLinked")) return linkedCards(s, r.item.sourceId, r.item.sourceZc).length > 0;
   // Neera, Wild Mage: "you may put it on the bottom of its owner's library. If you do, reveal ... until you reveal a nonland

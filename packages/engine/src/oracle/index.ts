@@ -23,7 +23,7 @@ export { parseManaAbility } from "./mana-abilities";
 export { parseBody, usesX } from "./body";
 export { parseCount } from "./counts";
 export { parseTargetPhrase } from "./targets";
-export { compileGranted, emblemAbilityOk, bindGrantSource, showGrantSource, CAST_BY_SOURCE, casterMark } from "./grants";
+export { compileGranted, emblemAbilityOk, bindGrantSource, showGrantSource, CAST_BY_SOURCE, casterMark, SPELL_CONTROLLER, playerMark } from "./grants";
 export { QUOTED_SOURCE_NAME } from "./compile";
 export { parseCopyExcept, PREDEFINED_TOKENS } from "./tokens";
 export { UNDERCITY, LOST_MINE, MAD_MAGE, TOMB_OF_ANNIHILATION, DUNGEONS, dungeonByName, dungeonDef, dungeonSupported, roomBody, type Dungeon, type DungeonRoom } from "./dungeons";

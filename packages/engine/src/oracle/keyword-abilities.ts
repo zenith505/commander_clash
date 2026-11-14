@@ -461,6 +461,16 @@ export function parseCostKeyword(
           body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, giveLife: 1 }], text: "Cumulative upkeep—an opponent gains 1 life: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless an opponent you choose gains 1 life for each age counter on it." },
         },
       };
+    // Jötun Grunt: "Cumulative upkeep—Put two cards from a single graveyard on the bottom of their owner's library": two
+    // cards for each age counter, each two from one graveyard, a different graveyard for each counter allowed (rulings);
+    // all of it paid at once or none (CR 702.24a), unpayable with too few cards (CR 118.3).
+    if (/^Cumulative upkeep—Put two cards from a single graveyard on the bottom of their owner's library\.?$/.test(line))
+      return {
+        trigger: {
+          event: "yourUpkeep",
+          body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, yardPairsToBottom: true }], text: "Cumulative upkeep—put two cards from a single graveyard on the bottom of their owner's library: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you put two cards from a single graveyard on the bottom of their owner's library for each age counter on it." },
+        },
+      };
     // Varchild's War-Riders: "Cumulative upkeep—Have an opponent create a 1/1 red Survivor creature token": an opponent
     // chosen for each age counter, the same one or different ones (rulings), each creating that token under their own
     // control (CR 111.2), all of it paid at once or none (CR 702.24a).
@@ -476,6 +486,15 @@ export function parseCostKeyword(
         },
       };
     }
+    // Thought Lash (round B210): "Cumulative upkeep—Exile the top card of your library": the top card for each age counter,
+    // all of them or none (CR 702.24a), unpayable with fewer cards in the library (CR 118.3).
+    if (/^Cumulative upkeep—Exile the top card of your library\.?$/.test(line))
+      return {
+        trigger: {
+          event: "yourUpkeep",
+          body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, exileTopCost: true }], text: "Cumulative upkeep—exile the top card of your library: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you exile the top card of your library for each age counter on it." },
+        },
+      };
     // Braid of Fire: "Cumulative upkeep—Add {R}": adding mana is the cost (rulings), {R} for each age counter, which can
     // always be paid; what isn't spent empties from the pool as the upkeep step ends (CR 500.4).
     const adds = /^Cumulative upkeep—Add ((?:\{[WUBRGC]\})+)\.?$/.exec(line);

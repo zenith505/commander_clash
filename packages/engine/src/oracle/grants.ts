@@ -36,6 +36,12 @@ export function compileQuoted(text: string): boolean {
 // (QUOTED_SOURCE_NAME spelled out: compile.ts isn't initialized yet when this module loads.)
 export const CAST_BY_SOURCE = "the player who cast \u27easource\u27eb";
 export const casterMark = (p: number | undefined, name: string) => `\u27eacaster ${p ?? "none"}|${name}\u27eb`;
+/**
+ * Martyrdom (round B210): "you" in the "Only you may activate this ability" it adds to the ability it gives, fixed as the
+ * spell resolves to the spell's controller ("⟪player 2|name⟫").
+ */
+export const SPELL_CONTROLLER = "\u27eayou\u27eb";
+export const playerMark = (p: number | undefined, name: string) => `\u27eaplayer ${p ?? "none"}|${name}\u27eb`;
 
 const grantedCache = new Map<string, CompiledCard>();
 /** A granted ability's name for the permanent that gave it, bound to that object: "⟪source t12 3⟫" (see bindGrantSource). */
@@ -47,7 +53,7 @@ const BOUND_SOURCE = /\u27easource (\S+) (\d+)\|([^\u27eb]*)\u27eb/g;
  */
 export const bindGrantSource = (text: string, id: string, zc: number, name: string) => text.replaceAll(QUOTED_SOURCE_NAME, `\u27easource ${id} ${zc}|${name}\u27eb`);
 /** A granted ability's text as players read it: the permanent that gave it by its name. */
-export const showGrantSource = (text: string) => text.replace(BOUND_SOURCE, "$3").replace(/\u27eacaster (?:\d|none)\|([^\u27eb]*)\u27eb/g, "the player who cast $1");
+export const showGrantSource = (text: string) => text.replace(BOUND_SOURCE, "$3").replace(/\u27eacaster (?:\d|none)\|([^\u27eb]*)\u27eb/g, "the player who cast $1").replace(/\u27eaplayer (?:\d+|none)\|([^\u27eb]*)\u27eb/g, "$1");
 /** Fills in `id` and `zc` of each ObjRef grantSource in a compiled granted ability, and its name in the text it shows. */
 function bindRefs<T>(x: T, id: string, zc: number, name: string, key?: string): T {
   if (typeof x === "string") return (key === "text" ? x.replaceAll(QUOTED_SOURCE_NAME, name) : x) as T;

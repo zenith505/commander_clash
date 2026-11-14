@@ -11227,6 +11227,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "liarGuess") {
+    // Liar's Pendulum: the guess is announced (rulings).
+    const st = r.scratch?.liarGuess;
+    if (!st || (choice !== "in" && choice !== "out")) throw new RulesError("nothing to choose");
+    st.guess = choice;
+    log(s, `${p.name} guesses ${pend.labels?.[pend.options.indexOf(choice)] ?? choice} (${pend.source}).`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "predicamentCard" || pend.what === "predicamentGuess") {
     // Master of Predicaments: the card stays secret (rulings); the guess is announced.
     const st = r.scratch?.predicament;

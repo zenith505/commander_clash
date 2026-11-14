@@ -800,8 +800,14 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const who = cond.who === "attached" ? (src.attachedTo && chars.get(src.attachedTo) ? chars.get(src.attachedTo)!.controller : undefined) : you;
       return who !== undefined && (s.players[who]?.graveyard.length ?? 0) >= cond.n;
     }
-    case "graveyardTypes": // delirium: card types, not subtypes or supertypes (CR 205.2a)
-      return new Set(yard().flatMap((d) => (cond.permanent ? d.types.filter((t) => PERMANENT_CARD_TYPES.includes(t)) : d.types))).size >= cond.n;
+    case "graveyardTypes": {
+      // delirium: card types, not subtypes or supertypes (CR 205.2a). Happily Ever After: your permanents' card types as the
+      // layers so far have them, together with those of the cards in your graveyard (an adventurer card's own types only,
+      // rulings).
+      const types = yard().flatMap((d) => (cond.permanent ? d.types.filter((t) => PERMANENT_CARD_TYPES.includes(t)) : d.types));
+      if (cond.andPermanents) for (const c of chars.values()) if (c.controller === you) types.push(...c.types);
+      return new Set(types).size >= cond.n;
+    }
     case "graveyardPermanents": // descend
       return yard().filter((d) => d.types.some((t) => PERMANENT_CARD_TYPES.includes(t))).length >= cond.n;
     case "selfCounter": // unleash (CR 702.98a)

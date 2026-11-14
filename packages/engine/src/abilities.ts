@@ -2391,7 +2391,7 @@ export type StaticCondition =
   /** "If ~ dealt damage to another creature this turn" (Wolverine, Best There Is): as the object it is now (TurnLog.damagedCreature). */
   | { kind: "selfDamagedCreature" }
   /** Delirium: card types among cards in your graveyard (CR 205.2a). */
-  | { kind: "graveyardTypes"; n: number; /** Only permanent types (CR 110.4a): "permanent types among cards in your graveyard". */ permanent?: true }
+  | { kind: "graveyardTypes"; n: number; /** Only permanent types (CR 110.4a): "permanent types among cards in your graveyard". */ permanent?: true; /** Happily Ever After: "among permanents you control and/or cards in your graveyard": your permanents' card types too, as they are now. */ andPermanents?: true }
   /** Descend: permanent cards in your graveyard (CR 110.4b). */
   | { kind: "graveyardPermanents"; n: number }
   | { kind: "selfCounter"; counter: CounterKind }
@@ -4336,6 +4336,23 @@ export type Effect =
   | { type: "exileCreatedWithAtEndStep" }
   /** That delayed trigger's effect: the tokens its subject (the permanent ~ was) created (GameObject.createdWith). */
   | { type: "exileTokensCreatedBy" }
+  /**
+   * Dust of Moments: "Remove two time counters from each permanent and each suspended card" ("remove"), "Put two time
+   * counters on each permanent with a time counter on it and each suspended card" ("add"): every player's permanents and
+   * suspended cards (CR 702.62b), all at once; the last time counter removed triggers suspend and vanishing.
+   */
+  | { type: "timeCountersEach"; mode: "remove" | "add"; n: number }
+  /**
+   * Crooked Scales: "Flip a coin. If you win the flip, destroy target creature an opponent controls [target 0]. If you lose
+   * the flip, destroy target creature you control [target 1] unless you pay {3} and repeat this process.": the same targets
+   * each time (rulings).
+   */
+  | { type: "flipDestroyOrRepeat"; pay: string }
+  /**
+   * Liar's Pendulum, after "Choose a card name": "Target opponent guesses whether a card with that name is in your hand. You
+   * may reveal your hand. If you do and your opponent guessed wrong, draw a card." (rulings).
+   */
+  | { type: "guessNamedInHand"; who: PlayerRef }
   /**
    * Temporal Aperture: "Shuffle your library, then reveal the top card. Until end of turn, for as long as that card remains
    * on top of your library, play with the top card of your library revealed and you may play that card without paying its

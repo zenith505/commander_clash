@@ -395,6 +395,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Fiery Gambit: flip again until more wins do nothing more (each flip risks the whole spell).
     // Game of Chaos: having just won, flip again only to win back what the game has cost us, or for a chance to finish the
     // opponent, and only while losing the next stake wouldn't kill us.
+    // Liar's Pendulum: reveal only when the guess was wrong, for the card; a right guess would show the hand for nothing.
+    if (pend.kind === "chooseMay" && pend.liarReveal) return [{ type: "chooseMay", player: pid, yes: !pend.liarReveal.guessedRight }];
     if (pend.kind === "chooseMay" && pend.chaosAgain) {
       const { stake, net, against } = pend.chaosAgain;
       const safe = player(s, pid).life > stake;
@@ -1767,6 +1769,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Master of Predicaments: most cards in a hand have mana value 4 or less, so we guess that; as the chooser, our
     // costliest nonland card, the one a wrong guess pays off most for.
     if (pend.kind === "chooseOption" && pend.what === "predicamentGuess") return [{ type: "chooseOption", player: pid, choice: "notOver" }];
+    // Liar's Pendulum: a deck is singleton (CR 903.5b), so a named card (other than a basic land) seen anywhere outside the
+    // namer's hand isn't in it; otherwise we expect them to have named a card they hold. Only public information is used.
+    if (pend.kind === "chooseOption" && pend.what === "liarGuess") {
+      const namer = s.resolving?.item.controller;
+      const name = s.resolving?.chosen?.name;
+      const q = namer !== undefined ? player(s, namer) : undefined;
+      const shown = q ? [...q.graveyard, ...q.command, ...q.exile.filter((id) => !obj(s, id).faceDown), ...s.battlefield.filter((id) => obj(s, id).owner === namer && !obj(s, id).faceDown)] : [];
+      const seen = name !== undefined && shown.some((id) => !obj(s, id).isToken && defOf(s, obj(s, id)).name === name && !(defOf(s, obj(s, id)).supertypes ?? []).includes("Basic"));
+      return [{ type: "chooseOption", player: pid, choice: seen ? "out" : "in" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "predicamentCard") {
       const spells = pend.options.filter((id) => !isType(defOf(s, obj(s, id)), "Land")).sort((a, b) => mv(s, b) - mv(s, a));
       return [{ type: "chooseOption", player: pid, choice: spells[0] ?? pend.options[0]! }];

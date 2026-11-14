@@ -46,6 +46,7 @@ import { runLaneB189Effect } from "./run-laneb189";
 import { runLaneB192Effect } from "./run-laneb192";
 import { runLaneB199Effect } from "./run-laneb199";
 import { runLaneB200Effect } from "./run-laneb200";
+import { runLaneB201Effect } from "./run-laneb201";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -1851,6 +1852,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileCreatedWithAtEndStep":
     case "exileTokensCreatedBy":
       return runLaneB200Effect(s, e, ctx, src);
+    case "timeCountersEach":
+    case "flipDestroyOrRepeat":
+    case "guessNamedInHand":
+      return runLaneB201Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

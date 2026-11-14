@@ -1,6 +1,6 @@
 # Roadmap
 
-31,315 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,320 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,881 of
 9,979 (99%).
 
@@ -2760,6 +2760,34 @@ line blocks.
    out: a type chosen and two creatures beheld as an optional cost); Rootpath Purifier ("land cards in your library are
    basic": searches read library cards' printed supertypes); Mysterious Stranger (still out: one target per graveyard);
    Sala, Deck Boss (unranked, Lane B's range).
+   Round 365 went on down the "Out after round N" lists and `npm run popular`, most played first, to attack triggers about
+   who is attacked, a creature trap, a reflexive trigger on a prevention shield and phasing until a source leaves:
+   Archnemesis's "Whenever you attack enchanted player, that player loses 2 life. You draw a card and gain 2 life." (once
+   each combat you attack the player it enchants, not their planeswalkers or battles, CR 508.3e; TriggeredAbility
+   `attacksEnchanted`) and "Whenever a player attacks you, you may attach this Aura to that player." (only an opponent can,
+   CR 506.2; Effect attachSelfToPlayer, while it's still that object and could enchant them, CR 701.3b, 702.5d); Mirror of
+   Life Trapping's "Whenever a creature enters, if it was cast, exile it, then return all other permanent cards exiled with
+   this artifact to the battlefield under their owners' control." (anyone's creature spell, not a copy, CR 707.10, an
+   intervening if, CR 603.4; exiled linked to it, CR 607.2a; the others return even if the creature is gone; moveLinked
+   `exceptLinkedNow`); New Way Forward's "The next time a source of your choice would deal damage to you this turn,
+   prevent that damage. When damage is prevented this way, ~ deals that much damage to that source's controller and you
+   draw that many cards." (the source chosen as it resolves, rulings; DamageRuleSpec `reflect`: a reflexive trigger of the
+   spell, CR 603.12, "that source's controller" as it resolves while the source is still that object, otherwise as the
+   damage was prevented); Mirkwood Trapper's "Whenever a player attacks you, target attacking creature gets -2/-0 until
+   end of turn." and "Whenever a player attacks, if they aren't attacking you, that player chooses an attacking creature.
+   It gets +2/+0 until end of turn." (any player's attack, yours too, CR 508.3d; one attacking only your planeswalker or a
+   battle you protect isn't attacking you, rulings; StaticCondition `notAttackingYou`, checked as it triggers and as it
+   resolves); The Moment's "Untap target creature you control. It phases out until ~ leaves the battlefield." (it phases in
+   only right after The Moment leaves, as it was; with The Moment already gone, untapped but not phased out, rulings).
+   Browser tests click through Archnemesis's move, Mirkwood Trapper's choice of attacker and New Way Forward's source.
+   Bots move Archnemesis to whoever attacks them, pump their best attacker, cast New Way Forward against an attack of 4 or
+   more, and keep The Moment's phasing for an opponent's spell or ability aimed at one of their creatures. +5, 31,320 of
+   31,936. The compiled text of every other card is unchanged.
+   Out after round 365 (looked at, not done): Archelos, Lagoon Mystic and Kraven the Hunter (still out, as in the earlier
+   lists); The Pandorica ("It can't phase in for as long as ~ remains tapped", then phasing in when it untaps or leaves:
+   a lock tied to the source's tapped state); Ashes of the Fallen (a chosen creature type for creature cards in your
+   graveyard only: the off-field type statics cover every zone outside the battlefield); Garland, Royal Kidnapper and Reap
+   (still out).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

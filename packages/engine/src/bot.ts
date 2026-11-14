@@ -2045,7 +2045,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   const dial = chooseEndTurnEscape(s, pid);
   if (dial) return dial;
-  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? choosePhaseAway(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid);
   if (regen) return regen;
   const silencer = chooseSilencerFaceUp(s, pid);
   if (silencer) return silencer;
@@ -6418,6 +6418,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.body.effects.length && ab.body.effects.every((e) => e.type === "delayed" && e.when === "dies")) continue;
       // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.
       if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
+      // The Moment: our creature phased out until it leaves is kept for saving one from an opponent's spell (choosePhaseAway).
+      if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.untilSourceLeaves && e.what.ref === "target" && ab.body.targets[e.what.index]?.kind === "object" && (ab.body.targets[e.what.index] as { controller?: string }).controller === "you")) continue;
       // "Until your next upkeep, ~ can't phase out" (Ertai's Familiar): only to keep our own phasing permanent here, once;
       // Spatial Binding's "target permanent can't phase out" bots leave alone.
       const binds = ab.body.effects.length > 0 && ab.body.effects.every((e) => e.type === "continuous" && e.mods.every((m) => m.kind === "cantPhaseOut"));
@@ -7839,6 +7841,38 @@ function chooseProtection(s: GameState, pid: PlayerId): Action[] | null {
       const costs = targets && abilityCosts(s, pid, o, abilities[i]!, targets);
       const plan = targets && costs !== null && planActivate(s, pid, id, i, targets, undefined, undefined, undefined, costs ?? undefined);
       if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
+ * The Moment: "Untap target creature you control. It phases out until ~ leaves the battlefield.": in answer to an
+ * opponent's spell or ability on top of the stack aimed at one of our creatures (phased out, it's no longer a legal
+ * target, CR 702.26b, 608.2b), the one worth the most.
+ */
+function choosePhaseAway(s: GameState, pid: PlayerId): Action[] | null {
+  const top = s.stack[s.stack.length - 1];
+  if (!top || top.controller === pid) return null;
+  const aimed = (top.targets ?? []).flatMap((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && controllerOf(s, obj(s, t.id)) === pid && objIsType(s, obj(s, t.id), "Creature") ? [t.id] : []));
+  if (!aimed.length) return null;
+  aimed.sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      const e = ab.body.effects.find((x) => x.type === "phaseOut" && x.untilSourceLeaves && x.what.ref === "target");
+      if (e?.type !== "phaseOut" || e.what.ref !== "target" || ab.body.targets.length !== 1 || ab.mana) continue;
+      for (const want of aimed) {
+        if (want === id) continue;
+        const ok = legalTargets(s, ab.body.targets[0]!, pid, undefined, sourceQuality(s, id), id).find((t) => t.kind === "object" && t.id === want);
+        if (!ok) continue;
+        const costs = abilityCosts(s, pid, o, ab, [ok]);
+        const plan = costs !== null && planActivate(s, pid, id, i, [ok], undefined, undefined, undefined, costs ?? undefined);
+        if (plan) return plan;
+      }
     }
   }
   return null;

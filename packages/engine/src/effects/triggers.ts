@@ -1778,7 +1778,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Desert Were-Worm: the first attack this turn with that much power (TurnLog.attackPower is from earlier ones).
         if (t.totalPowerFirst && (s.turnLog?.attackPower?.[ev.controller] ?? 0) >= (t.minTotalPower ?? 0)) continue;
         const amount = ev.type === "groupCombatDamage" ? hit.reduce((n, [, i]) => n + ev.amounts[i]!, 0) : undefined;
-        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.exactAttackers === !!t.exactAttackers && JSON.stringify(tt.allAttack) === JSON.stringify(t.allAttack) && tt.minTotalPower === t.minTotalPower && !!tt.totalPowerFirst === !!t.totalPowerFirst && !!tt.anyoneAttacks === anyone && !!tt.perPlayer === !!t.perPlayer && !!tt.selfOrCommander === !!t.selfOrCommander && !!tt.attacksPlayers === !!t.attacksPlayers;
+        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.exactAttackers === !!t.exactAttackers && JSON.stringify(tt.allAttack) === JSON.stringify(t.allAttack) && tt.minTotalPower === t.minTotalPower && !!tt.totalPowerFirst === !!t.totalPowerFirst && !!tt.anyoneAttacks === anyone && !!tt.perPlayer === !!t.perPlayer && !!tt.attacksEnchanted === !!t.attacksEnchanted && !!tt.selfOrCommander === !!t.selfOrCommander && !!tt.attacksPlayers === !!t.attacksPlayers;
         const group = hit.map(([x]) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
         if (t.attacksPlayers) {
           const attackedPlayers = s.turnOrder.filter((p) => hit.some(([x]) => obj(s, x).attacking === p));
@@ -1803,7 +1803,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "Whenever you attack a player": once for each player the matching creatures attack (CR 508.3e).
         if (t.perPlayer) {
           for (const p of s.turnOrder)
-            if ((!t.toInitiative || s.initiative === p) && hit.filter(([x]) => obj(s, x).attacking === p && !obj(s, x).attackingPermanent).length >= (t.minAttackers ?? 1))
+            // Archnemesis: "Whenever you attack enchanted player": the player it's attached to as attackers are declared.
+            if ((!t.toInitiative || s.initiative === p) && (!t.attacksEnchanted || o.attachedToPlayer === p) && hit.filter(([x]) => obj(s, x).attacking === p && !obj(s, x).attackingPermanent).length >= (t.minAttackers ?? 1))
               add(o, ev.controller, (_, tt) => same(tt), list, undefined, undefined, undefined, undefined, undefined, { player: p });
           // Rigo: each planeswalker attacked too, its controller as "that player".
           if (t.perWalker)

@@ -217,6 +217,12 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
   if (spec.redirectToSourceController) rule.redirect = { sourceController: true };
   if (spec.gainLife) rule.gainLife = spec.gainLife;
   if (spec.dealBack) rule.dealBack = spec.dealBack;
+  // New Way Forward: its reflexive trigger is New Way Forward's (CR 603.12), the spell as it is while resolving.
+  if (spec.reflect) {
+    const item = s.resolving?.item;
+    const from = ctx.sourceId ?? (item?.kind === "spell" ? item.objectId : undefined);
+    rule.reflect = { body: spec.reflect, ...(from && s.objects[from] ? { source: { id: from, zc: s.objects[from]!.zoneChanges ?? 0 } } : {}) };
+  }
   if (spec.tokens) rule.tokens = spec.tokens;
   if (spec.dealTo) {
     // Vengeful Archon: the target as it resolves; if it's gone, damage is still prevented, with none dealt (rulings).

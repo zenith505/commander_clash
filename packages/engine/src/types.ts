@@ -76,6 +76,8 @@ export interface DamageRule {
   countersOn?: { counter: string; tally?: true };
   /** Vengeful Archon: "If damage is prevented this way, ~ deals that much damage to target player or planeswalker", fixed as it resolved (rulings). */
   dealTo?: { object: ObjectId; zc: number } | { player: PlayerId };
+  /** New Way Forward: the reflexive trigger's body, and the object that made the rule (the spell, as it was then). */
+  reflect?: { body: AbilityBody; source?: { id: ObjectId; zc: number } };
 }
 
 /** Each player's starting life total in Commander (CR 903.7). */

@@ -1864,6 +1864,8 @@ export interface DamageRuleSpec {
   countersOn?: { counter: CounterKind; endStep?: true; ifCreature?: true };
   /** Vengeful Archon: "If damage is prevented this way, ~ deals that much damage to target player or planeswalker" (CR 615.5): the target chosen as it was activated; dealt at once, by the source, after the damage (rulings). */
   dealTo?: DamageRecipient;
+  /** New Way Forward: "When damage is prevented this way, ..." (CR 603.12): a reflexive trigger of this rule's source, once for each damage event it prevents damage in, "that much" the damage prevented then and "that source's controller" the controller of the source whose damage it was. */
+  reflect?: AbilityBody;
 }
 
 /** Does this reference cover target `i`? ("up to two target creatures" covers two in a row.) */
@@ -2453,6 +2455,8 @@ export type StaticCondition =
   | { kind: "eventPlayerMoreThanAnotherOpponent"; what: "life" }
   /** "If one or more players being attacked are poisoned" (Norn's Decree): attacked themselves, not their planeswalkers or battles (CR 508.3b), with a poison counter. */
   | { kind: "attackedPlayerPoisoned" }
+  /** Mirkwood Trapper: "if they aren't attacking you": no creature is attacking this ability's controller (one attacking a planeswalker of theirs or a battle they protect isn't, rulings, CR 506.3, 508.1b). */
+  | { kind: "notAttackingYou" }
   /** "If that player has another opponent who isn't being attacked" (Suppressor Skyguard): the trigger's event player (the attacking player) has an opponent other than you, still in the game, that no creature attacks itself (attacking their planeswalkers or battles doesn't count, rulings, CR 508.1b). */
   | { kind: "eventPlayerHasUnattackedOpponent" }
   /** "If no other creatures are attacking that player" (Jin Sakai, Ghost of Tsushima): no creature but the trigger's subject attacks the event's player itself (not their planeswalkers or battles). */
@@ -3025,7 +3029,7 @@ export type Effect =
       /** With `filter`: where the other cards revealed go ("shuffle" if left out); "bottom" is in a random order. */
       rest?: "shuffle" | "bottom";
     }
-  | { type: "moveLinked"; /** Pinnacle Starcage: "for each card put into a graveyard this way": count only those now in a graveyard (ResolvingState.movedLinked). */ countInGraveyard?: true; /** Vault 13: "Return two cards exiled with ~": exactly this many, chosen as it resolves (all of them with fewer). */ exactly?: number; dest: "hand" | "graveyard" | "battlefield"; filter?: TargetSpec; gain?: string[]; /** Ghost Vacuum: "with a flying counter on it", "Each of them is a 1/1 Spirit in addition to its other types" (from then on, CR 611.2c). */ counters?: Record<string, number>; alsoMods?: Modification[]; one?: true; yours?: true; other?: true; /** "You may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (Mimic Vat): only if this resolution linked a card, and not those. */ ifLinkedNow?: true; /** Emperor of Bones: "It gains haste. Sacrifice it at the beginning of the next end step." for the permanent it became. */ haste?: "game" | /** Yggdrasil, Rebirth Engine: "It gains haste until end of turn." */ "endOfTurn"; atEndStep?: "sacrifice"; /** Safe Haven: "under its owner's control", not this ability's controller's. */ ownersControl?: true; /** With `one`: chosen at random (Skyship Weatherlight). */ random?: true; /** Omenpath Journey: "onto the battlefield tapped". */ tapped?: true; /** Bag of Devouring: "up to X cards from among" them, chosen as it resolves. */ upTo?: Amount; /** Clone Shell: "turn the exiled card face up" first: every card exiled with it, then `filter` picks the ones that move. */ turnFaceUp?: true; /** Death in Heaven: "onto the battlefield face down under your control. They're 2/2 Cyberman artifact creatures" (FaceDownKind "cyberman"). */ faceDown?: "cyberman"; /** The Grim Captain: "tapped and attacking", what it attacks chosen as it enters (CR 508.4); with `one`. */ attacking?: true }
+  | { type: "moveLinked"; /** Pinnacle Starcage: "for each card put into a graveyard this way": count only those now in a graveyard (ResolvingState.movedLinked). */ countInGraveyard?: true; /** Vault 13: "Return two cards exiled with ~": exactly this many, chosen as it resolves (all of them with fewer). */ exactly?: number; dest: "hand" | "graveyard" | "battlefield"; filter?: TargetSpec; gain?: string[]; /** Ghost Vacuum: "with a flying counter on it", "Each of them is a 1/1 Spirit in addition to its other types" (from then on, CR 611.2c). */ counters?: Record<string, number>; alsoMods?: Modification[]; one?: true; yours?: true; other?: true; /** "You may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (Mimic Vat): only if this resolution linked a card, and not those. */ ifLinkedNow?: true; /** Mirror of Life Trapping: "exile it, then return all other permanent cards exiled with ~": not the cards this resolution linked, whether or not it linked any. */ exceptLinkedNow?: true; /** Emperor of Bones: "It gains haste. Sacrifice it at the beginning of the next end step." for the permanent it became. */ haste?: "game" | /** Yggdrasil, Rebirth Engine: "It gains haste until end of turn." */ "endOfTurn"; atEndStep?: "sacrifice"; /** Safe Haven: "under its owner's control", not this ability's controller's. */ ownersControl?: true; /** With `one`: chosen at random (Skyship Weatherlight). */ random?: true; /** Omenpath Journey: "onto the battlefield tapped". */ tapped?: true; /** Bag of Devouring: "up to X cards from among" them, chosen as it resolves. */ upTo?: Amount; /** Clone Shell: "turn the exiled card face up" first: every card exiled with it, then `filter` picks the ones that move. */ turnFaceUp?: true; /** Death in Heaven: "onto the battlefield face down under your control. They're 2/2 Cyberman artifact creatures" (FaceDownKind "cyberman"). */ faceDown?: "cyberman"; /** The Grim Captain: "tapped and attacking", what it attacks chosen as it enters (CR 508.4); with `one`. */ attacking?: true }
   /**
    * Memory Jar: "At the beginning of the next end step, each player ... returns to their hand each card they exiled this
    * way": the cards the ability exiled face down (`cards`, filled in as the delayed trigger is made), if they're still
@@ -5207,6 +5211,8 @@ export type Effect =
   | { type: "damageMod"; mod: DamageMod; until?: "yourNextTurn"; byTarget?: number; /** "Would be dealt to target creature" (Kill-Suit Cultist): this ability's target `toTarget`, as the object it is. */ toTarget?: number; toPlayer?: PlayerRef; /** "A source of your choice", chosen as it resolves (CR 609.7a). */ choose?: TargetSpec; /** With `choose`: only a permanent ("an unblocked creature of your choice", Forcefield), not a spell or a gone source. */ choosePermanent?: true; /** "That source" (Desperate Gambit): the source an earlier "chooseSourceNow" of this resolution chose (ResolvingInfo.chosenSource); nothing without one. */ chosenSource?: true; /** "That creature": the trigger's subject. */ bySubject?: true }
   /** Desperate Gambit: "Choose a source you control": a source of damage chosen as it resolves (CR 609.7a), before the rest of it, kept for "that source" (ResolvingInfo.chosenSource); `yours`: one its controller controls (a spell on the stack, or a source an ability refers to, too: rulings). */
   | { type: "chooseSourceNow"; choose: TargetSpec; yours?: true }
+  /** Archnemesis: "you may attach this Aura to that player": the source, still that object on the battlefield, to the first of these players it could enchant (CR 701.3a-b, 702.5d); nothing if it's already attached there. */
+  | { type: "attachSelfToPlayer"; who: PlayerRef }
   /** "If ~ was kicked, ...", with "... instead" as `otherwise` being what it does when it wasn't. */
   | { type: "if"; cond: SpellCondition; effects: Effect[]; otherwise?: Effect[] }
   /**
@@ -6529,6 +6535,8 @@ export interface TriggeredAbility {
   ifCond?: StaticCondition;
   /** With `perPlayer`: "Whenever you attack the player who has the initiative" (Loot Dispute): only for the player who had the initiative as attackers were declared (CR 726). */
   toInitiative?: true;
+  /** With `perPlayer`: "Whenever you attack enchanted player" (Archnemesis): only for the player this Aura is attached to as attackers are declared (CR 508.3e, 702.5d). */
+  attacksEnchanted?: true;
   /**
    * For "permanentDealtExcess" (CR 120.10): which permanents ("a creature or planeswalker an opponent controls", the
    * subject, "that excess damage" its event's amount), `noncombat` for "excess noncombat damage", `oneOrMore` for "one or

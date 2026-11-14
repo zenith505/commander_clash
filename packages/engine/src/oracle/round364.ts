@@ -6,6 +6,7 @@
 import type { CompiledCard, Effect, TargetSpec } from "../abilities";
 import type { Ctx } from "./body";
 import { parseTrigger } from "./triggers";
+import { round365Sentence } from "./round365";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -15,6 +16,9 @@ const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 const NO_SPELL: TargetSpec = { kind: "spell", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "exhaust ability" };
 
 export function round364Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 365's sentences first (oracle/round365.ts).
+  const r365 = round365Sentence(s, sentences, si, ctx, effects);
+  if (r365) return r365;
   const line = plain(s);
   const next = plain(sentences[si + 1]);
   // Pit Automaton: "{2}, {T}: When you next activate an exhaust ability that isn't a mana ability this turn, copy it. You may

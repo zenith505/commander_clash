@@ -4,6 +4,7 @@ import { parseBody } from "./body";
 import { parseActivated } from "./activated";
 import { parseTrigger } from "./triggers";
 import { parseSearchFilter } from "./search";
+import { roundB205Spell } from "./laneb205";
 
 /** One line of a card's text, compiled into `out` (an unsupported one reported as `raw`); false when it isn't one of these. */
 export function roundB204Line(line: string, raw: string, out: CompiledCard, isSpell: boolean): boolean {
@@ -136,5 +137,5 @@ export function roundB204Spell(text: string): AbilityBody | null | undefined {
     if (!sac || !dig || sac.targets.length || dig.targets.length || sac.effects.length !== 2 || dig.effects.length !== 1 || pick?.type !== "pick" || pick.action !== "sacrifice" || !pick.anyNumber || draw?.type !== "draw" || d?.type !== "dig" || d.into !== "battlefield" || !d.reveal || !d.upTo || d.rest !== "bottom" || !d.random) return null;
     return { targets: [], effects: [pick, { ...d, n: draw.n, nonlandFirst: true }], text };
   }
-  return undefined;
+  return roundB205Spell(text);
 }

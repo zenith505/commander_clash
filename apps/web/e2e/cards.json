@@ -3145,6 +3145,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "650bf82e-7f83-470c-bf4a-34281bfe9341",
+  "name": "Battlegrowth",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Put a +1/+1 counter on target creature.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b76d1ae6-ad1d-4bac-b4c3-2e03e0e84d9b",
   "name": "Bayou",
   "manaCost": "",
@@ -5501,6 +5527,46 @@
   "commanderLegal": "legal",
   "set": "m10",
   "releasedAt": "2009-07-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6d86d783-7116-4426-8c0f-718c2d904887",
+  "name": "Captain Marvel, Apex Avenger",
+  "manaCost": "{5}{R}{W}",
+  "cmc": 7,
+  "typeLine": "Legendary Creature — Human Kree Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Kree",
+   "Hero"
+  ],
+  "oracleText": "Flying, double strike, indestructible\nWhenever you put one or more counters on another creature, if it's not a Kree, you may put the same number and kind of counters on Captain Marvel.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Indestructible",
+   "Double strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -9829,6 +9895,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a4ae71c8-ea1b-4fa4-9e47-cf00ab60c5ee",
+  "name": "Don & Leo, Problem Solvers",
+  "manaCost": "{3}{W/U}{W/U}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Mutant Ninja Turtle",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Mutant",
+   "Ninja",
+   "Turtle"
+  ],
+  "oracleText": "Vigilance\nAt the beginning of your end step, exile up to one target artifact you control and up to one target creature you control. Then return them to the battlefield under their owners' control.",
+  "power": "4",
+  "toughness": "6",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "tmt",
+  "releasedAt": "2026-03-06",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "59e7f2ae-4535-4191-98be-3e65b6b2befa",
   "name": "Doom Blade",
   "manaCost": "{1}{B}",
@@ -10380,6 +10484,34 @@
   "set": "acr",
   "releasedAt": "2024-07-05",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2b87bcac-ec64-4012-9e75-f459d3640eb3",
+  "name": "Earth's Mightiest Heroes",
+  "manaCost": "{4}{G}{G}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Teamwork 5 (As an additional cost to cast this spell, you may tap any number of creatures you control with total power 5 or more.)\nReveal the top eight cards of your library. You may put a creature card from among them onto the battlefield. If this spell was cast using teamwork, put any number of creature cards from among them onto the battlefield instead. Put the rest into your graveyard.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Teamwork"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -13532,6 +13664,32 @@
   "releasedAt": "2023-10-13",
   "rarity": "rare",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cbf68ddd-596f-4b2d-b93c-3b7976ba4d37",
+  "name": "Fumble",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Return target creature to its owner's hand. Gain control of all Auras and Equipment that were attached to it, then attach them to another creature.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bbd",
+  "releasedAt": "2018-06-08",
+  "rarity": "uncommon",
+  "layout": "normal",
   "gameChanger": false
  },
  {
@@ -19333,6 +19491,39 @@
   "commanderLegal": "legal",
   "set": "khm",
   "releasedAt": "2021-02-05",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5e4c81b9-a31e-45e6-983f-30f11b8a05c0",
+  "name": "Kaya, Ghost Assassin",
+  "manaCost": "{2}{W}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Kaya",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Kaya"
+  ],
+  "oracleText": "0: Exile Kaya or up to one target creature. Return that card to the battlefield under its owner's control at the beginning of your next upkeep. You lose 2 life.\n−1: Each opponent loses 2 life and you gain 2 life.\n−2: Each opponent discards a card and you draw a card.",
+  "loyalty": "5",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cn2",
+  "releasedAt": "2016-08-26",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
@@ -37092,6 +37283,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a38ebf4a-064c-4517-a553-15f0a252c159",
+  "name": "The Three Seasons",
+  "manaCost": "{G}{U}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Mill three cards.\nII — Return up to two target snow permanent cards from your graveyard to your hand.\nIII — Choose three cards in each graveyard. Their owners shuffle those cards into their libraries.",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "uncommon",
+  "layout": "saga",
+  "gameChanger": false
+ },
+ {
   "oracleId": "be922360-ee9f-4cfb-bf10-d481c5de5cb1",
   "name": "The Unagi of Kyoshi Island",
   "manaCost": "{3}{U}{U}",
@@ -38133,6 +38356,34 @@
   "set": "bok",
   "releasedAt": "2005-02-04",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e50fecff-8872-42f5-8882-41ad13d9d1ae",
+  "name": "Too Evil to Stay Dead",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Teamwork 4 (As an additional cost to cast this spell, you may tap any number of creatures you control with total power 4 or more.)\nChoose target creature card in your graveyard with mana value 4 or less. If this spell was cast using teamwork, instead choose target creature card in your graveyard. Return the chosen card to the battlefield.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Teamwork"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -39439,6 +39690,41 @@
   "set": "mir",
   "releasedAt": "1996-10-08",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "258921f2-df26-4d8a-ad34-8f44d0158ae7",
+  "name": "Varchild's War-Riders",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warrior"
+  ],
+  "oracleText": "Cumulative upkeep—Have an opponent create a 1/1 red Survivor creature token. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nTrample; rampage 1 (Whenever this creature becomes blocked, it gets +1/+1 until end of turn for each creature blocking it beyond the first.)",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Trample",
+   "Rampage",
+   "Cumulative upkeep"
+  ],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

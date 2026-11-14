@@ -511,7 +511,8 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
     }
     const taken = new Set(Object.values(yp.picked).flat());
     // Ill-Gotten Gains: into their hands, any cards; onto the battlefield, only permanent cards (CR 110.4b).
-    const toHand = e.dest === undefined || e.dest === "exile" || e.dest === "keep";
+    // The Three Seasons: any cards, shuffled into their libraries.
+    const toHand = e.dest === undefined || e.dest === "exile" || e.dest === "keep" || e.dest === "shuffleIn";
     // Grave Sifter: "of that type", the type this player chose (none chosen: none fit).
     const own = e.filter?.chosen === "pickerType" ? s.resolving!.chosen?.typesBy?.[pid] : undefined;
     const filter = e.filter?.chosen === "pickerType" ? (own ? (({ chosen: _, ...f }) => ({ ...f, subtypes: [...(f.subtypes ?? []), own] }))(e.filter) : undefined) : e.filter;
@@ -528,7 +529,7 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
     // Dredge the Mire: they choose for you, so the card that helps you least (bots), as Visions of Dread.
     const forYou = e.underYours && pid !== ctx.controller ? { forPlayer: ctx.controller, helps: true as const, under: ctx.controller } : {};
     const what = e.n >= 999 ? `any number of ${kind.replace(/\bcard\b/, "cards")}` : e.n > 1 ? `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
-    s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : pid, source: src, what: `${what}${whose}`, ...forYou, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest === "exile" || e.dest === "keep" ? e.dest : toHand ? "hand" : "battlefield" };
+    s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : pid, source: src, what: `${what}${whose}`, ...forYou, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest === "exile" || e.dest === "keep" || e.dest === "shuffleIn" ? e.dest : toHand ? "hand" : "battlefield" };
     return "paused";
   }
   sc.yardPicks = undefined;
@@ -557,6 +558,18 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
     s.resolving!.yardChosen = moves.map((m) => m.id).filter((id) => obj(s, id).zone === "exile");
     // Summon: Esper Valigarmanda, King Narfi's Betrayal: "exiled with ~" for its later chapters (CR 607.2a).
     if (e.linked && ctx.sourceId) for (const id of s.resolving!.yardChosen) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+    return;
+  }
+  // The Three Seasons: "Their owners shuffle those cards into their libraries": all moved at once, then each owner who got
+  // one shuffles (a player with none chosen doesn't shuffle, rulings).
+  if (e.dest === "shuffleIn") {
+    const owners = [...new Set(moves.map((m) => obj(s, m.id).owner))];
+    for (const q of owners) {
+      const mine = moves.filter((m) => obj(s, m.id).owner === q);
+      log(s, `${player(s, q).name} shuffles ${mine.map((m) => defOf(s, obj(s, m.id)).name).join(", ")} from their graveyard into their library.`);
+    }
+    for (const { id } of moves) moveObject(s, id, "library");
+    for (const q of apnap(s, owners)) if (!player(s, q).lost) shuffleLibrary(s, player(s, q));
     return;
   }
   const under = (pid: PlayerId) => (e.youChoose || e.underYours ? ctx.controller : pid);
@@ -3670,8 +3683,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // "keep" is only compiled for each player's own graveyard (eachFromGraveyard).
       if (e.dest === "keep") return;
       const names = found.map((id) => defOf(s, obj(s, id)).name).join(", ");
-      if (found.length) log(s, e.dest === "exile" ? `${p.name} exiles ${names} from their graveyard.` : e.dest === "libraryTop" ? `${p.name} puts ${names} from their graveyard on top of their library.` : e.dest === "libraryBottom" ? `${p.name} puts ${names} from their graveyard on the bottom of their library.` : `${p.name} returns ${names} from their graveyard to their hand.`);
-      for (const id of found) (e.dest === "libraryTop" ? moveObject(s, id, "library", { top: true }) : e.dest === "libraryBottom" ? moveObject(s, id, "library") : moveObject(s, id, e.dest ?? "hand"));
+      if (found.length) log(s, e.dest === "exile" ? `${p.name} exiles ${names} from their graveyard.` : e.dest === "libraryTop" ? `${p.name} puts ${names} from their graveyard on top of their library.` : e.dest === "libraryBottom" ? `${p.name} puts ${names} from their graveyard on the bottom of their library.` : e.dest === "shuffleIn" ? `${p.name} shuffles ${names} from their graveyard into their library.` : `${p.name} returns ${names} from their graveyard to their hand.`);
+      for (const id of found) (e.dest === "libraryTop" ? moveObject(s, id, "library", { top: true }) : e.dest === "libraryBottom" || e.dest === "shuffleIn" ? moveObject(s, id, "library") : moveObject(s, id, e.dest ?? "hand"));
+      if (e.dest === "shuffleIn" && found.length) shuffleLibrary(s, p);
       // Azula, Cunning Usurper: "exiled with ~" (CR 607.2a), as the card it is in exile.
       if (e.linked && e.dest === "exile" && ctx.sourceId)
         for (const id of found) if (obj(s, id).zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: obj(s, id).zoneChanges ?? 0 });

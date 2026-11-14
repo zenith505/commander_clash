@@ -2537,8 +2537,40 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (host) attachTo(s, me, host);
       return;
     }
+    case "noteAttachments": {
+      // Fumble: what's attached to it now, before the next instruction moves it (CR 608.2c); by their types now.
+      const host = objects(s, e.what, ctx)[0];
+      s.resolving!.noted = host?.zone === "battlefield" ? s.battlefield.filter((id) => obj(s, id).attachedTo === host.id && characteristics(s, obj(s, id)).subtypes.some((t) => t === "Aura" || t === "Equipment")).map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })) : [];
+      return;
+    }
     case "attachToChosen": {
       const sc = (s.resolving!.scratch ??= {});
+      // Fumble: "attach them to another creature": every one of them to the same creature, one they can all legally be
+      // attached to, chosen as it resolves (not targeted: hexproof doesn't stop it, an opponent's creature if that's the
+      // only one); with none, they all stay unattached (rulings; state-based actions then put the Auras into graveyards).
+      if (e.together) {
+        const all = objects(s, e.source, ctx).filter((o) => o.zone === "battlefield");
+        if (!all.length) return;
+        const hosts = (sc.auraHosts ??= {});
+        const key = all[0]!.id;
+        if (hosts[key] === undefined) {
+          const options = s.battlefield.filter((x) => objectMatches(s, e.filter, obj(s, x), ctx.controller, false) && all.every((me) => canAttachTo(s, me, obj(s, x)))).sort((a, b) => power(s, obj(s, b)) - power(s, obj(s, a)));
+          if (!options.length) {
+            log(s, `${src}: there's no creature ${all.length === 1 ? "it" : "they all"} can be attached to.`);
+            return;
+          }
+          if (options.length > 1) {
+            sc.auraAsking = key;
+            const labels = options.map((x) => `${defOf(s, obj(s, x)).name}${controllerOf(s, obj(s, x)) === ctx.controller ? "" : ` (${player(s, controllerOf(s, obj(s, x))).name})`}`);
+            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "enchant", options, labels, prompt: `choose ${e.filter.text.replace(/^an? /, "a ")} to attach ${all.map((o) => defOf(s, o).name).join(", ")} to` };
+            return "paused";
+          }
+          hosts[key] = options[0]!;
+        }
+        const host = s.objects[hosts[key]!];
+        if (host?.zone === "battlefield") for (const me of all) if (canAttachTo(s, me, host)) attachTo(s, me, host);
+        return;
+      }
       // Kudzu: another player chooses (the destroyed land's controller as it last existed, CR 608.2h).
       const chooser = e.chooser ? players(s, e.chooser, ctx)[0] : ctx.controller;
       if (chooser === undefined) return;

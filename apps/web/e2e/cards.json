@@ -8778,6 +8778,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e03b553a-3d0d-453e-ad3e-f7d4b9fb2624",
+  "name": "Delaying Shield",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If damage would be dealt to you, put that many delay counters on this enchantment instead.\nAt the beginning of your upkeep, remove all delay counters from this enchantment. For each delay counter removed this way, you lose 1 life unless you pay {1}{W}.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ody",
+  "releasedAt": "2001-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8d57dadb-c689-4691-b331-aba15daf46ff",
   "name": "Delina, Wild Mage",
   "manaCost": "{3}{R}",
@@ -20387,6 +20413,28 @@
   "commanderLegal": "legal",
   "set": "m20",
   "releasedAt": "2019-07-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4f88ddfa-5478-426a-a978-dfc64c687db1",
+  "name": "Liar's Pendulum",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}, {T}: Choose a card name. Target opponent guesses whether a card with that name is in your hand. You may reveal your hand. If you do and your opponent guessed wrong, draw a card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

@@ -117,7 +117,7 @@ export function runLaneB201Effect(s: GameState, e: B201Effect, ctx: ResolveCtx, 
       if (!st.asked) {
         st.asked = true;
         sc.may = undefined;
-        s.pending = { kind: "chooseMay", player: you.id, source: src, prompt: `reveal your hand? ${player(s, guesser).name} guessed ${name} ${st.guess === "in" ? "is" : "isn't"} in your hand; if you reveal it and they guessed wrong, you draw a card`, liarReveal: { guessedRight: (st.guess === "in") === there } };
+        s.pending = { kind: "chooseMay", player: you.id, source: src, prompt: `reveal your hand (${player(s, guesser).name} guessed ${name} ${st.guess === "in" ? "is" : "isn't"} in your hand; if you reveal it and they guessed wrong, you draw a card)`, liarReveal: { guessedRight: (st.guess === "in") === there } };
         return "paused";
       }
       const reveal = sc.may !== false;

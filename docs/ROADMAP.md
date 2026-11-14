@@ -1,6 +1,6 @@
 # Roadmap
 
-31,292 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,310 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,881 of
 9,979 (99%).
 
@@ -2727,7 +2727,7 @@ line blocks.
    symbols paid with any mana, {C} still needs colorless, CR 609.4b; a copy of a spell leaves no card, CR 707.10a).
    Browser tests click through Deceiver of Form's and Vesuvan Drifter's prompts and cast the card Gale's Redirection
    exiled. Bots copy a revealed creature only when it beats what they have, bottom a land when they have six or more and
-   a card they can't cast soon, and value Trial's guilty vote by the exiled cards. +5, 31,292 of 31,936. The compiled
+   a card they can't cast soon, and value Trial's guilty vote by the exiled cards. +5, 31,310 of 31,936 with round 362 and Lane B's B201-B203. The compiled
    text of every other card is unchanged.
    Out after round 363 (looked at, not done): Ziatora's Envoy (playing a land from the top while the trigger resolves);
    Durnan of the Yawning Portal (undaunted granted to a spell cast from exile); Decoy Gambit ("unless its controller has

@@ -2566,6 +2566,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't attack you or planeswalkers you control$/.test(rest)) return [{ kind: "cantAttackYou" }];
   // Blazing Archon: "Creatures can't attack you": you, but not your planeswalkers (CR 508.1c).
   if (/^can't attack you$/.test(rest)) return [{ kind: "cantAttackYou", playerOnly: true }];
+  // Storm, Windrider: "Creatures with flying can't attack you or block creatures you control": both, "you" (not your
+  // planeswalkers, CR 508.1c) and "creatures you control" its controller's (CR 509.1b).
+  if (rest === "can't attack you or block creatures you control") return [{ kind: "cantAttackYou", playerOnly: true }, { kind: "cantBlockCreatures", filter: { kind: "object", types: ["Creature"], controller: "you", text: "creatures you control" } }];
   if (/^can't attack its owner$/.test(rest)) return [{ kind: "cantAttackOwner" }];
   if (/^can't attack its owner or planeswalkers its owner controls$/.test(rest)) return [{ kind: "cantAttackOwner", planeswalkers: true }];
   // Xantcha: "attacks each combat if able and can't attack its owner or planeswalkers its owner controls".
@@ -2707,6 +2710,13 @@ export function parseStatic(line: string): StaticAbility | null {
   const bwo = /^(.+) have "(bands with other [^"]+)\."$/.exec(line);
   if (bwo) {
     const st = parseStatic(`${bwo[1]} have ${bwo[2]}.`);
+    return st && { ...st, text: line };
+  }
+  // Ellywick Tumblestrum's emblem: "Creatures you control have trample and haste and get +2/+2 for each ...": the same as
+  // "get ... and have ...", each part in its own layer (CR 613.1f, 613.4c).
+  const haveGet = /^(Creatures you control) have ([a-z]+(?:,? and [a-z]+)*) and get ([+-]\d+\/[+-]\d+ for each [^.]+)\.$/.exec(line);
+  if (haveGet) {
+    const st = parseStatic(`${haveGet[1]} get ${haveGet[3]} and have ${haveGet[2]}.`);
     return st && { ...st, text: line };
   }
   // Lymph Sliver: "All Sliver creatures have absorb 1.": absorb N is "If a source would deal damage to this creature,

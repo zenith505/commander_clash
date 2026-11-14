@@ -162,6 +162,8 @@ export interface Characteristics {
   blocksOnlyFlyers: boolean;
   /** "Attacks each combat if able" (CR 508.1d). */
   attacksIfAble: boolean;
+  /** "Attacks a player each combat if able" (Nahiri, the Unforgiving): with `attacksIfAble`, a player, not a planeswalker or battle (CR 508.1d). */
+  attacksPlayerIfAble: boolean;
   /** Untaps during each other player's untap step too. */
   untapsDuringOthers: boolean;
   /** Generic mana per creature attacking its controller (Ghostly Prison). */
@@ -415,6 +417,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantBeSuspected: false,
     blocksOnlyFlyers: false,
     attacksIfAble: false,
+    attacksPlayerIfAble: false,
     untapsDuringOthers: false,
     attackTax: 0,
     attackTaxPlaneswalkers: 0,
@@ -2046,6 +2049,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       // Trench Behemoth: only in that player's combats, not the one going on as it resolved.
       if (m.turnOf !== undefined && (m.turnOf !== s.activePlayer || (m.notCombat && m.notCombat.turn === s.turn && m.notCombat.combat === (s.combatsThisTurn ?? 0)))) return;
       c.attacksIfAble = true;
+      if (m.player) c.attacksPlayerIfAble = true;
       return;
     case "mustAttackMostLife":
       c.mustAttackMostLife = true;

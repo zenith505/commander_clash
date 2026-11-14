@@ -1404,6 +1404,17 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     }
     return [{ type: "bounce", what }];
   }
+  // Nyla, Shirshu Sleuth: "return target card exiled with ~ to its owner's hand": a card its one exile ability exiled
+  // (CR 607.2a), linked in compile.ts; one ~ exiled as a new object is no longer among them (CR 400.7, rulings).
+  if ((m = /^[Rr]eturn (target (?:[a-z]+ )?card exiled with ~) to its owner's hand$/.exec(s))) {
+    const i = ctx.targets.length;
+    const what = parseCardTarget(m[1]!, ctx);
+    if (what?.ref !== "target" || !ctx.targets[i]?.linkedExile) {
+      ctx.targets.length = i;
+      return null;
+    }
+    return [{ type: "bounce", what }];
+  }
   // Pull from Eternity: "Put target face-up exiled card into its owner's graveyard", whoever exiled it (CR 406).
   if ((m = /^Put (target face-up exiled card) into its owner's graveyard$/.exec(s))) {
     const i = ctx.targets.length;
@@ -2088,6 +2099,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^(target creature an opponent controls|that creature) attacks during its controller's next combat phase if able$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "attacksIfAble", turnOf: "controller" }], duration: "controllersNextCombat" }] : null;
+  }
+  // Nahiri, the Unforgiving: "Until your next turn, up to one target creature attacks a player each combat if able": a
+  // requirement in each combat until then (CR 508.1d, 611.2b), a planeswalker or battle not obeying it; a creature that
+  // can't attack, or only by paying a cost, needn't (rulings).
+  if ((m = /^Until your next turn, (.+?) attacks (a player )?each combat if able$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what ? [{ type: "continuous", what, mods: [{ kind: "attacksIfAble", ...(m[2] ? { player: true as const } : {}) }], duration: "yourNextTurn" }] : null;
   }
   // "Target creature attacks this turn if able": in each combat this turn (CR 508.1d).
   if ((m = /^(.+?) attacks? (?:each combat )?this turn if able$/i.exec(s)) && !/ and$/.test(m[1]!)) {

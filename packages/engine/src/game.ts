@@ -13065,6 +13065,14 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     if ((a.planeswalker !== undefined ? 0 : obeyed(a.defender)) < best)
       throw new RulesError(`${defOf(s, o).name} is goaded: it must attack a player other than ${by.map((p) => player(s, p).name).join(" or ")} if able`);
   }
+  // Nahiri, the Unforgiving: "attacks a player each combat if able": attacking a planeswalker or battle doesn't obey it, so
+  // one that could attack a player without a cost must attack a player (CR 508.1d). One that also has to attack a
+  // planeswalker (Gideon) obeys as many requirements either way.
+  for (const a of attacks) {
+    const o = obj(s, a.attacker);
+    if (a.planeswalker === undefined || !characteristics(s, o).attacksPlayerIfAble || walkers.get(o.id)?.length) continue;
+    if (opps.some((d) => free(o, d))) throw new RulesError(`${defOf(s, o).name} must attack a player if able`);
+  }
   // "Attacks that opponent this turn if able" (encore): it attacks one of those players, not a planeswalker, if it can
   // (CR 508.1d). One that can't attack them, or only by paying a cost, needn't attack at all (encore rulings).
   for (const o of potentialAttackers(s, p.id)) {

@@ -1,6 +1,6 @@
 # Roadmap
 
-31,269 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,275 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,876 of
 9,979 (98%).
 
@@ -3667,7 +3667,7 @@ line blocks.
    among cards in your graveyard", and casting the discarded card from the graveyard as the trigger resolves); Araumi of
    the Dead Tide (its cost "Exile cards from your graveyard equal to the number of opponents you have"; granting encore
    now works); Obsidian Charmaw (a cost cut counting "each land your opponents control that could produce {C}", near Lane B's round B140 template, left for it); Lumbering Battlement
-   (the exile until it leaves isn't linked yet); Spectral Searchlight, Greater Gargadon, Ride the Avalanche, Panoptic
+   (the exile until it leaves isn't linked yet); Spectral Searchlight, Greater Gargadon, Ride the Avalanche (done in round B203), Panoptic
    Projektor, Read the Runes (done in round 320), Draco, Azra Oddsmaker, Leonin Arbiter (done in round 313), Incinerator of the Guilty (done in round 313), Baba Lysaga (done in round 315), Archelos and
    Hatchery Sliver (still out, for the reasons in their earlier notes).
    Round 302 took cards back off the "Out after round N" lists, most played first: "Whenever players finish voting, each
@@ -3690,7 +3690,7 @@ line blocks.
    equipped creature. Flip a coin" (Plasma Caster: the creature it equipped as the ability was activated, rulings).
    +10, 30,425 of 31,936 with B139.
    Out after round 302 (looked at, not done): Spectral Searchlight and Greater Gargadon (their templates are in Lane B's
-   open round B139); Ride the Avalanche, Panoptic Projektor, Read the Runes (done in round 320), Draco, Azra Oddsmaker, Leonin Arbiter (done in round 313),
+   open round B139); Ride the Avalanche (done in round B203), Panoptic Projektor, Read the Runes (done in round 320), Draco, Azra Oddsmaker, Leonin Arbiter (done in round 313),
    Incinerator of the Guilty (done in round 313), Baba Lysaga (done in round 315), Archelos and Hatchery Sliver (still out, for the reasons in their earlier
    notes).
    Round 301 took cards back off the "Out after round N" lists, most played first: "the next spell you cast this turn"
@@ -3714,7 +3714,7 @@ line blocks.
    battlefield" (Grenzo, Dungeon Warden: from exile too if a replacement put it there, and its last known power, rulings);
    "a Treasure token for each creature you controlled that dealt combat damage to a player this turn" (Excess: controlled as
    it dealt it, rulings). +11, 30,406 of 31,936 with B138.
-   Out after round 301 (looked at, not done): Ride the Avalanche ("When you next cast a spell this turn, put X +1/+1
+   Out after round 301 (looked at, not done): Ride the Avalanche (done in round B203) ("When you next cast a spell this turn, put X +1/+1
    counters on up to one target creature, where X is the mana value of that spell": a delayed trigger with a target and
    that spell's mana value); Panoptic Projektor (a cost cut for the next face-down creature spell: face-down costs aren't
    reduced by "next spell" effects yet); Read the Runes (done in round 320) (the sacrifices chosen first, then the discards for the rest, in
@@ -4091,7 +4091,7 @@ line blocks.
    chosen); Reverse the Sands (redistribute life totals).
    Out after round 256 (looked at, not done): Scrap Welder (done in round 270); Lynde, Cheerful Tormentor (a Curse returned "attached to you", then moved to an opponent);
    Supper for Spiders (cards that become Food artifacts losing their other card types and subtypes but keeping their
-   abilities); Nahiri, the Unforgiving ("attacks a player each combat if able" until your next turn); Cherished Hatchling
+   abilities); Nahiri, the Unforgiving (done in round B203) ("attacks a player each combat if able" until your next turn); Cherished Hatchling
    (Dinosaur spells cast this turn gain an enters-and-fight ability); Heirloom Epic (done in round 314) and Crashing Wave (done in round 328) (tap creatures, or
    artifacts and creatures, to pay generic mana of an ability's or a waterbend cost).
    Out after round 255 (looked at, not done): Benevolent Blessing (done in round 277) (protection that doesn't remove Auras and Equipment
@@ -4996,7 +4996,7 @@ line blocks.
      Tide, Bubbling Muck), attacks, blocks, life gain, other damage, Spiritualize (done in round B130) and the rest of the 11 unsupported ones.
    - "Whenever you cast a spell that targets ..." still out: "that targets only ..." (Loki,
      Beamsplitter Mage, Feather), "targets ~" except heroic (Druid of Horns, Speedball), "an Equipment spell or a spell
-     that targets" (Danitha, Sword of Hope (done in round B109)), and "those creatures" in the effect (Storm, Windrider; Dack's emblem).
+     that targets" (Danitha, Sword of Hope (done in round B109)), and "those creatures" in the effect (Storm, Windrider (done in round B203); Dack's emblem).
    - Crush Underfoot ("choose a Giant creature you control") is out because its Kindred type isn't parsed.
    - "Choose one that hasn't been chosen" cards still out on other lines: Breeches, Captive Audience, Gandalf, Gollum,
      Henrika, Kargan, Parapet Thrasher, Sol'Kanar (done in round B163), Survivor's Med Kit, Teval's Judgment, Fantastic Four, Zuko.
@@ -6472,7 +6472,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   then you put the creature card onto the battlefield under your control" (Telemin Performance), "The tokens have ..."
   (Return of the Mole Man). +18 (28,436 of 31,936 with round 222).
 - Out after round B56 (looked at, not done): Sudden Salvation (done in round B200) ("for each opponent who controls one or more of those
-  permanents"), Jhoira, Weatherlight Corsair (life loss equal to the mana value of the card put onto the battlefield),
+  permanents"), Jhoira, Weatherlight Corsair (done in round B203) (life loss equal to the mana value of the card put onto the battlefield),
   Djinn of Wishes (done in round B158) (playing the revealed card from the library, else exiling it), The Kingpin of Crime (done in round B192) (a group "assign
   combat damage equal to their toughness" until end of turn), Yasova Dragonclaw ("gain control of target creature an
   opponent controls with power less than ~'s power ..., untap that creature, and it gains haste"), Tajuru Paragon ("a
@@ -6685,7 +6685,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   than once), Winter, Cursed Rider (exiling X cards as a cost), Melira, the Living Cure (poison replacement and a
   delayed return), Mirkwood Trapper ("that player chooses an attacking creature"), Captain Marvel, Apex Avenger ("the
   same number and kind of counters"), Storyweave (lore counters and the next enchantment creatures entering), Lodestone
-  Bauble (cards from one player's graveyard on top in any order), Ellywick Tumblestrum ("If it's legendary" in a dig,
+  Bauble (cards from one player's graveyard on top in any order), Ellywick Tumblestrum (done in round B203) ("If it's legendary" in a dig,
   and her emblem), Scythe Specter (the greatest mana value among the discarded cards), Moorland Rescuer (done in round B202) (total power X
   or less), Nazahn, Revered Bladesmith (done in round B199), Liliana, the Necromancer (done in round B174) (creature cards from graveyards onto the battlefield).
 - Round B65 (the unlisted ones from EDHREC rank about 19,700 up, and Hollow One and Take Out the Trash from the B10 and
@@ -6734,7 +6734,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   by dredge), Szadek, Lord of Secrets (the affected player orders it against prevention), Domri, Chaos Bringer (riot on mana spent from a loyalty
   ability), Dreamshaper Shaman (a nonland permanent card put onto the battlefield: Auras and battles), Qasali Ambusher
   (flash only for the alternative cost), Debt of Loyalty ("if it regenerates this way", done in round B132), Murktide Regent (done in round B182) (which cards
-  delve exiled), War Tax, Mine Layer, Tatsumasa, the Dragon's Fang, Ride the Avalanche, Light Up the Night, Arachnus
+  delve exiled), War Tax, Mine Layer, Tatsumasa, the Dragon's Fang, Ride the Avalanche (done in round B203), Light Up the Night, Arachnus
   Spinner (done in round B71), Auratouched Mage, Bludgeon Brawl and Last Light of Durin's Day (searches across zones, cost-time choices or
   granted abilities with their own costs).
 - Round B67 (from EDHREC rank about 19,700 up and the B10 and B11 lists): "{1}: The next time you would draw a card this
@@ -8703,7 +8703,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   not chosen, a split card's combined mana value, rulings, CR 107.3c, 709.4; nothing exiled, it can't be activated). +6,
   31,192 of 31,936 with B189 to B194 and rounds 348 to 351.
 - Out after round B195 (looked at, not done): Reversal of Fortune (the copy is made and cast from the opponent's hand,
-  rulings: copies of cards are made in exile here, so "cast from exile" would wrongly apply), Nyla, Shirshu Sleuth ("If you
+  rulings: copies of cards are made in exile here, so "cast from exile" would wrongly apply), Nyla, Shirshu Sleuth (done in round B203) ("If you
   do, you lose X life and create X Clue tokens, where X is that card's mana value" after an exile, and "return target card
   exiled with ~ to its owner's hand": neither form is read yet), Cemetery Desecrator (a reflexive modal trigger with the
   exiled card's mana value) and Kaya, Ghost Assassin ("Exile ~ or up to one target creature", chosen as it resolves) stay
@@ -8853,6 +8853,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   across a spell's targets yet), Song of Inspiration (no ruling settles whether a target that became illegal still adds its
   mana value to the roll, CR 608.2b), Lodestone Bauble, Decoy Gambit and Coin of Fate stay out for the reasons in the
   earlier lists.
+- Round B203 (least played first, from the Lane B skip lists): Nyla, Shirshu Sleuth ("If you do, you lose X life and create
+  X Clue tokens, where X is that card's mana value" after exiling up to one target card: only if it was exiled, its mana
+  value in exile, CR 107.3c; "return target card exiled with ~ to its owner's hand", the card its one exile ability exiled,
+  CR 607.2a, never one exiled by a ~ that has since left, CR 400.7, rulings; its intervening if, CR 603.4). Ellywick
+  Tumblestrum ("If it's legendary, you gain 3 life" about the creature card put into your hand; its emblem's "+2/+2 for each
+  differently named dungeon you've completed", CR 309.7, every one completed this game, rulings, with trample and haste
+  even with none). Storm, Windrider ("Creatures with flying can't attack you or block creatures you control": you, not your
+  planeswalkers, CR 508.1c, 509.1b; "Whenever you cast a spell that targets one or more creatures, those creatures gain
+  flying until end of turn", the creatures it targets as the trigger resolves, before the spell does). Nahiri, the
+  Unforgiving ("Until your next turn, up to one target creature attacks a player each combat if able": attacking a
+  planeswalker or battle doesn't obey it, CR 508.1d; a creature that can't attack, or only by paying a cost, needn't,
+  rulings; bots send it at a player; "creature or Equipment card" targets). Ride the Avalanche ("When you next cast a spell
+  this turn, put X +1/+1 counters on up to one target creature, where X is the mana value of that spell": a delayed trigger
+  with its own target, chosen as it's put on the stack, rulings, CR 603.7; the next spell's flash used up by that same
+  spell). Jhoira, Weatherlight Corsair (the opponent reveals until a historic permanent card, which enters under your
+  control, and you lose life equal to its mana value; with none, every revealed card goes to the bottom and no life is
+  lost, CR 701.20a). +6, 31,275 of 31,936 with B201 and B202.
+- Out after round B203 (looked at, not done): Rinoa, Angel Wing ("you may return one of them", an attacking creature that
+  died from any owner's graveyard, "Do this only once each turn"), Sanctuary Blade ("As ~ becomes attached to a creature,
+  choose a color": a choice in the middle of attaching, every way it can become attached) and Kodama of the Center Tree stay
+  out for the reasons in the earlier lists.
 - Out after round B192 (looked at, not done): Garruk, Curse Breaker (its −4: how often "whenever one or more creatures
   attack one of your opponents" triggers when creatures attack two of them still isn't settled by rulings), Charmed
   Pendant (a hybrid symbol of the milled card adds one of its colors: a choice in the middle of a mana ability), Ulamog's
@@ -9176,7 +9197,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Ancient Hellkite (done in round B112) ("defending player" in an activated ability's target), Alluring Siren ("attacks you if able"), Dreams of
   Steel and Oil (the chosen cards exiled at once), Jester's Mask (done in round B158), The Ruinous Wrecking Crew (done in round B187) (choose up to X).
 - Out after round B100 (looked at, not done): Necrotic Plague (a target chosen by the dead creature's controller, not the
-  ability's), Nyla, Shirshu Sleuth and Sentinel of Lost Lore (targeting cards in exile, linked or with an Adventure), Close
+  ability's), Nyla, Shirshu Sleuth (done in round B203) and Sentinel of Lost Lore (targeting cards in exile, linked or with an Adventure), Close
   Encounter (a warped card in exile as an additional cost), Redemptor Dreadnought (an optional additional cost that exiles a
   card linked to the permanent), Torrent of Lava (an ability creatures have while it's on the stack), Speedball (new targets
   for a spell that targets it), Tetravus (done in round B171) (tokens created with it exiled to put counters back).

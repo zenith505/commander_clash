@@ -610,6 +610,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^(?:the number of )?(?:players|opponents) you attacked this combat$/i.test(p)) return { count: { kind: "opponentsAttacked" } };
   // "For each opponent you attacked [this turn]" (Rose, Cutthroat Raider).
   if (each && /^opponents? you attacked(?: this turn)?$/i.test(p)) return count({ kind: "players", opponents: true, attacked: true });
+  // Ellywick Tumblestrum's emblem: "for each differently named dungeon you've completed" (CR 309.7).
+  if (each && (m = /^(differently named )?dungeons? you've completed$/i.exec(p))) return count({ kind: "dungeonsCompleted", ...(m[1] ? { distinct: true as const } : {}) });
   // "For each opponent you have", "the number of opponents you have" (Inspired Sphinx).
   if (each && /^opponents?(?: you have)?$/i.test(p)) return count({ kind: "players", opponents: true });
   // "The number of opponents who control a creature with power 4 or greater" (Summon: Yojimbo), "for each opponent who

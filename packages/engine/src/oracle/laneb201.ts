@@ -1,10 +1,11 @@
 // Lane B round B201's lines, read by compileCard before its triggers and activated abilities (after round B200's), its
-// sentences, read at the end of round B200's chain, and its whole spells, read after round B200's.
+// sentences, read at the end of round B200's chain (then round B203's), and its whole spells, read after round B200's.
 import type { AbilityBody, CompiledCard, Effect, StaticCondition } from "../abilities";
 import { parseActivated } from "./activated";
 import { parseTrigger } from "./triggers";
 import { parseBody } from "./body";
 import type { Ctx } from "./body";
+import { roundB203Sentence } from "./laneb203";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -89,7 +90,8 @@ export function roundB201Sentence(s: string, _sentences: string[], si: number, c
   // 702.63a).
   if (plain(s) === "Remove two time counters from each permanent and each suspended card" && ctx.spell && !effects.length) return { effect: { type: "timeCountersEach", mode: "remove", n: 2 }, next: si + 1 };
   if (plain(s) === "Put two time counters on each permanent with a time counter on it and each suspended card" && ctx.spell && !effects.length) return { effect: { type: "timeCountersEach", mode: "add", n: 2 }, next: si + 1 };
-  return null;
+  // Round B203's sentences (oracle/laneb203.ts).
+  return roundB203Sentence(s, _sentences, si, ctx, effects);
 }
 
 /** A whole spell's text read at once; undefined when it isn't one of these, null when it is but fails. */

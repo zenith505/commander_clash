@@ -2290,6 +2290,11 @@ export function parseTargetPhrase(
     extra.orSubtypes = ["Food"];
     p = "creature";
   }
+  // Nahiri, the Unforgiving: "creature or Equipment card": a creature card, or an Equipment card (CR 205.3g).
+  if (p === "creature or equipment" && !extra.orSubtypes) {
+    extra.orSubtypes = ["Equipment"];
+    p = "creature";
+  }
   // Ray of Ruin: "creature, Vehicle, or nonbasic land": any one of the three (TargetSpec.anyOf).
   if (p === "creature, vehicle, or nonbasic land" && !extra.anyOf) {
     extra.anyOf = [

@@ -568,6 +568,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.dugToHand ?? 0;
     case "dugToHandMv":
       return (s.resolving?.dugToHandCards ?? []).reduce((a, id) => a + defMv(defOf(s, s.objects[id]!)), 0);
+    case "dungeonsCompleted": {
+      const done = s.players[ctx.controller]?.completedDungeons ?? [];
+      return c.distinct ? new Set(done).size : done.length;
+    }
     case "returnedToYourHand":
       return (s.resolving?.returnedToHand ?? []).filter((id) => s.objects[id]?.zone === "hand" && s.objects[id]!.owner === ctx.controller).length;
     case "milledManaValue": {
@@ -1549,6 +1553,8 @@ function describeCount(c: Count): string {
       return "#cards put into your hand";
     case "dugToHandMv":
       return "that card's mana value";
+    case "dungeonsCompleted":
+      return c.distinct ? "#differently named dungeons you've completed" : "#dungeons you've completed";
     case "returnedToYourHand":
       return "#cards returned to your hand";
     case "searchFoundMv":

@@ -3342,6 +3342,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // there as it resolves (CR 611.2c).
   // Start Your Engines: the same, then "Creatures you control get +2/+0 until end of turn", those Vehicles included (rulings).
   text = text.replace(/^Vehicles you control become artifact creatures until end of turn\.(?= |$)/, "Each Vehicle you control becomes an artifact creature until end of turn.");
+  // Ride the Avalanche: "When you next cast a spell this turn, put X +1/+1 counters on up to one target creature, where X
+  // is the mana value of that spell": the delayed trigger's own X, that spell's mana value (said the other way, so the X
+  // stays with the delayed trigger and isn't the spell's own).
+  text = text.replace(/(When you next cast a spell this turn, )put X (\+1\/\+1) counters on (up to one target creature), where X is the mana value of that spell\./, "$1put a number of $2 counters equal to that spell's mana value on $3.");
+  // Ellywick Tumblestrum: "You may reveal a creature card from among them and put it into your hand. If it's legendary, you
+  // gain 3 life. Put the rest on the bottom of your library in a random order.": "it" is the card put into your hand, by its
+  // printed supertypes there; nothing happens between the life and the rest going to the bottom, so they're one look, then
+  // the life, as "If you put a legendary card into your hand this way".
+  text = text.replace(/(You may reveal an? [a-z]+ card from among them and put it into your hand\.) If it's legendary, (you gain \d+ life)\. (Put the rest on the bottom of your library in a random order\.)/, "$1 $3 If you put a legendary card into your hand this way, $2.");
   // Does Machines: "mill two cards, draw two cards, then discard two cards": one after another.
   // Reviving Vapors: "Reveal the top three cards of your library and put one of them into your hand. You gain life equal to
   // that card's mana value. Put all other cards revealed this way into your graveyard.": one card must be taken; nothing
@@ -16993,6 +17002,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         const inner = thenFx();
         if (!inner) return null;
         effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "cardsExiledThisWay" } }, min: 1 }, effects: inner });
+        // Nyla, Shirshu Sleuth: "If you do, you lose X life and create X Clue tokens, where X is that card's mana value":
+        // its own "where X is ..." (CR 107.3c), the exiled card's mana value in exile.
+        if (!defineX()) return null;
         continue;
       }
       // "You may exile target creature. If you do, create a Gold token." (King Macar): only if it was exiled (not if a

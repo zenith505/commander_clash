@@ -665,7 +665,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           filter,
           sourceId: id ?? "",
           sourceCardId: o ? cardIdOf(o) : ctx.sourceDef.oracleId,
-          body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." },
+          body: { targets: e.targets ?? [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." },
           turn: s.turn,
           ...(e.cascade ? { cascade: true as const } : {}),
           ...(e.onlyOpponentOrTheirs ? { onlyOpponentOrTheirs: true as const } : {}),

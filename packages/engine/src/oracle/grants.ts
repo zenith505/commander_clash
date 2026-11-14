@@ -5,6 +5,7 @@ import { textKeywords, isKeywordLine } from "./keyword-abilities";
 import { parseKeywordList } from "./targets";
 import { layerOf } from "../layers";
 import { CREATURE_TYPES } from "../keywords";
+import { markOnlyWalls } from "./laneb199";
 
 /**
  * A quoted ability inside a quoted ability is in single quotes ('... token with 'This token gets +1/+1 ...'', Urza's Saga;
@@ -74,7 +75,8 @@ export function compileGranted(text: string): CompiledCard {
     // An equip ability given to Equipment (Puresteel Paladin's "Equipment you control have equip {0}"), a crew ability to
     // a Vehicle (Swift Reconfiguration), read ahead to a Saga (Barbara Wright).
     const subtypes = /^Equip (?:[A-Z][a-z]+ )?\{\d+\}$/.test(text) ? ["Equipment"] : /^Crew \d+$/.test(text) ? ["Vehicle"] : text === "Read ahead" ? ["Saga"] : [];
-    hit = compile({ name: "", oracleText: own, types: [], subtypes, supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", cmc: 0, typeLine: "", oracleId: `granted:${text}` });
+    // Wall of Shadows: a granted ability that can target only Walls is one too (TargetSpec.onlyWalls).
+    hit = markOnlyWalls(compile({ name: "", oracleText: own, types: [], subtypes, supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", cmc: 0, typeLine: "", oracleId: `granted:${text}` }));
     grantedCache.set(text, hit);
   }
   return hit;

@@ -1542,7 +1542,7 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
             const penalty = e.mode ? "Don't" : describePenalty(s, e, ctx);
             const which = pu.picks > 1 ? ` (${made.length + 1} of ${pu.picks})` : "";
             const did = Object.values(pu.made).some((m) => m.some((x) => x !== "none"));
-            const prompt = !e.mode ? `${can.map((i) => punisherLabel(e.options[i]!).toLowerCase()).join(" or ")}, or ${lowerFirst(penalty)}?${which}` : `${can.map((i, k) => (k ? punisherLabel(e.options[i]!).toLowerCase() : punisherLabel(e.options[i]!))).join(" or ")}? ${e.who.ref === "you" ? (e.mode === "ifAny" ? "If you do" : "If you don't") : e.mode === "ifAny" ? "If anyone does" : "If no one does"}, ${(e.thenText ?? "it happens").replace(/~/g, src)}${did ? " (someone already has)" : ""}.`;
+            const prompt = !e.mode ? `${can.map((i) => punisherLabel(e.options[i]!).toLowerCase()).join(" or ")}, or ${lowerFirst(penalty)}?${which}` : `${can.map((i, k) => (k ? punisherLabel(e.options[i]!).toLowerCase() : punisherLabel(e.options[i]!))).join(" or ")}? ${e.who.ref === "you" || e.who.ref === "eventPlayer" ? (e.mode === "ifAny" ? "If you do" : "If you don't") : e.mode === "ifAny" ? "If anyone does" : "If no one does"}, ${(e.thenText ?? "it happens").replace(/~/g, src)}${did ? " (someone already has)" : ""}.`;
             s.pending = { kind: "chooseOption", player: pid, source: src, what: "punisher", options: [...can.map(String), "none"], labels: [...can.map((i) => punisherLabel(e.options[i]!)), penalty], prompt };
             return "paused";
           }

@@ -45,6 +45,8 @@ import { runLaneB185Effect } from "./run-laneb185";
 import { runLaneB186Effect } from "./run-laneb186";
 import { runLaneB189Effect } from "./run-laneb189";
 import { runLaneB192Effect } from "./run-laneb192";
+import { runLaneB199Effect } from "./run-laneb199";
+import { runLaneB200Effect } from "./run-laneb200";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -1844,6 +1846,15 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB189Effect(s, e, ctx, src);
     case "exileSelfAndTopOneOf":
       return runLaneB192Effect(s, e, ctx, src);
+    case "noLegendRuleThisTurn":
+    case "exileReturnAttackingAtDeclare":
+    case "returnExiledAttacking":
+      return runLaneB199Effect(s, e, ctx, src);
+    case "returnExiledWithCounter":
+    case "othersChooseDestroyRest":
+    case "exileCreatedWithAtEndStep":
+    case "exileTokensCreatedBy":
+      return runLaneB200Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

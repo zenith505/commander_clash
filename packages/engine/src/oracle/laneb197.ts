@@ -6,6 +6,7 @@ import { parseSentence } from "./sentence";
 import { parseStaticCondition } from "./statics";
 import { parseTrigger } from "./triggers";
 import type { Ctx } from "./body";
+import { roundB200Sentence, roundB200Spell } from "./laneb200";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -89,10 +90,10 @@ export function roundB197Sentence(s: string, sentences: string[], si: number, ct
     if (index < 0 || ctx.targets.filter((t) => t.text === `target ${throne[1]}`).length !== 1 || !cond || then?.length !== 1 || sentences.length !== si + 1) return "fail";
     return { effect: { type: "delayed", when: "dies", of: { ref: "target", index }, thisTurn: true, ifCond: cond, effects: then, text: throne[3]! }, next: si + 1 };
   }
-  return null;
+  return roundB200Sentence(s, sentences, si, ctx, effects);
 }
 
 /** A whole spell's text read at once; undefined when it isn't one of these, null when it is but fails. */
-export function roundB197Spell(_text: string): AbilityBody | null | undefined {
-  return undefined;
+export function roundB197Spell(text: string): AbilityBody | null | undefined {
+  return roundB200Spell(text);
 }

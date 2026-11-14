@@ -92,7 +92,7 @@ describe("Encroaching Mycosynth", () => {
     const landInHand = into(s, ap, tower, "hand");
     const instant = into(s, ap, shock, "hand");
     const theirs = into(s, opp, ogre, "hand");
-    const cmdr = s.players[ap]!.commanders?.[0] ?? Object.values(s.objects).find((o) => o.isCommander && o.owner === ap && o.zone === "command")!.id;
+    const cmdr = Object.values(s.objects).find((o) => o.isCommander && o.owner === ap && o.zone === "command")!.id;
     expect(types(s, inHand)).toEqual(["Artifact", "Creature"]);
     expect(types(s, inYard)).toEqual(["Artifact", "Enchantment"]);
     expect(types(s, inLibrary)).toEqual(["Artifact", "Creature"]);

@@ -529,6 +529,11 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
   if (sentence === "Spend this mana only to cast kicked spells.") return { kickedSpells: true, text: sentence };
   // Volshe Tideturner: "only to cast an instant or sorcery spell or a kicked spell": either kind of spell.
   if (sentence === "Spend this mana only to cast an instant or sorcery spell or a kicked spell.") return { kickedSpells: true, spells: spellFilter("instant or sorcery")!, text: sentence };
+  // The Ringhart Crest: "Spend this mana only to cast a creature spell of the chosen type or a legendary creature spell": a
+  // creature spell with the creature type chosen as it entered (bound by boundSpend), or any legendary creature spell, also
+  // with no type chosen (rulings) (CR 106.6).
+  if (sentence === "Spend this mana only to cast a creature spell of the chosen type or a legendary creature spell.")
+    return { text: sentence, spells: { kind: "spell", types: ["Creature"], anyOf: [{ kind: "spell", types: ["Creature"], chosen: "type", text: "creature spell of the chosen type" }, { kind: "spell", types: ["Creature"], supertypes: ["Legendary"], text: "legendary creature spell" }], text: "creature spells of the chosen type or legendary creature spells" } };
   // Chandra's Embercat: "only to cast an Elemental spell or a Chandra planeswalker spell": a spell with that creature type
   // (a kindred spell too), or a planeswalker spell with that planeswalker type (CR 205.3j).
   const orWalker = /^Spend this mana only to cast an? ([A-Z][a-z]+) spell or an? ([A-Z][a-z]+) planeswalker spell\.$/.exec(sentence);

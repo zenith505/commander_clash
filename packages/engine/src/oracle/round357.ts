@@ -4,12 +4,16 @@
 import type { Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseCount } from "./counts";
+import { round358Sentence } from "./round358";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round357Sentence(s: string, sentences: string[], si: number, ctx: Ctx, _effects: Effect[]): Found {
+  // Round 358's sentences first (oracle/round358.ts).
+  const r358 = round358Sentence(s, sentences, si, ctx, _effects);
+  if (r358) return r358;
   const line = plain(s);
   // Ryan Sinclair: "exile cards from the top of your library until you exile a nonland card. You may cast the exiled card
   // without paying its mana cost if it's a spell with mana value less than or equal to ~'s power. Put the exiled cards not

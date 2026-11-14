@@ -319,6 +319,10 @@ export function boundSpend(o: GameObject, only: ManaSpend | undefined): ManaSpen
   if (only?.spells?.chosen === "color")
     // With no color chosen, no spell is of it: colorless and white at once.
     return { ...only, spells: o.chosen?.color ? bindChosen(only.spells, o.chosen) : { ...only.spells, chosen: undefined, colorCount: "colorless", colors: ["W"] }, text: `${only.text.replace(/\.$/, "")} (${o.chosen?.color ?? "none chosen"}).` };
+  // The Ringhart Crest: "a creature spell of the chosen type or a legendary creature spell": the type chosen for `o` in
+  // its alternative; with none chosen, only a legendary creature spell (rulings).
+  if (only?.spells?.anyOf?.some((a) => a.chosen === "type"))
+    return { ...only, spells: { ...only.spells, anyOf: only.spells.anyOf.map((a) => bindChosen(a, o.chosen)) }, text: `${only.text.replace(/\.$/, "")} (${o.chosen?.type ?? "none chosen"}).` };
   if (!only || (only.spells?.chosen !== "type" && abilities?.chosen !== "type")) return only;
   return {
     ...only,

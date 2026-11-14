@@ -1,6 +1,6 @@
 # Roadmap
 
-31,275 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,281 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,879 of
 9,979 (98%).
 
@@ -2662,6 +2662,32 @@ line blocks.
    prompt, then life or "sacrifices all but that many permanents"); Helm of Obedience (mill one at a time until a creature
    card or X cards, then sacrifice ~ and put one onto the battlefield); Infernal Offering (an opponent chosen for each
    paragraph, each of them sacrificing and returning in turn, not targets, rulings).
+   Round 361 went on down `npm run popular` and the "Out after round N" lists, most played first: Survivor's Med Kit's
+   "{1}, {T}: Choose one that hasn't been chosen — • Stimpak — Draw a card. • Fancy Lads Snack Cakes — Create a Food
+   token. • RadAway — Target player loses all rad counters. Sacrifice ~." (loseAllCounters `rad`: only those, CR 728);
+   Spiteful Repossession's "~ deals damage to each opponent who controls more lands than you equal to the difference.
+   Then create a number of Treasure tokens equal to the damage dealt this way." (each opponent's own difference, all at
+   once, none for one with no more lands, CR 120.3, 120.8; the Treasures counted after prevention); Zuko, Conflicted's
+   "At the beginning of your first main phase, choose one that hasn't been chosen and you lose 2 life —" (the life lost
+   with whichever mode, none once no mode is left, CR 603.3c; under an opponent's control, theirs to choose, rulings; the
+   last mode returns it as a new object, CR 400.7); Resplendent Marshal's "When ~ enters or dies, you may exile another
+   creature card from your graveyard. When you do, put a +1/+1 counter on each creature you control other than ~ that
+   shares a creature type with the exiled card." (Effect reflexive `aboutYardChosen`, Effect kinCounters: the exiled card
+   the reflexive ability's subject, known as it triggers, rulings; a changeling card shares every type, CR 702.73a);
+   Vislor Turlough's "When ~ enters, you may have an opponent gain control of it. If you do, it's goaded for as long as
+   they control it." (the opponent chosen as it resolves; goaded by you, CR 701.15a, with continuous `whileControlledBy`:
+   over once anyone else controls it, CR 611.2b); Oblivious Bookworm's "At the beginning of your end step, you may draw a
+   card. If you do, discard a card unless a permanent entered the battlefield face down under your control this turn or
+   you turned a permanent face up this turn." (StaticCondition youTurnedFaceUp, TurnLog.turnedFaceUp: the player who did,
+   by the special action or an effect, CR 116.2b, 708.8; checked as it resolves, rulings). No new prompt: each uses the
+   existing mode, may, choose-an-opponent, graveyard-pick and discard paths, with browser tests for Vislor Turlough and
+   Resplendent Marshal. +6, 31,281 of 31,936. The compiled text of every other card is unchanged.
+   Out after round 361 (looked at, not done): Fade Away (still out, as after round 340); Rift Elemental (still out: a
+   cost removing a time counter from a permanent or a suspended card); Thought Lash ("When a player doesn't pay ~'s
+   cumulative upkeep": a trigger on a cumulative upkeep left unpaid, with exiling the top card as the upkeep); Lavabrink
+   Floodgates (each player's choice in their upkeep to add or remove a doom counter, a new prompt, then a reflexive
+   sacrifice trigger); Coin of Fate (still out: an opponent chooses which of the two cards exiled as a cost goes to the
+   bottom).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

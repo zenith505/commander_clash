@@ -61,6 +61,7 @@ import { round354Finish, round354Line, round354Tiered } from "./round354";
 import { round358Line } from "./round358";
 import { round359Line } from "./round359";
 import { round360Line } from "./round360";
+import { round361Line } from "./round361";
 import { roundB189Line } from "./laneb189";
 
 const cache = new Map<string, CompiledCard>();
@@ -6048,6 +6049,8 @@ export function compile(d: CardDef): CompiledCard {
     if (round359Line(line, raw, out, isSpell)) continue;
     // Undercellar Sweep (round 360).
     if (round360Line(line, raw, out, isSpell)) continue;
+    // Zuko, Conflicted, Resplendent Marshal, Vislor Turlough, Oblivious Bookworm (round 361).
+    if (round361Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,

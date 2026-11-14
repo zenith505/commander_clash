@@ -1794,7 +1794,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       let whileControlled: ContinuousEffect["whileControlled"];
       if (e.duration === "whileControlled") {
         const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-        whileControlled = me && { id: me.id, zc: ctx.sourceZc ?? me.zoneChanges ?? 0, ...(e.whileOnBattlefield ? {} : { controller: ctx.controller }) };
+        // Vislor Turlough: "for as long as they control it": the player who gained control of it, not this ability's controller.
+        const holder = e.whileControlledBy ? players(s, e.whileControlledBy, ctx)[0] : ctx.controller;
+        if (holder === undefined) return;
+        whileControlled = me && { id: me.id, zc: ctx.sourceZc ?? me.zoneChanges ?? 0, ...(e.whileOnBattlefield ? {} : { controller: holder }) };
         if (!whileControlled || !whileControlledHolds(s, whileControlled)) {
           log(s, `${src}'s effect does nothing: ${e.whileOnBattlefield ? "it left the battlefield" : "its controller no longer controls it"}.`);
           return;
@@ -1846,7 +1849,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           mods: groupMods,
         });
         const names = group.map((id) => defOf(s, obj(s, id)).name);
-        log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, groupMods, giveTo ?? ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "endOfCombat" ? " until end of combat" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "yourNextUpkeep" ? ` until ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "endOfYourNextUpkeep" ? ` until the end of ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "controllersNextUntap" ? ` until ${player(s, controllerOf(s, obj(s, group[0]!))).name}'s next untap step` : untilCast ? ` until ${src} is cast from exile` : e.untilCreatureSpellCast ? " until a player casts a creature spell" : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? (e.whileOnBattlefield ? ` for as long as ${src} remains on the battlefield` : ` for as long as ${player(s, ctx.controller).name} controls ${src}`) : ""}.`);
+        log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, groupMods, giveTo ?? ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "endOfCombat" ? " until end of combat" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "yourNextUpkeep" ? ` until ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "endOfYourNextUpkeep" ? ` until the end of ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "controllersNextUntap" ? ` until ${player(s, controllerOf(s, obj(s, group[0]!))).name}'s next untap step` : untilCast ? ` until ${src} is cast from exile` : e.untilCreatureSpellCast ? " until a player casts a creature spell" : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? (e.whileOnBattlefield ? ` for as long as ${src} remains on the battlefield` : ` for as long as ${player(s, whileControlled?.controller ?? ctx.controller).name} controls ${src}`) : ""}.`);
       }
       if (e.setsDid && giveTo !== undefined && s.resolving) {
         invalidateCharacteristics(s);

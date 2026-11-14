@@ -8,12 +8,16 @@ import type { CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseSentence } from "./sentence";
 import { parseTrigger } from "./triggers";
+import { round361Sentence } from "./round361";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round360Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 361's sentences first (oracle/round361.ts).
+  const r361 = round361Sentence(s, sentences, si, ctx, effects);
+  if (r361) return r361;
   const line = plain(s);
   const next = plain(sentences[si + 1]);
   const prev = effects[effects.length - 1];

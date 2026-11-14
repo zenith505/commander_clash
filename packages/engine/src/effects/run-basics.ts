@@ -644,6 +644,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           log(s, `${p.name} loses all poison counters.`);
           continue;
         }
+        if (e.rad) {
+          if (!p.rad) continue;
+          p.rad = 0;
+          log(s, `${p.name} loses all rad counters.`);
+          continue;
+        }
         if (!p.poison && !p.energy && !p.experience && !p.rad) continue;
         if (e.counted && s.resolving) s.resolving.countersRemoved = (s.resolving.countersRemoved ?? 0) + (p.poison ?? 0) + (p.energy ?? 0) + (p.experience ?? 0) + (p.rad ?? 0);
         p.poison = 0;

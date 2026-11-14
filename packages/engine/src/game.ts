@@ -5215,6 +5215,8 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   // Neyali: only during a turn they attacked with a token.
   if (m.attackedWithToken && s.players[pid]?.tokenAttackedTurn !== s.turn) return false;
   if (m.attackedWithCommander && s.players[pid]?.commanderAttackedTurn !== s.turn) return false;
+  // Monk Class: only once its player has cast another spell this turn (this one isn't cast yet as this is asked).
+  if (m.castAnotherThisTurn && !(s.castThisTurn ?? []).some((c) => c.player === pid)) return false;
   // Robber of the Rich: only during a turn they declared a Rogue as an attacker (its creature types as it attacked).
   // Summon: Brynhildr: only during a turn they put a lore counter on that Saga, as that object (CR 400.7).
   if (m.loreOn && !(s.turnLog?.lorePut ?? []).includes(`${pid}:${m.loreOn.id}@${m.loreOn.zc}`)) return false;
@@ -5316,6 +5318,9 @@ function landPermit(s: GameState, pid: PlayerId, o?: GameObject): string | undef
     if (!once) continue;
     const arrived = abilitiesOf(s, p).landFromGraveyardArrived;
     if (arrived && (!o || !arrivedThisTurn(s, o, arrived))) continue;
+    // The Eighth Doctor: a historic land only (CR 700.6).
+    const landFilter = abilitiesOf(s, p).landFromGraveyardFilter;
+    if (landFilter && (!o || !printedMatches(landFilter, defOf(s, o)))) continue;
     // Serra Paragon: the one use it shares with its spell permission.
     const key = `${p.id}@${p.zoneChanges ?? 0}:${once === "shared" ? "" : "Land"}`;
     if (!used.includes(key)) return key;
@@ -5335,7 +5340,7 @@ export function mayPlayFromTop(s: GameState, o: GameObject, pid: PlayerId, way?:
  * The permanent whose permission lets `pid` play `o` from the top of their library: one without "once each turn" if
  * there is one, so a once-a-turn permission is kept for later (Johann). "Of the chosen type" is the permanent's choice.
  */
-function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" | "life"): { by?: GameObject; once?: true; haste?: "endOfTurn"; creatureCounter?: true; costs?: AdditionalCost[] } | undefined {
+function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" | "life"): { by?: GameObject; once?: true; haste?: "endOfTurn"; creatureCounter?: true; costs?: AdditionalCost[]; whenDo?: AbilityBody } | undefined {
   if (o.zone !== "library" || o.owner !== pid || player(s, pid).library[0] !== o.id) return undefined;
   const d = defOf(s, o);
   const land = isType(d, "Land");
@@ -5349,6 +5354,9 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" 
     if (land ? top.lands && (!top.landFilter || printedMatches(top.landFilter, d)) : top.spells === "any" || !!top.spells?.some((f) => printedMatches(f, d))) return {};
   }
   let once: GameObject | undefined;
+  // The Fourth Doctor: a once-a-turn permission with a "When you do" (FromTop.whenDo) is the one used while it's unused
+  // this turn, its controller's pick of the permissions that apply, so the Food isn't missed.
+  let whenDo: { by: GameObject; body: AbilityBody } | undefined;
   // A permission that also gives haste (Thundermane Dragon) or a +1/+1 counter (Mikey & Don) is the one used when several
   // apply: its controller's pick.
   let plain: GameObject | undefined;
@@ -5368,12 +5376,24 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" 
       if (!top.once && top.haste) return { by: src, haste: top.haste };
       if (!top.once && top.creatureCounter && isType(d, "Creature")) return { by: src, creatureCounter: true };
       if (!top.once) plain ??= src;
+      else if (src.topUsedTurn !== s.turn && top.whenDo) whenDo ??= { by: src, body: top.whenDo };
       else if (src.topUsedTurn !== s.turn) once ??= src;
     }
   }
+  if (whenDo) return { by: whenDo.by, once: true, whenDo: whenDo.body };
   if (plain) return { by: plain };
   if (once) return { by: once, once: true };
   return costly;
+}
+
+/**
+ * A permission to play `o` from the top of `pid`'s library is used (CR 601.2, 305.1): a once-a-turn one is used up for
+ * the turn (Johann; The Fourth Doctor's land or spell), and its "When you do" triggers (FromTop.whenDo, CR 603.12).
+ */
+function useTopPermission(s: GameState, pid: PlayerId, how: ReturnType<typeof topPermission>): void {
+  if (!how?.by) return;
+  if (how.once) how.by.topUsedTurn = s.turn;
+  if (how.whenDo) s.triggerQueue.push({ sourceId: how.by.id, sourceCardId: cardIdOf(how.by), controller: pid, index: -1, sourceZc: how.by.zoneChanges ?? 0, body: how.whenDo });
 }
 
 /**
@@ -5529,6 +5549,8 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, fac
   const choice = entersRulesOf(s, p.id, id).entersTappedChoice;
   if (untapped && !canEnterUntapped(s, p.id, id))
     throw new RulesError(choice?.kind === "payLife" ? `you can't pay ${choice.n} life` : choice && choice.kind !== "mayTapRad" ? `you have no ${choice.filter.text} to reveal` : `${d.name} has no choice to make as it enters`);
+  // Played from the top of the library: the permission used (a once-a-turn one used up, The Fourth Doctor's Food).
+  if (o.zone === "library") useTopPermission(s, p.id, topPermission(s, o, p.id));
   putLandPlayed(s, p, id, untapped, face);
 }
 
@@ -7497,7 +7519,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (castFrom === "library") {
     const how = topPermission(s, o, p.id, choices.alt === "citadel" ? "life" : "mana");
     topCosts = how?.costs ?? [];
-    if (how?.once && how.by) how.by.topUsedTurn = s.turn;
+    useTopPermission(s, p.id, how);
     // "If you cast a creature spell this way, it gains haste until end of turn": the spell and the creature it becomes.
     if (how?.haste && isType(d, "Creature") && o.hasteCast !== "game") o.hasteCast = how.haste;
     // "If you cast a creature spell this way, that creature enters with an additional +1/+1 counter on it" (CR 614.1c).
@@ -7540,6 +7562,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   // Cast with a permission that says "if that spell would be put into a graveyard, exile it instead" (Dire Fleet Daredevil).
   const exileAfter = castFrom === "exile" && !!o.mayPlay?.exileAfter && ownExilePermission(s, o, p.id);
+  // The Ruinous Powers: "When you cast a spell this way, ..." (CR 603.2): cast with that permission.
+  const castTrigger = castFrom === "exile" && ownExilePermission(s, o, p.id) ? o.mayPlay?.castTrigger : undefined;
   const from = zoneList(s, o)!;
   from.splice(from.indexOf(id), 1);
   o.zone = "stack";
@@ -7594,6 +7618,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const item = s.stack[s.stack.length - 1]!;
   const stackId = item.id;
   for (const t of spentQueue) if (!("spell" in t) || spellMatches(s, t.spell, item)) s.triggerQueue.push({ sourceId: t.sourceId, sourceCardId: t.sourceCardId, sourceZc: t.sourceZc, controller: p.id, index: -1, body: t.body, cause: stackId });
+  if (castTrigger) s.triggerQueue.push({ sourceId: castTrigger.sourceId, sourceCardId: castTrigger.sourceCardId, sourceZc: castTrigger.sourceZc, controller: p.id, index: -1, body: castTrigger.body, cause: stackId, subject: { id, zc: o.zoneChanges ?? 0 } });
   // "... the controller of the permanent it becomes sacrifices it at the beginning of the next cleanup step": about
   // the permanent it becomes as it enters (one more zone change, CR 400.7).
   if (flashSacrifice)
@@ -7986,6 +8011,8 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
       if (g.arrived && !arrivedThisTurn(s, o, g.arrived)) continue;
       // Lurrus: a card that can be cast with mana value that low (X counted as it's cast, see permitsForMv).
       if (g.maxMv !== undefined && defMv(d) > g.maxMv) continue;
+      // Arcade Gannon: "less than or equal to the number of quest counters on ~", counted now.
+      if (g.maxMvCount !== undefined && defMv(d) > evalAmount(s, g.maxMvCount, { controller: o.owner, sourceId: p.id })) continue;
       // Once each turn (Karador, Muldrotha's permanent types): the permissions not used yet, from every such permanent.
       if (g.once) {
         const used = s.turnLog?.gravePermits ?? [];
@@ -8057,7 +8084,8 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
 export function permitsForMv(s: GameState, permits: string[], mv: number): string[] {
   return permits.filter((k) => {
     const src = s.objects[k.split("@")[0]!];
-    const max = src ? abilitiesOf(s, src).graveyardGrants?.find((g) => g.once)?.maxMv : undefined;
+    const g = src ? abilitiesOf(s, src).graveyardGrants?.find((g) => g.once) : undefined;
+    const max = g?.maxMv ?? (g?.maxMvCount !== undefined ? evalAmount(s, g.maxMvCount, { controller: controllerOf(s, src!), sourceId: src!.id }) : undefined);
     return max === undefined || mv <= max;
   });
 }

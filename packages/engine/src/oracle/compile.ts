@@ -2990,6 +2990,38 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // The Eighth Doctor: "Once during each of your turns, you may play a historic land or cast a historic permanent spell
+    // from your graveyard. If you do, it gains "If this permanent would leave the battlefield, exile it instead of putting
+    // it anywhere else."": Serra Paragon's one use each turn for either, only for a historic card (an artifact, legendary
+    // or Saga, CR 700.6), and the permanent it becomes has that replacement effect of its own for good (CR 614.1a, 400.7).
+    if (/^Once during each of your turns, you may play a historic land or cast a historic permanent spell from your graveyard\. If you do, it gains "If (?:this permanent|~) would leave the battlefield, exile it instead of putting it anywhere else\."$/.test(line)) {
+      const filter = parseTargetPhrase("historic permanent card from a graveyard");
+      const lands = parseTargetPhrase("historic land card from a graveyard");
+      if (filter?.kind !== "card" || lands?.kind !== "card" || !filter.anyOf || !lands.anyOf) out.unsupported.push(raw);
+      else {
+        const { owner: _, ...f } = filter;
+        const { owner: _o, ...l } = lands;
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: "historic permanent cards" }, way: { kind: "turnPermission", costs: [], exile: false }, yourTurn: true, once: [""], gains: "If this permanent would leave the battlefield, exile it instead of putting it anywhere else." });
+        out.landFromGraveyardOnce = "shared";
+        out.landFromGraveyardFilter = { ...l, text: "historic land cards" };
+      }
+      continue;
+    }
+    // Arcade Gannon: "Once during each of your turns, you may cast an artifact or Human spell from your graveyard with mana
+    // value less than or equal to the number of quest counters on ~": Karador's once-each-turn permission (rulings: costs
+    // paid, timing followed, another permission doesn't use it up, a new Arcade Gannon is a new permission), the spell's
+    // mana value with its X (CR 202.3e) against the counters on this permanent as it's cast.
+    const gannon = /^Once during each of your turns, you may cast an? (artifact or Human) spell from your graveyard with mana value less than or equal to (the number of [a-z]+ counters on ~)\.$/.exec(line);
+    if (gannon) {
+      const filter = parseTargetPhrase(`${gannon[1]} card from a graveyard`);
+      const count = parseCount(gannon[2]!, null);
+      if (filter?.kind !== "card" || filter.manaValue || filter.bound || !count) out.unsupported.push(raw);
+      else {
+        const { owner: _, ...f } = filter;
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${gannon[1]} cards` }, way: { kind: "turnPermission", costs: [], exile: false }, yourTurn: true, once: [""], maxMvCount: count });
+      }
+      continue;
+    }
     // Kagha, Shadow Archdruid: "Once during each of your turns, you may play a land or cast a permanent spell from among
     // cards in your graveyard that were put there from your library this turn": one use each turn for either (as Serra
     // Paragon's), only for a card that came from the library this turn. Banon, the Returners' Leader: "... cast a
@@ -3205,6 +3237,16 @@ export function compile(d: CardDef): CompiledCard {
       const cond = parseStaticCondition(condTop[1]!, { affects: { kind: "self" }, mods: [], text: "" });
       if (!cond || !ifTop) out.unsupported.push(raw);
       else (out.fromTop ??= []).push({ ...ifTop, if: cond });
+      continue;
+    }
+    // The Fourth Doctor: "Would You Like A...? — Once each turn, you may play a historic land or cast a historic spell from
+    // the top of your library. When you do, create a Food token." (FromTop.whenDo, a reflexive trigger, CR 603.12).
+    const whenDoTop = /^(?:[^—]+ — )?(Once each turn, you may .+? from the top of your library)\. When you do, ([a-z].+)$/.exec(line);
+    if (whenDoTop) {
+      const t = parseFromTop(whenDoTop[1]!);
+      const body = parseBody(`${whenDoTop[2]![0]!.toUpperCase()}${whenDoTop[2]!.slice(1)}`);
+      if (!t?.once || !body || body.targets.length || !body.effects.length) out.unsupported.push(raw);
+      else (out.fromTop ??= []).push({ ...t, whenDo: body });
       continue;
     }
     // Bolas's Citadel: "... If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost."
@@ -7440,6 +7482,8 @@ function linkExile(out: CompiledCard) {
     // Living Lore: "you may cast the exiled card" is the card its "As ~ enters, exile ..." exiled (CR 607.2b).
     if (yardEntersLinkOnly(out, [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)])) {
       /* linked by the enters replacement */
+    } else if (!spells.length && others.length === 1 && others[0]!.type === "hideaway" && !out.spell) {
+      /* Smuggler's Buggy: "the exiled card" is the one its hideaway exiled (CR 702.75a, 607.2a), linked as it's exiled */
     } else if (spells.length !== 1 || others.length !== 1 || out.spell) out.unsupported.push("(casts an exiled card it can't link to one exile ability)");
     else spells[0]!.linked = true;
   }
@@ -8318,11 +8362,15 @@ export function parseFromTop(text: string): FromTop | null | undefined {
   // "You may play the top card of your library", "you may play cards from the top of your library": lands and spells.
   text = text.replace(/^(you may) play (?:the top card of your library|cards from the top of your library)$/i, "$1 play lands and cast spells from the top of your library");
   // "Play historic lands" (Crystal Skull): only lands of that kind.
+  // The Fourth Doctor: "play a historic land or cast a historic spell" is one land or one spell of those kinds.
+  text = text.replace(/^(Once each turn, you may) play an? ([a-z]+) land or cast an? ([a-z]+) spell from the top of your library$/, "$1 play $2 lands and cast $3 spells from the top of your library");
   const m = /^(Once each turn, )?[Yy]ou may (?:play (?:([a-z]+) )?lands(?: and cast (.+))?|cast (.+)) from the top of your library$/.exec(text);
   if (!m) return undefined;
   const lands = m[4] === undefined;
   const what = m[3] ?? m[4];
-  if (m[1] && (lands || !what)) return null; // only "once each turn, you may cast ..." is modeled
+  // "Once each turn, you may cast ...", and "... play a land or cast a spell ...": one land or spell each turn in all
+  // (topUsedTurn); a land-only one isn't modeled.
+  if (m[1] && !what) return null;
   const landFilter = m[2] ? parseSearchFilter(`${m[2]} land card`) : undefined;
   if (m[2] && !landFilter) return null;
   if (!what) return { lands, ...(landFilter ? { landFilter } : {}) };

@@ -891,6 +891,14 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${player(s, ctx.controller).name} puts ${name} ${sc.either === 0 ? "onto the battlefield" : "into their hand"}.`);
         return;
       }
+      // Strago and Relm: the card cast this way, still that spell on the stack (CR 400.7), if it's a creature spell as cast
+      // (a modal double-faced card's face, CR 712.11), gains these for as long as the permanent it becomes stays (CR 400.7a).
+      const castHit = sc.untilNonland.hit ? s.objects[sc.untilNonland.hit] : undefined;
+      if (e.creatureSpellGains && castHit?.zone === "stack" && objIsType(s, castHit, "Creature")) {
+        (castHit.spellGains ??= []).push({ mods: e.creatureSpellGains.mods, timestamp: s.nextTimestamp++, controller: ctx.controller, source: src, forever: true });
+        invalidateCharacteristics(s);
+        log(s, `${defOf(s, castHit).name} gains ${e.creatureSpellGains.text}.`);
+      }
       // "If you don't, put that card into your hand": its owner's, from exile (Breaching Dragonstorm).
       const left = sc.untilNonland.hit;
       if (e.orHand && left && s.objects[left]?.zone === "exile") {

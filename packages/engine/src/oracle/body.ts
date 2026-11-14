@@ -4373,6 +4373,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^you may look at that player's hand\. If you do, you may cast a spell from among those cards without paying its mana cost\.$/, "look at that player's hand. You may cast a spell from among those cards without paying its mana cost.");
   // Mercurial Spelldancer: "If you do, when you next cast an instant or sorcery spell this turn, copy that spell. You may
   // choose new targets for the copy.": the delayed trigger (CR 603.7) is made only if you did, its new targets with it.
+  // Najal, the Storm Runner: "If you do, when you next cast an instant or sorcery spell this turn, copy it. You may choose
+  // new targets for the copy.": "it" is that spell (round 357), the same delayed trigger.
+  text = text.replace(/\bIf you do, (when you next cast an? [^.,]+ this turn, copy) it\. You may choose new targets for the copy\./, "If you do, $1 that spell. You may choose new targets for the copy.");
   text = text.replace(/\bIf you do, (when you next cast an? [^.,]+ this turn, copy that spell)\. You may choose new targets for the copy\./, "If you do, $1 and you may choose new targets for the copy.");
   // Tibalt, the Fiend-Blooded: "~ deals damage equal to the number of cards in target player's hand to that player": the
   // same as "~ deals damage to target player equal to the number of cards in that player's hand", counted as it resolves.

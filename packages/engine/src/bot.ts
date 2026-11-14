@@ -458,6 +458,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Worldpurge: keep the cards most worth keeping, as many as allowed.
     if (pend.kind === "discard" && pend.keep) return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, player(s, pid).hand.length).reverse().slice(0, pend.count) }];
+    // Arcane Artisan: the best creature card in hand, for the token copy it makes.
+    const copyAfter = pend.kind === "discard" && pend.exile && s.resolving ? s.resolving.body.effects[s.resolving.next + 1] : undefined;
+    if (pend.kind === "discard" && copyAfter?.type === "if" && copyAfter.cond.kind === "exiledFromHandIs" && copyAfter.effects[0]?.type === "createTokenCopy") {
+      const best = player(s, pid).hand.filter((id) => defOf(s, obj(s, id)).types.includes("Creature")).sort((a, b) => defMv(defOf(s, obj(s, b))) - defMv(defOf(s, obj(s, a))))[0];
+      if (best) return [{ type: "discard", player: pid, objectIds: [best] }];
+    }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count, undefined, pend.filter, pend.upTo, pend.among) }];
     // Library of Leng: back on top go the spells we'd draw again, lands only while we're short of them; not a card
     // that wants the graveyard (madness, flashback and the like).
@@ -784,6 +790,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         return [{ type: "chooseOption", player: pid, choice: g.includes("+1/+1") ? "+1/+1" : g.find((k) => pend.options.includes(k)) ?? pend.options[0]! }];
       }
     }
+    // Fortunate Few: we can't spare our own, so we spare the least of the others' permanents.
+    if (pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving?.body.effects[s.resolving.next]?.type === "othersChooseDestroyRest")
+      return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0]!] }];
     // Order of Succession: the best of the creatures we gain control of.
     if (pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "successionControl"))
       return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];

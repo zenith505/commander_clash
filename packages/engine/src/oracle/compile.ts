@@ -44,6 +44,7 @@ import { roundB194Line, roundB194Spell } from "./laneb194";
 import { roundB197Line } from "./laneb197";
 import { roundB198Line } from "./laneb198";
 import { markOnlyWalls, roundB199Line } from "./laneb199";
+import { roundB200Line } from "./laneb200";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2098,6 +2099,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB198Line(line, raw, out, isSpell)) continue;
     // Nazahn, Hall of Echoes, Wall of Shadows, Fraying Line, Meandering Towershell, Noctis (round B199).
     if (roundB199Line(line, raw, out, isSpell)) continue;
+    // Tenth District Hero, Livio (round B200).
+    if (roundB200Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

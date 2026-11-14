@@ -2875,6 +2875,8 @@ export interface Resolving {
   /** Jester's Mask: how many cards this resolution put on top of a library from a hand (Count handPutOnTopThisWay). */
   handPutOnTop?: number;
   scratch?: {
+    /** Effect "othersChooseDestroyRest" (Fortunate Few): the players still to choose, in order, and the permanents chosen so far. */
+    othersChosen?: { queue: PlayerId[]; picked: ObjectId[] };
     /** Effect "controllersMayExile" (Disorienting Choice): the permanents still to ask about, in order, and those whose controllers chose to exile them. */
     mayExile?: { queue: { id: ObjectId; zc: number }[]; yes: { id: ObjectId; zc: number }[] };
     /** Zevlor, Elturel Exile (Effect copyPerOtherOpponent): the opponents still to choose for, the choices so far ("p<player>" or an object id), and the last answer. */

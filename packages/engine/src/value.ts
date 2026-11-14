@@ -127,6 +127,11 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
       v = v ?? 0;
       continue;
     }
+    // Fortunate Few: as good as destroying every such permanent (the one or two each player spares are their least).
+    if (e.type === "othersChooseDestroyRest") {
+      add(s.battlefield.map((id) => obj(s, id)).filter((o) => objectMatches(s, e.filter, o, pid, false)), true);
+      continue;
+    }
     if (e.type === "damage") {
       const amount = estimate(e.amount);
       if (e.to.ref === "each") add(group(e.to), true, (o) => (lethalDamage(s, o) <= amount ? 1 : 0.2));

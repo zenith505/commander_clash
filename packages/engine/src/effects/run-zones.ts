@@ -189,6 +189,12 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const { notSubject: _, ...rest } = e.filter;
     e = { ...e, filter: { ...rest, ...(here ? { notId: o!.id } : {}) } };
   }
+  // Yannik, Scavenging Sentinel: "until ~ leaves the battlefield" with ~ already gone exiles nothing (CR 610.3c, rulings).
+  const untilMe = e.untilSourceLeaves ? objects(s, { ref: "self" }, ctx)[0] : undefined;
+  if (e.untilSourceLeaves && untilMe?.zone !== "battlefield") {
+    log(s, `${src} has left the battlefield, so nothing is exiled.`);
+    return;
+  }
   const sc = (r.scratch ??= {});
   let who = players(s, e.who, ctx);
   // Each player's own number when it's "half the creatures they control" (CR 107.1a), all worked out before anyone picks.
@@ -403,6 +409,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)), controller: controllerOf(s, o) };
         moveObject(s, id, "exile");
         if (s.objects[id]?.zone === "exile" && s.resolving) (s.resolving.exiled ??= []).push(before);
+        if (untilMe && s.objects[id]?.zone === "exile" && !s.objects[id]!.isToken) (untilMe.exiledUntilLeaves ??= []).push({ id, zc: s.objects[id]!.zoneChanges ?? 0 });
         // The Master, Formed Anew: the counter goes on the card in exile (CR 122.1), not a token, which is gone (CR 111.7).
         const exiledCard = s.objects[id];
         if (e.exiledCounter && exiledCard?.zone === "exile" && !exiledCard.isToken) {

@@ -36,7 +36,8 @@ describe("X damage divided as you choose", () => {
     expect(planCast(s0, ap, ids[0]!, [obj(b1, 2), obj(b2, 2)], undefined, undefined, 3)).toBeNull(); // 4, not 3
     expect(planCast(s0, ap, ids[0]!, [obj(b1, 1), obj(b2, 1), pl(opp, 1), pl(ap, 1)], undefined, undefined, 3)).toBeNull(); // more targets than X
     expect(planCast(s0, ap, ids[0]!, [obj(b1, 3), obj(b2, 0)], undefined, undefined, 3)).toBeNull(); // 0 to a target
-    expect(planCast(s0, ap, ids[0]!, [], undefined, undefined, 3)).toBeNull(); // 3 to divide among nothing
+    // "Any number of targets" may be none, with nothing dealt (CR 115.6; rulings on Kuldotha Flamefiend, same wording).
+    expect(planCast(s0, ap, ids[0]!, [], undefined, undefined, 3)).not.toBeNull();
     const s = passAll(run(s0, planCast(s0, ap, ids[0]!, [obj(b1, 2), pl(opp, 1)], undefined, undefined, 3)));
     expect(s.objects[b1]!.zone).toBe("graveyard");
     expect(s.objects[b2]!.zone).toBe("battlefield");

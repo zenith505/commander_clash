@@ -75,5 +75,25 @@ export function roundB202Line(line: string, raw: string, out: CompiledCard, isSp
     out.triggers.push({ ...t, zone: "exile", ifCond: { kind: "selfInExile", counter: "egg" }, body: { targets: [], effects: [{ type: "removeCounterThenReturn", counter: "egg" }], text: line.replace(/^At the beginning of your upkeep, /, "") } });
     return true;
   }
+  return roundB202Activated(line, raw, out);
+}
+
+/** Round B202's activated lines read before the general parser (Stitcher Geralf); false when it isn't one of these. */
+export function roundB202Activated(line: string, raw: string, out: CompiledCard): boolean {
+  // Stitcher Geralf: "{2}{U}, {T}: Each player mills three cards. Exile up to two creature cards put into graveyards this way.
+  // Create an X/X blue Zombie creature token, where X is the total power of the cards exiled this way.": the cards milled
+  // and still in a graveyard, chosen as it resolves from any of them (CR 608.2c); a card a replacement exiled instead isn't
+  // one, and with none exiled the token is 0/0 (rulings); X is their total power in exile.
+  if (line === "{2}{U}, {T}: Each player mills three cards. Exile up to two creature cards put into graveyards this way. Create an X/X blue Zombie creature token, where X is the total power of the cards exiled this way.") {
+    const a = parseActivated("{2}{U}, {T}: Each player mills three cards. Create an X/X blue Zombie creature token, where X is the number of cards in your hand.");
+    const [mill, token] = a && a !== "fail" ? a.body.effects : [];
+    if (!a || a === "fail" || !a.tap || a.manaCost !== "{2}{U}" || (a.costs ?? []).length || a.body.effects.length !== 2 || mill?.type !== "mill" || mill.who.ref !== "eachPlayer" || mill.n !== 3 || token?.type !== "createToken" || !token.pt || token.token.subtypes.join() !== "Zombie") {
+      out.unsupported.push(raw);
+      return true;
+    }
+    const exile: Effect = { type: "chooseFromGraveyard", anyGraveyard: true, milled: true, milledInYard: true, n: 2, upTo: true, dest: "exile", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card put into a graveyard this way" } };
+    out.activated.push({ ...a, text: line, body: { targets: [], effects: [mill, exile, { ...token, pt: { count: { kind: "yardChosenPower" } } }], text: line.replace(/^\{2\}\{U\}, \{T\}: /, "") } });
+    return true;
+  }
   return false;
 }

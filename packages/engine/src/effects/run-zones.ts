@@ -3516,7 +3516,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const same = (m: { id: ObjectId; zc: number }) => (obj(s, m.id).zoneChanges ?? 0) === m.zc;
         const yards = () =>
           e.milled
-            ? [...(s.resolving!.milled ?? []).filter((m) => same(m) && obj(s, m.id).zone === "graveyard"), ...(s.resolving!.milledExiled ?? []).filter((m) => same(m) && obj(s, m.id).zone === "exile")].map((m) => m.id).filter(fits)
+            ? [...(s.resolving!.milled ?? []).filter((m) => same(m) && obj(s, m.id).zone === "graveyard"), ...(e.milledInYard ? [] : (s.resolving!.milledExiled ?? []).filter((m) => same(m) && obj(s, m.id).zone === "exile"))].map((m) => m.id).filter(fits)
             : livingPlayers(s).flatMap((pid) => player(s, pid).graveyard).filter(fits);
         if (!sc.found) {
           const cards = yards();

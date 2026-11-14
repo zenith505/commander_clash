@@ -7,7 +7,8 @@
 // power this turn, copy that spell. You may choose new targets for the copy.") and Darigaaz Reincarnated ("If Darigaaz would
 // die, instead exile it with three egg counters on it." / "At the beginning of your upkeep, if this card is exiled with an
 // egg counter on it, remove an egg counter from it. Then if this card has no egg counters on it, return it to the
-// battlefield.").
+// battlefield.") and Stitcher Geralf ("{2}{U}, {T}: Each player mills three cards. Exile up to two creature cards put into
+// graveyards this way. Create an X/X blue Zombie creature token, where X is the total power of the cards exiled this way.").
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
@@ -19,6 +20,7 @@ const tide = (): CardDef => ({"oracleId":"cb14b713-55e9-40cb-b769-6abe8e359580",
 const rescuer = (): CardDef => ({"oracleId":"f687a746-4807-41d5-848d-4053ddef6a76","name":"Moorland Rescuer","manaCost":"{5}{W}","cmc":6,"typeLine":"Creature — Human Knight","supertypes":[],"types":["Creature"],"subtypes":["Human","Knight"],"oracleText":"When this creature dies, return any number of other creature cards with total power X or less from your graveyard to the battlefield, where X is this creature's power. Exile this card.","power":"4","toughness":"4","colors":["W"],"colorIdentity":["W"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/0/c/0c293b8c-3ebc-4d14-b0a6-5e41d966cba1.jpg?1783925382","artUrl":"https://cards.scryfall.io/art_crop/front/0/c/0c293b8c-3ebc-4d14-b0a6-5e41d966cba1.jpg?1783925382","commanderLegal":"legal","set":"mic","releasedAt":"2021-09-24","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 const loki = (): CardDef => ({"oracleId":"9c78778a-6335-4949-8ade-11d0f085cb2b","name":"Loki Laufeyson","manaCost":"{1}{R}","cmc":2,"typeLine":"Legendary Creature — God Sorcerer Villain","supertypes":["Legendary"],"types":["Creature"],"subtypes":["God","Sorcerer","Villain"],"oracleText":"{1}, {T}: When you next cast an instant or sorcery spell with mana value less than or equal to Loki's power this turn, copy that spell. You may choose new targets for the copy.\nPower-up — {4}{R}: Put two +1/+1 counters on Loki. (Activate each power-up ability only once. Reduce the cost by his mana cost if he entered this turn.)","power":"2","toughness":"1","colors":["R"],"colorIdentity":["R"],"keywords":["Power-up"],"imageUrl":"https://cards.scryfall.io/normal/front/5/3/53b795a7-11f8-423a-b021-f811007fc82f.jpg?1783902928","artUrl":"https://cards.scryfall.io/art_crop/front/5/3/53b795a7-11f8-423a-b021-f811007fc82f.jpg?1783902928","commanderLegal":"legal","set":"msh","releasedAt":"2026-06-26","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
 const darigaaz = (): CardDef => ({"oracleId":"c2f42c67-ff88-4248-bfa5-79a18c6473d5","name":"Darigaaz Reincarnated","manaCost":"{4}{B}{R}{G}","cmc":7,"typeLine":"Legendary Creature — Dragon","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Dragon"],"oracleText":"Flying, trample, haste\nIf Darigaaz would die, instead exile it with three egg counters on it.\nAt the beginning of your upkeep, if this card is exiled with an egg counter on it, remove an egg counter from it. Then if this card has no egg counters on it, return it to the battlefield.","power":"7","toughness":"7","colors":["B","G","R"],"colorIdentity":["B","G","R"],"keywords":["Flying","Haste","Trample"],"imageUrl":"https://cards.scryfall.io/normal/front/9/4/9459ffca-5a1f-4641-88d4-8a499b261faa.jpg?1783934969","artUrl":"https://cards.scryfall.io/art_crop/front/9/4/9459ffca-5a1f-4641-88d4-8a499b261faa.jpg?1783934969","commanderLegal":"legal","set":"dom","releasedAt":"2018-04-27","rarity":"mythic","layout":"normal","gameChanger":false}) as CardDef;
+const geralf = (): CardDef => ({"oracleId":"da394a25-79c9-4b75-9ce6-741f64ae6913","name":"Stitcher Geralf","manaCost":"{3}{U}{U}","cmc":5,"typeLine":"Legendary Creature — Human Wizard","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Wizard"],"oracleText":"{2}{U}, {T}: Each player mills three cards. Exile up to two creature cards put into graveyards this way. Create an X/X blue Zombie creature token, where X is the total power of the cards exiled this way.","power":"3","toughness":"4","colors":["U"],"colorIdentity":["U"],"keywords":["Mill"],"imageUrl":"https://cards.scryfall.io/normal/front/1/5/156945db-4575-48ae-b9c9-e3b341353cd7.jpg?1783938871","artUrl":"https://cards.scryfall.io/art_crop/front/1/5/156945db-4575-48ae-b9c9-e3b341353cd7.jpg?1783938871","commanderLegal":"legal","set":"c14","releasedAt":"2014-11-07","rarity":"mythic","layout":"normal","gameChanger":false}) as CardDef;
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -66,7 +68,7 @@ const blast = card("Test Blast", "Sorcery", "{2}{R}", { cmc: 3, oracleText: "Tes
 const spark = card("Test Spark", "Instant", "{R}", { cmc: 1, oracleText: "Test Spark deals 1 damage to any target." });
 
 describe("round B202 cards are supported", () => {
-  it("compiles every line", () => supported(storm(), tide(), rescuer(), loki(), darigaaz()));
+  it("compiles every line", () => supported(storm(), tide(), rescuer(), loki(), darigaaz(), geralf()));
 });
 
 describe("Storm of Forms", () => {
@@ -284,5 +286,49 @@ describe("Darigaaz Reincarnated", () => {
     s.objects[d]!.counters = {};
     const after = settle(s);
     expect(zoneOf(after, d)).toBe("exile");
+  });
+});
+
+describe("Stitcher Geralf", () => {
+  /** Geralf on your battlefield; on top of each library three cards (the next player's start with Hill Giant, 3/3). */
+  const ready = (extra?: CardDef) => {
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, geralf());
+    if (extra) putOnBattlefield(s0, ap, extra);
+    const old = into(s0, ap, bear({ name: "Old Bear", power: "5", toughness: "5" }), "graveyard");
+    const tops: Record<number, ObjectId[]> = {};
+    for (const pid of s0.turnOrder) {
+      const names = pid === opp ? ["Hill Giant", "Their Forest", "Their Elf"] : [`Bear ${pid}`, `Land ${pid}`, `Land ${pid}b`];
+      tops[pid] = names.reverse().map((n) => into(s0, pid, /Land|Forest/.test(n) ? card(n, "Land") : /Elf/.test(n) ? bear({ name: n, power: "1", toughness: "1" }) : /Giant/.test(n) ? bear({ name: n, power: "3", toughness: "3" }) : bear({ name: n }), "library")).reverse();
+    }
+    const s = settle(run(s0, planActivate(s0, ap, g, 0)));
+    return { s, ap, opp, g, old, tops };
+  };
+  it("exiles up to two creature cards milled this way and makes an X/X Zombie, X their total power", () => {
+    const { s, ap, opp, old, tops } = ready();
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, min: 0, max: 2 });
+    if (s.pending?.kind !== "searchLibrary") return;
+    // Only creature cards milled this way: not the one already in your graveyard, not the lands.
+    expect(s.pending.cards).not.toContain(old);
+    expect(s.pending.cards).toContain(tops[opp]![0]);
+    expect(s.pending.cards).toContain(tops[opp]![2]);
+    expect(s.pending.cards).toHaveLength(5);
+    const done = settle(act(s, { type: "searchLibrary", player: ap, found: [tops[opp]![0]!, tops[ap]![0]!] }));
+    expect(zoneOf(done, tops[opp]![0]!)).toBe("exile");
+    expect(zoneOf(done, tops[ap]![0]!)).toBe("exile");
+    const zombie = done.battlefield.map((id) => done.objects[id]!).find((o) => o.isToken && done.cards[o.cardId]?.name === "Zombie Token");
+    expect(zombie && `${power(done, zombie)}`).toBe("5");
+  });
+  it("with nothing exiled the Zombie is 0/0 and dies", () => {
+    const { s, ap } = ready();
+    const done = settle(act(s, { type: "searchLibrary", player: ap, found: [] }));
+    expect(done.battlefield.some((id) => done.objects[id]!.isToken)).toBe(false);
+  });
+  it("cards a replacement exiled instead of milling into a graveyard can't be exiled this way (rulings)", () => {
+    const voidE = card("Test Void", "Enchantment", "{1}{W}", { cmc: 2, oracleText: "If a card or token would be put into a graveyard from anywhere, exile it instead." });
+    expect(isFullySupported(voidE)).toBe(true);
+    const { s } = ready(voidE);
+    expect(s.pending).toBe(null);
+    expect(s.battlefield.some((id) => s.objects[id]!.isToken)).toBe(false);
   });
 });

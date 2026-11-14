@@ -1,6 +1,6 @@
 # Roadmap
 
-31,251 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,263 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,876 of
 9,979 (98%).
 
@@ -4691,7 +4691,7 @@ line blocks.
      exiled card is a God card"), Invasive Surgery, Kotose, "look at an opponent's hand, then choose any card name"
      (Sorcerous Spyglass, Anointed Peacekeeper), Alpine Moon, Skyseer's Chariot (done in round B187), Cheering Fanatic (done in round B158), Null Chamber, Booby
      Trap, Petrified Hamlet, names another player chooses (Conundrum Sphinx, Petra Sphinx, Vexing Arcanix), random
-     cards from an opponent's hand (Dementia Sliver (done in round B127), Nebuchadnezzar), Mindblaze (done in round B129), Liar's Pendulum, Lammastide
+     cards from an opponent's hand (Dementia Sliver (done in round B127), Nebuchadnezzar), Mindblaze (done in round B129), Liar's Pendulum (done in round B201), Lammastide
      Weave ("its mana value"), "an additional ... for each card named ~" (Growth Cycle, Rune Snag), "as you cast ~"
      (Aether Burst), Sound the Call.
    - Bots name what they've seen: an opponent's commander or permanent for a ban, a graveyard card for Memoricide, the
@@ -4882,7 +4882,7 @@ line blocks.
    another player's library):
    - "Choose an opponent" as a spell resolves works (Myrkul's Edict; bots choose the strongest opponent); "You and that
      player each ..." (the Offerings) is out.
-   - Still out from this round's search: Power of Persuasion ("until the end of your next turn" control), The Ozolith,
+   - Still out from this round's search: Power of Persuasion (done in round B201) ("until the end of your next turn" control), The Ozolith,
      Taeko, Nikara, Sandstone Oracle, Wrenn and Seven.
    - Bots take the higher die and the strongest opponent, and still don't use abilities that work from the graveyard.
    Left from the round after #60 and the round after Kruphix (filters up to an amount, unspent mana, half of an amount,
@@ -4941,7 +4941,7 @@ line blocks.
    - Coin flips (CR 705) work for "If you win / lose the flip", "until you lose a flip" and "whenever you win a coin
      flip" (25 cards); still out: Krark's Thumb, Edgar's "come up heads" (705.3), heads or tails (Odds // Ends (done in round B129), Mana
      Clash, Two-Headed Giant, Rakdos the Showstopper, Molten Sentry (done in round B146)), a flip for each (Mutalith Vortex Beast (done in round 278), Fighting
-     Chance (done in round 329)), Fiery Gambit, Game of Chaos (done in round 298), Squee's Revenge (done in round 298), Crooked Scales, Krark the Thumbless, and lines
+     Chance (done in round 329)), Fiery Gambit, Game of Chaos (done in round 298), Squee's Revenge (done in round 298), Crooked Scales (done in round B201), Krark the Thumbless, and lines
      that are out for other reasons (Goblin Bangchuckers' "itself", Chance Encounter, Okaun). Bots weigh a flip whose loss costs
      them something as the average of its two outcomes (Bottle of Suleiman), and use "phase out or bounce, else
      sacrifice it" flips (Frenetic Efreet) only to save the permanent.
@@ -5006,7 +5006,7 @@ line blocks.
      "its controller" after a list (Acolyte Hybrid-style "its controller draws").
    - Vivid still out: Aurora Awakener, Sanar ("reveal until X permanent/nonland cards"), Prismabasher ("up to X
      target"), Prismatic Undercurrents ("up to X basic land cards"), First Family ("and spells you've cast this turn"),
-     General Tazri (done in round B106) ("colors among those creatures"), Happily Ever After.
+     General Tazri (done in round B106) ("colors among those creatures"), Happily Ever After (done in round B201).
    - "Cards drawn this turn" still out: Fists of Flame, Proft's Eidetic Memory ("minus one"), Molten Psyche, Niko Aris (done in round B130),
      Immortus, Elenda and Azor, Deem Inferior and Sylvan Library (other lines).
    - "Differently named" still out: Neriv ("differently named tokens"), Survey Mechan (an activated ability costing
@@ -6658,7 +6658,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   turn), Churning Reservoir (oil counters put this turn), Dutiful Knowledge Seeker (cards put into a library from
   anywhere), Simic Manipulator (done in round 315) and Arcee (remove one or more counters as a variable cost), Benalish Commander and
   Detritivore (suspend X), Darigaaz Reincarnated, Sekki, Seasons' Guide, Fugitive Codebreaker, Reroute (done in round B196), Serum Powder,
-  Delaying Shield, Immortal Coil, Fires of Mount Doom.
+  Delaying Shield (done in round B201), Immortal Coil, Fires of Mount Doom.
 - Round B64 (the unlisted ones from EDHREC rank about 19,700 up to 15,000): "return to the battlefield target creature
   card in your graveyard that was put there from the battlefield this turn" (Moira, Urborg Haunt), "Whenever you put a
   +1/+1 counter on a creature, ... This ability triggers only once each turn" (Ant-Man, Colony Commander), a Gingerbrute
@@ -8749,7 +8749,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B197 (looked at, not done): Battlefield Thaumaturge ("costs {1} less to cast for each creature it
   targets": its ruling "{1} per target creature, even if the spell targets a creature more than once" doesn't settle whether
   one creature targeted twice counts once or twice), Concerted Effort (landwalk and protection granted kind by kind),
-  Delaying Shield (a pay-or-lose-1-life choice for each delay counter removed) and Rootpath Purifier (land cards in your
+  Delaying Shield (done in round B201) (a pay-or-lose-1-life choice for each delay counter removed) and Rootpath Purifier (land cards in your
   library made basic, a characteristic of cards outside the battlefield) stay out.
 - Round B198 (least played first, from the Lane B skip lists): Boneyard Mycodrax ("~'s power and toughness are each equal to
   the number of other creature cards in your graveyard": in every zone, not counting itself in the graveyard, its scavenge
@@ -8816,6 +8816,24 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   test). Livio also has a browser test. +6, 31,257 of 31,936 with B199 and rounds 356, 357.
 - Out after round B200 (looked at, not done): Divine Deflection (one prevention shield shared by you and every permanent you
   control, with the prevented amount dealt back to any target chosen as damage is prevented) stays out.
+- Round B201 (least played first, from the Lane B skip lists): Happily Ever After (its upkeep win: one intervening if, CR
+  603.4, with five colors among your permanents, six or more card types among your permanents and the cards in your
+  graveyard together, CR 205.2a, and at least your starting life total of 40, CR 903.7, all checked as it triggers and as
+  it resolves, rulings). Delaying Shield ("For each delay counter removed this way, you lose 1 life unless you pay {1}{W}":
+  one payment asked for each counter, CR 118.12; a browser test). Crooked Scales (a coin flip, CR 705.2: won destroys the
+  opponent's creature; lost destroys yours unless you pay {3} and flip again with the same targets, rulings; 100 lost flips
+  in a row are cut short, CR 732; bots don't activate it). Liar's Pendulum (a card name, then the target opponent's guess,
+  then you may reveal your hand, drawing only if you do and the guess was wrong, rulings; bots guess "not in hand" only for
+  a nonbasic card they've seen elsewhere, a singleton deck, CR 903.5b, and reveal only for the card; browser tests of the
+  guess and of the reveal). Dust of Moments (two time counters off, or on, every permanent with one and every suspended
+  card, CR 702.62b, at once; the last ones removed trigger suspend and vanishing, CR 702.62a, 702.63a). Power of
+  Persuasion (its d20 table's "Gain control of it until the end of your next turn", CR 611.2a, 514.2). +6, 31,263 of 31,936
+  with B200.
+- Out after round B201 (looked at, not done): Thelon's Chant, Tourach's Chant, Nature's Wrath and Overburden still need
+  the player who put a permanent onto the battlefield (rulings: not its controller, and not always the controller of the
+  spell or ability either: "each player may put", "target opponent may put"); Cleansing (a choice by every player for each
+  land, with no rulings on whether the lands are destroyed one by one or at once); Peace Talks and Noxious Vapors stay
+  out for the reasons in the earlier lists.
 - Out after round B192 (looked at, not done): Garruk, Curse Breaker (its −4: how often "whenever one or more creatures
   attack one of your opponents" triggers when creatures attack two of them still isn't settled by rulings), Charmed
   Pendant (a hybrid symbol of the milled card adds one of its colors: a choice in the middle of a mana ability), Ulamog's
@@ -9006,7 +9024,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Infinite Authority (a delayed trigger that checks "if that creature was destroyed this way").
 - Out after round B135 (looked at, not done): Tariff (a punisher whose cost is the chosen creature's own mana cost),
   Words of War (done in round B163; its target is chosen as it's activated, CR 115.1c), Gloom (a tax on activated abilities, mana abilities too),
-  Delaying Shield (its first line compiles now; still out: "you lose 1 life unless you pay {1}{W}" for each counter removed).
+  Delaying Shield (done in round B201) (its first line compiles now; still out: "you lose 1 life unless you pay {1}{W}" for each counter removed).
 - Known gap from round B134: a splice or entwine cost that picks the same kind of thing as one of the spell's other costs
   (Torrent of Stone's Mountains onto an Arcane spell that also sacrifices a creature) isn't offered or is refused as it's
   cast, though the rules allow paying both.
@@ -9433,7 +9451,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Gorger), "whenever you discard a card, if it has madness" (Anje Falkenrath). A madness or suspended commander is
   moved to the command zone (the 903.9a choice is always yes).
 - Suspend: X or non-mana suspend costs; cards that look at or change suspended cards and time counters (Jhoira,
-  Clockspinning, Greater Gargadon, Deep-Sea Kraken, Delay, Dust of Moments, As Foretold, Chronozoa, vanishing).
+  Clockspinning, Greater Gargadon, Deep-Sea Kraken, Delay, Dust of Moments (done in round B201), As Foretold, Chronozoa, vanishing).
 - Bestow: non-mana bestow costs. Casualty X (Ob Nixilis), granted casualty (Anhelo, done in round 299). Dredge granted to other cards.
 - Loops (CR 732): bots don't propose shortcuts (a bot activates one ability at most 8 times a turn instead), and the
   human can't shorten a shortcut someone else proposes. Fragmented loops (732.3) and "[A] unless [B]" loops (732.6).

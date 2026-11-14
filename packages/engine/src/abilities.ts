@@ -2531,7 +2531,7 @@ export type StaticCondition =
    */
   /** "You control more lands than attacking player" (Monstrous Hound): than the active player, the one whose creatures attack (CR 506.2); `not`: you don't. */
   | { kind: "moreThanActive"; what: "lands" | "creatures"; not?: true }
-  | { kind: "onBattlefield"; filter: TargetSpec; max?: number; min?: number; /** "Five or more other creatures" (Deathbringer Regent): not counting the source. */ other?: true }
+  | { kind: "onBattlefield"; filter: TargetSpec; max?: number; min?: number; /** "Five or more other creatures" (Deathbringer Regent): not counting the source. */ other?: true; /** Portcullis (round B210): "if there are two or more other creatures on the battlefield" in a "Whenever a creature enters" trigger: not counting the entering creature, the trigger's subject. */ otherThanSubject?: true }
   /** "If an opponent lost life this turn". */
   /** "If an opponent lost life this turn"; `n`: "lost 2 or more life this turn", one opponent alone (rulings on Bloodchief Ascension). */
   /** "If a player discarded a card this turn" (The Raven Man): any player, any discard this turn. */
@@ -4969,7 +4969,7 @@ export type Effect =
    * Cumulative upkeep (CR 702.24a): put an age counter on it, then you may pay the cost once for each
    * age counter on it; if you don't, sacrifice it.
    */
-  | { type: "cumulativeUpkeep"; pay: PayCost; /** Jötun Grunt: "Put two cards from a single graveyard on the bottom of their owner's library": two cards for each age counter, each pair from one graveyard (run-laneb209.ts). */ yardPairsToBottom?: true; /** "Cumulative upkeep—Put a -1/-1 counter on ~" (Aboroth): the cost is that many of these counters on it, not a payment. */ selfCounter?: CounterKind; /** "Cumulative upkeep—Draw a card" (Psychic Vortex): the cost is drawing a card for each age counter. */ drawCost?: true; /** "Cumulative upkeep—Flip a coin" (Karplusan Minotaur): the cost is flipping a coin for each age counter, each won or lost. */ flipCost?: true; /** "Cumulative upkeep—Add {R}" (Braid of Fire): the cost is adding this mana for each age counter. */ addMana?: string; /** "Cumulative upkeep—Sacrifice a creature" (Phyrexian Soulgorger): a different permanent like this for each age counter. */ sacrificeCost?: TargetSpec; /** "Cumulative upkeep—Have an opponent create a 1/1 red Survivor creature token" (Varchild's War-Riders): for each age counter an opponent, chosen each time (rulings: different ones allowed), creates this token. */ giveToken?: TokenSpec; /** "Cumulative upkeep—An opponent gains 1 life" (Wall of Shards): for each age counter an opponent who can gain life, chosen each time (rulings: the same one or different ones), gains this much. */ giveLife?: number; /** "Cumulative upkeep—Discard a card" (Vexing Sphinx): a card discarded for each age counter. */ discardCost?: true; /** "Cumulative upkeep—Put a +1/+1 counter on a creature an opponent controls" (Sheltering Ancient): that many counters among creatures opponents control, the same one or different ones (rulings). */ oppCreatureCounter?: CounterKind; /** "Cumulative upkeep—Gain control of a land you don't control" (Herald of Leshrac): a different permanent like this for each age counter, chosen as it resolves (not targeted), all of them gained for as long as they stay (rulings, CR 702.24a). */ gainControlCost?: TargetSpec; } // "If you don't, ...": fabricate (CR 702.123a)
+  | { type: "cumulativeUpkeep"; pay: PayCost; /** Jötun Grunt: "Put two cards from a single graveyard on the bottom of their owner's library": two cards for each age counter, each pair from one graveyard (run-laneb209.ts). */ yardPairsToBottom?: true; /** "Cumulative upkeep—Put a -1/-1 counter on ~" (Aboroth): the cost is that many of these counters on it, not a payment. */ selfCounter?: CounterKind; /** "Cumulative upkeep—Draw a card" (Psychic Vortex): the cost is drawing a card for each age counter. */ drawCost?: true; /** "Cumulative upkeep—Flip a coin" (Karplusan Minotaur): the cost is flipping a coin for each age counter, each won or lost. */ flipCost?: true; /** "Cumulative upkeep—Add {R}" (Braid of Fire): the cost is adding this mana for each age counter. */ addMana?: string; /** "Cumulative upkeep—Sacrifice a creature" (Phyrexian Soulgorger): a different permanent like this for each age counter. */ sacrificeCost?: TargetSpec; /** "Cumulative upkeep—Have an opponent create a 1/1 red Survivor creature token" (Varchild's War-Riders): for each age counter an opponent, chosen each time (rulings: different ones allowed), creates this token. */ giveToken?: TokenSpec; /** "Cumulative upkeep—An opponent gains 1 life" (Wall of Shards): for each age counter an opponent who can gain life, chosen each time (rulings: the same one or different ones), gains this much. */ giveLife?: number; /** "Cumulative upkeep—Discard a card" (Vexing Sphinx): a card discarded for each age counter. */ discardCost?: true; /** "Cumulative upkeep—Put a +1/+1 counter on a creature an opponent controls" (Sheltering Ancient): that many counters among creatures opponents control, the same one or different ones (rulings). */ oppCreatureCounter?: CounterKind; /** "Cumulative upkeep—Gain control of a land you don't control" (Herald of Leshrac): a different permanent like this for each age counter, chosen as it resolves (not targeted), all of them gained for as long as they stay (rulings, CR 702.24a). */ gainControlCost?: TargetSpec; /** "Cumulative upkeep—Exile the top card of your library" (Thought Lash, round B210): the top card for each age counter, all at once, unpayable with fewer cards in the library (CR 118.3). */ exileTopCost?: true; } // "If you don't, ...": fabricate (CR 702.123a)
   /**
    * "You may collect evidence N" as it resolves (CR 701.59a), always inside a "may": its controller picks cards in their
    * graveyard with total mana value N or more (they can say yes only if they have them, 701.59b).
@@ -5080,6 +5080,14 @@ export type Effect =
   | { type: "gaveGift" }
   /** The end of a paid cumulative upkeep (CR 702.24a): "Whenever you pay ~'s cumulative upkeep" (Hibernation's End). */
   | { type: "cumulativeUpkeepPaid" }
+  /** A cumulative upkeep left unpaid (CR 702.24a): "When a player doesn't pay ~'s cumulative upkeep" (Thought Lash, round B210) triggers, then ~ is sacrificed. */
+  | { type: "cumulativeUpkeepUnpaid" }
+  /**
+   * Portcullis (round B210): "exile that creature. Return that card to the battlefield under its owner's control when ~
+   * leaves the battlefield.": the trigger's subject exiled, and a delayed "when ~ leaves" trigger about that card made
+   * only if ~ is still the object it was (one that already left never leaves again, so the card stays exiled).
+   */
+  | { type: "exileReturnWhenSourceLeaves" }
   /** A class level bar's "This Class's level becomes N" (CR 716.2a). */
   | { type: "classLevel"; n: number }
   /** A "To solve" trigger's "this Case becomes solved" (CR 719.3a). */
@@ -5368,7 +5376,7 @@ export type Effect =
    * value to that permanent or player. You may play the exiled cards until the end of your next turn." The targets are
    * done one at a time in APNAP order of the player each is or is controlled by, you choosing the order within each group
    * (rulings). */
-  | { type: "exileTopDamageEach"; to: { ref: "anyTarget"; index: number; n?: number } }
+  | { type: "exileTopDamageEach"; to: { ref: "anyTarget"; index: number; n?: number }; /** Kaboom! (round B210): "reveal cards from the top of your library until you reveal a nonland card, ~ deals damage equal to that card's mana value ..., then you put the revealed cards on the bottom of your library in any order", for each target, instead of exiling the top card. */ revealUntilNonland?: true }
   | { type: "exiledPiles"; /** Split the Spoils: "separate them into two piles. An opponent chooses one of those piles. Put that pile into your hand and the other into your graveyard": you separate, an opponent chosen as it resolves chooses (rulings). */ youSeparate?: true; /** Death or Glory: "Separate all creature cards in your graveyard into two piles. Exile the pile of an opponent's choice and return the other to the battlefield.": your graveyard's cards matching this, separated where they are (CR 700.3c) by you; the opponent chosen as it resolves picks the pile exiled. */ fromYourGraveyard?: TargetSpec }
   /**
    * Collision of Realms: "Each player shuffles all creatures they own into their library. Each player who shuffled a
@@ -6399,6 +6407,8 @@ export type TriggerEvent =
   | "selfTargetedByYourSpell" // heroic: "Whenever you cast a spell that targets ~"
   /** "Whenever you pay ~'s cumulative upkeep" (Hibernation's End, CR 702.24a). */
   | "selfCumulativeUpkeepPaid"
+  /** "When a player doesn't pay ~'s cumulative upkeep" (Thought Lash, round B210, CR 702.24a): the player who didn't pay is the event player. */
+  | "selfCumulativeUpkeepUnpaid"
   /** "Whenever a time counter is removed from ~ while it's exiled" (Aeon Chronicler; works in exile, CR 113.6): once for each counter. */
   | "selfTimeCounterRemovedExiled"
   /** "When the last time counter is removed from ~ while it's exiled" (Riftmarked Knight; works in exile, CR 113.6). */
@@ -7102,6 +7112,8 @@ export interface ActivatedAbility {
   ownerOnly?: true;
   /** With `anyPlayer`: "Only your opponents may activate this ability" (Clergy of the Holy Nimbus): an opponent of its controller. */
   opponentsOnly?: true;
+  /** With `anyPlayer`: Martyrdom's granted "Only you may activate this ability" (round B210): only this player, the spell's controller as it resolved, whoever controls the creature (-1: no one). */
+  onlyPlayer?: number;
   /** "Reveal the player you chose" (Guardian Archon): payable only if a player was secretly chosen for it as it entered. */
   revealChosen?: true;
   /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object (CR 400.7): see GameObject.activatedEver. */

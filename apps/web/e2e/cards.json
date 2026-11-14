@@ -19482,6 +19482,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c92802ff-484c-4d55-aba4-c3a000264113",
+  "name": "Kaboom!",
+  "manaCost": "{4}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose any number of target players or planeswalkers. For each of them, reveal cards from the top of your library until you reveal a nonland card, Kaboom! deals damage equal to that card's mana value to that player or planeswalker, then you put the revealed cards on the bottom of your library in any order.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4da13eb8-ca18-43f1-b54b-d3ddceb980d2",
   "name": "Kadena, Slinking Sorcerer",
   "manaCost": "{1}{B}{G}{U}",
@@ -22806,6 +22832,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f6a6da20-52c8-4921-9884-29d3a3051b0d",
+  "name": "Martyrdom",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Until end of turn, target creature you control gains \"{0}: The next 1 damage that would be dealt to target creature, planeswalker, or player this turn is dealt to this creature instead.\" Only you may activate this ability.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bb9e77c0-eb94-4bba-9b71-1935be280b75",
   "name": "Masako the Humorless",
   "manaCost": "{2}{W}",
@@ -25003,6 +25055,32 @@
   "set": "clb",
   "releasedAt": "2022-06-10",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0caf42f5-abff-48aa-9bbf-df6cba169ef3",
+  "name": "Mystic Barrier",
+  "manaCost": "{4}{W}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters and at the beginning of your upkeep, choose left or right.\nEach player may attack only the nearest opponent in the last chosen direction and planeswalkers controlled by that opponent.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c13",
+  "releasedAt": "2013-11-01",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -38266,6 +38344,34 @@
   "set": "hob",
   "releasedAt": "2026-08-14",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "81fe7c5e-503e-488c-b06c-1615ed38e5a3",
+  "name": "Thought Lash",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Cumulative upkeep—Exile the top card of your library. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nWhen a player doesn't pay this enchantment's cumulative upkeep, that player exiles all cards from their library.\nExile the top card of your library: Prevent the next 1 damage that would be dealt to you this turn.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Cumulative upkeep"
+  ],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

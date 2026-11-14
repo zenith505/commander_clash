@@ -9568,6 +9568,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   } else if (o.zone !== "battlefield" || (controllerOf(s, o) !== pid && !ab.anyPlayer)) return "you don't control that permanent";
   else if (ab.ownerOnly && o.owner !== pid) return `only ${d.name}'s owner may activate that ability`;
   else if (ab.opponentsOnly && !opponents(s, controllerOf(s, o)).includes(pid)) return `only ${d.name}'s controller's opponents may activate that ability`;
+  // Martyrdom (round B210): only the player its "Only you may activate this ability" names.
+  else if (ab.onlyPlayer !== undefined && ab.onlyPlayer !== pid) return ab.onlyPlayer >= 0 && s.players[ab.onlyPlayer] ? `only ${player(s, ab.onlyPlayer).name} may activate that ability` : "no one may activate that ability";
   else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
   else if (ab.tap && characteristics(s, o).cantActivateTap) return `${d.name}'s activated abilities with {T} in their costs can't be activated`; // Serra Bestiary
   const banned = nameActivationBan(s, o, !!ab.mana) ?? abolisherBan(s, pid, o); // Pithing Needle, in any zone (rulings); Grand Abolisher

@@ -3113,6 +3113,8 @@ export interface Resolving {
     eachTargetDone?: number[];
     nextTarget?: number;
     soulDamage?: { index: number; n: number };
+    /** Kaboom! (round B210): the cards revealed for the target being done, still to go on the bottom of the library. */
+    kaboomSeen?: ObjectId[];
     discardOrSac?: { queue: PlayerId[]; keep: string[]; before: ObjectId[]; pick?: number };
     /** Effect "eachChoosesFromHand" (Stronghold Gambit): the players still to choose, in turn order, and each one's card. */
     gambit?: { queue: PlayerId[]; picks: Partial<Record<PlayerId, ObjectId>> };

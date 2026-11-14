@@ -538,6 +538,16 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     anyPlayer = opponentsOnly = true;
     effectText = `${effectText.slice(0, oppOnly.index)}${oppOnly[1] ? " Activate only as a sorcery." : ""}`;
   }
+  // Martyrdom's granted ability (round B210): "Only you may activate this ability", "you" fixed as the spell resolved to
+  // its controller ("⟪player 2|name⟫", grants.ts playerMark): that player only, whoever controls the creature, and the
+  // one who activates it controls the ability (CR 602.2, 113.8).
+  let onlyPlayer: number | undefined;
+  const onlyOne = !anyone && !ownerOnly && !oppOnly ? / Only \u27eaplayer (\d+|none)\|[^\u27eb]*\u27eb may activate this ability\.$/.exec(effectText) : null;
+  if (onlyOne) {
+    anyPlayer = true;
+    onlyPlayer = onlyOne[1] === "none" ? -1 : Number(onlyOne[1]);
+    effectText = effectText.slice(0, onlyOne.index);
+  }
   for (let found = true; found; ) {
     found = false;
     if (/ Activate only if ~ is in your graveyard\.$/.test(effectText) && !inYard && !keyword) {
@@ -890,6 +900,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(anyPlayer ? { anyPlayer: true as const } : {}),
     ...(ownerOnly ? { ownerOnly: true as const } : {}),
     ...(opponentsOnly ? { opponentsOnly: true as const } : {}),
+    ...(onlyPlayer !== undefined ? { onlyPlayer } : {}),
     ...(spendOnlyChosenColor ? { spendOnlyChosenColor: true as const } : {}),
     ...(spendOnly ? { spendOnly } : {}),
     manaCost,

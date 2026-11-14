@@ -486,6 +486,15 @@ export function parseCostKeyword(
         },
       };
     }
+    // Thought Lash (round B210): "Cumulative upkeep—Exile the top card of your library": the top card for each age counter,
+    // all of them or none (CR 702.24a), unpayable with fewer cards in the library (CR 118.3).
+    if (/^Cumulative upkeep—Exile the top card of your library\.?$/.test(line))
+      return {
+        trigger: {
+          event: "yourUpkeep",
+          body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, exileTopCost: true }], text: "Cumulative upkeep—exile the top card of your library: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you exile the top card of your library for each age counter on it." },
+        },
+      };
     // Braid of Fire: "Cumulative upkeep—Add {R}": adding mana is the cost (rulings), {R} for each age counter, which can
     // always be paid; what isn't spent empties from the pool as the upkeep step ends (CR 500.4).
     const adds = /^Cumulative upkeep—Add ((?:\{[WUBRGC]\})+)\.?$/.exec(line);

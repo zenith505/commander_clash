@@ -7,7 +7,7 @@ import { controllerOf, characteristics, invalidateCharacteristics } from "../lay
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { type ResolveCtx, apnap, objects, players, runEffect } from "./resolve";
 import { inCombat } from "./triggers";
-import { chooseAnOpponent } from "./run-library";
+import { chooseAnOpponent, toBottom } from "./run-library";
 
 /** Gollum's guess prompt starts with this (bots guess at random, see bot.ts). */
 export const GUESS_PROMPT = "guess whether the top card of";
@@ -186,7 +186,16 @@ export function runExileTopDamageEachEffect(s: GameState, e: Extract<Effect, { t
     if (d.n > 0 && runEffect(s, { type: "damage", amount: d.n, to: { ref: "anyTarget", index: d.index } }, ctx) === "paused") return "paused";
     sc.soulDamage = undefined;
   };
-  if (deal() === "paused") return "paused";
+  // Kaboom! (round B210): after each target's damage, the cards revealed for it go on the bottom in the order you choose
+  // (CR 401.4), all of them with no nonland card among them (rulings: then no damage).
+  const bottom = (): "paused" | void => {
+    const seen = sc.kaboomSeen;
+    if (!seen) return;
+    if (toBottom(s, p.id, seen.filter((id) => p.library.includes(id)), src, false) === "paused") return "paused";
+    sc.kaboomSeen = undefined;
+    sc.arranged = undefined;
+  };
+  if (deal() === "paused" || bottom() === "paused") return "paused";
   for (;;) {
     const left = all.filter((i) => !done.includes(i) && groupOf(i) !== undefined);
     if (!left.length) break;
@@ -207,7 +216,13 @@ export function runExileTopDamageEachEffect(s: GameState, e: Extract<Effect, { t
     done.push(next);
     const top = p.library[0];
     let n = 0;
-    if (top) {
+    if (e.revealUntilNonland) {
+      const at = p.library.findIndex((id) => !defOf(s, obj(s, id)).types.includes("Land"));
+      const seen = at < 0 ? [...p.library] : p.library.slice(0, at + 1);
+      if (at >= 0) n = defMv(defOf(s, obj(s, p.library[at]!)));
+      if (seen.length) log(s, `${p.name} reveals ${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")}${at >= 0 ? ` (mana value ${n})` : " (no nonland card)"}.`);
+      sc.kaboomSeen = seen;
+    } else if (top) {
       moveObject(s, top, "exile");
       const c = obj(s, top);
       n = defMv(defOf(s, c));
@@ -215,7 +230,7 @@ export function runExileTopDamageEachEffect(s: GameState, e: Extract<Effect, { t
       if (c.zone === "exile") c.mayPlay = { player: p.id, zc: c.zoneChanges ?? 0, until: "nextTurn", turn: s.turn };
     }
     sc.soulDamage = { index: next, n };
-    if (deal() === "paused") return "paused";
+    if (deal() === "paused" || bottom() === "paused") return "paused";
   }
   sc.eachTargetDone = undefined;
 }

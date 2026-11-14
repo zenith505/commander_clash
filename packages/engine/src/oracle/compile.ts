@@ -53,6 +53,7 @@ import { roundB206Chapter, roundB206Line } from "./laneb206";
 import { roundB207Line } from "./laneb207";
 import { roundB208Line } from "./laneb208";
 import { roundB209Line } from "./laneb209";
+import { roundB210Line } from "./laneb210";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2140,6 +2141,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB208Line(line, raw, out, isSpell)) continue;
     // Laccolith Rig, Bill Potts, Beamsplitter Mage, Shuriken (round B209).
     if (roundB209Line(line, raw, out, isSpell)) continue;
+    // Thought Lash, Mystic Barrier (round B210).
+    if (roundB210Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

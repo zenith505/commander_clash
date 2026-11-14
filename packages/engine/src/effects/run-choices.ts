@@ -659,6 +659,21 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       // Hibernation's End: "Whenever you pay ~'s cumulative upkeep" triggers once it's paid.
       const paid: Effect = { type: "cumulativeUpkeepPaid" };
+      // Thought Lash (round B210): "When a player doesn't pay ~'s cumulative upkeep" triggers as it isn't paid, while ~ is
+      // still on the battlefield; then it's sacrificed (rulings). Only Thought Lash has such a trigger, and its cost is this one.
+      const unpaid: Effect[] = [{ type: "cumulativeUpkeepUnpaid" }, { type: "sacrifice", what: { ref: "self" } }];
+      // Thought Lash: the top card of your library for each age counter, all at once, or not at all (CR 702.24a); with fewer
+      // cards in the library than that it can't be paid (CR 118.3). None to exile for no age counters.
+      if (e.exileTopCost) {
+        if (!sc.n) return runEffect(s, paid, ctx);
+        const lib = player(s, ctx.controller).library.length;
+        if (lib < sc.n) {
+          log(s, `${player(s, ctx.controller).name} can't exile the top ${sc.n} cards of their library (${lib} in it).`);
+          runEffect(s, unpaid[0]!, ctx);
+          return runEffect(s, unpaid[1]!, ctx);
+        }
+        return runEffect(s, { type: "may", effects: [{ type: "exileTop", who: { ref: "you" }, n: sc.n }, paid], otherwise: unpaid, text: `Exile the top ${sc.n === 1 ? "card" : `${sc.n} cards`} of your library to keep ~ (cumulative upkeep)`, keep: true }, ctx);
+      }
       if (e.selfCounter) return runEffect(s, { type: "may", effects: [...(sc.n ? [{ type: "counters", what: { ref: "self" }, counter: e.selfCounter, n: sc.n } as Effect] : []), paid], otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Put ${sc.n} ${e.selfCounter} counter${sc.n === 1 ? "" : "s"} on ~ to keep it (cumulative upkeep)`, keep: true }, ctx);
       // Karplusan Minotaur: that many flips, one after another, each one won or lost (rulings); none for no age counters.
       if (e.flipCost) return runEffect(s, { type: "may", effects: [...(sc.n ? [{ type: "flipCoin", n: sc.n } as Effect] : []), paid], otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Flip ${sc.n === 1 ? "a coin" : `${sc.n} coins`} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
@@ -961,6 +976,15 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (chooser === undefined) return;
         s.pending = { kind: "chooseOption", player: chooser, source: src, what: e.choice, options: e.options ?? choiceOptions(e.choice, e.except), ...(e.choice === "landOrNonland" ? { labels: ["Land", "Nonland"], prompt: "choose land or nonland." } : e.choice === "direction" ? { labels: ["Left", "Right"], prompt: "choose left or right: each player may attack only the nearest opponent that way." } : e.choice === "planeswalkerType" ? { prompt: "choose a planeswalker type" } : {}) };
         return "paused";
+      }
+      // Mystic Barrier (round B210): "the last chosen direction" is kept on the permanent, while it's still that object (CR 400.7).
+      if (e.keepOnSource && e.choice === "direction" && r.chosen?.direction) {
+        const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        if (me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc)) {
+          me.chosen = { ...me.chosen, direction: r.chosen.direction };
+          invalidateCharacteristics(s);
+          log(s, `${src}: each player may attack only the nearest opponent to their ${r.chosen.direction}.`);
+        }
       }
       return;
     }

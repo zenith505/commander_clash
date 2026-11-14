@@ -1,6 +1,6 @@
 # Roadmap
 
-31,364 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,373 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,885 of
 9,979 (99%).
 
@@ -325,7 +325,7 @@ line blocks.
    Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order (done in round 324),
    Scheming Fence, Oath of Lieges (done in round B143), Helm of Obedience, Concerted Effort, Belbe's Portal (done in round 324), Edgewall Innkeeper, Simic
    Manipulator, Endless Whispers, Burn from Within (done in round 325), Skyfire Phoenix (done in round 276), Contagion (done in round 325), Gutter Grime, Coffin Queen, Genesis
-   Storm, Grim Return (done in round 326), Infernal Offering (done in round B204), Varolz, Undercellar Sweep, Wave of Vitriol, Martyrdom, Soul-Scar Mage,
+   Storm, Grim Return (done in round 326), Infernal Offering (done in round B204), Varolz, Undercellar Sweep, Wave of Vitriol, Martyrdom (done in round B210), Soul-Scar Mage,
    Remembrance, Spy Network (done in round B186), Dimir Doppelganger (done in round 362), Jailbreak, Inverter of Truth (done in round 329), Immovable Rod (done in round B186), Hypergenesis, Soul
    Transfer and the rest of the 222 still unsupported in that range; past it: Phytohydra (damage replaced by +1/+1
    counters even when it can't be prevented, which needs its controller's order against prevention shields), Intimidation
@@ -2683,7 +2683,7 @@ line blocks.
    existing mode, may, choose-an-opponent, graveyard-pick and discard paths, with browser tests for Vislor Turlough and
    Resplendent Marshal. +6, 31,281 of 31,936. The compiled text of every other card is unchanged.
    Out after round 361 (looked at, not done): Fade Away (still out, as after round 340); Rift Elemental (still out: a
-   cost removing a time counter from a permanent or a suspended card); Thought Lash ("When a player doesn't pay ~'s
+   cost removing a time counter from a permanent or a suspended card); Thought Lash (done in round B210) ("When a player doesn't pay ~'s
    cumulative upkeep": a trigger on a cumulative upkeep left unpaid, with exiling the top card as the upkeep); Lavabrink
    Floodgates (each player's choice in their upkeep to add or remove a doom counter, a new prompt, then a reflexive
    sacrifice trigger); Coin of Fate (still out: an opponent chooses which of the two cards exiled as a cost goes to the
@@ -4784,7 +4784,7 @@ line blocks.
    order against the player's own draw replacements, and several Thieves at once; Trostani Discordant, Not of This
    World; Webstrike Elite and Rampaging War Mammoth (done in round 277) (an X from the cycling cost in their targets); the other "you may
    pay {X}. When you do" cards (Isareth (done in round B146), Rose Room Treasurer, Tester of the Tangential (done in round B146)); "can't attack
-   unless you control more creatures than defending player" (Goblin Goon, Mogg Toady, Monstrous Hound); Kaboom!,
+   unless you control more creatures than defending player" (Goblin Goon, Mogg Toady, Monstrous Hound); Kaboom! (done in round B210),
    Soulfire Eruption ("choose any number of targets. For each of them, ..."). Smaller gaps from round 99: Depala, Azor's other line,
    Bane's and Biomancer's Familiar's other lines, Cadric, The Master, Sliver Gravemother (done in round 274), Spider-Verse and Mirror
    Box (Mirror Gallery and Council of Reeds play: the legend rule doesn't apply); the other tiered cards (Cloud, Ice,
@@ -5159,7 +5159,7 @@ line blocks.
      Flowers ("up to X mana of any one color"), Monastery Siege, "add mana in any combination of colors" from a trigger
      (Cosmic Crucible).
    - "Exile / reveal until a nonland card" works for casting it now or this turn, for Treasure Hunt and (round B23) for
-     damage or +X/±X by its mana value; still out: several targets (Kaboom!), a reflexive trigger after (Calibrated
+     damage or +X/±X by its mana value; still out: several targets (Kaboom! (done in round B210)), a reflexive trigger after (Calibrated
      Blast), Undying Flames' epic, "if the spell's mana value is ..." (Bre, Breaching Dragonstorm, Ryan Sinclair,
      Solstice Revelations), paying life or energy instead (Bismuth Mindrender, Amped Raptor), each opponent / each player (Fevered Suspicion, Etali, Plargg and Nassari),
      suspend and time counters (Kang Prime), Neera.
@@ -5327,7 +5327,7 @@ line blocks.
    Left from the filter lands/divided damage/X costs round:
    - Divided damage still out: Impact Resonance, Ghired's Belligerence's populate (done in round 318), Pollen Remedy (done in round B159) (kicker that isn't
      mana). The divide panel says "divide the damage" for prevention too (Remedy).
-   - "Any number of target players" still out: Communal Brewing, Hollow Marauder, Kaboom!, Memory Vampire, Singularity
+   - "Any number of target players" still out: Communal Brewing, Hollow Marauder, Kaboom! (done in round B210), Memory Vampire, Singularity
      Rupture, Curse of Surveillance (done in round 321); Will of the Abzan (below).
    - X in additional costs still out: Bond of Agony and Necrologia (their effect lines), "each player sacrifices X
      lands" (Devastating Dreams), "with mana value X" (Fix What's Broken, Vicious Rivalry), Devastating Summons' X/X
@@ -5738,7 +5738,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   rulings), "unless you return a basic land card from your graveyard to your hand"; "Whenever you play an Island";
   "Exile the top ten cards of your library" as a cost. +48 (26,245 with round B11).
 - Skipped there, with reasons: Drake Familiar (returns any player's enchantment), Storm Elemental (a condition on the
-  exiled card), Gift of Doom, Dralnu's Pet, Pollen Remedy (done in round B159), Chocobo Kick, Blood Tribute, Thought Lash and Phyrexian
+  exiled card), Gift of Doom, Dralnu's Pet, Pollen Remedy (done in round B159), Chocobo Kick, Blood Tribute, Thought Lash (done in round B210) and Phyrexian
   Devourer (their other lines aren't parsed yet).
 - Round B13 (harder skipped cards, least played first): state triggers (CR 603.8) are checked between the instructions
   of a resolving spell or ability too ("even if only for a brief moment", rulings on Emperor Crocodile and Veiled
@@ -5962,7 +5962,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Block button, Personal Incarnation's owner-only ability on Ana's side, Pillar Tombs' choice. +30 (26,846 with rounds 188 and 189).
 - Skipped there, with reasons: Oppressive Rays and Gloom (an activation tax that also applies to mana abilities);
   Gabriel Angelfire (rampage as a chosen ability); Goblin Sappers (one delayed trigger destroying two creatures);
-  Nissa's Defeat (its Nissa rider); Martyrdom (a granted ability with "Only you may activate"); Exalted Dragon,
+  Nissa's Defeat (its Nissa rider); Martyrdom (done in round B210) (a granted ability with "Only you may activate"); Exalted Dragon,
   Leviathan, Floodtide Serpent and Hollow Warrior (attack costs that aren't mana, which need a picker at declare
   attackers); Premature Burial ("a creature that entered since your last turn ended"); Whipgrass Entangler (done in round B122) and War
   Cadence (not attempted yet). Known limit: the world rule can't see a tie, since two World permanents that enter at
@@ -5984,7 +5984,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   as a cost (CR 107.3a; Martyr of Ashes, Spores, Sands and Frost), with the X picker and a reveal pick in the browser.
   New browser tests: Helica Glider's counter choice, Martyr of Ashes's X and reveal pick. +23 (26,869 with rounds 188
   and 189).
-- Skipped there, with reasons: Martyr of Bones ("up to X target cards" with an X that isn't the spell's own) (done in round B152); Kaboom!
+- Skipped there, with reasons: Martyr of Bones ("up to X target cards" with an X that isn't the spell's own) (done in round B152); Kaboom! (done in round B210)
   (any number of target players); Calibrated Blast (a reflexive trigger after the cards go to the bottom); Mount Velus
   Manticore and Argentum Masticore (done in round 311) (a reflexive "when you discard a card this way" about the discarded card's types or
   colors); Wolf of Devil's Breach (pay and discard in an attack trigger); Dralnu's Pet (a kicker that discards a
@@ -6592,7 +6592,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   bottom of the library, owner's choice), Case the Joint (done in round B146) and Medomai's Prophecy (the top card of each player's
   library), Kayla's Reconstruction (done in round B155), Treacherous Urge (done in round B155), Rogues' Gallery (done in round B166), Liberated Livestock, Borderland Explorer (done in round B148),
   Cathedral Membrane (done in round B108), Dimensional Infiltrator (done in round B108), Sharp-Eyed Rookie; harder: Grand Master of Flowers (done in round B175), Mana Maze (done in round B148), Eureka,
-  Portcullis.
+  Portcullis (done in round B210).
 - Round B51 (cards no earlier round wrote down, least played first, EDHREC rank about 24,700 to 23,200):
   "if you have a card in hand" (Imaginary Pet), "if you control no other colorless creatures" (Dust Stalker), "When a
   creature you control attacks, sacrifice ~" (Spiritual Asylum), "Whenever ~ is dealt 3 or more damage" (Innocent
@@ -9012,7 +9012,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B196 (looked at, not done): Druid of the Emerald Grove (done in round B204) (the basic lands searched for and revealed wait
   for a d20 that splits them between the battlefield and the hand: no search keeps its cards for a later roll yet), Fires
   of Mount Doom ("When you play a card this way": a trigger on playing the card that one exile let you play), Light Up the
-  Night (a flashback cost removing X loyalty counters from among your planeswalkers), Kaboom! (a reveal for each of any
+  Night (a flashback cost removing X loyalty counters from among your planeswalkers), Kaboom! (done in round B210) (a reveal for each of any
   number of targets) and Delif's Cone (done in round B207) stay out.
 - Round B197 (least played first, from the Lane B skip lists): Phyrexian Devourer ("When ~'s power is 7 or greater,
   sacrifice it": a state trigger, not again while it's on the stack, sacrificed even if its power is lower by then, rulings,
@@ -9242,6 +9242,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   702.24a, unpayable with too few cards, CR 118.3; each owner orders theirs on the bottom, CR 401.4, before anything
   moves). Browser tests for Jötun Grunt's pick, Beamsplitter Mage's choice, Bill Potts's new target, and Hankyu's and
   Shuriken's granted abilities. +6, 31,364 of 31,936.
+- Round B210 (least played first, from the Lane B skip lists): Kaboom! (any number of target players or planeswalkers,
+  done one at a time in turn order, the active player's group first, you ordering within a group, rulings; for each, the
+  cards revealed until a nonland card, damage equal to its mana value, none with only lands left, rulings, then all of them
+  on the bottom in the order you choose, CR 401.4). Thought Lash (its cumulative upkeep exiles the top card of your library
+  for each age counter, all at once or not at all, CR 702.24a, unpayable with fewer cards, CR 118.3; "When a player doesn't
+  pay ~'s cumulative upkeep" triggers before it's sacrificed and exiles that player's whole library, rulings). Mystic Barrier
+  (left or right as it enters and at each of your upkeeps, kept on it as the last chosen direction; Pramikon's rule by that
+  direction, none before the first choice; two with different directions leave only an opponent nearest both ways, rulings).
+  Martyrdom (the ability it gives may be activated only by the spell's controller as it resolved, CR 109.5, whoever controls
+  the creature then, CR 602.2, 113.8; ActivatedAbility.onlyPlayer). Portcullis (an intervening if counting the other
+  creatures, not the one that entered, as it triggers and as it resolves, CR 603.4, rulings; the return is a delayed "when ~
+  leaves the battlefield" trigger made as it resolves, CR 603.7, so a Portcullis already gone leaves the card exiled for good).
+  Browser tests for Kaboom!'s order on the bottom, Thought Lash paid and not paid, Mystic Barrier's direction and Martyrdom's
+  granted ability. +5, 31,373 of 31,936 with round 368. The compiled text of every other card is unchanged.
+- Out after round B210 (looked at, not done): Lodestone Bauble (still out: a player chosen as it's activated even with no
+  target, a new choice in activation), Light Up the Night (a flashback cost removing X loyalty counters from among your
+  planeswalkers), Duelist's Flame (its granted trigger: "look at that many cards", then an exiled card cast for free or left in
+  exile), Elemental Resonance (still out: what a {2/W} symbol adds) and Divine Intervention (still out: who removed the last
+  counter) stay out.
 - Out after round B208 (looked at, not done): Back from the Brink ("Exile a creature card from your graveyard and pay its
   mana cost": the activation's mana cost is set by the card the cost exiles, and activationCost doesn't see the cost's
   choices yet), Blood of the Martyr, Piracy, Mana Cache and Rhystic Cave stay out for the reasons in the earlier lists.
@@ -9368,7 +9387,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   permission by position in the graveyard), Tetravus (done in round B171) (the tokens created with ~ remembered for its second upkeep trigger),
   Alpine Moon (losing land types and abilities by a chosen name, opponents' lands only), Null Chamber (an opponent naming a
   card too), Grimoire Thief (done in round B189) (face-down exiles you may look at, then spells countered by their names).
-- Out after round B159 (looked at, not done): Kaboom! (a card revealed per target, each target's own
+- Out after round B159 (looked at, not done): Kaboom! (done in round B210) (a card revealed per target, each target's own
   loop, the order among them a choice), Ulamog's Despoiler, Sutured Ghoul (done in round B171), Frankenstein's Monster (done in round B171) and Living Lore (done in round B171) (a choice
   made as they enter, new), Charmed Pendant (mana of the milled card's colors), Nafs Asp, Glass Asp and Sabertooth Cobra
   ("unless that player pays {1} before their next draw step": a payment window), Spoils of War (done in round B164).
@@ -9656,7 +9675,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   by the keyword, not just a keyword to remove), Brothers Yamazaki (an exception to the legend rule), Rogue Skycaptain
   and Rohgahh of Kher Keep ("an opponent gains control of ~"), Stangg and Dance of the Many (linked tokens that leave
   with their source), Sengir Nosferatu (done in round B129) (a token's ability returns an exiled card named ~), Splintering Wind,
-  Negative Zone Portal (done in round B137), Sol'Kanar the Tainted (done in round B163), Mystic Barrier, Covenant of Minds (done in round B155).
+  Negative Zone Portal (done in round B137), Sol'Kanar the Tainted (done in round B163), Mystic Barrier (done in round B210), Covenant of Minds (done in round B155).
 - Out after round B87 (looked at, not done): Kodama of the Center Tree (soulshift X: a target bounded by a changing
   number), Hide // Seek (the mana value of a card found by the search), Revival Experiment (one card of each permanent
   type, and a battle's protector on entering is unclear), Love on the Battlefield (a combat damage trigger granted until

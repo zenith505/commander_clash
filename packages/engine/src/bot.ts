@@ -336,6 +336,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.oppCreatureCounter) return [{ type: "chooseMay", player: pid, yes: (s.resolving?.scratch?.n ?? 0) <= 2 }];
     // Braid of Fire: adding the mana costs nothing, so keep it.
     if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.addMana) return [{ type: "chooseMay", player: pid, yes: true }];
+    // Thought Lash (round B210): not paying exiles our whole library, so pay whenever we can.
+    if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.exileTopCost) return [{ type: "chooseMay", player: pid, yes: true }];
     // Psychic Vortex: keep drawing while the library has plenty left and the hand isn't overfull.
     if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.drawCost) {
       const n = s.resolving?.scratch?.n ?? 0;

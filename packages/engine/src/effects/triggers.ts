@@ -206,6 +206,8 @@ export type TriggerSourceEvent =
   /** "Whenever you discover" (Curator of Sun's Creation): the discover value as `amount`. */
   | { type: "discovered"; player: PlayerId; amount: number }
   | { type: "cumulativeUpkeepPaid"; id: ObjectId }
+  /** Thought Lash (round B210): `player` didn't pay the cumulative upkeep of permanent `id` (CR 702.24a). */
+  | { type: "cumulativeUpkeepUnpaid"; id: ObjectId; player: PlayerId }
   /** A player paid mana to cast a spell: what they had spent this turn on spells before and after (CR 700.14). */
   | { type: "expended"; player: PlayerId; before: number; after: number }
   /** A player scried or surveilled (CR 701.22d, 701.25d): `n`, how many cards they looked at. */
@@ -1292,6 +1294,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "cumulativeUpkeepPaid") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfCumulativeUpkeepPaid");
+  } else if (ev.type === "cumulativeUpkeepUnpaid") {
+    // Thought Lash: "When a player doesn't pay ~'s cumulative upkeep, that player ...": the player who didn't pay.
+    const o = s.objects[ev.id];
+    if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfCumulativeUpkeepUnpaid", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
   } else if (ev.type === "gaveGift") {
     for (const id of s.battlefield) {
       const o = obj(s, id);

@@ -406,7 +406,7 @@ describe("Druid of the Emerald Grove", () => {
     const t = s.log.map((e) => e.text);
     const searched = t.findIndex((x) => /searches their library, finds 2 cards \(Island, Forest\)\.$/.test(x));
     const roll = t.findIndex((x) => /rolls a d20 for Druid of the Emerald Grove/.test(x));
-    const shuffled = t.findLastIndex((x) => x === `${s.players[ap]!.name} shuffles their library.`);
+    const shuffled = t.lastIndexOf(`${s.players[ap]!.name} shuffles their library.`);
     expect(searched).toBeGreaterThanOrEqual(0);
     expect(roll).toBeGreaterThan(searched);
     expect(shuffled).toBeGreaterThan(roll);

@@ -65,6 +65,8 @@ import { round358Line } from "./round358";
 import { round359Line } from "./round359";
 import { round360Line } from "./round360";
 import { round361Line } from "./round361";
+import { round362Line } from "./round362";
+import { round363Line } from "./round363";
 import { roundB189Line } from "./laneb189";
 
 const cache = new Map<string, CompiledCard>();
@@ -6060,6 +6062,10 @@ export function compile(d: CardDef): CompiledCard {
     if (round360Line(line, raw, out, isSpell)) continue;
     // Zuko, Conflicted, Resplendent Marshal, Vislor Turlough, Oblivious Bookworm (round 361).
     if (round361Line(line, raw, out, isSpell)) continue;
+    // Round 362.
+    if (round362Line(line, raw, out, isSpell)) continue;
+    // Round 363's whole lines (oracle/round363.ts).
+    if (round363Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -8117,7 +8123,9 @@ function checkCastingLinks(out: CompiledCard) {
   if (out.flashIfKicked && !out.spell?.targets.length && out.kicker?.extraCosts?.[0]?.kind !== "tap") bad = true;
   // Dragon's Fire: "the power of that card or creature" is the one beheld for the spell's own optional behold cost.
   const beheldIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"beheldPower"');
-  if (beheldIn([out.triggers, out.statics, out.activated]) || (beheldIn(out.spell) && !(out.kicker?.optional && out.kicker.extraCosts?.length === 1 && out.kicker.extraCosts[0]!.kind === "reveal" && !!out.kicker.extraCosts[0]!.orControl && out.kicker.extraCosts[0]!.n === 1))) bad = true;
+  // Monstrous Emergence: or the one its mandatory "choose a creature you control or reveal a creature card" cost beheld.
+  const oneBehold = (cs: readonly AdditionalCost[] | undefined) => cs?.length === 1 && cs[0]!.kind === "reveal" && !!cs[0]!.orControl && cs[0]!.n === 1;
+  if (beheldIn([out.triggers, out.statics, out.activated]) || (beheldIn(out.spell) && !(out.kicker?.optional && oneBehold(out.kicker.extraCosts)) && !(!out.kicker && !out.costOr && oneBehold(out.additionalCosts)))) bad = true;
   // Wonderscape Sage: "that land" is the one land the ability's "Return a land you control to its owner's hand" cost returns.
   const retLandIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"returnedNonbasicLandType"');
   if (retLandIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => retLandIn(ab) && ab.costs?.filter((c) => c.kind === "returnToHand" && c.n === 1 && c.filter.kind === "object" && !!c.filter.types?.includes("Land")).length !== 1)) bad = true;

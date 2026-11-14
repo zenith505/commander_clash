@@ -612,6 +612,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           const p = s.objects[id]!.phased;
           if (s.objects[id]!.zone === "phasedOut" && p && !p.indirect) p.lock = { turnOf: ctx.controller, sinceTurn: s.turn };
         }
+      // The Phasing of Zhalfir: "It can't phase in for as long as you control ~": only if you control it now; otherwise the
+      // duration never begins and it phases in as usual (CR 611.2b).
+      if (e.lockWhileYouControlSource) {
+        const me = objects(s, { ref: "self" }, ctx)[0];
+        if (me && controllerOf(s, me) === ctx.controller)
+          for (const id of ids) {
+            const p = s.objects[id]!.phased;
+            if (s.objects[id]!.zone === "phasedOut" && p && !p.indirect) p.lockWhile = { id: me.id, zc: me.zoneChanges ?? 0, controller: ctx.controller };
+          }
+      }
       return;
     }
     case "earthbend": {

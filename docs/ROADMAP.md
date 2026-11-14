@@ -1,8 +1,8 @@
 # Roadmap
 
-31,299 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,879 of
-9,979 (98%).
+31,310 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,881 of
+9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -326,7 +326,7 @@ line blocks.
    Scheming Fence, Oath of Lieges (done in round B143), Helm of Obedience, Concerted Effort, Belbe's Portal (done in round 324), Edgewall Innkeeper, Simic
    Manipulator, Endless Whispers, Burn from Within (done in round 325), Skyfire Phoenix (done in round 276), Contagion (done in round 325), Gutter Grime, Coffin Queen, Genesis
    Storm, Grim Return (done in round 326), Infernal Offering (done in round B204), Varolz, Undercellar Sweep, Wave of Vitriol, Martyrdom, Soul-Scar Mage,
-   Remembrance, Spy Network (done in round B186), Dimir Doppelganger, Jailbreak, Inverter of Truth (done in round 329), Immovable Rod (done in round B186), Hypergenesis, Soul
+   Remembrance, Spy Network (done in round B186), Dimir Doppelganger (done in round 362), Jailbreak, Inverter of Truth (done in round 329), Immovable Rod (done in round B186), Hypergenesis, Soul
    Transfer and the rest of the 222 still unsupported in that range; past it: Phytohydra (damage replaced by +1/+1
    counters even when it can't be prevented, which needs its controller's order against prevention shields), Intimidation
    Bolt ("other creatures can't attack": other than the target), Fade Away, Viashino Heretic, Dazzling Reflection (done in round B108),
@@ -1224,7 +1224,7 @@ line blocks.
    "the first time counters have been put on that creature this turn" (Stalwart Successor); "a card in your graveyard
    that wasn't put there this combat" (Storrev, Devkarin Lich, CR 506.1); "that player may put a +1/+1 counter on ~. If
    they do, they add {C} for each counter on it" (Cheering Crowd). +16 (28,590 of 31,936 with Lane B B62).
-   Out after round 224 (looked at, not done): Heaven Sent (exile it and cast it this turn); Open the Omenpaths (mana of
+   Out after round 224 (looked at, not done): Heaven Sent (exile it and cast it this turn); Open the Omenpaths (done in round 362) (mana of
    two different colors); Spark of Creativity ("you may have ~ deal damage ... If you don't, you may play that card");
    Fires of Mount Doom ("when you play a card this way"); Festival of Embers (cast from the graveyard by paying 1 life
    more); Myr Superion (spend only mana produced by creatures). (Karn's Sylex and Strength of the Tajuru, also looked at
@@ -1383,7 +1383,7 @@ line blocks.
    Epic (tap creatures for an activation cost's mana, like convoke); Kaldring, the Rimestaff (play a snow permanent card
    from your graveyard this turn, entering tapped); Hostile Hostel (done in round 338) (soul counters, transform, then untap; Creeping Inn's
    "creature cards exiled with this creature"); Dawnbreak Reclaimer (an opponent chooses a card in your graveyard);
-   Cryptic Gateway (done in round 302), Mogg Assassin, Karplusan Minotaur (done in round 318), The Phasing of Zhalfir, Mirror of Life Trapping, Grasping Shadows
+   Cryptic Gateway (done in round 302), Mogg Assassin, Karplusan Minotaur (done in round 318), The Phasing of Zhalfir (done in round 363), Mirror of Life Trapping, Grasping Shadows
    ("transform it" is the enchantment, not the attacker).
    Round 233 (top of the list, now done): "you may pay one or more {E}. If you do, create an X/X ... Vehicle token"
    (Pia Nalaar, Chief Mechanic); "If a Hero enters this way, it enters with an additional +1/+1 counter" (Winter Soldier,
@@ -2535,7 +2535,7 @@ line blocks.
    up to one target creature you control", goaded "for the rest of the game", and "This creature can't be sacrificed"
    granted to it; "a creature you own but don't control attacks" isn't a trigger filter yet); Altaïr Ibn-La'Ahad (memory
    counters on exiled cards, and a tapped and attacking token copy of each one, each token's defender chosen separately,
-   rulings); Monstrous Emergence ("choose a creature you control or reveal a creature card from your hand" as an
+   rulings); Monstrous Emergence (done in round 362) ("choose a creature you control or reveal a creature card from your hand" as an
    additional cost, then that one's power); Arni Metalbrow ("attacks or enters attacking", then a creature card with
    lesser mana value than that creature put onto the battlefield tapped and attacking).
    Round 356 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards cast or played
@@ -2584,7 +2584,7 @@ line blocks.
    else."" (Serra Paragon's shared use, `landFromGraveyardFilter` for historic lands, CR 700.6). No new prompt: each
    uses the existing may, free-cast, copy-target and graveyard-cast paths. +6, 31,245 of 31,936 with round 356 and Lane
    B's B197 and B198. The compiled text of every other card is unchanged.
-   Out after round 357 (looked at, not done): Open the Omenpaths ("Add two mana of any one color and two mana of any
+   Out after round 357 (looked at, not done): Open the Omenpaths (done in round 362) ("Add two mana of any one color and two mana of any
    other color. Spend this mana only to cast creature or enchantment spells.": two different colors picked as it
    resolves, then a spend restriction, still out); Glorious Purpose ("When the sixth plan counter is put on ~": a trigger
    on a counter count reached, then any number of spells cast free from four exiled cards); Spirit of Resilience
@@ -2688,6 +2688,52 @@ line blocks.
    Floodgates (each player's choice in their upkeep to add or remove a doom counter, a new prompt, then a reflexive
    sacrifice trigger); Coin of Fate (still out: an opponent chooses which of the two cards exiled as a cost goes to the
    bottom).
+   Round 362 went on down the "Out after round N" lists and `npm run popular`, most played first: Dimir Doppelganger's
+   "{1}{U}{B}: Exile target creature card from a graveyard. ~ becomes a copy of that card, except it has this ability."
+   (the card as it is in exile, CR 707.2, with this ability's own text, CR 707.9a; a later copy overwrites it by
+   timestamp, rulings) and Shadow Kin's "At the beginning of your upkeep, each player mills three cards. You may exile a
+   creature card from among the cards milled this way. If you do, ~ becomes a copy of that card, except it has this
+   ability." (only milled cards still in a graveyard: chooseFromGraveyard `inGraveyards`); Open the Omenpaths's "Add two
+   mana of any one color and two mana of any other color. Spend this mana only to cast creature or enchantment spells."
+   (Effect choose `otherColor`: a second color asked anew, any but the first, CR 608.2d; all four restricted, CR
+   106.6); Monstrous Emergence's "As an additional cost to cast this spell, choose a creature you control or reveal a
+   creature card from your hand." and "~ deals damage equal to the power of the creature you chose or the card you
+   revealed to target creature." (a mandatory behold-like cost, CR 701.4a, with Amount beheldPower: the creature's power
+   as it resolves or as it last existed, rulings); Plunge into Darkness's "Pay any amount of life, then look at that many
+   cards from the top of your library. Put one of those cards into your hand and exile the rest." (chosen and paid as it
+   resolves, rulings, CR 119.4; its sacrifice mode and entwine were already read); Reverse the Sands's "Redistribute any
+   number of players' life totals." (Effect redistributeLife, PendingDecision chooseOption "redistribute": one option
+   for each way the totals can be handed around, none split, rulings; no higher total for a player who can't gain life
+   and no lower one for a player who can't lose life, CR 119.7, 119.8; each gains or loses the difference, CR 119.5).
+   Browser tests click through Open the Omenpaths's second color, Monstrous Emergence's cost and Reverse the Sands's
+   choice. Bots take the most life with Reverse the Sands and pay up to four life (keeping 20) to look with Plunge into
+   Darkness. +6, 31,287 of 31,936. The compiled text of every other card is unchanged.
+   Round 363 went on down the "Out after round N" lists and `npm run popular`, most played first, to copies of a revealed
+   card, phasing, a Saga's vote and a spell exiled from the stack: Vesuvan Drifter's "At the beginning of each combat,
+   you may reveal the top card of your library. If you reveal a creature card this way, ~ becomes a copy of that card
+   until end of turn, except it has flying." (the card as printed, its front face, CR 707.2, 712.8a, with flying as a
+   copiable value, CR 707.9b; becomeCopy of `revealed`) and Deceiver of Form's "At the beginning of combat on your turn,
+   reveal the top card of your library. If a creature card is revealed this way, you may have creatures you control other
+   than ~ become copies of that card until end of turn. You may put that card on the bottom of your library." (each keeps
+   its counters and noncopy effects, CR 613.7; the card may go to the bottom whatever it is, rulings); The Phasing of
+   Zhalfir's "Another target nonland permanent phases out. It can't phase in for as long as you control ~." (phaseOut
+   `lockWhileYouControlSource`: it skips its controller's untap steps while you control the Saga, then phases in as
+   usual, CR 611.2b, 702.26a; once you don't, never again); Trial of a Time Lord's "If guilty gets more votes, the owner
+   of each card exiled with ~ puts that card on the bottom of their library." (Effect untilLeavesToBottom: the cards its
+   chapters exiled until it leaves, CR 610.3; a tie leaves them to return); Gale's Redirection's table rows "You may cast
+   the exiled card for as long as it remains exiled, and you may spend mana as though it were mana of any color to cast
+   that spell." and "You may cast the exiled card without paying its mana cost for as long as it remains exiled." (Effect
+   mayCastExiledSpell on the card exiled from the stack, Resolving `exiledFromStack`; mayPlay `anyColor`: colored mana
+   symbols paid with any mana, {C} still needs colorless, CR 609.4b; a copy of a spell leaves no card, CR 707.10a).
+   Browser tests click through Deceiver of Form's and Vesuvan Drifter's prompts and cast the card Gale's Redirection
+   exiled. Bots copy a revealed creature only when it beats what they have, bottom a land when they have six or more and
+   a card they can't cast soon, and value Trial's guilty vote by the exiled cards. +5, 31,310 of 31,936 with round 362 and Lane B's B201-B203. The compiled
+   text of every other card is unchanged.
+   Out after round 363 (looked at, not done): Ziatora's Envoy (playing a land from the top while the trigger resolves);
+   Durnan of the Yawning Portal (undaunted granted to a spell cast from exile); Decoy Gambit ("unless its controller has
+   you draw a card", one choice per opponent); Sphinx Ambassador (an opponent names a card after a hidden search);
+   Choreographed Sparks ("can't be copied", and a copy of a creature spell with granted text); Mirror of Life Trapping and
+   Archnemesis (not yet looked at closely); Fell Beast's Shriek and Riddles in the Dark (in Lane B's range).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -2728,7 +2774,7 @@ line blocks.
    their opponents with Hollow Marauder.
    Out after round 348 (looked at, not done): Gift of Doom ("Morph—Sacrifice another creature": no morph cost that
    sacrifices another permanent yet; "As this Aura is turned face up, you may attach it to a creature": a choice made as
-   part of turning it face up, a special action, or in the middle of an effect that turns it face up); Monstrous Emergence
+   part of turning it face up, a special action, or in the middle of an effect that turns it face up); Monstrous Emergence (done in round 362)
    (still out, as after round 320).
    Round 347 went on down the "Out after round N" lists and `npm run popular`, most played first, to cards exiled with a
    permanent or spell that its controller may play: Lobelia, Defender of Bag End's "When ~ enters, look at the top card of
@@ -2754,7 +2800,7 @@ line blocks.
    Out after round 347 (looked at, not done): Firesong and Sunspeaker (lifelink given to red instant and sorcery spells,
    and "a white instant or sorcery spell causes you to gain life", which needs the spell that caused a life gain);
    Hollow Marauder ("any number of target opponents each discard a card", still out with the other "any number of target
-   players" cards); Everquill Phoenix (the Feather token's quoted "Sacrifice this token" ability); Monstrous Emergence
+   players" cards); Everquill Phoenix (the Feather token's quoted "Sacrifice this token" ability); Monstrous Emergence (done in round 362)
    (still out, as after round 320).
    Round 346 went on down the "Out after round N" lists and `npm run popular`, most played first: Crucible of the Spirit
    Dragon's "{T}, Remove X storage counters from this land: Add X mana in any combination of colors. Spend this mana only
@@ -3097,7 +3143,7 @@ line blocks.
    a cost); Hot Pursuit (done in round 349) (a creature suspected and goaded for as long as the enchantment stays, then control of every
    goaded or suspected creature once two players have lost); Master Warcraft (choosing which creatures other players
    attack and block with, and how they block); Coram, the Undertaker (cards put into graveyards from libraries this
-   turn, played from any graveyard); Shadow Kin (becoming a copy of a milled card "except it has this ability");
+   turn, played from any graveyard); Shadow Kin (done in round 362) (becoming a copy of a milled card "except it has this ability");
    Curie, Emergent Intelligence (done in round 336) (becoming a copy of the exiled creature with a gained ability, and its base power);
    Timothar, Baron of Bats (a token that returns the exiled card when it deals combat damage); Spell Queller (done in round 336) (the
    exiled spell's owner casting it for free once Spell Queller leaves).
@@ -3342,7 +3388,7 @@ line blocks.
    rulings; a browser test of paying); "-X/-0 until your next turn, where X is the number of different mana values among
    cards in your graveyard" (All-Seeing Arbiter: a land's 0 counts, rulings); "Return this card from your graveyard to the
    battlefield transformed" (Garland, Knight of Cornelia, CR 712.14). +10, 30,748 of 31,936 with round 319, B158 and B159.
-   Out after round 320 (looked at, not done): Monstrous Emergence (an additional cost of choosing a creature you control
+   Out after round 320 (looked at, not done): Monstrous Emergence (done in round 362) (an additional cost of choosing a creature you control
    or revealing a creature card, and damage by the power of whichever it was), Geth's Summons (done in round 328) (a target for each opponent
    with three or more poison counters as it's cast), Crashing Wave (done in round 328) and Reap (still out, for the reasons in their earlier
    lists), and the cards of the round 319 list (still out). Bots sacrifice for Read the Runes as for any optional
@@ -4181,12 +4227,12 @@ line blocks.
    Discerning Financier (done in round 272).
    Out after round 257 (looked at, not done): Vaevictis Asmadi, the Dire and Guff Rewrites History (one target for each
    player: no per-player target spec yet); Thieves' Auction (players draft exiled cards one by one until all are chosen);
-   Deceiver of Form (your other creatures become copies of the revealed card until end of turn); Monk Class (level 3 grants
+   Deceiver of Form (done in round 363) (your other creatures become copies of the revealed card until end of turn); Monk Class (level 3 grants
    an exiled card a cast-from-exile ability tied to another spell this turn); Sen Triplets (you play from an opponent's
    hand, which is revealed, while they can't cast or activate); Breath of Fury (the Aura moves after its creature is
    sacrificed, then an extra combat); Gollum, Scheming Guide (an opponent guesses land or nonland about your top card, then
    Gollum is removed from combat); Elrond of the White Council (secret council votes, then you gain control of the creatures
-   chosen); Reverse the Sands (redistribute life totals).
+   chosen); Reverse the Sands (done in round 362) (redistribute life totals).
    Out after round 256 (looked at, not done): Scrap Welder (done in round 270); Lynde, Cheerful Tormentor (a Curse returned "attached to you", then moved to an opponent);
    Supper for Spiders (cards that become Food artifacts losing their other card types and subtypes but keeping their
    abilities); Nahiri, the Unforgiving (done in round B203) ("attacks a player each combat if able" until your next turn); Cherished Hatchling
@@ -4223,7 +4269,7 @@ line blocks.
    and the rulings' loss of non-Alien subtypes); Stitcher Geralf (done in round B202) ("exile up to two creature cards put into graveyards
    this way" and their total power); Aragorn, Company Leader ("if you chose a creature other than ~ as your Ring-bearer"
    and "one of each of those kinds of counters"); Fervent Mastery ("If the {2}{R}{R} cost was paid": which alternative
-   cost was paid, and an opponent discarding any number then drawing that many); Plunge into Darkness ("Pay any amount of
+   cost was paid, and an opponent discarding any number then drawing that many); Plunge into Darkness (done in round 362) ("Pay any amount of
    life, then look at that many cards" inside an entwined mode); Lukka, Coppercoat Outcast (cards exiled this way gaining
    "You may cast ~ from exile as long as you control a Lukka planeswalker").
    Out after round 248 (looked at, not done): Unidentified Hovership (done in round 273; "the exiled card's owner manifests dread": each
@@ -4266,7 +4312,7 @@ line blocks.
    batch triggers); Saving Grace (done in round 311) (redirecting damage to itself); Volcanic Offering (done in round B141) (a target an opponent chooses);
    Riftmarked Knight (the token its suspend makes, with flanking and protection from white); Roiling Horror (done in round B111) (its
    characteristic-defining P/T counts a life difference); Watcher of Hours (done in round 340) ("you remove a time counter", a choice of
-   which); Jaya's Phoenix and Repeated Reverberation (copy the next loyalty ability); Coveted Falcon, Shadow Kin, Arna
+   which); Jaya's Phoenix and Repeated Reverberation (copy the next loyalty ability); Coveted Falcon, Shadow Kin (done in round 362), Arna
    Kennerüd, Confusion in the Ranks, Imodane (done in round 337), Mavinda, Manascape Refractor, Cass, Bronzehide Lion, Ria Ivor and
    Fabrication Foundry (looked at, not done this round).
    Out after round 241 (looked at, not done): Nuka-Nuke Launcher (done in round 321) ("until the end of defending player's next turn, that
@@ -4284,7 +4330,7 @@ line blocks.
    several new pieces each).
    Out after round 238 (looked at, not done): Storm Cauldron (done in round B191) (a land tapped for mana returns to hand mid-payment);
    Tomik, Distinguished Advokist (lands in graveyards can't be targeted by opponents, can't be played from graveyards, done in round 325);
-   Monstrous Emergence (an additional cost of choosing a creature or revealing one); Rootweaver Druid (each opponent
+   Monstrous Emergence (done in round 362) (an additional cost of choosing a creature or revealing one); Rootweaver Druid (each opponent
    searches, one land under your control); Quest for Ula's Temple (done in round 275); Arlinn, the
    Pack's Hope (+1 "until your next turn" flash plus an extra counter on each creature entering); Rootcoil Creeper
    (done in round 272); Whiskervale Forerunner (done in round 338) (put it
@@ -4312,7 +4358,7 @@ line blocks.
    trigger); Sorceress's Schemes (done in round 272); Cursecloth Wrappings (done in round 303) (embalm granted to a
    graveyard card); Oblivious Bookworm (a creature that entered face down or was turned face up this turn); Cait, Cage
    Brawler; Augusta, Order Returned; Vault 101: Birthday Party; The First Tyrannic War; Kitt Kanto;
-   Daretti, Ingenious Iconoclast (its −6); Expedited Inheritance; Monstrous Emergence; Nyssa of Traken.
+   Daretti, Ingenious Iconoclast (its −6); Expedited Inheritance; Monstrous Emergence (done in round 362); Nyssa of Traken.
    Out after round 231 (looked at, not done): Ecstatic Beauty ("put four time counters on each of those cards that
    has suspend": counters on the impulsed cards that already have suspend, without granting it); Knowledge Vault (done in round B129)
    ("{0}: Sacrifice ~. If you do, discard your hand, then ..." and its leaves trigger putting the cards into the
@@ -4767,7 +4813,7 @@ line blocks.
      most votes), Split Decision ("Choose target spell", then "the spell"), Messenger Jays ("for each card drawn this
      way"), Sail into the West (done in round 321), Galadriel, Expropriate, Fateful Tempest, Selvala's Stampede, Travel Through Caradhras;
      votes for a player (Mob Verdict, Círdan), Trap the Trespassers, Truth or Consequences ("an opponent at random");
-     the Sagas Vault 11 and Trial of a Time Lord; "whenever players finish voting" (Grudge Keeper (done in round 302), Model of Unity (done in round 302),
+     the Sagas Vault 11 and Trial of a Time Lord (done in round 363); "whenever players finish voting" (Grudge Keeper (done in round 302), Model of Unity (done in round 302),
      Erestor: an opponent counts only if none of their votes match yours, rulings); Elrond; the Planechase "Will of the
      Planeswalkers" cards.
    - Bots vote by a rough count of what each choice does for them (bot-votes.ts), and always take an optional extra
@@ -4904,7 +4950,7 @@ line blocks.
    - Gods still out on other lines: Athreos (both), Ephara, Keranos, Klothys, Phenax, Purphoros Bronze-Blooded.
    - "Reveal the top card of your library. If it's a X card, A. Otherwise, B" works for a card type filter and moves
      of "it"; still out: "you may reveal ... If a X card is revealed this way" (Elven Farsight, Galadriel, Isolated
-     Watchtower, Urza Assembles the Titans, Doors of Durin, Vesuvan Drifter), "with mana value 3 or less" (Kellan),
+     Watchtower, Urza Assembles the Titans, Doors of Durin, Vesuvan Drifter (done in round 363)), "with mana value 3 or less" (Kellan),
      "of the chosen type" (Bloodline Shaman), "it" meaning the source (Harsh Deceiver), amounts from the revealed card
      (Sapling of Colfenor, Baneful Omen), "repeat this process" (Countryside Crusher), casting it
      (Descendants' Path, Jadzi), several "If it's" lines (Druidic Satchel, done in round 277).
@@ -8724,7 +8770,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ("If X is 1, ... If X is 4 or more, do all of the above.": the X it was cast with, 0 if cast without paying its mana cost,
   CR 107.3a, rulings; the player is chosen as it resolves, not targeted, and that player chooses which creature they return,
   none if they control none, CR 608.2d; a browser test). +6, 31,146 of 31,936 with B188 to B190.
-- Out after round B191 (looked at, not done): Filigree Vector, Lodestone Bauble, Infernal Offering (done in round B204) and Open the Omenpaths
+- Out after round B191 (looked at, not done): Filigree Vector, Lodestone Bauble, Infernal Offering (done in round B204) and Open the Omenpaths (done in round 362)
   stay out for the reasons in the earlier lists.
 - Round B192 (least played first, from the Lane B skip lists): The Kingpin of Crime ("Whenever you attack, you may pay 2
   life. If you do, until end of turn, creatures you control with toughness greater than their power assign combat damage
@@ -9483,7 +9529,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   graveyard and that card on top).
 - Known gaps from round B71: bots always search the library too when "and/or library" lets them skip it, even with
   Psychic Surgery or Cosi's Trickster watching.
-- Out after round B70 (looked at, not done): Shell of the Last Kappa and Gale's Redirection (exiling a spell from the
+- Out after round B70 (looked at, not done): Shell of the Last Kappa and Gale's Redirection (done in round 363) (exiling a spell from the
   stack), Munda, Ambush Leader (done in round B196) (cards from the top revealed and put back on top in any order), Krang & Shredder
   (each opponent exiles until a nonland card, then a free cast among them under a Disappear condition).
 - Known gaps from round B69: War Cadence with X = 0 lets creatures block free, but a cost of {0} still has to be chosen
@@ -9597,7 +9643,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   can't be blocked", "exile those tokens unless you have the city's blessing".
 - Becoming a copy: double-faced cards (CR 707.8, they're unsupported entirely); copies chosen without targeting
   (Deepfathom Echo, Sakashima's Will; Cytoshape and Polymorphous Rush done in round B139); "for as long as" durations (Assimilation Aegis,
-  Blade of Shared Souls, Zygon Infiltrator, Secret Invasion); copying an exiled card (Dimir Doppelganger, The
+  Blade of Shared Souls, Zygon Infiltrator, Secret Invasion); copying an exiled card (Dimir Doppelganger (done in round 362), The
   Mimeoplasm, Dermotaxi, Lazav, Wearer of Faces, Niko); targets "with mana value X" (Lazav, the Multifarious,
   Likeness Looter, The Mycosynth Gardens), "with a counter on it" (Volrath), "of the chosen type" (Mirror of the
   Forebears), "a second target" (Shuri); Permeating Mass, Crystalline Resonance, Hall of Echoes (done in round B199), Absorbing Man,

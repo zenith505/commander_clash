@@ -73,6 +73,7 @@ import { round364Line } from "./round364";
 import { round365Line } from "./round365";
 import { round366Line } from "./round366";
 import { round367Line } from "./round367";
+import { round368Cost, round368Line } from "./round368";
 import { roundB189Line } from "./laneb189";
 
 const cache = new Map<string, CompiledCard>();
@@ -464,7 +465,7 @@ export function normalizeSelf(d: CardDef): string {
   // "Edgar" for "Edgar Markov": a legendary card's two-word name, when the first word isn't a type (CR 201.5c; not
   // "Sliver" for "Sliver Queen"). "Imskir" for "Imskir Iron-Eater": the second word may be hyphenated; "Niv-Mizzet" for
   // "Niv-Mizzet Reborn": the first one too. "Dáin" for "Dáin Ironfoot": letters with accents count (\p{L}).
-  const twoWords = comma === full && !ofThe && d.supertypes?.includes("Legendary") ? /^(\p{Lu}\p{Ll}+(?:-\p{Lu}\p{Ll}+)?) \p{Lu}\p{Ll}+(?:-\p{Lu}\p{Ll}+)?$/u.exec(full)?.[1] : undefined;
+  const twoWords = comma === full && !ofThe && d.supertypes?.includes("Legendary") ? /^(\p{Lu}\p{Ll}+(?:-\p{Lu}\p{Ll}+)?) \p{Lu}\p{Ll}+(?:[-']\p{Lu}\p{Ll}+)*$/u.exec(full)?.[1] : undefined;
   const first = twoWords && !CREATURE_TYPES.has(twoWords) && !/^(?:Artifact|Creature|Enchantment|Land|Planeswalker|Battle|Kindred|Tribal|Instant|Sorcery|Legendary|Basic|Snow|World)$/.test(twoWords) ? twoWords : undefined;
   // "King Darien" for "King Darien XLVIII": a legendary card's name without its regnal number.
   const regnal = comma === full && !ofThe && !first && d.supertypes?.includes("Legendary") ? /^(.+ .+) [IVXLC]+$/.exec(full)?.[1] : undefined;
@@ -2462,6 +2463,8 @@ export function compile(d: CardDef): CompiledCard {
       out.xMaxPlayers = true;
       continue;
     }
+    // Round 368's additional costs (oracle/round368.ts): Gorex, the Tombshell.
+    if (round368Cost(line, raw, out, isSpell)) continue;
     // The Marches: "As an additional cost to cast this spell, you may exile any number of blue cards from your hand. This
     // spell costs {2} less to cast for each card exiled this way." Announced with the other costs (CR 601.2b), then a
     // reduction of the total (601.2f), which can take {X} down too (rulings).
@@ -4844,7 +4847,10 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Llawan, Cephalid Empress: "Your opponents can't cast blue creature spells": the spell's color as it's cast (CR 601.3).
-    const cantCast = /^(You|Your opponents) can't cast ((?:white |blue |black |red |green )?(?:creature|noncreature)) spells\.$/.exec(line);
+    // Codie, Vociferous Codex: "You can't cast permanent spells": artifact, creature, enchantment, planeswalker or battle
+    // spells (CR 110.1), the face cast (an instant face of a modal double-faced card can be, rulings); lands are still
+    // played and other effects still put permanents onto the battlefield (rulings).
+    const cantCast = /^(You|Your opponents) can't cast ((?:white |blue |black |red |green )?(?:creature|noncreature)|permanent) spells\.$/.exec(line);
     if (cantCast) {
       const filter = parseTargetPhrase(`${cantCast[2]} spell`);
       if (filter?.kind !== "spell") out.unsupported.push(raw);
@@ -6088,6 +6094,8 @@ export function compile(d: CardDef): CompiledCard {
     if (round366Line(line, raw, out, isSpell)) continue;
     // Round 367's whole lines (oracle/round367.ts).
     if (round367Line(line, raw, out, isSpell)) continue;
+    // Round 368's whole lines (oracle/round368.ts).
+    if (round368Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,

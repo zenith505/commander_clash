@@ -6,13 +6,16 @@
 import type { CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseTrigger } from "./triggers";
+import { round368Sentence } from "./round368";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round367Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void sentences;
+  // Round 368's sentences first (oracle/round368.ts).
+  const r368 = round368Sentence(s, sentences, si, ctx, effects);
+  if (r368 !== null) return r368;
   const line = plain(s);
   // Vault 101: Birthday Party: "You may put an Aura or Equipment card from your hand or graveyard onto the battlefield. If
   // an Equipment is put onto the battlefield this way, you may attach it to a creature you control.": the one card put, if

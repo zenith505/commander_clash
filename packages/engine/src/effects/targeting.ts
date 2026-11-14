@@ -1511,6 +1511,8 @@ export function distinctModeCap(s: GameState, body: AbilityBody, controller: Pla
 /** The permanents a player could pick for a "pick" effect: their own, matching the filter (not targeted, so hexproof doesn't matter). */
 /** `sourceId`: "another creature you control" (filter.notSource) can't be the ability's source. */
 export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness" | "power"; greatest?: "power" | "manaValue"; greatestOfAll?: true; action?: PickAction; anyController?: true; destroyable?: true }, pid: PlayerId, sourceId?: ObjectId, sourceZc?: number): ObjectId[] {
+  // Three Dog, Galaxy News DJ: "sacrifice an Aura attached to ~": one attached to the source now ("~" bound to its id).
+  if (e.filter.attachedTo?.objectId === "~" && sourceId) return pickOptions(s, { ...e, filter: bindAttachedToSource(e.filter, sourceId) }, pid, sourceId);
   // "Put a +1/+1 counter on a creature" (Zimone's Hypothesis): any player's.
   // Drake Familiar: "return an enchantment to its owner's hand": any player's too.
   // The Horus Heresy: "each player chooses a creature", anyone's.

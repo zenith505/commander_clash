@@ -3966,6 +3966,8 @@ export type Effect =
       untilNonlandType?: true;
       /** "Until you reveal a nonland card with mana value 3 or greater" (Sibylline Soothsayer): only one like this stops it. */
       untilMvAtLeast?: number;
+      /** Codie, Vociferous Codex: "with lesser mana value" than the spell that triggered this delayed trigger (ResolveCtx.cause), as it is on the stack or last existed there (CR 113.7a), X included (CR 202.3e). */
+      lesserThanCause?: true;
       /** With `reveal`: "You may cast that card without paying its mana cost. Put all revealed cards not cast this way on the bottom of your library in a random order." (Treasure Keeper): the cards stay in the library, revealed, and the found card is cast from there; then the rest go to the bottom. */
       inPlace?: true;
       /** With `inPlace`: "That player may cast that card without paying its mana cost. Then the player shuffles." (Spellshift): the revealed cards stay where they are, for the shuffle after (the found card too, if it isn't cast, rulings). */
@@ -5241,6 +5243,8 @@ export type Effect =
   | { type: "returnAurasAttached"; cards: { id: ObjectId; zc: number }[] }
   /** Mana Web: "tap all lands that player controls that could produce any type of mana that land could produce": the trigger's player's lands sharing a type of mana with what the tapped land (the subject) could produce (CR 106.7), as it is now or, gone, as it was tapped (run-round367.ts). */
   | { type: "tapLandsSharingMana" }
+  /** Three Dog, Galaxy News DJ's reflexive trigger: "for each other attacking creature you control, create a token that's a copy of that Aura attached to that creature": the Aura its trigger sacrificed (ResolveCtx.sacrificed), its copiable values as it last existed (CR 707.2), one token for each such creature as this resolves, entering attached to it (run-round368.ts). */
+  | { type: "auraCopiesOnAttackers" }
   /** "If ~ was kicked, ...", with "... instead" as `otherwise` being what it does when it wasn't. */
   | { type: "if"; cond: SpellCondition; effects: Effect[]; otherwise?: Effect[] }
   /**
@@ -7562,7 +7566,7 @@ export type AdditionalCost =
    * `linked`: "Put a card exiled with ~ into its owner's graveyard" (Jester's Scepter): one of the cards the source's
    * linked exile took (CR 607.2a), moved to its owner's graveyard, chosen in CostChoices.exileCards.
    */
-  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true; linked?: true; /** Nethergoyf's escape: "Exile any number of other cards from your graveyard with four or more card types among them": any number of them (at least one), as long as the cards chosen have this many card types among them (CR 205.2a, rulings); `n` is 1. */ cardTypes?: number; /** Night Soil: "Exile two creature cards from a single graveyard": all `n` from any one player's graveyard (yours too). */ singleGraveyard?: true; /** Osgir, the Reconstructor: "{X}, Exile an artifact card with mana value X from your graveyard": the one X announced as it's activated (CR 107.3a, 602.2b), and `filter` gets that mana value. */ mvX?: true; /** "Put three cards from your graveyard on the bottom of your library" (Battlefield Scrounger): the chosen cards go to the bottom of your library, in the order chosen (CR 401.4), not into exile. */ toBottom?: true; /** "Put a card an opponent owns from exile into that player's graveyard" (the Eldrazi processors): any card an opponent owns in exile, chosen in CostChoices.exileCards. */ process?: true }
+  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true; linked?: true; /** Nethergoyf's escape: "Exile any number of other cards from your graveyard with four or more card types among them": any number of them (at least one), as long as the cards chosen have this many card types among them (CR 205.2a, rulings); `n` is 1. */ cardTypes?: number; /** Night Soil: "Exile two creature cards from a single graveyard": all `n` from any one player's graveyard (yours too). */ singleGraveyard?: true; /** Osgir, the Reconstructor: "{X}, Exile an artifact card with mana value X from your graveyard": the one X announced as it's activated (CR 107.3a, 602.2b), and `filter` gets that mana value. */ mvX?: true; /** "Put three cards from your graveyard on the bottom of your library" (Battlefield Scrounger): the chosen cards go to the bottom of your library, in the order chosen (CR 401.4), not into exile. */ toBottom?: true; /** "Put a card an opponent owns from exile into that player's graveyard" (the Eldrazi processors): any card an opponent owns in exile, chosen in CostChoices.exileCards. */ process?: true; /** Gorex, the Tombshell: a spell's cost whose cards are all linked to the permanent the spell becomes (CR 607.2q, StackItem.costExiled, CompiledCard.costExileLinked). */ linkSpell?: true }
   /**
    * "Exile an instant or sorcery spell you control" (Nivmagus Elemental, CR 602.2b): one of the ability's controller's spells
    * on the stack that matches, a copy too, chosen in CostChoices.exileSpell; it leaves the stack without being countered.

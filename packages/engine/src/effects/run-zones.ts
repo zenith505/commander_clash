@@ -3075,7 +3075,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           return now ?? (t.types === "all" ? "all" : new Set(t.types));
         });
         const kin = (id: ObjectId) => !e.kinOfCostTapped || (tapped.length > 0 && tapped.every((t) => shareCreatureType(t, creatureTypesOf(s, obj(s, id)))));
-        const cards = [...player(s, from).hand, ...(e.orGraveyard ? p.graveyard : [])].filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.lesserPower || power(s, obj(s, id)) < most) && (!e.auraSwap || swapFits(id)) && kin(id));
+        const cards = [...player(s, from).hand, ...(e.orGraveyard ? p.graveyard : [])].filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.lesserPower || power(s, obj(s, id)) < most) && (!e.auraSwap || swapFits(id)) && kin(id) && (!e.hostableAuras || !defOf(s, obj(s, id)).subtypes.includes("Aura") || auraHostOptions(s, obj(s, id), p.id).length > 0));
         const upTo = e.upTo === undefined ? Infinity : amountNow(s, e.upTo, ctx);
         // "You may put a land card from your hand onto the battlefield. If you don't, ..." (Hakbal): whether one was put.
         s.resolving!.did = false;

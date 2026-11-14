@@ -1,7 +1,7 @@
 # Roadmap
 
-31,337 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,881 of
+31,347 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,885 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -319,7 +319,7 @@ line blocks.
    Out after round 182 (ranks 12,330 to 13,222): City of
    Solitude (mana abilities only on your turn), Words of Waste, Kirtar's Wrath and Cleansing Meditation (threshold
    "instead" sweepers), Chandra, Heart of Fire, Lynde, Salt Road Ambushers, Origin of the Hidden Ones, Grab the Reins (done in round 325),
-   Pyromancer Ascension, Verdant Mastery, Primal Adversary, Planar Void (done in round 299), In Too Deep, Dollhouse of Horrors, Harald
+   Pyromancer Ascension (done in round 367), Verdant Mastery, Primal Adversary, Planar Void (done in round 299), In Too Deep, Dollhouse of Horrors, Harald
    Unites the Elves (done in round 326), Exquisite Archangel (done in round 329), Kellan, Planar
    Trailblazer, Najal, Rescue from the Underworld, Seal of the Guildpact (done in round 299), Fear of Infinity, Elderscale Wurm (done in round 324), Cradle of
    Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order (done in round 324),
@@ -781,7 +781,7 @@ line blocks.
    enter this turn" (The Fifth Doctor). +21 (27,521 of 31,936 with round 205 and Lane B round B35).
    Out after round 206 (looked at, not done): Havengul Laboratory (its back face's "the creature put onto the
    battlefield with ~"), Briarbridge Patrol ("deals damage to one or more creatures"), Mutated Cultist (done in round 300) ("remove all
-   counters from target permanent or opponent"), Elminster ("the number of cards looked at while scrying"), Sivitri, Dragon Master (done in round 302) (an attack tax paid in life), Obsidian Charmaw ("lands that could produce
+   counters from target permanent or opponent"), Elminster ("the number of cards looked at while scrying"), Sivitri, Dragon Master (done in round 302) (an attack tax paid in life), Obsidian Charmaw (done in round 367) ("lands that could produce
    {C}"), Dramatist's Puppet and Quarry Hauler (put or remove a counter of each kind, a choice per kind), Aquamorph
    Entity (done in round B139) (its "is turned face up" path).
    Round 207 went on from the top: "each creature card in your graveyard has unearth {2}{B}" and the same for artifact
@@ -2606,7 +2606,7 @@ line blocks.
    target, discard and creature-type paths. +6, 31,251 of 31,936. The compiled text of every other card is unchanged.
    Out after round 358 (looked at, not done): Garland, Royal Kidnapper (control "for as long as they're the monarch"),
    Urza Assembles the Titans (loyalty abilities twice this turn), Invisible Woman, Sue Storm (still no batched counters
-   event), Obsidian Charmaw ("each land your opponents control that could produce {C}": every mana ability of every land
+   event), Obsidian Charmaw (done in round 367) ("each land your opponents control that could produce {C}": every mana ability of every land
    read for {C}, conditional ones too).
    Round 359 went on down `npm run popular`, most played first: Sin, Spira's Punishment's "Whenever ~ enters or attacks,
    exile a permanent card from your graveyard at random, then create a tapped token that's a copy of that card. If the
@@ -2788,6 +2788,66 @@ line blocks.
    a lock tied to the source's tapped state); Ashes of the Fallen (a chosen creature type for creature cards in your
    graveyard only: the off-field type statics cover every zone outside the battlefield); Garland, Royal Kidnapper and Reap
    (still out).
+   Round 366 went on down `npm run popular`, most played first, to prevention that makes tokens, triggers on turning face
+   up, mana burn, an Aura that trades its creature for a combat and one that blinks its creature with its Auras: Ria Ivor,
+   Bane of Bladehold's "At the beginning of combat on your turn, the next time target creature would deal combat damage
+   to one or more players this combat, prevent that damage. If damage is prevented this way, create that many 1/1
+   colorless Phyrexian Mite artifact creature tokens with toxic 1 and "This token can't block."" (one shield for the first
+   combat damage event in which it would deal damage to players, CR 615.8, not its damage to creatures, ending with the
+   combat; the Mites part of the prevention, CR 615.5; DamageRuleSpec `tokens` with `thisCombat`); Panoptic Projektor's
+   "{T}: The next face-down creature spell you cast this turn costs {3} less to cast." (costModThisTurn `next` with
+   `faceDown`) and "If turning a face-down permanent face up causes a triggered ability of a permanent you control to
+   trigger, that ability triggers an additional time." (its own "when ~ is turned face up" abilities too, rulings, CR
+   603.2d; triggersAgain `by.event` "turnedFaceUp", a Cause set in effects/triggers.ts); Yurlok of Scorch Thrash's "A
+   player losing unspent mana causes that player to lose that much life." (as pools empty, CR 500.4, or an effect empties
+   one, CR 106.4; not mana kept or turned colorless; once however many Yurloks, rulings; CompiledCard `manaBurn`,
+   manaBurn in game.ts) and "{1}, {T}: Each player adds {B}{R}{G}." (a mana ability, CR 605.1a; ManaAbility
+   `toEachPlayer`: what it makes, replacements included, for every player; triggered extra mana only for the activator);
+   Breath of Fury's "When enchanted creature deals combat damage to a player, sacrifice it and attach this Aura to a
+   creature you control. If you do, untap all creatures you control and after this phase, there is an additional combat
+   phase." (the creature chosen as it resolves, not targeted; "If you do" needs both the sacrifice and the attach; with no
+   creature to move to, nothing else happens and the Aura goes to the graveyard, rulings; SpellCondition
+   `attachedThisWay`, ResolvingInfo `attachedNow`); Flickerform's "{2}{W}{W}: Exile enchanted creature and all Auras
+   attached to it. At the beginning of the next end step, return that card to the battlefield under its owner's control.
+   If you do, return the other cards exiled this way to the battlefield under their owners' control attached to that
+   creature." (the creature first, then each Aura that can legally enchant it, the rest staying exiled; a token creature
+   brings nothing back; a bestow card returns as a creature, rulings; Effects flickerWithAuras and returnAurasAttached in
+   effects/run-round366.ts). Browser tests click through Ria Ivor's target, Breath of Fury's choice, Flickerform's
+   ability and its return, Yurlok's mana and Panoptic Projektor's ability. Bots aim Ria Ivor's shield at one of their own
+   creatures and move Breath of Fury to their biggest creature; they don't activate Flickerform or Panoptic Projektor
+   (not taught when it's worth it). +5. The compiled text of every other card is unchanged.
+   Out after round 366 (looked at, not done): Sokrates, Athenian Teacher ("~'s controller and that player each draw half
+   that many cards": draws inside a combat damage event, which can stop for dredge and similar choices with nothing to
+   resume them); Spectral Searchlight (still out: another player choosing a color inside a mana ability); Filigree Vector
+   (still out: two "any number of target" groups); Pulmonic Sliver (an optional replacement for a permanent going to a
+   graveyard, a choice in the middle of any zone change); Sudden Substitution and the rest above rank 6,900 (still out).
+   Round 367 went on down `npm run popular` and the "Out after round N" lists, most played first, to "could produce" counts,
+   a tapped land tapping the rest, a cumulative upkeep paid in stolen lands, a quest that copies spells and a Saga's Aura
+   or Equipment from hand or graveyard: Obsidian Charmaw's "This spell costs {1} less to cast for each land your opponents
+   control that could produce {C}." (every mana ability of each land read for {C}, whether or not it could be activated
+   now, a Reflecting Pool by what its controller's other lands could make, CR 106.7, rulings; a `couldProduce` count in
+   oracle/counts.ts); Mana Web's "Whenever a land an opponent controls is tapped for mana, tap all lands that player
+   controls that could produce any type of mana that land could produce." (every type the land could produce, not only
+   the one it made; a trigger on the stack the opponent can respond to; the lands it taps make no mana, rulings; Effect
+   `tapLandsSharingMana`, with the land's types as it was tapped kept in TriggerEventInfo `couldProduce` for when it's
+   gone); Herald of Leshrac's "Cumulative upkeep—Gain control of a land you don't control." (a different land for each age
+   counter, chosen as it resolves, not targeted; fewer such lands than age counters can't be paid, rulings, CR 702.24a;
+   cumulativeUpkeep `gainControlCost`), "This creature gets +1/+1 for each land you control but don't own." and "When this
+   creature leaves the battlefield, each player gains control of each land they own that you control." (every land you
+   control but don't own, however you got it, rulings; ownersGainControl); Pyromancer Ascension's "Whenever you cast an
+   instant or sorcery spell that has the same name as a card in your graveyard, you may put a quest counter on this
+   enchantment." and "Whenever you cast an instant or sorcery spell while this enchantment has two or more quest counters
+   on it, you may copy that spell. You may choose new targets for the copy." (two counters already on it as the spell is
+   cast, a condition on the event only, CR 603.2, rulings; the copy made even if the spell is gone); Vault 101: Birthday
+   Party's "II, III — You may put an Aura or Equipment card from your hand or graveyard onto the battlefield. If an
+   Equipment is put onto the battlefield this way, you may attach it to a creature you control." (an Aura card that
+   couldn't be attached to anything can't be chosen, rulings, CR 303.4f: putFromHand `hostableAuras`; the Equipment to a
+   creature chosen as it resolves). Browser tests click through Herald of Leshrac's upkeep and its land, Vault 101's card
+   and creature, Pyromancer Ascension's copy and Mana Web's tapping. Bots answer Herald of Leshrac's upkeep with the
+   existing may and pick logic. +5, 31,347 of 31,936 with round 366 and Lane B's B205-B206. The compiled text of every other card is unchanged.
+   Out after round 367 (looked at, not done): Helm of Kaldra ("Attach those Equipment to it" when you control more than one
+   Equipment with one of the names: no ruling on which); Overburden (in Lane B's round B207); Grip of Chaos, Regenerations
+   Restored and Fabrication Foundry (still out, as in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -2876,7 +2936,7 @@ line blocks.
    Tamiyo, Inquisitive Student and Nephalia Academy (their discard replacements cut across every discard path); Sokrates,
    Athenian Teacher and Swans of Bryn Argoll (draws in the middle of damage, and the damage code can't pause for draw
    replacements such as dredge); Sunken Palace (mana that copies the ability it's spent on); Spectral Searchlight
-   (another player chooses the color during a mana ability); Obsidian Charmaw (left to Lane B).
+   (another player chooses the color during a mana ability); Obsidian Charmaw (done in round 367) (left to Lane B).
    Round 345 went on down the "Out after round N" lists and `npm run popular`, most played first: Last Night Together's
    "Choose two target creatures. Untap them. ... After this main phase, there is an additional combat phase. Only the
    chosen creatures can attack during that combat phase." (the added combat phase only, as the rulings on Bumi, Unleashed
@@ -3281,7 +3341,7 @@ line blocks.
    or more other Heroes at once: no batched counters event yet); Spiteful Repossession (damage to each opponent equal to
    their own difference, then "the damage dealt this way"); Codie, Vociferous Codex (its mana ability's "when you next
    cast a spell this turn" exile); Hellish Rebuke, Greater Gargadon and Foggy Swamp Visions (still out, for the reasons
-   in their earlier lists); Obsidian Charmaw (left for Lane B, as before).
+   in their earlier lists); Obsidian Charmaw (done in round 367) (left for Lane B, as before).
    Round 326 took cards back off the "Out after round N" lists, most played first: "Choose target creature card in a
    graveyard that was put there from the battlefield this turn. Put that card onto the battlefield under your control."
    (Grim Return: any player's graveyard, never a discarded card or a countered creature spell, rulings); "you may attach
@@ -3864,7 +3924,7 @@ line blocks.
    Out after round 303 (looked at, not done): Oskar, Rubbish Reclaimer (done in round 336) ("costs {1} less for each different mana value
    among cards in your graveyard", and casting the discarded card from the graveyard as the trigger resolves); Araumi of
    the Dead Tide (its cost "Exile cards from your graveyard equal to the number of opponents you have"; granting encore
-   now works); Obsidian Charmaw (a cost cut counting "each land your opponents control that could produce {C}", near Lane B's round B140 template, left for it); Lumbering Battlement
+   now works); Obsidian Charmaw (done in round 367) (a cost cut counting "each land your opponents control that could produce {C}", near Lane B's round B140 template, left for it); Lumbering Battlement
    (the exile until it leaves isn't linked yet); Spectral Searchlight, Greater Gargadon, Ride the Avalanche (done in round B203), Panoptic
    Projektor, Read the Runes (done in round 320), Draco, Azra Oddsmaker, Leonin Arbiter (done in round 313), Incinerator of the Guilty (done in round 313), Baba Lysaga (done in round 315), Archelos and
    Hatchery Sliver (still out, for the reasons in their earlier notes).
@@ -4352,7 +4412,7 @@ line blocks.
    turn except the first in your draw step, draw four instead": needs a place among the draw replacements the player
    orders, CR 616.1); The First Tyrannic War I ("if its mana cost contains {X}": a copy's cost counts, rulings, and the
    counters must be there as it enters); Daretti, Ingenious Iconoclast's −6 (a target that's an artifact card in a
-   graveyard or an artifact on the battlefield); Vault 101: Birthday Party (put an Aura or Equipment from hand or
+   graveyard or an artifact on the battlefield); Vault 101: Birthday Party (done in round 367) (put an Aura or Equipment from hand or
    graveyard, then may attach the Equipment); Expedited Inheritance ("its controller may exile that many cards ... They may
    play those cards": an impulse for another player, counting the damage); Obscuring Aether (done in round B198) (turning a permanent without
    morph face down); Abandoned Sarcophagus (casting cards with cycling from the graveyard, and "it wasn't cycled").
@@ -4390,9 +4450,9 @@ line blocks.
    (done in round 272); Whiskervale Forerunner (done in round 338) (put it
    onto the battlefield only on your turn); Deification (choose a planeswalker type, loyalty-damage replacement);
    Anafenza, the Foremost (exile instead of an opponent's graveyard, including cards not on the battlefield); Herald
-   of Leshrac and Burning-Rune Demon (as before).
+   of Leshrac (done in round 367) and Burning-Rune Demon (as before).
    Out after round 237 (looked at, not done): Burning-Rune Demon ("search for exactly two cards ... with different
-   names": no ruling on finding just one); Herald of Leshrac, Vault 21, Whiskervale Forerunner (done in round 338), Rootweaver Druid,
+   names": no ruling on finding just one); Herald of Leshrac (done in round 367), Vault 21, Whiskervale Forerunner (done in round 338), Rootweaver Druid,
    Galadriel, Elven-Queen, Erestor, King of the Oathbreakers, Deification, Indominus Rex, Protean Raider, Anafenza the
    Foremost, Goliath Hatchery (other lines, not started).
    Out after round 236 (looked at, not done): Ochre Jelly (a token copy, at the next end step, that enters with half
@@ -4411,7 +4471,7 @@ line blocks.
    Out after round 233 (looked at, not done): Invisible Woman, Sue Storm (counters put on several creatures at once as one
    trigger); Sorceress's Schemes (done in round 272); Cursecloth Wrappings (done in round 303) (embalm granted to a
    graveyard card); Oblivious Bookworm (a creature that entered face down or was turned face up this turn); Cait, Cage
-   Brawler; Augusta, Order Returned; Vault 101: Birthday Party; The First Tyrannic War; Kitt Kanto;
+   Brawler; Augusta, Order Returned; Vault 101: Birthday Party (done in round 367); The First Tyrannic War; Kitt Kanto;
    Daretti, Ingenious Iconoclast (its −6); Expedited Inheritance; Monstrous Emergence (done in round 362); Nyssa of Traken.
    Out after round 231 (looked at, not done): Ecstatic Beauty ("put four time counters on each of those cards that
    has suspend": counters on the impulsed cards that already have suspend, without granting it); Knowledge Vault (done in round B129)
@@ -5215,7 +5275,7 @@ line blocks.
    - "Didn't attack this turn" without Season of the Witch's exception (Aggression, Air Nomad Student, Erg Raiders,
      Kratos, Angel's Trumpet) isn't parsed yet; `GameObject.couldAttack` records who could attack each turn.
    Left from the X/X tokens, tapped-for-mana and "for as long as you control" round:
-   - Tapped-for-mana triggers still out: Price of Glory (intervening "if it's not that player's turn"), Mana Web,
+   - Tapped-for-mana triggers still out: Price of Glory (intervening "if it's not that player's turn"), Mana Web (done in round 367),
      Treasure Nabber; the Offerings with two "choose an opponent" choices in one ability.
    - "For as long as you control ~" still out: "can't become untapped" (Spider-Woman), "you may play that card for
      as long as you control ~" (Lightning, Victor Mancha, Taster of Wares), "with lesser power" / "power less than

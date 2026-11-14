@@ -22,6 +22,7 @@ import { sharesColorOrMvWithLinked } from "./run-laneb189";
 import { hasSuspend, isSuspended } from "./run-zones";
 import { sourcePowerNow } from "./run-laneb202";
 import { liveEmblems } from "../emblems";
+import { landCouldProduce } from "../manaabilities";
 
 /** The trigger events for the beginning of a step: on your turn, and on every turn. */
 const STEP_TRIGGERS: Partial<Record<Extract<TriggerSourceEvent, { type: "step" }>["step"], [TriggerEvent, TriggerEvent]>> = {
@@ -47,7 +48,7 @@ export function declareAttackersDue(s: GameState, d: DelayedTrigger): boolean {
 }
 
 /** See `causedBy` in fireEvent. */
-type Cause = { event: "enters" | "dies" | /** Left the battlefield, not dying. */ "leaves" | "attacks" | "combatDamage"; objs: { o: GameObject; c?: Characteristics; controller: PlayerId }[] } | { event: "castOrCopy"; caster: PlayerId; objs?: undefined } | /** A player drawing a card (Krang, the All-Powerful). */ { event: "draws"; player: PlayerId; objs?: undefined };
+type Cause = { event: "enters" | "dies" | /** Left the battlefield, not dying. */ "leaves" | "attacks" | "combatDamage" | /** A face-down permanent turned face up (Panoptic Projektor). */ "turnedFaceUp"; objs: { o: GameObject; c?: Characteristics; controller: PlayerId }[] } | { event: "castOrCopy"; caster: PlayerId; objs?: undefined } | /** A player drawing a card (Krang, the All-Powerful). */ { event: "draws"; player: PlayerId; objs?: undefined };
 
 /**
  * How many more times a triggered ability of `src` triggers (CR 603.2d): one for each "triggers an additional time" effect
@@ -1467,7 +1468,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever you tap ~ for mana", "whenever an opponent taps a Mountain for mana" (the land is the subject, "that
     // land"; "that player" is who tapped it).
     const o = obj(s, ev.id);
-    const info = { player: ev.player };
+    // Mana Web: what the land could produce as it was tapped (CR 106.7), for when it's gone by the time that resolves.
+    const info = { player: ev.player, ...(o.zone === "battlefield" && objIsType(s, o, "Land") ? { couldProduce: landCouldProduce(s, o) } : {}) };
     const byOk = (t: TriggeredAbility, you: PlayerId) => !!t.manaTap && (t.manaTap.by === "any" || (t.manaTap.by === "you") === (ev.player === you));
     add(o, controllerOf(s, o), (e, t) => e === "tappedForMana" && !t.manaTap?.filter && byOk(t, controllerOf(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, info);
     for (const id of s.battlefield) {
@@ -1676,6 +1678,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
   } else if (ev.type === "turnedFaceUp") {
     const o = obj(s, ev.id);
+    // Panoptic Projektor: what the turning face up makes trigger, its own "when ~ is turned face up" abilities and others'
+    // (rulings, CR 603.2d); not "as ~ is turned face up" replacements, which don't trigger.
+    causedBy = { event: "turnedFaceUp", objs: [{ o, controller: controllerOf(s, o) }] };
     // An X in its morph or disguise cost is the X its own abilities use (CR 702.37f, 702.168e).
     add(o, controllerOf(s, o), (e) => e === "selfTurnedFaceUp", undefined, undefined, undefined, undefined, ev.x);
     // "When enchanted creature is turned face up" (Fatal Mutation): the Auras on it.
@@ -1688,6 +1693,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // Deathmist Raptor: from its owner's graveyard, "a permanent you control" being its owner's (CR 113.6m, 113.8).
     fromGraveyards((w, owner) => add(w, owner, (e, t) => e === "permanentTurnedFaceUp" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, owner, false) && (!t.turnedByYou || ev.by === owner), undefined, undefined, o));
+    causedBy = null;
   } else if (ev.type === "attacks") {
     const o = obj(s, ev.id);
     causedBy = { event: "attacks", objs: [{ o, controller: controllerOf(s, o) }] };

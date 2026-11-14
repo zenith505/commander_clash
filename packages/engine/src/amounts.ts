@@ -865,8 +865,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "manaSpent":
       return ctx.manaSpent ?? 0;
-    case "convokedCount":
-      return ctx.sourceId !== undefined ? (s.objects[ctx.sourceId]?.convoked?.length ?? 0) : 0;
+    case "convokedCount": {
+      const o = ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined;
+      if (!o) return 0;
+      // Knight-Errant of Eos: the permanent as it last existed on the battlefield once it has left (CR 608.2h).
+      const lk = o.zone !== "battlefield" && o.zone !== "stack" ? s.lastKnown?.[o.id] : undefined;
+      if (lk && (ctx.sourceZc === undefined || lk.zc === ctx.sourceZc)) return lk.convoked ?? 0;
+      return o.convoked?.length ?? 0;
+    }
     case "manaSpentOn": {
       const o = refObjects(s, c.of, ctx)[0];
       if (!o) return 0;

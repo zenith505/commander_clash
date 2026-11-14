@@ -1880,6 +1880,8 @@ export interface TurnLog {
   /** The players who would have created one or more tokens this turn, replaced or not ("the first time you would create one or more tokens each turn", Moonlit Meditation). */
   tokenEvents?: PlayerId[];
   /** Permanents that entered the battlefield, with their controller, card types and colors as they entered. */
+  /** Oblivious Bookworm: the players who turned a permanent face up this turn, by the special action or an effect they controlled (CR 116.2b, 708.8). */
+  turnedFaceUp?: PlayerId[];
   entered?: { controller: PlayerId; /** It entered face down (Tunnel Tipster, CR 708.2). */ faceDown?: true; types: string[]; subtypes?: string[]; colors: Color[]; /** The permanent, for "another" (Éowyn). */ id?: ObjectId; zc?: number; /** A token (Gyome's "nontoken creatures"). */ token?: true; /** It had flying as it entered (Flying Drone's "another creature with flying entered"). */ flying?: true; /** It had every creature type as it entered (changeling, CR 702.73a). */ allCreatureTypes?: true }[];
   /** Noncreature permanents destroyed by a spell or ability: their controller and the destroying spell's or ability's (Cobra Trap). */
   destroyed?: { controller: PlayerId; by: PlayerId }[];

@@ -388,6 +388,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     attackPower: t.attackPower,
     cantBecomeMonarch: t.cantBecomeMonarch,
     scried: t.scried,
+    turnedFaceUp: t.turnedFaceUp ? [...t.turnedFaceUp].sort() : undefined,
     surveilled: t.surveilled,
     coinsFlipped: t.coinsFlipped,
     gainedLife: t.gainedLife,

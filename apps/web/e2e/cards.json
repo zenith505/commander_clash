@@ -28886,6 +28886,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1fb4c1c1-b10c-463f-a97d-eca9f978e371",
+  "name": "Resplendent Marshal",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Angel Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel",
+   "Warrior"
+  ],
+  "oracleText": "Flying\nWhen this creature enters or dies, you may exile another creature card from your graveyard. When you do, put a +1/+1 counter on each creature you control other than this creature that shares a creature type with the exiled card.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ddbe0d17-5cac-417c-afc0-e4aebae83205",
   "name": "Restoration Magic",
   "manaCost": "{W}",
@@ -39450,6 +39483,42 @@
   "commanderLegal": "legal",
   "set": "mic",
   "releasedAt": "2021-09-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cdf5c31c-c324-471f-b6d7-06a06e91daa3",
+  "name": "Vislor Turlough",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Rogue"
+  ],
+  "oracleText": "Deal with the Black Guardian — When Vislor Turlough enters, you may have an opponent gain control of it. If you do, it's goaded for as long as they control it.\nAt the beginning of your end step, draw a card, then you lose life equal to the number of cards in your hand.\nDoctor's companion (You can have two commanders if the other is the Doctor.)",
+  "power": "2",
+  "toughness": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Deal with the Black Guardian",
+   "Goad",
+   "Doctor's companion"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

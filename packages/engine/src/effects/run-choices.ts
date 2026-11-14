@@ -587,6 +587,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (typeof e.about === "object" && e.about.attachedThisWay && !(s.resolving!.attachedThisWay ?? []).some((id) => s.objects[id]?.zone === "battlefield" && s.objects[id]!.attachedTo === o.id && characteristics(s, s.objects[id]!).subtypes.includes("Equipment"))) return;
         about = { id: o.id, zc: o.zoneChanges ?? 0 };
       }
+      // Resplendent Marshal: "When you do, ... the exiled card": the card exiled just before, still that card in exile.
+      if (e.aboutYardChosen) {
+        const c = s.resolving!.chosenFromYard;
+        const card = c ? s.objects[c.id] : undefined;
+        if (!c || !card || card.zone !== "exile" || (card.zoneChanges ?? 0) !== c.zc) return;
+        about = { id: c.id, zc: c.zc };
+      }
       const subject = about ?? item.subject;
       // Gilgamesh: "When you put one or more Equipment onto the battlefield this way": only if any are there now.
       // Yuna's Whistle: "When you reveal a creature card this way": only if one was found.
@@ -1405,7 +1412,9 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     // nothing to return, so nothing to pay for.
     if (e.type === "putOntoBattlefield" && e.what.ref === "target" && !objects(s, e.what, ctx).length) return false;
     // Iroh, Tea Master: "have target opponent gain control of ...": only with that player still a legal target, in the game.
-    if (e.type === "continuous" && e.giveTo && !players(s, e.giveTo, ctx).some((p) => !player(s, p).lost)) return false;
+    // Vislor Turlough: "have an opponent gain control of it": the opponent is chosen first, as part of doing it.
+    const chosenFirst = e.type === "continuous" && e.giveTo?.ref === "chosenPlayer" && effects.slice(0, effects.indexOf(e)).some((x) => x.type === "choose" && x.choice === "opponent") && opponents(s, ctx.controller).length > 0;
+    if (e.type === "continuous" && e.giveTo && !chosenFirst && !players(s, e.giveTo, ctx).some((p) => !player(s, p).lost)) return false;
     if (e.type === "counters" && (e.what.ref === "target" || (e.what.ref === "self" && effects.length === 1)) && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
     // "Gain control of target land ... for as long as you control ~" (Orcish Squatters): over before it begins if you no
     // longer control ~ (CR 611.2b), so it can't be done.

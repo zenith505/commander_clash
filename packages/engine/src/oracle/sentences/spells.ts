@@ -715,6 +715,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // Vivien, Monsters' Advocate: "search your library for a creature card with lesser mana value, put it onto the
     // battlefield, then shuffle": less than that spell's mana value, X included (rulings), as it resolves.
     const lesser = !xBody ? /^(search your library for an? [a-z]+ card) with lesser mana value(, .+)$/.exec(m[2]!) : null;
+    // Ride the Avalanche: "When you next cast a spell this turn, put X +1/+1 counters on up to one target creature, where X
+    // is the mana value of that spell": the delayed trigger's own target, chosen as it's put on the stack (rulings), and
+    // that spell's mana value as it is on the stack, or last was (CR 603.7, 608.2h).
+    if (!xBody && !lesser && !fromHand && ctx.spell && before === 0 && /\btarget\b/.test(m[2]!) && /^put a number of \+1\/\+1 counters equal to that spell's mana value on up to one target creature$/.test(m[2]!)) {
+      const tb = parseBody(`${m[2]!.replace(/^./, (c) => c.toUpperCase())}.`, { castSpell: true });
+      if (!tb || tb.targets.length !== 1) return null;
+      return [{ type: "nextCast", filter, effects: tb.effects, targets: tb.targets, text: m[2]! }];
+    }
     const inner0 = xBody ? replaceX(xBody.effects, { count: { kind: "castSpellX" } }) : parseSentence((lesser ? `${lesser[1]}${lesser[2]}` : m[2]!).replace(/^./, (c) => c.toUpperCase()), { ...ctx, castSpell: true, spellIt: true });
     if (!inner0 || ctx.targets.length !== before) return null;
     let inner = inner0;

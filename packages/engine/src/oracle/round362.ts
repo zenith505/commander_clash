@@ -39,7 +39,7 @@ export function round362Sentence(s: string, sentences: string[], si: number, ctx
     const except = parseCopyExcept("it has this ability");
     if (effects.length !== 1 || prev?.type !== "mill" || prev.who.ref !== "eachPlayer" || ctx.targets.length || !except?.thisAbility) return "fail";
     const creature: TargetSpec = { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" };
-    effects.push({ type: "chooseFromGraveyard", filter: creature, n: 1, upTo: true, dest: "exile", anyGraveyard: true, milled: true, inGraveyards: true });
+    effects.push({ type: "chooseFromGraveyard", filter: creature, n: 1, upTo: true, dest: "exile", anyGraveyard: true, milled: true, milledInYard: true });
     return { effect: { type: "if", cond: { kind: "yardChosenIs", filter: creature }, effects: [{ type: "becomeCopy", what: { ref: "self" }, of: { ref: "chosenFromYard" }, except, duration: "game" }] }, next: si + 2 };
   }
   // Open the Omenpaths: "Add two mana of any one color and two mana of any other color.": a color chosen as it resolves,

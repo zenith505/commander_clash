@@ -20,6 +20,7 @@ import { isRingBearer, ringTrigger } from "./run-ring";
 import { kickedMatches } from "./run-spells";
 import { sharesColorOrMvWithLinked } from "./run-laneb189";
 import { hasSuspend, isSuspended } from "./run-zones";
+import { sourcePowerNow } from "./run-laneb202";
 import { liveEmblems } from "../emblems";
 
 /** The trigger events for the beginning of a step: on your turn, and on every turn. */
@@ -1081,6 +1082,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (at) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBlocksCreature" && t.blockPower === "attackerLess" && power(s, at) < power(s, o), undefined, undefined, at);
       }
     }
+    // Tide of War: "Whenever one or more creatures block": once, if any blocker at all was declared (rulings, CR 509.3a).
+    if (s.battlefield.some((id) => !!obj(s, id).blocking?.length)) for (const w of watchers) add(w, controllerOf(s, w), (e) => e === "creaturesBlock");
     // Neyith of the Dire Hunt: once if one or more creatures its controller controls became blocked (rulings).
     for (const w of watchers) {
       const you = controllerOf(s, w);
@@ -2309,6 +2312,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // "With mana value 2 or less" (Sea Gate Stormcaller): the spell's on the stack, its X counted (CR 202.3e).
       const { manaValue: mvRange, ...rest } = d.filter;
       if (mvRange && !inRange(item ? spellManaValue(s, item) : defMv(ev.card), mvRange)) continue;
+      // Loki Laufeyson: "with mana value less than or equal to ~'s power", that power as the spell is cast (CR 603.2), as it
+      // last existed on the battlefield once it has left (CR 113.7a, 608.2h).
+      if (d.mvMaxPowerOf && (item ? spellManaValue(s, item) : defMv(ev.card)) > sourcePowerNow(s, d.mvMaxPowerOf)) continue;
       if (d.loyalty === "only" || d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(rest, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
       // Zevlor, Elturel Exile: a spell that doesn't target only one opponent or one opponent's permanent doesn't use it up.
       if (d.onlyOpponentOrTheirs && opponentOrTheirsTarget(s, item?.targets ?? [], d.controller) === undefined) continue;
@@ -2958,6 +2964,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       stepWatch(o, controllerOf(s, o));
     }
     fromGraveyards(stepWatch);
+    // Darigaaz Reincarnated: "At the beginning of your upkeep, if this card is exiled with an egg counter on it": a card's
+    // ability that works in exile, its owner controlling it (CR 113.6, 113.8; round B202).
+    fromExiled(stepWatch);
     fromEmblems(stepWatch);
     // "At the beginning of each combat this turn" (Full Throttle): a delayed trigger made by a spell (CR 603.7b).
     fromFloating((o, you, triggers) => add(o, you, (e) => e === each, triggers, undefined, undefined, undefined, undefined, undefined, { player: ev.active }));

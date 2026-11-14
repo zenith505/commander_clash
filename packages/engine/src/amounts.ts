@@ -466,6 +466,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "yardChosenMv":
       return (s.resolving?.yardChosen ?? []).filter((id) => s.objects[id]?.zone === "exile").reduce((n, id) => n + defMv(defOf(s, s.objects[id]!)), 0);
+    case "yardChosenPower":
+      return (s.resolving?.yardChosen ?? []).filter((id) => s.objects[id]?.zone === "exile").reduce((n, id) => n + characteristics(s, s.objects[id]!).power, 0);
     case "yardChosenThisWay":
       return (s.resolving?.yardChosen ?? []).filter((id) => !!s.objects[id] && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!)))).length;
     case "discardedThisWay": {
@@ -566,6 +568,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.dugToHand ?? 0;
     case "dugToHandMv":
       return (s.resolving?.dugToHandCards ?? []).reduce((a, id) => a + defMv(defOf(s, s.objects[id]!)), 0);
+    case "dungeonsCompleted": {
+      const done = s.players[ctx.controller]?.completedDungeons ?? [];
+      return c.distinct ? new Set(done).size : done.length;
+    }
     case "returnedToYourHand":
       return (s.resolving?.returnedToHand ?? []).filter((id) => s.objects[id]?.zone === "hand" && s.objects[id]!.owner === ctx.controller).length;
     case "milledManaValue": {
@@ -1479,6 +1485,8 @@ function describeCount(c: Count): string {
       return `#${c.filter?.text ?? "card"}s exiled this way`;
     case "yardChosenMv":
       return "the exiled card's mana value";
+    case "yardChosenPower":
+      return "the total power of the exiled cards";
     case "discardedThisWay":
       return c.greatest ? "the most cards discarded" : "#cards discarded";
     case "discardedManaValue":
@@ -1545,6 +1553,8 @@ function describeCount(c: Count): string {
       return "#cards put into your hand";
     case "dugToHandMv":
       return "that card's mana value";
+    case "dungeonsCompleted":
+      return c.distinct ? "#differently named dungeons you've completed" : "#dungeons you've completed";
     case "returnedToYourHand":
       return "#cards returned to your hand";
     case "searchFoundMv":

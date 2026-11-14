@@ -162,6 +162,8 @@ export interface Characteristics {
   blocksOnlyFlyers: boolean;
   /** "Attacks each combat if able" (CR 508.1d). */
   attacksIfAble: boolean;
+  /** "Attacks a player each combat if able" (Nahiri, the Unforgiving): with `attacksIfAble`, a player, not a planeswalker or battle (CR 508.1d). */
+  attacksPlayerIfAble: boolean;
   /** Untaps during each other player's untap step too. */
   untapsDuringOthers: boolean;
   /** Generic mana per creature attacking its controller (Ghostly Prison). */
@@ -415,6 +417,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantBeSuspected: false,
     blocksOnlyFlyers: false,
     attacksIfAble: false,
+    attacksPlayerIfAble: false,
     untapsDuringOthers: false,
     attackTax: 0,
     attackTaxPlaneswalkers: 0,
@@ -757,7 +760,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
   const yard = () => s.players[you]?.graveyard.map((id) => defOf(s, s.objects[id]!)) ?? [];
   switch (cond.kind) {
     case "selfInExile": // Senu's intervening if (CR 603.4): the same object, face up in its owner's exile
-      return src.zone === "exile" && !src.faceDown && src.owner === you && (sourceZc === undefined || (src.zoneChanges ?? 0) === sourceZc);
+      return src.zone === "exile" && !src.faceDown && src.owner === you && (sourceZc === undefined || (src.zoneChanges ?? 0) === sourceZc) && (!cond.counter || (src.counters[cond.counter] ?? 0) > 0);
     case "selfSuspended": // CR 702.62b: in exile, with suspend (printed or gained there) and a time counter on it
       return src.zone === "exile" && !src.faceDown && src.owner === you && (sourceZc === undefined || (src.zoneChanges ?? 0) === sourceZc) && (src.counters.time ?? 0) > 0 && (!!compileCard(defOf(s, src)).suspend || src.gainedSuspend === (src.zoneChanges ?? 0));
     case "selfStill":
@@ -800,8 +803,14 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const who = cond.who === "attached" ? (src.attachedTo && chars.get(src.attachedTo) ? chars.get(src.attachedTo)!.controller : undefined) : you;
       return who !== undefined && (s.players[who]?.graveyard.length ?? 0) >= cond.n;
     }
-    case "graveyardTypes": // delirium: card types, not subtypes or supertypes (CR 205.2a)
-      return new Set(yard().flatMap((d) => (cond.permanent ? d.types.filter((t) => PERMANENT_CARD_TYPES.includes(t)) : d.types))).size >= cond.n;
+    case "graveyardTypes": {
+      // delirium: card types, not subtypes or supertypes (CR 205.2a). Happily Ever After: your permanents' card types as the
+      // layers so far have them, together with those of the cards in your graveyard (an adventurer card's own types only,
+      // rulings).
+      const types = yard().flatMap((d) => (cond.permanent ? d.types.filter((t) => PERMANENT_CARD_TYPES.includes(t)) : d.types));
+      if (cond.andPermanents) for (const c of chars.values()) if (c.controller === you) types.push(...c.types);
+      return new Set(types).size >= cond.n;
+    }
     case "graveyardPermanents": // descend
       return yard().filter((d) => d.types.some((t) => PERMANENT_CARD_TYPES.includes(t))).length >= cond.n;
     case "selfCounter": // unleash (CR 702.98a)
@@ -2060,6 +2069,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       // Trench Behemoth: only in that player's combats, not the one going on as it resolved.
       if (m.turnOf !== undefined && (m.turnOf !== s.activePlayer || (m.notCombat && m.notCombat.turn === s.turn && m.notCombat.combat === (s.combatsThisTurn ?? 0)))) return;
       c.attacksIfAble = true;
+      if (m.player) c.attacksPlayerIfAble = true;
       return;
     case "mustAttackMostLife":
       c.mustAttackMostLife = true;

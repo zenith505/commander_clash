@@ -396,6 +396,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Fiery Gambit: flip again until more wins do nothing more (each flip risks the whole spell).
     // Game of Chaos: having just won, flip again only to win back what the game has cost us, or for a chance to finish the
     // opponent, and only while losing the next stake wouldn't kill us.
+    // Liar's Pendulum: reveal only when the guess was wrong, for the card; a right guess would show the hand for nothing.
+    if (pend.kind === "chooseMay" && pend.liarReveal) return [{ type: "chooseMay", player: pid, yes: !pend.liarReveal.guessedRight }];
     if (pend.kind === "chooseMay" && pend.chaosAgain) {
       const { stake, net, against } = pend.chaosAgain;
       const safe = player(s, pid).life > stake;
@@ -725,6 +727,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         if (found.length >= pend.max || mv(s, id) > left) continue;
         found.push(id);
         left -= mv(s, id);
+      }
+      return [{ type: "searchLibrary", player: pid, found }];
+    }
+    // "With total power X or less" (Moorland Rescuer, round B202): the best-ranked cards that still fit.
+    if (pend.kind === "searchLibrary" && pend.totalPower !== undefined) {
+      const found: string[] = [];
+      let left = pend.totalPower;
+      const pow = (id: string) => characteristics(s, s.objects[id]!).power;
+      for (const id of chooseSearch(s, pid, pend.cards, pend.cards.length)) {
+        if (found.length >= pend.max || pow(id) > left) continue;
+        found.push(id);
+        left -= pow(id);
       }
       return [{ type: "searchLibrary", player: pid, found }];
     }
@@ -1790,6 +1804,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Master of Predicaments: most cards in a hand have mana value 4 or less, so we guess that; as the chooser, our
     // costliest nonland card, the one a wrong guess pays off most for.
     if (pend.kind === "chooseOption" && pend.what === "predicamentGuess") return [{ type: "chooseOption", player: pid, choice: "notOver" }];
+    // Liar's Pendulum: a deck is singleton (CR 903.5b), so a named card (other than a basic land) seen anywhere outside the
+    // namer's hand isn't in it; otherwise we expect them to have named a card they hold. Only public information is used.
+    if (pend.kind === "chooseOption" && pend.what === "liarGuess") {
+      const namer = s.resolving?.item.controller;
+      const name = s.resolving?.chosen?.name;
+      const q = namer !== undefined ? player(s, namer) : undefined;
+      const shown = q ? [...q.graveyard, ...q.command, ...q.exile.filter((id) => !obj(s, id).faceDown), ...s.battlefield.filter((id) => obj(s, id).owner === namer && !obj(s, id).faceDown)] : [];
+      const seen = name !== undefined && shown.some((id) => !obj(s, id).isToken && defOf(s, obj(s, id)).name === name && !(defOf(s, obj(s, id)).supertypes ?? []).includes("Basic"));
+      return [{ type: "chooseOption", player: pid, choice: seen ? "out" : "in" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "predicamentCard") {
       const spells = pend.options.filter((id) => !isType(defOf(s, obj(s, id)), "Land")).sort((a, b) => mv(s, b) - mv(s, a));
       return [{ type: "chooseOption", player: pid, choice: spells[0] ?? pend.options[0]! }];
@@ -8078,7 +8102,7 @@ function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: O
     if (atPlayer(owner) >= player(s, owner).life) continue;
     const blockers = s.battlefield.map((id) => obj(s, id)).filter((b) => controllerOf(s, b) === owner && untappedForBlocking(s, b) && objIsType(s, b, "Creature"));
     const free = attacks
-      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !mustAttackPlayers(s, obj(s, a.attacker)).length && !attackProblem(s, obj(s, a.attacker), owner))
+      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !characteristics(s, obj(s, a.attacker)).attacksPlayerIfAble && !mustAttackPlayers(s, obj(s, a.attacker)).length && !attackProblem(s, obj(s, a.attacker), owner))
       .filter((a) => blockers.every((b) => blockProblem(s, b, obj(s, a.attacker), owner)))
       .filter((a) => hit(obj(s, a.attacker), pw) > 0)
       .sort((a, b) => hit(obj(s, a.attacker), pw) - hit(obj(s, b.attacker), pw));
@@ -8113,7 +8137,7 @@ function attackBattles(s: GameState, pid: PlayerId, attacks: { attacker: ObjectI
     const guard = b.protector!;
     const blockers = s.battlefield.map((id) => obj(s, id)).filter((x) => controllerOf(s, x) === guard && untappedForBlocking(s, x) && objIsType(s, x, "Creature"));
     const free = attacks
-      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !mustAttackPlayers(s, obj(s, a.attacker)).length && !attackProblem(s, obj(s, a.attacker), guard))
+      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !characteristics(s, obj(s, a.attacker)).attacksPlayerIfAble && !mustAttackPlayers(s, obj(s, a.attacker)).length && !attackProblem(s, obj(s, a.attacker), guard))
       .filter((a) => atPlayer(a.defender) < player(s, a.defender).life)
       .filter((a) => blockers.every((x) => blockProblem(s, x, obj(s, a.attacker), guard)))
       .filter((a) => hit(obj(s, a.attacker), b) > 0)

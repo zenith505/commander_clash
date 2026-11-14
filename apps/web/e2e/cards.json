@@ -8835,6 +8835,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e03b553a-3d0d-453e-ad3e-f7d4b9fb2624",
+  "name": "Delaying Shield",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If damage would be dealt to you, put that many delay counters on this enchantment instead.\nAt the beginning of your upkeep, remove all delay counters from this enchantment. For each delay counter removed this way, you lose 1 life unless you pay {1}{W}.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ody",
+  "releasedAt": "2001-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8d57dadb-c689-4691-b331-aba15daf46ff",
   "name": "Delina, Wild Mage",
   "manaCost": "{3}{R}",
@@ -20506,6 +20532,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4f88ddfa-5478-426a-a978-dfc64c687db1",
+  "name": "Liar's Pendulum",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}, {T}: Choose a card name. Target opponent guesses whether a card with that name is in your hand. You may reveal your hand. If you do and your opponent guessed wrong, draw a card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "33a7d29a-ebc0-4606-91b6-7381e2a16016",
   "name": "Library",
   "manaCost": "",
@@ -23219,6 +23267,37 @@
   "commanderLegal": "legal",
   "set": "eoe",
   "releasedAt": "2025-08-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f687a746-4807-41d5-848d-4053ddef6a76",
+  "name": "Moorland Rescuer",
+  "manaCost": "{5}{W}",
+  "cmc": 6,
+  "typeLine": "Creature — Human Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "When this creature dies, return any number of other creature cards with total power X or less from your graveyard to the battlefield, where X is this creature's power. Exile this card.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mic",
+  "releasedAt": "2021-09-24",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

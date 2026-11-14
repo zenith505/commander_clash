@@ -5,6 +5,7 @@ import { parseActivated } from "./activated";
 import { parseTrigger } from "./triggers";
 import { parseBody } from "./body";
 import type { Ctx } from "./body";
+import { roundB201Sentence, roundB201Spell } from "./laneb201";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -109,8 +110,8 @@ export function roundB200Line(line: string, raw: string, out: CompiledCard, isSp
 }
 
 /** Round B200's sentences, read at the end of round B197's chain. */
-export function roundB200Sentence(_s: string, _sentences: string[], _si: number, _ctx: Ctx, _effects: Effect[]): Found {
-  return null;
+export function roundB200Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  return roundB201Sentence(s, sentences, si, ctx, effects);
 }
 
 /** A whole spell's text read at once; undefined when it isn't one of these, null when it is but fails. */
@@ -136,5 +137,5 @@ export function roundB200Spell(text: string): AbilityBody | null | undefined {
     if (!body || body.targets.length || d?.type !== "destroy" || d.what.ref !== "each" || Object.keys(d).length !== 2) return null;
     return { targets: [], effects: [{ type: "othersChooseDestroyRest", filter: { ...d.what.filter, text: "nonland permanent" } }], text };
   }
-  return undefined;
+  return roundB201Spell(text);
 }

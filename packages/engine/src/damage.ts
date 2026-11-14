@@ -848,7 +848,7 @@ function modLabel(s: GameState, m: LiveMod): string {
     : d.op === "allBut" ? `Prevent all but ${d.n} of it`
     : d.op === "raiseTo" || d.op === "setTo" ? `Make it ${modExtra(s, m)}`
     : d.op === "counters" && d.mill ? `Put that many ${d.counter} counters on ${m.card} and mill that many cards instead`
-    : d.op === "counters" ? `Put that many ${d.counter} counters on ${d.to?.self ? "it" : m.card} instead`
+    : d.op === "counters" ? `Put that many ${d.counter} counters on ${d.to?.self || d.onDamaged ? "it" : m.card} instead`
     : d.op === "mill" && d.exileTop ? "Exile that many cards from the top of the library instead"
     : d.op === "mill" ? "Mill that many cards instead"
     : d.op === "destroy" ? "Destroy it instead"
@@ -1145,7 +1145,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         const before = at[i]!;
         at[i] = modAmount(s, m, before);
         seen[i]!.add(m.key);
-        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}), ...toPlayer(to), ...(m.mod.op === "counters" && m.holder ? { counters: { id: m.holder.id, counter: m.mod.counter!, by: m.mod.you } } : {}), ...(m.mod.op === "destroy" && "object" in to ? { destroy: to.object } : {}), ...(m.mod.mill && "player" in to ? { mill: true as const, ...(m.mod.exileTop ? { exileTop: true as const } : {}) } : {}) });
+        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}), ...toPlayer(to), ...(m.mod.op === "counters" && (m.mod.onDamaged ? "object" in to : m.holder) ? { counters: { id: m.mod.onDamaged && "object" in to ? to.object : m.holder!.id, counter: m.mod.counter!, by: m.mod.you } } : {}), ...(m.mod.op === "destroy" && "object" in to ? { destroy: to.object } : {}), ...(m.mod.mill && "player" in to ? { mill: true as const, ...(m.mod.exileTop ? { exileTop: true as const } : {}) } : {}) });
       }
     };
     // How much of the damage a shield takes from each source's: `pick` chooses one at a time, among the options in the

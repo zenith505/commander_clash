@@ -1930,6 +1930,8 @@ export interface DamageMod {
   op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo" | /** "Put that many -1/-1 counters on it instead" (Lichenthrope, Phytohydra, CR 614.1a): none of it is dealt; `counter`s go on the holder. */ "counters" | /** "Destroy that creature instead" (Kill-Suit Cultist): none of it is dealt; the creature it would be dealt to is destroyed (rulings). */ "destroy" | /** Undead Alchemist: the damaged player mills that many cards instead. */ "mill";
   /** With op "counters": the kind put on the permanent instead of the damage (Force Bubble's depletion counters go on the holder, though the damage would be dealt to you). */
   counter?: CounterKind;
+  /** With op "counters": "put that many -1/-1 counters on that creature instead" (Soul-Scar Mage): on the permanent the damage would be dealt to, not the holder. */
+  onDamaged?: true;
   /** With op "mill" or "counters" (Szadek, Lord of Secrets): the player the damage would have been dealt to mills that many cards instead. */
   mill?: true;
   /** With `mill` (Crumbling Sanctuary): that player exiles that many cards from the top of their library instead, not a mill (CR 701.17a). */
@@ -2465,7 +2467,7 @@ export type StaticCondition =
   /** "If ~ is suspected" (CR 701.60); `not`: "if it's not suspected". */
   | { kind: "suspected"; not?: true }
   /** "If you have the initiative" (CR 726.1). */
-  | { kind: "initiative" }
+  | { kind: "initiative"; /** Undercellar Sweep: "if you or a player you're attacking has the initiative": or a player (not a planeswalker or battle) your creatures attack in this combat. */ orAttacked?: true }
   /**
    * "As long as you've completed a dungeon" (CR 309.7), in this game, whenever it was (rulings on Nadaar); `name`: "if you
    * haven't completed Tomb of Annihilation" (with `not`).
@@ -3310,6 +3312,8 @@ export type Effect =
        * ability's source, if it's on the battlefield) for each permanent put there (CR 603.7).
        */
       sacrificeOnLostControl?: true | { id: ObjectId; zc: number };
+      /** Coffin Queen: "When ~ becomes untapped or you lose control of ~, exile that creature": a delayed trigger watching this ability's source (if it's on the battlefield) for each permanent put there, once, the first time either happens (CR 603.7c). */
+      exileOnUntapOrLostControl?: true;
       /** With `atNextEndStep`: "you may return that card ... at the beginning of the next end step if ~ is still on the battlefield" (Shirei): the choice then, only while the source is still the object it was. */
       ifSourceHere?: true;
       mayThen?: true;
@@ -5059,7 +5063,7 @@ export type Effect =
   | { type: "topTurn"; top: FromTop }
   | { type: "graveyardTurn"; cast?: TargetSpec; lands?: true; exileInstead?: true; /** "From any graveyard" (The Great Work). */ anyGraveyard?: true; /** Osteomancer Adept: "by foraging in addition to paying their other costs" (CR 601.2f-h): the costs of a spell cast this way. */ costs?: AdditionalCost[]; /** Osteomancer Adept: "If you cast a spell this way, that creature enters with a finality counter on it" (CR 614.1c). */ entersWith?: { counter: CounterKind; n: number }; /** "If a spell cast this way would be put into a graveyard, exile it instead." */ exileCast?: true }
   /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
-  | { type: "costModThisTurn"; mod: CostMod; /** "... until your next turn" (Elspeth Conquers Death): as that turn begins (CR 611.2b). */ untilYourNextTurn?: true; /** "The next spell you cast this turn costs {1} less to cast" (Hardened Berserker): only the next such spell its controller casts this turn, used up as it becomes cast (CR 601.2f, 601.2i). */ next?: true; /** "Costs {X} less ..., where X is ~'s power as this ability resolves" (Maelstrom Muse): generic mana `mod.n` times this, counted as it resolves. */ times?: Amount; /** Cheering Fanatic: "spells with the chosen name": the card name chosen as it resolves, locked into `mod.filter.named`. */ chosenName?: true }
+  | { type: "costModThisTurn"; mod: CostMod; /** "... until your next turn" (Elspeth Conquers Death): as that turn begins (CR 611.2b). */ untilYourNextTurn?: true; /** Will Kenrith: "Until your next turn, instant, sorcery, and planeswalker spells that player casts cost {2} less to cast": the spells this player casts (the target player), until this ability's controller's next turn (with `untilYourNextTurn`). */ who?: PlayerRef; /** "The next spell you cast this turn costs {1} less to cast" (Hardened Berserker): only the next such spell its controller casts this turn, used up as it becomes cast (CR 601.2f, 601.2i). */ next?: true; /** "Costs {X} less ..., where X is ~'s power as this ability resolves" (Maelstrom Muse): generic mana `mod.n` times this, counted as it resolves. */ times?: Amount; /** Cheering Fanatic: "spells with the chosen name": the card name chosen as it resolves, locked into `mod.filter.named`. */ chosenName?: true }
   /**
    * "Your opponents can't cast spells this turn" (Silence), "target player can't ..." (Orim's Chant), "players can't cast
    * noncreature spells this turn" (Calamity's Wake): those players, chosen as it resolves, until the turn ends; `filter`

@@ -12,12 +12,16 @@ import { parseCount } from "./counts";
 import { parseSentence } from "./sentence";
 import { PERMANENT_TYPES } from "./targets";
 import { parseTrigger } from "./triggers";
+import { round360Sentence } from "./round360";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round359Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 360's sentences first (oracle/round360.ts).
+  const r360 = round360Sentence(s, sentences, si, ctx, effects);
+  if (r360) return r360;
   const line = plain(s);
   const next = plain(sentences[si + 1]);
   const prev = effects[effects.length - 1];

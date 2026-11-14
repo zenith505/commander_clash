@@ -3188,7 +3188,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Coffin Queen: "When ~ becomes untapped or you lose control of ~, exile that creature" watches it the same way.
       const watchSelf = e.sacrificeOnLostControl === true || !!e.exileOnUntapOrLostControl;
       const watch = watchSelf ? (ctx.sourceId ? s.objects[ctx.sourceId] : undefined) : undefined;
-      const watched = watchSelf ? (watch?.zone === "battlefield" && (ctx.sourceZc === undefined || (watch.zoneChanges ?? 0) === ctx.sourceZc) ? { id: watch.id, zc: watch.zoneChanges ?? 0 } : undefined) : e.sacrificeOnLostControl;
+      const watched = watchSelf ? (watch?.zone === "battlefield" && (ctx.sourceZc === undefined || (watch.zoneChanges ?? 0) === ctx.sourceZc) ? { id: watch.id, zc: watch.zoneChanges ?? 0 } : undefined) : e.sacrificeOnLostControl === true ? undefined : e.sacrificeOnLostControl;
       if (e.atNextEndStep) {
         // Seraph: "put that card onto the battlefield under your control at the beginning of the next end step" (CR 603.7),
         // if it's still that card then.

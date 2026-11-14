@@ -1,6 +1,6 @@
 # Roadmap
 
-31,320 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,326 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,881 of
 9,979 (99%).
 
@@ -2781,8 +2781,8 @@ line blocks.
    only right after The Moment leaves, as it was; with The Moment already gone, untapped but not phased out, rulings).
    Browser tests click through Archnemesis's move, Mirkwood Trapper's choice of attacker and New Way Forward's source.
    Bots move Archnemesis to whoever attacks them, pump their best attacker, cast New Way Forward against an attack of 4 or
-   more, and keep The Moment's phasing for an opponent's spell or ability aimed at one of their creatures. +5, 31,320 of
-   31,936. The compiled text of every other card is unchanged.
+   more, and keep The Moment's phasing for an opponent's spell or ability aimed at one of their creatures. +5, 31,326 of
+   31,936 with Lane B's B204. The compiled text of every other card is unchanged.
    Out after round 365 (looked at, not done): Archelos, Lagoon Mystic and Kraven the Hunter (still out, as in the earlier
    lists); The Pandorica ("It can't phase in for as long as ~ remains tapped", then phasing in when it untaps or leaves:
    a lock tied to the source's tapped state); Ashes of the Fallen (a chosen creature type for creature cards in your

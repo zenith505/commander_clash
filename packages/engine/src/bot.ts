@@ -8,6 +8,7 @@ import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana
 import { cantSearch } from "./effects/run-library";
 import { GUESS_PROMPT } from "./effects/run-round319";
 import { HOST_OR_NAMED_PROMPT } from "./effects/run-round321";
+import { redistributions } from "./effects/run-round362";
 import { abilitiesOf, lethalLeft, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
 import { reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
@@ -1279,6 +1280,19 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const hitters = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid && objIsType(s, o, "Creature") && power(s, o) > 0 && !objHasKeyword(s, o, "Defender"));
       return [{ type: "chooseOption", player: pid, choice: hitters.length ? "draw" : "combat" }];
     }
+    // Reverse the Sands: the most life for us, then the least for the opponent with the most, then the fewest changes.
+    if (pend.kind === "chooseOption" && pend.what === "redistribute") {
+      const { order } = redistributions(s);
+      const lives = order.map((x) => player(s, x).life);
+      const me = order.indexOf(pid);
+      const score = (o: string) => {
+        const way = o.split(",").map(Number);
+        const got = way.map((from) => lives[from]!);
+        const top = Math.max(...got.filter((_, i) => i !== me), 0);
+        return (me >= 0 ? got[me]! : 0) * 1000 - top * 10 - way.filter((from, to) => lives[from] !== lives[to]).length;
+      };
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => score(b) - score(a))[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "giveLife") return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => player(s, Number(b)).life - player(s, Number(a)).life)[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "nthPlayer") {
       const r = s.resolving;
@@ -1761,6 +1775,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const theirs = t?.kind === "player" ? player(s, t.id).hand.length : 0;
         return [{ type: "chooseOption", player: pid, choice: String(Math.max(0, Math.min(pend.numberRange?.max ?? 0, p.life - 20, theirs))) }];
       }
+      // Plunge into Darkness: "look at that many cards ... Put one of those cards into your hand and exile the rest": a few
+      // looks for the one card, keeping 20 life.
+      const look = s.resolving && allEffects(s.resolving.body.effects).find((x) => x.type === "dig" && typeof x.n === "object" && "count" in x.n && x.n.count.kind === "x");
+      if (look) return [{ type: "chooseOption", player: pid, choice: String(Math.max(0, Math.min(pend.numberRange?.max ?? 0, p.life - 20, 4, p.library.length))) }];
       const n = Math.max(0, Math.min(pend.numberRange?.max ?? 0, p.life - 15, p.library.length - 2, 5 - p.hand.length));
       return [{ type: "chooseOption", player: pid, choice: String(n) }];
     }
@@ -5324,6 +5342,17 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     if (t?.kind === "player") return harmsChosenTarget(r.body) ? t.id !== pid && !player(s, t.id).lost : t.id === pid;
     return !!t && t.kind === "object" && !!s.objects[t.id] && isMine(s, pid, t) !== harmsChosenTarget(r.body);
   }
+  // Deceiver of Form: "You may put that card on the bottom of your library": a land we don't need any more, or a card we
+  // couldn't cast for a while; otherwise it's our next draw.
+  if (r && e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "topToBottom" && r.revealed && s.objects[r.revealed.id]?.zone === "library") {
+    const d = defOf(s, obj(s, r.revealed.id));
+    const have = lands(s, pid);
+    return isType(d, "Land") ? have >= 6 : defMv(d) > have + 2;
+  }
+  // Deceiver of Form: "If a creature card is revealed this way, you may have creatures you control other than ~ become copies
+  // of that card": the may inside the condition, only if they gain by it.
+  const innerCopy = e?.type === "if" && e.effects.length === 1 && e.effects[0]!.type === "may" && e.effects[0]!.effects.length === 1 ? e.effects[0]!.effects[0] : undefined;
+  if (r && innerCopy?.type === "becomeCopy" && innerCopy.of.ref === "revealed") return copyGain(s, pid, innerCopy) > 0;
   if (!r || e?.type !== "may") return true;
   // Phyrexian Dreadnought: keep it only by sacrificing other creatures worth less than it, together.
   const floor = e.keep && e.effects.length === 1 && e.effects[0]!.type === "pick" ? e.effects[0]!.minTotalPower : undefined;
@@ -5417,7 +5446,8 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
       continue;
     }
     if (inner.type === "becomeCopy") {
-      v += copyGain(s, pid, inner) >= 0 ? 1 : -2;
+      // Vesuvan Drifter: revealing is only for the copy, so a worse copy decides it.
+      v += copyGain(s, pid, inner) >= 0 ? 1 : inner.of.ref === "revealed" ? -10 : -2;
       continue;
     }
     const i = targetIndexOf(inner);
@@ -5469,17 +5499,30 @@ const defWorth = (d: CardDef) => (isType(d, "Creature") ? 3 * basePower(d) + bas
 function copyGain(s: GameState, pid: PlayerId, e: Extract<Effect, { type: "becomeCopy" }>): number {
   const item = s.resolving!.item;
   const me = item.sourceId ? s.objects[item.sourceId] : undefined;
-  if (e.what.ref !== "self" || me?.zone !== "battlefield") return 0;
+  if (me?.zone !== "battlefield") return 0;
+  // Vesuvan Drifter, Deceiver of Form: the card revealed from the top of the library, or about to be one we may look at
+  // (Drifter's "You may look at the top card of your library any time").
+  const rv = s.resolving!.revealed;
+  const top = s.players[pid]!.library[0];
+  const revealed = e.of.ref === "revealed" ? (rv && s.objects[rv.id] ? defOf(s, obj(s, rv.id)) : top && compileCard(defOf(s, me)).lookTop ? defOf(s, obj(s, top)) : undefined) : undefined;
+  if (revealed && !isType(revealed, "Creature")) return 0;
+  // Deceiver of Form: "creatures you control other than ~": what each of them gains, together.
+  if (revealed && e.what.ref === "each" && e.what.other) {
+    const mine = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== me.id && controllerOf(s, o) === pid && objIsType(s, o, "Creature"));
+    return mine.reduce((n, o) => n + defWorth(revealed) - defWorth(defOf(s, o)), 0);
+  }
+  if (e.what.ref !== "self") return 0;
   const t = e.of.ref === "target" ? item.targets?.[e.of.index] : undefined;
   const sub = item.subject && s.objects[item.subject.id];
   const d =
-    t?.kind === "object"
+    revealed ??
+    (t?.kind === "object"
       ? defOf(s, obj(s, t.id))
       : e.of.ref === "subject" && sub
         ? defOf(s, sub)
         : e.of.ref === "subjectCard" && item.lki?.copyKey
           ? s.cards[item.lki.copyKey]
-          : undefined;
+          : undefined);
   if (!d) return 0;
   const legend = d.supertypes.includes("Legendary") && s.battlefield.some((id) => id !== me.id && controllerOf(s, obj(s, id)) === pid && defOf(s, obj(s, id)).name === d.name);
   return legend ? -1 : defWorth(d) - defWorth(defOf(s, me));
@@ -6064,6 +6107,13 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
       case "loseLife":
         v += e.who.ref === "you" ? -estimate(e.n) / 2 : estimate(e.n);
         break;
+      case "redistributeLife": {
+        // Reverse the Sands: the most life among the players, ours to take (as we'd choose, see "redistribute").
+        const { order, ways } = redistributions(s);
+        const me = order.indexOf(pid);
+        if (me >= 0) v += (Math.max(...ways.map((w) => player(s, order[w[me]!]!).life)) - player(s, pid).life) / 2;
+        break;
+      }
       case "exchangeLife": {
         // The life we'd gain (or lose) by taking the other player's total.
         const who = (r: typeof e.a) => {

@@ -9,12 +9,16 @@ import type { Ctx } from "./body";
 import { parseCount } from "./counts";
 import { parseSentence } from "./sentence";
 import { parseTrigger } from "./triggers";
+import { round362Sentence } from "./round362";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round361Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 362's sentences first (oracle/round362.ts).
+  const r362 = round362Sentence(s, sentences, si, ctx, effects);
+  if (r362) return r362;
   const line = plain(s);
   const next = plain(sentences[si + 1]);
   // Spiteful Repossession: "~ deals damage to each opponent who controls more lands than you equal to the difference. Then

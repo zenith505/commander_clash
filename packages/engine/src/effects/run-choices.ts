@@ -13,7 +13,7 @@ import { dealDamageBatch } from "../damage";
 import { kickedMatches, paidUnless } from "./run-spells";
 import { discardCards } from "./run-library";
 import { canTransform, lockedDoors } from "./run-permanents";
-import { describePay } from "./describe";
+import { COLOR_NAMES, describePay } from "./describe";
 import { doesNothingNow } from "./heuristics";
 import { cardNameOptions } from "../names";
 import { voteAmongMost, voteWins } from "./run-votes";
@@ -877,6 +877,19 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const range = bound ? { min: e.range.min, max: Math.max(e.range.min, ...players(s, bound, ctx).map((x) => player(s, x)[e.maxHandOf ? "hand" : "library"].length)) } : e.range;
         s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: [String(range.min)], numberRange: range, prompt: e.prompt ?? (bound ? `choose a number greater than ${e.range.min - 1} (up to ${range.max}, the cards in that player's ${e.maxHandOf ? "hand" : "library"})` : `choose a number between ${range.min} and ${range.max}`) };
         return "paused";
+      }
+      // Open the Omenpaths: "and two mana of any other color": a second color chosen as it resolves, any but the first
+      // (CR 608.2d); it takes the first one's place for the mana after it.
+      if (e.choice === "color" && e.otherColor) {
+        const sc = (r.scratch ??= {});
+        if (!sc.asked) {
+          sc.asked = true;
+          const first = r.chosen?.color;
+          r.chosen = { ...r.chosen, color: undefined };
+          s.pending = { kind: "chooseOption", player: e.who ? players(s, e.who, ctx)[0] ?? ctx.controller : ctx.controller, source: src, what: "color", options: choiceOptions("color", first ? COLOR_NAMES[first] : undefined), prompt: first ? `choose a color other than ${COLOR_NAMES[first].toLowerCase()}` : "choose a color" };
+          return "paused";
+        }
+        return;
       }
       if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "colors" ? "colors" : e.choice === "basicLandType" || e.choice === "landType" ? "landType" : e.choice === "keyword" ? "keyword" : e.choice === "parity" ? "parity" : e.choice === "direction" ? "direction" : e.choice === "landOrNonland" ? "landOrNonland" : e.choice === "planeswalkerType" ? "planeswalkerType" : "type"] === undefined) {
         const chooser = e.who ? players(s, e.who, ctx)[0] : ctx.controller;

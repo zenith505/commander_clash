@@ -128,6 +128,19 @@ function effectsValue(s: GameState, pid: PlayerId, controller: PlayerId, es: Eff
       case "createToken":
         to([controller], 2 * n(e.n));
         break;
+      // Trial of a Time Lord: the cards it exiled go for good instead of coming back: a loss to each owner as big as each
+      // card's mana value (and more), worth as much to the vote's controller as it hurts them.
+      case "untilLeavesToBottom": {
+        const src = s.resolving?.item.sourceId ? s.objects[s.resolving.item.sourceId] : undefined;
+        for (const l of src?.exiledUntilLeaves ?? []) {
+          const c = s.objects[l.id];
+          if (c?.zone !== "exile") continue;
+          const w = 3 + defMv(defOf(s, c));
+          to([c.owner], -w);
+          if (c.owner !== controller) to([controller], w);
+        }
+        break;
+      }
       case "extraTurn":
         to([controller], 10);
         break;

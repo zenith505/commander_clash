@@ -26,7 +26,9 @@ export function copiedValues(s: GameState, ref: ObjRef, ctx: ResolveCtx): CardDe
   // 707.2), the front face of a double-faced card (CR 712.8a).
   // Scion of the Ur-Dragon: the card the search put into the graveyard, as printed (CR 707.2), the front face of a
   // double-faced card (CR 712.8a); removing it from the graveyard later changes nothing (rulings).
-  if (ref.ref === "chosenFromYard" || ref.ref === "searchFound") {
+  // Vesuvan Drifter, Deceiver of Form: the card revealed from the top of the library, as printed (CR 707.2, rulings), the
+  // front face of a double-faced card (CR 712.8a).
+  if (ref.ref === "chosenFromYard" || ref.ref === "searchFound" || ref.ref === "revealed") {
     const o = objects(s, ref, ctx)[0];
     return o && o.zone !== "battlefield" && o.zone !== "stack" && !o.isToken ? restingDef(s.cards[o.cardId]!) : undefined;
   }

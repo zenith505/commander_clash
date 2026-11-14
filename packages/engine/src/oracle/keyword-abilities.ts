@@ -973,6 +973,9 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     const creature = m[2] ? { types: ["Creature"] } : {};
     return { kind: "reveal", filter: { kind: "card", subtypes: [st], ...creature, text: `${st}${m[2] ?? ""} card` }, n: 1, orControl: { kind: "object", subtypes: [st], ...creature, controller: "you", text: `${st}${m[2] ?? ""} you control` }, ...(m[3] ? { exile: true as const } : {}) };
   }
+  // Monstrous Emergence: "choose a creature you control or reveal a creature card from your hand": beholding a creature in
+  // all but name (CR 701.4a), a creature card from the hand or a creature you control, which the spell's text then names.
+  if (text === "choose a creature you control or reveal a creature card from your hand") return { kind: "reveal", filter: { kind: "card", types: ["Creature"], text: "creature" }, n: 1, orControl: { kind: "object", types: ["Creature"], controller: "you", text: "creature you control" } };
   if ((m = /^reveal an? (.+? card) from your hand$/i.exec(text))) {
     const filter = parseSearchFilter(m[1]!);
     return filter ? { kind: "reveal", filter, n: 1 } : null;

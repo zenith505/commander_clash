@@ -1,7 +1,7 @@
 // Phasing (CR 702.26): a phased-out permanent is treated as though it doesn't exist, without changing zones.
 
 import { objHasKeyword } from "./cards";
-import { clearCombat, log, nameOf, obj, removeFromCombat } from "./game";
+import { clearCombat, log, nameOf, obj, removeFromCombat, whileControlledHolds } from "./game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
 import { pairedWith } from "./cards";
 import type { GameState, ObjectId, PlayerId } from "./types";
@@ -62,7 +62,8 @@ export function phaseOut(s: GameState, ids: ObjectId[]) {
 export function phaseIn(s: GameState, ids: ObjectId[]) {
   const list = (s.phasedOut ??= []);
   // "They can't phase in" (Teferi, Timeless Voyager) until that lock ends, whatever would phase them in.
-  const all = [...new Set(ids)].filter((id) => s.objects[id]?.zone === "phasedOut" && !s.objects[id]!.phased?.lock);
+  // The Phasing of Zhalfir: "It can't phase in for as long as you control ~" (lockWhile).
+  const all = [...new Set(ids)].filter((id) => s.objects[id]?.zone === "phasedOut" && !s.objects[id]!.phased?.lock && !phaseLockedWhile(s, id));
   for (let i = 0; i < all.length; i++)
     for (const id of list) if (s.objects[id]!.phased?.indirect && s.objects[id]!.attachedTo === all[i] && !all.includes(id)) all.push(id);
   if (!all.length) return;
@@ -86,6 +87,15 @@ export function phaseIn(s: GameState, ids: ObjectId[]) {
 }
 
 /**
+ * The Phasing of Zhalfir: a phased-out permanent that can't phase in "for as long as you control ~", while that player
+ * still controls that object (CR 400.7, 611.2b); a phased-out ~ isn't controlled by anyone (CR 702.26b, rulings).
+ */
+export function phaseLockedWhile(s: GameState, id: ObjectId): boolean {
+  const w = s.objects[id]?.phased?.lockWhile;
+  return !!w && whileControlledHolds(s, w);
+}
+
+/**
  * The phasing event of `ap`'s untap step, before anything untaps (CR 702.26a): their phased-in permanents with
  * phasing phase out, and at the same time what phased out under their control phases in, along with what a player
  * who left the game phased out once that player's next turn would have begun (702.26n).
@@ -94,7 +104,7 @@ export function untapStepPhasing(s: GameState, ap: PlayerId) {
   const out = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === ap && objHasKeyword(s, obj(s, id), "Phasing"));
   const back = (s.phasedOut ?? []).filter((id) => {
     const p = s.objects[id]!.phased;
-    return p && !p.indirect && !p.until && !p.lock && (p.by === ap || p.released);
+    return p && !p.indirect && !p.until && !p.lock && !phaseLockedWhile(s, id) && (p.by === ap || p.released);
   });
   phaseOut(s, out);
   phaseIn(s, back);

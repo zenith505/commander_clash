@@ -2,7 +2,7 @@ import type { DamageRecipient, Effect, PlayerRef } from "../abilities";
 import { putPlayerCounters } from "../counters";
 import { defMv } from "../faces";
 import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { addPhases, canPreventDamage, inCombatPhase, drawGame, loseEnergy, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
+import { addPhases, manaBurn, canPreventDamage, inCombatPhase, drawGame, loseEnergy, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planDamage, unpreventable, type DamageEvent, type DamageSource } from "../damage";
@@ -1000,16 +1000,21 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       gainLife(s, up, diff);
       return;
     }
-    case "loseUnspentMana":
+    case "loseUnspentMana": {
       // Mana Short: all of it, mana kept "until end of turn" or by a permanent too (CR 106.4).
+      const lost: [PlayerId, number][] = [];
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
         if (!Object.values(p.manaPool).some((n) => n > 0)) continue;
+        lost.push([pid, Object.values(p.manaPool).reduce((a, n) => a + n, 0)]);
         p.manaPool = emptyPool();
         p.manaLots = undefined;
         log(s, `${p.name} loses all unspent mana.`);
       }
+      // Yurlok of Scorch Thrash: that mana lost costs life too.
+      manaBurn(s, lost);
       return;
+    }
     case "exchangeLifeWithSelf": {
       // CR 701.12g: the life total becomes the power or toughness ~ had, and it gets that player's previous life total.
       const [pid] = players(s, e.who, ctx);

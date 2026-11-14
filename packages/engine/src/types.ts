@@ -2581,6 +2581,8 @@ export interface AttackCostDue {
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
 export interface TriggerEventInfo {
   amount?: number;
+  /** "Whenever a land is tapped for mana" (Mana Web): the types of mana that land could produce as it was tapped (CR 106.7), for when it has left by the time the ability resolves. */
+  couldProduce?: ManaType[];
   /** Archfiend of Spite: the source that dealt the damage, for "that source's controller" as the ability resolves (rulings); while it's still that object on the battlefield or the stack, its controller then, otherwise `player`, its controller as it last existed (CR 608.2h). */
   sourceOf?: { id: ObjectId; zc: number };
   /** A counters-put trigger: the kind of counter put (Bold Plagiarist's "the same number and kind of counters"). */
@@ -2872,6 +2874,8 @@ export interface Resolving {
   /** Whether its controller won its last clash (CR 701.30d), for "If you win, ...". */
   /** Clash of Elements: the owner chose to put it on top of their library (putInLibrary "ownersChoice"). */
   putOnTop?: true;
+  /** Breath of Fury: an attachToChosen of this resolution attached something ("If you do"). */
+  attachedNow?: true;
   wonClash?: boolean;
   /** A draw of this resolution was replaced (dredge, Alhammarret's Archive): Sindbad's "reveal it" then does nothing (rulings). */
   drawReplaced?: true;

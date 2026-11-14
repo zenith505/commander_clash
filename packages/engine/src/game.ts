@@ -3759,7 +3759,26 @@ function manaKeeping(s: GameState, pid: PlayerId): { all: boolean; colors: Set<M
   return out;
 }
 
+/**
+ * Yurlok of Scorch Thrash: "A player losing unspent mana causes that player to lose that much life": mana burn, at the
+ * same time the mana is lost, without the stack (rulings), once however many such permanents there are (rulings). All
+ * the players losing mana at once lose their life at once (one life-loss event, CR 119.3).
+ */
+export function manaBurn(s: GameState, lost: [PlayerId, number][]): void {
+  const burns = lost.filter(([pid, n]) => n > 0 && !player(s, pid).lost);
+  const src = burns.length ? s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).manaBurn) : undefined;
+  if (src === undefined) return;
+  simultaneousLifeLoss(s, () => {
+    for (const [pid, n] of burns) {
+      log(s, `${player(s, pid).name} loses ${n} unspent mana and ${n} life (${nameOf(s, src)}).`);
+      loseLife(s, pid, n);
+    }
+  });
+}
+
 function emptyManaPools(s: GameState): void {
+  const total = (pool: Record<ManaType, number>) => Object.values(pool).reduce((a, n) => a + n, 0);
+  const lost: [PlayerId, number][] = [];
   for (const p of s.players) {
     // Mana empties as each step ends (CR 500.4), except firebending's red until end of combat (702.189a), mana kept
     // "until end of turn", lost as the cleanup step ends (514.2), and mana a permanent keeps (manaKeeping). Kept mana keeps
@@ -3790,9 +3809,11 @@ function emptyManaPools(s: GameState): void {
       }
     }
     if (changed) log(s, `${p.name}'s unspent mana becomes ${keeping.becomes === "C" ? "colorless" : COLOR_NAMES[keeping.becomes as Color].toLowerCase()} instead of emptying.`);
+    lost.push([p.id, total(p.manaPool) - total(pool)]);
     p.manaPool = pool;
     p.manaLots = kept.length ? kept : undefined;
   }
+  manaBurn(s, lost);
 }
 
 function advanceStep(s: GameState): void {
@@ -5746,6 +5767,13 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // "Whenever you cast a permanent spell using mana produced by Tecutlan": its mana is kept apart, to tell.
   const source = abilitiesOf(s, o).triggers.some((t) => t.cast?.manaFromSelf) ? `${o.id}#${o.zoneChanges ?? 0}` : undefined;
   if (getter !== p.id) log(s, `${p.name} taps ${name}: ${player(s, getter).name} adds ${adds.map((m) => `{${m}}`).join("")}.`);
+  // Yurlok of Scorch Thrash: "Each player adds {B}{R}{G}": the others get what it makes too (a replacement like Mana
+  // Reflection's changes what the permanent produces, CR 106.12), not the activator's own riders or extra mana.
+  if (ab.toEachPlayer) {
+    const others = turnOrderFrom(s, s.activePlayer).filter((q) => q !== p.id && !player(s, q).lost);
+    if (others.length) log(s, `${name}: each player adds ${adds.map((m) => `{${m}}`).join("")}.`);
+    for (const q of others) addMana(s, q, adds, { from });
+  }
   addMana(s, getter, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: ab.spentCreatureCounter } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
   // Tyvar the Bellicose: "Whenever a mana ability of this creature resolves" (CR 605.3b), the mana it made.
   if (o.zone === "battlefield") fireEvent(s, { type: "manaAbilityResolved", id: o.id, amount: adds.length });

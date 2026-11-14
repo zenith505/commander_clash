@@ -73,6 +73,8 @@ import { round362Line } from "./round362";
 import { round363Line } from "./round363";
 import { round364Line } from "./round364";
 import { round365Line } from "./round365";
+import { round366Line } from "./round366";
+import { round367Line } from "./round367";
 import { roundB189Line } from "./laneb189";
 
 const cache = new Map<string, CompiledCard>();
@@ -6088,6 +6090,10 @@ export function compile(d: CardDef): CompiledCard {
     if (round364Line(line, raw, out, isSpell)) continue;
     // Round 365's whole lines (oracle/round365.ts).
     if (round365Line(line, raw, out, isSpell)) continue;
+    // Round 366's whole lines (oracle/round366.ts).
+    if (round366Line(line, raw, out, isSpell)) continue;
+    // Round 367's whole lines (oracle/round367.ts).
+    if (round367Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -8519,6 +8525,10 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
   if (line === "If you casting or copying an instant or sorcery spell causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time.") return { by: { event: "castOrCopy" } };
   // Krang, the All-Powerful: any player's draw (CR 603.2d); not abilities that trigger on what the draw led to (rulings).
   if (line === "If a player drawing a card causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time.") return { by: { event: "draws" } };
+  // Panoptic Projektor: any face-down permanent turning face up, anyone's, however it's turned (CR 702.37e, 701.40b, 708.8),
+  // makes each ability of a permanent you control that it triggers trigger once more (CR 603.2d): its own "when ~ is turned
+  // face up" ones too; two Projektors make three in all (rulings).
+  if (line === "If turning a face-down permanent face up causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time.") return { by: { event: "turnedFaceUp" } };
   m = /^If a triggered ability of (?:an? )?(.+?) triggers, (?:that ability|it) triggers an additional time\.$/.exec(line);
   // "Another creature you control of the chosen type" (Roaming Throne): the creature type chosen as it entered.
   const ofChosen = m && /^(another )?(creature you control) of the chosen type$/.exec(m[1]!);

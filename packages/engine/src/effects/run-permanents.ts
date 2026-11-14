@@ -2620,6 +2620,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         const host = s.objects[hosts[me.id]!];
         if (host && canAttachTo(s, me, host)) {
           attachTo(s, me, host);
+          s.resolving!.attachedNow = true;
           log(s, `${defOf(s, me).name} is attached to ${defOf(s, host).name}.`);
         }
         if (each) hosts[me.id] = "done";

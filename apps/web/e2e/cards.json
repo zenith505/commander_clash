@@ -1183,6 +1183,31 @@
   "gameChanger": false
  },
  {
+  "oracleId": "23467047-6dba-4498-b783-1ebc4f74b8c2",
+  "name": "Ancient Tomb",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}{C}. This land deals 2 damage to you.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "zne",
+  "releasedAt": "2020-09-25",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": true
+ },
+ {
   "oracleId": "f4ce6078-8c7b-4f68-b324-13130c63a983",
   "name": "Angel of Serenity",
   "manaCost": "{4}{W}{W}{W}",
@@ -4871,6 +4896,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fdaa0faf-e7ee-48b3-9330-de0fc3792ad3",
+  "name": "Breath of Fury",
+  "manaCost": "{2}{R}{R}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature you control\nWhen enchanted creature deals combat damage to a player, sacrifice it and attach this Aura to a creature you control. If you do, untap all creatures you control and after this phase, there is an additional combat phase.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-05-11",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a41e632f-9d36-44d2-b1dd-e17df0d2486e",
   "name": "Breathkeeper Seraph",
   "manaCost": "{4}{W}{W}",
@@ -4899,6 +4954,38 @@
   "commanderLegal": "legal",
   "set": "voc",
   "releasedAt": "2021-11-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "20283c4a-f1f0-42f0-bc08-6da87474426b",
+  "name": "Breeding Pool",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Forest Island",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Forest",
+   "Island"
+  ],
+  "oracleText": "({T}: Add {G} or {U}.)\nAs this land enters, you may pay 2 life. If you don't, it enters tapped.",
+  "colors": [],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G",
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "trk",
+  "releasedAt": "2026-11-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -13173,6 +13260,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e5345c28-7046-4ff3-a5d6-eeb7a0fb230b",
+  "name": "Flickerform",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\n{2}{W}{W}: Exile enchanted creature and all Auras attached to it. At the beginning of the next end step, return that card to the battlefield under its owner's control. If you do, return the other cards exiled this way to the battlefield under their owners' control attached to that creature.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "rav",
+  "releasedAt": "2005-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3d92f2e6-27df-4329-b552-cf905f7616ba",
   "name": "Flood of Tears",
   "manaCost": "{4}{U}{U}",
@@ -16818,6 +16935,39 @@
   "set": "ncc",
   "releasedAt": "2022-04-29",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ed9e39ad-996c-4a68-8d11-e1c7d35f556c",
+  "name": "Herald of Leshrac",
+  "manaCost": "{6}{B}",
+  "cmc": 7,
+  "typeLine": "Creature — Avatar",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Avatar"
+  ],
+  "oracleText": "Flying\nCumulative upkeep—Gain control of a land you don't control. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nThis creature gets +1/+1 for each land you control but don't own.\nWhen this creature leaves the battlefield, each player gains control of each land they own that you control.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Cumulative upkeep",
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "csp",
+  "releasedAt": "2006-07-21",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -22158,6 +22308,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "82909ff4-f6f7-44f1-bbd0-6e54afa5ee6d",
+  "name": "Mana Web",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever a land an opponent controls is tapped for mana, tap all lands that player controls that could produce any type of mana that land could produce.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "wth",
+  "releasedAt": "1997-06-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "482006a0-bb2a-4533-891b-2195da5e0f01",
   "name": "Manabond",
   "manaCost": "{G}",
@@ -26721,6 +26893,28 @@
   "gameChanger": true
  },
  {
+  "oracleId": "1e1a787a-2294-472d-908d-d4d72821a7cc",
+  "name": "Panoptic Projektor",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: The next face-down creature spell you cast this turn costs {3} less to cast.\nIf turning a face-down permanent face up causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mkc",
+  "releasedAt": "2024-02-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a4fa2afe-52fc-4ad0-a694-693cb9c88096",
   "name": "Pardic Dragon",
   "manaCost": "{4}{R}{R}",
@@ -28547,6 +28741,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "85845b6c-abb5-4591-b987-a375972cf25b",
+  "name": "Pyromancer Ascension",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever you cast an instant or sorcery spell that has the same name as a card in your graveyard, you may put a quest counter on this enchantment.\nWhenever you cast an instant or sorcery spell while this enchantment has two or more quest counters on it, you may copy that spell. You may choose new targets for the copy.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ss3",
+  "releasedAt": "2020-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "636e9863-29ac-476a-86db-d8f73b4adbf4",
   "name": "Qal Sisma Behemoth",
   "manaCost": "{2}{R}",
@@ -30121,6 +30341,43 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": true
+ },
+ {
+  "oracleId": "785f55bb-d47c-470c-94d4-95f69055e35f",
+  "name": "Ria Ivor, Bane of Bladehold",
+  "manaCost": "{2}{W}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Phyrexian Knight",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Knight"
+  ],
+  "oracleText": "Battle cry (Whenever this creature attacks, each other attacking creature gets +1/+0 until end of turn.)\nAt the beginning of combat on your turn, the next time target creature would deal combat damage to one or more players this combat, prevent that damage. If damage is prevented this way, create that many 1/1 colorless Phyrexian Mite artifact creature tokens with toxic 1 and \"This token can't block.\"",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [
+   "Battle Cry"
+  ],
+  "commanderLegal": "legal",
+  "set": "one",
+  "releasedAt": "2023-02-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "2b8afa9f-4236-4c02-a8d5-3c145caecfd6",
@@ -39948,6 +40205,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "77322d69-330e-4b00-b984-62c6d45c9540",
+  "name": "Vault 101: Birthday Party",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Create a 1/1 white Human Soldier creature token and a Food token. (A Food token is an artifact with \"{2}, {T}, Sacrifice this token: You gain 3 life.\")\nII, III — You may put an Aura or Equipment card from your hand or graveyard onto the battlefield. If an Equipment is put onto the battlefield this way, you may attach it to a creature you control.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Food"
+  ],
+  "commanderLegal": "legal",
+  "set": "pip",
+  "releasedAt": "2024-03-08",
+  "rarity": "rare",
+  "layout": "saga",
+  "gameChanger": false
+ },
+ {
   "oracleId": "09496421-74e4-466a-9546-56f2a0c8eef4",
   "name": "Vault of Whispers",
   "manaCost": "",
@@ -42857,6 +43144,50 @@
   "commanderLegal": "legal",
   "set": "c18",
   "releasedAt": "2018-08-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7baaf462-b0e6-4e21-86a7-73a883c4c9f7",
+  "name": "Yurlok of Scorch Thrash",
+  "manaCost": "{1}{B}{R}{G}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Lizard Shaman",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Lizard",
+   "Shaman"
+  ],
+  "oracleText": "Vigilance\nA player losing unspent mana causes that player to lose that much life.\n{1}, {T}: Each player adds {B}{R}{G}.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

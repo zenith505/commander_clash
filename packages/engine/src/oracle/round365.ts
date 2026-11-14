@@ -5,6 +5,7 @@
 // (Mirkwood Trapper) and a creature phased out until its source leaves (The Moment).
 import type { AbilityBody, CompiledCard, Effect, TargetSpec } from "../abilities";
 import type { Ctx } from "./body";
+import { round366Sentence } from "./round366";
 import { parseTrigger } from "./triggers";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
@@ -12,6 +13,9 @@ type Found = { effect: Effect; next: number } | "fail" | null;
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round365Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 366's sentences first (oracle/round366.ts).
+  const r366 = round366Sentence(s, sentences, si, ctx, effects);
+  if (r366) return r366;
   const line = plain(s);
   // The Moment: "{2}, {T}: Untap target creature you control. It phases out until ~ leaves the battlefield.": the target
   // untapped, then phased out (CR 702.26) without phasing in during its controller's untap steps, only right after ~

@@ -714,6 +714,25 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const [q, n] of each) gainLife(s, q, n);
         return runEffect(s, paid, ctx);
       }
+      // Herald of Leshrac: whether to pay first, then a different land you don't control for each age counter, chosen as it
+      // resolves (not targeted), and control of all of them gained at once, for as long as they stay (CR 611.2c). With
+      // fewer such lands than age counters it can't be paid, so it's sacrificed (rulings, CR 118.3); none to gain for no
+      // age counters.
+      if (e.gainControlCost) {
+        if (!sc.n) return runEffect(s, paid, ctx);
+        const filter = e.gainControlCost;
+        const can = s.battlefield.filter((id) => objectMatches(s, filter, obj(s, id), ctx.controller, false));
+        if (can.length < sc.n) {
+          log(s, `${player(s, ctx.controller).name} can't gain control of ${sc.n} ${filter.text}s (${can.length} on the battlefield).`);
+          return runEffect(s, { type: "sacrifice", what: { ref: "self" } }, ctx);
+        }
+        const gain: Effect[] = [
+          { type: "pick", who: { ref: "you" }, filter, n: sc.n, action: "choose", anyController: true, prompt: `choose ${sc.n === 1 ? `a ${filter.text}` : `${sc.n} ${filter.text}s`} to gain control of (cumulative upkeep for ~)` },
+          { type: "continuous", what: { ref: "created" }, mods: [{ kind: "control" }], duration: "game" },
+          paid,
+        ];
+        return runEffect(s, { type: "may", effects: gain, otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Gain control of ${sc.n === 1 ? `a ${filter.text}` : `${sc.n} ${filter.text}s`} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
+      }
       // Varchild's War-Riders: whether to pay first, then an opponent for each age counter (the same or different ones,
       // rulings), each of whom creates the token; all of it is one payment (CR 702.24a), the tokens made together, each
       // player's under their own control (CR 111.2). With no opponent left it can't be paid (CR 118.3).
@@ -1000,6 +1019,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.resolving!.digTook
             : e.cond.kind === "searchFound"
             ? !!s.resolving!.searchFound?.some((id) => printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, obj(s, id))))
+            : e.cond.kind === "attachedThisWay"
+            ? !!s.resolving!.attachedNow && (!(e.cond as { sacrificed?: true }).sacrificed || !!s.resolving!.sacrificedThisWay?.some((k) => k.controller === ctx.controller))
             : e.cond.kind === "shuffledInThisWay"
             ? !!s.resolving!.shuffledIn?.length
             : e.cond.kind === "bouncedThisWay"

@@ -964,6 +964,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.resolving!.digTook
             : e.cond.kind === "searchFound"
             ? !!s.resolving!.searchFound?.some((id) => printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, obj(s, id))))
+            : e.cond.kind === "attachedThisWay"
+            ? !!s.resolving!.attachedNow && (!(e.cond as { sacrificed?: true }).sacrificed || !!s.resolving!.sacrificedThisWay?.some((k) => k.controller === ctx.controller))
             : e.cond.kind === "shuffledInThisWay"
             ? !!s.resolving!.shuffledIn?.length
             : e.cond.kind === "bouncedThisWay"

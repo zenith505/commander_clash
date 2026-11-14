@@ -2863,6 +2863,8 @@ export interface Resolving {
   /** Whether its controller won its last clash (CR 701.30d), for "If you win, ...". */
   /** Clash of Elements: the owner chose to put it on top of their library (putInLibrary "ownersChoice"). */
   putOnTop?: true;
+  /** Breath of Fury: an attachToChosen of this resolution attached something ("If you do"). */
+  attachedNow?: true;
   wonClash?: boolean;
   /** A draw of this resolution was replaced (dredge, Alhammarret's Archive): Sindbad's "reveal it" then does nothing (rulings). */
   drawReplaced?: true;

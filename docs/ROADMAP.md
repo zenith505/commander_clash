@@ -2788,6 +2788,39 @@ line blocks.
    a lock tied to the source's tapped state); Ashes of the Fallen (a chosen creature type for creature cards in your
    graveyard only: the off-field type statics cover every zone outside the battlefield); Garland, Royal Kidnapper and Reap
    (still out).
+   Round 366 went on down `npm run popular`, most played first, to prevention that makes tokens, triggers on turning face
+   up, mana burn, an Aura that trades its creature for a combat and one that blinks its creature with its Auras: Ria Ivor,
+   Bane of Bladehold's "At the beginning of combat on your turn, the next time target creature would deal combat damage
+   to one or more players this combat, prevent that damage. If damage is prevented this way, create that many 1/1
+   colorless Phyrexian Mite artifact creature tokens with toxic 1 and "This token can't block."" (one shield for the first
+   combat damage event in which it would deal damage to players, CR 615.8, not its damage to creatures, ending with the
+   combat; the Mites part of the prevention, CR 615.5; DamageRuleSpec `tokens` with `thisCombat`); Panoptic Projektor's
+   "{T}: The next face-down creature spell you cast this turn costs {3} less to cast." (costModThisTurn `next` with
+   `faceDown`) and "If turning a face-down permanent face up causes a triggered ability of a permanent you control to
+   trigger, that ability triggers an additional time." (its own "when ~ is turned face up" abilities too, rulings, CR
+   603.2d; triggersAgain `by.event` "turnedFaceUp", a Cause set in effects/triggers.ts); Yurlok of Scorch Thrash's "A
+   player losing unspent mana causes that player to lose that much life." (as pools empty, CR 500.4, or an effect empties
+   one, CR 106.4; not mana kept or turned colorless; once however many Yurloks, rulings; CompiledCard `manaBurn`,
+   manaBurn in game.ts) and "{1}, {T}: Each player adds {B}{R}{G}." (a mana ability, CR 605.1a; ManaAbility
+   `toEachPlayer`: what it makes, replacements included, for every player; triggered extra mana only for the activator);
+   Breath of Fury's "When enchanted creature deals combat damage to a player, sacrifice it and attach this Aura to a
+   creature you control. If you do, untap all creatures you control and after this phase, there is an additional combat
+   phase." (the creature chosen as it resolves, not targeted; "If you do" needs both the sacrifice and the attach; with no
+   creature to move to, nothing else happens and the Aura goes to the graveyard, rulings; SpellCondition
+   `attachedThisWay`, ResolvingInfo `attachedNow`); Flickerform's "{2}{W}{W}: Exile enchanted creature and all Auras
+   attached to it. At the beginning of the next end step, return that card to the battlefield under its owner's control.
+   If you do, return the other cards exiled this way to the battlefield under their owners' control attached to that
+   creature." (the creature first, then each Aura that can legally enchant it, the rest staying exiled; a token creature
+   brings nothing back; a bestow card returns as a creature, rulings; Effects flickerWithAuras and returnAurasAttached in
+   effects/run-round366.ts). Browser tests click through Ria Ivor's target, Breath of Fury's choice, Flickerform's
+   ability and its return, Yurlok's mana and Panoptic Projektor's ability. Bots aim Ria Ivor's shield at one of their own
+   creatures and move Breath of Fury to their biggest creature; they don't activate Flickerform or Panoptic Projektor
+   (not taught when it's worth it). +5. The compiled text of every other card is unchanged.
+   Out after round 366 (looked at, not done): Sokrates, Athenian Teacher ("~'s controller and that player each draw half
+   that many cards": draws inside a combat damage event, which can stop for dredge and similar choices with nothing to
+   resume them); Spectral Searchlight (still out: another player choosing a color inside a mana ability); Filigree Vector
+   (still out: two "any number of target" groups); Pulmonic Sliver (an optional replacement for a permanent going to a
+   graveyard, a choice in the middle of any zone change); Sudden Substitution and the rest above rank 6,900 (still out).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

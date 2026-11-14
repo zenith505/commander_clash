@@ -47,7 +47,7 @@ export function declareAttackersDue(s: GameState, d: DelayedTrigger): boolean {
 }
 
 /** See `causedBy` in fireEvent. */
-type Cause = { event: "enters" | "dies" | /** Left the battlefield, not dying. */ "leaves" | "attacks" | "combatDamage"; objs: { o: GameObject; c?: Characteristics; controller: PlayerId }[] } | { event: "castOrCopy"; caster: PlayerId; objs?: undefined } | /** A player drawing a card (Krang, the All-Powerful). */ { event: "draws"; player: PlayerId; objs?: undefined };
+type Cause = { event: "enters" | "dies" | /** Left the battlefield, not dying. */ "leaves" | "attacks" | "combatDamage" | /** A face-down permanent turned face up (Panoptic Projektor). */ "turnedFaceUp"; objs: { o: GameObject; c?: Characteristics; controller: PlayerId }[] } | { event: "castOrCopy"; caster: PlayerId; objs?: undefined } | /** A player drawing a card (Krang, the All-Powerful). */ { event: "draws"; player: PlayerId; objs?: undefined };
 
 /**
  * How many more times a triggered ability of `src` triggers (CR 603.2d): one for each "triggers an additional time" effect
@@ -1676,6 +1676,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
   } else if (ev.type === "turnedFaceUp") {
     const o = obj(s, ev.id);
+    // Panoptic Projektor: what the turning face up makes trigger, its own "when ~ is turned face up" abilities and others'
+    // (rulings, CR 603.2d); not "as ~ is turned face up" replacements, which don't trigger.
+    causedBy = { event: "turnedFaceUp", objs: [{ o, controller: controllerOf(s, o) }] };
     // An X in its morph or disguise cost is the X its own abilities use (CR 702.37f, 702.168e).
     add(o, controllerOf(s, o), (e) => e === "selfTurnedFaceUp", undefined, undefined, undefined, undefined, ev.x);
     // "When enchanted creature is turned face up" (Fatal Mutation): the Auras on it.
@@ -1688,6 +1691,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // Deathmist Raptor: from its owner's graveyard, "a permanent you control" being its owner's (CR 113.6m, 113.8).
     fromGraveyards((w, owner) => add(w, owner, (e, t) => e === "permanentTurnedFaceUp" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, owner, false) && (!t.turnedByYou || ev.by === owner), undefined, undefined, o));
+    causedBy = null;
   } else if (ev.type === "attacks") {
     const o = obj(s, ev.id);
     causedBy = { event: "attacks", objs: [{ o, controller: controllerOf(s, o) }] };

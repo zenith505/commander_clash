@@ -4845,6 +4845,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fdaa0faf-e7ee-48b3-9330-de0fc3792ad3",
+  "name": "Breath of Fury",
+  "manaCost": "{2}{R}{R}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature you control\nWhen enchanted creature deals combat damage to a player, sacrifice it and attach this Aura to a creature you control. If you do, untap all creatures you control and after this phase, there is an additional combat phase.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-05-11",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a41e632f-9d36-44d2-b1dd-e17df0d2486e",
   "name": "Breathkeeper Seraph",
   "manaCost": "{4}{W}{W}",
@@ -13015,6 +13045,36 @@
   "set": "tor",
   "releasedAt": "2002-02-04",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e5345c28-7046-4ff3-a5d6-eeb7a0fb230b",
+  "name": "Flickerform",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\n{2}{W}{W}: Exile enchanted creature and all Auras attached to it. At the beginning of the next end step, return that card to the battlefield under its owner's control. If you do, return the other cards exiled this way to the battlefield under their owners' control attached to that creature.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "rav",
+  "releasedAt": "2005-10-07",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -26407,6 +26467,28 @@
   "gameChanger": true
  },
  {
+  "oracleId": "1e1a787a-2294-472d-908d-d4d72821a7cc",
+  "name": "Panoptic Projektor",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: The next face-down creature spell you cast this turn costs {3} less to cast.\nIf turning a face-down permanent face up causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mkc",
+  "releasedAt": "2024-02-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a4fa2afe-52fc-4ad0-a694-693cb9c88096",
   "name": "Pardic Dragon",
   "manaCost": "{4}{R}{R}",
@@ -29807,6 +29889,43 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": true
+ },
+ {
+  "oracleId": "785f55bb-d47c-470c-94d4-95f69055e35f",
+  "name": "Ria Ivor, Bane of Bladehold",
+  "manaCost": "{2}{W}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Phyrexian Knight",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Knight"
+  ],
+  "oracleText": "Battle cry (Whenever this creature attacks, each other attacking creature gets +1/+0 until end of turn.)\nAt the beginning of combat on your turn, the next time target creature would deal combat damage to one or more players this combat, prevent that damage. If damage is prevented this way, create that many 1/1 colorless Phyrexian Mite artifact creature tokens with toxic 1 and \"This token can't block.\"",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [
+   "Battle Cry"
+  ],
+  "commanderLegal": "legal",
+  "set": "one",
+  "releasedAt": "2023-02-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "2b8afa9f-4236-4c02-a8d5-3c145caecfd6",
@@ -42356,6 +42475,50 @@
   "commanderLegal": "legal",
   "set": "c18",
   "releasedAt": "2018-08-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7baaf462-b0e6-4e21-86a7-73a883c4c9f7",
+  "name": "Yurlok of Scorch Thrash",
+  "manaCost": "{1}{B}{R}{G}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Lizard Shaman",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Lizard",
+   "Shaman"
+  ],
+  "oracleText": "Vigilance\nA player losing unspent mana causes that player to lose that much life.\n{1}, {T}: Each player adds {B}{R}{G}.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

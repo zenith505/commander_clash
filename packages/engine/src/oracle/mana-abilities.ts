@@ -19,6 +19,13 @@ import { parseSearchFilter } from "./search";
 export function parseManaAbility(line0: string): ManaAbility | null {
   // Victory Chimes: "{T}: A player of your choice adds {C}." Still a mana ability (rulings, CR 605.1a): its mana goes to
   // the player chosen.
+  // Yurlok of Scorch Thrash: "{1}, {T}: Each player adds {B}{R}{G}." A mana ability too (CR 605.1a): the same mana for
+  // every player still in the game, all at once.
+  const each = /^(.+): Each player adds ((?:\{[WUBRGC]\})+)\.$/.exec(line0);
+  if (each) {
+    const ab = parseManaAbility(`${each[1]}: Add ${each[2]}.`);
+    return ab && ab.produces.kind === "fixed" ? { ...ab, text: line0, toEachPlayer: true } : null;
+  }
   const chosen = /^(.+): A player of your choice adds ((?:\{[WUBRGC]\})+)\.$/.exec(line0);
   if (chosen) {
     const ab = parseManaAbility(`${chosen[1]}: Add ${chosen[2]}.`);

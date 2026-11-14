@@ -32,6 +32,7 @@ import { runRedistributeLifeEffect } from "./run-round362";
 import { runMayCastExiledSpellEffect, runUntilLeavesToBottomEffect } from "./run-round363";
 import { runChooseSourceNowEffect } from "./run-round364";
 import { runAttachSelfToPlayerEffect } from "./run-round365";
+import { runFlickerWithAurasEffect, runReturnAurasAttachedEffect } from "./run-round366";
 import { runAttackingNowEffect, runDiscardOrSacrificeEffect, runExileTopDamageEachEffect, runGuessTopKindEffect, runReturnSacrificedCardsEffect, runSacrificeTargetsRevealEffect } from "./run-round319";
 import { runRepeatIfDidEffect } from "./run-round320";
 import { runChooseHostOrNamedEffect, runPutMilledPairEffect, runSearchEachExileEffect } from "./run-round321";
@@ -1821,6 +1822,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runChooseSourceNowEffect(s, e, ctx, src);
     case "attachSelfToPlayer":
       return runAttachSelfToPlayerEffect(s, e, ctx);
+    case "flickerWithAuras":
+      return runFlickerWithAurasEffect(s, ctx, src);
+    case "returnAurasAttached":
+      return runReturnAurasAttachedEffect(s, e, ctx, src);
     case "mayCastExiledSpell":
       return runMayCastExiledSpellEffect(s, e, ctx);
     case "sacrificeTargetsReveal":

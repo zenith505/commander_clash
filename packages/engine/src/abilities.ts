@@ -5223,6 +5223,14 @@ export type Effect =
   | { type: "chooseSourceNow"; choose: TargetSpec; yours?: true }
   /** Archnemesis: "you may attach this Aura to that player": the source, still that object on the battlefield, to the first of these players it could enchant (CR 701.3a-b, 702.5d); nothing if it's already attached there. */
   | { type: "attachSelfToPlayer"; who: PlayerRef }
+  /**
+   * Flickerform: "Exile enchanted creature and all Auras attached to it. At the beginning of the next end step, return that
+   * card to the battlefield under its owner's control. If you do, return the other cards exiled this way to the battlefield
+   * under their owners' control attached to that creature." (run-round366.ts)
+   */
+  | { type: "flickerWithAuras" }
+  /** Flickerform's delayed trigger, after its returnExiled of the creature card (the subject): these cards, attached to it if it came back (run-round366.ts). */
+  | { type: "returnAurasAttached"; cards: { id: ObjectId; zc: number }[] }
   /** "If ~ was kicked, ...", with "... instead" as `otherwise` being what it does when it wasn't. */
   | { type: "if"; cond: SpellCondition; effects: Effect[]; otherwise?: Effect[] }
   /**
@@ -5678,6 +5686,8 @@ export type SpellCondition =
   /** "If another Desert was returned this way" (Arid Archway): its "return a ... you control" pick returned one, as it last existed, other than its source. */
   /** "~'s owner shuffles it into their library. If that player does, ..." (Mirror-Mad Phantasm): its shuffleIntoLibrary of the source put it into a library (a token too: it went there before ceasing to exist, rulings). */
   | { kind: "shuffledInThisWay" }
+  /** Breath of Fury: "sacrifice it and attach ~ to a creature you control. If you do": this ability's attachToChosen attached it, after the sacrifice (`sacrificed`: and that sacrificed something). */
+  | { kind: "attachedThisWay"; sacrificed?: true }
   | { kind: "bouncedThisWay"; subtype?: string; another?: true; /** Mistbreath Elder: "Return another creature you control to its owner's hand. If you do, ...": one went to its owner's hand (not a commander sent to the command zone instead). */ returned?: true }
   /** "If you return four or more nontoken permanents you control this way" (Flood of Tears): this resolution's "return all ..." returned at least `n` of them, counting one a replacement sent elsewhere (rulings). */
   | { kind: "returnedYoursAtLeast"; n: number }
@@ -7221,6 +7231,8 @@ export interface ManaAbility {
   text: string;
   /** "{T}: A player of your choice adds {C}." (Victory Chimes): the player chosen as it's activated adds it (Action activateMana `to`). */
   toChosenPlayer?: true;
+  /** "{1}, {T}: Each player adds {B}{R}{G}." (Yurlok of Scorch Thrash): every player still in the game adds what it makes, the activator included. */
+  toEachPlayer?: true;
   manaCost: string; // "{1}" or ""
   tap: boolean;
   /**
@@ -8476,6 +8488,8 @@ export interface CompiledCard {
   lethalByPower?: true;
   /** "Players can't draw cards" (Maralen of the Mornsong, Omen Machine): no draw happens, for any reason, so nothing replaces one (rulings). */
   playersCantDraw?: true;
+  /** "A player losing unspent mana causes that player to lose that much life." (Yurlok of Scorch Thrash): mana burn, once however many there are (rulings). */
+  manaBurn?: true;
   /**
    * Notion Thief: "If an opponent would draw a card except the first one they draw in each of their draw steps, instead
    * that player skips that draw and you draw a card" (a replacement effect, CR 614.1a, 614.10).
@@ -9033,7 +9047,7 @@ export interface CompiledCard {
    * Never delayed or reflexive triggers (603.2d).
    */
   /** `anchor`: only while that anchor word was chosen as it entered (Windcrag Siege's "• Mardu —", CR 614.12b). */
-  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy" | /** Krang, the All-Powerful: "If a player drawing a card causes ...". */ "draws" | /** Gandalf the White: entering, or leaving the battlefield for any zone. */ "entersOrLeaves"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true; /** Wizard's Staff: "If a triggered ability of equipped creature triggers": the creature it's attached to, whoever controls either. */ ofEquipped?: true; /** The Masamune's granted "a triggered ability of this creature or an emblem you own": this permanent's own abilities and its controller's emblems'. */ selfOrEmblems?: true; /** Bifur: "As long as you have an enduring story" (CR 702.195b). */ enduringStory?: true; /** Sanctum of All: "while you control six or more Shrines": at least `n` permanents matching `filter` its controller controls as the ability triggers. */ whileControl?: { filter: TargetSpec; n: number } }[];
+  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy" | /** Krang, the All-Powerful: "If a player drawing a card causes ...". */ "draws" | /** Gandalf the White: entering, or leaving the battlefield for any zone. */ "entersOrLeaves" | /** Panoptic Projektor: "If turning a face-down permanent face up causes ...": any player's, any permanent's. */ "turnedFaceUp"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true; /** Wizard's Staff: "If a triggered ability of equipped creature triggers": the creature it's attached to, whoever controls either. */ ofEquipped?: true; /** The Masamune's granted "a triggered ability of this creature or an emblem you own": this permanent's own abilities and its controller's emblems'. */ selfOrEmblems?: true; /** Bifur: "As long as you have an enduring story" (CR 702.195b). */ enduringStory?: true; /** Sanctum of All: "while you control six or more Shrines": at least `n` permanents matching `filter` its controller controls as the ability triggers. */ whileControl?: { filter: TargetSpec; n: number } }[];
   /** Fist of Suns: "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast" (an alternative cost, CR 118.9). */
   payWUBRG?: true;
   /** Omniscience: "You may cast spells from your hand without paying their mana costs" (AltCostKind "omniscience"). */

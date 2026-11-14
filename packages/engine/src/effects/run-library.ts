@@ -20,6 +20,7 @@ import { characteristics } from "../layers";
 import type { TargetSpec } from "../abilities";
 import { CREATURE_TYPES, LAND_TYPES } from "../keywords";
 import { dealDamage, objectSource } from "../damage";
+import { couldEnchantAsLastExisted } from "./run-laneb208";
 
 /** "Shares a color with a legendary creature you control" (Ringsight): their colors now; a colorless one shares none (rulings). */
 function legendColors(s: GameState, spec: TargetSpec, pid: PlayerId): TargetSpec {
@@ -528,7 +529,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       s.resolving!.parley = { ...counts, ids: revealed };
       // Game Preserve: every card revealed a creature card, they all enter together under their owners' control.
       if (e.allCreaturesEnter && revealed.length && revealed.every((id) => isType(defOf(s, obj(s, id)), "Creature")))
-        enterTogether(s, () => revealed.forEach((id) => moveObject(s, id, "battlefield", { controller: obj(s, id).owner })));
+        enterTogether(s, () => revealed.forEach((id) => moveObject(s, id, "battlefield", { controller: obj(s, id).owner, putBy: ctx.controller })));
       return;
     }
     case "parleyToGraveyards": {
@@ -1507,7 +1508,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // asked when the graveyard has a card that fits; otherwise both are searched.
         // Sovereigns of Lost Alara: only an Aura that could enchant that creature, still on the battlefield as that object.
         const enchantee = e.couldEnchantDest && e.dest.attachTo ? objects(s, e.dest.attachTo, ctx).find((o) => o.zone === "battlefield") : undefined;
-        const fits = (id: ObjectId) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.couldEnchantDest || (!!enchantee && auraHostOptions(s, obj(s, id), p.id).some((h) => "attachTo" in h && h.attachTo === enchantee.id)));
+        // Auratouched Mage: "an Aura card that could enchant it" once it has left, as it last existed (round B208, rulings).
+        const gone = (id: ObjectId) => !e.couldEnchantSelfGone || (!!ctx.sourceId && ctx.sourceZc !== undefined && couldEnchantAsLastExisted(s, obj(s, id), ctx.sourceId, ctx.sourceZc, p.id));
+        const fits = (id: ObjectId) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.couldEnchantDest || (!!enchantee && auraHostOptions(s, obj(s, id), p.id).some((h) => "attachTo" in h && h.attachTo === enchantee.id))) && gone(id);
         if (e.orGraveyard && sc.searchZones === undefined) {
           // Dark Supplicant: the hand is searched with the graveyard ("graveyard, hand, and/or library").
           if (!barred(p.id) && (e.andHand ? [...p.graveyard, ...p.hand] : p.graveyard).some(fits)) {
@@ -1680,7 +1683,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             const extra = to.counters ? Math.max(0, amountNow(s, to.counters.n, ctx)) : 0;
             // "Under target player's control" (Yavimaya Dryad).
             const under = to.under ? players(s, to.under, ctx)[0] : undefined;
-            moveObject(s, id, "battlefield", { controller: under ?? pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id), ...(extra ? { counters: { [to.counters!.counter]: extra } } : {}) });
+            moveObject(s, id, "battlefield", { controller: under ?? pid, putBy: pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id), ...(extra ? { counters: { [to.counters!.counter]: extra } } : {}) });
             if (r.created && obj(s, id).zone === "battlefield") r.created.push(id);
           } else moveObject(s, id, to.zone);
           // Myr Incubator: "Search your library for any number of artifact cards, exile them, then create that many ...":

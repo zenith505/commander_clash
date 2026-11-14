@@ -1198,7 +1198,7 @@ export function becomeMonarch(s: GameState, pid: PlayerId) {
   if (!due.length) return;
   s.exiledUntilMonarch = s.exiledUntilMonarch!.filter((x) => !due.includes(x));
   if (!s.exiledUntilMonarch.length) s.exiledUntilMonarch = undefined;
-  for (const x of due) returnUntilLeaves(s, x.cards, x.source, `${p.name} became the monarch`);
+  for (const x of due) returnUntilLeaves(s, x.cards, x.source, `${p.name} became the monarch`, x.controller);
 }
 
 /**

@@ -716,7 +716,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "punisher", who: { ref: "eachPlayer" }, options, effects: [{ type: "damage", amount: num(m[1]!), to: { ref: "punished" } }] }];
   }
   // "~ deals 5 damage to target opponent unless that player sacrifices a creature of their choice" (Demanding Dragon).
-  if ((m = new RegExp(`^(?:~|It) deals ${NUMX} damage to (.+?) unless (?:they|that player|he or she) ((?:sacrifices?|discards?|pays?) .+)$`).exec(s))) {
+  // Thelon's Chant: "~ deals 3 damage to that player unless the player puts a -1/-1 counter on a creature they control".
+  if ((m = new RegExp(`^(?:~|It) deals ${NUMX} damage to (.+?) unless (?:they|that player|he or she|the player) ((?:sacrifices?|discards?|pays?|puts? a -1/-1 counter) .+)$`).exec(s))) {
     if (/^It /.test(s) && !ctx.selfIt) return null;
     const who = parsePlayer(m[2]!, ctx);
     const options = parsePunisherOptions(m[3]!, ctx);
@@ -2104,6 +2105,9 @@ export function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] |
     else if (/^sacrifices? X permanents of their choice$/.test(part)) out.push({ sacrifice: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanent" }, n: 1, nAmount: X });
     // "Have it deal 4 damage to them" (Vexing Devil), "have Browbeat deal 5 damage to them": the source deals it.
     else if ((m = /^ha(?:ve|s) (?:it|~) deal (\d+) damage to (?:them|that player)$/.exec(part))) out.push({ damage: Number(m[1]) });
+    // Thelon's Chant: "unless they put a -1/-1 counter on a creature they control": blighting 1 (CR 701.68a), which they
+    // can't choose to do with no creature (701.68b).
+    else if (/^puts? a -1\/-1 counter on a creature they control$/.test(part)) out.push({ pay: { cost: "{0}", blight: 1 } });
     // Temporal Extortion: "any player may pay half their life, rounded up": half their own life (CR 107.1a).
     else if ((m = /^pays? half their life, rounded (up|down)$/.exec(part))) out.push({ halfLife: m[1] as "up" | "down" });
     // Carrion Rats, Carrion Wurm: "any player may exile a card (three cards) from their graveyard": their own (CR 404).

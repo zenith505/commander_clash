@@ -1152,7 +1152,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Hourglass of the Lost: "{T}, Remove X time counters from ~ and exile it: Return each nonland permanent card with mana
     // value X ...": the X announced for the ability's cost (CR 107.3a, 602.2b), like a spell's.
     if (withX && !withN && (spec.xRange?.key !== "manaValue" || spec.xRange.at !== (exactX ? "exact" : "most") || !(ctx.spell || ctx.ownX))) return null;
-    return [{ type: "returnAllFromGraveyard", who: { ref: m[4] ? "eachPlayer" : "you" }, filter: { ...spec, text: withX ? `${m[1]!.slice(0, -withX[0].length)} card${withX[0]}` : `${m[1]} card` }, ...(m[3] ? { tapped: true } : {}), ...(m[4] ? { owners: true as const } : {}) }];
+    return [{ type: "returnAllFromGraveyard", who: { ref: m[4] ? "eachPlayer" : "you" }, filter: { ...spec, text: withX ? `${m[1]!.slice(0, -withX[0].length)} card${withX[0]}` : `${m[1]} card` }, ...(m[3] ? { tapped: true } : {}), ...(m[4] ? { owners: true as const, ...(eachReturns ? {} : { byYou: true as const }) } : {}) }];
   }
   // Garna, the Bloodflame: "return to your hand all creature cards in your graveyard that were put there from anywhere
   // this turn", which cards worked out as it resolves (rulings).

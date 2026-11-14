@@ -511,6 +511,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const ranked = [...pend.cards].sort((a, b) => handWorth(s, b) - handWorth(s, a));
       return [{ type: "searchLibrary", player: pid, found: [pid === s.resolving.item.controller ? ranked[1]! : ranked[0]!] }];
     }
+    // Storm Herald (round B208): only the Auras that help the creature of ours they'll enchant (they're exiled later anyway).
+    if (pend.kind === "searchLibrary" && pend.fromGraveyard === "battlefield" && s.resolving?.body.effects[s.resolving.next]?.type === "aurasFromYardToYourCreatures")
+      return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => auraHelps(defOf(s, obj(s, id)))).slice(0, pend.max) }];
+    // Auratouched Mage (round B208): an Aura that helps it when it'll be attached to it, the costliest; into our hand, the costliest.
+    if (pend.kind === "searchLibrary" && !pend.dig && s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "search" && x.couldEnchantSelfGone)) {
+      const me = s.resolving.item.sourceId ? s.objects[s.resolving.item.sourceId] : undefined;
+      const attaching = me?.zone === "battlefield" && (s.resolving.item.sourceZc === undefined || (me.zoneChanges ?? 0) === s.resolving.item.sourceZc);
+      const best = pend.cards.filter((id) => !attaching || auraHelps(defOf(s, obj(s, id)))).sort((a, b) => mv(s, b) - mv(s, a))[0];
+      return [{ type: "searchLibrary", player: pid, found: best && pend.max > 0 ? [best] : [] }];
+    }
     // Signal the Clans: only cards with different names give a card, so the best of each name.
     if (pend.kind === "searchLibrary" && !pend.dig && s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "search" && !!x.randomOfDistinct)) {
       const seen = new Set<string>();
@@ -1861,6 +1871,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "predicamentGuess") return [{ type: "chooseOption", player: pid, choice: "notOver" }];
     // Liar's Pendulum: a deck is singleton (CR 903.5b), so a named card (other than a basic land) seen anywhere outside the
     // namer's hand isn't in it; otherwise we expect them to have named a card they hold. Only public information is used.
+    // Liberated Livestock (round B208): the costliest Aura that helps a creature of ours, else none.
+    if (pend.kind === "chooseOption" && pend.what === "auraForToken") {
+      const best = pend.options.filter((o) => o !== "none" && auraHelps(defOf(s, obj(s, o)))).sort((a, b) => mv(s, b) - mv(s, a))[0];
+      return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "liarGuess") {
       const namer = s.resolving?.item.controller;
       const name = s.resolving?.chosen?.name;
@@ -5118,9 +5133,12 @@ function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<Pen
   // "Sacrifice any number of ...": for Scapeshift's "search for up to that many land cards", the tapped lands (they come
   // back tapped, as better lands); to draw that many (Sephiroth, Bontu), the cheap tokens.
   const r = s.resolving;
-  const here = r?.body.effects[r.next];
+  // Lumbering Battlement (round B208): its pick and exile inside "if ~ is still on the battlefield".
+  const top = r?.body.effects[r.next];
+  const inIf = top?.type === "if" && top.effects[0]?.type === "pick" && top.effects[0].anyNumber ? top.effects : undefined;
+  const here = inIf ? inIf[0] : top;
   if (here?.type === "pick" && here.anyNumber) {
-    const next = r!.body.effects[r!.next + 1];
+    const next = inIf ? inIf[1] : r!.body.effects[r!.next + 1];
     // Swashbuckler Extraordinaire: a Treasure for each of our attackers with power 2 or more that lacks double strike.
     if (next?.type === "if" && next.effects.some((e) => e.type === "reflexive" && e.xSacrificed)) {
       const strikers = s.battlefield.filter((id) => {

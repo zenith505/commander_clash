@@ -50,6 +50,8 @@ import { roundB202Line } from "./laneb202";
 import { roundB204Line } from "./laneb204";
 import { roundB205Line } from "./laneb205";
 import { roundB206Chapter, roundB206Line } from "./laneb206";
+import { roundB207Line } from "./laneb207";
+import { roundB208Line } from "./laneb208";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2131,6 +2133,10 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB205Line(line, raw, out, isSpell)) continue;
     // Kaya, Ghost Assassin, Drach'Nyen (round B206).
     if (roundB206Line(line, raw, out, isSpell)) continue;
+    // Tourach's Chant, Thelon's Chant, Nature's Wrath, Overburden, Delif's Cone, Delif's Cube (round B207).
+    if (roundB207Line(line, raw, out, isSpell)) continue;
+    // Lumbering Battlement, Auratouched Mage, Storm Herald, Liberated Livestock, Hans Eriksson (round B208).
+    if (roundB208Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -7702,7 +7708,13 @@ function linkExile(out: CompiledCard) {
     // Creeping Inn: "you may exile a creature card from your graveyard", one card chosen as it resolves, its one exile.
     const fromYard = all.filter((e): e is Extract<Effect, { type: "chooseFromGraveyard" }> => e.type === "chooseFromGraveyard" && e.dest === "exile" && e.n === 1 && !e.who && !e.anyGraveyard && !e.fromExile && !e.nAmount && !e.anyNumber && !e.chooser);
     const others = all.some((e) => e.type === "exileGraveyard" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile && !fromHand.includes(e)) || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !fromYard.includes(e)));
-    if (others || out.spell || exiles.length + fromHand.length + fromYard.length !== 1) out.unsupported.push("(counts cards exiled with it that it can't link to one exile ability)");
+    // Lumbering Battlement (round B208): its one "exile ... until it leaves the battlefield", linked as it was parsed.
+    const untilLinked = all.filter((e) => e.type === "exile" && e.until === "sourceLeaves" && !!e.linked);
+    const otherUntil = all.some((e) => e.type === "exile" && !!e.until && !untilLinked.includes(e));
+    if (untilLinked.length && (others || otherUntil || out.spell || exiles.length + fromHand.length + fromYard.length + untilLinked.length !== 1)) out.unsupported.push("(counts cards exiled with it that it can't link to one exile ability)");
+    else if (untilLinked.length) {
+      // already linked
+    } else if (others || out.spell || exiles.length + fromHand.length + fromYard.length !== 1) out.unsupported.push("(counts cards exiled with it that it can't link to one exile ability)");
     else (exiles[0] ?? fromHand[0] ?? fromYard[0]!).linked = true;
   }
   // Evendo Brushrazer: "play cards exiled with ~" is about the cards its one "exile the top card of your library" exiled

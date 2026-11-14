@@ -1,7 +1,7 @@
 # Roadmap
 
-31,251 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,878 of
+31,257 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,879 of
 9,979 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2608,6 +2608,34 @@ line blocks.
    Urza Assembles the Titans (loyalty abilities twice this turn), Invisible Woman, Sue Storm (still no batched counters
    event), Obsidian Charmaw ("each land your opponents control that could produce {C}": every mana ability of every land
    read for {C}, conditional ones too).
+   Round 359 went on down `npm run popular`, most played first: Sin, Spira's Punishment's "Whenever ~ enters or attacks,
+   exile a permanent card from your graveyard at random, then create a tapped token that's a copy of that card. If the
+   exiled card is a land card, repeat this process." (Effect exileRandomTokenCopy: the printed card copied, CR 707.2, 712.8a;
+   an Aura copy enters attached to what you choose, CR 303.4f-g; it ends with a nonland card or an empty graveyard); Foggy
+   Swamp Visions's "Exile X target creature cards from graveyards. For each creature card exiled this way, create a token
+   that's a copy of it. At the beginning of your next end step, sacrifice those tokens." (X from its waterbend {X}); Daretti,
+   Ingenious Iconoclast's "−6: Choose target artifact card in a graveyard or artifact on the battlefield. Create three tokens
+   that are copies of it." (one target, either kind, TargetSpec.orCard; an artifact that left is an illegal target even
+   with its card in a graveyard, rulings, CR 400.7); The First Tyrannic War's chapter I "You may put a creature card from
+   your hand onto the battlefield. If its mana cost contains {X}, it enters with a number of +1/+1 counters on it equal to
+   the number of lands you control." (putFromHand `countersIfXCost`, judged by what it enters as, a copy's mana cost,
+   rulings, CR 614.1c); Expedited Inheritance's "Whenever a creature is dealt damage, its controller may exile that many
+   cards from the top of their library. They may play those cards until the end of their next turn." (that player decides
+   and has the permission, CR 608.2h); Northampton Farm's "Return a creature card exiled with this land to the battlefield
+   under your control. Return each other card exiled with this land to its owner's hand." (the cards linked to it, CR
+   607.2a, after it was sacrificed for the cost). No new prompt: each uses the existing may, pick-from-hand, card-pick,
+   enters-as-a-copy and Aura-host paths. Bots put a card with {X} in its mana cost first for The First Tyrannic War, and
+   exile cards for Expedited Inheritance only while five or more stay in their library. +6, 31,257 of 31,936. The
+   compiled text of every other card is unchanged.
+   Out after round 359 (looked at, not done): Arni Metalbrow ("Whenever a creature you control attacks or enters
+   attacking": the many ways a creature is put onto the battlefield attacking set it attacking after its enters event
+   fires, so an "enters attacking" trigger would miss some); Jasmine Boreal of the Seven ("Spend this mana only to cast
+   creature spells with no abilities": a spell given an ability by another permanent as it's cast can't use it, rulings,
+   and every such grant with its conditions would have to be checked as the mana is spent); Archelos, Lagoon Mystic
+   (permanents entering untapped while it's untapped: its controller orders it against other "enters tapped" replacement
+   effects, CR 616.1, and it overrides every "put onto the battlefield tapped", rulings); Fumble (gaining control of the
+   Auras and Equipment that were attached to the returned creature, then attaching all of them to one creature they could
+   all be attached to, a new choice).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

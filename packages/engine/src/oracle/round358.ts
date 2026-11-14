@@ -7,6 +7,7 @@
 import type { CompiledCard, Effect, TargetSpec } from "../abilities";
 import { canonicalKeyword, YARD_CREATURE_CARD_KEYWORD } from "../keywords";
 import { addTarget, type Ctx } from "./body";
+import { round359Sentence } from "./round359";
 import { parseSentence } from "./sentence";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
@@ -16,6 +17,9 @@ const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 const ARTIFACT_CARD: TargetSpec = { kind: "card", types: ["Artifact"], notTypes: [], notColors: [], text: "artifact card" };
 
 export function round358Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
+  // Round 359's sentences first (oracle/round359.ts).
+  const r359 = round359Sentence(s, sentences, si, ctx, effects);
+  if (r359) return r359;
   const line = plain(s);
   // Conqueror's Galleon: "When ~ attacks, exile it at end of combat, then return it to the battlefield transformed under
   // your control.": a delayed trigger (CR 603.7) about ~ as it is now; if it has left the battlefield by then, it's a new

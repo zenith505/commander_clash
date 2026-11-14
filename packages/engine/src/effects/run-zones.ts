@@ -3138,7 +3138,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const attacks = defender !== undefined && isType(defOf(s, o), "Creature") && fits(o);
           const tapped = e.tapped && fits(o);
           log(s, `${p.name} puts ${defOf(s, o).name} from ${from === p.id ? "their" : `${player(s, from).name}'s`} ${o.zone} onto the battlefield${tapped ? ", tapped" : ""}${attacks ? ` and attacking ${attack!.label}` : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}${equip ? ` attached to ${defOf(s, self!).name}` : e.attachToSelf && !host ? ", unattached" : ""}.`);
-          moveObject(s, o.id, "battlefield", { controller: p.id, ...(tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.counters } : {}), ...host, ...equip });
+          // The First Tyrannic War: the number counted now, as it resolves; the {X} judged as it enters (game.ts).
+          const ifX = e.countersIfXCost ? { countersIfXCost: { [e.countersIfXCost.counter]: Math.max(0, amountNow(s, e.countersIfXCost.n, ctx)) } } : {};
+          moveObject(s, o.id, "battlefield", { controller: p.id, ...(tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.counters } : {}), ...ifX, ...host, ...equip });
           if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
             o.attacking = defender;
             if (attack?.planeswalker) o.attackingPermanent = attackingPermanentOf(s, attack.planeswalker);

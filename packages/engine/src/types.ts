@@ -2865,6 +2865,8 @@ export interface Resolving {
   /** Jester's Mask: how many cards this resolution put on top of a library from a hand (Count handPutOnTopThisWay). */
   handPutOnTop?: number;
   scratch?: {
+    /** Effect "exileRandomTokenCopy" (Sin, Spira's Punishment): the card exiled this time, and whether it was a land card, until its token copy is made. */
+    randomCopy?: { id: ObjectId; zc: number; land: boolean };
     /** Effect "controllersMayExile" (Disorienting Choice): the permanents still to ask about, in order, and those whose controllers chose to exile them. */
     mayExile?: { queue: { id: ObjectId; zc: number }[]; yes: { id: ObjectId; zc: number }[] };
     /** Zevlor, Elturel Exile (Effect copyPerOtherOpponent): the opponents still to choose for, the choices so far ("p<player>" or an object id), and the last answer. */

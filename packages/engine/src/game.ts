@@ -9466,6 +9466,8 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       const whose = c.kind === "exileFromGraveyard" && c.singleGraveyard && obj(s, ids[0]!).owner !== p.id ? `${player(s, obj(s, ids[0]!).owner).name}'s` : "their";
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from ${whose} graveyard.`);
       for (const id of ids) moveObject(s, id, "exile");
+      // Gorex, the Tombshell: every card this cost exiled, for the permanent the spell becomes (CR 607.2q).
+      if (c.kind === "exileFromGraveyard" && c.linkSpell) for (const id of ids) exiled?.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
       // "Create a token that's a copy of the exiled card" (Tawnos, Solemn Survivor): the one card this cost exiled, the
       // only cost that exiles anything (compile.ts yardCostCard), still that card in exile (CR 400.7).
       if (c.kind === "exileFromGraveyard" && !c.top && !c.x && !c.linked && !c.process && c.n === 1 && ids.length === 1 && costs.filter((x) => x.kind === "exileFromGraveyard" || x.kind === "exileFromHand" || x.kind === "craft" || (x.kind === "sacrifice" && x.exile) || (x.kind === "mill" && x.exile) || (x.kind === "reveal" && x.exile)).length === 1)

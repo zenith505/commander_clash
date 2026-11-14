@@ -303,8 +303,8 @@ line blocks.
    Out after round 181: Horrid Shadowspinner (done in round B105) (the number discarded is fixed as you choose to draw), Luminate Primordial (done in round 276),
    Old Man Willow (done in round B105) ("another creature or a token" to
    sacrifice), Terrifying Presence, Delirium, Heroic Feast, Fated Clash, Rent Is Due, Avengers Assemble! (done in round 324), Chocobo Camp (done in round 324),
-   Transcendence (done in round B105), Fumble (done in round B206), Goblin Assassin (done in round 276), Kasmina, Enigma Sage, Codie, Vociferous Codex, Jetfire, Hollow Marauder,
-   Gorex, the Tombshell, Council's Deliberation (done in round 276), Lumbering Megasloth (done in round 299), Braids's Frightful Return (done in round 276), Awakening of
+   Transcendence (done in round B105), Fumble (done in round B206), Goblin Assassin (done in round 276), Kasmina, Enigma Sage, Codie, Vociferous Codex (done in round 368), Jetfire, Hollow Marauder,
+   Gorex, the Tombshell (done in round 368), Council's Deliberation (done in round 276), Lumbering Megasloth (done in round 299), Braids's Frightful Return (done in round 276), Awakening of
    Vitu-Ghazi, Quiet Speculation, Breaking of the Fellowship (done in round 276), Stoic Farmer, See the Unwritten, Razorlash
    Transmogrant, Auntie Blyte, Nimble Trapfinder (done in round 324), Willie Lumpkin, Ajani Unrelenting, Kitt Kanto, Ellie, Azor, Oko the
    Ringleader, Fiery Annihilation, Spell Crumple (done in round 325); past rank 12,200: Academy Loremaster (done in round 326), Cait, Celebrate the Harvest (done in round 324),
@@ -999,7 +999,7 @@ line blocks.
    left the battlefield this turn"); Fight for the Throne (a delayed "when the creature an opponent controls dies this
    turn" with a monarch condition); Battlefield Thaumaturge (cost cut per creature targeted); Bucolic Ranch (done in round B187); Rosheen,
    Roaring Prophet; Aurification; Creeping Dread; Gavi, Nest Warden (done in round 326); Tezzeret, Agent of Bolas (−1 base 5/5); Jared
-   Carthalion; Frodo, Determined Hero (done in round 326); Syr Carah; Shadow Urchin (done in round B182); Head Games; Seeker of Slaanesh (done in round 326); Drizzt Do'Urden;
+   Carthalion; Frodo, Determined Hero (done in round 326); Syr Carah; Shadow Urchin (done in round B182); Head Games; Seeker of Slaanesh (done in round 326); Drizzt Do'Urden (done in round 368);
    Soul-Shackled Zombie (done in round B156) ("from a single graveyard ... if at least one creature card was exiled this way"); Ambitious
    Augmenter; Isareth the Awakener (done in round B146); Maeve, Insidious Singer. Next fresh candidates, looked at briefly or not at all: Renegade Bull ("up to one target" exile-and-copy),
    Duel for Dominance, Startled Awake, Borrowed Knowledge, Thought-Stalker Warlock, Embermouth Sentinel,
@@ -2848,6 +2848,33 @@ line blocks.
    Out after round 367 (looked at, not done): Helm of Kaldra ("Attach those Equipment to it" when you control more than one
    Equipment with one of the names: no ruling on which); Overburden (in Lane B's round B207); Grip of Chaos, Regenerations
    Restored and Fabrication Foundry (still out, as in their earlier lists).
+   Round 368 went on down `npm run popular` and the "Out after round N" lists, most played first, to a difference in power,
+   an Aura copied onto each attacker, a mana ability's delayed cascade and cards exiled to pay a spell's cost: Drizzt
+   Do'Urden's "Whenever a creature dies, if it had power greater than Drizzt's power, put a number of +1/+1 counters on
+   Drizzt equal to the difference." (the dead creature's power as it last existed, CR 603.10a; an intervening if checked
+   again as it resolves, so of several bigger creatures dying at once the later triggers may add nothing, CR 603.4,
+   rulings; a `difference` count; a legendary short name with an apostrophe now reads, CR 201.5c); Three Dog, Galaxy News
+   DJ's "Whenever you attack, you may pay {2} and sacrifice an Aura attached to Three Dog. When you sacrifice an Aura this
+   way, for each other attacking creature you control, create a token that's a copy of that Aura attached to that
+   creature." (a reflexive trigger, CR 603.12; the Aura's copiable values as it was sacrificed, not targeted, so a shrouded
+   attacker gets one and one it can't enchant gets none, CR 303.4g, rulings; Effect `auraCopiesOnAttackers`); Codie,
+   Vociferous Codex's "You can't cast permanent spells." and "{4}, {T}: Add {W}{U}{B}{R}{G}. When you next cast a spell
+   this turn, exile cards from the top of your library until you exile an instant or sorcery card with lesser mana value.
+   Until end of turn, you may cast that card without paying its mana cost. Put each other card exiled this way on the
+   bottom of your library in a random order." (a mana ability, CR 605.1a, with a delayed trigger on the next spell, CR
+   603.7; the triggering spell's mana value from its mana cost, rulings; exileUntilNonland `lesserThanCause`, and
+   `restBottom` now also for a card cast free this turn); Gorex, the Tombshell's "As an additional cost to cast this spell,
+   you may exile any number of creature cards from your graveyard. This spell costs {2} less to cast for each card exiled
+   this way." (cards beyond the reduction allowed, rulings; linked to the permanent Gorex becomes, CR 607.2q:
+   exileFromGraveyard `linkSpell`) and "Whenever Gorex attacks or dies, choose a card at random exiled with Gorex and put
+   that card into its owner's hand." (moveLinked). Browser tests click through Gorex's X and its graveyard picks, Three
+   Dog's payment and Codie's mana and free card. Bots cast Gorex with the cards it needs and answer Three Dog with the
+   existing may and pick logic. +4, 31,362 of 31,936 with Lane B's B207-B208. The compiled text of every other card is unchanged.
+   Out after round 368 (looked at, not done): Aragorn, Company Leader ("one or more counters" put on a creature at once
+   comes as one event per kind of counter); Captain America, First Avenger (the damage division announced before the
+   cost picks the Equipment, no ruling); Spectral Searchlight (still out: another player choosing a color inside a mana
+   ability); Sanctuary Blade and Psychic Paper (a choice made as the Equipment becomes attached); Rift Elemental (still
+   out); Altaïr Ibn-La'Ahad (its short name now reads; memory counters on token copies still missing).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -3339,7 +3366,7 @@ line blocks.
    see it, and a spell with a kicker of its own would have two; Consume Spirit and Drain Life (done in round B179) ("Spend only black mana on
    X" in a spell whose mana cost is more than {X}); Invisible Woman, Sue Storm (one trigger for +1/+1 counters put on one
    or more other Heroes at once: no batched counters event yet); Spiteful Repossession (damage to each opponent equal to
-   their own difference, then "the damage dealt this way"); Codie, Vociferous Codex (its mana ability's "when you next
+   their own difference, then "the damage dealt this way"); Codie, Vociferous Codex (done in round 368) (its mana ability's "when you next
    cast a spell this turn" exile); Hellish Rebuke, Greater Gargadon and Foggy Swamp Visions (still out, for the reasons
    in their earlier lists); Obsidian Charmaw (done in round 367) (left for Lane B, as before).
    Round 326 took cards back off the "Out after round N" lists, most played first: "Choose target creature card in a
@@ -3646,7 +3673,7 @@ line blocks.
    the number of +1/+1 counters removed this way" (Simic Manipulator: X at least 1, the target checked as it's chosen and
    as it resolves, CR 608.2b, a browser test). +10, 30,652 of 31,936 with rounds 314 and B153.
    Out after round 315 (looked at, not done): Arcee, Sharpshooter (its other line), Jetfire, Ingenious Scientist (convert
-   and mana from removed counters), Tetravus (done in round B171) (tokens created with ~ and exiled with it), Gorex, the Tombshell (a card at
+   and mana from removed counters), Tetravus (done in round B171) (tokens created with ~ and exiled with it), Gorex, the Tombshell (done in round 368) (a card at
    random from the linked exile, CR 607.2q), Mossbridge Troll (tap creatures with total power 10 or more), Light Up the
    Night, Kusari-Gama and Urgent Necropsy (still out, for the reasons in their earlier lists). Bots don't yet activate
    Baba Lysaga or Ooze Flux, or move counters onto Aetherborn Marauder.
@@ -4165,7 +4192,7 @@ line blocks.
    as it resolves); Mimeoplasm, Revered One ("as ~ enters, exile up to X creature cards from your graveyard", then copies of
    them); Verrak, Warped Sengir, Ashnod the Uncaring and Dynaheir, Invoker Adept (copying an ability by what paid its cost);
    Prowl, Stoic Strategist and Flamewar, Brash Veteran (convert, intel counters); Spawnsire of Ulamog, Vivien, Arkbow Ranger
-   (cards from outside the game); Lucy MacLean, Positively Armed; Three Dog, Galaxy News DJ; Baron Helmut Zemo (black mana
+   (cards from outside the game); Lucy MacLean, Positively Armed; Three Dog, Galaxy News DJ (done in round 368); Baron Helmut Zemo (black mana
    symbols among exiled cards' costs); March from Velis Vel (lands of a chosen type become copies); Judgment of Alexander;
    The Brothers' War (chapter II's attack requirement); Duelist's Flame; Spirit of Resilience; Eye of Ojer Taq and Ore-Rich
    Stalactite (done in round 334) (craft with cards that share a type, or four or more); Kaya, Spirits' Justice; Ashiok, Wicked Manipulator (a
@@ -7365,7 +7392,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B88 (looked at, not done): Psychic Rebuttal (copying a spell after it's been countered), Soulblast (done in round B137)
   (an additional cost of sacrificing all creatures you control), Tyrannical Pitlord (done in round 298) ("as ~ enters, choose another
   creature you control"), Spatial Binding (done in round B128) ("can't phase out"), Batroc the Leaper (up to X targets, X the times kicked),
-  Miasma Demon (discard any number, then up to that many targets), Gorex, the Tombshell (an optional exile cost that
+  Miasma Demon (discard any number, then up to that many targets), Gorex, the Tombshell (done in round 368) (an optional exile cost that
   reduces the cost), Rasputin Dreamweaver ("if ~ started the turn untapped").
 - Round B89 (one-line templates from the bottom of the list): Aura moves, "Attach target Aura attached to a creature to
   another creature" (any controller's, Enchantment Alteration's "a creature or land" to one of the same type), "with the
@@ -9215,7 +9242,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Pendant (a hybrid symbol of the milled card adds one of its colors: a choice in the middle of a mana ability), Ulamog's
   Despoiler (face-down cards in exile chosen by group and then at random, rulings) stay out.
 - Out after round B188 (looked at, not done): Kang Dynasty (chapters I and II goad creatures of each opponent's choosing
-  and draw for their combat damage until your next turn; III is done), Drizzt Do'Urden (its short name "Drizzt" isn't read
+  and draw for their combat damage until your next turn; III is done), Drizzt Do'Urden (done in round 368) (its short name "Drizzt" isn't read
   as ~), Long Rest, Time Reaper, Pulsemage Advocate (done in round B191), Heart of Kiran and Turf War stay out.
 - Out after round B187 (looked at, not done): Kraven the Hunter (the greatest power among a player's creatures as one died,
   several dying at once), Corrosive Ooze, Trove of Temptation, Rain of Gore and Blood Scrivener stay out for the reasons in

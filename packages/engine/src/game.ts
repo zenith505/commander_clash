@@ -11256,6 +11256,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "auraForToken") {
+    // Liberated Livestock (round B208): the Aura card for this token, or none.
+    const st = r.scratch?.auraForToken;
+    if (!st) throw new RulesError("nothing to choose");
+    st.answer = choice;
+    log(s, `${p.name} chooses ${choice === "none" ? "no Aura" : defOf(s, obj(s, choice)).name} (${pend.source}).`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "liarGuess") {
     // Liar's Pendulum: the guess is announced (rulings).
     const st = r.scratch?.liarGuess;

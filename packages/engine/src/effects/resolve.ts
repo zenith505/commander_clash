@@ -610,6 +610,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   if (ref.ref === "sacrificedCards") return (ctx.sacrificed ?? []).flatMap((l) => (l.id !== undefined && l.cardZc !== undefined && s.objects[l.id]?.zone === "graveyard" && (s.objects[l.id]!.zoneChanges ?? 0) === l.cardZc ? [s.objects[l.id]!] : []));
   if (ref.ref === "costExiled") return (s.resolving?.item.costExiled ?? []).flatMap((c) => (s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : []));
   if (ref.ref === "yourGraveyard") return player(s, ctx.controller).graveyard.map((id) => obj(s, id)).filter((o) => printedMatches(ref.filter, defOf(s, o)));
+  // Fumble: the Auras and Equipment noted before it left, still those objects on the battlefield (CR 400.7).
+  if (ref.ref === "noted") return (s.resolving?.noted ?? []).flatMap((c) => (s.objects[c.id]?.zone === "battlefield" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : []));
   if (ref.ref === "putThisWay") return (s.resolving?.item.putThisWay ?? []).flatMap((c) => (s.objects[c.id]?.zone === "battlefield" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : []));
   if (ref.ref === "amassed") {
     const a = s.resolving?.amassed ?? s.resolving?.item.amassed;
@@ -1677,6 +1679,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "attachElsewhere":
     case "attachToRandomOpponent":
     case "attachToChosen":
+    case "noteAttachments":
     case "unattach":
     case "unattachSelf":
     case "transformSelf":

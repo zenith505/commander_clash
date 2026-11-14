@@ -49,6 +49,7 @@ import { roundB201Line } from "./laneb201";
 import { roundB202Line } from "./laneb202";
 import { roundB204Line } from "./laneb204";
 import { roundB205Line } from "./laneb205";
+import { roundB206Chapter, roundB206Line } from "./laneb206";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -1056,7 +1057,9 @@ export function compile(d: CardDef): CompiledCard {
         // The Princess Takes Flight: "III — Return the exiled card to the battlefield under its owner's control": the card
         // its chapter I exiled (CR 607.2a; linkExile).
         // The Aesir Escape Valhalla's linked chapters (round 345).
-        const r345 = round345Chapter(chapter[2]!, (x) => parseBody(x, {}));
+        // The Three Seasons (round B206).
+        const rB206 = roundB206Chapter(chapter[2]!);
+        const r345 = rB206 !== undefined ? rB206 : round345Chapter(chapter[2]!, (x) => parseBody(x, {}));
         const body = r345 === "fail" ? null : r345 ? r345 : /^Return the exiled card to the battlefield under its owner's control\.$/.test(chapter[2]!)
           ? { targets: [], effects: [{ type: "returnLinked" as const, dest: "battlefield" as const, here: true as const }], text: chapter[2]! }
           : parseBody(chapter[2]!.replace(/^(?!Choose\b)[A-Z][^—•:"]{0,30}? — (?=\S)/, ""), {});
@@ -1132,6 +1135,8 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Loyalty abilities (CR 606): "+1: ...", "−2: ...", "0: ...", "−X: ...". Given in quotes, they're bracketed
     // ('Planeswalkers you control have "[−4]: ..."'): the ability is still a loyalty ability (CR 606.3).
+    // Kaya, Ghost Assassin's 0 (round B206).
+    if (d.types.includes("Planeswalker") && roundB206Line(line, raw, out, isSpell)) continue;
     const loyal = /^([+−-]?)(\d+|X): (.+)$/.exec(line) ?? /^\[([+−-]?)(\d+|X)\]: (.+)$/.exec(line);
     if (loyal && (d.types.includes("Planeswalker") || line.startsWith("["))) {
       const ab = parseLoyalty(loyal[1]!, loyal[2]!, loyal[3]!, raw);
@@ -2119,6 +2124,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB204Line(line, raw, out, isSpell)) continue;
     // Don & Leo, Captain Marvel, Knickknack Ouphe (round B205).
     if (roundB205Line(line, raw, out, isSpell)) continue;
+    // Kaya, Ghost Assassin, Drach'Nyen (round B206).
+    if (roundB206Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

@@ -452,6 +452,21 @@ export function parseCostKeyword(
           body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, giveLife: 1 }], text: "Cumulative upkeep—an opponent gains 1 life: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless an opponent you choose gains 1 life for each age counter on it." },
         },
       };
+    // Varchild's War-Riders: "Cumulative upkeep—Have an opponent create a 1/1 red Survivor creature token": an opponent
+    // chosen for each age counter, the same one or different ones (rulings), each creating that token under their own
+    // control (CR 111.2), all of it paid at once or none (CR 702.24a).
+    const giveToken = /^Cumulative upkeep—Have an opponent create (an? [^.]+ creature token)\.?$/.exec(line);
+    if (giveToken) {
+      const made = parseBody(`You create ${giveToken[1]}.`, {});
+      const [create] = made?.effects ?? [];
+      if (!made || made.targets.length || made.effects.length !== 1 || create?.type !== "createToken" || create.n !== 1 || create.who?.ref !== "you" || Object.keys(create).some((k) => !["type", "who", "n", "token"].includes(k))) return "fail";
+      return {
+        trigger: {
+          event: "yourUpkeep",
+          body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, giveToken: create.token }], text: `Cumulative upkeep—have an opponent create ${giveToken[1]}: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you have an opponent create ${giveToken[1]} for each age counter on it.` },
+        },
+      };
+    }
     // Braid of Fire: "Cumulative upkeep—Add {R}": adding mana is the cost (rulings), {R} for each age counter, which can
     // always be paid; what isn't spent empties from the pool as the upkeep step ends (CR 500.4).
     const adds = /^Cumulative upkeep—Add ((?:\{[WUBRGC]\})+)\.?$/.exec(line);

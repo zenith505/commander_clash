@@ -13575,6 +13575,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cbf68ddd-596f-4b2d-b93c-3b7976ba4d37",
+  "name": "Fumble",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Return target creature to its owner's hand. Gain control of all Auras and Equipment that were attached to it, then attach them to another creature.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bbd",
+  "releasedAt": "2018-06-08",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "68715465-6cf9-4006-87e9-31f227fe9ed3",
   "name": "Furnace of Rath",
   "manaCost": "{1}{R}{R}{R}",
@@ -19373,6 +19399,39 @@
   "commanderLegal": "legal",
   "set": "khm",
   "releasedAt": "2021-02-05",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5e4c81b9-a31e-45e6-983f-30f11b8a05c0",
+  "name": "Kaya, Ghost Assassin",
+  "manaCost": "{2}{W}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Kaya",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Kaya"
+  ],
+  "oracleText": "0: Exile Kaya or up to one target creature. Return that card to the battlefield under its owner's control at the beginning of your next upkeep. You lose 2 life.\n−1: Each opponent loses 2 life and you gain 2 life.\n−2: Each opponent discards a card and you draw a card.",
+  "loyalty": "5",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cn2",
+  "releasedAt": "2016-08-26",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
@@ -37038,6 +37097,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a38ebf4a-064c-4517-a553-15f0a252c159",
+  "name": "The Three Seasons",
+  "manaCost": "{G}{U}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Mill three cards.\nII — Return up to two target snow permanent cards from your graveyard to your hand.\nIII — Choose three cards in each graveyard. Their owners shuffle those cards into their libraries.",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "uncommon",
+  "layout": "saga",
+  "gameChanger": false
+ },
+ {
   "oracleId": "be922360-ee9f-4cfb-bf10-d481c5de5cb1",
   "name": "The Unagi of Kyoshi Island",
   "manaCost": "{3}{U}{U}",
@@ -39413,6 +39504,41 @@
   "set": "mir",
   "releasedAt": "1996-10-08",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "258921f2-df26-4d8a-ad34-8f44d0158ae7",
+  "name": "Varchild's War-Riders",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warrior"
+  ],
+  "oracleText": "Cumulative upkeep—Have an opponent create a 1/1 red Survivor creature token. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nTrample; rampage 1 (Whenever this creature becomes blocked, it gets +1/+1 until end of turn for each creature blocking it beyond the first.)",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Trample",
+   "Rampage",
+   "Cumulative upkeep"
+  ],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -329,6 +329,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseMay", player: pid, yes: left >= 2 }];
     }
     // Wall of Shards: a wall worth a few life for the opponents, while the total stays small.
+    // Varchild's War-Riders: a 1/1 for an opponent per age counter; worth it while that's at most two.
+    if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.giveToken) return [{ type: "chooseMay", player: pid, yes: (s.resolving?.scratch?.n ?? 0) <= 2 }];
     if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.giveLife) return [{ type: "chooseMay", player: pid, yes: (s.resolving?.scratch?.n ?? 0) * upkeepFx.giveLife <= 4 }];
     // Sheltering Ancient: a cheap trampler worth a couple of counters on the opponents' creatures, not more.
     if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.oppCreatureCounter) return [{ type: "chooseMay", player: pid, yes: (s.resolving?.scratch?.n ?? 0) <= 2 }];
@@ -689,6 +691,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const score = (id: ObjectId) => defOf(s, obj(s, id)).types.reduce((n, t) => n + ours.filter((x) => x === t).length, 0);
       const theirs = pend.cards.filter((id) => obj(s, id).owner !== pid).sort((a, b) => score(b) - score(a) || mv(s, b) - mv(s, a));
       return [{ type: "searchLibrary", player: pid, found: theirs.slice(0, pend.min) }];
+    }
+    // The Three Seasons: three cards of a graveyard shuffled into their owner's library: from ours, the dearest ones we have
+    // no use for there (they may be drawn again); from an opponent's, the ones they could use there, then the dearest.
+    if (pend.kind === "searchLibrary" && pend.fromGraveyard === "shuffleIn") {
+      const ours = pend.cards.every((id) => obj(s, id).owner === pid);
+      const sorted = [...pend.cards].sort((a, b) => (ours ? Number(usefulInGraveyard(s, a)) - Number(usefulInGraveyard(s, b)) : Number(usefulInGraveyard(s, b)) - Number(usefulInGraveyard(s, a))) || mv(s, b) - mv(s, a));
+      return [{ type: "searchLibrary", player: pid, found: sorted.slice(0, pend.max) }];
     }
     // Watchers of the Dead: the cards to keep (the rest are exiled), those we can use there first, then the dearest.
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "keep")
@@ -1668,6 +1677,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const v = (o: string) => groupValue(s, pid, { targets: [], effects: either.options[Number(o)]!, text: "" }) ?? 0;
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => v(b) - v(a))[0]! }];
     }
+    // Kaya, Ghost Assassin: "Exile ~ or up to one target creature": the creature we targeted (an opponent's out of the way
+    // until our upkeep, or ours saved), not Kaya.
+    if (pend.kind === "chooseOption" && either?.type === "either" && either.options.length === 2 && either.options[0]!.length === 1 && either.options[0]![0]!.type === "flicker" && either.options[0]![0]!.what.ref === "self" && either.options[1]!.length === 1 && either.options[1]![0]!.type === "flicker" && either.options[1]![0]!.what.ref === "target" && pend.options.includes("1"))
+      return [{ type: "chooseOption", player: pid, choice: "1" }];
     // Retribution, Cannibalize: the picked target is the one hit hardest, so our own least worthy creature, or an
     // opponent's most worthy one.
     if (pend.kind === "chooseOption" && pend.what === "splitTargets" && s.resolving) {

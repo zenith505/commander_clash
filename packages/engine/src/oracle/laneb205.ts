@@ -3,6 +3,7 @@
 import type { AbilityBody, CompiledCard, Effect, TargetSpec } from "../abilities";
 import { parseBody } from "./body";
 import { parseTrigger } from "./triggers";
+import { roundB206Spell } from "./laneb206";
 
 /** One line of a card's text, compiled into `out` (an unsupported one reported as `raw`); false when it isn't one of these. */
 export function roundB205Line(line: string, raw: string, out: CompiledCard, isSpell: boolean): boolean {
@@ -103,5 +104,5 @@ export function roundB205Spell(text: string): AbilityBody | null | undefined {
     if (!one || !many || one.targets.length || many.targets.length || one.effects.length !== 1 || many.effects.length !== 1 || a?.type !== "dig" || b?.type !== "dig" || a.count !== 1 || b.count !== 99 || a.into !== "battlefield" || b.into !== "battlefield" || a.rest !== "graveyard" || b.rest !== "graveyard") return null;
     return { targets: [], effects: [{ type: "if", cond: { kind: "teamwork" }, effects: [b], otherwise: [a] }], text };
   }
-  return undefined;
+  return roundB206Spell(text);
 }

@@ -4418,6 +4418,8 @@ function LibrarySearch({
                   ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your graveyard on top of your library`
                   : pending.fromGraveyard === "libraryBottom"
                   ? `${pending.source}: put ${pending.what} from your graveyard on the bottom of your library`
+                  : pending.fromGraveyard === "shuffleIn"
+                  ? `${pending.source}: choose ${pending.what}; their owners shuffle them into their libraries`
                   : pending.fromGraveyard === "keep"
                   ? `${pending.source}: choose ${pending.what} in your graveyard to keep; the rest of your graveyard is exiled`
                   : pending.fromGraveyard

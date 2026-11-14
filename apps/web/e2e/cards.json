@@ -6287,6 +6287,34 @@
   ]
  },
  {
+  "oracleId": "506714a8-b9c2-443a-a9e8-ef9130e674ba",
+  "name": "Choice of Damnations",
+  "manaCost": "{5}{B}",
+  "cmc": 6,
+  "typeLine": "Sorcery — Arcane",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [
+   "Arcane"
+  ],
+  "oracleText": "Target opponent chooses a number. You may have that player lose that much life. If you don't, that player sacrifices all but that many permanents of their choice.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sok",
+  "releasedAt": "2005-06-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "faffc9fb-32b3-4015-8c3f-e6b45002c050",
   "name": "Chong and Lily, Nomads",
   "manaCost": "{3}{R}",
@@ -10180,6 +10208,37 @@
   "set": "drc",
   "releasedAt": "2025-02-14",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "acf54a85-0e9e-43fb-99d9-c223c02f13c4",
+  "name": "Druid of the Emerald Grove",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Dwarf Druid",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dwarf",
+   "Druid"
+  ],
+  "oracleText": "When this creature enters, search your library for up to two basic land cards and reveal them, then roll a d20.\n9 or less | Put those cards into your hand, then shuffle.\n10—19 | Put one of those cards onto the battlefield tapped and the other into your hand, then shuffle.\n20+ | Put those cards onto the battlefield tapped, then shuffle.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -16613,6 +16672,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8818bbf8-58ec-4070-a81a-c7ce248057ab",
+  "name": "Hew the Entwood",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Sacrifice any number of lands. Reveal the top X cards of your library, where X is the number of lands sacrificed this way. Choose any number of artifact and/or land cards revealed this way. Put all nonland cards chosen this way onto the battlefield, then put all land cards chosen this way onto the battlefield tapped, then put the rest on the bottom of your library in a random order.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ltr",
+  "releasedAt": "2023-06-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a1c7cd7a-0795-4135-b787-effeb981d95b",
   "name": "Hidden Volcano",
   "manaCost": "",
@@ -17409,6 +17494,32 @@
   "commanderLegal": "legal",
   "set": "m15",
   "releasedAt": "2014-07-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "348201c4-79de-4278-9896-d8b1567cc5cc",
+  "name": "Infernal Offering",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose an opponent. You and that player each sacrifice a creature. Each player who sacrificed a creature this way draws two cards.\nChoose an opponent. Return a creature card from your graveyard to the battlefield, then that player returns a creature card from their graveyard to the battlefield.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c14",
+  "releasedAt": "2014-11-07",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -18715,6 +18826,32 @@
     "artUrl": "https://cards.scryfall.io/art_crop/back/9/5/950ecba7-90b1-42bc-a5f4-ab8d9e9607ee.jpg?1783928152"
    }
   ]
+ },
+ {
+  "oracleId": "a5f5e662-b32c-44f1-848d-0228f0fe1eb6",
+  "name": "Journey to the Lost City",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, exile the top four cards of your library, then roll a d20.\n1—9 | You may put a land card from among those cards onto the battlefield.\n10—19 | Create a 2/2 green Wolf creature token, then put a +1/+1 counter on it for each creature card among those cards.\n20 | Put all permanent cards exiled with this enchantment onto the battlefield, then sacrifice it.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "794ad296-4718-45b7-ab85-6ae45903ada7",
@@ -20322,6 +20459,35 @@
   "set": "uma",
   "releasedAt": "2018-12-07",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "bd4df73c-bbd5-47fd-a961-19f3a3c59381",
+  "name": "Lavabrink Floodgates",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {R}{R}.\nAt the beginning of each player's upkeep, that player may put a doom counter on this artifact or remove a doom counter from it. Then if it has three or more doom counters on it, sacrifice this artifact. When you do, it deals 6 damage to each creature.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "c20",
+  "releasedAt": "2020-04-17",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

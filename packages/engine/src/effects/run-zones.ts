@@ -3350,6 +3350,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
             continue;
           }
+          if (e.attachToSubject && !d.subtypes.includes("Aura") && d.subtypes.includes("Equipment")) {
+            // Forum Filibuster (round 371): an Equipment "attached to that token": attached if that token is still the same
+            // creature on the battlefield and the Equipment could equip it, otherwise it enters unattached (CR 301.5b-c).
+            const host = ctx.subject && s.objects[ctx.subject.id];
+            const ok = !!host && host.zone === "battlefield" && (host.zoneChanges ?? 0) === ctx.subject!.zc && !isType(d, "Creature") && objectMatches(s, { kind: "object", types: ["Creature"], text: "creature" }, host, ctx.controller, false, d);
+            log(s, `${src} returns ${d.name} to the battlefield${ok ? ` attached to ${defOf(s, host!).name}` : ", unattached"}.`);
+            moveObject(s, o.id, "battlefield", { controller: ctx.controller, ...(ok ? { attachTo: host!.id } : {}) });
+            if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
+            continue;
+          }
           if (e.attachToSubject) {
             // An Aura returned "attached to that creature" (CR 303.4f): only to one it could enchant, protection
             // included (CR 303.4d); otherwise it stays where it is (CR 303.4g). Being attached isn't targeting.

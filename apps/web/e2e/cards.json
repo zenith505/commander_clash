@@ -593,6 +593,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7744bae4-a8b7-44a5-9b4c-0048ad4cc448",
+  "name": "Air Elemental",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Creature — Elemental",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "Flying",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "xln",
+  "releasedAt": "2017-09-29",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e101b744-9175-4aa5-bf80-d6944359e538",
   "name": "Airbending Lesson",
   "manaCost": "{2}{W}",
@@ -13137,6 +13169,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "018327d1-a3ba-4912-9c88-f0f0c54a1750",
+  "name": "Fear of Infinity",
+  "manaCost": "{1}{U}{B}",
+  "cmc": 3,
+  "typeLine": "Enchantment Creature — Nightmare",
+  "supertypes": [],
+  "types": [
+   "Enchantment",
+   "Creature"
+  ],
+  "subtypes": [
+   "Nightmare"
+  ],
+  "oracleText": "Flying, lifelink\nThis creature can't block.\nEerie — Whenever an enchantment you control enters and whenever you fully unlock a Room, you may return this card from your graveyard to your hand.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Lifelink",
+   "Eerie"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "957413ae-e756-4afe-886a-b57bf59d5f8d",
   "name": "Feather, Radiant Arbiter",
   "manaCost": "{R}{W}{W}",
@@ -13491,6 +13560,36 @@
     ]
    }
   ]
+ },
+ {
+  "oracleId": "3912d21e-1ebc-4a81-9dc9-f404248d564a",
+  "name": "Fire Elemental",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Creature — Elemental",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dom",
+  "releasedAt": "2018-04-27",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "7d309b18-8dc5-41ee-888c-e275761029e7",
@@ -13952,6 +14051,32 @@
   "commanderLegal": "legal",
   "set": "c17",
   "releasedAt": "2017-08-25",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6a9cc11b-a223-46f0-bf58-c1e08ad1253d",
+  "name": "Forum Filibuster",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, create a 2/1 white and black Inkling creature token with flying. When you do, return up to one target Aura or Equipment card from your graveyard to the battlefield attached to that token.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "soc",
+  "releasedAt": "2026-04-24",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -20488,6 +20613,38 @@
   "commanderLegal": "legal",
   "set": "dis",
   "releasedAt": "2006-05-05",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c7ca6371-73bb-4717-a148-0804b8f4c1e6",
+  "name": "Kindle the Inner Flame",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Kindred Sorcery — Elemental",
+  "supertypes": [],
+  "types": [
+   "Kindred",
+   "Sorcery"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "Create a token that's a copy of target creature you control, except it has haste and \"At the beginning of the end step, sacrifice this token.\"\nFlashback—{1}{R}, Behold three Elementals. (You may cast this card from your graveyard for its flashback cost. Then exile it. To behold an Elemental, choose an Elemental you control or reveal an Elemental card from your hand.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Behold",
+   "Flashback"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
@@ -42302,6 +42459,36 @@
   "commanderLegal": "legal",
   "set": "rav",
   "releasedAt": "2005-10-07",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c470fbe1-0538-46ec-8741-3143f5e78af8",
+  "name": "Water Elemental",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Creature — Elemental",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

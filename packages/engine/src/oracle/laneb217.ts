@@ -2,6 +2,7 @@
 // whole spells (chained from round B216's).
 import type { AbilityBody, CompiledCard, Effect } from "../abilities";
 import { parseActivated } from "./activated";
+import { roundB219Spell } from "./laneb219";
 import { parseBody } from "./body";
 import { parseTrigger } from "./triggers";
 
@@ -74,5 +75,5 @@ export function roundB217Spell(text: string): AbilityBody | null | undefined {
     const eight: Effect = { type: "if", cond: { kind: "state", cond: { kind: "amount", amount: { count: { kind: "returnedToYourHand" } }, min: 8 } }, effects: life.effects };
     return { targets: body.targets, effects: [bounce, eight, exile], text };
   }
-  return undefined;
+  return roundB219Spell(text);
 }

@@ -13157,6 +13157,104 @@ export function attackWithOneOptions(s: GameState, pid: PlayerId): ObjectId[] {
   return group.length > 1 || (group.length === 1 && !characteristics(s, obj(s, group[0]!.attacker)).cantAttackAlone) ? group.map((a) => a.attacker) : [];
 }
 
+/**
+ * Trove of Temptation: the requirements on `pid`, one for each such permanent an opponent controls, that `pid` attack that
+ * opponent or a planeswalker they control with at least one creature if able (CR 508.1d); keyed by that opponent.
+ */
+export function attackYouWithOneRequired(s: GameState, pid: PlayerId): Map<PlayerId, ObjectId[]> {
+  const out = new Map<PlayerId, ObjectId[]>();
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const t = controllerOf(s, o);
+    if (t === pid || player(s, t).lost || !opponents(s, pid).includes(t) || !abilitiesOf(s, o).opponentsAttackYouWithOne) continue;
+    out.set(t, [...(out.get(t) ?? []), id]);
+  }
+  return out;
+}
+
+type AttackDecl = { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId };
+
+/**
+ * With Trove of Temptation's requirement on `pid` (attackYouWithOneRequired), how many requirements an attack declaration
+ * obeys (CR 508.1d): each attacker's "attacks each combat if able" (Nahiri's only at a player), the requirements about whom
+ * it attacks (attackTargetScore: goad, encore, Gideon), Seeker of Slaanesh's "at least one creature", and one for each
+ * Trove of Temptation whose controller (or a planeswalker they control) at least one of them attacks.
+ */
+function attackRequirementScore(s: GameState, pid: PlayerId, attacks: AttackDecl[], troves: Map<PlayerId, ObjectId[]>): number {
+  let n = 0;
+  for (const a of attacks) {
+    const o = obj(s, a.attacker);
+    const c = characteristics(s, o);
+    if (c.attacksIfAble && (!c.attacksPlayerIfAble || a.planeswalker === undefined)) n++;
+    n += attackTargetScore(s, o, a.defender, a.planeswalker);
+  }
+  if (attacks.length && attackWithOneRequired(s, pid) !== undefined) n++;
+  for (const [t, ids] of troves) if (attacks.some((a) => a.defender === t && (a.planeswalker === undefined || objIsType(s, obj(s, a.planeswalker), "Planeswalker")))) n += ids.length;
+  return n;
+}
+
+/**
+ * Trove of Temptation (CR 508.1d): with its requirement on `pid`, a declaration that one change would make obey more
+ * requirements without breaking a restriction (CR 508.1c) isn't legal: adding a creature, sending one attacker at another
+ * player or planeswalker, or attacking with another creature instead of one (when no more can attack). Each creature moved
+ * must be able to attack there without a cost (CR 508.1d: nothing obliges paying one). Weighed together this way, goad's
+ * "a player other than" and Trove's "you" count one requirement each (CR 508.1d, 701.15b). The better declaration and why,
+ * or undefined: none, or no such requirement on `pid`.
+ */
+export function attackRequirementImprovement(s: GameState, pid: PlayerId, attacks: AttackDecl[]): { attacks: AttackDecl[]; why: string } | undefined {
+  const troves = attackYouWithOneRequired(s, pid);
+  if (!troves.size) return undefined;
+  const opps = opponents(s, pid);
+  const limit = combatLimit(s, "attack");
+  const pool = potentialAttackers(s, pid);
+  const caps = new Map(opps.map((d) => [d, attackYouLimit(s, d)] as const));
+  // Where creature `o` could attack without a cost: an opponent, or a planeswalker one of them controls.
+  const spots = (o: GameObject): AttackDecl[] => {
+    if (characteristics(s, o).ownAttackCosts.length) return [];
+    const out: AttackDecl[] = [];
+    for (const d of opps) {
+      if (!attackProblem(s, o, d) && !attackTaxPer(s, d, false, o.id)) out.push({ attacker: o.id, defender: d });
+      for (const id of s.battlefield)
+        if (objIsType(s, obj(s, id), "Planeswalker") && controllerOf(s, obj(s, id)) === d && attackablePermanentProblem(s, pid, d, id) === null && !attackProblem(s, o, d, true, id) && !attackTaxPer(s, d, true, o.id)) out.push({ attacker: o.id, defender: d, planeswalker: id });
+    }
+    return out;
+  };
+  // The restrictions on the whole declaration (CR 508.1c), as declareAttackers checks them.
+  const legal = (decl: AttackDecl[]) => {
+    if (decl.length > limit) return false;
+    if (decl.length === 1 && characteristics(s, obj(s, decl[0]!.attacker)).cantAttackAlone) return false;
+    if (decl.length > 1 && decl.some((a) => characteristics(s, obj(s, a.attacker)).onlyAttacksAlone)) return false;
+    if (decl.some((a) => withoutCompany(s, a.attacker, decl))) return false;
+    for (const d of opps) if (decl.filter((a) => a.defender === d && a.planeswalker === undefined).length > caps.get(d)!) return false;
+    for (const pw of new Set(decl.flatMap((a) => (a.planeswalker !== undefined ? [a.planeswalker] : [])))) {
+      const cap = abilitiesOf(s, obj(s, pw)).combatLimit?.attackSelf;
+      if (cap !== undefined && decl.filter((a) => a.planeswalker === pw).length > cap) return false;
+    }
+    return true;
+  };
+  const now = attackRequirementScore(s, pid, attacks, troves);
+  const where = (a: AttackDecl) => (a.planeswalker !== undefined ? nameOf(s, a.planeswalker) : player(s, a.defender).name);
+  const better = (decl: AttackDecl[], why: string) => (legal(decl) && attackRequirementScore(s, pid, decl, troves) > now ? { attacks: decl, why } : undefined);
+  const idle = pool.filter((o) => !attacks.some((a) => a.attacker === o.id));
+  for (const o of idle) for (const at of spots(o)) {
+    const r = better([...attacks, at], `${defOf(s, o).name} attacking ${where(at)} obeys more of the requirements on this attack`);
+    if (r) return r;
+  }
+  for (const [i, a] of attacks.entries()) {
+    const o = obj(s, a.attacker);
+    for (const at of spots(o)) {
+      if (at.defender === a.defender && at.planeswalker === a.planeswalker) continue;
+      const r = better(attacks.map((x, j) => (j === i ? at : x)), `${defOf(s, o).name} attacking ${where(at)} instead obeys more of the requirements on this attack`);
+      if (r) return r;
+    }
+    for (const c of idle) for (const at of spots(c)) {
+      const r = better(attacks.map((x, j) => (j === i ? at : x)), `${defOf(s, c).name} attacking ${where(at)} instead of ${defOf(s, o).name} obeys more of the requirements on this attack`);
+      if (r) return r;
+    }
+  }
+  return undefined;
+}
+
 /** War's Toll: a permanent an opponent of `pid` controls that makes all of `pid`'s creatures attack if able once one does. */
 export function attackAllIfOne(s: GameState, pid: PlayerId): ObjectId | undefined {
   return s.battlefield.find((id) => controllerOf(s, obj(s, id)) !== pid && abilitiesOf(s, obj(s, id)).opponentsAttackAll);
@@ -13224,8 +13322,11 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   const shirking = potentialAttackers(s, p.id).find((o) => mustAttack(o) && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0) && !withoutCompany(s, o.id, [...attacks, { attacker: o.id }]));
   const required = potentialAttackers(s, p.id).filter(mustAttack);
   const shirks = (o: GameObject) => (characteristics(s, o).attacksIfAble && opps.some((d) => free(o, d)) ? `${defOf(s, o).name} attacks each combat if able` : `${defOf(s, o).name} must attack ${walkers.get(o.id)!.map((w) => nameOf(s, w)).join(" or ")} if able`);
+  // Trove of Temptation: its requirement weighed with the others below (attackRequirementImprovement), in place of the
+  // checks of one requirement at a time that it could compete with (CR 508.1d).
+  const trove = attackYouWithOneRequired(s, p.id).size > 0;
   if (attacks.length >= limit) {
-    if (attacks.filter((a) => required.some((o) => o.id === a.attacker)).length < Math.min(limit, required.length)) throw new RulesError(shirks(shirking!));
+    if (!trove && attacks.filter((a) => required.some((o) => o.id === a.attacker)).length < Math.min(limit, required.length)) throw new RulesError(shirks(shirking!));
   } else if (shirking && opps.length) throw new RulesError(shirks(shirking));
   // Seeker of Slaanesh: with no attackers declared, the requirement that at least one creature attack is obeyed by none,
   // and declaring one that could attack without a cost would obey it without breaking a restriction (CR 508.1c-d).
@@ -13254,14 +13355,14 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   // requirement, and the attack must obey as many as it can: attacking a planeswalker obeys none of them (rulings).
   // One that has to attack a planeswalker (Gideon) as well obeys as many of all its requirements as it can (CR 508.1d):
   // each goad, encore's player and the planeswalker count one each (attackTargetScore).
-  for (const a of attacks) {
+  for (const a of trove ? [] : attacks) {
     const o = obj(s, a.attacker);
     const ws = walkers.get(o.id) ?? [];
     if (!ws.length) continue;
     const best = Math.max(1, ...opps.filter((d) => free(o, d)).map((d) => attackTargetScore(s, o, d)));
     if (attackTargetScore(s, o, a.defender, a.planeswalker) < best) throw new RulesError(`${defOf(s, o).name} must attack ${ws.map((w) => nameOf(s, w)).join(" or ")} if able`);
   }
-  for (const a of attacks) {
+  for (const a of trove ? [] : attacks) {
     const o = obj(s, a.attacker);
     const by = characteristics(s, o).goadedBy;
     if (!by.length || walkers.get(o.id)?.length) continue;
@@ -13280,12 +13381,15 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   }
   // "Attacks that opponent this turn if able" (encore): it attacks one of those players, not a planeswalker, if it can
   // (CR 508.1d). One that can't attack them, or only by paying a cost, needn't attack at all (encore rulings).
-  for (const o of potentialAttackers(s, p.id)) {
+  for (const o of trove ? [] : potentialAttackers(s, p.id)) {
     const able = mustAttackPlayers(s, o).filter((d) => opps.includes(d) && free(o, d));
     if (!able.length || walkers.get(o.id)?.length) continue;
     const a = attacks.find((x) => x.attacker === o.id);
     if (!a || a.planeswalker !== undefined || !able.includes(a.defender)) throw new RulesError(`${defOf(s, o).name} must attack ${able.map((d) => player(s, d).name).join(" or ")} if able`);
   }
+  // Trove of Temptation: no single change obeys more requirements (CR 508.1d).
+  const improve = trove ? attackRequirementImprovement(s, p.id, attacks) : undefined;
+  if (improve) throw new RulesError(`${p.name} must attack ${[...attackYouWithOneRequired(s, p.id).keys()].map((t) => player(s, t).name).join(" and ")} or a planeswalker they control with at least one creature if able (${improve.why})`);
   // Costs to attack that aren't mana (Exalted Dragon): all of them together, a permanent paying only one (CR 508.1i).
   const costs: AttackCostDue[] = attacks.flatMap((a) => characteristics(s, obj(s, a.attacker)).ownAttackCosts.map((c) => ({ id: a.attacker, ...c })));
   if (!attackCostsPayable(s, p.id, costs)) throw new RulesError(`you can't pay all the costs to attack with these creatures: ${costs.map((c) => `${nameOf(s, c.id)} needs you to ${describeAttackCost(c)}`).join("; ")}`);

@@ -10996,6 +10996,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d06ef178-f02a-45a4-8193-140dee52c99d",
+  "name": "Dreamshaper Shaman",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Enchantment Creature — Minotaur Shaman",
+  "supertypes": [],
+  "types": [
+   "Enchantment",
+   "Creature"
+  ],
+  "subtypes": [
+   "Minotaur",
+   "Shaman"
+  ],
+  "oracleText": "At the beginning of your end step, you may pay {2}{R} and sacrifice a nonland permanent. If you do, reveal cards from the top of your library until you reveal a nonland permanent card. Put that card onto the battlefield and the rest on the bottom of your library in a random order.",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "thb",
+  "releasedAt": "2020-01-24",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "383e9005-5869-4d1d-917d-30e5f214fbd9",
   "name": "Drop of Honey",
   "manaCost": "{G}",
@@ -14998,6 +15030,37 @@
   "set": "fin",
   "releasedAt": "2025-06-13",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "184d4672-05a9-4182-8b3f-3561fb33ed62",
+  "name": "Garruk, Curse Breaker",
+  "manaCost": "{3}{G}{G}",
+  "cmc": 5,
+  "typeLine": "Legendary Planeswalker — Garruk",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Garruk"
+  ],
+  "oracleText": "Whenever a creature you control with power 4 or greater enters, draw a card.\n+2: Untap up to two target lands.\n−3: Create a 4/4 green Beast creature token with trample.\n−4: Until your next turn, whenever one or more creatures attack one of your opponents, those creatures get +2/+2 and gain trample until end of turn.",
+  "loyalty": "5",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fra",
+  "releasedAt": "2026-10-02",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -41092,6 +41155,41 @@
   "set": "fin",
   "releasedAt": "2025-06-13",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f624c0f1-1c09-4b7a-b140-11329f27e3c7",
+  "name": "Trove of Temptation",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Each opponent must attack you or a planeswalker you control with at least one creature each combat if able.\nAt the beginning of your end step, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Treasure"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "xln",
+  "releasedAt": "2017-09-29",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

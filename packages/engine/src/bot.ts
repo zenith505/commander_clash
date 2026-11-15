@@ -45,6 +45,7 @@ import {
   attackLifeCost,
   attackYouLimit,
   attackAllIfOne,
+  attackRequirementImprovement,
   attackWithOneOptions,
   attackWithOneRequired,
   combatLimit,
@@ -8598,6 +8599,18 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
       return other === undefined ? [] : [{ attacker: a.attacker, defender: other }];
     });
   }
+  // Trove of Temptation: one change at a time that obeys more of the requirements on this attack (CR 508.1d), until none
+  // does; each such change only moves a creature that attacks without a cost.
+  const obey = (decl: typeof declared) => {
+    for (let i = 0; i < 64; i++) {
+      const r = attackRequirementImprovement(s, pid, decl);
+      if (!r) break;
+      decl = r.attacks;
+    }
+    return decl;
+  };
+  declared = obey(declared);
+  let rounds = 0;
   // Ghostly Prison: pay what attacking costs if we can (CR 508.1g-i); otherwise send the weakest taxed attacker at
   // someone it costs nothing to attack, or keep it home. Nothing obliges paying for a requirement (CR 508.1d).
   for (;;) {
@@ -8610,6 +8623,11 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
     if (taps && (!lifeTax || (payableLife(s, pid) >= lifeTax && player(s, pid).life - lifeTax - 2 * symbols > 10))) {
       if (declared.length === 1 && characteristics(s, obj(s, declared[0]!.attacker)).cantAttackAlone) declared = [];
       if (declared.some((a) => withoutCompany(s, a.attacker, declared))) declared = declared.filter((a) => !withoutCompany(s, a.attacker, declared));
+      const obeyed = rounds++ < 8 ? obey(declared) : declared;
+      if (obeyed !== declared) {
+        declared = obeyed;
+        continue;
+      }
       return [...(declared.length ? taps : []), { type: "declareAttackers", player: pid, attacks: declared }];
     }
     const taxed = declared.filter((a) => attackTaxOf(s, a)).sort((a, b) => power(s, obj(s, a.attacker)) - power(s, obj(s, b.attacker)))[0]!;

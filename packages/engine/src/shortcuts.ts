@@ -419,6 +419,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     toGraveyardNotBattlefield: capped((t.toGraveyardNotBattlefield ?? {}) as Record<number, number>),
     activatedInGraveyard: t.activatedInGraveyard,
     oilRemoved: t.oilRemoved ? [...t.oilRemoved].sort() : undefined,
+    tappedLandForMana: t.tappedLandForMana ? [...t.tappedLandForMana].sort() : undefined,
     oilPermanentToGraveyard: t.oilPermanentToGraveyard,
     noMorePoison: t.noMorePoison ? [...t.noMorePoison].sort() : undefined,
     creaturesLeft: capped((t.creaturesLeft ?? {}) as Record<number, number>),

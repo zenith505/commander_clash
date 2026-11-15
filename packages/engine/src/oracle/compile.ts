@@ -55,6 +55,9 @@ import { roundB208Line } from "./laneb208";
 import { roundB209Line } from "./laneb209";
 import { roundB210Line } from "./laneb210";
 import { roundB211Line } from "./laneb211";
+import { roundB213Line } from "./laneb213";
+import { roundB214Line } from "./laneb214";
+import { roundB215Line } from "./laneb215";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -129,10 +132,12 @@ export function compileCard(card: CardDef): CompiledCard {
   // puts onto the battlefield is supported.
   if (d.meld && !isMeldResult(d) && /\bmeld them into\b/.test(d.oracleText) && !meldResultSupported(d.meld.result)) out.unsupported.push(`(${d.meld.result}, the permanent it melds into)`);
   // Warping Wurm: "Whenever ~ phases in" and an upkeep trigger that phases it out go on the stack together, in the order
-  // its controller chooses (CR 603.3b); the engine has no such choice, and the wrong order loses the counter.
-  const phasesIn = out.triggers.find((t) => t.event === "selfPhasesIn");
-  if (phasesIn && out.triggers.some((t) => t.event === "yourUpkeep" && allEffects(t.body.effects).some((e) => e.type === "phaseOut" && e.what.ref === "self")))
-    out.unsupported.push(`${phasesIn.body.text} (ordering it with the upkeep trigger)`);
+  // its controller chooses (CR 603.3b). The engine doesn't ask; the phase-in trigger resolves first (round B214,
+  // TriggeredAbility.resolveFirst), as its controller would have it: the other order only loses the counter when it phases
+  // out (CR 702.26b), and with it paid for the two orders end the same.
+  const phasesIn = out.triggers.findIndex((t) => t.event === "selfPhasesIn");
+  if (phasesIn >= 0 && out.triggers.some((t) => t.event === "yourUpkeep" && allEffects(t.body.effects).some((e) => e.type === "phaseOut" && e.what.ref === "self")))
+    out.triggers[phasesIn] = { ...out.triggers[phasesIn]!, resolveFirst: true };
   if (d.oracleId === MONARCH.oracleId) out.triggers = MONARCH_TRIGGERS;
   if (d.oracleId === RING.oracleId) out.triggers = RING_TRIGGERS;
   if (d.oracleId === INITIATIVE.oracleId) out.triggers = INITIATIVE_TRIGGERS;
@@ -2154,6 +2159,12 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB210Line(line, raw, out, isSpell)) continue;
     // Chromatic Armor, Call to Arms, Nettlevine Blight, Strax, Merseine (round B211).
     if (roundB211Line(line, raw, out, isSpell)) continue;
+    // Desolation, Kodama of the Center Tree, Corrosive Ooze (round B213).
+    if (roundB213Line(line, raw, out, isSpell)) continue;
+    // All Hallow's Eve, Ice Cave, Tidal Flats, Alpine Moon (round B214).
+    if (roundB214Line(line, raw, out, isSpell)) continue;
+    // Necrotic Plague (round B215).
+    if (roundB215Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -2306,6 +2317,15 @@ export function compile(d: CardDef): CompiledCard {
     // resolving, instead of going to its owner's graveyard (CR 608.2n).
     if (line === "Exile ~." && isSpell && li === lines.length - 1) {
       out.exileSelfOnResolve = true;
+      continue;
+    }
+    // All Hallow's Eve (round B214): "Exile ~ with two scream counters on it.", the spell's only instruction (its other line
+    // is an ability that works in exile): as it resolves it's exiled with those counters, instead of going to its owner's
+    // graveyard (CR 608.2n, 122.1; rulings: that's all it does).
+    const exileWith = isSpell ? /^Exile ~ with (two|three) ([a-z]+) counters on it\.$/.exec(line) : null;
+    if (exileWith && !out.exileSelfOnResolve && lines.every((l, k) => k === li || /^At the beginning of your upkeep, if ~ is exiled with an? [a-z]+ counter on it, /.test(l))) {
+      out.exileSelfOnResolve = true;
+      out.exileSelfCounters = { counter: exileWith[2]!, n: exileWith[1] === "two" ? 2 : 3 };
       continue;
     }
     // Grifter's Blade: "As this Equipment enters, choose a creature you control it could be attached to. If you do, it
@@ -7237,6 +7257,8 @@ export function compile(d: CardDef): CompiledCard {
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
     // Into the Time Vortex, Throes of Chaos: cascade and nothing else to do; the spell resolves doing nothing more (CR 608.2).
     else if (!spellLines.length && !ascendSpell && d.keywords.includes("Cascade")) out.spell = { targets: [], effects: [], text: "" };
+    // All Hallow's Eve (round B214): exiled with its counters as it resolves (CompiledCard.exileSelfCounters) and nothing else.
+    else if (!spellLines.length && !ascendSpell && out.exileSelfCounters) out.spell = { targets: [], effects: [], text: "" };
     else out.unsupported.push(...spellLines);
   }
   if (unpreventableX !== undefined) {
@@ -8321,7 +8343,7 @@ function checkX(d: CardDef, out: CompiledCard) {
   out.triggers = out.triggers.filter((tr) => {
     // A "when you cast this spell" ability uses the X the spell was cast with (CR 107.3a, 601.2b; rulings on Hydroid Krasis).
     // "Where X is the number of nonland cards milled this way" (The Wise Mothman): the event's (TriggeredAbility.eventX).
-    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX) || (tr.event === "selfCycled" && cyclingX) || (tr.event === "selfTurnedFaceUp" && faceUpX) || tr.eventX || (tr.xKicked && out.kicker?.multi)) return true;
+    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX) || (tr.event === "selfCycled" && cyclingX) || (tr.event === "selfTurnedFaceUp" && faceUpX) || tr.eventX || tr.xLookBackSubtype || (tr.xKicked && out.kicker?.multi)) return true;
     bad(tr.body.text);
     return false;
   });

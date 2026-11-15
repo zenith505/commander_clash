@@ -405,7 +405,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         // A characteristic-defining ability of the card's own applies in exile (CR 604.3; rulings on Phyrexian Ingester and
         // Sutured Ghoul: Dungrove Elder counts its owner's Forests there).
         const v = exiledCardPT(s, o, c.stat, ctx.view);
-        return ch.types.includes("Creature") ? n + (c.signed ? v : Math.max(0, v)) : n;
+        // Bishop of Binding: any card's power, a Vehicle's printed one too (rulings); a card with none adds 0.
+        return c.anyCard || ch.types.includes("Creature") ? n + (c.signed ? v : Math.max(0, v)) : n;
       }, 0);
     }
     case "movedLinkedThisWay":

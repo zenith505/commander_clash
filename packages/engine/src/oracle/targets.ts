@@ -988,6 +988,9 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const sameCtl = !!another && !many && n === 1 && !cards && / with the same controller$/.test(mine0);
   // "Any number of target creature cards that each have a different mana value X or less" (Agadeem's Awakening).
   const differMv = many === "any" ? / that each have a different mana value (\d+|X) or less(?= from |$)/.exec(mine0) : null;
+  // Long Rest: "X target cards with different mana values from your graveyard": each a mana value none of the others has
+  // (CR 601.2c), as for Agadeem's Awakening but with no limit.
+  const differMvAll = !!many && !differMv && / with different mana values(?= from |$)/.test(mine0);
   // "With total mana value 6 or less" (TargetSpec.total): the group together, X being the one announced (CR 107.3a).
   const totalM = n > 1 || many ? / with total (mana value|power) (\d+|X) or less(?= from | in |$)/.exec(mine0) : null;
   // With "where X is ...", X is defined by the text, which defineX (body.ts) works out or refuses.
@@ -995,7 +998,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   // "Any number of target creatures with equal toughness" (V.A.T.S.).
   const equalToughness = many === "any" && / with equal toughness$/.test(mine0);
   const total: TargetSpec["total"] | undefined = totalM ? { key: totalM[1] === "power" ? "power" : "manaValue", ...(totalM[2] === "X" ? { x: true as const } : { max: Number(totalM[2]) }) } : undefined;
-  const mine = mine0.replace(/ with the same controller$/, "").replace(/ controlled by different players$/, "").replace(/ that share a card type$/, "").replace(/ that share no creature types$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "").replace(equalToughness ? / with equal toughness$/ : /^$/, "");
+  const mine = mine0.replace(/ with the same controller$/, "").replace(/ controlled by different players$/, "").replace(/ that share a card type$/, "").replace(/ that share no creature types$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(differMvAll ? / with different mana values(?= from |$)/ : /^$/, "").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "").replace(equalToughness ? / with equal toughness$/ : /^$/, "");
   // "Up to three target creatures with toughness X or less" (Finale of Eternity): each one, with the spell's X.
   // "Up to X target artifact cards each with mana value X or less" (Dance of the Manse): each one's, with the spell's X.
   const each = (n > 1 || !!many) && / each with mana value X or less(?= from |$)/.test(mine);
@@ -1031,7 +1034,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
     // Rats' Feast: "X target cards from a single graveyard": each in the graveyard of the others (TargetSpec.singleGraveyard).
     // Martyr of Bones: "up to X target cards from a single graveyard", the same for the ones chosen (as Kaya's "up to two").
     if ((single && many !== "exactX" && many !== "x") || share || ctx.targets.some((t) => t.many)) return null;
-    addTarget(ctx, { ...spec, ...(single ? { singleGraveyard: true as const, text: spec.text.replace(/ from a graveyard$/, " from a single graveyard") } : {}), ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), ...(manyMax ? { manyMax } : {}), ...(range === "one or more" ? { manyMin: 1 as const } : {}), ...(whereMany ? { manyWhere: true as const } : {}), ...(twice ? { manyTimes: 2 as const } : {}), ...(manyDiffCtl ? { differentControllers: true as const, text: `${spec.text} controlled by a different player` } : {}), ...(differMv ? { differentManaValues: true as const, text: spec.text.replace(" with mana value ", " with a different mana value ") } : {}), many });
+    addTarget(ctx, { ...spec, ...(single ? { singleGraveyard: true as const, text: spec.text.replace(/ from a graveyard$/, " from a single graveyard") } : {}), ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), ...(manyMax ? { manyMax } : {}), ...(range === "one or more" ? { manyMin: 1 as const } : {}), ...(whereMany ? { manyWhere: true as const } : {}), ...(twice ? { manyTimes: 2 as const } : {}), ...(manyDiffCtl ? { differentControllers: true as const, text: `${spec.text} controlled by a different player` } : {}), ...(differMv ? { differentManaValues: true as const, text: spec.text.replace(" with mana value ", " with a different mana value ") } : {}), ...(differMvAll ? { differentManaValues: true as const, text: `${spec.text} (each with a different mana value)` } : {}), many });
     // "It" can't mean one of them; "they", "those creatures" means all of them, however many.
     ctx.lastObjectTarget = undefined;
     ctx.lastTargets = { index: first, n: 2 };

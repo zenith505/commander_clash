@@ -249,7 +249,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const bin = wantOnTop(s, pid, a) && !wantOnTop(s, pid, b) ? b : !wantOnTop(s, pid, a) && wantOnTop(s, pid, b) ? a : mv(s, a) >= mv(s, b) ? b : a;
       return [{ type: "drawLook", player: pid, objectId: bin }];
     }
-    // Out of the Tombs: the creature card that costs the most comes back.
+    // Out of the Tombs: the creature card that costs the most comes back; Forbidden Crypt: the card that costs the most.
     if (pend.kind === "drawEmptyReturn") return [{ type: "drawEmptyReturn", player: pid, objectId: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a))[0]! }];
     if (pend.kind === "drawInstead") {
       // Its own Words before an opponent's Urabrask; the life when it's low, otherwise the token.
@@ -269,7 +269,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const shelter = sanctuary && !player(s, pid).attackOnlyByUntil && grounded(abilitiesOf(s, s.objects[sanctuary.slice("mayskip:".length)]!).drawStepMaySkip!.attackOnlyBy) * 2 >= player(s, pid).life ? sanctuary : undefined;
       const skip = shelter ?? (player(s, pid).library.length <= 5 ? has("mayskip") : undefined);
       const declinable = (k: string) => k === "thief" || /^(?:dredge|mayskip|counter):/.test(k);
-      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("archive") ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? pend.options.find((k) => !declinable(k)) ?? pend.options[0]!;
+      // Forbidden Crypt with an empty graveyard loses the game: anything else first.
+      const loses = (k: string) => k.startsWith("crypt:") && !player(s, pid).graveyard.length;
+      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("archive") ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? pend.options.find((k) => !declinable(k) && !loses(k)) ?? pend.options.find((k) => !loses(k)) ?? pend.options[0]!;
       return [{ type: "drawInstead", player: pid, choice: pick }];
     }
     if (pend.kind === "dredge") {
@@ -319,6 +321,22 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && s.resolving!.item.controller !== pid && theirMay.effects.length === 1 && theirMay.effects[0]!.type === "revealedTo") {
       const lib = player(s, s.resolving!.item.controller).library.length - (s.resolving!.revealedUntil?.length ?? 0);
       return [{ type: "chooseMay", player: pid, yes: lib >= 5 }];
+    }
+    // Curse of the Cabal (round B216): another player's suspended Curse waits two more turns for one of our permanents while
+    // we have plenty (it would take half of them); our own we let come.
+    if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && theirMay.effects.length === 1 && theirMay.effects[0]!.type === "pick" && theirMay.effects[0]!.action === "sacrifice" && s.resolving!.body.effects[s.resolving!.next + 1]?.type === "if") {
+      const mine = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid).length;
+      return [{ type: "chooseMay", player: pid, yes: s.resolving!.item.controller !== pid && mine >= 5 }];
+    }
+    // Forbidden Ritual (round B216): another pass while we keep plenty of nontoken permanents.
+    if (pend.kind === "chooseMay" && pend.repeat && theirMay?.type === "repeatMaySteps") {
+      const mine = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !obj(s, id).isToken).length;
+      return [{ type: "chooseMay", player: pid, yes: mine >= 8 }];
+    }
+    // Preferred Selection (round B216): the enchantment and four mana for one of the two cards only with an empty hand.
+    if (pend.kind === "chooseMay" && pend.pay?.mana && theirMay?.type === "lookTopMaySacrificePay") {
+      const taps = planMana(s, pid, parseManaCost(pend.pay.mana));
+      return taps && player(s, pid).hand.length === 0 ? [...taps, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
     }
     if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && s.resolving!.item.controller !== pid)
       return [{ type: "chooseMay", player: pid, yes: theirMay.effects.every((x) => x.type === "counters" && x.counter === "time" && x.what.ref === "selfCard") }];
@@ -1924,6 +1942,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Liar's Pendulum: a deck is singleton (CR 903.5b), so a named card (other than a basic land) seen anywhere outside the
     // namer's hand isn't in it; otherwise we expect them to have named a card they hold. Only public information is used.
     // Liberated Livestock (round B208): the costliest Aura that helps a creature of ours, else none.
+    // Preferred Selection (round B216): the card we'd rather draw into our hand, the other one to the bottom.
+    if (pend.kind === "chooseOption" && pend.what === "lookedCard") {
+      const toHand = /into your hand/.test(pend.prompt ?? "");
+      const want = pend.options.filter((o) => wantOnTop(s, pid, o));
+      const rest = pend.options.filter((o) => !want.includes(o));
+      return [{ type: "chooseOption", player: pid, choice: (toHand ? (want[0] ?? rest[0]) : (rest[0] ?? want[0]))! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "auraForToken") {
       const best = pend.options.filter((o) => o !== "none" && auraHelps(defOf(s, obj(s, o)))).sort((a, b) => mv(s, b) - mv(s, a))[0];
       return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];

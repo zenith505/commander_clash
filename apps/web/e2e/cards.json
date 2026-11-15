@@ -655,6 +655,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dfb5f660-fd8b-4b7b-934c-6a71cd182f15",
+  "name": "Ajani Goldmane",
+  "manaCost": "{2}{W}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Ajani",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Ajani"
+  ],
+  "oracleText": "+1: You gain 2 life.\n−1: Put a +1/+1 counter on each creature you control. Those creatures gain vigilance until end of turn.\n−6: Create a white Avatar creature token. It has \"This token's power and toughness are each equal to your life total.\"",
+  "loyalty": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lrw",
+  "releasedAt": "2007-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c03ae426-2536-4c20-a73a-a24e816f76b0",
   "name": "Akiri, Fearless Voyager",
   "manaCost": "{1}{R}{W}",
@@ -7799,6 +7830,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fb1bd39c-c870-4f63-9e4f-32c94ac46555",
+  "name": "Conundrum Sphinx",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Sphinx",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx"
+  ],
+  "oracleText": "Flying\nWhenever this creature attacks, each player chooses a card name. Then each player reveals the top card of their library. If the card a player revealed has the name they chose, that player puts it into their hand. If it doesn't, that player puts it on the bottom of their library.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "m11",
+  "releasedAt": "2010-07-16",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "685c4665-e04c-4012-aa5b-888a042c2a21",
   "name": "Convincing Mirage",
   "manaCost": "{1}{U}",
@@ -8715,6 +8778,34 @@
   "set": "isd",
   "releasedAt": "2011-09-30",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cafede0d-aa14-4266-b619-321ac756262d",
+  "name": "Curse of the Cabal",
+  "manaCost": "{9}{B}",
+  "cmc": 10,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target player sacrifices half the permanents they control of their choice, rounded down.\nSuspend 2—{2}{B}{B} (Rather than cast this card from your hand, you may pay {2}{B}{B} and exile it with two time counters on it. At the beginning of your upkeep, remove a time counter. When the last is removed, you may cast it without paying its mana cost.)\nAt the beginning of each player's upkeep, if this card is suspended, that player may sacrifice a permanent of their choice. If the player does, put two time counters on this card.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Suspend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -14128,6 +14219,58 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8b34b211-985b-4934-bb3b-8e6672685ac2",
+  "name": "Forbidden Crypt",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If you would draw a card, return a card from your graveyard to your hand instead. If you can't, you lose the game.\nIf a card would be put into your graveyard from anywhere, exile that card instead.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4b5d9c76-8be8-4e25-b978-9750df3d8c15",
+  "name": "Forbidden Ritual",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Sacrifice a nontoken permanent. If you do, target opponent loses 2 life unless that player sacrifices a permanent of their choice or discards a card. You may repeat this process any number of times.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "vis",
+  "releasedAt": "1997-02-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "956381ba-6d37-4a8a-846c-bad79222dbee",
   "name": "Force of Will",
   "manaCost": "{3}{U}{U}",
@@ -14458,6 +14601,41 @@
   "commanderLegal": "legal",
   "set": "j25",
   "releasedAt": "2024-11-15",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "af2b36ee-2945-41d3-a186-8fd28f3cde16",
+  "name": "Fugitive Codebreaker",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Creature — Goblin Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Rogue"
+  ],
+  "oracleText": "Prowess, haste\nDisguise {5}{R}. This cost is reduced by {1} for each instant and sorcery card in your graveyard. (You may cast this card face down for {3} as a 2/2 creature with ward {2}. Turn it face up any time for its disguise cost.)\nWhen this creature is turned face up, discard your hand, then draw three cards.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Prowess",
+   "Haste",
+   "Disguise"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -17456,6 +17634,38 @@
   "commanderLegal": "legal",
   "set": "blc",
   "releasedAt": "2024-08-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e2ee410f-2467-4f1f-84a0-8a79faedc0b3",
+  "name": "Heart of Kiran",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Legendary Artifact — Vehicle",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Vehicle"
+  ],
+  "oracleText": "Flying, vigilance\nCrew 3 (Tap any number of creatures you control with total power 3 or more: This Vehicle becomes an artifact creature until end of turn.)\nYou may remove a loyalty counter from a planeswalker you control rather than pay Heart of Kiran's crew cost.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Flying",
+   "Vigilance",
+   "Crew"
+  ],
+  "commanderLegal": "legal",
+  "set": "aer",
+  "releasedAt": "2017-01-20",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
@@ -22897,6 +23107,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fc8df5c8-fda6-454c-a1ac-21c6e3d75b9c",
+  "name": "Long Rest",
+  "manaCost": "{X}{G}{G}{G}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Return X target cards with different mana values from your graveyard to your hand. If eight or more cards were returned to your hand this way, your life total becomes equal to your starting life total. Exile Long Rest.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c65c4d01-29da-47e6-993c-a265cf1f198c",
   "name": "Long River Lurker",
   "manaCost": "{2}{U}",
@@ -24567,6 +24803,28 @@
   "commanderLegal": "legal",
   "set": "ltc",
   "releasedAt": "2023-06-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "38ffe614-e8f7-4625-b921-9409e7e7ee5b",
+  "name": "Mirror of Fate",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}, Sacrifice this artifact: Choose up to seven face-up exiled cards you own. Exile all the cards from your library, then put the chosen cards on top of your library.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m10",
+  "releasedAt": "2009-07-17",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -29271,6 +29529,32 @@
   "set": "gpt",
   "releasedAt": "2006-02-03",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1d05d2d6-3ea1-4d8a-9f1c-6fc3f5e38ea9",
+  "name": "Preferred Selection",
+  "manaCost": "{2}{G}{G}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, look at the top two cards of your library. You may sacrifice this enchantment and pay {2}{G}{G}. If you do, put one of those cards into your hand. If you don't, put one of those cards on the bottom of your library.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -64,6 +64,8 @@ import { runLaneB210Effect } from "./run-laneb210";
 import { runLaneB212Effect } from "./run-laneb212";
 import { runLaneB214Effect } from "./run-laneb214";
 import { runLaneB215Effect } from "./run-laneb215";
+import { runLaneB216Effect } from "./run-laneb216";
+import { runLaneB218Effect } from "./run-laneb218";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -1953,6 +1955,12 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB214Effect(s, e, ctx, src);
     case "eachLandUnlessAnyPaysLife":
       return runLaneB215Effect(s, e, ctx, src);
+    case "repeatMaySteps":
+    case "lookTopMaySacrificePay":
+      return runLaneB216Effect(s, e, ctx, src);
+    case "eachGuessTop":
+    case "exiledToLibraryTop":
+      return runLaneB218Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

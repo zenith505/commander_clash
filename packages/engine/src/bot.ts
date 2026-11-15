@@ -297,6 +297,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const o = asked ? s.objects[asked.id] : undefined;
       return [{ type: "chooseMay", player: pid, yes: !!o?.isToken }];
     }
+    // Decoy Gambit: our creature returned to our hand, or a card for its caster: the card, for a token (it would cease to
+    // exist), a creature worth recasting much more than a card (mana value 4 or more), one with counters or Auras on it,
+    // or a commander; a cheap one goes back to our hand.
+    if (pend.kind === "chooseMay" && theirMay?.type === "bounceUnlessDraw") {
+      const asked = s.resolving!.scratch?.decoy?.queue[0];
+      const o = asked ? s.objects[asked.id] : undefined;
+      const keep = !!o && (o.isToken || o.isCommander || mv(s, o.id) >= 4 || Object.values(o.counters ?? {}).some((n) => (n ?? 0) > 0) || s.battlefield.some((id) => s.objects[id]!.attachedTo === o.id));
+      return [{ type: "chooseMay", player: pid, yes: keep }];
+    }
     // Covenant of Minds: the three cards seen rather than five unseen, unless five more draws would empty that library.
     if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && s.resolving!.item.controller !== pid && theirMay.effects.length === 1 && theirMay.effects[0]!.type === "revealedTo") {
       const lib = player(s, s.resolving!.item.controller).library.length - (s.resolving!.revealedUntil?.length ?? 0);

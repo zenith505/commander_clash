@@ -1,6 +1,6 @@
 # Roadmap
 
-31,378 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,383 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,885 of
 9,979 (99%).
 
@@ -329,7 +329,7 @@ line blocks.
    Remembrance, Spy Network (done in round B186), Dimir Doppelganger (done in round 362), Jailbreak, Inverter of Truth (done in round 329), Immovable Rod (done in round B186), Hypergenesis, Soul
    Transfer and the rest of the 222 still unsupported in that range; past it: Phytohydra (damage replaced by +1/+1
    counters even when it can't be prevented, which needs its controller's order against prevention shields), Intimidation
-   Bolt ("other creatures can't attack": other than the target), Fade Away, Viashino Heretic, Dazzling Reflection (done in round B108),
+   Bolt ("other creatures can't attack": other than the target), Fade Away (done in round B212), Viashino Heretic, Dazzling Reflection (done in round B108),
    Arcbound Fiend, Consume Spirit (done in round B179), Pestilent Spirit, End Hostilities.
    Round 182 went down from rank 12,330 to about rank 13,222 (Temporal Cleansing, Deem Inferior, Lost Days, Happy Hogan
    and Trickster's Stratagem (second from the top or the bottom, the owner's choice), Phyrexian Hydra, Pain
@@ -1050,7 +1050,7 @@ line blocks.
    one target" exile-and-copy (Renegade Bull); "Put ~ from your graveyard onto the battlefield transformed" (Startled
    Awake). +21 (28,104 of 31,936 with B46 and B47).
    Out after round 217 (looked at, not done): Barbed Wire (done in round B182) (needs a "prevent the next damage dealt by a source"
-   shield); Decoy Gambit (a per-target "unless its controller has you draw a card"); Multiple Choice (done in round B191); Laboratory Drudge
+   shield); Decoy Gambit (done in round B212) (a per-target "unless its controller has you draw a card"); Multiple Choice (done in round B191); Laboratory Drudge
    (needs tracking of cards cast and abilities activated from graveyards); Kraven the Hunter (greatest power as it
    died); The Eighth Doctor; Arcade Gannon. Next fresh candidates, not looked at
    closely: Seize the Storm, Aberrant Mind Sorcerer, Key to the Side-Door, Prized Amalgam, Kathril, Aspect Warper,
@@ -2682,7 +2682,7 @@ line blocks.
    by the special action or an effect, CR 116.2b, 708.8; checked as it resolves, rulings). No new prompt: each uses the
    existing mode, may, choose-an-opponent, graveyard-pick and discard paths, with browser tests for Vislor Turlough and
    Resplendent Marshal. +6, 31,281 of 31,936. The compiled text of every other card is unchanged.
-   Out after round 361 (looked at, not done): Fade Away (still out, as after round 340); Rift Elemental (still out: a
+   Out after round 361 (looked at, not done): Fade Away (done in round B212) (still out, as after round 340); Rift Elemental (still out: a
    cost removing a time counter from a permanent or a suspended card); Thought Lash (done in round B210) ("When a player doesn't pay ~'s
    cumulative upkeep": a trigger on a cumulative upkeep left unpaid, with exiling the top card as the upkeep); Lavabrink
    Floodgates (each player's choice in their upkeep to add or remove a doom counter, a new prompt, then a reflexive
@@ -2730,7 +2730,7 @@ line blocks.
    a card they can't cast soon, and value Trial's guilty vote by the exiled cards. +5, 31,310 of 31,936 with round 362 and Lane B's B201-B203. The compiled
    text of every other card is unchanged.
    Out after round 363 (looked at, not done): Ziatora's Envoy (playing a land from the top while the trigger resolves);
-   Durnan of the Yawning Portal (undaunted granted to a spell cast from exile); Decoy Gambit ("unless its controller has
+   Durnan of the Yawning Portal (undaunted granted to a spell cast from exile); Decoy Gambit (done in round B212) ("unless its controller has
    you draw a card", one choice per opponent); Sphinx Ambassador (an opponent names a card after a hidden search);
    Choreographed Sparks ("can't be copied", and a copy of a creature spell with granted text); Mirror of Life Trapping and
    Archnemesis (not yet looked at closely); Fell Beast's Shriek and Riddles in the Dark (in Lane B's range).
@@ -3092,7 +3092,7 @@ line blocks.
    Out after round 340 (looked at, not done): Regenerations Restored (its last-counter trigger and vanishing's sacrifice
    trigger go on the stack in an order its controller picks, CR 603.3b, and the engine has no such choice yet); Rift
    Elemental (a cost removing a time counter from a permanent or suspended card); Words of Waste (a choice in the middle
-   of a draw); Fade Away (every player's payments announced before any sacrifice); Lodestone Bauble (one player's
+   of a draw); Fade Away (done in round B212) (every player's payments announced before any sacrifice); Lodestone Bauble (one player's
    graveyard chosen with no target).
    Round 339 went on down the "Out after round N" lists, most played first: Kadena's Silencer's "counter all abilities
    your opponents control" (abilities only, spells stay, CR 701.6b) and Strict Proctor's "Whenever a permanent entering
@@ -6938,8 +6938,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Phyrexian mana and life costs; 0 life can still be paid, CR 119.4b; not turning a face-down permanent face up, a
   special action). Breathless Knight, Bounty of the Luxa, Woodland Weavemaster and Cheering Crowd were dropped from
   this round: Lane A's round 224 does them. +11 (28,601 of 31,936 with round 224).
-- Out after round B63 (looked at, not done): Divine Deflection (prevention shared by you and your permanents),
-  Refraction Trap (trap cost and a chosen source), Intermediate Chirography (a modified creature that died this
+- Out after round B63 (looked at, not done): Divine Deflection (done in round B212) (prevention shared by you and your permanents),
+  Refraction Trap (done in round B212) (trap cost and a chosen source), Intermediate Chirography (a modified creature that died this
   turn), Churning Reservoir (oil counters put this turn), Dutiful Knowledge Seeker (cards put into a library from
   anywhere), Simic Manipulator (done in round 315) and Arcee (remove one or more counters as a variable cost), Benalish Commander and
   Detritivore (suspend X), Darigaaz Reincarnated (done in round B202), Sekki, Seasons' Guide, Fugitive Codebreaker, Reroute (done in round B196), Serum Powder,
@@ -7829,7 +7829,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Lichenthrope, Force Bubble (done in round B135) and Crumbling Sanctuary (damage replaced by counters or exiled cards: a replacement that isn't
   a prevention, so it applies to damage that can't be prevented and is ordered with the shields, CR 616.1; the damage rules
   only prevent or redirect), Eye for an Eye (the damage is dealt and the same amount dealt to the source's controller),
-  Channel Harm ("you may have ~ deal that much damage" each time damage is prevented, a choice inside the prevention).
+  Channel Harm (done in round B212) ("you may have ~ deal that much damage" each time damage is prevented, a choice inside the prevention).
 - Round B121 (least played first, from the skip lists): Coalition Honor Guard, Standard Bearer and Coalition Flag (an
   opponent choosing targets for a spell they cast or an ability they activate must choose at least one Flagbearer if able:
   not for triggered abilities, not its controller, and a Flagbearer that can't be targeted doesn't bind; checked against
@@ -9099,7 +9099,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   draws, then exiles a card from their hand; a creature card gives them a token copy of it, CR 707.2; when ~ leaves, every
   token created with it is exiled at the next end step, the tokens of the permanent it was, CR 603.10a, 400.7; a browser
   test). Livio also has a browser test. +6, 31,257 of 31,936 with B199 and rounds 356, 357.
-- Out after round B200 (looked at, not done): Divine Deflection (one prevention shield shared by you and every permanent you
+- Out after round B200 (looked at, not done): Divine Deflection (done in round B212) (one prevention shield shared by you and every permanent you
   control, with the prevented amount dealt back to any target chosen as damage is prevented) stays out.
 - Round B201 (least played first, from the Lane B skip lists): Happily Ever After (its upkeep win: one intervening if, CR
   603.4, with five colors among your permanents, six or more card types among your permanents and the cards in your
@@ -9136,7 +9136,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   replacement exiled instead not among them, rulings; X the total power of the cards exiled). +6, 31,269 of 31,936 with B201.
 - Out after round B202 (looked at, not done): Long Rest ("X target cards with different mana values": no targeting rule
   across a spell's targets yet), Song of Inspiration (no ruling settles whether a target that became illegal still adds its
-  mana value to the roll, CR 608.2b), Lodestone Bauble, Decoy Gambit and Coin of Fate stay out for the reasons in the
+  mana value to the roll, CR 608.2b), Lodestone Bauble, Decoy Gambit (done in round B212) and Coin of Fate stay out for the reasons in the
   earlier lists.
 - Round B203 (least played first, from the Lane B skip lists): Nyla, Shirshu Sleuth ("If you do, you lose X life and create
   X Clue tokens, where X is that card's mana value" after exiling up to one target card: only if it was exiled, its mana
@@ -9272,6 +9272,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   like, the mana cost as it is then with colored symbols, rulings, {X} as 0, CR 107.3h, unpayable without one, CR 118.6;
   bots pay at an opponent's end step). Browser tests for each. +5, 31,378 of 31,936. The compiled text of every other card is
   unchanged.
+- Round B212 (least played first, from the Lane B skip lists): Divine Deflection (one shield of the next X damage for you
+  and your permanents together, CR 615.7, the target chosen as it's cast, rulings: an illegal target as it resolves and
+  nothing is prevented; damage dealt at once to several of them is split as you choose, and all it prevents in one event is
+  dealt as one amount, CR 615.5). Refraction Trap (its trap cost after an opponent cast a red instant or sorcery spell this
+  turn (rulings), and the same shield for the next 3 damage from a source chosen as it resolves, CR 615.10).
+  Channel Harm (all damage to you and your permanents from sources you don't control this turn prevented; each time, you
+  may have it deal that much to the target creature, a choice inside the prevention, not a redirection, rulings; bots
+  decline when the creature's controller has a Channel Harm of their own aimed back, which ends the loop the rulings
+  describe). Decoy Gambit (one target per opponent; as it resolves each targeted creature's controller, in APNAP order,
+  CR 101.4, knowing the earlier answers, chooses: you draw a card, or the creature returns; you draw first, then those
+  creatures return at once, rulings; bots keep tokens, commanders, creatures of mana value 4 or more and creatures with
+  counters or attachments). Fade Away (each player counts their creatures as it begins, then in APNAP order pays {1} or
+  picks a permanent for each, with no "neither", and every pick is sacrificed at once at the end, rulings). Also: all
+  damage a prevention-and-deal rule prevents in one event is now dealt as one amount (Vengeful Archon too). Browser tests
+  for Channel Harm's question, Decoy Gambit's choice and Fade Away's payments and pick. +5, 31,383 of 31,936. The compiled
+  text of every other card is unchanged.
+- Out after round B212 (looked at, not done): Rain of Gore (whether lifelink damage from a spell is that spell causing
+  the life gain), Kraven the Hunter (the greatest power as several creatures die at once) and Blood Scrivener (two draws
+  and a life loss replacing one draw) stay out for the reasons in the earlier lists.
 - Out after round B211 (looked at, not done): Caller of the Hunt (a creature type chosen as an additional cost to cast it,
   kept by the spell and then the permanent for its power and toughness; no cast-time choice of that kind yet), Mangara's
   Equity (damage to "you or a white creature you control" grouped per event), Worms of the Earth ("Lands can't enter the
@@ -9313,7 +9332,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ("when you cast a spell with the chosen name for the first time this turn": a spell of that name cast earlier that turn,
   before chapter III, isn't settled by its rulings), Spectral Searchlight (another player choosing a color in the middle of a
   mana ability), Day of the Moon (every name chosen for the Saga kept on it), Dralnu, Lich Lord (sacrifices chosen in the
-  middle of dealing damage), Words of Waste and Fade Away (see round 340's list) stay out.
+  middle of dealing damage), Words of Waste and Fade Away (done in round B212) (see round 340's list) stay out.
 - Out after round B181 (looked at, not done): Ludevic, Necrogenius (its back face becomes a copy of a creature card exiled
   with it as it transforms), Song of Inspiration ("add the total mana value of those cards" to a d20 roll: whether a target
   that became illegal still counts isn't settled by its rulings) stay out.
@@ -9571,7 +9590,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B109 (looked at, not done): Chainer's Torment (done in round B121) (an X/X token that deals X damage to you, each token if
   several are made, with X fixed as it resolves, rulings), Cruel Calculations (done in round B128) (cards put into a graveyard from the library
   this turn: only "from hand or library" is counted).
-- Out after round B108 (looked at, not done): Fade Away (for each creature, a payment or a sacrifice, all players' choices
+- Out after round B108 (looked at, not done): Fade Away (done in round B212) (for each creature, a payment or a sacrifice, all players' choices
   announced in turn order before any sacrifice, rulings), Crypsis (done in round B187) ("protection from creatures your opponents control":
   relative to the protected creature's controller, creature cards owned by an opponent too, rulings), Mister Immortal (done in round B139)
   (an ability activated from exile: no activation from exile yet).
@@ -9934,7 +9953,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Prevention still out: "that damage is dealt to that source's controller instead" (Reflect Damage, done in round B121), Eye for an Eye's
   "instead that source deals that much damage to you and ~ deals that much damage to that source's controller",
   Nova Pentacle's "target creature of an opponent's choice",
-  "if damage is prevented this way, you may have ~ deal that much damage to target creature" (Channel Harm) and
+  "if damage is prevented this way, you may have ~ deal that much damage to target creature" (Channel Harm (done in round B212)) and
   "to that creature" (Comeuppance), "sources of the color of your choice" (Prismatic Strands), Rhystic Circle's "any
   player may pay {1}", Heavy Fog's cast restriction; about 95 cards that mention prevention are still out (search
   the card data for "source of your choice" or "prevented this way"). a shield that redirects to

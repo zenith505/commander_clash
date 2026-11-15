@@ -160,6 +160,21 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     const to = protectedAny(m[2]!, ctx);
     return by && to ? rule({ by: { choose: by }, to, n: amt(m[1]!) }) : null;
   }
+  // Divine Deflection: "Prevent the next X damage that would be dealt to you and/or permanents you control this turn":
+  // one shield of X for all of them, from any source; when more than X would be dealt to them at once, you choose which
+  // of it to prevent, as the damage would be dealt (rulings; see planShields).
+  if ((m = new RegExp(`^Prevent the next ${NUMX} damage that would be dealt to (you and/or permanents you control) this turn$`, "i").exec(s))) {
+    const to = protectedGroup(m[2]!);
+    return to ? rule({ to, n: amt(m[1]!) }) : null;
+  }
+  // Refraction Trap: "Prevent the next 3 damage that a source of your choice would deal to you and/or permanents you
+  // control this turn": the source chosen as it resolves (rulings, CR 609.7a), one shield of 3 shared by all of them,
+  // you choosing which of it to prevent when its damage to them at once is more than that (rulings).
+  if ((m = new RegExp(`^Prevent the next ${NUMX} damage that ${QUAL} would deal to (you and/or permanents you control) this turn$`, "i").exec(s))) {
+    const by = choose(m[2], m[3]);
+    const to = protectedGroup(m[4]!);
+    return by && to ? rule({ by: { choose: by }, to, n: amt(m[1]!) }) : null;
+  }
   // "All damage that would be dealt this turn to target creature you control by a source of your choice is dealt to
   // another target creature instead" (Kor Chant), "... to target creature this turn by ... is dealt to ~ instead".
   if ((m = new RegExp(`^All damage that would be dealt (?:this turn )?to (.+?) (?:this turn )?by ${QUAL} is dealt to (.+) instead$`, "i").exec(s))) {

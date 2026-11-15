@@ -1537,6 +1537,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         const lk = sourceZc !== undefined && (src.zoneChanges ?? 0) !== sourceZc ? s.lastKnown?.[sourceId] : undefined;
         return lk ? lk.zc === sourceZc && lk.castFromHandBy === you : src.zone === "battlefield" && !!src.castFromHand && src.castBy === you;
       }
+      // Turncoat Kunoichi: whether its sneak cost was paid, as it last existed once it has left (CR 608.2h, rulings).
+      if (cond.is === "sneakPaid") {
+        const lk = sourceZc !== undefined && (src.zoneChanges ?? 0) !== sourceZc ? s.lastKnown?.[sourceId] : undefined;
+        return lk ? lk.zc === sourceZc && !!lk.sneak : src.zone === "battlefield" && src.castAlt === "sneak";
+      }
       if (cond.is === "sneakThisTurn") return src.zone === "battlefield" && src.castAlt === "sneak" && src.enteredTurn === s.turn;
       if (cond.is === "countersPutThisTurn") return src.countersPutAt?.turn === s.turn && src.countersPutAt.zc === (src.zoneChanges ?? 0);
       if (cond.is === "impending") return src.castAlt === "impending" && (src.counters.time ?? 0) > 0; // CR 702.176a

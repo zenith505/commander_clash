@@ -1061,7 +1061,7 @@ export function moveObject(
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.fromOwnLibrary ? { fromOwnLibrary: true as const } : {}), ...(o.castFromHand && o.castBy !== undefined ? { castFromHandBy: o.castBy } : {}), ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), ...(o.convoked?.length ? { convoked: o.convoked.length } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.chosen?.object ? { chosenObject: { ...o.chosen.object } } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.fromOwnLibrary ? { fromOwnLibrary: true as const } : {}), ...(o.castFromHand && o.castBy !== undefined ? { castFromHandBy: o.castBy } : {}), ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), ...(o.castAlt === "sneak" ? { sneak: true as const } : {}), ...(o.convoked?.length ? { convoked: o.convoked.length } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.chosen?.object ? { chosenObject: { ...o.chosen.object } } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
@@ -6399,7 +6399,7 @@ export function castProblem(
   const manySpecs = specs.filter((t) => t.many === "any" && !t.skip);
   if (targets && manySlot(specs) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c).
-    const fit = fitMany({ targets: specs, effects: [], text: "" }, targets, manyX(s, specs, pid, id, x));
+    const fit = fitMany({ targets: specs, effects: [], text: "" }, targets, manyX(s, specs, pid, id, x, targets));
     if (typeof fit === "string") return fit;
     [specs, targets] = [fit.body.targets, fit.targets];
   }
@@ -7489,7 +7489,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (body && spell?.modal?.chooser) body = { ...body, targets: bindModeChooser(body.targets, choices.modeChooser) };
   if (body && manySlot(body.targets) >= 0) {
     // As many targets as were chosen for "any number of target ..." (CR 601.2c); castProblem checked them.
-    const fit = fitMany(body, targets ?? [], manyX(s, body.targets, p.id, id, x)) as Exclude<ReturnType<typeof fitMany>, string>;
+    const fit = fitMany(body, targets ?? [], manyX(s, body.targets, p.id, id, x, targets)) as Exclude<ReturnType<typeof fitMany>, string>;
     [body, targets] = [fit.body, fit.targets];
   }
   // "Target creature of an opponent's choice they control" (Evangelize): the opponents' picks (askChoosers), its targets
@@ -9094,11 +9094,15 @@ export function counterCostKinds(c: Extract<AdditionalCost, { kind: "removeCount
 }
 
 export function counterCostCandidates(s: GameState, pid: PlayerId, source: GameObject, c: Extract<AdditionalCost, { kind: "removeCounters" }>): { id: ObjectId; kind: string; n: number }[] {
-  return s.battlefield.flatMap((id) => {
+  const onField = s.battlefield.flatMap((id) => {
     const x = obj(s, id);
     if (controllerOf(s, x) !== pid || (c.other && id === source.id) || (c.self && id !== source.id) || !objectMatches(s, c.filter, x, pid, false)) return [];
     return Object.entries(x.counters).filter(([k, n]) => n > 0 && (!c.counter || k === c.counter) && (!c.counters || c.counters.includes(k)) && !countersStay(s, x, k)).map(([kind, n]) => ({ id, kind, n }));
   });
+  // Rift Elemental: a suspended card you own too, in exile with suspend and a time counter on it (CR 702.62b).
+  if (!c.orSuspended) return onField;
+  const suspended = player(s, pid).exile.filter((id) => obj(s, id).owner === pid && isSuspended(s, obj(s, id)));
+  return [...onField, ...suspended.map((id) => ({ id, kind: "time", n: obj(s, id).counters.time ?? 0 }))];
 }
 
 /** The cards still exiled with `o` by its linked exile ability, as this object (CR 607.2a, 400.7): Jester's Scepter's cost. */
@@ -9236,7 +9240,8 @@ export function beholdCandidates(s: GameState, pid: PlayerId, o: GameObject, c: 
 /** "An Elf" for "behold an Elf". */
 export const beholdWhat = (c: Extract<AdditionalCost, { kind: "reveal" }>) => {
   const kind = c.filter.subtypes?.[0] ? `${c.filter.subtypes[0]}${c.filter.types?.includes("Creature") ? " creature" : ""}` : c.filter.text;
-  return `${c.n === 1 ? (/^[AEIOU]/.test(kind) ? "an" : "a") : c.n} ${kind}`;
+  // "Three Elementals" (Kindle the Inner Flame, round 371).
+  return c.n === 1 ? `${/^[AEIOU]/.test(kind) ? "an" : "a"} ${kind}` : `${["two", "three", "four", "five"][c.n - 2] ?? c.n} ${kind}s`;
 };
 
 /**

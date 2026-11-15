@@ -4,7 +4,7 @@ import { abilitiesOf, cardIdOf, defOf, isType, objIsType } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { blightOptions, putCounters } from "../counters";
-import { castProblem, collectEvidence, destroyPermanent, evidenceProblem, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
+import { castProblem, collectEvidence, destroyPermanent, enterTogether, evidenceProblem, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import { PERMANENT_TYPES } from "../oracle/targets";
 import type { CardDef, Chosen, DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
@@ -747,8 +747,30 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         sc.cascade = { exiled, ...(hit ? { hit } : {}) };
         log(s, `${src} cascades: ${p.name} exiles ${exiled.length} card${exiled.length === 1 ? "" : "s"}${hit ? `, hitting ${defOf(s, obj(s, hit)).name}` : ", finding nothing to cast"}.`);
-        if (hit) {
-          // Cast as this resolves, so its card type's timing doesn't matter; it still needs legal targets and modes.
+      }
+      // Averna, the Chaos Bloom: "As you cascade, you may put a land card from among the exiled cards onto the battlefield
+      // tapped": after the last card is exiled, before the nonland card is cast or not (its reminder text, rulings), one
+      // land for each such ability its controller has. Not playing a land (rulings). Jodah's isn't cascade.
+      if (!e.legendary && !sc.cascade.landsDone) {
+        const n = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p.id && !!abilitiesOf(s, obj(s, id)).cascadeLand).length;
+        const lands = sc.cascade.exiled.filter((id) => s.objects[id]?.zone === "exile" && isType(defOf(s, obj(s, id)), "Land"));
+        if (n && lands.length && !sc.found) {
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: n === 1 ? "a land card" : `up to ${n} land cards`, cards: lands, min: 0, max: Math.min(n, lands.length), exiled: true, dig: { looked: sc.cascade.exiled.filter((id) => s.objects[id]?.zone === "exile"), to: "to put onto the battlefield tapped", rest: "stay in exile for now" } };
+          return "paused";
+        }
+        const put = (sc.found ?? []).filter((id) => lands.includes(id));
+        sc.found = undefined;
+        sc.cascade.landsDone = true;
+        if (put.length) {
+          enterTogether(s, () => put.forEach((id) => moveObject(s, id, "battlefield", { controller: p.id, tapped: true })));
+          log(s, `${p.name} puts ${put.map((id) => defOf(s, obj(s, id)).name).join(", ")} onto the battlefield tapped.`);
+        }
+      }
+      const hit = sc.cascade.hit;
+      if (hit && !sc.cascade.castAsked) {
+        sc.cascade.castAsked = true;
+        // Cast as this resolves, so its card type's timing doesn't matter; it still needs legal targets and modes.
+        if (s.objects[hit]?.zone === "exile") {
           s.pending = { kind: "castFree", player: p.id, objectId: hit, source: src };
           if (freeCastable(s, p.id, hit)) return "paused";
           s.pending = null;

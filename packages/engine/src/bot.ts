@@ -11,7 +11,7 @@ import { HOST_OR_NAMED_PROMPT } from "./effects/run-round321";
 import { redistributions } from "./effects/run-round362";
 import { abilitiesOf, lethalLeft, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
-import { reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { manyX, reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, modeRange, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   applyAction,
@@ -3120,6 +3120,19 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     if (!forced && picked.reduce((n, id) => n + defMv(defOf(s, obj(s, id))), 0) < 4) return null;
     if (body.targets.length !== printed.targets.length + slots - 1 || printed.targets.length !== 1) return null;
     return Array.from({ length: slots }, (_, k): TargetChoice => (picked[k] ? { kind: "object", id: picked[k]! } : { kind: "none" }));
+  }
+  // Reap: "up to X target cards ..., where X is the number of black permanents target opponent controls": the opponent
+  // with the most of them, then our best cards up to that many; none to return, not worth it.
+  const countOf = many === 1 && printed.targets[0]?.kind === "player" ? printed.targets[1]!.manyCount?.count : undefined;
+  if (countOf?.kind === "permanents" && countOf.whose?.ref === "target" && countOf.whose.index === 0) {
+    const src = sourceId ? botSource(s, sourceId) : undefined;
+    const opps = legalTargets(s, printed.targets[0]!, pid, undefined, src, sourceId).flatMap((t) => (t.kind === "player" ? [t.id] : []));
+    const withN = opps.map((q) => ({ q, n: manyX(s, printed.targets, pid, sourceId, x, [{ kind: "player", id: q }]) })).sort((a, b) => b.n - a.n);
+    const best = withN[0];
+    if (!best) return null;
+    const cards = legalTargets(s, printed.targets[1]!, pid, undefined, src, sourceId).flatMap((t) => (t.kind === "object" ? [t.id] : [])).sort((a, b) => handWorth(s, b) - handWorth(s, a)).slice(0, best.n);
+    if (!cards.length && !forced) return null;
+    return [{ kind: "player", id: best.q }, ...(cards.length ? cards.map((id): TargetChoice => ({ kind: "object", id })) : [{ kind: "none" as const }])];
   }
   // Coveted Falcon: "target opponent gains control of any number of target permanents you control. Draw a card for each
   // one ...": a bot gives away none of its permanents (a card isn't worth a permanent to it); the opponent with the least
@@ -7539,10 +7552,12 @@ function spareCounterHost(s: GameState, pid: PlayerId, c: Extract<AdditionalCost
  */
 function spareCounters(s: GameState, pid: PlayerId, source: GameObject, c: Extract<AdditionalCost, { kind: "removeCounters" }>): { id: ObjectId; kind: string }[] | null {
   const rank = (k: string) => (harmfulCounter(k) ? 0 : k === "+1/+1" ? 2 : ["loyalty", "lore", "time", "fade", "age", "defense"].includes(k) ? 9 : 1);
+  // Rift Elemental: a time counter off a suspended card of ours only brings its free cast nearer (CR 702.62a).
+  const rankOf = (x: { id: ObjectId; kind: string }) => (x.kind === "time" && s.objects[x.id]?.zone === "exile" ? 1 : rank(x.kind));
   const pool = counterCostCandidates(s, pid, source, c)
-    .filter((x) => rank(x.kind) < 9)
+    .filter((x) => rankOf(x) < 9)
     .flatMap((x) => Array.from({ length: x.kind === "+1/+1" ? x.n - 1 : x.n }, () => ({ id: x.id, kind: x.kind })))
-    .sort((a, b) => rank(a.kind) - rank(b.kind));
+    .sort((a, b) => rankOf(a) - rankOf(b));
   // Moxite Refinery: all from one permanent, the first that has enough to spare.
   if (c.one) {
     const id = [...new Set(pool.map((x) => x.id))].find((x) => pool.filter((p) => p.id === x).length >= c.n);

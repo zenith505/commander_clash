@@ -1609,6 +1609,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youFullyUnlockRoom", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
+    // Fear of Infinity (round 371): "you may return this card from your graveyard": its owner's card there (CR 113.6m).
+    fromGraveyards((o, owner) => owner === ev.player && add(o, owner, (e) => e === "youFullyUnlockRoom", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player }));
   } else if (ev.type === "solved") {
     // Case File Auditor: "whenever you solve a Case": its "to solve" ability resolved, controlled by the Case's controller
     // (CR 719.3a-b, rulings).

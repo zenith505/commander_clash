@@ -3,6 +3,7 @@
 import type { AbilityBody, CompiledCard, Effect } from "../abilities";
 import { parseBody } from "./body";
 import { compileGranted, playerMark, SPELL_CONTROLLER } from "./grants";
+import { roundB212Spell } from "./laneb212";
 import { parseTrigger } from "./triggers";
 
 /** One line of a card's text, compiled into `out` (an unsupported one reported as `raw`); false when it isn't one of these. */
@@ -82,5 +83,5 @@ export function roundB210Spell(text: string): AbilityBody | null | undefined {
     const effects: Effect[] = [{ ...gain, mods: [{ kind: "addAbility", text: granted }] }];
     return { ...body, effects, text };
   }
-  return undefined;
+  return roundB212Spell(text);
 }

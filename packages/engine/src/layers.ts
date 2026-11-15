@@ -1302,7 +1302,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "opponentCastCount":
       return s.turnOrder.some((p) => p !== you && (s.castThisTurn ?? []).filter((c) => c.player === p).length >= cond.n);
     case "opponentCast":
-      return (s.castThisTurn ?? []).some((c) => c.player !== you && !!c.colors?.some((x) => cond.colors.includes(x)));
+      return (s.castThisTurn ?? []).some((c) => c.player !== you && !!c.colors?.some((x) => cond.colors.includes(x)) && (!cond.types || !!c.types?.some((t) => cond.types!.includes(t))));
     case "noneInHand":
       return !(s.players[you]?.hand ?? []).some((id) => printedMatches(cond.filter, defOf(s, s.objects[id]!)));
     case "opponentDealtDamage":

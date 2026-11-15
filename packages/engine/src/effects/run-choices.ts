@@ -1649,7 +1649,10 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
     const lost = e.effects.length === 1 && e.effects[0]!.type === "loseLife" ? e.effects[0]!.n : undefined;
     const loseN = lost !== undefined && typeof lost !== "number" ? Math.max(0, amountNow(s, lost, ctx)) : undefined;
     const hurt = dmg?.type === "damage" && "index" in dmg.to && dmg.to.ref === "target" ? objects(s, { ref: "target", index: dmg.to.index }, ctx)[0] : undefined;
-    sc.punish = { queue: apnap(s, players(s, e.who, ctx)), picked: {}, made: {}, round: 0, times, picks, options, ...punisherHarm(e), ...(dmgN !== undefined && !hurt ? { lose: dmgN } : {}), ...(loseN !== undefined ? { lose: loseN } : {}), ...(hurt && dmg?.type === "damage" ? { hurts: { id: hurt.id, n: dmgN ?? (typeof dmg.amount === "number" ? dmg.amount : 0) }, lose: undefined } : {}), ...(doomed ? { destroys: doomed } : {}), ...(e.mode ? { mode: e.mode } : {}) };
+    const queue = apnap(s, players(s, e.who, ctx));
+    // Fade Away: each player counts their own creatures as it starts (rulings); one choice for each.
+    const picksBy = e.picksEach === undefined ? undefined : Object.fromEntries(queue.map((pid) => [pid, Math.max(0, amountNow(s, e.picksEach!, { ...ctx, eachOne: pid }))]));
+    sc.punish = { queue, picked: {}, made: {}, round: 0, times, picks, options, ...(picksBy ? { picksBy } : {}), ...punisherHarm(e), ...(dmgN !== undefined && !hurt ? { lose: dmgN } : {}), ...(loseN !== undefined ? { lose: loseN } : {}), ...(hurt && dmg?.type === "damage" ? { hurts: { id: hurt.id, n: dmgN ?? (typeof dmg.amount === "number" ? dmg.amount : 0) }, lose: undefined } : {}), ...(doomed ? { destroys: doomed } : {}), ...(e.mode ? { mode: e.mode } : {}) };
   }
   const fixLife = (o: PunisherOption) => (!!e.mode || e.options.length > 1) && lifeOnly(o);
   if (e.options.some((o) => ("damage" in o && typeof o.damage !== "number") || ("sacrifice" in o && (o.nAmount !== undefined || o.sacrifice.targetObject !== undefined || o.sacrifice.notTargetObject !== undefined)) || fixLife(o))) e = { ...e, options: e.options.map((o, i) => ("damage" in o || ("sacrifice" in o && (o.nAmount !== undefined || o.sacrifice.targetObject !== undefined || o.sacrifice.notTargetObject !== undefined)) || fixLife(o) ? sc.punish!.options[i]! : o)) };
@@ -1664,15 +1667,26 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
       const pid = pu.queue[0]!;
       const p = player(s, pid);
       const made = (pu.made[pid] ??= []);
-      while (made.length < pu.picks) {
+      const picksHere = pu.picksBy?.[pid] ?? pu.picks;
+      while (made.length < picksHere) {
         if (pu.picked[pid] === undefined) {
-          const can = p.lost ? [] : punisherOptions(s, e, pid, ctx.sourceId, made);
+          // Fade Away (`required`): a payment they can't make now isn't one of their choices.
+          const can = (p.lost ? [] : punisherOptions(s, e, pid, ctx.sourceId, made)).filter((i) => {
+            const o = e.options[i]!;
+            return !e.required || !("pay" in o) || canPayNow(s, pid, { ...(o.pay.cost ? { mana: o.pay.cost } : {}), ...(o.pay.life ? { life: o.pay.life } : {}) });
+          });
           if (!can.length) pu.picked[pid] = "none";
           // Only a payment: its own prompt has "Don't pay".
           else if (!e.mode && can.length === 1 && e.options.length === 1 && "pay" in e.options[can[0]!]!) pu.picked[pid] = String(can[0]);
           else {
             const penalty = e.mode ? "Don't" : describePenalty(s, e, ctx);
-            const which = pu.picks > 1 ? ` (${made.length + 1} of ${pu.picks})` : "";
+            const which = picksHere > 1 ? ` (${made.length + 1} of ${picksHere})` : "";
+            if (e.required) {
+              // "Sacrifices a permanent of their choice unless they pay {1}": one or the other, nothing else.
+              const labels = can.map((i) => punisherLabel(e.options[i]!));
+              s.pending = { kind: "chooseOption", player: pid, source: src, what: "punisher", options: can.map(String), labels, prompt: `${labels.map((l, k) => (k ? l.toLowerCase() : l)).join(" or ")}?${which}` };
+              return "paused";
+            }
             const did = Object.values(pu.made).some((m) => m.some((x) => x !== "none"));
             const prompt = !e.mode ? `${can.map((i) => punisherLabel(e.options[i]!).toLowerCase()).join(" or ")}, or ${lowerFirst(penalty)}?${which}` : `${can.map((i, k) => (k ? punisherLabel(e.options[i]!).toLowerCase() : punisherLabel(e.options[i]!))).join(" or ")}? ${e.who.ref === "you" || e.who.ref === "eventPlayer" ? (e.mode === "ifAny" ? "If you do" : "If you don't") : e.mode === "ifAny" ? "If anyone does" : "If no one does"}, ${(e.thenText ?? "it happens").replace(/~/g, src)}${did ? " (someone already has)" : ""}.`;
             s.pending = { kind: "chooseOption", player: pid, source: src, what: "punisher", options: [...can.map(String), "none"], labels: [...can.map((i) => punisherLabel(e.options[i]!)), penalty], prompt };
@@ -1691,10 +1705,16 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
           if (o.pay.life) payLife(s, pid, o.pay.life);
           log(s, `${p.name} pays ${o.pay.life} life.`);
         } else if (o && "pay" in o) {
-          const paid = e.mode ? paidUnless(s, ctx, pid, o.pay, src, "don't", "don't pay") : paidUnless(s, ctx, pid, o.pay, src, lowerFirst(describePenalty(s, e, ctx)), lowerFirst(describePenalty(s, e, ctx)));
+          // Fade Away (`required`): not paying after all means the other choice.
+          const instead = e.required ? `${e.options.filter((x) => !("pay" in x)).map((x) => punisherLabel(x).toLowerCase()).join(" or ")} instead` : undefined;
+          const paid = e.mode ? paidUnless(s, ctx, pid, o.pay, src, "don't", "don't pay") : instead ? paidUnless(s, ctx, pid, o.pay, src, instead, instead) : paidUnless(s, ctx, pid, o.pay, src, lowerFirst(describePenalty(s, e, ctx)), lowerFirst(describePenalty(s, e, ctx)));
           if (paid === "paused") return "paused";
-          if (!paid) pu.picked[pid] = "none";
           sc.paid = undefined;
+          if (!paid && e.required) {
+            // Fade Away: not paid after all, so the other one (a permanent sacrificed), if they can.
+            const other = punisherOptions(s, e, pid, ctx.sourceId, made).filter((i) => !("pay" in e.options[i]!));
+            pu.picked[pid] = other.length ? String(other[0]) : "none";
+          } else if (!paid) pu.picked[pid] = "none";
         }
         made.push(pu.picked[pid]!);
         delete pu.picked[pid];

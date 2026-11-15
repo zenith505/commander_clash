@@ -76,6 +76,8 @@ export interface DamageRule {
   countersOn?: { counter: string; tally?: true };
   /** Vengeful Archon: "If damage is prevented this way, ~ deals that much damage to target player or planeswalker", fixed as it resolved (rulings). */
   dealTo?: { object: ObjectId; zc: number } | { player: PlayerId };
+  /** Channel Harm: dealTo only if its controller chooses to, each time it prevents damage (rulings). */
+  dealToMay?: true;
   /** New Way Forward: the reflexive trigger's body, and the object that made the rule (the spell, as it was then). */
   reflect?: { body: AbilityBody; source?: { id: ObjectId; zc: number } };
 }
@@ -2906,6 +2908,8 @@ export interface Resolving {
     othersChosen?: { queue: PlayerId[]; picked: ObjectId[] };
     /** Effect "controllersMayExile" (Disorienting Choice): the permanents still to ask about, in order, and those whose controllers chose to exile them. */
     mayExile?: { queue: { id: ObjectId; zc: number }[]; yes: { id: ObjectId; zc: number }[] };
+    /** Decoy Gambit (Effect bounceUnlessDraw): the creatures whose controllers are still to choose, in order, how many chose the draw, the creatures to return, and how far it has got. */
+    decoy?: { queue: { pid: PlayerId; id: ObjectId; zc: number }[]; draws: number; back: { id: ObjectId; zc: number }[]; step: number };
     /** Zevlor, Elturel Exile (Effect copyPerOtherOpponent): the opponents still to choose for, the choices so far ("p<player>" or an object id), and the last answer. */
     zevlor?: { left: PlayerId[]; picks: string[]; answer?: string };
     /** Effect "copyForPlayers" (Hive Mind, Tempt with Mayhem): the players still to copy, in APNAP order; how many have copied; whether the first of them chose to and is copying now. */
@@ -3019,6 +3023,8 @@ export interface Resolving {
       picked: Record<string, string>;
       /** The choices each player made this round (one, or `picks`). */
       made: Record<string, string[]>;
+      /** Fade Away (punisher `picksEach`): how many choices each player makes, counted as it starts (rulings). */
+      picksBy?: Record<string, number>;
       /** The cards each player picked to discard and the permanents to sacrifice. */
       chosen?: Record<string, { discard?: ObjectId[]; sacrifice?: ObjectId[]; /** Cards in their graveyard to exile (PunisherOption exileFromGraveyard). */ exile?: ObjectId[]; /** Cards from their hand to put on top of their library (PunisherOption handToTop). */ top?: ObjectId[]; /** The permanent they tap (PunisherOption tap). */ tap?: ObjectId[] }>;
       /** The player asked which permanent to tap (PunisherOption tap; pickPermanents' answer is ResolvingState.scratch.chosen). */

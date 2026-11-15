@@ -6509,6 +6509,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4b3d1cfb-9f1d-4e4e-a15a-2e248ff5bdfc",
+  "name": "Channel Harm",
+  "manaCost": "{5}{W}",
+  "cmc": 6,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Prevent all damage that would be dealt to you and permanents you control this turn by sources you don't control. If damage is prevented this way, you may have Channel Harm deal that much damage to target creature.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "frf",
+  "releasedAt": "2015-01-23",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "eba7ef08-f444-4d23-92b8-29d2ac08b156",
   "name": "Chaos Defiler",
   "manaCost": "{3}{B}{R}",
@@ -9224,6 +9250,32 @@
   "commanderLegal": "legal",
   "set": "ogw",
   "releasedAt": "2016-01-22",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "94d9878e-9786-438c-8b33-c1dff730b748",
+  "name": "Decoy Gambit",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "For each opponent, choose up to one target creature that player controls, then return that creature to its owner's hand unless its controller has you draw a card.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c20",
+  "releasedAt": "2020-04-17",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -12757,6 +12809,32 @@
   "set": "dmr",
   "releasedAt": "2023-01-13",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f92c2d47-f2f7-43d9-acf3-0145bad1977d",
+  "name": "Fade Away",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "For each creature, its controller sacrifices a permanent of their choice unless they pay {1}.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "exo",
+  "releasedAt": "1998-06-15",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

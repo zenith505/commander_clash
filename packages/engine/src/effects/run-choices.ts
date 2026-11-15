@@ -622,6 +622,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // four and not at all if none could be put (rulings).
       const perCounters = e.perCounters;
       const times = perCounters ? Math.floor((s.resolving!.countersPutThisWay ?? []).filter((c) => c.id === sourceId && c.kind === perCounters.counter).reduce((a, c) => a + (c.n ?? 1), 0) / perCounters.n) : kind ? (s.resolving!.created ?? []).filter((id) => s.objects[id]?.cardId === kind).length : 1;
+      // Forum Filibuster (round 371): "attached to that token": each one about its own token (CR 603.12a).
+      const tokens = e.perTokenSubject && kind ? (s.resolving!.created ?? []).filter((id) => s.objects[id]?.cardId === kind).map((id) => ({ id, zc: s.objects[id]!.zoneChanges ?? 0 })) : undefined;
       for (let i = 0; i < times; i++) s.triggerQueue.push({
         sourceId,
         sourceCardId: cardId,
@@ -629,7 +631,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         index: -1,
         body,
         ...(sourceZc !== undefined ? { sourceZc } : {}),
-        ...(subject ? { subject } : {}),
+        ...(tokens?.[i] ? { subject: tokens[i]! } : subject ? { subject } : {}),
         ...(spell ? { fromSpell: true as const } : {}),
         ...(s.resolving!.amassed ? { amassed: s.resolving!.amassed } : {}),
         // "When ~ dies, you may pay {E}{E}{E}. When you do, ~ deals damage equal to its power" (Cyclops Superconductor):

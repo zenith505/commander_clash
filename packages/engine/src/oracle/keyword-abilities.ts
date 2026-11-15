@@ -1016,6 +1016,13 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     const creature = m[2] ? { types: ["Creature"] } : {};
     return { kind: "reveal", filter: { kind: "card", subtypes: [st], ...creature, text: `${st}${m[2] ?? ""} card` }, n: 1, orControl: { kind: "object", subtypes: [st], ...creature, controller: "you", text: `${st}${m[2] ?? ""} you control` }, ...(m[3] ? { exile: true as const } : {}) };
   }
+  // Kindle the Inner Flame (round 371): "Behold three Elementals" (its flashback cost): three different objects, each an
+  // Elemental card revealed from your hand or an Elemental you control, in any combination, none beheld twice (CR 701.4a,
+  // rulings). A regular plural of a subtype only.
+  if ((m = /^[Bb]ehold (two|three|four|five) ([A-Z][a-z]+)s$/.exec(text)) && subtypeSet(m[2]!) && CREATURE_TYPES.has(m[2]!)) {
+    const st = m[2]!;
+    return { kind: "reveal", filter: { kind: "card", subtypes: [st], text: `${st} card` }, n: num(m[1]!), orControl: { kind: "object", subtypes: [st], controller: "you", text: `${st} you control` } };
+  }
   // Monstrous Emergence: "choose a creature you control or reveal a creature card from your hand": beholding a creature in
   // all but name (CR 701.4a), a creature card from the hand or a creature you control, which the spell's text then names.
   if (text === "choose a creature you control or reveal a creature card from your hand") return { kind: "reveal", filter: { kind: "card", types: ["Creature"], text: "creature" }, n: 1, orControl: { kind: "object", types: ["Creature"], controller: "you", text: "creature you control" } };

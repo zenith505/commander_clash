@@ -1,6 +1,6 @@
 # Roadmap
 
-31,381 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,391 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,890 of
 9,979 (99%).
 
@@ -321,7 +321,7 @@ line blocks.
    "instead" sweepers), Chandra, Heart of Fire, Lynde, Salt Road Ambushers, Origin of the Hidden Ones, Grab the Reins (done in round 325),
    Pyromancer Ascension (done in round 367), Verdant Mastery, Primal Adversary, Planar Void (done in round 299), In Too Deep, Dollhouse of Horrors, Harald
    Unites the Elves (done in round 326), Exquisite Archangel (done in round 329), Kellan, Planar
-   Trailblazer, Najal, Rescue from the Underworld, Seal of the Guildpact (done in round 299), Fear of Infinity, Elderscale Wurm (done in round 324), Cradle of
+   Trailblazer, Najal, Rescue from the Underworld, Seal of the Guildpact (done in round 299), Fear of Infinity (done in round 371), Elderscale Wurm (done in round 324), Cradle of
    Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order (done in round 324),
    Scheming Fence, Oath of Lieges (done in round B143), Helm of Obedience, Concerted Effort, Belbe's Portal (done in round 324), Edgewall Innkeeper, Simic
    Manipulator, Endless Whispers, Burn from Within (done in round 325), Skyfire Phoenix (done in round 276), Contagion (done in round 325), Gutter Grime, Coffin Queen, Genesis
@@ -617,7 +617,7 @@ line blocks.
    Caustic Bronco (no "saddled" condition on a trigger's life loss), Sigarda's Splendor ("note your life total"), Back for Seconds (bargained: one of the
    returned cards onto the battlefield instead), Phyrexian Soulgorger (cumulative upkeep that sacrifices creatures), Mariposa Military Base
    (rad counters as it enters tapped). Smaller gaps: bots never activate Grinning Ignus; Celestial Reunion, Countersculpt (done in round B179),
-   Kindle the Inner Flame, Molten Exhale (done in round 299) and Theorist's Sanctum (done in round B179) (behold as a cost or a replacement) are still out.
+   Kindle the Inner Flame (done in round 371), Molten Exhale (done in round 299) and Theorist's Sanctum (done in round B179) (behold as a cost or a replacement) are still out.
    Round 199 went on from the top: "as long as you control an artifact creature or a Plan" (Doctor Doom; Plan is now a
    subtype, so The Masters of Evil's search works), "each creature you control that's a Food or a Golem" (Brenard,
    Ginger Sculptor), "each creature that didn't enter this turn" (Let the Galaxy Burn), "prevent all combat damage that
@@ -1383,7 +1383,7 @@ line blocks.
    Epic (tap creatures for an activation cost's mana, like convoke); Kaldring, the Rimestaff (play a snow permanent card
    from your graveyard this turn, entering tapped); Hostile Hostel (done in round 338) (soul counters, transform, then untap; Creeping Inn's
    "creature cards exiled with this creature"); Dawnbreak Reclaimer (an opponent chooses a card in your graveyard);
-   Cryptic Gateway (done in round 302), Mogg Assassin, Karplusan Minotaur (done in round 318), The Phasing of Zhalfir (done in round 363), Mirror of Life Trapping, Grasping Shadows
+   Cryptic Gateway (done in round 302), Mogg Assassin, Karplusan Minotaur (done in round 318), The Phasing of Zhalfir (done in round 363), Mirror of Life Trapping, Grasping Shadows (done in round 371)
    ("transform it" is the enchantment, not the attacker).
    Round 233 (top of the list, now done): "you may pay one or more {E}. If you do, create an X/X ... Vehicle token"
    (Pia Nalaar, Chief Mechanic); "If a Hero enters this way, it enters with an additional +1/+1 counter" (Winter Soldier,
@@ -2918,6 +2918,31 @@ line blocks.
    lands found, one under an opponent's control); Wayta, Trainer Prodigy and Invisible Woman, Sue Storm (still out, as in
    their earlier lists). Polish: the free-cast prompt of Bre, Breaching Dragonstorm and Solstice
    Revelations doesn't say the card goes to the hand if not cast.
+   Round 371 went on down `npm run popular`, most played first, to a graveyard card's eerie, a dread counter on the
+   enchantment, a behold of three, a sneak cost that makes an exile permanent and an Aura or Equipment returned onto the
+   token just made: Fear of Infinity's "Eerie — Whenever an enchantment you control enters and whenever you fully unlock a
+   Room, you may return this card from your graveyard to your hand." (an ability of the card in the graveyard, CR 113.6m;
+   "whenever you fully unlock a Room" is now watched from graveyards too, CR 709.5i, rulings); Grasping Shadows's
+   "Whenever a creature you control attacks alone, it gains deathtouch and lifelink until end of turn. Put a dread counter
+   on this enchantment. Then if there are three or more dread counters on it, transform it." ("it" is the enchantment,
+   which keeps its counters as Shadows' Lair, rulings; only a creature declared alone, CR 506.5); Kindle the Inner Flame's
+   "Flashback—{1}{R}, Behold three Elementals." (three different objects, Elementals you control and Elemental cards in
+   your hand in any mix, CR 701.4a, rulings: "behold two/three/four/five <type>s" as a cost); Turncoat Kunoichi's "Exile
+   that creature until this creature leaves the battlefield. If this creature's sneak cost was paid, instead exile the
+   chosen creature." (for good with sneak, CR 702.190a; whether it was paid read as the creature last existed if it has
+   left, CR 608.2h, LastKnown.sneak; without sneak and gone first, nothing is exiled, CR 610.3c, rulings); Forum
+   Filibuster's "create a 2/1 white and black Inkling creature token with flying. When you do, return up to one target Aura
+   or Equipment card from your graveyard to the battlefield attached to that token." (one reflexive ability for each
+   Inkling, CR 603.12a, each about its own token: reflexive perTokenSubject; an Aura that can't enchant it stays in the
+   graveyard, CR 303.4g; an Equipment with the token gone enters unattached, CR 301.5b). Browser tests click through
+   Kindle's behold picker (the picker now says "behold three Elementals"), Fear's return and Filibuster's target. No new
+   prompts. +5, 31,391 of 31,936 with rounds 369-370 and Lane B's B209-B211. The compiled text of every other card is
+   unchanged.
+   Out after round 371 (looked at, not done): Jailbreak ("When that permanent enters, return up to one target permanent
+   card with equal or lesser mana value": a reflexive target bounded by its subject's mana value); Lukka, Coppercoat
+   Outcast (cards exiled this way gaining a cast permission that lasts while you control a Lukka planeswalker); Mizzix,
+   Replica Rider and Choreographed Sparks (still out: a copy of a permanent spell that gains haste and an end step
+   sacrifice; "this spell can't be copied").
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -4643,7 +4668,7 @@ line blocks.
    in hand; Mechtitan Core's "Exile ... four other" cost button reads "Exile and activate" now (the cost picker said
    "Sacrifice and activate" for every exile-instead cost, Food Chain's too).
    Smaller gaps from round 154: "Create a token. When you do, ..." triggers once for each of those tokens created (CR
-   603.12a), except when the reflexive ability is about "that token" (Forum Filibuster, Ratonhnhaké:ton, Dáin
+   603.12a), except when the reflexive ability is about "that token" (Forum Filibuster (done in round 371), Ratonhnhaké:ton, Dáin
    Ironfoot), which still triggers once; Ob Nixilis, Captive Kingpin triggers when at least one opponent lost exactly 1
    life in the event, even if another opponent lost more at the same time; bots say yes to Descendants' Fury only with a
    token among the creatures that dealt damage, and use Kaya, Geist Hunter's −2 like any other ability; Yorion is a
@@ -5468,7 +5493,7 @@ line blocks.
    (Errant and Giada), Vizier of the Menagerie's "spend mana of any type", Experimental Frenzy's (done in round 325) "can't play cards from
    your hand", granted look-at-top (Glowcap Lantern (done in round B186)), "until end of turn, you may look at the top card" (Gwenom, The
    Belligerent). Left from the ripple/sneak round: Karai's "if a sneak cost was paid this turn", sneak conditions on
-   Last Ronin's Technique and Turncoat Kunoichi, Melek and Mistbreath Elder, putting cards from a hand on the bottom
+   Last Ronin's Technique and Turncoat Kunoichi (done in round 371), Melek and Mistbreath Elder, putting cards from a hand on the bottom
    in any order (Arjun, Mindmoil), granting cascade, and the owner's order when several target spells or permanents
    go to the bottom at once (CR 401.4). Left from the
    earthbend/foretell round: {X} foretell and freerunning costs (Starnheim Unleashed done in round 300, Monastery Raid),

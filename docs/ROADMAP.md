@@ -1,6 +1,6 @@
 # Roadmap
 
-31,391 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,396 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,890 of
 9,979 (99%).
 
@@ -2936,7 +2936,7 @@ line blocks.
    Inkling, CR 603.12a, each about its own token: reflexive perTokenSubject; an Aura that can't enchant it stays in the
    graveyard, CR 303.4g; an Equipment with the token gone enters unattached, CR 301.5b). Browser tests click through
    Kindle's behold picker (the picker now says "behold three Elementals"), Fear's return and Filibuster's target. No new
-   prompts. +5, 31,391 of 31,936 with rounds 369-370 and Lane B's B209-B211. The compiled text of every other card is
+   prompts. +5, 31,396 of 31,936 with rounds 369-370 and Lane B's B209-B212. The compiled text of every other card is
    unchanged.
    Out after round 371 (looked at, not done): Jailbreak ("When that permanent enters, return up to one target permanent
    card with equal or lesser mana value": a reflexive target bounded by its subject's mana value); Lukka, Coppercoat

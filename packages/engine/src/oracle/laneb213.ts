@@ -1,5 +1,6 @@
 // Lane B round B213's lines, read by compileCard before its triggers and activated abilities (after round B211's).
 import type { AbilityBody, CompiledCard, Effect, TargetSpec } from "../abilities";
+import { roundB215Spell } from "./laneb215";
 import { parseBody } from "./body";
 import { parseTrigger } from "./triggers";
 
@@ -70,5 +71,5 @@ export function roundB213Spell(text: string): AbilityBody | null | undefined {
     const effects: Effect[] = [{ type: "if", cond: { kind: "targetIs", index: 0, filter: creatureOrPw }, effects: [{ ...dmg, amount: { count: { kind: "x" }, plus: 1 } }], otherwise: [dmg] }];
     return { targets: body.targets, effects, text };
   }
-  return undefined;
+  return roundB215Spell(text);
 }

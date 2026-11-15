@@ -1121,6 +1121,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         if (total + pw(id) <= pend.maxTotalPower) (ids.push(id), (total += pw(id)));
       return [{ type: "pickPermanents", player: pid, ids }];
     }
+    // Cleansing: our own lands, the best first, while we keep 6 life or more; never anyone else's.
+    if (pend.kind === "pickPermanents" && pend.action === "keep" && pend.payLife !== undefined && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "eachLandUnlessAnyPaysLife")) {
+      const ids: ObjectId[] = [];
+      let life = player(s, pid).life;
+      for (const id of pend.options.filter((x) => controllerOf(s, obj(s, x)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))) {
+        if (ids.length >= pend.count || life - pend.payLife < 6) break;
+        ids.push(id);
+        life -= pend.payLife;
+      }
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
     // Killing Wave: our best creatures, each while it's worth the life it costs (the more, the closer to 0), never all of it.
     if (pend.kind === "pickPermanents" && pend.action === "keep" && pend.payLife !== undefined) {
       const ids: ObjectId[] = [];

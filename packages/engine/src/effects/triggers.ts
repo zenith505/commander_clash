@@ -3291,6 +3291,13 @@ function triggerBodyAsIs(s: GameState, t: PendingTrigger): AbilityBody {
   const who = t.event?.player;
   // Colfenor: "other target creature card": not the card that died (TargetSpec.notSubject).
   if (t.subject && body.targets.some((x) => x.notSubject)) return { ...body, targets: body.targets.map((x) => (x.notSubject ? { ...x, notId: t.subject!.id } : x)) };
+  // Necrotic Plague: "creature one of their opponents controls", "their" being the subject's controller as it last existed
+  // (the player choosing the target, TargetSpec.chosenBy "subjectController").
+  if (body.targets.some((x) => x.opponentOfSubjectController)) {
+    const subj = t.subject && s.objects[t.subject.id];
+    const chooser = subj && subj.zone === "battlefield" && (subj.zoneChanges ?? 0) === t.subject!.zc ? controllerOf(s, subj) : (s.lastKnown?.[t.subject?.id ?? ""]?.controller ?? t.controller);
+    return { ...body, targets: body.targets.map((x) => (x.opponentOfSubjectController ? (({ opponentOfSubjectController: _, ...rest }) => ({ ...rest, controlledByAny: opponents(s, chooser) }))(x) : x)) };
+  }
   const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || x.attackingWhom === "eventPlayer" || !!x.notEventPlayer || x.outnumbers?.than === "eventPlayer" || !!x.sameNameAsCause || !!x.anyOf?.some(isEvent);
   if (!body.targets.some(isEvent) && !body.modal?.modes.some((m) => m.targets?.some(isEvent))) return body;
   const fix = (x0: TargetSpec): TargetSpec => {

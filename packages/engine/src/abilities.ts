@@ -697,6 +697,12 @@ export interface TargetSpec {
   /** An Aura's target when what the Aura does hurts the enchanted permanent's controller (Brand of Ill Omen): bots aim it at an opponent's. */
   harmsEnchanted?: true;
   /**
+   * Necrotic Plague (round B215): "its controller chooses target creature one of their opponents controls", with `chosenBy`
+   * "subjectController": controlled by an opponent of the player choosing (the trigger's subject's controller as it last
+   * existed), made concrete as `controlledByAny` once the trigger knows that player. The ability's controller may be one.
+   */
+  opponentOfSubjectController?: true;
+  /**
    * "object" = a permanent, "player", "any" = creature/planeswalker/player (CR 115.4),
    * "spell" = an object on the stack, "card" = a card in a graveyard ("target creature card
    * from your graveyard", CR 109.2a, 115.2).
@@ -4408,6 +4414,13 @@ export type Effect =
    */
   | { type: "othersPaySpellCostToCounter" }
   /**
+   * Cleansing (round B215): "For each land, destroy that land unless any player pays 1 life.": each player in turn order
+   * from the active player (CR 101.4), knowing the choices before theirs, chooses any of the lands no one has paid for yet
+   * (anyone's) and pays `life` for each as they choose (as many as they can pay, CR 119.4); then every land not paid for is
+   * destroyed at once.
+   */
+  | { type: "eachLandUnlessAnyPaysLife"; filter: TargetSpec; life: number }
+  /**
    * Tidal Flats (round B214): "For each attacking creature without flying, its controller may pay {1}. If that player
    * doesn't, creatures you control blocking that creature gain first strike until end of turn.": asked as it resolves, the
    * creatures counted then (rulings), each attacker's controller in turn order (CR 101.4).
@@ -5240,7 +5253,7 @@ export type Effect =
    * process until no one puts a card onto the battlefield.": in turn order from you, each card entering as it's chosen;
    * over once every player in the game in a row has put none (rulings).
    */
-  | { type: "putFromHandRounds" }
+  | { type: "putFromHandRounds"; /** Hypergenesis (round B215): "an artifact, creature, enchantment, or land card": only permanent cards that match this. */ filter?: TargetSpec }
   /**
    * Predatory Focus: "You may have creatures you control assign their combat damage this turn as though they weren't
    * blocked": chosen as it resolves (rulings), for every creature this ability's controller controls as it assigns its

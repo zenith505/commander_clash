@@ -61,6 +61,7 @@ import { runLaneB208Effect } from "./run-laneb208";
 import { runLaneB210Effect } from "./run-laneb210";
 import { runLaneB212Effect } from "./run-laneb212";
 import { runLaneB214Effect } from "./run-laneb214";
+import { runLaneB215Effect } from "./run-laneb215";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -1938,6 +1939,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "othersPaySpellCostToCounter":
     case "attackersPayOrBlockersGain":
       return runLaneB214Effect(s, e, ctx, src);
+    case "eachLandUnlessAnyPaysLife":
+      return runLaneB215Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

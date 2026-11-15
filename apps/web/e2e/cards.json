@@ -6929,6 +6929,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "46b83657-1699-4162-a4bb-b792da396fe6",
+  "name": "Cleansing",
+  "manaCost": "{W}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "For each land, destroy that land unless any player pays 1 life.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "drk",
+  "releasedAt": "1994-08-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "66566999-f70a-4f14-9bf0-23325295a977",
   "name": "Clergy of the Holy Nimbus",
   "manaCost": "{W}",
@@ -25747,6 +25773,36 @@
   "commanderLegal": "legal",
   "set": "c14",
   "releasedAt": "2014-11-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9d637892-26d7-46f1-bd7d-89bda523f649",
+  "name": "Necrotic Plague",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature has \"At the beginning of your upkeep, sacrifice this creature.\"\nWhen enchanted creature dies, its controller chooses target creature one of their opponents controls. Return this card from its owner's graveyard to the battlefield attached to that creature.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "m11",
+  "releasedAt": "2010-07-16",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

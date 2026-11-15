@@ -2912,6 +2912,8 @@ export interface Resolving {
     mayExile?: { queue: { id: ObjectId; zc: number }[]; yes: { id: ObjectId; zc: number }[] };
     /** Decoy Gambit (Effect bounceUnlessDraw): the creatures whose controllers are still to choose, in order, how many chose the draw, the creatures to return, and how far it has got. */
     decoy?: { queue: { pid: PlayerId; id: ObjectId; zc: number }[]; draws: number; back: { id: ObjectId; zc: number }[]; step: number };
+    /** Cleansing (Effect eachLandUnlessAnyPaysLife, round B215): the players still to choose, in turn order, and the lands paid for. */
+    cleansing?: { queue: PlayerId[]; saved: ObjectId[] };
     /** Ice Cave (Effect othersPaySpellCostToCounter, round B214): the players still to be asked, in turn order. */
     iceCave?: { queue: PlayerId[] };
     /** Tidal Flats (Effect attackersPayOrBlockersGain, round B214): the attackers whose controllers are still to choose, and those not paid for. */

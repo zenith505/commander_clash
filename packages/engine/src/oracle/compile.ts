@@ -57,6 +57,7 @@ import { roundB210Line } from "./laneb210";
 import { roundB211Line } from "./laneb211";
 import { roundB213Line } from "./laneb213";
 import { roundB214Line } from "./laneb214";
+import { roundB215Line } from "./laneb215";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2157,6 +2158,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB213Line(line, raw, out, isSpell)) continue;
     // All Hallow's Eve, Ice Cave, Tidal Flats, Alpine Moon (round B214).
     if (roundB214Line(line, raw, out, isSpell)) continue;
+    // Necrotic Plague (round B215).
+    if (roundB215Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

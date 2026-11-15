@@ -902,6 +902,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         return [{ type: "chooseOption", player: pid, choice: g.includes("+1/+1") ? "+1/+1" : g.find((k) => pend.options.includes(k)) ?? pend.options[0]! }];
       }
     }
+    // Equipoise (round B222): the other player's best permanents of that type phase out.
+    const excess = pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    if (pend.kind === "pickPermanents" && excess?.type === "phaseOutExcess") return [{ type: "pickPermanents", player: pid, ids: [...pend.options].sort((x, y) => worth(s, pid, obj(s, y)) - worth(s, pid, obj(s, x))).slice(0, pend.count) }];
     // Cultural Exchange (round B220): as one of the two players, our least creatures for the other's best, one pair at a time
     // while what we get is worth more than what we give; as neither, nothing.
     const swap = pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
@@ -3312,6 +3315,16 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     const pick = ranked[0];
     if (forced) return pick ? [pick] : null;
     return pick && s.activePlayer === pid && s.step === "main1" && army(pick.id) > army(pid) + 3 ? [pick] : null;
+  }
+  // Equipoise (round B222): the opponent with the most permanents beyond ours, of the types in turn (a mandatory trigger).
+  if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "phaseOutExcess") {
+    const types = body.effects[0]!.types;
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const count = (who: PlayerId, type: string) => s.battlefield.filter((id) => objIsType(s, obj(s, id), type) && controllerOf(s, obj(s, id)) === who).length;
+    const excess = (them: PlayerId) => types.reduce((n, type) => n + Math.max(0, count(them, type) - count(pid, type)), 0);
+    const ranked = all.filter((t): t is Extract<TargetChoice, { kind: "player" }> => t.kind === "player" && t.id !== pid).sort((a, b) => excess(b.id) - excess(a.id));
+    const pick = ranked[0] ?? all[0];
+    return pick ? [pick] : null;
   }
   // Juxtapose: the opponent whose greatest mana value creature and artifact are worth the most more than ours.
   if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "juxtapose") {

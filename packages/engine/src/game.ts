@@ -6306,7 +6306,7 @@ export function castProblem(
   // "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): the face cast must
   // be one, unless something else lets it be cast (rulings).
   if (!free && !via && o.zone === "exile" && o.mayPlay?.castFilter && ownExilePermission(s, o, pid) && !printedMatches(o.mayPlay.castFilter, d) && !linkedPlayPermission(s, o, pid))
-    return `only ${/^[aeiou]/i.test(o.mayPlay.castFilter.text) ? "an" : "a"} ${o.mayPlay.castFilter.text.replace(/ card$/, "")} spell can be cast this way`;
+    return /^card /.test(o.mayPlay.castFilter.text) ? `only a spell ${o.mayPlay.castFilter.text.replace(/^card /, "")} can be cast this way` : `only ${/^[aeiou]/i.test(o.mayPlay.castFilter.text) ? "an" : "a"} ${o.mayPlay.castFilter.text.replace(/ card$/, "")} spell can be cast this way`;
   // Court of Locthwain's card with no other permission: only without paying its mana cost.
   if (!free && !via && o.zone === "exile" && choices?.alt !== "linkedFree" && !mayPlayExiledOtherwise(s, o, pid) && linkedFreeGrant(s, o, pid) >= 0) return `${d.name} can only be cast without paying its mana cost`;
   if (choices?.buyback && compileCard(d).buyback === undefined) return `${d.name} doesn't have buyback`;

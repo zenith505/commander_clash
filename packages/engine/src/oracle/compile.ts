@@ -64,6 +64,7 @@ import { roundB218Line } from "./laneb218";
 import { roundB219Line } from "./laneb219";
 import { roundB220Line } from "./laneb220";
 import { roundB221Line } from "./laneb221";
+import { roundB222Line } from "./laneb222";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2184,6 +2185,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB220Line(line, raw, out, isSpell)) continue;
     // Cemetery Desecrator, Callous Oppressor (round B221).
     if (roundB221Line(line, raw, out, isSpell)) continue;
+    // Phyrexian Splicer, Elemental Expressionist, Time Reaper, Equipoise (round B222).
+    if (roundB222Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

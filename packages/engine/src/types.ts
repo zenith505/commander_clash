@@ -2936,6 +2936,8 @@ export interface Resolving {
     mirrorTop?: ObjectId[];
     /** Effect "exchangeGroups" (Cultural Exchange, round B220): the creatures chosen of the first target player, then of the second. */
     exchange?: { first?: ObjectId[]; second?: ObjectId[] };
+    /** Effect "phaseOutExcess" (Equipoise, round B222): the index into its `types` of the pass now being chosen. */
+    excessPass?: number;
     /** Preferred Selection (round B216): the cards looked at, whether it was done, and the card chosen to move. */
     lookTopMay?: { looked: ObjectId[]; did?: boolean; pick?: string };
     /** Ice Cave (Effect othersPaySpellCostToCounter, round B214): the players still to be asked, in turn order. */

@@ -9416,7 +9416,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   they can pay, CR 119.4; every other land is destroyed at once; bots pay only for their own lands, down to 6 life).
   Hypergenesis (Eureka's rounds limited to artifact, creature, enchantment and land cards, Effect putFromHandRounds
   filter). Browser tests for Cleansing's land picker and Necrotic Plague's target chosen by the dead creature's controller.
-  +4, 31,405 of 31,936. The compiled text of every other card is unchanged.
+  +4, 31,414 of 31,936 with rounds 371 and 372. The compiled text of every other card is unchanged.
 - Round B216 (least played first, from the Lane B skip lists): Bone Mask (the next damage from a source of your choice
   prevented, and that many cards exiled from the top of your library as part of the prevention, CR 615.5, all of it with
   fewer cards, rulings; DamageRule exileTopPrevented). Forbidden Ritual (each pass you sacrifice a nontoken permanent as it

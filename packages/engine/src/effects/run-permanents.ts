@@ -1819,6 +1819,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           return;
         }
       }
+      // Garland, Royal Kidnapper: "for as long as they're the monarch": over already if that player stopped being the
+      // monarch before this resolved, so it does nothing (rulings, CR 611.2b).
+      const whileMonarch = e.whileMonarch ? players(s, e.whileMonarch, ctx)[0] : undefined;
+      if (e.whileMonarch && (whileMonarch === undefined || s.monarch !== whileMonarch)) {
+        log(s, `${src}'s effect does nothing: that player isn't the monarch.`);
+        return;
+      }
       // "Until ~ is cast from exile" (Shattered Seraph): the card its cost exiled, while it's still that object in exile; gone
       // from exile some other way already, it never ends (rulings).
       const exiledSelf = e.untilCastFromExile && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -1858,6 +1865,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           ...(whileTapped && e.whilePowerAtMostSource ? { powerAtMost: { id: whileTapped.id, zc: whileTapped.zc } } : {}),
           ...(whileControlled ? { whileControlled } : {}),
           ...(e.whileCounter ? { whileCounter: e.whileCounter } : {}),
+          ...(whileMonarch !== undefined ? { whileMonarch } : {}),
           ...(e.whileEnchanted ? { whileEnchanted: true as const } : {}),
           ...(untilCast ? { untilCast } : {}),
           ...(e.untilCreatureSpellCast ? { untilCreatureSpell: true as const } : {}),
@@ -1865,7 +1873,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           mods: groupMods,
         });
         const names = group.map((id) => defOf(s, obj(s, id)).name);
-        log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, groupMods, giveTo ?? ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "endOfCombat" ? " until end of combat" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "yourNextUpkeep" ? ` until ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "endOfYourNextUpkeep" ? ` until the end of ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "controllersNextUntap" ? ` until ${player(s, controllerOf(s, obj(s, group[0]!))).name}'s next untap step` : untilCast ? ` until ${src} is cast from exile` : e.untilCreatureSpellCast ? " until a player casts a creature spell" : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? (e.whileOnBattlefield ? ` for as long as ${src} remains on the battlefield` : ` for as long as ${player(s, whileControlled?.controller ?? ctx.controller).name} controls ${src}`) : ""}.`);
+        log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, groupMods, giveTo ?? ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "endOfCombat" ? " until end of combat" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "yourNextUpkeep" ? ` until ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "endOfYourNextUpkeep" ? ` until the end of ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "controllersNextUntap" ? ` until ${player(s, controllerOf(s, obj(s, group[0]!))).name}'s next untap step` : untilCast ? ` until ${src} is cast from exile` : e.untilCreatureSpellCast ? " until a player casts a creature spell" : whileMonarch !== undefined ? ` for as long as ${player(s, whileMonarch).name} is the monarch` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? (e.whileOnBattlefield ? ` for as long as ${src} remains on the battlefield` : ` for as long as ${player(s, whileControlled?.controller ?? ctx.controller).name} controls ${src}`) : ""}.`);
       }
       if (e.setsDid && giveTo !== undefined && s.resolving) {
         invalidateCharacteristics(s);

@@ -3229,6 +3229,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const toPlayer = e.under ? players(s, e.under, ctx).find((p) => !player(s, p).lost) : undefined;
       if (e.under && toPlayer === undefined) return;
       const under = (o: GameObject) => (toPlayer !== undefined ? toPlayer : e.owner ? o.owner : ctx.controller);
+      // Endless Whispers: "that player puts ~ ... onto the battlefield under their control": they put it there (GameObject.putter).
+      const putter = e.putByUnder && toPlayer !== undefined ? toPlayer : ctx.controller;
       if (e.faceDown) {
         // Yedora: face down as a Forest land, whatever the card is (CR 708.2a); not an Aura there, so it enchants nothing.
         // The Cyber-Controller: face down as 2/2 Cyberman artifact creatures, all at once; which cards they are is hidden
@@ -3237,7 +3239,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         enterTogether(s, () => {
           for (const o of list) {
             log(s, e.faceDown === "cyberman" ? `${src} puts a card onto the battlefield face down under ${player(s, under(o)).name}'s control: it's a 2/2 Cyberman artifact creature.` : e.faceDown === "plain" ? `${src} returns a card to the battlefield face down under ${player(s, under(o)).name}'s control: it's a 2/2 creature.` : `${src} returns ${defOf(s, o).name} to the battlefield face down under ${player(s, under(o)).name}'s control: it's a Forest land.`);
-            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: ctx.controller, faceDown: e.faceDown === "plain" ? "morph" : e.faceDown });
+            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: putter, faceDown: e.faceDown === "plain" ? "morph" : e.faceDown });
             if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
           }
         });
@@ -3297,7 +3299,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
               continue;
             }
             log(s, `${src} returns ${d.name} to the battlefield${face ? " transformed" : ""} attached to ${auraHostName(s, host)}.`);
-            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: ctx.controller, ...(face ? { face } : {}), ...host });
+            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: putter, ...(face ? { face } : {}), ...host });
             continue;
           }
           if (e.attachToEnchanted) {
@@ -3346,7 +3348,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (equipHosts?.has(o.id)) {
             const host = equipHosts.get(o.id)!;
             log(s, `${src} returns ${d.name} to the battlefield${host ? ` attached to ${defOf(s, obj(s, host)).name}` : ", unattached"}.`);
-            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: ctx.controller, ...(host ? { attachTo: host } : {}) });
+            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: putter, ...(host ? { attachTo: host } : {}) });
             if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
             continue;
           }
@@ -3387,7 +3389,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // Vehicle or a creature card is what the card is as it's put there.
           const also = e.alsoMods && (!e.alsoModsIfSubtype || characteristics(s, o).subtypes.includes(e.alsoModsIfSubtype)) && (!e.alsoModsIfCreature || objIsType(s, o, "Creature")) ? e.alsoMods : undefined;
           const entersAs = [...(e.entersAs && (ctx.x ?? 0) >= e.entersAs.x ? e.entersAs.mods : []), ...(also ?? [])];
-          moveObject(s, o.id, "battlefield", { controller: under(o), putBy: ctx.controller, tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(entersAs.length ? { entersAs, ...(also ? { entersAsBy: { controller: ctx.controller, source: src, ...(e.alsoModsWhileCounter ? { whileCounter: e.alsoModsWhileCounter } : {}) } } : {}) } : {}), ...(e.counters ? e.countersIfSubtype ? { countersIfSubtype: { subtype: e.countersIfSubtype, counters: e.counters } } : { [e.countersIfCreature ? "countersIfCreature" : "counters"]: e.counters } : {}), ...(e.countersFromLast ? { counters: { [e.countersFromLast.kind]: Math.max(0, (s.lastKnown?.[o.id]?.counters?.[e.countersFromLast.kind] ?? 0) + e.countersFromLast.plus) } } : {}), ...(e.countersAmount ? { counters: { [e.countersAmount.kind]: Math.max(0, amountNow(s, e.countersAmount.n, ctx)) } } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
+          moveObject(s, o.id, "battlefield", { controller: under(o), putBy: putter, tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(entersAs.length ? { entersAs, ...(also ? { entersAsBy: { controller: ctx.controller, source: src, ...(e.alsoModsWhileCounter ? { whileCounter: e.alsoModsWhileCounter } : {}) } } : {}) } : {}), ...(e.counters ? e.countersIfSubtype ? { countersIfSubtype: { subtype: e.countersIfSubtype, counters: e.counters } } : { [e.countersIfCreature ? "countersIfCreature" : "counters"]: e.counters } : {}), ...(e.countersFromLast ? { counters: { [e.countersFromLast.kind]: Math.max(0, (s.lastKnown?.[o.id]?.counters?.[e.countersFromLast.kind] ?? 0) + e.countersFromLast.plus) } } : {}), ...(e.countersAmount ? { counters: { [e.countersAmount.kind]: Math.max(0, amountNow(s, e.countersAmount.n, ctx)) } } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
           // Attacking as it enters, before its enters abilities trigger (CR 508.4).
           if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
             o.attacking = attack!.player;

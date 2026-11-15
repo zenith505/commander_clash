@@ -11949,6 +11949,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "47630b28-c0bc-4911-8d76-33c6fcabf2d7",
+  "name": "Endless Whispers",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Each creature has \"When this creature dies, choose target opponent. That player puts this card from its owner's graveyard onto the battlefield under their control at the beginning of the next end step.\"",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "5dn",
+  "releasedAt": "2004-06-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a0380b63-58ef-4545-beec-6ad307bbc21b",
   "name": "Eruth, Tormented Prophet",
   "manaCost": "{1}{U}{R}",
@@ -14724,6 +14750,41 @@
   "commanderLegal": "legal",
   "set": "ice",
   "releasedAt": "1995-06-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ab914053-4384-415f-b1e8-09fecb5a30b8",
+  "name": "Garland, Royal Kidnapper",
+  "manaCost": "{2}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Knight",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "When Garland enters, target opponent becomes the monarch.\nWhenever an opponent becomes the monarch, gain control of target creature that player controls for as long as they're the monarch.\nCreatures you control but don't own get +2/+2 and can't be sacrificed.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-12-05",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -19830,6 +19891,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c5c19d6e-16d5-4d24-be2d-c63646bdf00c",
+  "name": "Jon Irenicus, Shattered One",
+  "manaCost": "{2}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Elf Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Wizard"
+  ],
+  "oracleText": "At the beginning of your end step, target opponent gains control of up to one target creature you control. Put two +1/+1 counters on it and tap it. It's goaded for the rest of the game and it gains \"This creature can't be sacrificed.\" (It attacks each combat if able and attacks a player other than you if able.)\nWhenever a creature you own but don't control attacks, you draw a card.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Goad"
+  ],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bd43b485-e42e-4c20-adcb-799b0ce18a59",
   "name": "Jorn, God of Winter // Kaldring, the Rimestaff",
   "manaCost": "{2}{G}",
@@ -22820,6 +22918,40 @@
   "commanderLegal": "legal",
   "set": "mh2",
   "releasedAt": "2021-06-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6c87c261-00a8-46f2-92c8-42009a0a2faf",
+  "name": "Lorcan, Warlock Collector",
+  "manaCost": "{5}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Legendary Creature — Devil",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Devil"
+  ],
+  "oracleText": "Flying\nWhenever a creature card is put into an opponent's graveyard from anywhere, you may pay life equal to its mana value. If you do, put it onto the battlefield under your control. It's a Warlock in addition to its other types.\nIf a Warlock you control would die, exile it instead.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "afc",
+  "releasedAt": "2021-07-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

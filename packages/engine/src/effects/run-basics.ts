@@ -2,7 +2,7 @@ import type { DamageRecipient, Effect, PlayerRef } from "../abilities";
 import { putPlayerCounters } from "../counters";
 import { defMv } from "../faces";
 import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { addPhases, manaBurn, canPreventDamage, inCombatPhase, drawGame, loseEnergy, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
+import { addPhases, endWhileTapped, manaBurn, canPreventDamage, inCombatPhase, drawGame, loseEnergy, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planDamage, unpreventable, type DamageEvent, type DamageSource } from "../damage";
@@ -1191,6 +1191,7 @@ export function becomeMonarch(s: GameState, pid: PlayerId) {
   s.cards[MONARCH.oracleId] ??= MONARCH;
   s.monarch = pid;
   invalidateCharacteristics(s); // "as long as you're the monarch"
+  endWhileTapped(s); // "for as long as they're the monarch" (Garland, Royal Kidnapper, CR 611.2b)
   log(s, `${p.name} becomes the monarch.`);
   fireEvent(s, { type: "becameMonarch", player: pid });
   // Palace Jailer: what it exiled returns as one of its controller's opponents becomes the monarch (CR 610.3).

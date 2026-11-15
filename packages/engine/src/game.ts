@@ -2516,7 +2516,7 @@ export function endWhileTapped(s: GameState): boolean {
     const kept = e.affected.filter((id) => s.objects[id]?.zone !== "battlefield" || pw(obj(s, id)) <= pw(me));
     if (kept.length < e.affected.length) [e.affected, lost] = [kept, true];
   }
-  const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)) || ((e.whileCounter || e.whileEnchanted || e.powerAtMost) && !e.affected.length));
+  const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)) || (e.whileMonarch !== undefined && s.monarch !== e.whileMonarch) || ((e.whileCounter || e.whileEnchanted || e.powerAtMost) && !e.affected.length));
   if (!ended.length) {
     if (lost) invalidateCharacteristics(s);
     return lost;

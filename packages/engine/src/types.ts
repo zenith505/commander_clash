@@ -1612,6 +1612,11 @@ export interface ContinuousEffect {
   /** "For as long as it has a vow counter on it" (CR 611.2b): it applies only to those of `affected` with one (Promise of Loyalty). */
   whileCounter?: string;
   /**
+   * "For as long as they're the monarch" (Garland, Royal Kidnapper, CR 611.2b): it ends once this player isn't the monarch
+   * (CR 725.3), and doesn't start again if they become the monarch later.
+   */
+  whileMonarch?: PlayerId;
+  /**
    * "For as long as that creature is enchanted" (Rootwater Matriarch, CR 611.2b): over for a permanent once no Aura is
    * attached to it (checked with the state-based actions), even if one is attached to it again later (rulings).
    */

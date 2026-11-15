@@ -1,7 +1,7 @@
 # Roadmap
 
-31,408 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
+31,412 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,893 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3015,6 +3015,29 @@ line blocks.
    Effect swapFromGraveyards; bots return the pair when theirs is worth at least the opponent's). Browser tests click
    through Coin of Fate's cost and opponent, Rescue's target and sacrifice, and both of Dawnbreak's pickers and its yes.
    No new prompt kinds. +4, 31,408 of 31,936 with round 373. The compiled text of every other card is unchanged.
+   Round 375 went on down `npm run popular`, most played first, to control for as long as a player is the monarch, a
+   creature card bought for life, a granted dies trigger that gives the card away and a creature given away goaded for
+   good: Garland, Royal Kidnapper's "Whenever an opponent becomes the monarch, gain control of target creature that player
+   controls for as long as they're the monarch." (layer 2, CR 613.1b, ending once that player isn't the monarch, CR
+   611.2b, 725.3, and not starting at all if they stopped being it before it resolves, rulings: Effect continuous
+   `whileMonarch`, ContinuousEffect.whileMonarch, ended in becomeMonarch); Lorcan, Warlock Collector's "Whenever a creature
+   card is put into an opponent's graveyard from anywhere, you may pay life equal to its mana value. If you do, put it onto
+   the battlefield under your control. It's a Warlock in addition to its other types." (once for each card, a creature
+   card as it is in the graveyard, rulings; only if it's still that card, CR 400.7); Endless Whispers' granted "When this
+   creature dies, choose target opponent. That player puts this card from its owner's graveyard onto the battlefield under
+   their control at the beginning of the next end step." (each creature's controller targets one of their opponents,
+   rulings; the delayed trigger remembers that player, CR 603.7c, who puts it there: putOntoBattlefield `putByUnder`);
+   Jon Irenicus, Shattered One's end step gift of up to one target creature you control, with two +1/+1 counters, tapped,
+   goaded for the rest of the game and "can't be sacrificed", all as it resolves (rulings), and "Whenever a creature you own
+   but don't control attacks, you draw a card." Browser tests click through Garland's two targets, Lorcan's payment,
+   Endless Whispers' target opponent and Jon's targets with and without a creature. No new prompt kinds. +4, 31,412 of
+   31,936 with round 374. The compiled text of every other card is unchanged. Bots give no creature to Jon's opponent.
+   Out after round 375 (looked at, not done): Battlefield Thaumaturge (still out: "{1} per target creature, even if the
+   spell targets a creature more than once" reads either way for one creature targeted by two "target" words); Ranar the
+   Ever-Watchful and Hero of Bretagard (still out: "a spell or ability you control exiles one or more permanents" needs who
+   controls the exiling effect for costs and replacement effects too, not recorded on zone moves); Stardew Valley
+   ("another player of your choice may gain control": a player chosen as it resolves, then that player's yes or no).
+   Polish: Lorcan's prompt says "pay life equal to its mana value" without the number (the Pay button pays it).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

@@ -290,7 +290,14 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       if (e.each === "selfCard") {
         // An Aura's card that went to the graveyard as its creature died (Ghoulish Impetus): `of` says so.
-        for (const card of objects(s, e.of?.ref === "selfCard" ? e.of : { ref: "selfCard" }, ctx)) addDelayed(s, e.when, ctx.controller, card, body);
+        // Endless Whispers: "choose target opponent. That player puts ~ ...": the delayed trigger remembers that player as its
+        // event player (CR 603.7c); none is made for a player who has left.
+        const who = e.event?.player ? players(s, e.event.player, ctx)[0] : undefined;
+        if (e.event?.player && who === undefined) return;
+        for (const card of objects(s, e.of?.ref === "selfCard" ? e.of : { ref: "selfCard" }, ctx)) {
+          addDelayed(s, e.when, ctx.controller, card, body);
+          if (who !== undefined) s.delayed![s.delayed!.length - 1]!.event = { player: who };
+        }
         return;
       }
       if (e.each === "subject") {

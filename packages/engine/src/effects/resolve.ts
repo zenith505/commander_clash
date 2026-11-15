@@ -757,6 +757,14 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   }
   if (ref.ref === "attachedToSubject") {
     const host = objects(s, { ref: "subject" }, ctx)[0];
+    if (!host && ref.lastKnown && ctx.subject) {
+      const lk = s.lastKnown?.[ctx.subject.id];
+      if (lk?.zc !== ctx.subject.zc) return [];
+      return (lk.attached ?? []).flatMap((a) => {
+        const o = s.objects[a.id];
+        return o?.zone === "battlefield" && (o.zoneChanges ?? 0) === a.zc && objectMatches(s, ref.filter, o, ctx.controller, false) ? [o] : [];
+      });
+    }
     return host ? s.battlefield.map((id) => obj(s, id)).filter((o) => o.attachedTo === host.id && objectMatches(s, ref.filter, o, ctx.controller, false)) : [];
   }
   if (ref.ref === "subject") {
@@ -895,7 +903,11 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       return apnap(s, livingPlayers(s).filter((x) => x === ctx.controller || x === p));
     }
     case "sacrificedThisWay": {
-      const by = new Set((s.resolving?.sacrificedThisWay ?? []).map((x) => x.controller));
+      const by = new Set((s.resolving?.sacrificedThisWay ?? []).filter((x) => !ref.subtype || !!x.subtypes?.includes(ref.subtype)).map((x) => x.controller));
+      return apnap(s, livingPlayers(s).filter((x) => by.has(x)));
+    }
+    case "tappedLandForMana": {
+      const by = new Set(s.turnLog?.tappedLandForMana ?? []);
       return apnap(s, livingPlayers(s).filter((x) => by.has(x)));
     }
     case "youAndEventPlayers":

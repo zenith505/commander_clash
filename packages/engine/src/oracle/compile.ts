@@ -55,6 +55,7 @@ import { roundB208Line } from "./laneb208";
 import { roundB209Line } from "./laneb209";
 import { roundB210Line } from "./laneb210";
 import { roundB211Line } from "./laneb211";
+import { roundB213Line } from "./laneb213";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2148,6 +2149,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB210Line(line, raw, out, isSpell)) continue;
     // Chromatic Armor, Call to Arms, Nettlevine Blight, Strax, Merseine (round B211).
     if (roundB211Line(line, raw, out, isSpell)) continue;
+    // Desolation, Kodama of the Center Tree, Corrosive Ooze (round B213).
+    if (roundB213Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -8303,7 +8306,7 @@ function checkX(d: CardDef, out: CompiledCard) {
   out.triggers = out.triggers.filter((tr) => {
     // A "when you cast this spell" ability uses the X the spell was cast with (CR 107.3a, 601.2b; rulings on Hydroid Krasis).
     // "Where X is the number of nonland cards milled this way" (The Wise Mothman): the event's (TriggeredAbility.eventX).
-    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX) || (tr.event === "selfCycled" && cyclingX) || (tr.event === "selfTurnedFaceUp" && faceUpX) || tr.eventX || (tr.xKicked && out.kicker?.multi)) return true;
+    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX) || (tr.event === "selfCycled" && cyclingX) || (tr.event === "selfTurnedFaceUp" && faceUpX) || tr.eventX || tr.xLookBackSubtype || (tr.xKicked && out.kicker?.multi)) return true;
     bad(tr.body.text);
     return false;
   });

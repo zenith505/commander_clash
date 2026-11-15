@@ -309,10 +309,13 @@ export function parseDamageMod(line: string): StaticAbility | null {
  */
 function parsePreventionMod(text: string, line: string): StaticAbility | null {
   const m =
-    /^[Ii]f (.+?) would deal (combat |noncombat )?(?:(\d+) or less )?damage to (.+?), prevent (that damage|(\d+|X) of that damage|all but (\d+) of that damage|half that damage, rounded (up|down)|(\d+) damage that spell would deal to that permanent or player)(?:, where X is (.+))?$/.exec(text);
+    /^[Ii]f (.+?) would deal (combat |noncombat )?(?:(\d+) or less )?damage to (.+?), (you may )?prevent (that damage|(\d+|X) of that damage|all but (\d+) of that damage|half that damage, rounded (up|down)|(\d+) damage that spell would deal to that permanent or player)(?:, where X is (.+))?$/.exec(text);
   if (!m) return null;
-  const [, srcText, combatWord, atMost, toText, what, nOf, allBut, round, spellN, xText] = m;
+  const [, srcText, combatWord, atMost, toText, mayWord, what, nOf, allBut, round, spellN, xText] = m;
   if (spellN && srcText !== "a spell") return null;
+  // Battletide Alchemist: "you may prevent X of that damage": only "X of that damage" to players, its controller choosing
+  // for each player and each source's damage separately (rulings), in damage.ts planShields.
+  if (mayWord && (nOf !== "X" || toText !== "a player")) return null;
   const attached = /^(?:equipped|enchanted) creature$/.test(toText!);
   const byP = parseBy(srcText!.replace(/^an artifact$/, "an artifact source").replace(/^a creature$/, "a creature source"), attached);
   if (!byP) return null;
@@ -333,6 +336,7 @@ function parsePreventionMod(text: string, line: string): StaticAbility | null {
     // What's dealt is the rest: half rounded down when half is prevented rounded up.
     if (round === "down") mod.up = true;
   } else if (what !== "that damage") return null;
+  if (mayWord) mod.may = true;
   if (atMost) mod.atMost = Number(atMost);
   if (combatWord) mod.combat = combatWord === "combat " ? "only" : "non";
   if (byP.by) mod.by = byP.by;
@@ -409,7 +413,7 @@ export function parseDamageModSentence(text: string, ctx: Ctx): Effect[] | null 
   const st = parseDamageMod(t.replace(/^if /, "If "));
   if (plusX && st?.mods[0]?.kind === "damageMod") st.mods[0].mod.amount = { count: { kind: "x" } };
   const m = st?.mods[0];
-  if (!st || st.affects.kind !== "self" || m?.kind !== "damageMod" || m.mod.by?.self || m.mod.to?.self || m.mod.while || ["enchanted", "chosen"].includes(m.mod.to?.players ?? "")) return null;
+  if (!st || st.affects.kind !== "self" || m?.kind !== "damageMod" || m.mod.by?.self || m.mod.to?.self || m.mod.while || m.mod.may || ["enchanted", "chosen"].includes(m.mod.to?.players ?? "")) return null;
   const mod: DamageMod = { ...m.mod, text };
   return [{ type: "damageMod", mod, ...(until ? { until } : {}), ...(byTarget !== undefined ? { byTarget } : {}), ...(toPlayer ? { toPlayer: { ref: "eventPlayer" } } : {}) }];
 }

@@ -1232,6 +1232,10 @@ export function moveObject(
         s.objects[other]!.attachedTo = undefined;
         attachments.push(other);
       }
+    // Corrosive Ooze: what stayed on the battlefield attached to it as it left, as those objects (CR 400.7).
+    const stayed = attachments.filter((a) => s.objects[a]?.zone === "battlefield");
+    const lk = s.lastKnown?.[id];
+    if (lk && stayed.length) lk.attached = stayed.map((a) => ({ id: a, zc: s.objects[a]!.zoneChanges ?? 0 }));
   }
   if (to === "battlefield") [o.controlledSinceTurn, o.enteredTurn] = [s.turn, s.turn];
   // Who put it onto the battlefield (rulings on Arboria, Thelon's Chant: the player, not whose control it entered under).
@@ -6436,6 +6440,9 @@ export function castProblem(
   const xp = xProblem(costX || kickX || altX ? parseManaCost("{X}") : parseManaCost(d.manaCost), x);
   if (xp) return xp;
   if (kickX && (x ?? 0) < (kicker?.xMin ?? 0)) return "X can't be 0";
+  // Light Up the Night: "If you cast this spell this way, X can't be 0" (CastFromGraveyard.xMin). Without an X yet, the
+  // question is whether it could be cast this way (castSpell holds a cast to it, X left out being 0).
+  if (via?.xMin && x !== undefined && x < via.xMin) return "X can't be 0";
   // Mind Grind: "X can't be 0", so it can't be cast without paying its mana cost either (rulings, CR 107.3b).
   if (manaX && !costX && (x ?? 0) < (compileCard(d).xMin ?? 0)) return "X can't be 0";
   // Cast without paying an {X} in its mana cost, the only choice for X is 0 (CR 107.3b); not so for an X in an
@@ -7466,6 +7473,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Tegwyll's Scouring: cast as though it had flash only with its tapping paid (kicks left out are none).
   const problem = castProblem(s, p.id, id, specs.length ? (targets ?? []) : undefined, spell?.modal ? modes : undefined, convoke, improvise, x, compileCard(d).flashIfKicked && choices.kicks === undefined ? { ...choices, kicks: [] } : choices);
   if (problem) throw new RulesError(problem);
+  // Light Up the Night cast with its flashback: X left out is 0, which it can't be (CastFromGraveyard.xMin).
+  const xMinVia = choices.via ? graveyardWay(s, o, choices.via, p.id)?.xMin : undefined;
+  if (xMinVia && (x ?? 0) < xMinVia) throw new RulesError("X can't be 0");
   // What pays a cost beyond mana (which creatures are sacrificed, which cards discarded) is chosen as it's cast (CR
   // 601.2h): a cast that doesn't say can't skip the cost. As for abilities (activateAbility).
   const unpicked = castExtraCosts(d, { ...choices, objectId: id, ...(spell?.modal && modes ? { modes } : {}) }, x ?? 0, s, p.id).find((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !choices[costPickKey(c)]?.length);

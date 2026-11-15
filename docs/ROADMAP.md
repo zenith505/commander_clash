@@ -1,6 +1,6 @@
 # Roadmap
 
-31,383 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,388 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,885 of
 9,979 (99%).
 
@@ -1208,7 +1208,7 @@ line blocks.
    or more +1/+1 counters as a variable cost); Chancellor of the Annex (done in round 338) (the first spell each opponent casts); Kaima,
    the Fractured Calm (a count of creatures goaded this way); Namor the Sub-Mariner; Words of Worship and Words of Wind
    (replacing the next draw this turn); Become the Pilot (done in round B164) (can't be blocked unless attacking its owner); Nemesis Phoenix
-   (returned tapped and attacking from the graveyard); Battletide Alchemist ("you may prevent X of that damage" for any
+   (returned tapped and attacking from the graveyard); Battletide Alchemist (done in round B213) ("you may prevent X of that damage" for any
    player).
    Round 224 (fresh cards from the top): a floating "whenever one or more Gorgons and/or Snakes you control deal combat
    damage to a player" (Aphelia, Viper Whisperer); "spend this mana only to cast a spell that's one or more colors
@@ -6786,7 +6786,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Arrows). +17 (28,453 of 31,936 with round 222).
 - Out after round B57 (looked at, not done): Saw (done in round B173) ("a permanent other than that creature or ~": a pick that excludes the
   trigger's subject), Glimpse the Cosmos (done in round B173) (a conditional cast from the graveyard for another cost), Traveler's Cloak (any
-  land type, nonbasic too), Corrosive Ooze (destroying Equipment at end of combat), Trove of Temptation (an attack
+  land type, nonbasic too), Corrosive Ooze (done in round B213) (destroying Equipment at end of combat), Trove of Temptation (an attack
   requirement toward you or your planeswalkers), Viral Spawning (done in round B154) (a conditional flashback), Silver Surfer, Galactus's Herald
   ("attacks that player each combat"), Blue Dragon (done in round B154) (three targets until your next turn), Satyr Firedancer (a spell's damage
   to an opponent), Thrill-Kill Disciple (done in round B175) (squad with a discard), Magnigoth Treefolk and Diligent Zookeeper (both done in round B164) (counted
@@ -7019,7 +7019,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   by dredge), Szadek, Lord of Secrets (the affected player orders it against prevention), Domri, Chaos Bringer (riot on mana spent from a loyalty
   ability), Dreamshaper Shaman (a nonland permanent card put onto the battlefield: Auras and battles), Qasali Ambusher
   (flash only for the alternative cost), Debt of Loyalty ("if it regenerates this way", done in round B132), Murktide Regent (done in round B182) (which cards
-  delve exiled), War Tax, Mine Layer, Tatsumasa, the Dragon's Fang, Ride the Avalanche (done in round B203), Light Up the Night, Arachnus
+  delve exiled), War Tax, Mine Layer, Tatsumasa, the Dragon's Fang, Ride the Avalanche (done in round B203), Light Up the Night (done in round B213), Arachnus
   Spinner (done in round B71), Auratouched Mage, Bludgeon Brawl and Last Light of Durin's Day (searches across zones, cost-time choices or
   granted abilities with their own costs).
 - Round B67 (from EDHREC rank about 19,700 up and the B10 and B11 lists): "{1}: The next time you would draw a card this
@@ -9051,7 +9051,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   else (CR 708.4), its {3} reduced (CR 702.37c, 601.2f; CostMod.faceDown); "the first ... spell you cast each turn" counts a
   face-down one by those characteristics only; the Cast face down button shows the cost now (a browser test with Kadena).
   +8, 31,215 of 31,936 with B189 to B197 and rounds 348 to 351.
-- Out after round B198 (looked at, not done): Kodama of the Center Tree (soulshift X counted from the Spirits you controlled
+- Out after round B198 (looked at, not done): Kodama of the Center Tree (done in round B213) (soulshift X counted from the Spirits you controlled
   just before it died, CR 603.10a, and kept for the target's mana value), Nacatl War-Pride (done in round 364) ("must be blocked by exactly one
   creature if able" and token copies attacking as many as the defending player's creatures), Hans Eriksson (a revealed
   creature put onto the battlefield attacking that player or a planeswalker they control, then a reflexive fight), Grime
@@ -9157,7 +9157,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   lost, CR 701.20a). +6, 31,299 of 31,936 with B201, B202 and rounds 358 to 361.
 - Out after round B203 (looked at, not done): Rinoa, Angel Wing ("you may return one of them", an attacking creature that
   died from any owner's graveyard, "Do this only once each turn"), Sanctuary Blade ("As ~ becomes attached to a creature,
-  choose a color": a choice in the middle of attaching, every way it can become attached) and Kodama of the Center Tree stay
+  choose a color": a choice in the middle of attaching, every way it can become attached) and Kodama of the Center Tree (done in round B213) stay
   out for the reasons in the earlier lists.
 - Round B204 (least played first, from the Lane B skip lists): Journey to the Lost City (the four cards its upkeep trigger
   exiles, then a d20: a land card from among them, a Wolf with a counter for each creature card among them, or every
@@ -9175,7 +9175,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   choice, asked only for two different names, one found alone entering as with Cultivate, rulings, or both tapped; "20+"
   and "9 or less" count modified results). +6, 31,316 of 31,936 with rounds 362 and 363. `npm run typecheck` now gives tsc a 4 GB heap: the engine's
   check had reached Node's default limit of about 2 GB (2.36 GB on main) and ran out in a fresh clone.
-- Out after round B204 (looked at, not done): Rinoa, Angel Wing, Sanctuary Blade and Kodama of the Center Tree stay out
+- Out after round B204 (looked at, not done): Rinoa, Angel Wing, Sanctuary Blade and Kodama of the Center Tree (done in round B213) stay out
   for the reasons in the earlier lists.
 - Round B205 (least played first, from the Lane B skip lists): Don & Leo, Problem Solvers (its end step's "up to one target
   artifact you control and up to one target creature you control", the same artifact creature allowed for both, CR 115.3,
@@ -9288,6 +9288,20 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   damage a prevention-and-deal rule prevents in one event is now dealt as one amount (Vengeful Archon too). Browser tests
   for Channel Harm's question, Decoy Gambit's choice and Fade Away's payments and pick. +5, 31,383 of 31,936. The compiled
   text of every other card is unchanged.
+- Round B213 (least played first, from the Lane B skip lists): Battletide Alchemist ("you may prevent X of that damage":
+  its controller is asked for each source's damage to each player, X the Clerics they control as the damage would be dealt,
+  rulings; declined, it doesn't apply to that damage; bots prevent damage to themselves only). Desolation (each player who
+  tapped a land for mana this turn sacrifices a land at each end step, and 2 damage to each who sacrificed a Plains this
+  way; the new TurnLog.tappedLandForMana). Kodama of the Center Tree (soulshift X, X the Spirits you controlled as it died,
+  itself and those that died with it counted from their last known information, CR 603.10a). Light Up the Night (X, or X
+  plus 1 to a creature or planeswalker; flashback {3}{R} and X loyalty counters removed from among your planeswalkers, X
+  not 0 when cast that way, and the browser's X picker starts at 1). Corrosive Ooze (the Equipment attached to an equipped
+  creature it blocks or is blocked by is destroyed at end of combat, also when that creature has left the battlefield: the
+  Equipment it had as it left, CR 603.10a, rulings). Browser tests
+  for Battletide Alchemist's question (both answers), Light Up the Night's flashback with X and counters, and Kodama's
+  soulshift. +5, 31,388 of 31,936. The compiled text of every other card is unchanged.
+- Out after round B213 (looked at, not done): a bot picking the land for Desolation's sacrifice isn't told that a Plains
+  costs it 2 life (it plays legally, only not at its best).
 - Out after round B212 (looked at, not done): Rain of Gore (whether lifelink damage from a spell is that spell causing
   the life gain), Kraven the Hunter (the greatest power as several creatures die at once) and Blood Scrivener (two draws
   and a life loss replacing one draw) stay out for the reasons in the earlier lists.
@@ -9296,7 +9310,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Equity (damage to "you or a white creature you control" grouped per event), Worms of the Earth ("Lands can't enter the
   battlefield" for every way a land is put onto it) stay out.
 - Out after round B210 (looked at, not done): Lodestone Bauble (still out: a player chosen as it's activated even with no
-  target, a new choice in activation), Light Up the Night (a flashback cost removing X loyalty counters from among your
+  target, a new choice in activation), Light Up the Night (done in round B213) (a flashback cost removing X loyalty counters from among your
   planeswalkers), Duelist's Flame (its granted trigger: "look at that many cards", then an exiled card cast for free or left in
   exile), Elemental Resonance (still out: what a {2/W} symbol adds) and Divine Intervention (still out: who removed the last
   counter) stay out.
@@ -9309,7 +9323,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   names chosen for the Saga kept on it), Spectral Searchlight (mana another player adds, in a color they choose) stay out.
 - Out after round B205 (looked at, not done): Supper for Spiders (whether the cards are Food artifacts as they enter, for
   "whenever a creature enters" and replacements, isn't settled by its rulings), Fell Beast's Shriek (splice), Rinoa, Angel
-  Wing, Sanctuary Blade and Kodama of the Center Tree stay out for the reasons in the earlier lists.
+  Wing, Sanctuary Blade and Kodama of the Center Tree (done in round B213) stay out for the reasons in the earlier lists.
 - Out after round B192 (looked at, not done): Garruk, Curse Breaker (its −4: how often "whenever one or more creatures
   attack one of your opponents" triggers when creatures attack two of them still isn't settled by rulings), Charmed
   Pendant (a hybrid symbol of the milled card adds one of its colors: a choice in the middle of a mana ability), Ulamog's
@@ -9318,7 +9332,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   and draw for their combat damage until your next turn; III is done), Drizzt Do'Urden (done in round 368) (its short name "Drizzt" isn't read
   as ~), Long Rest, Time Reaper, Pulsemage Advocate (done in round B191), Heart of Kiran and Turf War stay out.
 - Out after round B187 (looked at, not done): Kraven the Hunter (the greatest power among a player's creatures as one died,
-  several dying at once), Corrosive Ooze, Trove of Temptation, Rain of Gore and Blood Scrivener stay out for the reasons in
+  several dying at once), Corrosive Ooze (done in round B213), Trove of Temptation, Rain of Gore and Blood Scrivener stay out for the reasons in
   the earlier lists.
 - Out after round B186 (looked at, not done): Coffin Queen ("When ~ becomes untapped or you lose control of ~": whether ~
   leaving the battlefield after the ability resolved counts as losing control of it isn't settled by its rulings) stays out.
@@ -9337,7 +9351,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   with it as it transforms), Song of Inspiration ("add the total mana value of those cards" to a d20 roll: whether a target
   that became illegal still counts isn't settled by its rulings) stay out.
 - Out after round B180 (looked at, not done): Strax, Sontaran Nurse (done in round B211) (a reflexive trigger's target limited to the creatures
-  of a player chosen at random), Battletide Alchemist ("you may prevent X of that damage" to any player: a choice for each
+  of a player chosen at random), Battletide Alchemist (done in round B213) ("you may prevent X of that damage" to any player: a choice for each
   player as each source's damage is dealt), Zethi, Arcane Blademaster (X targets by kicks, then copies of the kicked
   cards cast), Back from the Brink (paying the mana cost of the card a cost exiled) stay out; Thelon's Chant (done in round B207), Tourach's
   Chant, Nature's Wrath (done in round B207) and Overburden (done in round B207) still need who put a permanent onto the battlefield. A "Pay {1}" for Nafs Asp is
@@ -9359,7 +9373,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   controller to gain life isn't settled by its rulings), Lich's Mirror, Blood Scrivener, Snowblind and Garruk, Curse Breaker
   stay out for the reasons in the earlier lists.
 - Out after round B176 (looked at, not done): Battlefield Thaumaturge ("{1} less for each creature it targets": whether a
-  creature targeted twice counts twice isn't settled by its rulings' wording), Kodama of the Center Tree (soulshift X counted
+  creature targeted twice counts twice isn't settled by its rulings' wording), Kodama of the Center Tree (done in round B213) (soulshift X counted
   from the Spirits as they last existed), Barbed Wire (done in round B182) (a "prevent the next damage dealt by ~" shield), Spiteful Repossession
   (each opponent's own difference, then "the damage dealt this way") stay out for these reasons.
 - Out after round B175 (looked at, not done): Chong and Lily (done in round B187), Threefold Signal, Hankyu (done in round B209) and Time Reaper stay out for the
@@ -9367,7 +9381,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B174 (looked at, not done): Demilich (done in round B193), Arcane Proxy (done in round B193) and Roving Actuator (a copy of a graveyard card cast
   while the ability resolves), Sproutback Trudge (done in round B193) (cast from the graveyard as its end step trigger resolves), Outmaneuver and
   Long Rest (X targets), Pulsemage Advocate (done in round B191) (three targets from one opponent's graveyard).
-- Out after round B173 (looked at, not done): Corrosive Ooze (the Equipment attached to the creature just before it left the
+- Out after round B173 (looked at, not done): Corrosive Ooze (done in round B213) (the Equipment attached to the creature just before it left the
   battlefield is destroyed at end of combat, rulings: attachments as they last existed aren't kept), Oppressive Rays and
   Gloom (done in round B184) (the tax reaches mana abilities), Murktide Regent and Soulflayer (done in round B182) (which cards delve exiled aren't kept with the
   permanent), Heart of Kiran (a loyalty counter removed instead of crewing, still crewing for "crews" triggers), Crypsis (done in round B187)
@@ -9390,7 +9404,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   controls one or more of those permanents"), Garruk, Curse Breaker's −4 ("whenever one or more creatures attack one of
   your opponents": how often that batched trigger fires when creatures attack two opponents isn't settled by rulings),
   Revival Experiment (one card of each permanent type) stay out.
-- Out after round B167 (looked at, not done): Kodama of the Center Tree (soulshift X: the target's mana value is bounded
+- Out after round B167 (looked at, not done): Kodama of the Center Tree (done in round B213) (soulshift X: the target's mana value is bounded
   by the Spirits you controlled just before it died, and target checks have no place to keep that number), Meandering
   Towershell (no "at the beginning of the declare attackers step on your next turn" timing yet; it returns attacking a
   player or planeswalker chosen then, rulings), Rain of Gore (whether a spell or ability causes the life gain), Churning
@@ -9448,7 +9462,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cast), Sutured Ghoul (done in round B171) (a characteristic-defining power and toughness from the cards it exiled), Preferred Selection (a
   look held across the may decision), Graceful Takedown (done in round B187) (two target groups that must differ), Glass Asp and Nafs Asp
   (a payment any time before the draw step, as a special action), Noxious Vapors (keeping one card of each color in
-  hand), Kodama of the Center Tree, Reflecting Mirror.
+  hand), Kodama of the Center Tree (done in round B213), Reflecting Mirror.
 - Out after round B150 (looked at, not done): Boneyard Mycodrax (done in round B198) (its scavenge compiles now; its "other creature cards in
   your graveyard" power doesn't yet), the never-examined names still left (Ring of Ma'rûf and the other wishes, Seafarer's
   Quay and the other banding grants, Cyclopean Tomb, False Orders, Mirror-Shield Hoplite, Chorus of the Conclave, Temporal
@@ -9494,7 +9508,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   graveyard), Meddle ("if target spell has only one target and that target is a creature": a condition on the spell's
   targets as it resolves), Drafna's Restoration (done in round B159), Sutured Ghoul (done in round B171), Twinning Glass and Pardic Dragon (done in round B152), still out for the
   reasons in the earlier lists.
-- Out after round B138 (looked at, not done): Kodama of the Center Tree (soulshift X counted from the Spirits on the
+- Out after round B138 (looked at, not done): Kodama of the Center Tree (done in round B213) (soulshift X counted from the Spirits on the
   battlefield just before it died, Spirits dying with it included, CR 603.10a), Lantern Flare (X in its cleave cost).
 - Out after round B136 (looked at, not done): Forgotten Lore (done in round B142) (an opponent chooses again each time you pay {G}),
   Infinite Authority (a delayed trigger that checks "if that creature was destroyed this way").
@@ -9551,7 +9565,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   on every target of every mode, not the ones chosen), Obstinate Familiar (done in round B139) ("you may skip that draw instead": the draw
   replacement offers no way to decline), Breaking // Entering (its Entering half is still unsupported).
 - Out after round B119 (looked at, not done): Gloom (activated abilities of white enchantments cost {3} more: mana
-  abilities too, and their cost paths take no tax), Kodama of the Center Tree (soulshift X, X counted as the trigger
+  abilities too, and their cost paths take no tax), Kodama of the Center Tree (done in round B213) (soulshift X, X counted as the trigger
   goes on the stack), Invoke the Ancients (a separate counter choice for each of the two tokens created, rulings).
 - Out after round B118 (looked at, not done): Flying Drone ("another creature with flying entered the battlefield under your
   control this turn": the turn's enter log doesn't keep keywords), Cellar Door (done in round B137) ("puts the bottom card of their library into
@@ -9715,7 +9729,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   and Rohgahh of Kher Keep ("an opponent gains control of ~"), Stangg and Dance of the Many (linked tokens that leave
   with their source), Sengir Nosferatu (done in round B129) (a token's ability returns an exiled card named ~), Splintering Wind,
   Negative Zone Portal (done in round B137), Sol'Kanar the Tainted (done in round B163), Mystic Barrier (done in round B210), Covenant of Minds (done in round B155).
-- Out after round B87 (looked at, not done): Kodama of the Center Tree (soulshift X: a target bounded by a changing
+- Out after round B87 (looked at, not done): Kodama of the Center Tree (done in round B213) (soulshift X: a target bounded by a changing
   number), Hide // Seek (the mana value of a card found by the search), Revival Experiment (one card of each permanent
   type, and a battle's protector on entering is unclear), Love on the Battlefield (a combat damage trigger granted until
   end of turn), Sharkey, Tyrant of the Shire, Woodcaller Automaton (done in round B158), Dancing Sword (done in round B153), Elemental Resonance, Bat Colony (done in round B166).
@@ -9822,7 +9836,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   middle of a draw), Hedonist's Trove (done in round B192) (lands from its exile any number of times, one spell a turn), Day of the Dragons,
   Lumbering Battlement, Wall of Mourning (cards exiled with ~ from abilities not linked yet; Kayla's Music Box and
   Serpent's Soul-Jar done in round B70), Ashes of the Fallen (creature types of cards in a graveyard: Lane A's round 227 adds those for Roshan,
-  so after it merges), Desolation (who tapped a land for mana this turn), Nefarious Lich (damage replaced by exiling
+  so after it merges), Desolation (done in round B213) (who tapped a land for mana this turn), Nefarious Lich (damage replaced by exiling
   from the graveyard, losing if you can't).
 - Next for Lane B, least played first: the unsupported ones no round has written down yet (`npm run popular -- --least`,
   minus the names already in ROADMAP and HISTORY). After round B75 about 269 of those are ranked below 25,000 and about
@@ -9830,7 +9844,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   replacement, damage dealt this turn by a source); only 7 are left between 19,700 and 15,000. Then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match (done in round B185), Reweave, Kheru Mind-Eater, Day of the Dragons (supported), Bloodbond March (done in round B185), Song of Inspiration, Countersculpt, Order of
-  Succession (supported), Drain Power, Volcano Hellion (done in round B185), Drain Life (done in round B179), Desolation, Urza's Sylex (done in round B185), Diabolic Servitude, Shared Fate.
+  Succession (supported), Drain Power, Volcano Hellion (done in round B185), Drain Life (done in round B179), Desolation (done in round B213), Urza's Sylex (done in round B185), Diabolic Servitude, Shared Fate.
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 460 are still unsupported there, its skips
   included): Aeon Engine, Haunting Imitation (done in round B185), The Fugitive Doctor (done in round B184), Shifting Shadow, Prince of Thralls (done in round B185),
   Eriette, Manifold Insights (done in round B185), Fortune's Favor (supported), Curse of Inertia (done in round B184), Dreamshaper Shaman, Fishing Pole, Regna's Sanction (done in round B184),

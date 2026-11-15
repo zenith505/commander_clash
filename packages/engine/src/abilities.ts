@@ -1548,7 +1548,7 @@ export type ObjRef =
   | { ref: "sharingName"; subject?: true }
   | { ref: "subject" } // the object its trigger event was about: exalted's "that creature" (see PendingTrigger.subject)
   /** "All Auras attached to that creature" (Treefolk Mystic): the permanents matching `filter` attached to the subject as this resolves. */
-  | { ref: "attachedToSubject"; filter: TargetSpec }
+  | { ref: "attachedToSubject"; filter: TargetSpec; /** Corrosive Ooze: once the subject has left the battlefield, the ones attached to it just before it left, still on the battlefield as those objects (rulings, CR 400.7). */ lastKnown?: true }
   /** "Whenever one or more tokens your opponents control enter, for each of them, ..." (Kambal): those that entered, while on the battlefield. */
   | { ref: "eventGroup" }
   /**
@@ -1709,7 +1709,9 @@ export type PlayerRef =
   /** Infernal Offering: "you and that player", the chosen opponent (Chosen.player), in APNAP order (CR 101.4). */
   | { ref: "youAndChosenPlayer" }
   /** Infernal Offering: "each player who sacrificed a creature this way": the controllers of what this resolution sacrificed (ResolvingInfo.sacrificedThisWay), still in the game, in APNAP order. */
-  | { ref: "sacrificedThisWay" }
+  | { ref: "sacrificedThisWay"; /** Desolation: "each player who sacrificed a Plains this way": only those who sacrificed one with this subtype, as it last existed (CR 608.2h). */ subtype?: string }
+  /** Desolation: "each player who tapped a land for mana this turn" (TurnLog.tappedLandForMana), still in the game, in APNAP order. */
+  | { ref: "tappedLandForMana" }
   /** Erestor of the Council: "each opponent who voted for a choice you voted for" in the vote that triggered it. */
   | { ref: "votedWithYou" }
   /** Grudge Keeper: "each opponent who voted for a choice you didn't vote for", in the vote that triggered it: one none of whose votes matches one of yours (rulings: with extra votes, an opponent counts only if they voted for none of your choices). */
@@ -1991,6 +1993,8 @@ export interface DamageMod {
   nextTime?: true;
   /** Well-Laid Plans: "... to a creature by another creature if they share a color": only when the source, as it deals the damage, and the permanent it's dealt to share a color, and aren't the same object. */
   shareColor?: true;
+  /** Battletide Alchemist: "you may prevent X of that damage": the mod's controller chooses, for each player and each source's damage, whether it applies (rulings). */
+  may?: true;
   text: string;
 }
 
@@ -6481,6 +6485,12 @@ export type TriggerEvent =
 export type TriggerDuration = "endOfTurn" | "yourNextTurn" | "endOfYourNextTurn" | "endOfCombat" | /** Chancellor of the Annex: for the rest of the game (with `once` and `forPlayer`, until that player's first spell). */ "game";
 
 export interface TriggeredAbility {
+  /**
+   * Kodama of the Center Tree: "soulshift X, where X is the number of Spirits you control": for a "selfDies" trigger, X is
+   * the number of permanents of this subtype its controller controlled just before it left (itself and the others leaving
+   * at the same time included, CR 603.10a, rulings), known as it triggers, for its target's mana value (TargetSpec.xRange).
+   */
+  xLookBackSubtype?: string;
   /** Druid of Horns: "Whenever you cast an Aura spell that targets ~": heroic for spells like this only. */
   heroicSpell?: TargetSpec;
   /** Speedball, New Warrior: "Whenever a player casts a spell that targets ~": heroic for any player's spell, not only its controller's. */
@@ -7750,6 +7760,8 @@ export const GRANTED_WAY_COSTS: Partial<Record<CastFromGraveyardKind, Additional
 };
 export interface CastFromGraveyard {
   kind: CastFromGraveyardKind;
+  /** Light Up the Night: "If you cast this spell this way, X can't be 0" (CR 107.3a, 601.2b). */
+  xMin?: number;
   /** A split card's half this way casts (graveyardWays): an aftermath half, or a half given flashback. */
   face?: number;
   mana?: string;

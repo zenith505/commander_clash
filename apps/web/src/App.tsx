@@ -1111,8 +1111,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // A madness cost with an {X} the mana cost doesn't have: "Madness {X}{B}{B}" (From Under the Floorboards).
     const madnessX = free && parseManaCost(madnessCastOf(s, HUMAN, d.objectId) ?? "").hasX;
     if (d.x === undefined && ((parseManaCost(card.manaCost).hasX && (!free || madnessX) && !d.via && !d.alt) || altX || costX || madnessX)) {
+      // Light Up the Night's flashback: "If you cast this spell this way, X can't be 0" (X 0 is planned as that least X).
+      const way = d.via ? graveyardWays(s, s.objects[d.objectId]!, HUMAN).find((g) => g.kind === d.via) : undefined;
+      const [viaMin, viaMana] = [way?.xMin, way?.mana];
       // Rottenmouth Viper: with as many sacrificed as X (the ones picked later may differ).
-      const plan = (n: number) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, compiled.sacrificedReduction ? { ...kicks, ...reducingChoices(s, d.objectId, n) } : kicks);
+      const plan = (n: number) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", Math.max(n, viaMin ?? 0), compiled.sacrificedReduction ? { ...kicks, ...reducingChoices(s, d.objectId, n) } : kicks);
       // "You may sacrifice one or more creatures" (Plumb the Forbidden): X is how many, none unless you pick more.
       const optional = compiled.additionalCosts?.find((c) => c.kind === "sacrifice" && c.optional);
       // Explosive Singularity, Burn at the Stake, Hierophant Bio-Titan: "tap any number of untapped creatures you control",
@@ -1126,8 +1129,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       // Nahiri's Sacrifice: "sacrifice an artifact or creature with mana value X": only some X work, so the greatest that does.
       const mvSac = compiled.additionalCosts?.some((c) => c.kind === "sacrifice" && c.mvX);
       const max = range ? range.max : mvSac ? (Array.from({ length: 21 }, (_, n) => 20 - n).find((n) => !!plan(n)) ?? 0) : maxX(plan);
-      const extra = optional?.kind === "sacrifice" ? (compiled.sacrificedReduction ? `sacrifice X ${optional.filter.text.replace(/s?$/, "s")}, each making it {${compiled.sacrificedReduction}} cheaper` : `sacrifice X ${optional.filter.text.replace(/s?$/, "s")} (X can be 0)`) : anyText ? (compiled.sacrificedReduction ? `${anyText}, each making it {${compiled.sacrificedReduction}} cheaper` : `${anyText} (X can be 0)`) : costX ? (/\b(?:(?:pay|discard|sacrifice|return|exile) X [^.(]*|sacrifice an? [^.(]*?with mana value X)/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
-      return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : card.manaCost), max, value: range ? range.min : optional ? 0 : Math.max(max, compiled.xMin ?? 0), ...(range?.min ? { min: range.min } : !costX && compiled.xMin ? { min: compiled.xMin } : {}), ...(extra ? { extra } : {}) });
+      const extra = optional?.kind === "sacrifice" ? (compiled.sacrificedReduction ? `sacrifice X ${optional.filter.text.replace(/s?$/, "s")}, each making it {${compiled.sacrificedReduction}} cheaper` : `sacrifice X ${optional.filter.text.replace(/s?$/, "s")} (X can be 0)`) : anyText ? (compiled.sacrificedReduction ? `${anyText}, each making it {${compiled.sacrificedReduction}} cheaper` : `${anyText} (X can be 0)`) : costX ? (/\b(?:(?:pay|discard|sacrifice|return|exile|remove) X [^.(]*|sacrifice an? [^.(]*?with mana value X)/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
+      return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : viaMana ?? card.manaCost), max, value: range ? range.min : optional ? 0 : Math.max(max, compiled.xMin ?? 0, viaMin ?? 0), ...(range?.min ? { min: range.min } : viaMin ? { min: viaMin } : !costX && compiled.xMin ? { min: compiled.xMin } : {}), ...(extra ? { extra } : {}) });
     }
     // "Kicker {X}": X is announced once it's kicked (CR 601.2b), "X can't be 0" (Thieving Skydiver).
     // Waterbender's Restoration: a required "waterbend {X}", always paid, so X is always announced.

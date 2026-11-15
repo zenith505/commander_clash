@@ -918,6 +918,19 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (d.to?.includes(ev.to) && !diesLocked)
         s.triggerQueue.push({ sourceId: d.source?.id ?? ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.about ?? { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body, ...(d.source ? { sourceZc: d.source.zc } : {}), ...(d.lkiCounters ? { lki: { counters: { ...ev.counters } } } : {}), ...(d.ifCond ? { ifCond: d.ifCond } : {}) });
     }
+    // Kodama of the Center Tree (TriggeredAbility.xLookBackSubtype): the permanents of that subtype its controller controlled
+    // just before it left, as they last existed for the ones leaving at the same time, itself included (CR 603.10a).
+    const lookBackX = (subtype: string | undefined): number | undefined => {
+      if (!subtype) return undefined;
+      const spec: TargetSpec = { kind: "object", subtypes: [subtype], controller: "you", text: subtype };
+      let n = s.battlefield.filter((id) => objectMatches(s, spec, obj(s, id), ev.controller, false)).length;
+      for (const l of s.leftTogether ?? []) {
+        const lk = s.lastKnown?.[l.id];
+        if (!lk || lk.controller !== ev.controller || s.objects[l.id]?.zone === "battlefield") continue;
+        if (lk.creatureTypes === "all" || lk.source?.allCreatureTypes || lk.source?.subtypes.includes(subtype)) n++;
+      }
+      return n;
+    };
     // Its abilities as it last existed on the battlefield (CR 603.10a): a merged permanent's from all its cards (730.2a),
     // a copy's from what it copied.
     const lastAbilities = withGranted(ev.hadAbilities ? compileCard(ev.snapshot ? defOf(s, ev.snapshot) : defOf(s, o)) : NO_ABILITIES, ev.grantedAbilities ?? []).triggers;
@@ -937,6 +950,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       undefined,
       undefined,
       { counters: ev.counters, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) },
+      lookBackX(lastAbilities.find((t) => t.event === "selfDies" && t.xLookBackSubtype)?.xLookBackSubtype),
     );
     // Zenos yae Galvus: "When the chosen creature leaves the battlefield": the permanent noted as it, that object (CR 400.7),
     // gone to any zone; Zenos's own ability, so only while Zenos is on the battlefield.
@@ -1484,6 +1498,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const o = obj(s, ev.id);
     // Mana Web: what the land could produce as it was tapped (CR 106.7), for when it's gone by the time that resolves.
     const info = { player: ev.player, ...(o.zone === "battlefield" && objIsType(s, o, "Land") ? { couldProduce: landCouldProduce(s, o) } : {}) };
+    // Desolation: "each player who tapped a land for mana this turn" (CR 106.12), whatever was on the battlefield then (rulings).
+    if (o.zone === "battlefield" && objIsType(s, o, "Land")) {
+      const tl = ((s.turnLog ??= {}).tappedLandForMana ??= []);
+      if (!tl.includes(ev.player)) tl.push(ev.player);
+    }
     const byOk = (t: TriggeredAbility, you: PlayerId) => !!t.manaTap && (t.manaTap.by === "any" || (t.manaTap.by === "you") === (ev.player === you));
     add(o, controllerOf(s, o), (e, t) => e === "tappedForMana" && !t.manaTap?.filter && byOk(t, controllerOf(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, info);
     for (const id of s.battlefield) {

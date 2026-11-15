@@ -3196,6 +3196,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4867cc47-de84-4958-b1de-4a0a5050210e",
+  "name": "Battletide Alchemist",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Creature — Kithkin Cleric",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Kithkin",
+   "Cleric"
+  ],
+  "oracleText": "If a source would deal damage to a player, you may prevent X of that damage, where X is the number of Clerics you control.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mor",
+  "releasedAt": "2008-02-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b76d1ae6-ad1d-4bac-b4c3-2e03e0e84d9b",
   "name": "Bayou",
   "manaCost": "",
@@ -20674,6 +20705,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "88188cc1-3211-4bf8-a591-613b66192695",
+  "name": "Kodama of the Center Tree",
+  "manaCost": "{4}{G}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Spirit",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit"
+  ],
+  "oracleText": "Kodama of the Center Tree's power and toughness are each equal to the number of Spirits you control.\nKodama of the Center Tree has soulshift X, where X is the number of Spirits you control. (When this creature dies, you may return target Spirit card with mana value X or less from your graveyard to your hand.)",
+  "power": "*",
+  "toughness": "*",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bok",
+  "releasedAt": "2005-02-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d69b1e68-8d8e-460b-9eb4-6a68be886197",
   "name": "Kodama of the West Tree",
   "manaCost": "{2}{G}",
@@ -21784,6 +21847,34 @@
   "set": "snc",
   "releasedAt": "2022-04-29",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4669926b-93f9-4d80-aee3-492fbf8e0a0a",
+  "name": "Light Up the Night",
+  "manaCost": "{X}{R}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Light Up the Night deals X damage to any target. It deals X plus 1 damage instead if that target is a creature or planeswalker.\nFlashback—{3}{R}, Remove X loyalty counters from among planeswalkers you control. If you cast this spell this way, X can't be 0. (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flashback"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

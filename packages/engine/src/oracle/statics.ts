@@ -1601,6 +1601,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Sandstalker Moloch: "if an opponent cast a blue and/or black spell this turn", a spell of either color or both.
   if ((m = /^an opponent (?:has )?cast an? (white|blue|black|red|green)(?: (?:and\/)?or (white|blue|black|red|green))? spell this turn$/.exec(text)))
     return { kind: "opponentCast", colors: [COLOR_WORDS[m[1]!]!, ...(m[2] ? [COLOR_WORDS[m[2]]!] : [])] };
+  // Refraction Trap: "if an opponent cast a red instant or sorcery spell this turn": red, and an instant or a sorcery, as
+  // it was cast (castThisTurn).
+  if ((m = /^an opponent cast an? (white|blue|black|red|green) instant or sorcery spell this turn$/.exec(text))) return { kind: "opponentCast", colors: [COLOR_WORDS[m[1]!]!], types: ["Instant", "Sorcery"] };
   if ((m = /^you have no (land|creature|artifact|enchantment|instant|sorcery|planeswalker) cards in hand$/.exec(text))) return { kind: "noneInHand", filter: { kind: "card", types: [capital(m[1]!)], text: `${m[1]} card` } };
   if ((m = new RegExp(`^an opponent was dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "opponentDealtDamage", n: num(m[1]!) };
   if ((m = new RegExp(`^you were dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "opponentDealtDamage", n: num(m[1]!), you: true };

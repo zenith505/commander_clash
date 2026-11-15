@@ -541,6 +541,8 @@ interface ShieldPlan {
   destroyed?: ObjectId[];
   /** Weeping Angel: the permanents shuffled into their owners' libraries once the damage is dealt, filled in as the plan is committed. */
   shuffled?: { id: ObjectId; zc: number; card: string; by: PlayerId }[];
+  /** Channel Harm: the rules (by id) whose controller chose not to have them deal the damage they prevented (DamageRule.dealToMay). */
+  declined?: string[];
 }
 
 /** One of the shields around a permanent or player, as the planner sees it. */
@@ -1310,6 +1312,31 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     for (const [i, e] of incoming.entries()) if (left[i]! > 0) final.push({ ...e, n: left[i]! });
   }
   if (ask) return { ask, ops, final, used: next };
+  // Channel Harm: "If damage is prevented this way, you may have ~ deal that much damage to target creature": its
+  // controller chooses once the damage it prevents in this event is known (rulings). A bot declines when the creature's
+  // controller would prevent that damage the same way and deal it back (the loop the rulings describe, which either
+  // player may break).
+  const declined: string[] = [];
+  const prevented = new Map<string, number>();
+  for (const op of ops) {
+    if (op.kind !== "preventAll" && op.kind !== "prevent") continue;
+    const r0 = op.rule ? allRules.find((x) => x.id === op.rule) : undefined;
+    const r = r0?.base ? (allRules.find((x) => x.id === r0.base) ?? r0) : r0;
+    const n = op.n ?? 0;
+    if (r?.dealTo && r.dealToMay && n > 0 && op.src) prevented.set(r.id, (prevented.get(r.id) ?? 0) + n);
+  }
+  for (const [id, n] of prevented) {
+    const r = allRules.find((x) => x.id === id)!;
+    const to: Rec = "player" in r.dealTo! ? { player: r.dealTo.player } : { object: r.dealTo!.object };
+    const there = "object" in to ? s.objects[to.object]?.zone === "battlefield" && (s.objects[to.object]!.zoneChanges ?? 0) === (r.dealTo as { zc: number }).zc : !player(s, to.player).lost;
+    if (!there) continue;
+    const back = allRules.some((x) => x !== r && x.dealTo && x.dealToMay && x.controller === chooserOf(to) && ruleCovers(s, x, to));
+    const labels = [`Deal ${n} damage to ${nameOf(to)}`, "Don't deal it"];
+    const order = back ? [1, 0] : [0, 1];
+    const i = choose({ player: r.controller, prompt: `${cardName(s, r)}: ${n} damage was prevented. Deal that much damage to ${nameOf(to)}?`, labels: order.map((k) => labels[k]!) });
+    if (i === null) return { ask, ops, final, used: next };
+    if (order[i] === 1) declined.push(id);
+  }
   // One amount per source and permanent or player: damage redirected back to where it came from adds up.
   const out = new Map<string, DamageEvent>();
   for (const e of final) {
@@ -1318,7 +1345,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     if (m) m.n += e.n;
     else out.set(k, { src: e.src, to: e.to, n: e.n, ...(e.combat ? { combat: true } : {}) });
   }
-  return { ops, final: [...out.values()], used: next, rules: allRules };
+  return { ops, final: [...out.values()], used: next, rules: allRules, ...(declined.length ? { declined } : {}) };
 }
 
 /**
@@ -1432,8 +1459,10 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     // Sacred Boon's end step counters count it up for then.
     if (r.countersOn?.tally) (s.preventedTally ??= {})[r.id] = (s.preventedTally?.[r.id] ?? 0) + n;
     else if (r.countersOn && r.to?.object) ruleCountersLater.push({ ...r.to.object, counter: r.countersOn.counter, n, by: r.controller, card: cardName(s, r) });
-    // Vengeful Archon deals that much damage to the target fixed as it resolved, right after (rulings).
-    if (r.dealTo) back.push({ cardId: r.cardId, controller: r.controller, to: "player" in r.dealTo ? r.dealTo.player : r.controller, n, ...("object" in r.dealTo ? { toObject: r.dealTo } : {}) });
+    // Vengeful Archon deals that much damage to the target fixed as it resolved, right after (rulings): all it prevented
+    // in this damage event, as one amount ("Then Vengeful Archon deals its damage", rulings). Channel Harm: only if its
+    // controller chose to (planShields).
+    if (r.dealTo && !plan.declined?.includes(r.id)) dealToLater.set(r.id, { r, n: (dealToLater.get(r.id)?.n ?? 0) + n });
     // New Way Forward: one reflexive trigger for all it prevented in this event (CR 603.12), about that source.
     if (r.reflect) {
       const was = ruleReflectLater.get(r.id);
@@ -1441,6 +1470,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     }
   };
   const ruleReflectLater = new Map<string, { r: DamageRule; n: number; src: DamageSource }>();
+  const dealToLater = new Map<string, { r: DamageRule; n: number }>();
   const ruleCountersLater: { id: ObjectId; zc: number; counter: string; n: number; by: PlayerId; card: string }[] = [];
   // Vigor's +1/+1 counters, put once the damage is prevented.
   const plusOnesLater: { id: ObjectId; n: number; by: PlayerId }[] = [];
@@ -1549,6 +1579,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
       log(s, `${op.n} damage from ${op.srcName} to ${op.fromName} is dealt to ${op.toName} instead (${op.card}).`);
     }
   }
+  for (const { r, n } of dealToLater.values()) if (n > 0 && r.dealTo) back.push({ cardId: r.cardId, controller: r.controller, to: "player" in r.dealTo ? r.dealTo.player : r.controller, n, ...("object" in r.dealTo ? { toObject: r.dealTo } : {}) });
   for (const { pid, n } of gains.values()) if (n > 0) gainLife(s, pid, n);
   for (const { id, n, by } of plusOnesLater) {
     const o = obj(s, id);

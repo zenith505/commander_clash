@@ -45,6 +45,7 @@ import {
   attackLifeCost,
   attackYouLimit,
   attackAllIfOne,
+  attackRequirementImprovement,
   attackWithOneOptions,
   attackWithOneRequired,
   combatLimit,
@@ -255,7 +256,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const bin = wantOnTop(s, pid, a) && !wantOnTop(s, pid, b) ? b : !wantOnTop(s, pid, a) && wantOnTop(s, pid, b) ? a : mv(s, a) >= mv(s, b) ? b : a;
       return [{ type: "drawLook", player: pid, objectId: bin }];
     }
-    // Out of the Tombs: the creature card that costs the most comes back.
+    // Out of the Tombs: the creature card that costs the most comes back; Forbidden Crypt: the card that costs the most.
     if (pend.kind === "drawEmptyReturn") return [{ type: "drawEmptyReturn", player: pid, objectId: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a))[0]! }];
     if (pend.kind === "drawInstead") {
       // Its own Words before an opponent's Urabrask; the life when it's low, otherwise the token.
@@ -275,7 +276,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const shelter = sanctuary && !player(s, pid).attackOnlyByUntil && grounded(abilitiesOf(s, s.objects[sanctuary.slice("mayskip:".length)]!).drawStepMaySkip!.attackOnlyBy) * 2 >= player(s, pid).life ? sanctuary : undefined;
       const skip = shelter ?? (player(s, pid).library.length <= 5 ? has("mayskip") : undefined);
       const declinable = (k: string) => k === "thief" || /^(?:dredge|mayskip|counter):/.test(k);
-      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("archive") ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? pend.options.find((k) => !declinable(k)) ?? pend.options[0]!;
+      // Forbidden Crypt with an empty graveyard loses the game: anything else first.
+      const loses = (k: string) => k.startsWith("crypt:") && !player(s, pid).graveyard.length;
+      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("archive") ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? pend.options.find((k) => !declinable(k) && !loses(k)) ?? pend.options.find((k) => !loses(k)) ?? pend.options[0]!;
       return [{ type: "drawInstead", player: pid, choice: pick }];
     }
     if (pend.kind === "dredge") {
@@ -298,6 +301,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Pardic Dragon: "that player may put a time counter on ~": an opponent's suspended card, kept from being cast longer.
     const theirMay = pend.kind === "chooseMay" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
     // Disorienting Choice: our permanent exiled, or a land for its caster: only a token goes (a Treasure, a Clue).
+    // Spirit-Sister's Call (round B220): only for a permanent sharing a card type that costs less than the card coming back (a
+    // token nothing), never the card's own worth or more.
+    const kinPick = pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.effects.length === 1 && theirMay.effects[0]!.type === "pick" ? theirMay.effects[0]! : undefined;
+    if (kinPick?.type === "pick" && kinPick.sharesCardTypeWithTarget !== undefined) {
+      const t = s.resolving!.item.targets?.[kinPick.sharesCardTypeWithTarget];
+      const back = t?.kind === "object" ? s.objects[t.id] : undefined;
+      const c = back ? characteristics(s, back) : undefined;
+      const cheaper = !!c && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && characteristics(s, obj(s, id)).types.some((ty) => c.types.includes(ty)) && (obj(s, id).isToken ? 0 : characteristics(s, obj(s, id)).manaValue) < c.manaValue);
+      return [{ type: "chooseMay", player: pid, yes: cheaper }];
+    }
     if (pend.kind === "chooseMay" && theirMay?.type === "controllersMayExile") {
       const asked = s.resolving!.scratch?.mayExile?.queue[0];
       const o = asked ? s.objects[asked.id] : undefined;
@@ -325,6 +338,22 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && s.resolving!.item.controller !== pid && theirMay.effects.length === 1 && theirMay.effects[0]!.type === "revealedTo") {
       const lib = player(s, s.resolving!.item.controller).library.length - (s.resolving!.revealedUntil?.length ?? 0);
       return [{ type: "chooseMay", player: pid, yes: lib >= 5 }];
+    }
+    // Curse of the Cabal (round B216): another player's suspended Curse waits two more turns for one of our permanents while
+    // we have plenty (it would take half of them); our own we let come.
+    if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && theirMay.effects.length === 1 && theirMay.effects[0]!.type === "pick" && theirMay.effects[0]!.action === "sacrifice" && s.resolving!.body.effects[s.resolving!.next + 1]?.type === "if") {
+      const mine = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid).length;
+      return [{ type: "chooseMay", player: pid, yes: s.resolving!.item.controller !== pid && mine >= 5 }];
+    }
+    // Forbidden Ritual (round B216): another pass while we keep plenty of nontoken permanents.
+    if (pend.kind === "chooseMay" && pend.repeat && theirMay?.type === "repeatMaySteps") {
+      const mine = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !obj(s, id).isToken).length;
+      return [{ type: "chooseMay", player: pid, yes: mine >= 8 }];
+    }
+    // Preferred Selection (round B216): the enchantment and four mana for one of the two cards only with an empty hand.
+    if (pend.kind === "chooseMay" && pend.pay?.mana && theirMay?.type === "lookTopMaySacrificePay") {
+      const taps = planMana(s, pid, parseManaCost(pend.pay.mana));
+      return taps && player(s, pid).hand.length === 0 ? [...taps, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
     }
     if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && s.resolving!.item.controller !== pid)
       return [{ type: "chooseMay", player: pid, yes: theirMay.effects.every((x) => x.type === "counters" && x.counter === "time" && x.what.ref === "selfCard") }];
@@ -888,6 +917,31 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const g = good(obj(s, pend.about));
         return [{ type: "chooseOption", player: pid, choice: g.includes("+1/+1") ? "+1/+1" : g.find((k) => pend.options.includes(k)) ?? pend.options[0]! }];
       }
+    }
+    // Equipoise (round B222): the other player's best permanents of that type phase out.
+    const excess = pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    if (pend.kind === "pickPermanents" && excess?.type === "phaseOutExcess") return [{ type: "pickPermanents", player: pid, ids: [...pend.options].sort((x, y) => worth(s, pid, obj(s, y)) - worth(s, pid, obj(s, x))).slice(0, pend.count) }];
+    // Cultural Exchange (round B220): as one of the two players, our least creatures for the other's best, one pair at a time
+    // while what we get is worth more than what we give; as neither, nothing.
+    const swap = pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    if (pend.kind === "pickPermanents" && swap?.type === "exchangeGroups") {
+      const playerAt = (ref: PlayerRef) => ((t) => (t?.kind === "player" ? t.id : undefined))(ref.ref === "target" ? s.resolving!.item.targets?.[ref.index ?? 0] : undefined);
+      const [a, b] = [playerAt(swap.a), playerAt(swap.b)];
+      const val = (id: ObjectId) => worth(s, pid, obj(s, id));
+      const ofPlayer = (p?: PlayerId) => s.battlefield.filter((id) => objIsType(s, obj(s, id), "Creature") && controllerOf(s, obj(s, id)) === p);
+      const firstPick = pend.min === 0;
+      const ours = a === pid ? "a" : b === pid ? "b" : undefined;
+      if (firstPick) {
+        if (!ours) return [{ type: "pickPermanents", player: pid, ids: [] }];
+        const mine = [...ofPlayer(pid)].sort((x, y) => val(x) - val(y));
+        const theirs = [...ofPlayer(ours === "a" ? b : a)].sort((x, y) => val(y) - val(x));
+        let k = 0;
+        while (k < pend.count && k < mine.length && k < theirs.length && val(theirs[k]!) > val(mine[k]!)) k++;
+        const picks = ours === "a" ? mine.slice(0, k) : theirs.slice(0, k);
+        return [{ type: "pickPermanents", player: pid, ids: picks.filter((id) => pend.options.includes(id)) }];
+      }
+      const order = [...pend.options].sort((x, y) => (ours === "b" ? val(x) - val(y) : val(y) - val(x)));
+      return [{ type: "pickPermanents", player: pid, ids: order.slice(0, pend.count) }];
     }
     // Fortunate Few: we can't spare our own, so we spare the least of the others' permanents.
     if (pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving?.body.effects[s.resolving.next]?.type === "othersChooseDestroyRest")
@@ -1945,6 +1999,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Liar's Pendulum: a deck is singleton (CR 903.5b), so a named card (other than a basic land) seen anywhere outside the
     // namer's hand isn't in it; otherwise we expect them to have named a card they hold. Only public information is used.
     // Liberated Livestock (round B208): the costliest Aura that helps a creature of ours, else none.
+    // Preferred Selection (round B216): the card we'd rather draw into our hand, the other one to the bottom.
+    if (pend.kind === "chooseOption" && pend.what === "lookedCard") {
+      const toHand = /into your hand/.test(pend.prompt ?? "");
+      const want = pend.options.filter((o) => wantOnTop(s, pid, o));
+      const rest = pend.options.filter((o) => !want.includes(o));
+      return [{ type: "chooseOption", player: pid, choice: (toHand ? (want[0] ?? rest[0]) : (rest[0] ?? want[0]))! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "auraForToken") {
       const best = pend.options.filter((o) => o !== "none" && auraHelps(defOf(s, obj(s, o)))).sort((a, b) => mv(s, b) - mv(s, a))[0];
       return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
@@ -3282,6 +3343,16 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     if (forced) return pick ? [pick] : null;
     return pick && s.activePlayer === pid && s.step === "main1" && army(pick.id) > army(pid) + 3 ? [pick] : null;
   }
+  // Equipoise (round B222): the opponent with the most permanents beyond ours, of the types in turn (a mandatory trigger).
+  if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "phaseOutExcess") {
+    const types = body.effects[0]!.types;
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const count = (who: PlayerId, type: string) => s.battlefield.filter((id) => objIsType(s, obj(s, id), type) && controllerOf(s, obj(s, id)) === who).length;
+    const excess = (them: PlayerId) => types.reduce((n, type) => n + Math.max(0, count(them, type) - count(pid, type)), 0);
+    const ranked = all.filter((t): t is Extract<TargetChoice, { kind: "player" }> => t.kind === "player" && t.id !== pid).sort((a, b) => excess(b.id) - excess(a.id));
+    const pick = ranked[0] ?? all[0];
+    return pick ? [pick] : null;
+  }
   // Juxtapose: the opponent whose greatest mana value creature and artifact are worth the most more than ours.
   if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "juxtapose") {
     const types = body.effects[0]!.types;
@@ -3820,6 +3891,10 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "flipCoinEachWon") && !s.battlefield.some((b) => (obj(s, b).blocking ?? []).some((a) => s.objects[a] && controllerOf(s, obj(s, a)) === pid))) return null;
   // Stunning Reversal: kept for when our life is low enough that we might lose this turn.
   if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "loseInsteadThisTurn") && player(s, pid).life > 5) return null;
+  // Terminal Velocity (round B221): the permanent it puts from our hand is sacrificed at our end step and its damage hits our
+  // creatures too; bots have no plan for that, so they don't cast it.
+  const spellFx = compileCard(d).spell?.effects ?? [];
+  if (spellFx.some((e) => e.type === "putFromHand") && spellFx.some((e) => e.type === "continuous" && e.what.ref === "created" && e.mods.some((m) => m.kind === "addAbility" && /^At the beginning of your end step, sacrifice ~\.$/.test(m.text)))) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
@@ -8714,6 +8789,18 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
       return other === undefined ? [] : [{ attacker: a.attacker, defender: other }];
     });
   }
+  // Trove of Temptation: one change at a time that obeys more of the requirements on this attack (CR 508.1d), until none
+  // does; each such change only moves a creature that attacks without a cost.
+  const obey = (decl: typeof declared) => {
+    for (let i = 0; i < 64; i++) {
+      const r = attackRequirementImprovement(s, pid, decl);
+      if (!r) break;
+      decl = r.attacks;
+    }
+    return decl;
+  };
+  declared = obey(declared);
+  let rounds = 0;
   // Ghostly Prison: pay what attacking costs if we can (CR 508.1g-i); otherwise send the weakest taxed attacker at
   // someone it costs nothing to attack, or keep it home. Nothing obliges paying for a requirement (CR 508.1d).
   for (;;) {
@@ -8726,6 +8813,11 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
     if (taps && (!lifeTax || (payableLife(s, pid) >= lifeTax && player(s, pid).life - lifeTax - 2 * symbols > 10))) {
       if (declared.length === 1 && characteristics(s, obj(s, declared[0]!.attacker)).cantAttackAlone) declared = [];
       if (declared.some((a) => withoutCompany(s, a.attacker, declared))) declared = declared.filter((a) => !withoutCompany(s, a.attacker, declared));
+      const obeyed = rounds++ < 8 ? obey(declared) : declared;
+      if (obeyed !== declared) {
+        declared = obeyed;
+        continue;
+      }
       return [...(declared.length ? taps : []), { type: "declareAttackers", player: pid, attacks: declared }];
     }
     const taxed = declared.filter((a) => attackTaxOf(s, a)).sort((a, b) => power(s, obj(s, a.attacker)) - power(s, obj(s, b.attacker)))[0]!;

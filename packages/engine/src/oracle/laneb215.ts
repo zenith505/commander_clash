@@ -2,6 +2,7 @@
 // whole spells (chained from round B213's).
 import type { AbilityBody, CompiledCard, Effect, TargetSpec } from "../abilities";
 import { parseBody } from "./body";
+import { roundB216Spell } from "./laneb216";
 import { parseTrigger } from "./triggers";
 
 /** A trigger line read the usual way, or null. */
@@ -54,5 +55,5 @@ export function roundB215Spell(text: string): AbilityBody | null | undefined {
     const filter: TargetSpec = { kind: "object", types: ["Land"], notTypes: [], notColors: [], text: "land" };
     return { targets: [], effects: [{ type: "eachLandUnlessAnyPaysLife", filter, life: 1 }], text };
   }
-  return undefined;
+  return roundB216Spell(text);
 }

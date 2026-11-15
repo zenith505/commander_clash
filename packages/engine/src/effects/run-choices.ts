@@ -643,7 +643,9 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // "That amount of excess damage" (Unleash the Inferno): the excess this spell dealt, its X (CR 603.12).
         // "You may pay {X}. When you do, ..." (Electro): the X paid, which the "may" put in ctx.
         // "Up to that many target creatures" after "you may sacrifice one or more Treasures" (Swashbuckler Extraordinaire).
-        ...(e.xAmount ? { x: Math.max(0, amountNow(s, e.xAmount, ctx)) } : e.xDiscardedMv ? { x: ((id) => (id && s.objects[id] ? characteristics(s, s.objects[id]!).manaValue : 0))((s.resolving!.discardedAll ?? []).at(-1)) } : e.xDiscardedTypes ? { x: new Set((s.resolving!.discardedAll ?? []).flatMap((id) => (s.objects[id] ? defOf(s, s.objects[id]!).types : []))).size } : e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : e.xSacrificed ? { x: s.resolving!.sacrificedThisWay?.length ?? 0 } : e.xDiscarded ? { x: s.resolving!.discardedAll?.length ?? 0 } : e.xRevealedMv ? { x: s.resolving!.revealedUntilMv ?? 0 } : exiled ? { x: characteristics(s, exiled).manaValue } : ctx.x || item.x ? { x: ctx.x || item.x } : {}),
+        // Jailbreak (round B220): "with equal or lesser mana value" than the permanent put onto the battlefield this way, as it
+        // is there now (CR 202.3).
+        ...(e.xPutMv ? { x: put?.[0] && s.objects[put[0].id] ? characteristics(s, s.objects[put[0].id]!).manaValue : 0 } : e.xAmount ? { x: Math.max(0, amountNow(s, e.xAmount, ctx)) } : e.xDiscardedMv ? { x: ((id) => (id && s.objects[id] ? characteristics(s, s.objects[id]!).manaValue : 0))((s.resolving!.discardedAll ?? []).at(-1)) } : e.xDiscardedTypes ? { x: new Set((s.resolving!.discardedAll ?? []).flatMap((id) => (s.objects[id] ? defOf(s, s.objects[id]!).types : []))).size } : e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : e.xSacrificed ? { x: s.resolving!.sacrificedThisWay?.length ?? 0 } : e.xDiscarded ? { x: s.resolving!.discardedAll?.length ?? 0 } : e.xRevealedMv ? { x: s.resolving!.revealedUntilMv ?? 0 } : exiled ? { x: characteristics(s, exiled).manaValue } : ctx.x || item.x ? { x: ctx.x || item.x } : {}),
         ...(s.resolving!.rolled ? { rolled: s.resolving!.rolled.result } : {}),
         ...(s.resolving!.revealedFromHand !== undefined ? { revealed: s.resolving!.revealedFromHand } : {}),
         ...(s.resolving!.tappedThisWay !== undefined ? { tapped: s.resolving!.tappedThisWay } : {}),
@@ -1129,7 +1131,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
                 return defOf(s, card).types.some((t) => types.includes(t));
               })(s.resolving!.revealed)
             : e.cond.kind === "targetExiled"
-            ? ((t) => !!t && t.kind === "object" && !!ctx.legal[e.cond.index] && s.objects[t.id]?.zone === "exile" && (s.objects[t.id]!.zoneChanges ?? 0) === (t.zc ?? 0) + 1)(ctx.targets[e.cond.index])
+            ? ((t) => !!t && t.kind === "object" && !!ctx.legal[e.cond.index] && s.objects[t.id]?.zone === ((e.cond as { to?: "library" }).to ?? "exile") && (s.objects[t.id]!.zoneChanges ?? 0) === (t.zc ?? 0) + 1)(ctx.targets[e.cond.index])
             : e.cond.kind === "revealedMv"
             ? revealedMv(s) === amountNow(s, e.cond.mv, ctx)
             : e.cond.kind === "createdNone"
@@ -1523,6 +1525,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     // "You may gain 1 life for each creature card in your graveyard. If you do, ..." (Skyfisher Spider): gaining no life,
     // or life that can't be gained, isn't gaining life (CR 119.7, 119.9).
     if (e.type === "gainLife" && e.who.ref === "you" && (!canGainLife(s, ctx.controller) || amountNow(s, e.n, ctx) <= 0)) return false;
+    // Curse of the Cabal (round B216): "that player may sacrifice a permanent of their choice": not with none to sacrifice.
+    if (e.type === "pick" && e.action === "sacrifice" && e.who.ref === "eventPlayer" && ctx.event?.player !== undefined && !pickOptions(s, e, ctx.event.player).length) return false;
     // Sigarda, Host of Herons: an opponent's spell or ability can't give its controller the option (rulings).
     if (e.type === "sacrifice" && !objects(s, e.what, ctx).some((o) => (e.byController || controllerOf(s, o) === ctx.controller) && canBeSacrificed(s, o))) return false;
     if (e.type === "exile" && (e.what.ref === "selfCard" || e.what.ref === "subjectCard") && !objects(s, e.what, ctx).length) return false;

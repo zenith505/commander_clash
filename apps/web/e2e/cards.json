@@ -655,6 +655,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dfb5f660-fd8b-4b7b-934c-6a71cd182f15",
+  "name": "Ajani Goldmane",
+  "manaCost": "{2}{W}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Ajani",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Ajani"
+  ],
+  "oracleText": "+1: You gain 2 life.\n−1: Put a +1/+1 counter on each creature you control. Those creatures gain vigilance until end of turn.\n−6: Create a white Avatar creature token. It has \"This token's power and toughness are each equal to your life total.\"",
+  "loyalty": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lrw",
+  "releasedAt": "2007-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c03ae426-2536-4c20-a73a-a24e816f76b0",
   "name": "Akiri, Fearless Voyager",
   "manaCost": "{1}{R}{W}",
@@ -5845,6 +5876,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "de14f6a9-1c62-42e9-b174-3e8b1080e0dc",
+  "name": "Callous Oppressor",
+  "manaCost": "{1}{U}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Octopus",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Octopus"
+  ],
+  "oracleText": "You may choose not to untap this creature during your untap step.\nAs this creature enters, an opponent chooses a creature type.\n{T}: Gain control of target creature that isn't of the chosen type for as long as this creature remains tapped.",
+  "power": "1",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "312c7a7b-2084-42b0-9b13-0a6d3e43a73d",
   "name": "Camellia, the Seedmiser",
   "manaCost": "{1}{B}{G}",
@@ -6298,6 +6359,38 @@
   "set": "mic",
   "releasedAt": "2021-09-24",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "85e9a43e-5676-4d12-ac27-e8cf57307d5e",
+  "name": "Cemetery Desecrator",
+  "manaCost": "{4}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Creature — Zombie",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie"
+  ],
+  "oracleText": "Menace\nWhen this creature enters or dies, exile another card from a graveyard. When you do, choose one —\n• Remove X counters from target permanent, where X is the mana value of the exiled card.\n• Target creature an opponent controls gets -X/-X until end of turn, where X is the mana value of the exiled card.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -7913,6 +8006,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fb1bd39c-c870-4f63-9e4f-32c94ac46555",
+  "name": "Conundrum Sphinx",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Sphinx",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx"
+  ],
+  "oracleText": "Flying\nWhenever this creature attacks, each player chooses a card name. Then each player reveals the top card of their library. If the card a player revealed has the name they chose, that player puts it into their hand. If it doesn't, that player puts it on the bottom of their library.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "m11",
+  "releasedAt": "2010-07-16",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "685c4665-e04c-4012-aa5b-888a042c2a21",
   "name": "Convincing Mirage",
   "manaCost": "{1}{U}",
@@ -8591,6 +8716,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c85ba59f-2851-4c75-86db-da798334850c",
+  "name": "Cultural Exchange",
+  "manaCost": "{4}{U}{U}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose any number of creatures target player controls. Choose the same number of creatures another target player controls. Those players exchange control of those creatures. (This effect lasts indefinitely.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ody",
+  "releasedAt": "2001-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4f94ce97-5b2d-42fb-ac8e-c64075fe1af2",
   "name": "Cunning Giant",
   "manaCost": "{5}{R}",
@@ -8829,6 +8980,34 @@
   "set": "isd",
   "releasedAt": "2011-09-30",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cafede0d-aa14-4266-b619-321ac756262d",
+  "name": "Curse of the Cabal",
+  "manaCost": "{9}{B}",
+  "cmc": 10,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target player sacrifices half the permanents they control of their choice, rounded down.\nSuspend 2—{2}{B}{B} (Rather than cast this card from your hand, you may pay {2}{B}{B} and exile it with two time counters on it. At the beginning of your upkeep, remove a time counter. When the last is removed, you may cast it without paying its mana cost.)\nAt the beginning of each player's upkeep, if this card is suspended, that player may sacrifice a permanent of their choice. If the player does, put two time counters on this card.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Suspend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -11045,6 +11224,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d06ef178-f02a-45a4-8193-140dee52c99d",
+  "name": "Dreamshaper Shaman",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Enchantment Creature — Minotaur Shaman",
+  "supertypes": [],
+  "types": [
+   "Enchantment",
+   "Creature"
+  ],
+  "subtypes": [
+   "Minotaur",
+   "Shaman"
+  ],
+  "oracleText": "At the beginning of your end step, you may pay {2}{R} and sacrifice a nonland permanent. If you do, reveal cards from the top of your library until you reveal a nonland permanent card. Put that card onto the battlefield and the rest on the bottom of your library in a random order.",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "thb",
+  "releasedAt": "2020-01-24",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "383e9005-5869-4d1d-917d-30e5f214fbd9",
   "name": "Drop of Honey",
   "manaCost": "{G}",
@@ -11554,6 +11765,41 @@
   "set": "mh3",
   "releasedAt": "2024-06-14",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "dfc45c58-821c-42f3-ab48-05b912748bdf",
+  "name": "Elemental Expressionist",
+  "manaCost": "{U/R}{U/R}{U/R}{U/R}",
+  "cmc": 4,
+  "typeLine": "Creature — Orc Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Orc",
+   "Wizard"
+  ],
+  "oracleText": "Magecraft — Whenever you cast or copy an instant or sorcery spell, choose target creature you control. Until end of turn, it gains \"If this creature would leave the battlefield, exile it instead of putting it anywhere else\" and \"When this creature is put into exile, create a 4/4 blue and red Elemental creature token.\" (Each instance of that ability triggers separately.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Magecraft"
+  ],
+  "commanderLegal": "legal",
+  "set": "stx",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -12232,6 +12478,32 @@
   "commanderLegal": "legal",
   "set": "5dn",
   "releasedAt": "2004-06-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "aab905ef-b945-4523-b26f-fb5e6932bb56",
+  "name": "Equipoise",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, for each land target player controls in excess of the number you control, choose a land that player controls, then the chosen permanents phase out. Repeat this process for artifacts and creatures. (While they're phased out, they're treated as though they don't exist. They phase in before that player untaps during their next untap step.)",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "vis",
+  "releasedAt": "1997-02-03",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -13786,6 +14058,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cae6d903-3fd6-422d-b21b-92201b78fa1b",
+  "name": "Fervent Mastery",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "You may pay {2}{R}{R} rather than pay this spell's mana cost.\nIf the {2}{R}{R} cost was paid, an opponent discards any number of cards, then draws that many cards.\nSearch your library for up to three cards, put them into your hand, shuffle, then discard three cards at random.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "stx",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f825c98f-a327-440b-8c0d-ebe02e23bfb7",
   "name": "Field of Ruin",
   "manaCost": "",
@@ -14359,6 +14657,58 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8b34b211-985b-4934-bb3b-8e6672685ac2",
+  "name": "Forbidden Crypt",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If you would draw a card, return a card from your graveyard to your hand instead. If you can't, you lose the game.\nIf a card would be put into your graveyard from anywhere, exile that card instead.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4b5d9c76-8be8-4e25-b978-9750df3d8c15",
+  "name": "Forbidden Ritual",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Sacrifice a nontoken permanent. If you do, target opponent loses 2 life unless that player sacrifices a permanent of their choice or discards a card. You may repeat this process any number of times.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "vis",
+  "releasedAt": "1997-02-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "956381ba-6d37-4a8a-846c-bad79222dbee",
   "name": "Force of Will",
   "manaCost": "{3}{U}{U}",
@@ -14689,6 +15039,41 @@
   "commanderLegal": "legal",
   "set": "j25",
   "releasedAt": "2024-11-15",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "af2b36ee-2945-41d3-a186-8fd28f3cde16",
+  "name": "Fugitive Codebreaker",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Creature — Goblin Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Rogue"
+  ],
+  "oracleText": "Prowess, haste\nDisguise {5}{R}. This cost is reduced by {1} for each instant and sorcery card in your graveyard. (You may cast this card face down for {3} as a 2/2 creature with ward {2}. Turn it face up any time for its disguise cost.)\nWhen this creature is turned face up, discard your hand, then draw three cards.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Prowess",
+   "Haste",
+   "Disguise"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -15086,6 +15471,37 @@
   "set": "fin",
   "releasedAt": "2025-06-13",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "184d4672-05a9-4182-8b3f-3561fb33ed62",
+  "name": "Garruk, Curse Breaker",
+  "manaCost": "{3}{G}{G}",
+  "cmc": 5,
+  "typeLine": "Legendary Planeswalker — Garruk",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Garruk"
+  ],
+  "oracleText": "Whenever a creature you control with power 4 or greater enters, draw a card.\n+2: Untap up to two target lands.\n−3: Create a 4/4 green Beast creature token with trample.\n−4: Until your next turn, whenever one or more creatures attack one of your opponents, those creatures get +2/+2 and gain trample until end of turn.",
+  "loyalty": "5",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fra",
+  "releasedAt": "2026-10-02",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -17794,6 +18210,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e2ee410f-2467-4f1f-84a0-8a79faedc0b3",
+  "name": "Heart of Kiran",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Legendary Artifact — Vehicle",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Vehicle"
+  ],
+  "oracleText": "Flying, vigilance\nCrew 3 (Tap any number of creatures you control with total power 3 or more: This Vehicle becomes an artifact creature until end of turn.)\nYou may remove a loyalty counter from a planeswalker you control rather than pay Heart of Kiran's crew cost.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Flying",
+   "Vigilance",
+   "Crew"
+  ],
+  "commanderLegal": "legal",
+  "set": "aer",
+  "releasedAt": "2017-01-20",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "20418984-bc6d-42e5-ada6-30b5281925c0",
   "name": "Heart-Shaped Herb",
   "manaCost": "{4}",
@@ -20022,6 +20470,32 @@
   "commanderLegal": "legal",
   "set": "acr",
   "releasedAt": "2024-07-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "169cf74a-07bf-4841-83f3-904df8a0a39b",
+  "name": "Jailbreak",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Return target permanent card in an opponent's graveyard to the battlefield under their control. When that permanent enters, return up to one target permanent card with equal or lesser mana value from your graveyard to the battlefield.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -23350,6 +23824,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fc8df5c8-fda6-454c-a1ac-21c6e3d75b9c",
+  "name": "Long Rest",
+  "manaCost": "{X}{G}{G}{G}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Return X target cards with different mana values from your graveyard to your hand. If eight or more cards were returned to your hand this way, your life total becomes equal to your starting life total. Exile Long Rest.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c65c4d01-29da-47e6-993c-a265cf1f198c",
   "name": "Long River Lurker",
   "manaCost": "{2}{U}",
@@ -25080,6 +25580,28 @@
   "commanderLegal": "legal",
   "set": "ltc",
   "releasedAt": "2023-06-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "38ffe614-e8f7-4625-b921-9409e7e7ee5b",
+  "name": "Mirror of Fate",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}, Sacrifice this artifact: Choose up to seven face-up exiled cards you own. Exile all the cards from your library, then put the chosen cards on top of your library.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m10",
+  "releasedAt": "2009-07-17",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -27383,6 +27905,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a9b345ea-3e34-48cf-8ab8-887c2b67df9c",
+  "name": "Nyxborn Courser",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment Creature — Centaur Scout",
+  "supertypes": [],
+  "types": [
+   "Enchantment",
+   "Creature"
+  ],
+  "subtypes": [
+   "Centaur",
+   "Scout"
+  ],
+  "oracleText": "",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "thb",
+  "releasedAt": "2020-01-24",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cf0dcb27-f02e-4065-81dc-75fbbb09ea3f",
   "name": "Oath of Druids",
   "manaCost": "{1}{G}",
@@ -29269,6 +29823,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4433a5fd-2daa-440a-b9cc-4ad028358cbc",
+  "name": "Phyrexian Splicer",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}, {T}, Choose flying, first strike, trample, or shadow: Until end of turn, target creature with the chosen ability loses it and another target creature gains it.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4f5a7b65-b7f4-4bad-acfd-35edfb8f86a7",
   "name": "Phytohydra",
   "manaCost": "{2}{G}{W}{W}",
@@ -29784,6 +30360,32 @@
   "set": "gpt",
   "releasedAt": "2006-02-03",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1d05d2d6-3ea1-4d8a-9f1c-6fc3f5e38ea9",
+  "name": "Preferred Selection",
+  "manaCost": "{2}{G}{G}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, look at the top two cards of your library. You may sacrifice this enchantment and pay {2}{G}{G}. If you do, put one of those cards into your hand. If you don't, put one of those cards on the bottom of your library.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -36520,6 +37122,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "83914a83-4de2-4d64-9770-f68a12014167",
+  "name": "Spirit-Sister's Call",
+  "manaCost": "{3}{W}{B}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your end step, choose target permanent card in your graveyard. You may sacrifice a permanent that shares a card type with the chosen card. If you do, return the chosen card from your graveyard to the battlefield and it gains \"If this permanent would leave the battlefield, exile it instead of putting it anywhere else.\"",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9ad61841-9894-41da-bdd8-248c2ce21b00",
   "name": "Split the Party",
   "manaCost": "{3}{U}{U}",
@@ -37189,6 +37819,32 @@
   "set": "thb",
   "releasedAt": "2020-01-24",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "94389047-4976-4be2-aaca-25dcdc538abe",
+  "name": "Storyweave",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose one —\n• Put two +1/+1 counters on target creature you control.\n• Put two lore counters on target Saga you control. The next time one or more enchantment creatures you control enter this turn, each enters with two additional +1/+1 counters on it.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -38724,6 +39380,32 @@
   "commanderLegal": "legal",
   "set": "snc",
   "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cdda2f04-d59e-4ef8-a26d-964d80750940",
+  "name": "Terminal Velocity",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "You may put an artifact or creature card from your hand onto the battlefield. That permanent gains haste, \"When this permanent leaves the battlefield, it deals damage equal to its mana value to each creature,\" and \"At the beginning of your end step, sacrifice this permanent.\"",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "eoe",
+  "releasedAt": "2025-08-01",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -40558,6 +41240,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a3f9126f-5797-4436-ac5c-c6911d22ffc2",
+  "name": "Time Reaper",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Creature — Alien Horror",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Alien",
+   "Horror"
+  ],
+  "oracleText": "Flying, haste\nConsume Anomaly — Whenever this creature deals combat damage to a player, put target face-up card they own in exile on the bottom of their library. If you do, you gain 3 life.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying",
+   "Consume Anomaly",
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3c307122-bc18-41f1-87d5-ae6b3ca9b8b9",
   "name": "Timeline Culler",
   "manaCost": "{B}{B}",
@@ -41504,6 +42221,41 @@
   "set": "fin",
   "releasedAt": "2025-06-13",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f624c0f1-1c09-4b7a-b140-11329f27e3c7",
+  "name": "Trove of Temptation",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Each opponent must attack you or a planeswalker you control with at least one creature each combat if able.\nAt the beginning of your end step, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Treasure"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "xln",
+  "releasedAt": "2017-09-29",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

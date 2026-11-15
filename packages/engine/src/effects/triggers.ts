@@ -949,7 +949,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       lastAbilities,
       undefined,
       undefined,
-      { counters: ev.counters, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) },
+      // Terminal Velocity's granted "it deals damage equal to its mana value" (round B221): its mana value then (CR 608.2h).
+      { counters: ev.counters, ...(ev.snapshot ? { manaValue: defMv(defOf(s, ev.snapshot)) } : {}), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) },
       lookBackX(lastAbilities.find((t) => t.event === "selfDies" && t.xLookBackSubtype)?.xLookBackSubtype),
     );
     // Zenos yae Galvus: "When the chosen creature leaves the battlefield": the permanent noted as it, that object (CR 400.7),
@@ -1798,12 +1799,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const want = ev.type === "groupAttack" ? "creaturesYouControlAttack" : "creaturesYouControlDealCombatDamageToPlayer";
     causedBy = { event: ev.type === "groupAttack" ? "attacks" : "combatDamage", objs: ev.ids.filter((x) => s.objects[x]).map((x) => ({ o: obj(s, x), controller: ev.controller })) };
     // `list`: a delayed trigger's own (Forth Eorlingas!), not the object's.
-    const groupWatch = (o: GameObject, anyone = false, list?: TriggeredAbility[]) => {
+    // `owner`: a delayed trigger's controller (CR 603.7e), whoever controls its source now.
+    const groupWatch = (o: GameObject, anyone = false, list?: TriggeredAbility[], owner?: PlayerId) => {
       // Only the creatures that match count ("one or more Rogues you control"): "that much" is what they dealt.
       const fits = (t: TriggeredAbility) =>
         // Any player's attack (Killian, Decisive Mentor: "creatures that are enchanted by an Aura you control"): "you" is
         // the watcher's controller.
-        ev.ids.map((x, i) => [x, i] as const).filter(([x]) => s.objects[x] && (!t.group || objectMatches(s, t.group, obj(s, x), anyone ? controllerOf(s, o) : ev.controller, false)) && (!t.selfOrCommander || x === o.id || (!!obj(s, x).isCommander && obj(s, x).owner === ev.controller)));
+        ev.ids.map((x, i) => [x, i] as const).filter(([x]) => s.objects[x] && (!t.group || objectMatches(s, t.group, obj(s, x), anyone ? (owner ?? controllerOf(s, o)) : ev.controller, false)) && (!t.selfOrCommander || x === o.id || (!!obj(s, x).isCommander && obj(s, x).owner === ev.controller)));
       for (const t of list ?? abilitiesOf(s, o).triggers) {
         if (t.event !== want || !!t.anyoneAttacks !== anyone) continue;
         if (t.anotherPlayer && controllerOf(s, o) === ev.controller) continue;
@@ -1828,7 +1830,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         }
         // "Whenever another player attacks": the attacking player, and how many of those creatures attack this one's
         // controller, as they were declared (rulings on Firemane Commando).
-        const watcher = controllerOf(s, o);
+        const watcher = owner ?? controllerOf(s, o);
         // Otherwise, "that many": how many of them attacked (The Ur-Dragon).
         // Any player's attack (Norn's Decree): "the attacking player".
         const attacked = t.anotherPlayer ? { player: ev.controller, amount: hit.filter(([x]) => obj(s, x).attacking === watcher && !obj(s, x).attackingPermanent).length } : ev.type === "groupAttack" && !anyone ? { amount: hit.length, group } : anyone ? { player: ev.controller, ...(ev.type === "groupAttack" ? { group } : {}) } : undefined;
@@ -1875,6 +1877,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever one or more creatures you control deal combat damage to one or more players this turn" (Forth Eorlingas!).
     // "Whenever you attack this turn" (Dalkovan Encampment): its controller's attacks.
     fromFloating((src, ctrl, triggers) => ctrl === ev.controller && groupWatch(src, false, triggers));
+    // Garruk, Curse Breaker's −4 (round B219): "Until your next turn, whenever one or more creatures attack one of your
+    // opponents": any player's attack, "your" being the delayed trigger's controller (CR 603.7e).
+    if (ev.type === "groupAttack") fromFloating((src, ctrl, triggers) => groupWatch(src, true, triggers, ctrl));
     // "Whenever an opponent attacks you with two or more creatures" (Mangara): each of the attacker's opponents counts
     // the ones attacking them (and their planeswalkers, for Mangara).
     if (ev.type === "groupAttack") {

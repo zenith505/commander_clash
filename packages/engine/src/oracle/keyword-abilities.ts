@@ -361,6 +361,8 @@ export function parseCostKeyword(
     if (!cost || !["payLife", "discard", "reveal", "sacrifice", "returnToHand"].includes(cost.kind) || ("x" in cost && cost.x) || (cost.kind === "discard" && cost.random) || (cost.kind === "reveal" && cost.orControl)) return "fail";
     return { faceDown: { kind: "morph", cost: "", costs: [cost], text } };
   }
+  // Fugitive Codebreaker's "Disguise {5}{R}. This cost is reduced by ..." is read with round B218's lines.
+  if (/^Disguise (?:\{[^}]+\})+\. This cost is reduced by /.test(line)) return null;
   if ((m = /^(Morph|Megamorph|Disguise)(?: |—)(.+?)\.?$/.exec(line))) {
     const cost = m[2]!;
     // "Disguise {X}{3}{W}", "Morph {X}{X}{R}": X chosen as it's turned face up (CR 107.3d), for its own abilities (702.37f, 702.168e).

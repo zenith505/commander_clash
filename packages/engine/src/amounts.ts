@@ -410,7 +410,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         // A characteristic-defining ability of the card's own applies in exile (CR 604.3; rulings on Phyrexian Ingester and
         // Sutured Ghoul: Dungrove Elder counts its owner's Forests there).
         const v = exiledCardPT(s, o, c.stat, ctx.view);
-        return ch.types.includes("Creature") ? n + (c.signed ? v : Math.max(0, v)) : n;
+        // Bishop of Binding: any card's power, a Vehicle's printed one too (rulings); a card with none adds 0.
+        return c.anyCard || ch.types.includes("Creature") ? n + (c.signed ? v : Math.max(0, v)) : n;
       }, 0);
     }
     case "movedLinkedThisWay":
@@ -577,8 +578,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const done = s.players[ctx.controller]?.completedDungeons ?? [];
       return c.distinct ? new Set(done).size : done.length;
     }
-    case "returnedToYourHand":
-      return (s.resolving?.returnedToHand ?? []).filter((id) => s.objects[id]?.zone === "hand" && s.objects[id]!.owner === ctx.controller).length;
+    case "returnedToYourHand": {
+      const back = (s.resolving?.returnedToHand ?? []).filter((id) => s.objects[id]?.zone === "hand" && s.objects[id]!.owner === ctx.controller);
+      return c.totalMv ? back.reduce((n, id) => n + defMv(defOf(s, s.objects[id]!)), 0) : back.length;
+    }
     case "milledManaValue": {
       // A milled card is found where it went, a graveyard or exile instead (Rest in Peace), as both are public (CR 701.17c);
       // with more than one card milled, their total (CR 701.17d).
@@ -1127,6 +1130,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         const left = c.of.ref === "self" && !ctx.lki && ctx.sourceId !== undefined && ctx.sourceZc !== undefined ? s.lastKnown?.[ctx.sourceId] : undefined;
         if (left && left.zc === ctx.sourceZc && c.kind !== "manaValue") return Math.max(0, left[c.kind]);
         if ((c.of.ref === "self" || c.of.ref === "subject") && c.kind !== "manaValue") return Math.max(0, ctx.lki?.[c.kind] ?? 0);
+        // Terminal Velocity's (round B221) "When this permanent leaves the battlefield, it deals damage equal to its mana value":
+        // as it last existed on the battlefield (rulings, CR 608.2h), an {X} in its cost as 0 (CR 202.3e).
+        if ((c.of.ref === "self" || c.of.ref === "subject") && c.kind === "manaValue" && ctx.lki?.manaValue !== undefined) return Math.max(0, ctx.lki.manaValue);
         // The amassed Army that has left: as it last existed (CR 608.2h).
         const a = c.of.ref === "amassed" ? (s.resolving?.amassed ?? s.resolving?.item.amassed) : undefined;
         const lk = a && s.lastKnown?.[a.id];
@@ -1567,7 +1573,7 @@ function describeCount(c: Count): string {
     case "dungeonsCompleted":
       return c.distinct ? "#differently named dungeons you've completed" : "#dungeons you've completed";
     case "returnedToYourHand":
-      return "#cards returned to your hand";
+      return c.totalMv ? "the total mana value of the cards returned to your hand" : "#cards returned to your hand";
     case "searchFoundMv":
       return "the mana value of the card found";
     case "milledManaValue":

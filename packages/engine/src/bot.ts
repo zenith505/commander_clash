@@ -1802,6 +1802,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // What an Aura entering without being cast enchants (CR 303.4f): one of ours if it only helps, an opponent's otherwise.
     if (pend.kind === "chooseOption" && pend.what === "enchant") {
+      // Nettlevine Blight (round B211): the Aura that will make us sacrifice what it's attached to, on our least worth
+      // creature or land.
+      if (s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "attachToChosen" && e.source.ref === "grantSource")) {
+        const least = pend.options.filter((x) => s.objects[x]?.zone === "battlefield").sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0];
+        return [{ type: "chooseOption", player: pid, choice: least ?? pend.options[0]! }];
+      }
       const waiting = s.untilReturns?.auras[0];
       const aura = waiting?.asking ? waiting.id : s.resolving?.scratch?.auraAsking;
       const best = aura && s.objects[aura] ? auraHostFor(s, s.objects[aura]!, pid, pend.options) : undefined;
@@ -2130,7 +2136,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   const dial = chooseEndTurnEscape(s, pid);
   if (dial) return dial;
-  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? choosePhaseAway(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? choosePhaseAway(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid) ?? choosePayEnchantedCost(s, pid);
   if (regen) return regen;
   const silencer = chooseSilencerFaceUp(s, pid);
   if (silencer) return silencer;
@@ -5863,6 +5869,13 @@ const edictsChosenType = (s: GameState) => !!s.resolving && allEffects(s.resolvi
 
 function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardDef | undefined, options: string[]): string {
   if (what === "parity") return chooseParity(s, pid, card);
+  // Call to Arms (round B211): a color that is the strict most common one among some opponent's nontoken permanents (it's
+  // sacrificed at once otherwise), white first since white creatures get +1/+1, then the one most opponents share.
+  if (what === "color" && card && JSON.stringify(compileCard(card).statics).includes('"chosenColorMostCommonOfChosen"')) {
+    const tops = opponents(s, pid).map((x) => strictMostCommonColor(s, x)).filter((x): x is Color => !!x);
+    const score = (name: string) => tops.filter((col) => COLOR_NAMES[col] === name).length * 2 + (name === COLOR_NAMES.W && tops.includes("W") ? 1 : 0);
+    return [...options].sort((a, b) => score(b) - score(a))[0]!;
+  }
   // Order of Succession: the direction whose next player has the best creature for us to take (someone takes ours
   // either way).
   if (what === "direction" && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "successionControl")) {
@@ -6003,7 +6016,9 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
   }
   // Protection from the chosen color is against what opponents have, above all the spell or ability
   // that's about to resolve against us.
-  const protects = !!c && what === "color" && (JSON.stringify(c).includes(CHOSEN_PROTECTION) || JSON.stringify(c).includes(CHOSEN_HEXPROOF));
+  // Prismatic Ward, Chromatic Armor (round B211): damage from sources of the chosen color is prevented, so the color of what
+  // opponents have, as for protection.
+  const protects = !!c && what === "color" && (JSON.stringify(c).includes(CHOSEN_PROTECTION) || JSON.stringify(c).includes(CHOSEN_HEXPROOF) || JSON.stringify(c.statics).includes('"fromChosenColor":true'));
   const hurts = protects || (c ? choiceHurts(c) : false);
   const tally = new Map<string, number>();
   const count = (name: string, n = 1) => options.includes(name) && tally.set(name, (tally.get(name) ?? 0) + n);
@@ -7075,6 +7090,28 @@ function pointlessAttach(s: GameState, body: AbilityBody, targets: TargetChoice[
  * empty: "only during your upkeep", "only during combat", "only if you've been attacked this step". Not at the beginning
  * of combat, before anyone attacks; damage prevention (Heavy Fog) only when enough damage is attacking us.
  */
+/**
+ * Merseine (round B211): "Pay enchanted creature's mana cost: Remove a net counter from ~", only for us as the creature's
+ * controller: at an opponent's end step with nothing on the stack, with mana that would otherwise go unused, until the
+ * counters are gone and the creature untaps again.
+ */
+function choosePayEnchantedCost(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.stack.length || s.step !== "end" || s.activePlayer === pid) return null;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
+    if (!host || host.zone !== "battlefield" || controllerOf(s, host) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      if (!ab.enchantedControllerOnly || !ab.body.effects.every((e) => e.type === "removeCounters" && e.what.ref === "self" && (o.counters[e.counter] ?? 0) > 0)) continue;
+      const plan = planActivate(s, pid, id, i);
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
 function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
   if (s.stack.length || s.step === "beginCombat") return null;
   for (const id of player(s, pid).hand) {
@@ -8749,8 +8786,22 @@ function orderOwnGraveyard(s: GameState, cards: ObjectId[]): ObjectId[] {
  * player's upkeep" trigger deals damage (Black Vise, The Rack): a score for each player, higher is better for us.
  * Undefined when the permanent's abilities don't depend on the chosen player that way.
  */
+/** Call to Arms (round B211): the color with more nontoken permanents of that color controlled by `x` than any other, if one has. */
+function strictMostCommonColor(s: GameState, x: PlayerId): Color | undefined {
+  const n: Partial<Record<Color, number>> = {};
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (o.isToken || controllerOf(s, o) !== x) continue;
+    for (const col of characteristics(s, o).colors) n[col] = (n[col] ?? 0) + 1;
+  }
+  const sorted = (Object.entries(n) as [Color, number][]).sort((a, b) => b[1] - a[1]);
+  return sorted[0] && (sorted.length === 1 || sorted[0][1] > sorted[1]![1]) ? sorted[0][0] : undefined;
+}
+
 function chosenPlayerScore(s: GameState, o: GameObject, pid: PlayerId): ((x: PlayerId) => number) | undefined {
   const c = compileCard(defOf(s, o));
+  // Call to Arms (round B211): an opponent whose strict most common color is the one chosen, or it's sacrificed at once.
+  if (JSON.stringify(c.statics).includes('"chosenColorMostCommonOfChosen"')) return (x) => (o.chosen?.color && strictMostCommonColor(s, x) === o.chosen.color ? 1 : 0);
   const asEvent = <T>(v: T): T => JSON.parse(JSON.stringify(v).replaceAll('{"ref":"selfChosenPlayer"}', '{"ref":"eventPlayer"}'));
   const pts = (c.statics ?? []).filter((st) => st.affects.kind === "self").flatMap((st) => st.mods).filter((m) => (m.kind === "modifyPT" || m.kind === "definePT") && JSON.stringify(m).includes('"selfChosenPlayer"'));
   const hurts = (c.triggers ?? []).filter((t) => t.chosenPlayersTurn).flatMap((t) => t.body.effects).filter((e) => e.type === "damage" && JSON.stringify(e.to) === '{"ref":"eventPlayer"}');

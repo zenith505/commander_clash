@@ -1387,6 +1387,22 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "mostCommonColor":
       return mostCommonColors(s, (id) => chars.get(id)).includes(cond.color);
+    case "chosenColorMostCommonOfChosen": {
+      // Call to Arms (round B211): the color and the opponent chosen as it entered (CR 614.12), whoever controls it now
+      // (rulings); the nontoken permanents that player controls now, each counted once for each of its colors, colorless
+      // ones not; the chosen color must have more than every other color (rulings). Nothing chosen: never.
+      const col = src.chosen?.color;
+      const who = src.chosen?.player;
+      if (!col || who === undefined) return false;
+      const n: Partial<Record<Color, number>> = {};
+      for (const id of s.battlefield) {
+        const c = chars.get(id);
+        if (!c || c.controller !== who || s.objects[id]!.isToken) continue;
+        for (const x of c.colors) n[x] = (n[x] ?? 0) + 1;
+      }
+      const mine = n[col] ?? 0;
+      return mine > 0 && (Object.keys(n) as Color[]).every((x) => x === col || (n[x] ?? 0) < mine);
+    }
     case "attachedIs": {
       const host = src.attachedTo ? s.objects[src.attachedTo] : undefined;
       const c = host && chars.get(host.id);

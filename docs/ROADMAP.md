@@ -1,6 +1,6 @@
 # Roadmap
 
-31,373 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,378 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,885 of
 9,979 (99%).
 
@@ -4168,7 +4168,7 @@ line blocks.
    (creatures a Wall blocked this turn); Infernal Denizen; Drought and Brutal Suppression (sacrifices added to costs);
    Delif's Cube (done in round B207) and Acidic Dagger (triggers set up on a target for the turn); Worms of the Earth (lands can't enter the
    battlefield); The Prismatic Piper (a color chosen before the game); False Dawn; Tidal Flats (a payment for each attacking
-   creature); Backdraft (damage dealt by each sorcery spell); Merseine ("pay enchanted creature's mana cost", activated only
+   creature); Backdraft (damage dealt by each sorcery spell); Merseine (done in round B211) ("pay enchanted creature's mana cost", activated only
    by that creature's controller); Frankenstein's Monster (done in round B171) (a counter chosen for each exiled card as it enters); Cyclopean
    Tomb; Apocalypse Chime, Golgothian Sylex and City in a Bottle (names first printed in a set); Reflecting Mirror;
    Extrapolate the Impossible and Golden Wish (cards from outside the game); Search the City; Minamo's Meddling (spliced
@@ -9256,6 +9256,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   leaves the battlefield" trigger made as it resolves, CR 603.7, so a Portcullis already gone leaves the card exiled for good).
   Browser tests for Kaboom!'s order on the bottom, Thought Lash paid and not paid, Mystic Barrier's direction and Martyrdom's
   granted ability. +5, 31,373 of 31,936 with round 368. The compiled text of every other card is unchanged.
+- Round B211 (least played first, from the Lane B skip lists): Chromatic Armor (Prismatic Ward's prevention by the last
+  chosen color, kept on the Aura: the one chosen as it entered, CR 614.12, until its {X} ability, X the sleight counters on
+  it as it's activated, CR 107.3c, puts a counter on it and chooses another as it resolves, CR 608.2d). Call to Arms (a color
+  and an opponent chosen as it enters; every white creature, anyone's, gets +1/+1 while that color has more of the chosen
+  player's nontoken permanents than any other color, multicolored ones counted for each color and colorless ones not,
+  whoever controls Call to Arms then; otherwise a state trigger sacrifices it, CR 603.8, rulings; bots choose a color some
+  opponent has the strict most of, and that opponent). Nettlevine Blight (its granted end step trigger is the enchanted
+  permanent's controller's: they sacrifice it, then choose a creature or land of theirs the Aura can enchant, not targeted,
+  CR 115.10, 303.4; with none it goes to the graveyard by state-based actions, CR 704.5m, rulings; bots pick their least
+  worth one). Strax, Sontaran Nurse (Grenades!: any player still in the game chosen at random, you too, then a reflexive
+  ability, CR 603.12, whose target is another creature that player controls, chosen by Strax's controller, rulings; none and
+  it's removed from the stack, CR 603.3d). Merseine (the enchanted creature stays tapped while it has a net counter; "Pay
+  enchanted creature's mana cost" may be activated only by that creature's controller, CR 602.2, 113.8, as often as they
+  like, the mana cost as it is then with colored symbols, rulings, {X} as 0, CR 107.3h, unpayable without one, CR 118.6;
+  bots pay at an opponent's end step). Browser tests for each. +5, 31,378 of 31,936. The compiled text of every other card is
+  unchanged.
+- Out after round B211 (looked at, not done): Caller of the Hunt (a creature type chosen as an additional cost to cast it,
+  kept by the spell and then the permanent for its power and toughness; no cast-time choice of that kind yet), Mangara's
+  Equity (damage to "you or a white creature you control" grouped per event), Worms of the Earth ("Lands can't enter the
+  battlefield" for every way a land is put onto it) stay out.
 - Out after round B210 (looked at, not done): Lodestone Bauble (still out: a player chosen as it's activated even with no
   target, a new choice in activation), Light Up the Night (a flashback cost removing X loyalty counters from among your
   planeswalkers), Duelist's Flame (its granted trigger: "look at that many cards", then an exiled card cast for free or left in
@@ -9297,7 +9317,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B181 (looked at, not done): Ludevic, Necrogenius (its back face becomes a copy of a creature card exiled
   with it as it transforms), Song of Inspiration ("add the total mana value of those cards" to a d20 roll: whether a target
   that became illegal still counts isn't settled by its rulings) stay out.
-- Out after round B180 (looked at, not done): Strax, Sontaran Nurse (a reflexive trigger's target limited to the creatures
+- Out after round B180 (looked at, not done): Strax, Sontaran Nurse (done in round B211) (a reflexive trigger's target limited to the creatures
   of a player chosen at random), Battletide Alchemist ("you may prevent X of that damage" to any player: a choice for each
   player as each source's damage is dealt), Zethi, Arcane Blademaster (X targets by kicks, then copies of the kicked
   cards cast), Back from the Brink (paying the mana cost of the card a cost exiled) stay out; Thelon's Chant (done in round B207), Tourach's
@@ -9366,7 +9386,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   stay out for the reasons in the earlier lists. Protective Sphere and Imperiosaur, out after B162 and B67, are done.
 - Out after round B163 (looked at, not done): Words of Waste and Words of Wind (an opponent's discard or each player's
   bounce chosen in the middle of a draw: a pause the draw sequence resumes from only for some replacements), Strax,
-  Sontaran Nurse ("Choose a player at random. When you do, ~ fights another target creature that player controls": a
+  Sontaran Nurse (done in round B211) ("Choose a player at random. When you do, ~ fights another target creature that player controls": a
   reflexive trigger's targets limited by the chosen player), Goblin Maskmaker (done in round B198) (face-down spells as a cost reduction's
   filter), Lantern Flare (a cleave cost with {X} on a card whose mana cost has none, X defined by its text otherwise),
   Saproling Burst (a token's power and toughness from the counters on the permanent that made it), Mana Cache (any player
@@ -9435,7 +9455,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   The Red Terror; merged now, so they're next), Bargaining Table (still: the opponent chosen as it's activated sets X), Foraging
   Wickermaw (a mana ability that also makes ~ the color of the mana it made), Isu the Abominable (done in round B164) ("you may pay {G}, {W},
   or {U}": one of three payments), Cheering Fanatic (done in round B158) ("spells with the chosen name cost {1} less to cast this turn").
-- Out after round B144 (looked at, not done): Merseine ("pay enchanted creature's mana cost" as a cost, activated only
+- Out after round B144 (looked at, not done): Merseine (done in round B211) ("pay enchanted creature's mana cost" as a cost, activated only
   by that creature's controller), Yare (done in round B145) and Blaze of Glory (done in round B145) ("target creature defending player controls" on a spell, with
   several defending players, CR 508.5a), North Star (mana spent as though any type for one spell), Lumbering Laundry (done in round B186)
   (looking at face-down creatures), Guard Dogs (a prevention shield tied to a permanent chosen as it resolves), Butcher
@@ -9605,7 +9625,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Rhystic Cave (a mana ability with "unless any player pays {1}"), Booby Trap (revealed draws), Sasaya (flip by revealing
   seven lands).
 - Out after round B98 (looked at, not done): Teferi, Timeless Voyager (done in round B153) ("Until the end of your next turn, they can't phase
-  in"), Time Reaper (targeting a face-up card in exile), Strax, Sontaran Nurse (a player chosen at random, then a reflexive
+  in"), Time Reaper (targeting a face-up card in exile), Strax, Sontaran Nurse (done in round B211) (a player chosen at random, then a reflexive
   fight), Sevinne, the Chronoclasm (done in round B175) (copy the first instant or sorcery cast from a graveyard each turn), Soulcipher Board (done in round B189)
   (omen counters off for each creature card put into your graveyard), Biolume Egg ("When you sacrifice ~, return it ...
   transformed"), Wumpus Aberration (done in round B166), Roving Actuator, Kianne, Dean of Substance (done in round B189), Chong and Lily, Nomads (done in round B187), Soul Ransom (done in round B142) ("Only
@@ -9651,7 +9671,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   controller"), Fasting (done in round B136) (a may skip of the draw step as it would begin), Naked Singularity (a land with two basic land
   types, as Reality Twist), Harsh Judgment and Aegis of Honor (an instant or sorcery's damage redirected to its
   controller), Peace Talks ("this turn and next turn"), Stronghold Gambit, Grenzo's Rebuttal (done in round B152), Planar Overlay (done in round B114), Worldpurge (done in round B189),
-  Call to Arms.
+  Call to Arms (done in round B211).
 - Out after round B92 (looked at, not done): Reality Twist ("Plains produce {R}, Swamps produce {G}...": a land with two
   basic land types lets its controller pick the color, rulings), Harvest Mage and Pulse of Llanowar (mana of a color of
   your choice instead: a choice as the land is tapped), Escaped Shapeshifter (keywords and protection read from opponents'
@@ -9737,13 +9757,13 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B74 (looked at, not done): Hankyu (done in round B209) (remove all aim counters as a cost, damage equal to the number
   removed), Fishing Pole ("Tap Fishing Pole" as a cost of the granted ability), Hold for Ransom (the Aura's controller
   as a player), Heliod's Punishment ("Then if it has no task counters on it, destroy Heliod's Punishment"), Shuriken (done in round B209)
-  (its controller gains control of it unless it was unattached from a Ninja), Nettlevine Blight, Animal Friend (done in round 328) and
+  (its controller gains control of it unless it was unattached from a Ninja), Nettlevine Blight (done in round B211), Animal Friend (done in round 328) and
   The Dominion Bracelet (granted abilities that move or recount the source), Gutter Grime and Saproling Burst (token
   abilities naming the permanent that made them), Earnest Fellowship and Pledge of Loyalty (done in round B112) (Lane A's round 236, now
   merged, changed the same keyword-binding code: next).
 - Out after round B73 (looked at, not done): Nafs Asp and Glass Asp ("unless they pay {1} before that draw step": a
   payment the player may make any time before then, not as the trigger resolves), Illusionary Terrain (done in round B155) (two basic land
-  types chosen, the first changed into the second), Chromatic Armor (the last chosen color, chosen again with sleight
+  types chosen, the first changed into the second), Chromatic Armor (done in round B211) (the last chosen color, chosen again with sleight
   counters).
 - Out after round B72 (looked at, not done): Ghost Ark (unearth until end of turn: Lane A's round 233 added escape until
   end of turn, now in main, to build on), Kheru Mind-Eater (whoever controls it may look at and play the face-down card),

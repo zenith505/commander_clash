@@ -5482,6 +5482,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "72eaaa73-3263-46e9-aa86-5862d3aed20a",
+  "name": "Call to Arms",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "As this enchantment enters, choose a color and an opponent.\nWhite creatures get +1/+1 as long as the chosen color is the most common color among nontoken permanents the chosen player controls but isn't tied for most common.\nWhen the chosen color isn't the most common color among nontoken permanents the chosen player controls or is tied for most common, sacrifice this enchantment.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c2db2c28-3ddc-41ce-a0c2-ddc555dea133",
   "name": "Call to the Void",
   "manaCost": "{4}{B}",
@@ -6564,6 +6590,38 @@
   "commanderLegal": "legal",
   "set": "tle",
   "releasedAt": "2025-11-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "65b3a40e-1d2b-4b24-996f-c935414ded7d",
+  "name": "Chromatic Armor",
+  "manaCost": "{1}{W}{U}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nAs this Aura enters, choose a color.\nThis Aura enters with a sleight counter on it.\nPrevent all damage that would be dealt to enchanted creature by sources of the last chosen color.\n{X}: Put a sleight counter on this Aura and choose a color. X is the number of sleight counters on this Aura.",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -23427,6 +23485,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b6b6e085-eef8-486d-9d66-1b7f1ee7d0dc",
+  "name": "Merseine",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nThis Aura enters with three net counters on it.\nEnchanted creature doesn't untap during its controller's untap step if this Aura has a net counter on it.\nPay enchanted creature's mana cost: Remove a net counter from this Aura. Only the controller of the enchanted creature may activate this ability.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "fem",
+  "releasedAt": "1994-11-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "21c82044-6e16-4e41-a6d0-e4d7cb42f37c",
   "name": "Mesmeric Sliver",
   "manaCost": "{3}{U}",
@@ -25458,6 +25546,36 @@
   "set": "mh3",
   "releasedAt": "2024-06-14",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "11132bbe-985d-44fa-a5b4-4b4e0dc3a7cf",
+  "name": "Nettlevine Blight",
+  "manaCost": "{4}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature or land\nEnchanted permanent has \"At the beginning of your end step, sacrifice this permanent and attach Nettlevine Blight to a creature or land you control.\"",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "lrw",
+  "releasedAt": "2007-10-12",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -35567,6 +35685,47 @@
   "commanderLegal": "legal",
   "set": "thb",
   "releasedAt": "2020-01-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ffde2558-2168-4b40-a31a-86d160bdb289",
+  "name": "Strax, Sontaran Nurse",
+  "manaCost": "{3}{R}{G}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Alien Cleric",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Alien",
+   "Cleric"
+  ],
+  "oracleText": "Vigilance, trample\nGrenades! — {2}, {T}, Sacrifice an artifact: Choose a player at random. When you do, Strax fights another target creature that player controls.\nGlory of Battle — Whenever Strax deals damage to a creature, put a +1/+1 counter on Strax.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [
+   "Vigilance",
+   "Glory of Battle",
+   "Trample",
+   "Fight",
+   "Grenades!"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

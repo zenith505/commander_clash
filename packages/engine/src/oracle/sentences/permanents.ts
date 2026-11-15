@@ -156,6 +156,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Berserker's Frenzy (round 378): "You choose which creatures block this turn and how those creatures block": the same
   // for every combat of the turn (CR 509.1), whoever's creatures they are, yours too (rulings: the blocks must be legal).
   if (/^[Yy]ou choose which creatures block this turn and how those creatures block$/.test(s)) return [{ type: "chooseBlocks", thisTurn: true }];
+  // Master Warcraft (round 379): "You choose which creatures attack this turn": in every combat this turn you choose which of
+  // the active player's creatures attack, legally, and that player chooses what each attacks (rulings; game.ts attacksChooser).
+  if (/^[Yy]ou choose which creatures attack this turn$/.test(s)) return [{ type: "chooseAttacks" }];
   // Brutal Hordechief (round 378): "Creatures your opponents control block this turn if able, and you choose how those
   // creatures block": a rule for whatever creatures they control at any time this turn, those that enter later too, and
   // you declare those creatures' blocks (rulings; CR 509.1c: still only as many requirements as can be obeyed, none that
@@ -456,7 +459,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Removing from combat (CR 506.4): Gustcloak Runner's "untap it and remove it from combat", "remove ~ from combat".
   // Observed Stasis: "remove enchanted creature from combat".
   if (/^[Rr]emove enchanted creature from combat$/.test(s) && !ctx.spell) return [{ type: "removeFromCombat", what: { ref: "attached" } }];
-  if ((m = /^(?:(Untap) (~|it|target .+?) and )?[Rr]emove (~|it|target .+?) from combat$/.exec(s))) {
+  if ((m = /^(?:([Uu]ntap) (~|it|target .+?) and )?[Rr]emove (~|it|target .+?) from combat$/.exec(s))) {
     if (m[1] && m[3] !== "it" && m[3] !== m[2]) return null;
     const what = parseObject(m[2] ?? m[3]!, ctx);
     if (!what || isGroup(what)) return null;

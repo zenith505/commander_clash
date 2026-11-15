@@ -82,6 +82,8 @@ import {
   canGainLife,
   player,
   potentialAttackers,
+  attackAssignment,
+  chosenAttackersProblem,
   foretoldCast,
   foretellCostOf,
   combatDamageOf,
@@ -173,6 +175,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   // A bot controlling another player's turn (CR 723.5) makes them do nothing they don't have to: no spells, abilities,
   // land or attacks. The choices they must make (blocks, discards, what their own triggers target) are made for them
   // as they'd make them.
+  // Master Warcraft (round 379): attackers another player chose: what each attacks, never paying for them (see
+  // fixedAttacks); and choosing which of the active player's creatures attack.
+  if (pend?.player === pid && pend.kind === "declareAttackers" && pend.fixed) return [fixedAttacks(s, pid, pend.fixed)];
+  if (pend?.player === pid && pend.kind === "chooseAttackers") return [{ type: "chooseAttackers", player: pid, attackers: attackersForOpponent(s, pid, pend.attacker) }];
   if (deciderOf(s, pid) !== pid) {
     if (!pend) return [{ type: "passPriority", player: pid }];
     if (pend.player === pid && pend.kind === "declareAttackers") return [{ type: "declareAttackers", player: pid, attacks: [] }];
@@ -7237,6 +7243,38 @@ function choosePayEnchantedCost(s: GameState, pid: PlayerId): Action[] | null {
     }
   }
   return null;
+}
+
+/**
+ * Master Warcraft (round 379): the creatures we choose for another player to attack with: as few as the rules allow (none
+ * if that's legal), so that nobody is attacked by more than they must be. Then the ones that have to attack (requirements,
+ * CR 508.1d), then all of them, then one more at a time.
+ */
+function attackersForOpponent(s: GameState, pid: PlayerId, ap: PlayerId): ObjectId[] {
+  const ok = (ids: ObjectId[]) => !chosenAttackersProblem(s, pid, ids);
+  if (ok([])) return [];
+  const all = potentialAttackers(s, ap);
+  const must = all.filter((o) => { const c = characteristics(s, o); return c.attacksIfAble || c.goadedBy.length > 0 || c.mustAttack.length > 0; }).map((o) => o.id);
+  if (must.length && ok(must)) return must;
+  for (const o of all) if (ok([o.id])) return [o.id];
+  const ids = all.map((o) => o.id);
+  if (ok(ids)) return ids;
+  // Growing from the required ones, one creature at a time (the first group that's legal).
+  const grown = [...must];
+  for (const o of all) {
+    if (grown.includes(o.id)) continue;
+    grown.push(o.id);
+    if (ok(grown)) return grown;
+  }
+  return ids;
+}
+
+/** Master Warcraft (round 379): attackers another player chose for us: a declaration that costs nothing, or we don't pay (CR 508.1h-i; rulings). */
+function fixedAttacks(s: GameState, pid: PlayerId, ids: ObjectId[]): Action {
+  const prefer = [...opponents(s, pid)].sort((a, b) => player(s, a).life - player(s, b).life);
+  const free = attackAssignment(s, pid, ids, true, prefer);
+  if (free) return { type: "declareAttackers", player: pid, attacks: free };
+  return { type: "declareAttackers", player: pid, attacks: [], decline: true };
 }
 
 function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {

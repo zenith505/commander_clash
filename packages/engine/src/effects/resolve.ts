@@ -2012,6 +2012,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "controlFromEach":
     case "chooseVotes":
     case "chooseBlocks":
+    case "chooseAttacks":
     case "secretNumbers":
     case "bidLife":
     case "payLifeRounds":

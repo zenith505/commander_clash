@@ -389,7 +389,10 @@ export function applyInPlace(s: GameState, action: Action): void {
       chooseCopyTargets(s, p, action.targets);
       break;
     case "declareAttackers":
-      declareAttackers(s, p, action.attacks);
+      declareAttackers(s, p, action.attacks, action.decline);
+      break;
+    case "chooseAttackers":
+      chooseAttackers(s, p, action.attackers);
       break;
     case "declareBlockers":
       declareBlockers(s, p, action.blocks);
@@ -4526,7 +4529,10 @@ function beginStep(s: GameState, step: Step): void {
         break;
       }
       if (able.length === 0) return beginStep(s, "endCombat");
-      s.pending = { kind: "declareAttackers", player: ap };
+      // Master Warcraft (round 379): another player chooses which of them attack.
+      const chooser = attacksChooser(s);
+      s.pending = chooser !== undefined && chooser !== ap ? { kind: "chooseAttackers", player: chooser, attacker: ap } : { kind: "declareAttackers", player: ap };
+      if (s.pending.kind === "chooseAttackers") log(s, `${player(s, chooser!).name} chooses which creatures ${player(s, ap).name} attacks with.`);
       return;
     }
     case "declareBlockers": {
@@ -10794,6 +10800,9 @@ function loyaltyPerTurn(s: GameState, o: GameObject): number {
   if (abilitiesOf(s, o).loyaltyTwice) return 2 + veil;
   // Kaito, Dancing Shadow: twice this turn, not more however many times it resolved (rulings).
   if ((s.turnRules ?? []).some((r) => r.turn === s.turn && r.rule === "loyaltyTwice" && r.object?.id === o.id && r.object.zc === (o.zoneChanges ?? 0))) return 2 + veil;
+  // Urza Assembles the Titans: its controller's planeswalkers this turn, whichever they control as the ability is
+  // activated (CR 606.3); twice, not more, with other such effects (rulings).
+  if ((s.turnRules ?? []).some((r) => r.turn === s.turn && r.rule === "loyaltyTwice" && !r.object && r.player === pid)) return 2 + veil;
   return (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).loyaltyTwice === "yours" && controllerOf(s, obj(s, id)) === pid) ? 2 : 1) + veil;
 }
 
@@ -13130,30 +13139,34 @@ export function attackYouLimit(s: GameState, defender: PlayerId): number {
   return n;
 }
 
-function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[]) {
-  if (s.pending?.kind !== "declareAttackers" || s.pending.player !== p.id) throw new RulesError("not declaring attackers now");
-  const legal = new Set(potentialAttackers(s, p.id).map((o) => o.id));
-  const opps = opponents(s, p.id);
+/**
+ * Why this declaration of attackers by `pid` is illegal, or null (CR 508.1a-d): each creature able to attack what it
+ * attacks, the restrictions and as many requirements obeyed as can be, and the costs that aren't mana payable (CR
+ * 508.1i). The mana attacking costs isn't checked here: it's paid as the attackers are declared (declareAttackers).
+ */
+export function attackDeclarationProblem(s: GameState, pid: PlayerId, attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[]): string | null {
+  const legal = new Set(potentialAttackers(s, pid).map((o) => o.id));
+  const opps = opponents(s, pid);
   const seen = new Set<ObjectId>();
   for (const a of attacks) {
-    if (!legal.has(a.attacker) || seen.has(a.attacker)) throw new RulesError(`${nameOf(s, a.attacker)} can't attack`);
-    if (!opps.includes(a.defender)) throw new RulesError("must attack a living opponent");
+    if (!legal.has(a.attacker) || seen.has(a.attacker)) return `${nameOf(s, a.attacker)} can't attack`;
+    if (!opps.includes(a.defender)) return "must attack a living opponent";
     // A planeswalker a defending player controls can be attacked instead (CR 506.2, 508.1b, 802.3).
     // So can a battle that player protects, its own controller's too (CR 310.9b).
     if (a.planeswalker !== undefined) {
-      const why = attackablePermanentProblem(s, p.id, a.defender, a.planeswalker);
-      if (why) throw new RulesError(why);
+      const why = attackablePermanentProblem(s, pid, a.defender, a.planeswalker);
+      if (why) return why;
     }
     const why = attackProblem(s, obj(s, a.attacker), a.defender, a.planeswalker !== undefined, a.planeswalker);
-    if (why) throw new RulesError(why);
+    if (why) return why;
     seen.add(a.attacker);
   }
   // "Can't attack alone": the only creature declared as an attacker attacks alone (CR 506.5).
-  if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) throw new RulesError(`${nameOf(s, attacks[0]!.attacker)} can't attack alone`);
+  if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) return `${nameOf(s, attacks[0]!.attacker)} can't attack alone`;
   const lonely = attacks.find((a) => withoutCompany(s, a.attacker, attacks));
-  if (lonely) throw new RulesError(withoutCompany(s, lonely.attacker, attacks)!);
+  if (lonely) return withoutCompany(s, lonely.attacker, attacks)!;
   const loner = attacks.length > 1 ? attacks.find((a) => characteristics(s, obj(s, a.attacker)).onlyAttacksAlone) : undefined;
-  if (loner) throw new RulesError(`${nameOf(s, loner.attacker)} can only attack alone`);
+  if (loner) return `${nameOf(s, loner.attacker)} can only attack alone`;
   // Requirements (CR 508.1d): every creature that "attacks each combat if able" and can attack has to,
   // unless that would break a restriction: one that can't attack alone needn't attack by itself.
   // A requirement that would need a cost paid to obey (Ghostly Prison) doesn't oblige anyone to pay it (CR 508.1d).
@@ -13163,38 +13176,38 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   const youLimits = new Map(opps.map((d) => [d, attackYouLimit(s, d)] as const));
   for (const d of opps) {
     const cap = youLimits.get(d)!;
-    if (atPlayer(d) > cap) throw new RulesError(`no more than ${cap === 1 ? "one creature" : `${cap} creatures`} can attack ${player(s, d).name} each combat`);
+    if (atPlayer(d) > cap) return `no more than ${cap === 1 ? "one creature" : `${cap} creatures`} can attack ${player(s, d).name} each combat`;
   }
   // "No more than one creature can attack ~ each combat" (The Eternal Wanderer): a restriction on that permanent (CR 508.1c).
   for (const pw of new Set(attacks.flatMap((a) => (a.planeswalker !== undefined ? [a.planeswalker] : [])))) {
     const cap = s.objects[pw] ? abilitiesOf(s, obj(s, pw)).combatLimit?.attackSelf : undefined;
-    if (cap !== undefined && attacks.filter((a) => a.planeswalker === pw).length > cap) throw new RulesError(`no more than ${cap === 1 ? "one creature" : `${cap} creatures`} can attack ${nameOf(s, pw)} each combat`);
+    if (cap !== undefined && attacks.filter((a) => a.planeswalker === pw).length > cap) return `no more than ${cap === 1 ? "one creature" : `${cap} creatures`} can attack ${nameOf(s, pw)} each combat`;
   }
   const free = (o: GameObject, d: PlayerId) => !attackProblem(s, o, d) && !attackTaxPer(s, d, false, o.id) && !characteristics(s, o).ownAttackCosts.length && atPlayer(d, o.id) < youLimits.get(d)!;
   // "No more than one creature can attack each combat" (Silent Arbiter): a restriction, which requirements can't break;
   // as many of the creatures that have to attack as the limit allows do (CR 508.1c-d).
   const limit = combatLimit(s, "attack");
-  if (attacks.length > limit) throw new RulesError(`no more than ${limit === 1 ? "one creature" : `${limit} creatures`} can attack each combat`);
+  if (attacks.length > limit) return `no more than ${limit === 1 ? "one creature" : `${limit} creatures`} can attack each combat`;
   // Gideon's "attacks ~ if able" is a requirement to attack too, when that planeswalker can be attacked (rulings).
-  const walkers = new Map(potentialAttackers(s, p.id).map((o) => [o.id, walkersFreeToAttack(s, o)] as const));
+  const walkers = new Map(potentialAttackers(s, pid).map((o) => [o.id, walkersFreeToAttack(s, o)] as const));
   const mustAttack = (o: GameObject) => (characteristics(s, o).attacksIfAble && opps.some((d) => free(o, d))) || !!walkers.get(o.id)?.length;
-  const shirking = potentialAttackers(s, p.id).find((o) => mustAttack(o) && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0) && !withoutCompany(s, o.id, [...attacks, { attacker: o.id }]));
-  const required = potentialAttackers(s, p.id).filter(mustAttack);
+  const shirking = potentialAttackers(s, pid).find((o) => mustAttack(o) && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0) && !withoutCompany(s, o.id, [...attacks, { attacker: o.id }]));
+  const required = potentialAttackers(s, pid).filter(mustAttack);
   const shirks = (o: GameObject) => (characteristics(s, o).attacksIfAble && opps.some((d) => free(o, d)) ? `${defOf(s, o).name} attacks each combat if able` : `${defOf(s, o).name} must attack ${walkers.get(o.id)!.map((w) => nameOf(s, w)).join(" or ")} if able`);
   if (attacks.length >= limit) {
-    if (attacks.filter((a) => required.some((o) => o.id === a.attacker)).length < Math.min(limit, required.length)) throw new RulesError(shirks(shirking!));
-  } else if (shirking && opps.length) throw new RulesError(shirks(shirking));
+    if (attacks.filter((a) => required.some((o) => o.id === a.attacker)).length < Math.min(limit, required.length)) return shirks(shirking!);
+  } else if (shirking && opps.length) return shirks(shirking);
   // Seeker of Slaanesh: with no attackers declared, the requirement that at least one creature attack is obeyed by none,
   // and declaring one that could attack without a cost would obey it without breaking a restriction (CR 508.1c-d).
-  const seeker = attacks.length ? undefined : attackWithOneRequired(s, p.id);
-  if (seeker && opps.length && attackWithOneOptions(s, p.id).length) throw new RulesError(`${p.name} must attack with at least one creature this combat if able (${nameOf(s, seeker)})`);
+  const seeker = attacks.length ? undefined : attackWithOneRequired(s, pid);
+  if (seeker && opps.length && attackWithOneOptions(s, pid).length) return `${player(s, pid).name} must attack with at least one creature this combat if able (${nameOf(s, seeker)})`;
   // War's Toll: once one of its controller's opponent's creatures attacks, all of that player's creatures attack if able
   // (CR 508.1d), up to a limit on attackers (CR 508.1c); none attacking obeys it too. A creature that would need a cost
   // paid to attack needn't (CR 508.1d).
-  const toll = attacks.length && attacks.length < limit ? attackAllIfOne(s, p.id) : undefined;
+  const toll = attacks.length && attacks.length < limit ? attackAllIfOne(s, pid) : undefined;
   if (toll) {
-    const idle = potentialAttackers(s, p.id).find((o) => !seen.has(o.id) && opps.some((d) => free(o, d)) && !withoutCompany(s, o.id, [...attacks, { attacker: o.id }]));
-    if (idle) throw new RulesError(`${defOf(s, idle).name} has to attack too: all creatures ${p.name} controls attack if able once one does (${nameOf(s, toll)})`);
+    const idle = potentialAttackers(s, pid).find((o) => !seen.has(o.id) && opps.some((d) => free(o, d)) && !withoutCompany(s, o.id, [...attacks, { attacker: o.id }]));
+    if (idle) return `${defOf(s, idle).name} has to attack too: all creatures ${player(s, pid).name} controls attack if able once one does (${nameOf(s, toll)})`;
   }
   // Viashino Bey: once it's declared as an attacker, all its controller's creatures attack if able; Ekundu Cyclops: once
   // another creature its controller controls is, it attacks if able (CR 508.1d). Neither has to attack itself, and a
@@ -13202,10 +13215,10 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   if (attacks.length && attacks.length < limit) {
     const idleOk = (o: GameObject) => !seen.has(o.id) && opps.some((d) => free(o, d)) && !withoutCompany(s, o.id, [...attacks, { attacker: o.id }]);
     const bey = attacks.find((a) => abilitiesOf(s, obj(s, a.attacker)).allAttackIfSelfAttacks);
-    const idle = bey ? potentialAttackers(s, p.id).find(idleOk) : undefined;
-    if (bey && idle) throw new RulesError(`${defOf(s, idle).name} has to attack too: all creatures ${p.name} controls attack if able once ${nameOf(s, bey.attacker)} does`);
-    const cyclops = potentialAttackers(s, p.id).find((o) => abilitiesOf(s, o).attacksIfOneAttacks && idleOk(o));
-    if (cyclops) throw new RulesError(`${defOf(s, cyclops).name} has to attack too: it attacks if able once a creature ${p.name} controls does`);
+    const idle = bey ? potentialAttackers(s, pid).find(idleOk) : undefined;
+    if (bey && idle) return `${defOf(s, idle).name} has to attack too: all creatures ${player(s, pid).name} controls attack if able once ${nameOf(s, bey.attacker)} does`;
+    const cyclops = potentialAttackers(s, pid).find((o) => abilitiesOf(s, o).attacksIfOneAttacks && idleOk(o));
+    if (cyclops) return `${defOf(s, cyclops).name} has to attack too: it attacks if able once a creature ${player(s, pid).name} controls does`;
   }
   // Goaded: it attacks a player other than the ones who goaded it, if it can (CR 701.15b, 508.1d). Each goad is a
   // requirement, and the attack must obey as many as it can: attacking a planeswalker obeys none of them (rulings).
@@ -13216,7 +13229,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     const ws = walkers.get(o.id) ?? [];
     if (!ws.length) continue;
     const best = Math.max(1, ...opps.filter((d) => free(o, d)).map((d) => attackTargetScore(s, o, d)));
-    if (attackTargetScore(s, o, a.defender, a.planeswalker) < best) throw new RulesError(`${defOf(s, o).name} must attack ${ws.map((w) => nameOf(s, w)).join(" or ")} if able`);
+    if (attackTargetScore(s, o, a.defender, a.planeswalker) < best) return `${defOf(s, o).name} must attack ${ws.map((w) => nameOf(s, w)).join(" or ")} if able`;
   }
   for (const a of attacks) {
     const o = obj(s, a.attacker);
@@ -13225,7 +13238,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     const obeyed = (d: PlayerId) => by.filter((g) => g !== d).length;
     const best = Math.max(0, ...opps.filter((d) => free(o, d) || d === a.defender).map(obeyed));
     if ((a.planeswalker !== undefined ? 0 : obeyed(a.defender)) < best)
-      throw new RulesError(`${defOf(s, o).name} is goaded: it must attack a player other than ${by.map((p) => player(s, p).name).join(" or ")} if able`);
+      return `${defOf(s, o).name} is goaded: it must attack a player other than ${by.map((p) => player(s, p).name).join(" or ")} if able`;
   }
   // Nahiri, the Unforgiving: "attacks a player each combat if able": attacking a planeswalker or battle doesn't obey it, so
   // one that could attack a player without a cost must attack a player (CR 508.1d). One that also has to attack a
@@ -13233,25 +13246,143 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   for (const a of attacks) {
     const o = obj(s, a.attacker);
     if (a.planeswalker === undefined || !characteristics(s, o).attacksPlayerIfAble || walkers.get(o.id)?.length) continue;
-    if (opps.some((d) => free(o, d))) throw new RulesError(`${defOf(s, o).name} must attack a player if able`);
+    if (opps.some((d) => free(o, d))) return `${defOf(s, o).name} must attack a player if able`;
   }
   // "Attacks that opponent this turn if able" (encore): it attacks one of those players, not a planeswalker, if it can
   // (CR 508.1d). One that can't attack them, or only by paying a cost, needn't attack at all (encore rulings).
-  for (const o of potentialAttackers(s, p.id)) {
+  for (const o of potentialAttackers(s, pid)) {
     const able = mustAttackPlayers(s, o).filter((d) => opps.includes(d) && free(o, d));
     if (!able.length || walkers.get(o.id)?.length) continue;
     const a = attacks.find((x) => x.attacker === o.id);
-    if (!a || a.planeswalker !== undefined || !able.includes(a.defender)) throw new RulesError(`${defOf(s, o).name} must attack ${able.map((d) => player(s, d).name).join(" or ")} if able`);
+    if (!a || a.planeswalker !== undefined || !able.includes(a.defender)) return `${defOf(s, o).name} must attack ${able.map((d) => player(s, d).name).join(" or ")} if able`;
   }
   // Costs to attack that aren't mana (Exalted Dragon): all of them together, a permanent paying only one (CR 508.1i).
   const costs: AttackCostDue[] = attacks.flatMap((a) => characteristics(s, obj(s, a.attacker)).ownAttackCosts.map((c) => ({ id: a.attacker, ...c })));
-  if (!attackCostsPayable(s, p.id, costs)) throw new RulesError(`you can't pay all the costs to attack with these creatures: ${costs.map((c) => `${nameOf(s, c.id)} needs you to ${describeAttackCost(c)}`).join("; ")}`);
+  if (!attackCostsPayable(s, pid, costs)) return `you can't pay all the costs to attack with these creatures: ${costs.map((c) => `${nameOf(s, c.id)} needs you to ${describeAttackCost(c)}`).join("; ")}`;
+  // Sivitri, Dragon Master: life, paid with the mana; only with that much life (CR 119.4).
+  const lifeTax = attackLifeCost(s, attacks);
+  if (lifeTax && payableLife(s, pid) < lifeTax) return `attacking with these creatures costs ${lifeTax} life, and ${player(s, pid).name} can't pay it`;
+  return null;
+}
+
+/**
+ * Master Warcraft (round 379): who chooses which creatures the active player attacks with this combat, when an effect says
+ * someone does: of those this turn, the latest to resolve (as with Brutal Hordechief's blocks, rulings); a player who has
+ * left the game chooses nothing (CR 800.4a). Undefined: the active player, as usual (CR 508.1a).
+ */
+export function attacksChooser(s: GameState): PlayerId | undefined {
+  const live = (s.attacksChosenThisTurn ?? []).filter((b) => b.turn === s.turn && !player(s, b.player).lost).sort((a, b) => b.timestamp - a.timestamp);
+  return live[0]?.player;
+}
+
+const attackGroupKey = (ids: ObjectId[]) => [...ids].sort().join(",");
+
+/**
+ * Master Warcraft (round 379): a declaration of attackers `pid` could make with exactly these creatures, each attacking a
+ * player or a planeswalker or battle, that's legal (attackDeclarationProblem): the chooser picks the group, and the
+ * active player picks what each attacks (rulings: "the person who cast Master Warcraft first chooses the complete group of
+ * creatures that are going to attack. Then, for each of those creatures, the active player chooses who or what it's going
+ * to attack"; "your choices must be legal within the normal rules"). With `free`, one that costs nothing to declare
+ * (CR 508.1g-h). `prefer`: the defending players to try first. Undefined when there's none (searched up to a few thousand
+ * declarations, the likeliest first: each creature's requirements obeyed and its limits kept as the search goes).
+ */
+export function attackAssignment(s: GameState, pid: PlayerId, ids: ObjectId[], free = false, prefer: PlayerId[] = []): { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[] | undefined {
+  type A = { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId };
+  const opps = [...opponents(s, pid)].sort((a, b) => (prefer.includes(a) ? prefer.indexOf(a) : 99) - (prefer.includes(b) ? prefer.indexOf(b) : 99));
+  const legal = new Set(potentialAttackers(s, pid).map((o) => o.id));
+  if (ids.some((id) => !legal.has(id)) || new Set(ids).size !== ids.length) return undefined;
+  if (free && ids.some((id) => characteristics(s, obj(s, id)).ownAttackCosts.length)) return undefined;
+  const walkers = s.battlefield.map((id) => obj(s, id)).filter((w) => objIsType(s, w, "Planeswalker") || objIsType(s, w, "Battle"));
+  const options = ids.map((id) => {
+    const o = obj(s, id);
+    const out: A[] = [];
+    for (const d of opps) {
+      if (!attackProblem(s, o, d) && !(free && attackTaxPer(s, d, false, id))) out.push({ attacker: id, defender: d });
+      for (const w of walkers) {
+        const by = objIsType(s, w, "Battle") ? w.protector : controllerOf(s, w);
+        if (by !== d || attackablePermanentProblem(s, pid, d, w.id) !== null || attackProblem(s, o, d, true, w.id)) continue;
+        if (free && attackTaxPer(s, d, true, id)) continue;
+        out.push({ attacker: id, defender: d, planeswalker: w.id });
+      }
+    }
+    // The likeliest first: the most requirements obeyed (goad, encore's player, a planeswalker it must attack).
+    return out.map((a, i) => ({ a, i, score: attackTargetScore(s, o, a.defender, a.planeswalker) })).sort((x, y) => y.score - x.score || x.i - y.i).map((x) => x.a);
+  });
+  if (options.some((o) => !o.length)) return undefined;
+  const limits = new Map(opps.map((d) => [d, attackYouLimit(s, d)] as const));
+  let budget = 4000;
+  const chosen: A[] = [];
+  const atPlayer = (d: PlayerId) => chosen.filter((a) => a.defender === d && a.planeswalker === undefined).length;
+  const dfs = (i: number): A[] | undefined => {
+    if (i === ids.length) {
+      budget--;
+      if (attackDeclarationProblem(s, pid, chosen)) return undefined;
+      if (free && (attackCost(s, chosen) || attackLifeCost(s, chosen))) return undefined;
+      return [...chosen];
+    }
+    for (const a of options[i]!) {
+      if (budget <= 0) return undefined;
+      if (a.planeswalker === undefined && atPlayer(a.defender) >= limits.get(a.defender)!) continue; // Crawlspace (CR 508.1c)
+      chosen.push(a);
+      const r = dfs(i + 1);
+      chosen.pop();
+      if (r) return r;
+    }
+    return undefined;
+  };
+  return dfs(0);
+}
+
+/** Master Warcraft (round 379): why `chooser` can't choose these creatures of the active player's to attack, or null. */
+export function chosenAttackersProblem(s: GameState, chooser: PlayerId, ids: ObjectId[]): string | null {
+  const pend = s.pending;
+  if (pend?.kind !== "chooseAttackers" || pend.player !== chooser) return "not choosing attackers now";
+  const ap = pend.attacker;
+  for (const id of ids) if (!potentialAttackers(s, ap).some((o) => o.id === id)) return `${s.objects[id] ? nameOf(s, id) : "that"} can't attack`;
+  if (pend.declined?.includes(attackGroupKey(ids))) return `${player(s, ap).name} won't pay for those attackers: choose another group`;
+  if (attackAssignment(s, ap, ids)) return null;
+  // The reason the likeliest declaration with them is illegal, when there's one to try.
+  const guess = ids.map((id) => ({ attacker: id, defender: opponents(s, ap).find((d) => !attackProblem(s, obj(s, id), d)) ?? opponents(s, ap)[0]! }));
+  return attackDeclarationProblem(s, ap, guess) ?? `${player(s, ap).name} can't attack with exactly those creatures`;
+}
+
+function chooseAttackers(s: GameState, p: Player, ids: ObjectId[]) {
+  const pend = s.pending;
+  if (pend?.kind !== "chooseAttackers" || pend.player !== p.id) throw new RulesError("not choosing attackers now");
+  const why = chosenAttackersProblem(s, p.id, ids);
+  if (why) throw new RulesError(why);
+  const ap = player(s, pend.attacker);
+  log(s, ids.length ? `${p.name} chooses ${ids.map((id) => nameOf(s, id)).join(", ")} to attack.` : `${p.name} chooses no attackers for ${ap.name}.`);
+  s.pending = { kind: "declareAttackers", player: ap.id, fixed: [...ids], chooser: p.id, ...(pend.declined ? { declined: pend.declined } : {}) };
+  // No attackers: nothing is left for the active player to choose, so the declaration is made at once.
+  if (!ids.length) return declareAttackers(s, ap, []);
+}
+
+function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[], decline?: true) {
+  if (s.pending?.kind !== "declareAttackers" || s.pending.player !== p.id) throw new RulesError("not declaring attackers now");
+  // Master Warcraft (round 379): exactly the creatures the chooser chose. Its controller may refuse to pay what attacking
+  // with them costs, and the chooser chooses again (the rulings of Odric, Brutal Hordechief and Berserker's Frenzy for
+  // blocks chosen by another player: "its controller can choose to pay that cost or not. If that player decides to not
+  // pay that cost, you must propose a new set"), only when every legal declaration with them costs something.
+  const fixed = s.pending.fixed;
+  if (decline) {
+    const pend = s.pending;
+    if (!fixed || pend.chooser === undefined) throw new RulesError("nothing to decline");
+    if (attackAssignment(s, p.id, fixed, true)) throw new RulesError("those creatures can attack without paying anything");
+    log(s, `${p.name} won't pay for those attackers; ${player(s, pend.chooser).name} chooses again.`);
+    const declined = [...(pend.declined ?? []), attackGroupKey(fixed)];
+    s.pending = player(s, pend.chooser).lost ? { kind: "declareAttackers", player: p.id } : { kind: "chooseAttackers", player: pend.chooser, attacker: p.id, declined };
+    return;
+  }
+  if (fixed && attackGroupKey(attacks.map((a) => a.attacker)) !== attackGroupKey(fixed)) throw new RulesError(`${player(s, s.pending.chooser!).name} chose the attackers: declare ${fixed.length ? fixed.map((id) => nameOf(s, id)).join(", ") : "none"}`);
+  const why = attackDeclarationProblem(s, p.id, attacks);
+  if (why) throw new RulesError(why);
   // Attack costs are totalled and paid, with mana abilities activated first (CR 508.1g-i).
   // A Phyrexian symbol is paid with its color's mana from the pool, otherwise 2 life (CR 107.4f, 119.4).
   const tax = attackCost(s, attacks);
-  // Sivitri, Dragon Master: life, paid with the mana; only with that much life (CR 119.4).
   const lifeTax = attackLifeCost(s, attacks);
-  if (lifeTax && payableLife(s, p.id) < lifeTax) throw new RulesError(`attacking with these creatures costs ${lifeTax} life, and ${p.name} can't pay it`);
+  // Costs to attack that aren't mana (Exalted Dragon), paid once the attack is declared (CR 508.1i, finishAttacks).
+  const costs: AttackCostDue[] = attacks.flatMap((a) => characteristics(s, obj(s, a.attacker)).ownAttackCosts.map((c) => ({ id: a.attacker, ...c })));
   if (tax) {
     const paid = spendFromPool(s, p.id, parseManaCost(tax), "other", 0, payableLife(s, p.id) - lifeTax);
     if (!paid) throw new RulesError(`attacking these players costs ${tax}: add the mana first`);

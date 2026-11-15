@@ -1636,7 +1636,14 @@ export interface ContinuousEffect {
 
 /** What the engine is waiting on from a specific player, beyond normal priority. */
 export type PendingDecision =
-  | { kind: "declareAttackers"; player: PlayerId }
+  /**
+   * Master Warcraft (round 379): with `fixed`, `chooser` chose which of this player's creatures attack (chooseAttackers),
+   * and this player declares exactly those, choosing what each attacks and paying the costs (rulings); `declined` are the
+   * groups this player refused to pay for, which `chooser` can't choose again this combat.
+   */
+  | { kind: "declareAttackers"; player: PlayerId; fixed?: ObjectId[]; chooser?: PlayerId; declined?: string[] }
+  /** Master Warcraft (round 379): this player chooses which of `attacker`'s creatures attack this combat (GameState.attacksChosenThisTurn). */
+  | { kind: "chooseAttackers"; player: PlayerId; attacker: PlayerId; declined?: string[] }
   /** `defender`: Odric's controller (`player`) declares the blockers of that defending player (GameState.blocksChosenBy). */
   | { kind: "declareBlockers"; player: PlayerId; remaining: PlayerId[]; defender?: PlayerId }
   | { kind: "discardToHandSize"; player: PlayerId; count: number }
@@ -2318,6 +2325,11 @@ export interface GameState {
    * the latest one that covers a defending player decides for that player (rulings), see blockersPending.
    */
   blocksChosenThisTurn?: { player: PlayerId; turn: number; timestamp: number; opponents?: true }[];
+  /**
+   * Master Warcraft (round 379): "You choose which creatures attack this turn": `player` chooses which creatures the active
+   * player attacks with in every combat of turn `turn`; with several, the latest one to resolve decides (attacksChooser).
+   */
+  attacksChosenThisTurn?: { player: PlayerId; turn: number; timestamp: number }[];
   namedBansUntil?: { name: string; players?: PlayerId[]; lands?: true; controller: PlayerId; source: string }[];
   /** "Until your next turn, you may cast sorcery spells as though they had flash" (Teferi, Time Raveler): `controller` may. */
   flashUntil?: { controller: PlayerId; filter: TargetSpec; /** Only during this turn (Winding Canyons). */ turn?: number }[];
@@ -2586,7 +2598,7 @@ export interface TurnRule {
   /** "noLoyalty": Revel in Silence's "your opponents can't ... activate planeswalkers' loyalty abilities this turn" (CR 606.3). */
   /** "noActivations": Abeyance's "that player can't activate abilities that aren't mana abilities" this turn, in any zone (rulings). */
   /** "castFromHandFree": Chandra, Flame's Catalyst's "Until end of turn, you may cast spells from your hand without paying their mana costs" (Omniscience's alternative cost for this turn, CR 118.9). */
-  /** "loyaltyTwice": Kaito, Dancing Shadow's "you may activate loyalty abilities of ~ twice this turn rather than only once": of `object` only (CR 606.3), not more than twice however often (rulings). */
+  /** "loyaltyTwice": Kaito, Dancing Shadow's "you may activate loyalty abilities of ~ twice this turn rather than only once": of `object` only (CR 606.3), not more than twice however often (rulings); with no `object` (Urza Assembles the Titans), of every planeswalker `player` controls this turn. */
   rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof" | "noLoyalty" | "noActivations" | "castFromHandFree" | "loyaltyTwice";
   /** The permanent the rule is about ("loyaltyTwice"), as the object it was then (CR 400.7). */
   object?: { id: ObjectId; zc: number };
@@ -3409,7 +3421,10 @@ export type Action =
   /** The new target for a spell whose target is being changed (see PendingDecision "changeTarget"). */
   | { type: "changeTarget"; player: PlayerId; target: TargetChoice }
   /** `planeswalker`: it attacks that planeswalker, controlled by `defender`, instead of the player (CR 508.1b). */
-  | { type: "declareAttackers"; player: PlayerId; attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[] }
+  /** `decline` (Master Warcraft, round 379): with attackers another player chose that only attack for a cost, refuse to pay; that player chooses again. */
+  | { type: "declareAttackers"; player: PlayerId; attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[]; decline?: true }
+  /** Master Warcraft (round 379): the creatures of the active player's that attack, chosen by another player (PendingDecision chooseAttackers). */
+  | { type: "chooseAttackers"; player: PlayerId; attackers: ObjectId[] }
   | { type: "declareBlockers"; player: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[] }
   | { type: "discard"; player: PlayerId; objectIds: ObjectId[] }
   /** Answer to arrangeTop: `top` goes back on top in this order (first = top); `away` goes to the bottom (scry) or graveyard (surveil). */

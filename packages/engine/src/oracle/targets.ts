@@ -2285,6 +2285,12 @@ export function parseTargetPhrase(
     extra.orSubtypes = ["Vehicle"];
     p = "creature or planeswalker";
   }
+  // In Too Deep: "Enchant creature, planeswalker, or Clue": a creature or a planeswalker, or a Clue (an artifact subtype, CR
+  // 205.3g) whatever its card types.
+  if (p === "creature, planeswalker, or clue" && !extra.orSubtypes) {
+    extra.orSubtypes = ["Clue"];
+    p = "creature or planeswalker";
+  }
   // Ragamuffin Raptor: "creature or Food card": a creature card, or a Food card (an artifact subtype, CR 205.3g).
   if (p === "creature or food" && !extra.orSubtypes) {
     extra.orSubtypes = ["Food"];

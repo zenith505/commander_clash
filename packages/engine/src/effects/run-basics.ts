@@ -448,6 +448,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${player(s, ctx.controller).name}'s spells and abilities can target their opponents and their creatures as though they didn't have hexproof this turn.`);
         return;
       }
+      if (e.rules[0] === "loyaltyTwice") {
+        log(s, `${player(s, ctx.controller).name} may activate the loyalty abilities of planeswalkers they control twice this turn.`);
+        return;
+      }
       if (e.rules[0] === "extraLoyalty") {
         log(s, `${player(s, ctx.controller).name} may activate a loyalty ability of each planeswalker they control once more this turn.`);
         return;

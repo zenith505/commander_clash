@@ -156,6 +156,8 @@ import {
   entersRulesOf,
   crewPower,
   potentialAttackers,
+  attackAssignment,
+  chosenAttackersProblem,
   walkersFreeToAttack,
   attackedName,
   returnCandidates,
@@ -1430,6 +1432,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     // Attacking: click a creature, then the player it attacks (an arrow follows the mouse).
     // Clicking an attacking creature again takes it out of the attack.
+    // Master Warcraft (round 379): choosing which of the active player's creatures attack: click them to pick them.
+    if (pending?.kind === "chooseAttackers") {
+      if (potentialAttackers(s, pending.attacker).some((a) => a.id === o.id)) setDiscards((prev) => (prev.includes(o.id) ? prev.filter((x) => x !== o.id) : [...prev, o.id]));
+      return;
+    }
     if (pending?.kind === "declareAttackers") {
       // An opponent's planeswalker can be attacked instead of the player (CR 506.2, 508.1b).
       if (aim && attackablePlaneswalker(o.id)) {
@@ -1440,6 +1447,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         return;
       }
       if (controllerOf(s, o) !== HUMAN || !potentialAttackers(s, HUMAN).some((a) => a.id === o.id)) return;
+      // Master Warcraft: only the creatures another player chose attack.
+      if (pending.fixed && !pending.fixed.includes(o.id)) return;
       if (o.id in attacks) {
         const next = { ...attacks };
         delete next[o.id];
@@ -1530,7 +1539,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   }
 
   // Creatures that can still be told to attack or block glow, like playable cards.
-  const attackers = pending?.kind === "declareAttackers" ? new Set(potentialAttackers(s, HUMAN).map((a) => a.id)) : null;
+  const attackers = pending?.kind === "declareAttackers" ? new Set(potentialAttackers(s, HUMAN).map((a) => a.id).filter((id) => !pending.fixed || pending.fixed.includes(id))) : null;
   const blockingFor = pending?.kind === "declareBlockers" ? (pending.defender ?? HUMAN) : HUMAN;
   const attackingMe = s.battlefield.map((id) => s.objects[id]!).filter((o) => o.attacking === blockingFor);
   const canBlockWith = (o: GameObject) =>
@@ -1555,7 +1564,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       (canBlockWith(o) && blocker !== o.id) ||
       (!!tapPick && !tapPick.chosen.includes(o.id) && tapCandidates(s, tapPick).some((c) => c.id === o.id)) ||
       (!!costPick && !costPick.chosen.includes(o.id) && costPick.candidates.includes(o.id)) ||
-      (pending?.kind === "pickPermanents" && pending.player === HUMAN && pending.options.includes(o.id) && !discards.includes(o.id)),
+      (pending?.kind === "pickPermanents" && pending.player === HUMAN && pending.options.includes(o.id) && !discards.includes(o.id)) ||
+      (pending?.kind === "chooseAttackers" && !discards.includes(o.id) && potentialAttackers(s, pending.attacker).some((a) => a.id === o.id)),
   };
   const waiting = waitingOn(s);
   const corners = seatCorners(s);
@@ -5417,19 +5427,39 @@ function Controls({
       </div>
     );
   }
+  // Master Warcraft (round 379): you choose which of another player's creatures attack; they choose what each attacks.
+  if (pending?.kind === "chooseAttackers") {
+    const theirs = s.players[pending.attacker]!.name;
+    const why = chosenAttackersProblem(s, HUMAN, discards);
+    return (
+      <div className="controls">
+        <span>{why && discards.length ? `${why.charAt(0).toUpperCase()}${why.slice(1)}.` : `You choose which of ${theirs}'s creatures attack: click them, then confirm. ${theirs} chooses what each attacks.`}</span>
+        <button disabled={!!why} title={why ?? undefined} onClick={() => dispatch([{ type: "chooseAttackers", player: HUMAN, attackers: discards }])}>
+          {discards.length ? `${theirs} attacks with ${discards.length}` : "No attackers"}
+        </button>
+      </div>
+    );
+  }
   if (pending?.kind === "declareAttackers") {
+    // Master Warcraft (round 379): the attackers another player chose; you choose what each attacks, and may refuse to pay
+    // what that costs when every way to attack with them costs something (rulings).
+    const fixed = pending.fixed;
+    const chooserName = pending.chooser !== undefined ? s.players[pending.chooser]!.name : "";
+    const pool = potentialAttackers(s, HUMAN).filter((o) => !fixed || fixed.includes(o.id));
+    const unassigned = fixed ? fixed.filter((id) => !(id in attacks)) : [];
+    const mayDecline = !!fixed && fixed.length > 0 && !attackAssignment(s, HUMAN, fixed, true);
     // Creatures that attack each combat if able have to be declared (CR 508.1d).
     // Not when attacking would cost something (Ghostly Prison): nothing obliges paying (CR 508.1d).
     const free = (o: GameObject, d: PlayerId) => !attackProblem(s, o, d) && !attackTaxPer(s, d, false, o.id);
-    const must = potentialAttackers(s, HUMAN).filter((o) => characteristics(s, o).attacksIfAble && !(o.id in attacks) && opponents(s, HUMAN).some((d) => free(o, d)));
+    const must = pool.filter((o) => characteristics(s, o).attacksIfAble && !(o.id in attacks) && opponents(s, HUMAN).some((d) => free(o, d)));
     // Encore tokens attack their opponent if able (CR 508.1d).
-    const bound = potentialAttackers(s, HUMAN).flatMap((o) => {
+    const bound = pool.flatMap((o) => {
       const able = characteristics(s, o).mustAttack.filter((d) => opponents(s, HUMAN).includes(d) && free(o, d));
       const a = attacks[o.id];
       return able.length && !walkersFreeToAttack(s, o).length && (!a || a.planeswalker || !able.includes(a.defender)) ? [`${cardOf(s, o.id).name} must attack ${able.map((d) => s.players[d]!.name).join(" or ")}.`] : [];
     });
     // Gideon: "attacks ~ if able" (CR 508.1d), when it isn't goaded or bound to a player as well (the engine weighs those).
-    const toWalker = potentialAttackers(s, HUMAN).flatMap((o) => {
+    const toWalker = pool.flatMap((o) => {
       const ws = walkersFreeToAttack(s, o);
       const a = attacks[o.id];
       if (!ws.length || characteristics(s, o).goadedBy.length || characteristics(s, o).mustAttack.length || (a?.planeswalker && ws.includes(a.planeswalker))) return [];
@@ -5449,7 +5479,9 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          {alone && !aim
+          {fixed && unassigned.length && !aim
+            ? `${chooserName} chose your attackers: click ${unassigned.map((id) => cardOf(s, id).name).join(", ")}, then what ${unassigned.length === 1 ? "it attacks" : "each attacks"}.`
+            : alone && !aim
             ? alone
             : bound.length && !aim
             ? bound[0]
@@ -5461,8 +5493,13 @@ function Controls({
               ? "Click your creatures to attack. Click an attacker again to take it back."
               : "Click a creature, then the player it attacks. Click an attacker again to take it back."}
         </span>
+        {mayDecline && (
+          <button className="ghost" title={`Attacking with these creatures costs something: ${chooserName} chooses again`} onClick={() => dispatch([{ type: "declareAttackers", player: HUMAN, attacks: [], decline: true }])}>
+            Don't pay
+          </button>
+        )}
         <button
-          disabled={must.length > 0 || bound.length > 0 || !!alone || !taxTaps || lifeShort}
+          disabled={must.length > 0 || bound.length > 0 || !!alone || !taxTaps || lifeShort || unassigned.length > 0}
           title={lifeShort ? `Attacking costs ${lifeTax} life and you can't pay it` : tax && !taxTaps ? `Attacking costs ${tax} and you can't pay it` : tax.includes("/P}") ? "Phyrexian mana: paid with mana in your pool, otherwise 2 life each" : undefined}
           onClick={() => dispatch([...(taxTaps ?? []), { type: "declareAttackers", player: HUMAN, attacks: declared }])}
         >

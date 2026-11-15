@@ -5683,6 +5683,8 @@ export type Effect =
    * `opponents`: Brutal Hordechief's "you choose how those creatures block", only for creatures your opponents control.
    */
   | { type: "chooseBlocks"; thisTurn?: true; opponents?: true }
+  /** Master Warcraft (round 379): "You choose which creatures attack this turn" (GameState.attacksChosenThisTurn). */
+  | { type: "chooseAttacks" }
   /**
    * "Each player secretly chooses a number 0 or greater, then all players reveal those numbers simultaneously"
    * (Wheel of Misfortune, Menacing Ogre): each one chooses without seeing the others' numbers, then what the card does

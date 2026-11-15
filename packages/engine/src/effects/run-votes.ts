@@ -26,6 +26,11 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       s.blocksChosenBy = { player: ctx.controller, turn: s.turn, combat: s.combatsThisTurn ?? 0, timestamp: s.nextTimestamp++ };
       log(s, `${player(s, ctx.controller).name} chooses which creatures block this combat and how they block.`);
       return;
+    case "chooseAttacks":
+      // Master Warcraft (round 379): every combat this turn; the latest one to resolve decides (game.ts attacksChooser).
+      s.attacksChosenThisTurn = [...(s.attacksChosenThisTurn ?? []).filter((b) => b.turn === s.turn), { player: ctx.controller, turn: s.turn, timestamp: s.nextTimestamp++ }];
+      log(s, `${player(s, ctx.controller).name} chooses which creatures attack this turn.`);
+      return;
     case "chooseVotes":
       // Illusion of Choice: the last one to resolve this turn decides (rulings).
       s.votesChosenBy = { player: ctx.controller, turn: s.turn };

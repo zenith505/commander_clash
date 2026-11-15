@@ -7128,7 +7128,7 @@ export function compile(d: CardDef): CompiledCard {
       spellLines.push(line);
       continue;
     }
-    if (isSpell && spellLines.length && /^Whenever [^,]+ this turn, /.test(line)) {
+    if (isSpell && spellLines.length && /^Whenever [^,]+ this (?:turn|combat), /.test(line)) {
       spellLines.push(line);
       continue;
     }

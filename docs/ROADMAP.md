@@ -1,7 +1,7 @@
 # Roadmap
 
-31,433 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,897 of
+31,440 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,900 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3112,11 +3112,38 @@ line blocks.
    Hordechief and cast Frenzy in their first main phase while they have an attacker and an opponent an untapped creature,
    pick only the opponents' creatures for Frenzy, and send each creature that must block where it dies and the attacker
    lives.
-   Out after round 378 (looked at, not done): Master Warcraft ("You choose which creatures attack this turn": another player
+   Out after round 378 (looked at, not done): Master Warcraft (done in round 379) ("You choose which creatures attack this turn": another player
    picks the attackers, then the active player chooses what each one attacks and pays its costs, rulings; no such split of
-   the attack declaration yet, nor its UI and bot); Melee ("Whenever a creature attacks and isn't blocked this
+   the attack declaration yet, nor its UI and bot); Melee (done in round 379) ("Whenever a creature attacks and isn't blocked this
    combat, untap it and remove it from combat": a trigger on not being blocked, then removing it from combat); Tamiyo, Collector of Tales, Celestial Reunion, Fabrication Foundry,
    Ziatora's Envoy and Archelos, Lagoon Mystic (still out, as in their earlier lists).
+   Round 379 went on down the "Out after round N" lists and `npm run popular`, most played first, to attackers chosen by
+   another player, unblocked attackers removed from combat, an Aura for a creature, a planeswalker or a Clue and two
+   loyalty abilities a turn: Master Warcraft's "You choose which creatures attack this turn." (in every combat this turn
+   the caster chooses the complete group of the active player's creatures that attack, a legal one, requirements obeyed,
+   then the active player chooses what each attacks, rulings, CR 508.1a-d; the latest one to resolve decides; the active
+   player may refuse to pay when every legal declaration with the group costs something, and the chooser must choose
+   another group, by the same rule the rulings of Odric, Brutal Hordechief and Berserker's Frenzy give for blocks:
+   Effect chooseAttacks, GameState.attacksChosenThisTurn, PendingDecision chooseAttackers and declareAttackers `fixed`,
+   game.ts attacksChooser, attackAssignment, attackDeclarationProblem) with its "You choose which creatures block this
+   turn and how those creatures block." (as Berserker's Frenzy's); Melee's "Whenever a creature attacks and isn't blocked
+   this combat, untap it and remove it from combat." (a delayed trigger until this combat ends, CR 603.7b, for each
+   attacker no creature was declared to block, rulings, CR 509.1h; only the attacking player's creatures attack, CR
+   506.3b, and Melee is cast only on its caster's turn, so they're the creatures its controller controls) with its
+   blocks you choose this combat; In Too Deep's "Enchant creature, planeswalker, or Clue" (a Clue whatever its card types,
+   CR 205.3g: TargetSpec orSubtypes); Urza Assembles the Titans' "III — You may activate the loyalty abilities of
+   planeswalkers you control twice this turn rather than only once." (a rule for the player this turn, planeswalkers that
+   come later too, CR 606.3, 611.2c; still twice with Oath of Teferi, rulings: turnRules loyaltyTwice with no object).
+   Browser tests click through choosing Ana's attackers, the declaration of the attackers Ana chose for you and its "Don't
+   pay" button, Melee's blocks, In Too Deep's target and Urza's chapter III with Chandra's +1 twice. New prompts: the
+   attacker picker for another player's creatures, and the "Don't pay" button. +4, 31,440 of 31,936 with round 378. The
+   compiled text of every other card is unchanged. Bots choosing another player's attackers choose as few as the rules
+   allow; bots whose attackers another player chose attack the opponent with the least life, and never pay for them; bots
+   cast Master Warcraft like Berserker's Frenzy (in their first main phase, to choose the blocks) and never cast Melee.
+   Out after round 379 (looked at, not done): Capricopian ("Only the player ~ is attacking may activate this ability": an
+   ability another player activates, then "reselect which player ~ is attacking"); Tamiyo, Collector of Tales, Celestial
+   Reunion, Fabrication Foundry, Ziatora's Envoy and Archelos, Lagoon Mystic (still out, as in their earlier lists).
+   Polish: the log says "You chooses Hill Giant to attack." (the known "You chooses" wording).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

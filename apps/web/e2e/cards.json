@@ -15445,6 +15445,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e828b189-0e8f-43b8-b909-4c23e742e028",
+  "name": "Ghostly Prison",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Creatures can't attack you unless their controller pays {2} for each creature they control that's attacking you.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2022-02-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8b59cacb-46ff-4400-a7f6-b258c81a9b14",
   "name": "Giant Albatross",
   "manaCost": "{1}{U}",
@@ -18830,6 +18856,37 @@
   "set": "dmu",
   "releasedAt": "2022-09-09",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2829ae08-9964-4679-80e8-46d5d33d10b9",
+  "name": "In Too Deep",
+  "manaCost": "{U}{U}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Split second (As long as this spell is on the stack, players can't cast spells or activate abilities that aren't mana abilities.)\nEnchant creature, planeswalker, or Clue\nEnchanted permanent is a colorless Clue artifact with \"{2}, Sacrifice this artifact: Draw a card\" and loses all other abilities. (It's no longer a creature or planeswalker.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant",
+   "Split second"
+  ],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -24250,6 +24307,32 @@
   "set": "tmp",
   "releasedAt": "1997-10-14",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "93fc1ff8-6ef0-42a2-b090-ba95b6f3c98e",
+  "name": "Melee",
+  "manaCost": "{4}{R}",
+  "cmc": 5,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Cast this spell only during combat on your turn before blockers are declared.\nYou choose which creatures block this combat and how those creatures block.\nWhenever a creature attacks and isn't blocked this combat, untap it and remove it from combat.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -41789,6 +41872,37 @@
   "releasedAt": "2025-06-13",
   "rarity": "rare",
   "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0d406496-e1c3-4e1c-976c-618d5ad67d0b",
+  "name": "Urza Assembles the Titans",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "Read ahead (Choose a chapter and start with that many lore counters. Add one after your draw step. Skipped chapters don't trigger. Sacrifice after III.)\nI — Scry 4, then you may reveal the top card of your library. If a planeswalker card is revealed this way, put it into your hand.\nII — You may put a planeswalker card with mana value 6 or less from your hand onto the battlefield.\nIII — You may activate the loyalty abilities of planeswalkers you control twice this turn rather than only once.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Read Ahead",
+   "Scry"
+  ],
+  "commanderLegal": "legal",
+  "set": "dmu",
+  "releasedAt": "2022-09-09",
+  "rarity": "rare",
+  "layout": "saga",
   "gameChanger": false
  },
  {

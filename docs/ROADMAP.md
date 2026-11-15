@@ -1,6 +1,6 @@
 # Roadmap
 
-31,418 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,423 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,891 of
 9,979 (99%).
 
@@ -242,7 +242,7 @@ line blocks.
    (colored cost reductions), Skyscribing (forecast), Clever Conjurer ("not named ~" in target legality), Zaffai,
    Thunder Conductor (an opponent chosen at random), Super-Soldier Serum, Xathrid Demon (done in round B148), Minion of Leshrac and Oath
    of Lim-Dûl (their other lines), Geralf, the Fleshwright ("each other Zombie that entered this turn": the count
-   leaving out the one that entered), Oketra's Last Mercy and Long Rest ("lands you control don't untap during your
+   leaving out the one that entered), Oketra's Last Mercy and Long Rest (done in round B217) ("lands you control don't untap during your
    next untap step", lands that enter later too), Trench Behemoth and Sizzling Soloist ("attacks during its
    controller's next combat phase if able"), Brotherhood Outcast (an Aura card returned to the battlefield), Fury Charm
    (time counters on a suspended card), Exterminate! (done in round 304) (replicate by tapping a Dalek), Flaming Gambit (done in round B143) (the player
@@ -1226,7 +1226,7 @@ line blocks.
    they do, they add {C} for each counter on it" (Cheering Crowd). +16 (28,590 of 31,936 with Lane B B62).
    Out after round 224 (looked at, not done): Heaven Sent (exile it and cast it this turn); Open the Omenpaths (done in round 362) (mana of
    two different colors); Spark of Creativity ("you may have ~ deal damage ... If you don't, you may play that card");
-   Fires of Mount Doom ("when you play a card this way"); Festival of Embers (cast from the graveyard by paying 1 life
+   Fires of Mount Doom (done in round B217) ("when you play a card this way"); Festival of Embers (cast from the graveyard by paying 1 life
    more); Myr Superion (spend only mana produced by creatures). (Karn's Sylex and Strength of the Tajuru, also looked at
    here, went in with Lane B round B63.)
    Round 225 (fresh cards from the top): "If you've committed a crime this turn, ... Otherwise, ..." (Oko, the
@@ -5116,7 +5116,7 @@ line blocks.
    - Triggers still out: "When ~ enters and whenever ..." (Exuberant Fuseling), "another creature you control or a land
      you control" (Long Feng), "they create a Treasure token" (Pain Distributor), "Players can't play lands"
      (Territorial Dispute). "Return a card from your graveyard to your hand" inside modes (Gix's Command, Kairi) and
-     "You return ..." (Dark Intimations, Cruel Ultimatum) are out.
+     "You return ..." (Dark Intimations (done in round B217), Cruel Ultimatum) are out.
    Left from the Field of Ruin, crime, discover and suspect round:
    - Bots never use an "Exile ~" cost (Relic of Progenitus, Feldon's Cane), as with sacrificing their own permanent.
      "Equip—Pay {3} or discard a card" (Bloodthorn Flail) is two equip abilities, one for each cost.
@@ -7010,8 +7010,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Skyclave Shade (done in round B182) (a landfall trigger from the graveyard that lets it be cast this turn), Jocasta, Automaton Avenger
   (returns tapped and attacking when you attack with your commander, from the graveyard), Undiscovered Paradise (done in round B154)
   (returned to hand during your next untap step), Archangel of Strife (done in round B148) (each player chooses war or peace), Lumbering
-  Battlement (exile any number until it leaves, +2/+2 for each), Forbidden Crypt (draws replaced, losing if you
-  can't), Induced Amnesia (exiled face down, returned when it leaves), Heart of Kiran (a loyalty counter instead of
+  Battlement (exile any number until it leaves, +2/+2 for each), Forbidden Crypt (done in round B217) (draws replaced, losing if you
+  can't), Induced Amnesia (exiled face down, returned when it leaves), Heart of Kiran (done in round B217) (a loyalty counter instead of
   crewing).
 - Round B63 (the unlisted ones from EDHREC rank about 19,700 up): "If damage is prevented this way, ~ deals that much
   damage to any target" (Acolyte's Reward: the damage is still prevented when only that second target is gone,
@@ -7034,7 +7034,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   turn), Churning Reservoir (oil counters put this turn), Dutiful Knowledge Seeker (cards put into a library from
   anywhere), Simic Manipulator (done in round 315) and Arcee (remove one or more counters as a variable cost), Benalish Commander and
   Detritivore (suspend X), Darigaaz Reincarnated (done in round B202), Sekki, Seasons' Guide, Fugitive Codebreaker, Reroute (done in round B196), Serum Powder,
-  Delaying Shield (done in round B201), Immortal Coil, Fires of Mount Doom.
+  Delaying Shield (done in round B201), Immortal Coil, Fires of Mount Doom (done in round B217).
 - Round B64 (the unlisted ones from EDHREC rank about 19,700 up to 15,000): "return to the battlefield target creature
   card in your graveyard that was put there from the battlefield this turn" (Moira, Urborg Haunt), "Whenever you put a
   +1/+1 counter on a creature, ... This ability triggers only once each turn" (Ant-Man, Colony Commander), a Gingerbrute
@@ -9225,7 +9225,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   CR 603.4; upkeep triggers now work from exile; as a commander it still always goes to the command zone, CR 903.9a, so it
   doesn't hatch there). Stitcher Geralf (up to two creature cards milled this way and still in a graveyard, a card a
   replacement exiled instead not among them, rulings; X the total power of the cards exiled). +6, 31,269 of 31,936 with B201.
-- Out after round B202 (looked at, not done): Long Rest ("X target cards with different mana values": no targeting rule
+- Out after round B202 (looked at, not done): Long Rest (done in round B217) ("X target cards with different mana values": no targeting rule
   across a spell's targets yet), Song of Inspiration (no ruling settles whether a target that became illegal still adds its
   mana value to the roll, CR 608.2b), Lodestone Bauble, Decoy Gambit (done in round B212) and Coin of Fate stay out for the reasons in the
   earlier lists.
@@ -9430,6 +9430,28 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   sacrifice for another player's Curse with five or more permanents). Browser tests for Preferred Selection's question
   (both answers), Forbidden Ritual's repeat question and Curse of the Cabal's question. +4, 31,418 of 31,936 with rounds
   371-372. The compiled text of every other card is unchanged.
+- Round B217 (least played first, from the Lane B skip lists): Long Rest (X targets, each with a mana value none of the
+  others has, TargetSpec differentManaValues now read for "X target cards with different mana values" too, CR 601.2c; only
+  the cards actually returned count toward eight, then your life total becomes your starting life total, CR 119.5, and it
+  exiles itself). Dark Intimations (an ability of the card in your graveyard, CR 113.6m, triggering as you cast a Bolas
+  planeswalker spell; it's exiled and the planeswalker enters with one more loyalty counter for each one, rulings, CR
+  614.1c). Fires of Mount Doom (the card exiled from the top of your library is played with its usual timing and costs, a
+  land as your land play; playing it this way, a land or a spell, triggers 2 damage to each player, CR 603.2, rulings; not
+  playing it, nothing: Effect impulse playTrigger, MayPlay castTrigger play). Forbidden Crypt (each draw replaced by a card
+  of your choice from your graveyard put into your hand, not drawn, CR 614.6; with none to choose you lose the game,
+  rulings; one draw at a time; offered with the other draw replacements, CR 616.1; CompiledCard drawReturnsFromGraveyard, the
+  "drawEmptyReturn" question with toHand). Heart of Kiran (a loyalty counter removed from a planeswalker you control rather
+  than tapping creatures for its crew cost, not a loyalty ability, so also after that planeswalker's loyalty ability this
+  turn, rulings; CostChoices crewLoyalty, a button in the crew bar; bots still only crew with creatures). Browser tests for
+  Forbidden Crypt's question, Heart of Kiran's button and Long Rest's targets. +5, 31,423 of 31,936. The compiled text of
+  every other card is unchanged.
+- Out after round B217 (looked at, not done): Lich and Nefarious Lich (life gained becomes cards drawn, and those draws
+  can happen in the middle of lifelink damage, where a draw replacement can't pause yet, see Swans of Bryn Argoll; Nefarious
+  Lich's and Dralnu, Lich Lord's choices of what to exile or sacrifice for each damage are in the middle of damage too),
+  Battlefield Thaumaturge (still out: whether a creature targeted twice counts twice), Charmed Pendant (a mana ability whose
+  colors come from the card its cost mills, a hybrid symbol giving either color: the mana can't be known before paying, so
+  autopay can't plan it), Cemetery Desecrator (a reflexive modal trigger after exiling a card from any graveyard, X its mana
+  value) stays out for now.
 - Out after round B216 (looked at, not done): Swans of Bryn Argoll (see round B66: its draws in the middle of damage can
   be replaced by dredge) and Immortal Coil (a card of your choice exiled from your graveyard for each 1 damage, a choice
   in the middle of damage) stay out.
@@ -9471,7 +9493,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Despoiler (face-down cards in exile chosen by group and then at random, rulings) stay out.
 - Out after round B188 (looked at, not done): Kang Dynasty (chapters I and II goad creatures of each opponent's choosing
   and draw for their combat damage until your next turn; III is done), Drizzt Do'Urden (done in round 368) (its short name "Drizzt" isn't read
-  as ~), Long Rest, Time Reaper, Pulsemage Advocate (done in round B191), Heart of Kiran and Turf War stay out.
+  as ~), Long Rest (done in round B217), Time Reaper, Pulsemage Advocate (done in round B191), Heart of Kiran (done in round B217) and Turf War stay out.
 - Out after round B187 (looked at, not done): Kraven the Hunter (the greatest power among a player's creatures as one died,
   several dying at once), Corrosive Ooze (done in round B213), Trove of Temptation, Rain of Gore and Blood Scrivener stay out for the reasons in
   the earlier lists.
@@ -9521,11 +9543,11 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   reasons in the earlier lists.
 - Out after round B174 (looked at, not done): Demilich (done in round B193), Arcane Proxy (done in round B193) and Roving Actuator (a copy of a graveyard card cast
   while the ability resolves), Sproutback Trudge (done in round B193) (cast from the graveyard as its end step trigger resolves), Outmaneuver and
-  Long Rest (X targets), Pulsemage Advocate (done in round B191) (three targets from one opponent's graveyard).
+  Long Rest (done in round B217) (X targets), Pulsemage Advocate (done in round B191) (three targets from one opponent's graveyard).
 - Out after round B173 (looked at, not done): Corrosive Ooze (done in round B213) (the Equipment attached to the creature just before it left the
   battlefield is destroyed at end of combat, rulings: attachments as they last existed aren't kept), Oppressive Rays and
   Gloom (done in round B184) (the tax reaches mana abilities), Murktide Regent and Soulflayer (done in round B182) (which cards delve exiled aren't kept with the
-  permanent), Heart of Kiran (a loyalty counter removed instead of crewing, still crewing for "crews" triggers), Crypsis (done in round B187)
+  permanent), Heart of Kiran (done in round B217) (a loyalty counter removed instead of crewing, still crewing for "crews" triggers), Crypsis (done in round B187)
   ("protection from creatures your opponents control"), Gorm the Great (done in round B198) ("must be blocked by two or more creatures if able"),
   Phyrexian Devourer and Boneyard Mycodrax (done in round B198) (their other lines) stay out.
 - Out after round B172 (looked at, not done): Titania's Song (its effect "continues until end of turn" once it leaves: whether

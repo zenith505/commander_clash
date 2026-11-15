@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   asFace,
+  crewLoyaltyChoices,
   dredgeAmount,
   castableFaces,
   isType,
@@ -1949,6 +1950,15 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                     : undefined
               }
               onCancel={() => setTapPick(null)}
+              onCrewLoyalty={
+                tapPick.kind === "crew"
+                  ? (walker) => {
+                      setTapPick(null);
+                      const { objectId, index } = tapPick;
+                      dispatch(planActivate(s, HUMAN, objectId, index, undefined, undefined, undefined, undefined, { crewLoyalty: walker }) ?? [{ type: "activateAbility", player: HUMAN, objectId, index, costs: { crewLoyalty: walker } }]);
+                    }
+                  : undefined
+              }
             />
           )}
           {xOppPick && (
@@ -3101,7 +3111,7 @@ function EvidenceChoice({
   );
 }
 
-function TapPickBar({ s, pick, onDone, onSkip, onCancel }: { s: GameState; pick: TapPick; onDone: () => void; onSkip?: () => void; onCancel: () => void }) {
+function TapPickBar({ s, pick, onDone, onSkip, onCancel, onCrewLoyalty }: { s: GameState; pick: TapPick; onDone: () => void; onSkip?: () => void; onCancel: () => void; /** Heart of Kiran: a loyalty counter removed from this planeswalker instead of the crew cost. */ onCrewLoyalty?: (walker: string) => void }) {
   const name = cardOf(s, pick.objectId).name;
   if (pick.kind === "teamwork") {
     const total = pick.chosen.reduce((n, id) => n + teamworkPower(s, id), 0);
@@ -3141,6 +3151,8 @@ function TapPickBar({ s, pick, onDone, onSkip, onCancel }: { s: GameState; pick:
   if (pick.kind === "crew") {
     const total = pick.chosen.reduce((n, id) => n + (pick.plain ? Math.max(0, power(s, s.objects[id]!)) : crewPower(s, s.objects[id]!, pick.saddle)), 0);
     const verb = pick.plain ? "Tap" : pick.saddle ? "Saddle" : "Crew";
+    // Heart of Kiran: or a loyalty counter from one of your planeswalkers instead of tapping creatures.
+    const walkers = onCrewLoyalty ? crewLoyaltyChoices(s, HUMAN, s.objects[pick.objectId]!, abilitiesOf(s, s.objects[pick.objectId]!).activated[pick.index]!) : [];
     return (
       <div className="targeting">
         <span>
@@ -3152,6 +3164,11 @@ function TapPickBar({ s, pick, onDone, onSkip, onCancel }: { s: GameState; pick:
         <button disabled={total < pick.n} onClick={onDone}>
           {verb}
         </button>
+        {walkers.map((w) => (
+          <button key={w} onClick={() => onCrewLoyalty!(w)}>
+            Remove a loyalty counter from {cardOf(s, w).name} instead
+          </button>
+        ))}
         <button className="ghost" onClick={onCancel}>
           Cancel
         </button>
@@ -5334,7 +5351,8 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}:</strong> your library is empty, so instead of drawing, return a creature card from your graveyard to the battlefield
+          <strong>{pending.source}:</strong>{" "}
+          {pending.toHand ? "instead of drawing, return a card from your graveyard to your hand" : "your library is empty, so instead of drawing, return a creature card from your graveyard to the battlefield"}
           {pending.left > 0 ? ` (${pending.left} more draw${pending.left === 1 ? "" : "s"} after this)` : ""}
         </span>
         {pending.cards.map((id) => {

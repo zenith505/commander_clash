@@ -547,7 +547,7 @@ export interface GameObject {
     /** Lightstall Inquisitor: "Each land played this way enters tapped": a land played with this permission enters tapped (CR 614.1c); a spell doesn't. */
     landTapped?: true;
     /** The Ruinous Powers: "When you cast a spell this way, ...": this triggers, from the ability's source, as a spell is cast with this permission (CR 603.2), about that spell (Effect impulse `castTrigger`). */
-    castTrigger?: { body: AbilityBody; sourceId: ObjectId; sourceZc: number; sourceCardId: string };
+    castTrigger?: { body: AbilityBody; sourceId: ObjectId; sourceZc: number; sourceCardId: string; /** Fires of Mount Doom: "When you play a card this way": a land played with the permission too. */ play?: true };
     /** Monk Class: "as long as you've cast another spell this turn": only while `player` has cast a spell this turn (GameState.castThisTurn). */
     castAnotherThisTurn?: true;
   };
@@ -1441,6 +1441,8 @@ export interface LastKnown {
 
 /** Choices for a spell's additional costs (CR 601.2b, 601.2f-h). */
 export interface CostChoices {
+  /** Heart of Kiran (CompiledCard.crewLoyaltyAlt): the planeswalker you control a loyalty counter is removed from rather than paying the crew cost; no creature is tapped. */
+  crewLoyalty?: ObjectId;
   /** Kicker costs to pay, by index; multikicker's index 0 once per time (CR 702.33). */
   kicks?: number[];
   /** Casting from a graveyard: which way (flashback, jump-start, retrace, escape). */
@@ -1704,7 +1706,7 @@ export type PendingDecision =
    * Out of the Tombs (CompiledCard.drawEmptyReturn): a draw from an empty library is replaced; `player` picks which of
    * `cards`, the creature cards in their graveyard, returns to the battlefield. `left` and `made` are the draws after it.
    */
-  | { kind: "drawEmptyReturn"; player: PlayerId; source: string; cards: ObjectId[]; left: number; made?: number[]; after?: "drawStep" }
+  | { kind: "drawEmptyReturn"; player: PlayerId; source: string; cards: ObjectId[]; left: number; made?: number[]; after?: "drawStep"; /** Forbidden Crypt (CompiledCard.drawReturnsFromGraveyard): any card of `cards`, the player's graveyard, to their hand instead, whatever their library holds. */ toHand?: true }
   /**
    * Different replacements could apply to this draw (shields of Urabrask, Heretic Praetor and the Words, with each other
    * or with Underrealm Lich, Tomorrow, dredge, Notion Thief, Alhammarret's Archive, Scion of Halaster or Abundance; two

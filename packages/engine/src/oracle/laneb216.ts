@@ -2,6 +2,7 @@
 // whole spells (chained from round B215's).
 import type { AbilityBody, CompiledCard, Effect, TargetSpec } from "../abilities";
 import { parseBody } from "./body";
+import { roundB217Spell } from "./laneb217";
 import { parseTrigger } from "./triggers";
 
 /** A trigger line read the usual way, or null. */
@@ -57,5 +58,5 @@ export function roundB216Spell(text: string): AbilityBody | null | undefined {
     const nontoken: TargetSpec = sac.filter;
     return { targets: body.targets, effects: [{ type: "repeatMaySteps", effects: body.effects, text: "sacrifice a nontoken permanent; if you do, that opponent loses 2 life unless they sacrifice a permanent or discard a card", while: nontoken }], text };
   }
-  return undefined;
+  return roundB217Spell(text);
 }

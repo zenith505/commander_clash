@@ -2735,6 +2735,8 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
     return player(s, second).lost ? true : draw(s, second, 1, undefined, [], true);
   }
   while (n > 0 || made.length) {
+    // A player who has lost (Forbidden Crypt with no card to return) has left the game, and draws nothing more (CR 800.4a).
+    if (player(s, pid).lost) break;
     // Narset, Parter of Veils (Spirit of the Labyrinth: any player): an opponent who has drawn a card this turn can't
     // draw another; the draw doesn't happen, so nothing replaces it (rulings), and the rest of these don't either.
     const narset = (player(s, pid).draws?.turn === s.turn ? player(s, pid).draws!.n : 0) >= 1 ? s.battlefield.find((id) => (controllerOf(s, obj(s, id)) !== pid && abilitiesOf(s, obj(s, id)).opponentsDrawOnce) || abilitiesOf(s, obj(s, id)).playersDrawOnce) : undefined;
@@ -3407,8 +3409,12 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   for (const id of mine((a) => a.drawMaySkip || a.drawMayCounter)) if (!skippers.some((d) => nameOf(s, d) === nameOf(s, id))) skippers.push(id);
   // Island Sanctuary: only during that player's own draw step; one of each name.
   if (s.step === "draw" && s.activePlayer === pid) for (const id of mine((a) => a.drawStepMaySkip)) if (!skippers.some((d) => nameOf(s, d) === nameOf(s, id))) skippers.push(id);
-  if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length) return undefined;
+  // Forbidden Crypt: one of each name, mandatory (two of them do the same thing; the first replaces the draw, CR 614.5).
+  const crypts: ObjectId[] = [];
+  for (const id of mine((a) => a.drawReturnsFromGraveyard)) if (!crypts.some((d) => nameOf(s, d) === nameOf(s, id))) crypts.push(id);
+  if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length) return undefined;
   const out = [...shields];
+  for (const id of crypts) out.push({ key: `crypt:${id}`, label: `Return a card from your graveyard to your hand instead; with none, you lose the game (${nameOf(s, id)})` });
   for (const id of sages) out.push({ key: `sages:${id}`, label: `Reveal the top ${abilitiesOf(s, obj(s, id)).drawRevealCreatures} cards instead, the creature cards into your hand, the rest on the bottom of your library (${nameOf(s, id)})` });
   for (const id of exilers) {
     const a = abilitiesOf(s, obj(s, id)).drawExile!;
@@ -3434,7 +3440,7 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
     out.push({ key: `${kind ? "counter" : "mayskip"}:${id}`, label: kind ? `Put a ${kind} counter on ${nameOf(s, id)} instead` : only ? `Skip this draw; until your next turn you can't be attacked except by creatures with ${only.map((k) => k.toLowerCase()).join(" and/or ")} (${nameOf(s, id)})` : `Skip this draw (${nameOf(s, id)})` });
   }
   // A Notion Thief with nothing else to choose from goes on as before.
-  if (!shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && digs.length < 2 && out.length < 2) return undefined;
+  if (!shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && digs.length < 2 && out.length < 2) return undefined;
   // Only replacements its player may decline (dredge, Abundance, Archmage Ascension, Obstinate Familiar, Pursuit of
   // Knowledge): or none of them, the draw itself.
   if (out.every((x) => /^(?:dredge|abundance|tutor|mayskip|counter):/.test(x.key))) out.push({ key: "draw", label: "Draw the card" });
@@ -3537,6 +3543,7 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
     return;
   }
   if (key.startsWith("tutor:")) return tutorInstead(s, pid, key.slice("tutor:".length), left, after, made);
+  if (key.startsWith("crypt:")) return cryptInstead(s, pid, nameOf(s, key.slice("crypt:".length)), left, after, made);
   if (key === "draw") {
     // None of the optional replacements: the card is drawn (an empty library's own replacements still apply).
     const one = drawOne(s, pid, { left, made, ...(after ? { after } : {}) });
@@ -3658,7 +3665,7 @@ function chooseDrawInstead(s: GameState, p: Player, choice: string) {
   if (choice === "thief" && !notionThief(s, p.id)) throw new RulesError("no Notion Thief replaces that draw");
   if (choice.startsWith("tutor:") && !s.battlefield.includes(choice.slice("tutor:".length))) throw new RulesError("that permanent no longer replaces the draw");
   if (choice.startsWith("exiles:") && !drawExilers(s, p.id).includes(choice.slice("exiles:".length))) throw new RulesError("that permanent no longer replaces the draw");
-  if (/^(?:sages|mayskip|counter):/.test(choice) && !s.battlefield.includes(choice.slice(choice.indexOf(":") + 1))) throw new RulesError("that permanent no longer replaces the draw");
+  if (/^(?:sages|mayskip|counter|crypt):/.test(choice) && !s.battlefield.includes(choice.slice(choice.indexOf(":") + 1))) throw new RulesError("that permanent no longer replaces the draw");
   s.pending = null;
   const made = [...(pend.made ?? [])];
   const done = applyDrawReplacement(s, p.id, choice, pend.left, pend.after, made, pend.archives);
@@ -3672,6 +3679,31 @@ export function continueDraws(s: GameState, pid: PlayerId, left: number, after: 
   else if (s.resolving) continueResolution(s);
 }
 
+/**
+ * Forbidden Crypt instead of a draw (CompiledCard.drawReturnsFromGraveyard, CR 614.1a): a card from `pid`'s graveyard to
+ * their hand, their choice of any card there (not drawn, CR 614.6); with none to choose, they lose the game (rulings: "if you
+ * can't" is about choosing a card as well as putting it into the hand). `left` and `made` are the draws after it.
+ */
+function cryptInstead(s: GameState, pid: PlayerId, source: string, left: number, after: "drawStep" | undefined, made: number[]): "paused" | void {
+  const p = player(s, pid);
+  if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+  const cards = [...p.graveyard];
+  if (!cards.length) {
+    log(s, `${p.name} would draw a card, and has no card in their graveyard to return instead (${source}).`);
+    playerLoses(s, pid, `${source}: no card to return`);
+    return;
+  }
+  if (cards.length === 1) return returnToHandInstead(s, pid, cards[0]!, source);
+  s.pending = { kind: "drawEmptyReturn", player: pid, source, cards, left, ...(made.length ? { made: [...made] } : {}), ...(after ? { after } : {}), toHand: true };
+  return "paused";
+}
+
+/** Forbidden Crypt's card returned to its owner's hand instead of a draw. */
+function returnToHandInstead(s: GameState, pid: PlayerId, id: ObjectId, source: string) {
+  log(s, `${player(s, pid).name} returns ${nameOf(s, id)} from their graveyard to their hand instead of drawing (${source}).`);
+  moveObject(s, id, "hand");
+}
+
 /** Out of the Tombs instead of a draw: the creature card returns to the battlefield under its owner's control. */
 function returnFromTombs(s: GameState, pid: PlayerId, id: ObjectId, source: string) {
   if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
@@ -3682,9 +3714,10 @@ function returnFromTombs(s: GameState, pid: PlayerId, id: ObjectId, source: stri
 function chooseDrawEmptyReturn(s: GameState, p: Player, id: ObjectId) {
   const pend = s.pending;
   if (pend?.kind !== "drawEmptyReturn" || pend.player !== p.id) throw new RulesError("no draw to replace");
-  if (!pend.cards.includes(id) || obj(s, id).zone !== "graveyard") throw new RulesError("choose a creature card in your graveyard");
+  if (!pend.cards.includes(id) || obj(s, id).zone !== "graveyard") throw new RulesError(pend.toHand ? "choose a card in your graveyard" : "choose a creature card in your graveyard");
   s.pending = null;
-  returnFromTombs(s, p.id, id, pend.source);
+  if (pend.toHand) returnToHandInstead(s, p.id, id, pend.source);
+  else returnFromTombs(s, p.id, id, pend.source);
   continueDraws(s, p.id, pend.left, pend.after, [...(pend.made ?? [])]);
 }
 
@@ -5596,7 +5629,10 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, fac
     throw new RulesError(choice?.kind === "payLife" ? `you can't pay ${choice.n} life` : choice && choice.kind !== "mayTapRad" ? `you have no ${choice.filter.text} to reveal` : `${d.name} has no choice to make as it enters`);
   // Played from the top of the library: the permission used (a once-a-turn one used up, The Fourth Doctor's Food).
   if (o.zone === "library") useTopPermission(s, p.id, topPermission(s, o, p.id));
+  // Fires of Mount Doom: "When you play a card this way, ..." (CR 603.2): a land played with that permission, about it.
+  const playTrigger = o.zone === "exile" && ownExilePermission(s, o, p.id) && o.mayPlay?.castTrigger?.play ? o.mayPlay.castTrigger : undefined;
   putLandPlayed(s, p, id, untapped, face);
+  if (playTrigger) s.triggerQueue.push({ sourceId: playTrigger.sourceId, sourceCardId: playTrigger.sourceCardId, sourceZc: playTrigger.sourceZc, controller: p.id, index: -1, body: playTrigger.body, subject: { id, zc: obj(s, id).zoneChanges ?? 0 } });
 }
 
 /**
@@ -9672,9 +9708,14 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const toRemove = ab.removeCounters?.x ? (x ?? 0) : (ab.removeCounters?.n ?? 0);
   if (ab.removeCounters && removableCounters(s, o, ab.removeCounters.counter) < toRemove) return `${d.name} doesn't have ${toRemove} ${ab.removeCounters.counter} counter${toRemove === 1 ? "" : "s"} to remove`;
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
-  if (ab.crew !== undefined) {
+  if (ab.crew !== undefined && costs?.crewLoyalty !== undefined) {
+    // Heart of Kiran: a loyalty counter removed instead of the crew cost, no creature tapped.
+    if (!crewLoyaltyChoices(s, pid, o, ab).includes(costs.crewLoyalty)) return `no loyalty counter to remove from that planeswalker instead of ${d.name}'s crew cost`;
+    if (tapCreatures?.length) return "no creature is tapped when a loyalty counter is removed instead";
+  } else if (ab.crew !== undefined) {
     const cp = crewProblem(s, pid, o, ab.crew, tapCreatures, ab.saddle, ab.tapPower);
-    if (cp) return cp;
+    // With nothing chosen yet, Heart of Kiran's other way to pay may still be there.
+    if (cp && !(tapCreatures === undefined && crewLoyaltyChoices(s, pid, o, ab).length)) return cp;
   } else if (ab.station) {
     // Station (CR 702.184a): tap another untapped creature you control, whatever its power.
     if (tapCreatures === undefined) {
@@ -10114,6 +10155,19 @@ export function crewPower(s: GameState, c: GameObject, saddle = false): number {
  * Crew N's cost (CR 702.122a): tap any number of other untapped creatures you control with total
  * power N or greater. Without a choice, whether some choice would do.
  */
+/**
+ * Heart of Kiran (CompiledCard.crewLoyaltyAlt): the planeswalkers `pid` controls with a loyalty counter to remove rather
+ * than pay this crew ability's cost (none for any other permanent, or for saddle). Any time the crew ability could be
+ * activated, even after a loyalty ability of that planeswalker this turn (rulings).
+ */
+export function crewLoyaltyChoices(s: GameState, pid: PlayerId, vehicle: GameObject, ab: ActivatedAbility): ObjectId[] {
+  if (ab.crew === undefined || ab.saddle || ab.tapPower || !abilitiesOf(s, vehicle).crewLoyaltyAlt) return [];
+  return s.battlefield.filter((id) => {
+    const w = obj(s, id);
+    return controllerOf(s, w) === pid && objIsType(s, w, "Planeswalker") && (w.counters.loyalty ?? 0) >= 1;
+  });
+}
+
 function crewProblem(s: GameState, pid: PlayerId, vehicle: GameObject, n: number, chosen?: ObjectId[], saddle = false, plain = false): string | null {
   // Mossbridge Troll (ActivatedAbility.tapPower): not crewing, so each creature counts its power (rulings: checked only
   // as the cost is paid), and one that "can't crew" may be tapped.
@@ -10143,7 +10197,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab?.xIs && typeof ab.xIs === "object" && "opponentHand" in ab.xIs && costs?.xOpponent === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose an opponent: X is the number of cards in their hand");
   if (ab?.body.modal && modes === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose ${describeCount(ab.body.modal.min, ab.body.modal.max)} for ${d.name}'s ability`);
   if (ab?.station && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose a creature to tap for station");
-  if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.tapPower ? "tap" : ab.saddle ? "saddle" : "crew"} with`);
+  if (ab?.crew !== undefined && !tapCreatures && costs?.crewLoyalty === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.tapPower ? "tap" : ab.saddle ? "saddle" : "crew"} with`);
   // What pays each cost beyond mana is chosen as it's activated (CR 602.2b, 601.2h): an activation that doesn't say,
   // or says for one cost and not another, can't skip it. As for spells (castSpell).
   if (ab && activatedCosts(ab, x, o, s, p.id).some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
@@ -10272,6 +10326,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
       invalidateCharacteristics(s);
     }
     for (const c of tapCreatures ?? []) tapPermanent(s, obj(s, c));
+    // Heart of Kiran: a loyalty counter removed instead (not a loyalty ability, rulings).
+    if (ab.crew !== undefined && costs?.crewLoyalty !== undefined) removeCountersCost(s, obj(s, costs.crewLoyalty), { counter: "loyalty", n: 1 });
   });
   if (ab.waterbend !== undefined && tapCreatures?.length) log(s, `${p.name} taps ${tapCreatures.map((c) => nameOf(s, c)).join(", ")} ${ab.bendCreaturesOnly ? "to pay for it" : "to waterbend"}.`);
   // Its last known information takes in the counters its cost put on or removed (CR 608.2h): Nissa, Ascended Animist's
@@ -10356,6 +10412,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab.cycling) log(s, `${p.name} cycles ${d.name} (${ab.text}).`);
   else if (ab.discardSelf) log(s, `${p.name} discards ${d.name} (${ab.text}).`);
   else if (ab.crew !== undefined && ab.tapPower) log(s, `${p.name} activates ${d.name} (${ab.text.replace(/~/g, d.name).replace(/\.$/, "")}), tapping ${tapCreatures!.map((c) => nameOf(s, c)).join(", ")}.`);
+  else if (ab.crew !== undefined && costs?.crewLoyalty !== undefined) log(s, `${p.name} crews ${d.name}, removing a loyalty counter from ${nameOf(s, costs.crewLoyalty)} instead of tapping creatures.`);
   else if (ab.crew !== undefined) log(s, `${p.name} ${ab.saddle ? "saddles" : "crews"} ${d.name} with ${tapCreatures!.map((c) => nameOf(s, c)).join(", ")}.`);
   else if (ab.station) log(s, `${p.name} stations ${d.name} with ${nameOf(s, tapCreatures![0]!)}.`);
   else {

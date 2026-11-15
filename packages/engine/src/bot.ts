@@ -249,7 +249,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const bin = wantOnTop(s, pid, a) && !wantOnTop(s, pid, b) ? b : !wantOnTop(s, pid, a) && wantOnTop(s, pid, b) ? a : mv(s, a) >= mv(s, b) ? b : a;
       return [{ type: "drawLook", player: pid, objectId: bin }];
     }
-    // Out of the Tombs: the creature card that costs the most comes back.
+    // Out of the Tombs: the creature card that costs the most comes back; Forbidden Crypt: the card that costs the most.
     if (pend.kind === "drawEmptyReturn") return [{ type: "drawEmptyReturn", player: pid, objectId: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a))[0]! }];
     if (pend.kind === "drawInstead") {
       // Its own Words before an opponent's Urabrask; the life when it's low, otherwise the token.
@@ -269,7 +269,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const shelter = sanctuary && !player(s, pid).attackOnlyByUntil && grounded(abilitiesOf(s, s.objects[sanctuary.slice("mayskip:".length)]!).drawStepMaySkip!.attackOnlyBy) * 2 >= player(s, pid).life ? sanctuary : undefined;
       const skip = shelter ?? (player(s, pid).library.length <= 5 ? has("mayskip") : undefined);
       const declinable = (k: string) => k === "thief" || /^(?:dredge|mayskip|counter):/.test(k);
-      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("archive") ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? pend.options.find((k) => !declinable(k)) ?? pend.options[0]!;
+      // Forbidden Crypt with an empty graveyard loses the game: anything else first.
+      const loses = (k: string) => k.startsWith("crypt:") && !player(s, pid).graveyard.length;
+      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("archive") ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? pend.options.find((k) => !declinable(k) && !loses(k)) ?? pend.options.find((k) => !loses(k)) ?? pend.options[0]!;
       return [{ type: "drawInstead", player: pid, choice: pick }];
     }
     if (pend.kind === "dredge") {

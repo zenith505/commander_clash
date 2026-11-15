@@ -655,6 +655,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dfb5f660-fd8b-4b7b-934c-6a71cd182f15",
+  "name": "Ajani Goldmane",
+  "manaCost": "{2}{W}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Ajani",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Ajani"
+  ],
+  "oracleText": "+1: You gain 2 life.\n−1: Put a +1/+1 counter on each creature you control. Those creatures gain vigilance until end of turn.\n−6: Create a white Avatar creature token. It has \"This token's power and toughness are each equal to your life total.\"",
+  "loyalty": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lrw",
+  "releasedAt": "2007-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c03ae426-2536-4c20-a73a-a24e816f76b0",
   "name": "Akiri, Fearless Voyager",
   "manaCost": "{1}{R}{W}",
@@ -14065,6 +14096,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8b34b211-985b-4934-bb3b-8e6672685ac2",
+  "name": "Forbidden Crypt",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If you would draw a card, return a card from your graveyard to your hand instead. If you can't, you lose the game.\nIf a card would be put into your graveyard from anywhere, exile that card instead.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4b5d9c76-8be8-4e25-b978-9750df3d8c15",
   "name": "Forbidden Ritual",
   "manaCost": "{2}{B}{B}",
@@ -17419,6 +17476,38 @@
   "commanderLegal": "legal",
   "set": "blc",
   "releasedAt": "2024-08-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e2ee410f-2467-4f1f-84a0-8a79faedc0b3",
+  "name": "Heart of Kiran",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Legendary Artifact — Vehicle",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Vehicle"
+  ],
+  "oracleText": "Flying, vigilance\nCrew 3 (Tap any number of creatures you control with total power 3 or more: This Vehicle becomes an artifact creature until end of turn.)\nYou may remove a loyalty counter from a planeswalker you control rather than pay Heart of Kiran's crew cost.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Flying",
+   "Vigilance",
+   "Crew"
+  ],
+  "commanderLegal": "legal",
+  "set": "aer",
+  "releasedAt": "2017-01-20",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
@@ -22831,6 +22920,32 @@
   "commanderLegal": "legal",
   "set": "fic",
   "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fc8df5c8-fda6-454c-a1ac-21c6e3d75b9c",
+  "name": "Long Rest",
+  "manaCost": "{X}{G}{G}{G}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Return X target cards with different mana values from your graveyard to your hand. If eight or more cards were returned to your hand this way, your life total becomes equal to your starting life total. Exile Long Rest.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

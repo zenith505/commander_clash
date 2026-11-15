@@ -6,7 +6,7 @@
 
 import type { Amount, AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "./abilities";
 import { ANY_COUNTER } from "./abilities";
-import { abilitiesOf, basePowerNow, defOf, isType } from "./cards";
+import { abilitiesOf, basePowerNow, castCardAs, defOf, isType } from "./cards";
 import { compileCard } from "./oracle";
 import { bindChosen, cardPT, isSuspended, objectMatches, printedMatches, ringBearer, spellManaValue, spellPT } from "./effects";
 import { characteristics, controllerOf, staticConditionNow, type Characteristics } from "./layers";
@@ -865,8 +865,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "manaSpent":
       return ctx.manaSpent ?? 0;
-    case "convokedCount":
-      return ctx.sourceId !== undefined ? (s.objects[ctx.sourceId]?.convoked?.length ?? 0) : 0;
+    case "convokedCount": {
+      const o = ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined;
+      if (!o) return 0;
+      // Knight-Errant of Eos: the permanent as it last existed on the battlefield once it has left (CR 608.2h).
+      const lk = o.zone !== "battlefield" && o.zone !== "stack" ? s.lastKnown?.[o.id] : undefined;
+      if (lk && (ctx.sourceZc === undefined || lk.zc === ctx.sourceZc)) return lk.convoked ?? 0;
+      return o.convoked?.length ?? 0;
+    }
     case "manaSpentOn": {
       const o = refObjects(s, c.of, ctx)[0];
       if (!o) return 0;
@@ -1302,7 +1308,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : c.notSource && ctx.sourceId ? s.objects[ctx.sourceId]?.castNth : undefined;
       // Sentinel Tower: before the spell whose cast triggered this ability.
       const before = c.beforeCause ? (ctx.cause ? s.castItems?.[ctx.cause]?.castNth : undefined) ?? 0 : Infinity;
-      const cast = (s.castThisTurn ?? []).filter((x, i) => i !== self && i < before && (c.anyone || (c.opponents ? opponents(s, ctx.controller).includes(x.player) : x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller))) && !(c.notFromHand && x.from === "hand") && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!))));
+      const cast = (s.castThisTurn ?? []).filter((x, i) => i !== self && i < before && (c.anyone || (c.opponents ? opponents(s, ctx.controller).includes(x.player) : x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller))) && !(c.notFromHand && x.from === "hand") && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, castCardAs(s, x)!))));
       if (c.cardTypes) return new Set(cast.flatMap((x) => x.types ?? s.cards[x.card]?.types ?? [])).size;
       const n = cast.length;
       return c.beyondFirst ? Math.max(0, n - 1) : n;
@@ -1310,7 +1316,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "manaValueCastThisTurn": {
       // The resolving spell's own cast is its castNth'th; a copy wasn't cast, so it has none (CR 707.10).
       const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : undefined;
-      const mvs = (s.castThisTurn ?? []).flatMap((x, i) => (x.player === ctx.controller && i !== self && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!))) ? [x.mv ?? 0] : []));
+      const mvs = (s.castThisTurn ?? []).flatMap((x, i) => (x.player === ctx.controller && i !== self && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, castCardAs(s, x)!))) ? [x.mv ?? 0] : []));
       return c.greatest ? Math.max(0, ...mvs) : mvs.reduce((n, v) => n + v, 0);
     }
     case "colorsAmongPermanents": {

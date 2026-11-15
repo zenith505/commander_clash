@@ -22,6 +22,7 @@ import { roundB167Sentence } from "./laneb167";
 import { roundB170WholeText } from "./laneb170";
 import { round319WholeText } from "./round319";
 import { round320WholeText } from "./round320";
+import { round370WholeText } from "./round370";
 
 export interface Ctx {
   targets: TargetSpec[];
@@ -2382,7 +2383,14 @@ function decayedZombieMods(sentence: string | undefined): Modification[] | null 
   return mods ? [...mods, { kind: "addKeywords", keywords: ["Decayed"] }] : null;
 }
 
+/** Round 370's whole texts (oracle/round370.ts), read before parseBodyTextOwn's rewrites; then those. */
 function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfAttacking?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; costTappedX?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
+  const r370 = round370WholeText(text, (t) => parseBody(t, opts));
+  if (r370 !== null && typeof r370 !== "string") return r370;
+  return parseBodyTextOwn(typeof r370 === "string" ? r370 : text, opts);
+}
+
+function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfAttacking?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; costTappedX?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~")
     // Ecstatic Beauty: "You may play those cards until end of turn." after an exile from the top: the usual wording.

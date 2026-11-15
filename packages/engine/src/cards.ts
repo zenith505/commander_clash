@@ -135,6 +135,15 @@ export const defOf = (s: GameState, o: GameObject): CardDef => {
 };
 
 /**
+ * A spell cast this turn (GameState.castThisTurn), with the card types it had as it was cast, which effects can change
+ * on the stack (Encroaching Mycosynth's artifact spells, CR 613.1d): "the second artifact spell you cast this turn".
+ */
+export const castCardAs = (s: GameState, c: { card: string; types?: string[] }): CardDef | undefined => {
+  const d = s.cards[c.card];
+  return d && c.types && (c.types.length !== d.types.length || c.types.some((t, i) => t !== d.types[i])) ? { ...d, types: c.types } : d;
+};
+
+/**
  * `d` with the rules text of the definition `from` (an exchange of text boxes, CR 612.5): its keywords and text, where
  * that card's name, which meant that object, now means this one (CR 201.5). Registered in GameState.cards under a key of
  * its own, so it compiles and caches like any card.

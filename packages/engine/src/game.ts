@@ -5774,7 +5774,10 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     if (others.length) log(s, `${name}: each player adds ${adds.map((m) => `{${m}}`).join("")}.`);
     for (const q of others) addMana(s, q, adds, { from });
   }
-  addMana(s, getter, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: ab.spentCreatureCounter } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
+  // Spectral Searchlight: another player chooses the color of the mana they add (CR 605.3b, 608.2d): asked below, once the
+  // rest of the ability is done; the activator's pick only says how much (Mana Reflection's doubling, CR 106.12b).
+  const theyChoose = ab.getterChooses && getter !== p.id;
+  if (!theyChoose) addMana(s, getter, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: ab.spentCreatureCounter } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
   // Tyvar the Bellicose: "Whenever a mana ability of this creature resolves" (CR 605.3b), the mana it made.
   if (o.zone === "battlefield") fireEvent(s, { type: "manaAbilityResolved", id: o.id, amount: adds.length });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
@@ -5805,6 +5808,10 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Vazi: "if mana from a Treasure was spent to ... activate it" counts mana abilities too.
   // Wizard's Rockets: {X} in its activation cost (Magus Lucea Kane's delayed trigger is used up by it, with nothing to copy).
   fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}), ...(ab.exhaust ? { exhaust: true as const } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}) });
+  if (theyChoose && adds.length && !player(s, getter).lost) {
+    s.manaColorFor = { player: getter, n: adds.length, from, source: name };
+    s.pending = { kind: "chooseOption", player: getter, source: name, what: "manaColorFor", options: COLORS.map((c) => COLOR_NAMES[c]), prompt: `${p.name} tapped ${name}: choose the color of the ${adds.length === 1 ? "mana" : `${adds.length} mana`} you add` };
+  }
 }
 
 /** What mana casting it can spend (CR 106.6): Security Rhox's alternative cost only mana from Treasures (CR 106.3). */
@@ -10966,6 +10973,16 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "loseReplacement") {
     // Kept for the game loss about to happen as the state-based actions are performed (playerLoses).
     s.loseChoice = { player: p.id, choice };
+    return;
+  }
+  if (pend.what === "manaColorFor") {
+    // Spectral Searchlight: the chosen player adds the mana in the color they chose (see activateMana).
+    const m = s.manaColorFor;
+    if (!m || m.player !== p.id) throw new RulesError("no mana is waiting for its color");
+    s.manaColorFor = undefined;
+    const c = COLORS.find((k) => COLOR_NAMES[k] === choice)!;
+    addMana(s, p.id, Array<ManaType>(m.n).fill(c), { from: m.from });
+    log(s, `${p.name} adds ${`{${c}}`.repeat(m.n)} (${m.source}).`);
     return;
   }
   if (pend.what === "legend") {

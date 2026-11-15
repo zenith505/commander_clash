@@ -5270,6 +5270,14 @@ export type Effect =
   | { type: "damageMod"; mod: DamageMod; until?: "yourNextTurn"; byTarget?: number; /** "Would be dealt to target creature" (Kill-Suit Cultist): this ability's target `toTarget`, as the object it is. */ toTarget?: number; toPlayer?: PlayerRef; /** "A source of your choice", chosen as it resolves (CR 609.7a). */ choose?: TargetSpec; /** With `choose`: only a permanent ("an unblocked creature of your choice", Forcefield), not a spell or a gone source. */ choosePermanent?: true; /** "That source" (Desperate Gambit): the source an earlier "chooseSourceNow" of this resolution chose (ResolvingInfo.chosenSource); nothing without one. */ chosenSource?: true; /** "That creature": the trigger's subject. */ bySubject?: true }
   /** Desperate Gambit: "Choose a source you control": a source of damage chosen as it resolves (CR 609.7a), before the rest of it, kept for "that source" (ResolvingInfo.chosenSource); `yours`: one its controller controls (a spell on the stack, or a source an ability refers to, too: rulings). */
   | { type: "chooseSourceNow"; choose: TargetSpec; yours?: true }
+  /**
+   * Helm of Obedience (round 373): "Target opponent mills a card, then repeats this process until a creature card or X
+   * cards have been put into their graveyard this way, whichever comes first": one "mill a card" at a time (as many as a
+   * replacement makes of it, millCount), counting only the cards that went into that graveyard (ResolvingInfo.milled); a
+   * card exiled instead doesn't count, so with every card exiled the whole library goes (rulings). `until`: the card that
+   * ends it once one is put there.
+   */
+  | { type: "millUntil"; who: PlayerRef; n: Amount; until: TargetSpec }
   /** Archnemesis: "you may attach this Aura to that player": the source, still that object on the battlefield, to the first of these players it could enchant (CR 701.3a-b, 702.5d); nothing if it's already attached there. */
   | { type: "attachSelfToPlayer"; who: PlayerRef }
   /**
@@ -7296,6 +7304,12 @@ export interface ManaAbility {
   text: string;
   /** "{T}: A player of your choice adds {C}." (Victory Chimes): the player chosen as it's activated adds it (Action activateMana `to`). */
   toChosenPlayer?: true;
+  /**
+   * With `toChosenPlayer`, Spectral Searchlight: "That player adds one mana of any color they choose": the chosen player
+   * chooses the color as it resolves (CR 605.3b, 608.2d). Its activator's own pick is the mana it's activated for; another
+   * player is asked (GameState.manaColorFor, chooseOption "manaColorFor").
+   */
+  getterChooses?: true;
   /** "{1}, {T}: Each player adds {B}{R}{G}." (Yurlok of Scorch Thrash): every player still in the game adds what it makes, the activator included. */
   toEachPlayer?: true;
   manaCost: string; // "{1}" or ""

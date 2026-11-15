@@ -26,6 +26,14 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     const ab = parseManaAbility(`${each[1]}: Add ${each[2]}.`);
     return ab && ab.produces.kind === "fixed" ? { ...ab, text: line0, toEachPlayer: true } : null;
   }
+  // Spectral Searchlight: "{T}: Choose a player. That player adds one mana of any color they choose." No target, so a mana
+  // ability (CR 605.1a), its player chosen as it's activated, you too (rulings); that player chooses the color as it
+  // resolves (CR 605.3b), which game.ts activateMana asks another player for.
+  const theyChoose = /^(.+): Choose a player\. That player adds one mana of any color they choose\.$/.exec(line0);
+  if (theyChoose) {
+    const ab = parseManaAbility(`${theyChoose[1]}: Add one mana of any color.`);
+    return ab && ab.produces.kind === "oneOf" && ab.produces.amount === 1 && ab.produces.options.length === 5 && !ab.produces.n ? { ...ab, text: line0, toChosenPlayer: true, getterChooses: true } : null;
+  }
   const chosen = /^(.+): A player of your choice adds ((?:\{[WUBRGC]\})+)\.$/.exec(line0);
   if (chosen) {
     const ab = parseManaAbility(`${chosen[1]}: Add ${chosen[2]}.`);

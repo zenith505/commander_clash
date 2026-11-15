@@ -1,7 +1,7 @@
 # Roadmap
 
-31,400 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,891 of
+31,404 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -323,7 +323,7 @@ line blocks.
    Unites the Elves (done in round 326), Exquisite Archangel (done in round 329), Kellan, Planar
    Trailblazer, Najal, Rescue from the Underworld, Seal of the Guildpact (done in round 299), Fear of Infinity (done in round 371), Elderscale Wurm (done in round 324), Cradle of
    Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order (done in round 324),
-   Scheming Fence, Oath of Lieges (done in round B143), Helm of Obedience, Concerted Effort, Belbe's Portal (done in round 324), Edgewall Innkeeper, Simic
+   Scheming Fence, Oath of Lieges (done in round B143), Helm of Obedience (done in round 373), Concerted Effort, Belbe's Portal (done in round 324), Edgewall Innkeeper, Simic
    Manipulator, Endless Whispers, Burn from Within (done in round 325), Skyfire Phoenix (done in round 276), Contagion (done in round 325), Gutter Grime, Coffin Queen, Genesis
    Storm, Grim Return (done in round 326), Infernal Offering (done in round B204), Varolz, Undercellar Sweep, Wave of Vitriol, Martyrdom (done in round B210), Soul-Scar Mage,
    Remembrance, Spy Network (done in round B186), Dimir Doppelganger (done in round 362), Jailbreak, Inverter of Truth (done in round 329), Immovable Rod (done in round B186), Hypergenesis, Soul
@@ -1244,7 +1244,7 @@ line blocks.
    Wombat). UI fix: clicking an opponent's planeswalker to attack it attacked the player instead. +14 (28,615 of 31,936 with Lane B B63).
    Tadeas, Juniper Ascendant was left to Lane B's B63.
    Out after round 225 (looked at, not done): Wayta, Trainer Prodigy (damage triggers doubled across many events);
-   Auntie Ool (done in round 266); Fell Beast's Shriek (splice onto instant or sorcery); Jasmine Boreal of the Seven
+   Auntie Ool (done in round 266); Fell Beast's Shriek (done in round 373) (splice onto instant or sorcery); Jasmine Boreal of the Seven
    (mana for creature spells with no abilities); Kethis, the Hidden Hand (graveyard cards gain "you may play"); Cult of
    the Waxing Moon (transforms into a non-Human creature); Zinnia, Valley's Voice (creature spells gain offspring);
    Elsha of the Infinite (cast noncreature spells from the top as though they had flash); Najal, the Storm Runner (copy
@@ -2483,7 +2483,7 @@ line blocks.
    with {X}, Wizard's Rockets, uses it up with nothing to copy, CR 605.3a), with a browser test. +5, 31,176 of 31,936 with
    rounds 348 to 352 and B188 to B191 (31,209 with B192 to B196). The compiled text of every other card is unchanged.
    Bots always copy when asked.
-   Out after round 353 (looked at, not done): Spectral Searchlight (still out: another player chooses the color of the
+   Out after round 353 (looked at, not done): Spectral Searchlight (done in round 373) (still out: another player chooses the color of the
    mana it adds, in the middle of a mana ability); Quicksilver Elemental ("gains all activated abilities of target
    creature until end of turn" and "You may spend blue mana as though it were mana of any color to pay the activation
    costs of ~'s abilities": abilities gained from a permanent for a while, and a mana rule for one source's abilities);
@@ -2659,7 +2659,7 @@ line blocks.
    Out after round 360 (looked at, not done): Rescue from the Underworld ("Return that card and the sacrificed card":
    the card sacrificed for its cost, returned from whatever public zone it went to, rulings, with no ref for it yet);
    Reap (still out: a target count set by another target); Choice of Damnations (done in round B204) (an opponent chooses a number, a new
-   prompt, then life or "sacrifices all but that many permanents"); Helm of Obedience (mill one at a time until a creature
+   prompt, then life or "sacrifices all but that many permanents"); Helm of Obedience (done in round 373) (mill one at a time until a creature
    card or X cards, then sacrifice ~ and put one onto the battlefield); Infernal Offering (done in round B204) (an opponent chosen for each
    paragraph, each of them sacrificing and returning in turn, not targets, rulings).
    Round 361 went on down `npm run popular` and the "Out after round N" lists, most played first: Survivor's Med Kit's
@@ -2966,6 +2966,34 @@ line blocks.
    were mana of any color": a hybrid symbol can't hold {C} yet); Pulmonic Sliver, Spectral Searchlight and Mysterious
    Stranger (still out, as in their earlier lists). Polish: Reap's card slots are offered before the opponent is chosen,
    as many as the opponent with the most black permanents allows.
+   Round 373 went on down the "Out after round N" lists, most played first, to mana another player adds in a color they
+   choose, milling one card at a time until a creature card, a copy of a legendary or Rat card cast for its costs and
+   creatures each opponent chooses to tap and goad: Spectral Searchlight's "{T}: Choose a player. That player adds one mana
+   of any color they choose." (no target, so a mana ability, CR 605.1a; you may choose yourself, rulings; another player
+   chooses the color as it resolves, CR 605.3b, 608.2d: ManaAbility.getterChooses, GameState.manaColorFor and a
+   chooseOption "manaColorFor" for that player, answered by bots with the color of most of their hand; the menu has a
+   button for each other player); Helm of Obedience's "{X}, {T}: Target opponent mills a card, then repeats this process
+   until a creature card or X cards have been put into their graveyard this way, whichever comes first. If one or more
+   creature cards were put into that graveyard this way, sacrifice ~ and put one of them onto the battlefield under your
+   control. X can't be 0." (one mill at a time, Bruvac's doubling applied to each; only cards that reach the graveyard
+   count, so with Leyline of the Void the whole library goes, rulings; the creature is put in even if Helm couldn't be
+   sacrificed, rulings: Effect millUntil, then a pick among the milled creature cards); Nashi, Moon's Legacy's "exile up
+   to one target legendary or Rat card from your graveyard and copy it. You may cast the copy." (cast as it resolves or
+   never, paying its costs, as Kaervek's and Demilich's, rulings; the target is a card that's either); Fell Beast's
+   Shriek's "Each opponent chooses a creature they control. Tap and goad the chosen creatures." (not targets, as Riches'
+   choice; its splice onto instants and sorceries adds it after the other spell's effects, rulings, CR 702.47b). Browser
+   tests click through Nashi's target and cast, Helm's X, opponent and pick, Searchlight's button for another player and
+   Shriek's cast. No new prompts for Ken (the color pick is the color prompt's look). +4, 31,404 of 31,936 with round 372.
+   The compiled text of every other card is unchanged. Polish: an activated ability with "X can't be 0" and {X} in its
+   mana cost (Helm of Obedience, Lair of the Hydra) was greyed out in the menu ("X can't be 0", asked before X), and its
+   X picker offered only 0; both now start from the smallest X allowed.
+   Out after round 373 (looked at, not done): Lodestone Bauble (still out: the player whose graveyard it is is chosen as
+   it's activated, even with no target, rulings: no activation-time player choice in the UI and bots yet); Pulmonic Sliver
+   (still out: an optional "you may put it on top of its owner's library instead" inside a zone move, which can't pause
+   for the choice, and several Slivers dying at once ordered by their owner, rulings); Blood Scrivener (still out: "draw
+   two cards and lose 1 life" replacing one draw, the life lost after both draws, each Scrivener applying once to each
+   draw it made, rulings; the draw loop's made draws only count Alhammarret's Archives); Callous Oppressor (still out: an
+   opponent, chosen by its controller, chooses the creature type as it enters).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -4331,7 +4359,7 @@ line blocks.
    for lands); Galea, Kindler of Hope (a cast trigger that gives the Equipment spell an enters ability); Kellan, Planar
    Trailblazer (becoming a Detective and gaining an impulse trigger, only if it's a Scout); Cloudspire Coordinator (the
    Mounts and Vehicles that entered this turn, tokens that saddle and crew as though their power were 2 greater); Nashi,
-   Moon's Legacy (copying a graveyard card and casting the copy, paying its costs); Discover the Impossible (a face-down
+   Moon's Legacy (done in round 373) (copying a graveyard card and casting the copy, paying its costs); Discover the Impossible (a face-down
    exiled card cast free only if it's an instant with mana value 2 or less, else into your hand); Meeting of the Five
    (spells with exactly three colors, and mana only for them); Essence of the Wild (creatures entering as a copy of it,
    ordered with other copy effects, CR 616.1); Ice Cave (any other player may pay a spell's mana cost to counter it);
@@ -4485,7 +4513,7 @@ line blocks.
    Out after round 252 (looked at, not done): Cybership (the top two cards of a library, lands included, put onto the
    battlefield face down as Cybermen: needs a library-top face-down put); Kaervek, the Punisher (done in round 267; "You may cast the copy.
    If you do, you lose 2 life": the paid copy is there now, the "if you do" after casting a copy isn't; Nashi, Moon's
-   Legacy would follow); Ob Nixilis, the Adversary (done in round 352) (casualty X: the copy's starting loyalty from the chosen X);
+   Legacy would follow, done in round 373); Ob Nixilis, the Adversary (done in round 352) (casualty X: the copy's starting loyalty from the chosen X);
    Mysterious Stranger and Zethi, Arcane Blademaster (a variable number of targets per graveyard / per kick).
    Out after round 251 (looked at, not done): Ill-Timed Explosion (done in round 273; "you may discard two cards. When you do": no ruling on
    whether you can do it with fewer than two cards in hand, as with Thrilling Discovery).

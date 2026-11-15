@@ -819,8 +819,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         const max = Array.from({ length: 21 }, (_, n) => 20 - n).find(fits) ?? 0;
         return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: max, modes, extra: `exile ${mvCard.kind === "exileFromGraveyard" && mvCard.filter ? `${/^[aeiou]/i.test(mvCard.filter.text) ? "an" : "a"} ${mvCard.filter.text}` : "a card"} from your graveyard` });
       }
-      const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));
-      return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: max, modes });
+      // "X can't be 0" (Helm of Obedience): from the smallest X allowed.
+      const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, Math.max(n, ab.xMin ?? 0)));
+      return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: max, modes, ...(ab.xMin ? { min: ab.xMin } : {}) });
     }
     // "Sacrifice X Squirrels" (Chatterfang): X is announced first, up to how many you could sacrifice (CR 107.3a, 602.2b).
     if (x === undefined && abilityCostsHaveX(ab)) {
@@ -4817,8 +4818,10 @@ function AbilityMenu({
         {ignoreButton}
         {abilitiesOf(s, o).activated.map((ab, i) => {
           if (!ab.anyPlayer || (ab.ownerOnly && o.owner !== HUMAN) || (ab.opponentsOnly && !opponents(s, controllerOf(s, o)).includes(HUMAN)) || (ab.onlyPlayer !== undefined && ab.onlyPlayer !== HUMAN) || (ab.enchantedControllerOnly && !enchantsYours(s, o))) return null;
-          const problem = abilityProblem(s, HUMAN, objectId, i);
-          const ok = !problem || (/not enough mana/.test(problem) && planActivate(s, HUMAN, objectId, i) !== null);
+          // "X can't be 0" (Helm of Obedience): the menu asks before X is chosen, so with the smallest X allowed.
+          const xLeast = abilityProblem(s, HUMAN, objectId, i) === "X can't be 0" && ab.xMin ? ab.xMin : undefined;
+          const problem = abilityProblem(s, HUMAN, objectId, i, undefined, undefined, undefined, xLeast);
+          const ok = !problem || (/not enough mana/.test(problem) && planActivate(s, HUMAN, objectId, i, undefined, undefined, undefined, xLeast) !== null);
           return (
             <button key={i} disabled={!ok} title={problem ?? (ab.ownerOnly ? "Only its owner may activate this ability; you control it." : ab.onlyPlayer !== undefined ? "Only you may activate this ability; you control it." : ab.enchantedControllerOnly ? "Only the controller of the enchanted creature may activate this ability; you control it." : ab.opponentsOnly ? "Only its controller's opponents may activate this ability; you control it." : "Any player may activate this ability; you control it.")} onClick={() => onUse(objectId, i)}>
               <RulesText text={ab.text.replace(/~/g, d.name).replace(/ Any player may activate this ability\.$/, "")} />
@@ -5076,6 +5079,21 @@ function AbilityMenu({
           );
           // Victory Chimes: "a player of your choice adds {C}": you, or one of the others.
           if (!ab.toChosenPlayer) return button;
+          // Spectral Searchlight: "That player adds one mana of any color they choose": a button for each color for you, and
+          // one for each other player, who then chooses the color.
+          if (ab.getterChooses) {
+            if (all.findIndex((y) => y.ability === x.ability) !== i) return button;
+            return [
+              button,
+              ...livingPlayers(s)
+                .filter((pid) => pid !== HUMAN)
+                .map((pid) => (
+                  <button key={`${x.ability}-to${pid}`} className="ghost" data-mana-to={pid} onClick={() => onMana(x, pid)}>
+                    <RulesText text={cost} />: {s.players[pid]!.name} adds one mana of any color they choose
+                  </button>
+                )),
+            ];
+          }
           return [
             button,
             ...livingPlayers(s)
@@ -5094,8 +5112,10 @@ function AbilityMenu({
         if ((ab.zone ?? "battlefield") !== o.zone && !(ab.orCommand && o.zone === "command") && !(ab.orExile && o.zone === "exile")) return null;
         // Torrent Elemental's works only from exile.
         if (ab.onlyExile && o.zone !== "exile") return null;
-        const problem = abilityProblem(s, HUMAN, objectId, i);
-        const ok = !problem || (/not enough mana/.test(problem) && planActivate(s, HUMAN, objectId, i) !== null);
+        // "X can't be 0" (Helm of Obedience, Lair of the Hydra): the menu asks before X is chosen, so with the smallest X allowed.
+        const xLeast = abilityProblem(s, HUMAN, objectId, i) === "X can't be 0" && ab.xMin ? ab.xMin : undefined;
+        const problem = abilityProblem(s, HUMAN, objectId, i, undefined, undefined, undefined, xLeast);
+        const ok = !problem || (/not enough mana/.test(problem) && planActivate(s, HUMAN, objectId, i, undefined, undefined, undefined, xLeast) !== null);
         // A mana ability with a choice of mana (CR 605.1a): a button for each, like a land's.
         const picks = ab.mana ? (activatedManaOptions(s, o, i) ?? []).filter((x) => x.adds.length) : [];
         if (picks.length > 1) {
@@ -5818,7 +5838,8 @@ function Controls({
       </div>
     );
   if (pending?.kind === "chooseOption" && pending.what === "colors" && pending.player === HUMAN) return <ColorsPick key={pending.source} pending={pending} dispatch={dispatch} />;
-  if (pending?.kind === "chooseOption" && pending.what === "color" && pending.player === HUMAN)
+  // Spectral Searchlight's "any color they choose", for mana another player gave you: the same pick.
+  if (pending?.kind === "chooseOption" && (pending.what === "color" || pending.what === "manaColorFor") && pending.player === HUMAN)
     return (
       <div className="controls color-pick">
         <span>

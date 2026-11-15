@@ -13370,6 +13370,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d660f6a0-3642-4445-b877-fda2a2950680",
+  "name": "Fell Beast's Shriek",
+  "manaCost": "{U}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each opponent chooses a creature they control. Tap and goad the chosen creatures. (Until your next turn, those creatures attack each combat if able and attack a player other than you if able.)\nSplice onto instant or sorcery {2}{U}{R} (As you cast an instant or sorcery spell, you may reveal this card from your hand and pay its splice cost. If you do, add this card's effects to that spell.)",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Goad",
+   "Splice"
+  ],
+  "commanderLegal": "legal",
+  "set": "ltc",
+  "releasedAt": "2023-11-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cf14d4e5-5965-45ad-97f7-26facf2884b5",
   "name": "Fertile Ground",
   "manaCost": "{1}{G}",
@@ -17498,6 +17529,30 @@
   "set": "iko",
   "releasedAt": "2020-04-24",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "16cadebf-c484-41f8-9e38-5c2c528f5b54",
+  "name": "Helm of Obedience",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{X}, {T}: Target opponent mills a card, then repeats this process until a creature card or X cards have been put into their graveyard this way, whichever comes first. If one or more creature cards were put into that graveyard this way, sacrifice this artifact and put one of them onto the battlefield under your control. X can't be 0.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -25804,6 +25859,46 @@
   "set": "one",
   "releasedAt": "2023-02-10",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ffa6c14e-3d8e-47a2-b102-d37538d60ef6",
+  "name": "Nashi, Moon's Legacy",
+  "manaCost": "{B}{G}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Rat Shaman",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Rat",
+   "Shaman"
+  ],
+  "oracleText": "Menace, ward {1}\nWhenever Nashi attacks, exile up to one target legendary or Rat card from your graveyard and copy it. You may cast the copy. (You still pay its costs. A copy of a permanent spell becomes a token.)",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Menace",
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "mat",
+  "releasedAt": "2023-05-12",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -35198,6 +35293,35 @@
   "set": "voc",
   "releasedAt": "2021-11-19",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "511b1174-8ef7-4d17-93de-01b9b81bda6a",
+  "name": "Spectral Searchlight",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Choose a player. That player adds one mana of any color they choose.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "rav",
+  "releasedAt": "2005-10-07",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

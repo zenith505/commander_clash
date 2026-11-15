@@ -31,6 +31,7 @@ import { runKinCountersEffect } from "./run-round361";
 import { runRedistributeLifeEffect } from "./run-round362";
 import { runMayCastExiledSpellEffect, runUntilLeavesToBottomEffect } from "./run-round363";
 import { runChooseSourceNowEffect } from "./run-round364";
+import { runMillUntilEffect } from "./run-round373";
 import { runAttachSelfToPlayerEffect } from "./run-round365";
 import { runFlickerWithAurasEffect, runReturnAurasAttachedEffect } from "./run-round366";
 import { runTapLandsSharingManaEffect } from "./run-round367";
@@ -1834,6 +1835,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runUntilLeavesToBottomEffect(s, ctx, src);
     case "chooseSourceNow":
       return runChooseSourceNowEffect(s, e, ctx, src);
+    case "millUntil":
+      return runMillUntilEffect(s, e, ctx);
     case "attachSelfToPlayer":
       return runAttachSelfToPlayerEffect(s, e, ctx);
     case "flickerWithAuras":

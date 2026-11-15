@@ -7300,6 +7300,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e43b478b-4cb8-42b1-a5b0-0b1421b84852",
+  "name": "Coin of Fate",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "When this artifact enters, surveil 1.\n{3}{W}, {T}, Exile two creature cards from your graveyard, Sacrifice this artifact: An opponent chooses one of the exiled cards. You put that card on the bottom of your library and return the other to the battlefield tapped. You become the monarch.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Surveil"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ad786230-4045-46af-bc89-078d45891e5b",
   "name": "Colfenor's Plans",
   "manaCost": "{2}{B}{B}",
@@ -9227,6 +9255,38 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2024-09-30",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6fa7229d-18b6-43d8-aa57-a56cdb815767",
+  "name": "Dawnbreak Reclaimer",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Creature — Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flying\nAt the beginning of your end step, choose a creature card in an opponent's graveyard, then that player chooses a creature card in your graveyard. You may return those cards to the battlefield under their owners' control.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "c15",
+  "releasedAt": "2015-11-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -13427,6 +13487,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d660f6a0-3642-4445-b877-fda2a2950680",
+  "name": "Fell Beast's Shriek",
+  "manaCost": "{U}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each opponent chooses a creature they control. Tap and goad the chosen creatures. (Until your next turn, those creatures attack each combat if able and attack a player other than you if able.)\nSplice onto instant or sorcery {2}{U}{R} (As you cast an instant or sorcery spell, you may reveal this card from your hand and pay its splice cost. If you do, add this card's effects to that spell.)",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Goad",
+   "Splice"
+  ],
+  "commanderLegal": "legal",
+  "set": "ltc",
+  "releasedAt": "2023-11-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cf14d4e5-5965-45ad-97f7-26facf2884b5",
   "name": "Fertile Ground",
   "manaCost": "{1}{G}",
@@ -17555,6 +17646,30 @@
   "set": "iko",
   "releasedAt": "2020-04-24",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "16cadebf-c484-41f8-9e38-5c2c528f5b54",
+  "name": "Helm of Obedience",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{X}, {T}: Target opponent mills a card, then repeats this process until a creature card or X cards have been put into their graveyard this way, whichever comes first. If one or more creature cards were put into that graveyard this way, sacrifice this artifact and put one of them onto the battlefield under your control. X can't be 0.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -25951,6 +26066,46 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ffa6c14e-3d8e-47a2-b102-d37538d60ef6",
+  "name": "Nashi, Moon's Legacy",
+  "manaCost": "{B}{G}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Rat Shaman",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Rat",
+   "Shaman"
+  ],
+  "oracleText": "Menace, ward {1}\nWhenever Nashi attacks, exile up to one target legendary or Rat card from your graveyard and copy it. You may cast the copy. (You still pay its costs. A copy of a permanent spell becomes a token.)",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Menace",
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "mat",
+  "releasedAt": "2023-05-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "613a8774-165e-4cf6-ad43-124f9ffc9980",
   "name": "Nautiloid Ship",
   "manaCost": "{4}",
@@ -30842,6 +30997,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7217ea53-3685-48d6-9df1-58a551f8c979",
+  "name": "Rescue from the Underworld",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, sacrifice a creature.\nChoose target creature card in your graveyard. Return that card and the sacrificed card to the battlefield under your control at the beginning of your next upkeep. Exile Rescue from the Underworld.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ths",
+  "releasedAt": "2013-09-27",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d4c4ad11-7e71-4ad0-aee7-58ac7b1b38f8",
   "name": "Rescuer Sphinx",
   "manaCost": "{2}{U}{U}",
@@ -35371,6 +35552,35 @@
   "set": "voc",
   "releasedAt": "2021-11-19",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "511b1174-8ef7-4d17-93de-01b9b81bda6a",
+  "name": "Spectral Searchlight",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Choose a player. That player adds one mana of any color they choose.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "rav",
+  "releasedAt": "2005-10-07",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

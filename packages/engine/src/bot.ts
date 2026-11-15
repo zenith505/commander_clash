@@ -306,6 +306,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const keep = !!o && (o.isToken || o.isCommander || mv(s, o.id) >= 4 || Object.values(o.counters ?? {}).some((n) => (n ?? 0) > 0) || s.battlefield.some((id) => s.objects[id]!.attachedTo === o.id));
       return [{ type: "chooseMay", player: pid, yes: keep }];
     }
+    // Dawnbreak Reclaimer: both cards return or neither: ours for theirs only when ours is worth at least as much (mana
+    // value), and ours alone always.
+    if (pend.kind === "chooseMay" && theirMay?.type === "swapFromGraveyards") {
+      const st = s.resolving!.scratch?.swap;
+      const worth = (c: { id: string; zc: number } | "none" | undefined) => (c && c !== "none" && s.objects[c.id]?.zone === "graveyard" ? mv(s, c.id) : undefined);
+      const ours = worth(st?.yours);
+      const theirs = worth(st?.theirs);
+      return [{ type: "chooseMay", player: pid, yes: ours !== undefined && (theirs === undefined || ours >= theirs) }];
+    }
     // Covenant of Minds: the three cards seen rather than five unseen, unless five more draws would empty that library.
     if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && s.resolving!.item.controller !== pid && theirMay.effects.length === 1 && theirMay.effects[0]!.type === "revealedTo") {
       const lib = player(s, s.resolving!.item.controller).library.length - (s.resolving!.revealedUntil?.length ?? 0);
@@ -2035,6 +2044,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => mv(s, b) + 2 * (player(s, pid).commanderCasts[b] ?? 0) - mv(s, a) - 2 * (player(s, pid).commanderCasts[a] ?? 0))[0]! }];
     // The color of a mana ability's mana, chosen as it resolves (Food Chain): the one that pays for the dearest card we
     // could then cast from our hand or command zone.
+    // Spectral Searchlight: mana another player gave us, in the color of most of the cards in our hand (it empties as the
+    // step ends, so only what we could cast now counts, if anything).
+    if (pend.kind === "chooseOption" && pend.what === "manaColorFor") {
+      const counts = new Map<string, number>(pend.options.map((o) => [o, 0]));
+      for (const id of player(s, pid).hand) for (const c of defOf(s, obj(s, id)).colors) counts.set(COLOR_NAMES[c], (counts.get(COLOR_NAMES[c]) ?? 0) + 1);
+      const most = [...pend.options].sort((a, b) => counts.get(b)! - counts.get(a)!)[0]!;
+      return [{ type: "chooseOption", player: pid, choice: manaColorFor(s, pid, pend.options) ?? most }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "color" && s.resolving?.item.manaAbility) {
       const pick = manaColorFor(s, pid, pend.options);
       if (pick) return [{ type: "chooseOption", player: pid, choice: pick }];

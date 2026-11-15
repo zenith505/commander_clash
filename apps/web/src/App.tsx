@@ -1210,7 +1210,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       // Behold (CR 701.4a): a card from your hand or a permanent you control, picked from both together.
       if (c.kind === "reveal" && c.orControl) {
         const kind = beholdWhat(c);
-        return setCostPick({ draft: d, kind: "reveal", label: card.name, what: `behold ${kind}${c.exile ? " and exile it" : ""} (${kind.replace(/^an? /, "")} you control or ${kind.replace(/^an? /, "")} card from your hand)`, n: c.n, candidates: beholdCandidates(s, HUMAN, s.objects[d.objectId]!, c), chosen: [] });
+        // "Behold three Elementals": Elementals you control or Elemental cards from your hand, in any mix (round 371).
+        const one = beholdWhat({ ...c, n: 1 }).replace(/^an? /, "");
+        const many = c.n > 1 ? "s" : "";
+        return setCostPick({ draft: d, kind: "reveal", label: card.name, what: `behold ${kind}${c.exile ? " and exile it" : ""} (${one}${many} you control or ${one} card${many} from your hand)`, n: c.n, candidates: beholdCandidates(s, HUMAN, s.objects[d.objectId]!, c), chosen: [] });
       }
       const me = s.players[HUMAN]!;
       const candidates =

@@ -593,6 +593,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7744bae4-a8b7-44a5-9b4c-0048ad4cc448",
+  "name": "Air Elemental",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Creature — Elemental",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "Flying",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "xln",
+  "releasedAt": "2017-09-29",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e101b744-9175-4aa5-bf80-d6944359e538",
   "name": "Airbending Lesson",
   "manaCost": "{2}{W}",
@@ -2709,6 +2741,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "23695bc2-86d3-4d78-b374-9e83c4cc9cc4",
+  "name": "Averna, the Chaos Bloom",
+  "manaCost": "{G}{U}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Elemental Shaman",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental",
+   "Shaman"
+  ],
+  "oracleText": "As you cascade, you may put a land card from among the exiled cards onto the battlefield tapped. (Do this after the last card is exiled but before deciding whether to cast a nonland card.)",
+  "power": "4",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "j25",
+  "releasedAt": "2024-11-15",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "35b3ae1c-4116-49b0-89a9-7332fe9bbff0",
   "name": "Axebane Ferox",
   "manaCost": "{2}{G}{G}",
@@ -2867,6 +2936,32 @@
   "set": "woe",
   "releasedAt": "2023-09-08",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fc5d3341-cbce-49e5-93cc-8add92479dca",
+  "name": "Bad Moon",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Black creatures get +1/+1.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -4176,6 +4271,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3f0c9466-5ab9-4205-a84f-b4b27b5a678e",
+  "name": "Bloodbraid Elf",
+  "manaCost": "{2}{R}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Elf Berserker",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Berserker"
+  ],
+  "oracleText": "Haste (This creature can attack and {T} as soon as it comes under your control.)\nCascade (When you cast this spell, exile cards from the top of your library until you exile a nonland card that costs less. You may cast it without paying its mana cost. Put the exiled cards on the bottom in a random order.)",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [
+   "Haste",
+   "Cascade"
+  ],
+  "commanderLegal": "legal",
+  "set": "ema",
+  "releasedAt": "2016-06-10",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "64e29bfc-9313-4e8c-808c-bc27f6b018a6",
   "name": "Bloodfell Caves",
   "manaCost": "",
@@ -4908,6 +5039,41 @@
   "set": "woe",
   "releasedAt": "2023-09-08",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "59384481-3ca0-49dd-b94f-d3680b336f1e",
+  "name": "Bre of Clan Stoutarm",
+  "manaCost": "{2}{R}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Giant Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Giant",
+   "Warrior"
+  ],
+  "oracleText": "{1}{W}, {T}: Another target creature you control gains flying and lifelink until end of turn.\nAt the beginning of your end step, if you gained life this turn, exile cards from the top of your library until you exile a nonland card. You may cast that card without paying its mana cost if the spell's mana value is less than or equal to the amount of life you gained this turn. Otherwise, put it into your hand.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -6325,6 +6491,40 @@
    "R"
   ],
   "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m21",
+  "releasedAt": "2020-07-03",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "58ad45fc-b625-4484-8d49-ebc42db9040a",
+  "name": "Chandra, Heart of Fire",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Planeswalker — Chandra",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Chandra"
+  ],
+  "oracleText": "+1: Discard your hand, then exile the top three cards of your library. Until end of turn, you may play cards exiled this way.\n+1: Chandra deals 2 damage to any target.\n−9: Search your graveyard and library for any number of red instant and/or sorcery cards, exile them, then shuffle. You may cast them this turn. Add six {R}.",
+  "loyalty": "5",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "R"
+  ],
   "commanderLegal": "legal",
   "set": "m21",
   "releasedAt": "2020-07-03",
@@ -13099,6 +13299,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "018327d1-a3ba-4912-9c88-f0f0c54a1750",
+  "name": "Fear of Infinity",
+  "manaCost": "{1}{U}{B}",
+  "cmc": 3,
+  "typeLine": "Enchantment Creature — Nightmare",
+  "supertypes": [],
+  "types": [
+   "Enchantment",
+   "Creature"
+  ],
+  "subtypes": [
+   "Nightmare"
+  ],
+  "oracleText": "Flying, lifelink\nThis creature can't block.\nEerie — Whenever an enchantment you control enters and whenever you fully unlock a Room, you may return this card from your graveyard to your hand.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Lifelink",
+   "Eerie"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "957413ae-e756-4afe-886a-b57bf59d5f8d",
   "name": "Feather, Radiant Arbiter",
   "manaCost": "{R}{W}{W}",
@@ -13453,6 +13690,36 @@
     ]
    }
   ]
+ },
+ {
+  "oracleId": "3912d21e-1ebc-4a81-9dc9-f404248d564a",
+  "name": "Fire Elemental",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Creature — Elemental",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dom",
+  "releasedAt": "2018-04-27",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "7d309b18-8dc5-41ee-888c-e275761029e7",
@@ -13914,6 +14181,32 @@
   "commanderLegal": "legal",
   "set": "c17",
   "releasedAt": "2017-08-25",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6a9cc11b-a223-46f0-bf58-c1e08ad1253d",
+  "name": "Forum Filibuster",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, create a 2/1 white and black Inkling creature token with flying. When you do, return up to one target Aura or Equipment card from your graveyard to the battlefield attached to that token.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "soc",
+  "releasedAt": "2026-04-24",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -20481,6 +20774,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c7ca6371-73bb-4717-a148-0804b8f4c1e6",
+  "name": "Kindle the Inner Flame",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Kindred Sorcery — Elemental",
+  "supertypes": [],
+  "types": [
+   "Kindred",
+   "Sorcery"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "Create a token that's a copy of target creature you control, except it has haste and \"At the beginning of the end step, sacrifice this token.\"\nFlashback—{1}{R}, Behold three Elementals. (You may cast this card from your graveyard for its flashback cost. Then exile it. To behold an Elemental, choose an Elemental you control or reveal an Elemental card from your hand.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Behold",
+   "Flashback"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "845d80ee-1cd5-437a-90a5-40dcc657d3aa",
   "name": "Kinsbaile Aspirant",
   "manaCost": "{W}",
@@ -20696,6 +21021,39 @@
   "set": "lrw",
   "releasedAt": "2007-10-12",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4bd20d79-0861-494a-a8f2-f6ddb5088004",
+  "name": "Knight-Errant of Eos",
+  "manaCost": "{4}{W}",
+  "cmc": 5,
+  "typeLine": "Creature — Human Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "Convoke\nWhen this creature enters, look at the top six cards of your library. You may reveal up to two creature cards with mana value X or less from among them, where X is the number of creatures that convoked this creature. Put the revealed cards into your hand, then shuffle.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Convoke"
+  ],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -21286,6 +21644,32 @@
   "set": "mul",
   "releasedAt": "2023-04-21",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "387b6b07-a283-412d-94c3-f7f1dc76e858",
+  "name": "Lava Axe",
+  "manaCost": "{4}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Lava Axe deals 5 damage to target player or planeswalker.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ulg",
+  "releasedAt": "1999-02-15",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -30044,6 +30428,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7fcb8472-1e77-4dcd-b18f-8abf8806da08",
+  "name": "Reap",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Return up to X target cards from your graveyard to your hand, where X is the number of black permanents target opponent controls as you cast this spell.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4fb83127-00cf-4ce7-aedf-cb0b2740c66f",
   "name": "Reckless Bushwhacker",
   "manaCost": "{2}{R}",
@@ -30999,6 +31409,36 @@
   "set": "sld",
   "releasedAt": "2025-04-28",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e9602731-2e8e-44ea-96a1-6b38e1efbbd9",
+  "name": "Rift Elemental",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Creature — Elemental",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "{1}{R}, Remove a time counter from a permanent you control or suspended card you own: This creature gets +2/+0 until end of turn.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -37449,6 +37889,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1bd3e453-aa21-4ee6-95c2-d6d920ee8e7a",
+  "name": "Terramorphic Expanse",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}, Sacrifice this land: Search your library for a basic land card, put it onto the battlefield tapped, then shuffle.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "85255c26-4e74-4cf0-91a6-78ddba5abdc6",
   "name": "Tetravus",
   "manaCost": "{6}",
@@ -42317,6 +42779,36 @@
   "commanderLegal": "legal",
   "set": "rav",
   "releasedAt": "2005-10-07",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c470fbe1-0538-46ec-8741-3143f5e78af8",
+  "name": "Water Elemental",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Creature — Elemental",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

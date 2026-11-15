@@ -1,7 +1,7 @@
 # Roadmap
 
-31,393 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,978 of 4,988 (99%), top 10,000: 9,885 of
+31,410 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,891 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -144,7 +144,7 @@ line blocks.
    spell targets a commander you control ... instead"), Killer Service (pay mana and sacrifice as one "may" cost),
    Sapling of Colfenor (gain toughness and lose power from the revealed card). Round 170 went down the list to Cloud,
    Planet's Champion (rank 7,020), skipping over the cards still listed by `npm run popular`.
-   Out after round 171, each needing a piece of its own: Averna, the Chaos Bloom (a land among the cards cascade exiles), Anax, Hardened
+   Out after round 171, each needing a piece of its own: Averna, the Chaos Bloom (done in round 372) (a land among the cards cascade exiles), Anax, Hardened
    in the Forge ("if the creature had power 4 or greater, create two ... instead"), Armory Automaton
    ("attach any number of target Equipment"),
    Chandra, Spark Hunter (+2: "sacrifice an artifact or discard a card. If you do"), Phyrexian Unlife and Lich's Tomb
@@ -269,7 +269,7 @@ line blocks.
    Out after round 179: Smoldering Egg (counters equal to the mana spent on another spell), Cryptic Spires (circled
    colors), Jadzi, Oracle of Arcavios, Oskar, Rubbish Reclaimer (done in round 336), Strict Proctor and Kadena's Silencer (done in round 339) (countering
    triggered abilities), Alacrian Armory (done in round 358), Deadly Cover-Up, Chandra, Fire Artisan (loyalty counters removed),
-   Kusari-Gama (done in round 339), Reap (X targets set by another target), Fearless Swashbuckler (done in round 299) ("a Pirate and a Vehicle attacked"),
+   Kusari-Gama (done in round 339), Reap (done in round 372) (X targets set by another target), Fearless Swashbuckler (done in round 299) ("a Pirate and a Vehicle attacked"),
    Friendly Rivalry (two differently targeted creatures each dealing damage), Invoke Justice (done in round 304) (counters distributed
    among a target player's creatures), The Eagles Are Coming!, Thief of Blood (done in round 300), Eldrazi Mimic ("base power and
    toughness become" another's), Arcbound Javelineer ("Remove X counters" as a cost), Wonderscape Sage (done in round 299) ("unless that
@@ -303,7 +303,7 @@ line blocks.
    Out after round 181: Horrid Shadowspinner (done in round B105) (the number discarded is fixed as you choose to draw), Luminate Primordial (done in round 276),
    Old Man Willow (done in round B105) ("another creature or a token" to
    sacrifice), Terrifying Presence, Delirium, Heroic Feast, Fated Clash, Rent Is Due, Avengers Assemble! (done in round 324), Chocobo Camp (done in round 324),
-   Transcendence (done in round B105), Fumble (done in round B206), Goblin Assassin (done in round 276), Kasmina, Enigma Sage, Codie, Vociferous Codex (done in round 368), Jetfire, Hollow Marauder,
+   Transcendence (done in round B105), Fumble (done in round B206), Goblin Assassin (done in round 276), Kasmina, Enigma Sage, Codie, Vociferous Codex (done in round 368), Jetfire (done in round 372), Hollow Marauder,
    Gorex, the Tombshell (done in round 368), Council's Deliberation (done in round 276), Lumbering Megasloth (done in round 299), Braids's Frightful Return (done in round 276), Awakening of
    Vitu-Ghazi, Quiet Speculation, Breaking of the Fellowship (done in round 276), Stoic Farmer, See the Unwritten, Razorlash
    Transmogrant, Auntie Blyte, Nimble Trapfinder (done in round 324), Willie Lumpkin, Ajani Unrelenting, Kitt Kanto, Ellie, Azor, Oko the
@@ -321,7 +321,7 @@ line blocks.
    "instead" sweepers), Chandra, Heart of Fire, Lynde, Salt Road Ambushers, Origin of the Hidden Ones, Grab the Reins (done in round 325),
    Pyromancer Ascension (done in round 367), Verdant Mastery, Primal Adversary, Planar Void (done in round 299), In Too Deep, Dollhouse of Horrors, Harald
    Unites the Elves (done in round 326), Exquisite Archangel (done in round 329), Kellan, Planar
-   Trailblazer, Najal, Rescue from the Underworld, Seal of the Guildpact (done in round 299), Fear of Infinity, Elderscale Wurm (done in round 324), Cradle of
+   Trailblazer, Najal, Rescue from the Underworld, Seal of the Guildpact (done in round 299), Fear of Infinity (done in round 371), Elderscale Wurm (done in round 324), Cradle of
    Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order (done in round 324),
    Scheming Fence, Oath of Lieges (done in round B143), Helm of Obedience, Concerted Effort, Belbe's Portal (done in round 324), Edgewall Innkeeper, Simic
    Manipulator, Endless Whispers, Burn from Within (done in round 325), Skyfire Phoenix (done in round 276), Contagion (done in round 325), Gutter Grime, Coffin Queen, Genesis
@@ -617,7 +617,7 @@ line blocks.
    Caustic Bronco (no "saddled" condition on a trigger's life loss), Sigarda's Splendor ("note your life total"), Back for Seconds (bargained: one of the
    returned cards onto the battlefield instead), Phyrexian Soulgorger (cumulative upkeep that sacrifices creatures), Mariposa Military Base
    (rad counters as it enters tapped). Smaller gaps: bots never activate Grinning Ignus; Celestial Reunion, Countersculpt (done in round B179),
-   Kindle the Inner Flame, Molten Exhale (done in round 299) and Theorist's Sanctum (done in round B179) (behold as a cost or a replacement) are still out.
+   Kindle the Inner Flame (done in round 371), Molten Exhale (done in round 299) and Theorist's Sanctum (done in round B179) (behold as a cost or a replacement) are still out.
    Round 199 went on from the top: "as long as you control an artifact creature or a Plan" (Doctor Doom; Plan is now a
    subtype, so The Masters of Evil's search works), "each creature you control that's a Food or a Golem" (Brenard,
    Ginger Sculptor), "each creature that didn't enter this turn" (Let the Galaxy Burn), "prevent all combat damage that
@@ -1153,7 +1153,7 @@ line blocks.
    Out after round 221 (looked at, not done): New Perspectives (done in round 326) ({0} instead of every cycling cost, non-mana ones
    included); Clay Golem (a die roll as a cost, done in round 325); Ian the Reckless (done in round B175) (damage to you and any target at once);
    Stumpsquall Hydra (done in round 340) (distribute counters among it and commanders); Cursecloth
-   Wrappings (done in round 303) (granted embalm with the card's own mana cost); Rift Elemental (remove a time counter from a permanent or
+   Wrappings (done in round 303) (granted embalm with the card's own mana cost); Rift Elemental (done in round 372) (remove a time counter from a permanent or
    suspended card); Ashcloud Phoenix (return face down); Nightshade Assassin (done in round B182) (reveal X black cards); Silverquill
    Lecturer (granted demonstrate); Cosi's Trickster (whenever an opponent shuffles, done in round B71); Ib Halfheart, Goblin Tactician
    ("becomes blocked, sacrifice it. If you do, it deals 4 damage to each creature blocking it", done in round 325); Vivien's Stampede
@@ -1383,7 +1383,7 @@ line blocks.
    Epic (tap creatures for an activation cost's mana, like convoke); Kaldring, the Rimestaff (play a snow permanent card
    from your graveyard this turn, entering tapped); Hostile Hostel (done in round 338) (soul counters, transform, then untap; Creeping Inn's
    "creature cards exiled with this creature"); Dawnbreak Reclaimer (an opponent chooses a card in your graveyard);
-   Cryptic Gateway (done in round 302), Mogg Assassin, Karplusan Minotaur (done in round 318), The Phasing of Zhalfir (done in round 363), Mirror of Life Trapping, Grasping Shadows
+   Cryptic Gateway (done in round 302), Mogg Assassin, Karplusan Minotaur (done in round 318), The Phasing of Zhalfir (done in round 363), Mirror of Life Trapping, Grasping Shadows (done in round 371)
    ("transform it" is the enchantment, not the attacker).
    Round 233 (top of the list, now done): "you may pay one or more {E}. If you do, create an X/X ... Vehicle token"
    (Pia Nalaar, Chief Mechanic); "If a Hero enters this way, it enters with an additional +1/+1 counter" (Winter Soldier,
@@ -2875,6 +2875,97 @@ line blocks.
    cost picks the Equipment, no ruling); Spectral Searchlight (still out: another player choosing a color inside a mana
    ability); Sanctuary Blade and Psychic Paper (a choice made as the Equipment becomes attached); Rift Elemental (still
    out); Altaïr Ibn-La'Ahad (its short name now reads; memory counters on token copies still missing).
+   Round 369 went on down `npm run popular`, most played first, to card types, supertypes and colors of cards outside the
+   battlefield: Encroaching Mycosynth's "Nonland permanents you control are artifacts in addition to their other types. The
+   same is true for permanent spells you control and nonland permanent cards you own that aren't on the battlefield." and
+   Biotransference's "Creatures you control are artifacts in addition to their other types. The same is true for creature
+   spells you control and creature cards you own that aren't on the battlefield." (a card type in layer 4, CR 613.1d, for
+   cards in every zone, hidden ones too, so Fabricate finds a creature card and Etherium Sculptor makes a creature spell
+   cheaper, rulings; StaticAbility.offFieldCards; a creature entering under an "artifacts enter tapped" effect enters
+   tapped, CR 614.12, rulings); Rootpath Purifier's "Lands you control and land cards in your library are basic." (the
+   supertype in layer 4, CR 205.4a, so a search for a basic land card may find any land card in your library, with no basic
+   land type, rulings; Blood Moon depends on it and stops applying to those lands, CR 613.8a, rulings; offFieldTyped now
+   adds supertypes); Painter's Servant's "All cards that aren't on the battlefield, spells, and permanents are the chosen
+   color in addition to their other colors." (layer 5, CR 613.1e, for every card, spell and permanent whoever owns it, two
+   Servants adding both colors and a Mycosynth Lattice the later of the two winning, CR 613.7, rulings; addColors
+   `chosen`). Spells cast this turn are now judged by the card types they had as they were cast (castCardAs), so Ethersworn
+   Canonist lets a creature spell cast under Biotransference count as an artifact spell. No new prompts. +4, 31,382 of
+   31,936 with Lane B's B209-B211. The compiled text of every other card is unchanged.
+   Out after round 369 (looked at, not done): Hatchery Sliver (still out: a second replicate cost beside the spell's own
+   kicker or replicate); Jasmine Boreal of the Seven, Archelos, Lagoon Mystic, Tamiyo, Collector of Tales, Nephalia Academy,
+   Celestial Reunion and Stalking Leonin (still out, as in their earlier lists).
+   Round 370 went on down `npm run popular`, most played first, to a free spell as big as the life gained this turn, spells
+   from exile made cheaper by the players attacked, a look as deep as the creatures that convoked it and a search of
+   graveyard and library: Bre of Clan Stoutarm's "At the beginning of your end step, if you gained life this turn, exile
+   cards from the top of your library until you exile a nonland card. You may cast that card without paying its mana cost
+   if the spell's mana value is less than or equal to the amount of life you gained this turn. Otherwise, put it into your
+   hand." (an intervening if, CR 603.4, rulings; cast as it resolves, X 0, CR 608.2g, 118.9; too big or not cast, into the
+   hand); Commander Liara Portyr's "Whenever you attack, spells you cast from exile this turn cost {X} less to cast, where
+   X is the number of players being attacked. Exile the top X cards of your library. Until end of turn, you may cast
+   spells from among those exiled cards." (X counted as it resolves, a planeswalker alone not counting its controller,
+   rulings; every spell cast from exile that turn by any permission, rulings; costModThisTurn now reads CostMod.fromZones
+   by the zone the card is cast from); Knight-Errant of Eos's "look at the top six cards of your library. You may reveal up
+   to two creature cards with mana value X or less from among them, where X is the number of creatures that convoked ~.
+   Put the revealed cards into your hand, then shuffle." (the convokers counted as the permanent last existed if it has
+   left, CR 608.2h: lastKnown.convoked); Chandra, Heart of Fire's "+1: Discard your hand, then exile the top three cards of
+   your library. Until end of turn, you may play cards exiled this way." and "−9: Search your graveyard and library for any
+   number of red instant and/or sorcery cards, exile them, then shuffle. You may cast them this turn. Add six {R}." (normal
+   timing, costs paid, rulings; not a mana ability, CR 605.1a). Browser tests click through Bre's free cast, Knight-Errant's
+   pick and Chandra's −9 search. No new prompts. +4, 31,391 of 31,936 with round 369 and Lane B's B209-B212. The compiled text of every other card is
+   unchanged.
+   Out after round 370 (looked at, not done): Words of Waste ("each opponent discards a card instead": a discard choice in
+   the middle of a replaced draw, with nothing to resume the draws after it); Verdant Mastery (three destinations for the
+   lands found, one under an opponent's control); Wayta, Trainer Prodigy and Invisible Woman, Sue Storm (still out, as in
+   their earlier lists). Polish: the free-cast prompt of Bre, Breaching Dragonstorm and Solstice
+   Revelations doesn't say the card goes to the hand if not cast.
+   Round 371 went on down `npm run popular`, most played first, to a graveyard card's eerie, a dread counter on the
+   enchantment, a behold of three, a sneak cost that makes an exile permanent and an Aura or Equipment returned onto the
+   token just made: Fear of Infinity's "Eerie — Whenever an enchantment you control enters and whenever you fully unlock a
+   Room, you may return this card from your graveyard to your hand." (an ability of the card in the graveyard, CR 113.6m;
+   "whenever you fully unlock a Room" is now watched from graveyards too, CR 709.5i, rulings); Grasping Shadows's
+   "Whenever a creature you control attacks alone, it gains deathtouch and lifelink until end of turn. Put a dread counter
+   on this enchantment. Then if there are three or more dread counters on it, transform it." ("it" is the enchantment,
+   which keeps its counters as Shadows' Lair, rulings; only a creature declared alone, CR 506.5); Kindle the Inner Flame's
+   "Flashback—{1}{R}, Behold three Elementals." (three different objects, Elementals you control and Elemental cards in
+   your hand in any mix, CR 701.4a, rulings: "behold two/three/four/five <type>s" as a cost); Turncoat Kunoichi's "Exile
+   that creature until this creature leaves the battlefield. If this creature's sneak cost was paid, instead exile the
+   chosen creature." (for good with sneak, CR 702.190a; whether it was paid read as the creature last existed if it has
+   left, CR 608.2h, LastKnown.sneak; without sneak and gone first, nothing is exiled, CR 610.3c, rulings); Forum
+   Filibuster's "create a 2/1 white and black Inkling creature token with flying. When you do, return up to one target Aura
+   or Equipment card from your graveyard to the battlefield attached to that token." (one reflexive ability for each
+   Inkling, CR 603.12a, each about its own token: reflexive perTokenSubject; an Aura that can't enchant it stays in the
+   graveyard, CR 303.4g; an Equipment with the token gone enters unattached, CR 301.5b). Browser tests click through
+   Kindle's behold picker (the picker now says "behold three Elementals"), Fear's return and Filibuster's target. No new
+   prompts. +5, 31,396 of 31,936 with rounds 369-370 and Lane B's B209-B212. The compiled text of every other card is
+   unchanged.
+   Out after round 371 (looked at, not done): Jailbreak ("When that permanent enters, return up to one target permanent
+   card with equal or lesser mana value": a reflexive target bounded by its subject's mana value); Lukka, Coppercoat
+   Outcast (cards exiled this way gaining a cast permission that lasts while you control a Lukka planeswalker); Mizzix,
+   Replica Rider and Choreographed Sparks (still out: a copy of a permanent spell that gains haste and an end step
+   sacrifice; "this spell can't be copied").
+   Round 372 went on down the "Out after round N" lists, most played first, to a time counter taken from a suspended card,
+   a target count set by another target, a land put in from among the cards cascade exiled and colorless mana for another
+   player: Rift Elemental's "{1}{R}, Remove a time counter from a permanent you control or suspended card you own: ~ gets
+   +2/+0 until end of turn." (one counter, from a permanent you control or a card in exile you own with suspend and a time
+   counter, CR 702.62b, 602.2b; the last one triggers suspend above the ability, rulings: AdditionalCost removeCounters
+   `orSuspended`); Reap's "Return up to X target cards from your graveyard to your hand, where X is the number of black
+   permanents target opponent controls as you cast ~." (the opponent is a target, the errata, chosen first, and its black
+   permanents counted as the targets are chosen and not again, rulings, CR 601.2c: manyX reads the chosen opponent; before
+   it's chosen the UI offers as many as the opponent with the most allows, and the cast is refused with too many);
+   Averna, the Chaos Bloom's "As you cascade, you may put a land card from among the exiled cards onto the battlefield
+   tapped." (after the last card is exiled and before the cast, its reminder text and rulings; not playing a land, rulings;
+   one land for each such ability; not Jodah's or discover, which aren't cascade, CR 702.85a: CompiledCard.cascadeLand);
+   Jetfire, Ingenious Scientist's "Remove one or more +1/+1 counters from among artifacts you control: Target player adds
+   that much {C}. This mana can't be spent to cast nonartifact spells. Convert ~." (X counters, X at least 1; with a target
+   it isn't a mana ability, CR 605.1a, rulings; the mana may pay for anything but a nonartifact spell, rulings). Browser
+   tests click through Averna's land pick, Reap's targets and Rift Elemental's counter picker. No new prompts. +4, 31,400
+   of 31,936 with rounds 369-371 and Lane B's B209-B212. The compiled text of every other card is unchanged.
+   Out after round 372 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   ability); Kraven the Hunter (the greatest power among a player's creatures immediately before several die at once, CR
+   603.10a: the creatures that stay are read as they are after); Abstruse Appropriation ("spend colorless mana as though it
+   were mana of any color": a hybrid symbol can't hold {C} yet); Pulmonic Sliver, Spectral Searchlight and Mysterious
+   Stranger (still out, as in their earlier lists). Polish: Reap's card slots are offered before the opponent is chosen,
+   as many as the opponent with the most black permanents allows.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -4232,7 +4323,7 @@ line blocks.
    the TARDIS and Territory Forge (abilities of cards in exile or granted from a graveyard card); Forger's Foundry, Goliath
    Daydreamer and Rod of Absorption (spells exiled as they resolve, cast later from among them); Risky Move ("When you gain
    control of ~ from another player": no control-change event yet); Blaster, Combat DJ (granted modular, and moving X
-   counters onto another artifact); Jetfire, Ingenious Scientist (removing counters from among artifacts as a cost, mana
+   counters onto another artifact); Jetfire, Ingenious Scientist (done in round 372) (removing counters from among artifacts as a cost, mana
    for a target player); Sabertooth Cobra ("unless they pay {2} before that step"); Ranar the Ever-Watchful (the first
    foretell each turn for {0}, and exile from hand or by your effects as one trigger); Soundwave, Sonic Spy (a copy of a
    card exiled from a graveyard by the damage dealt); Grip of Chaos and Psychic Battle (targets reselected at random).
@@ -4600,7 +4691,7 @@ line blocks.
    in hand; Mechtitan Core's "Exile ... four other" cost button reads "Exile and activate" now (the cost picker said
    "Sacrifice and activate" for every exile-instead cost, Food Chain's too).
    Smaller gaps from round 154: "Create a token. When you do, ..." triggers once for each of those tokens created (CR
-   603.12a), except when the reflexive ability is about "that token" (Forum Filibuster, Ratonhnhaké:ton, Dáin
+   603.12a), except when the reflexive ability is about "that token" (Forum Filibuster (done in round 371), Ratonhnhaké:ton, Dáin
    Ironfoot), which still triggers once; Ob Nixilis, Captive Kingpin triggers when at least one opponent lost exactly 1
    life in the event, even if another opponent lost more at the same time; bots say yes to Descendants' Fury only with a
    token among the creatures that dealt damage, and use Kaya, Geist Hunter's −2 like any other ability; Yorion is a
@@ -5425,7 +5516,7 @@ line blocks.
    (Errant and Giada), Vizier of the Menagerie's "spend mana of any type", Experimental Frenzy's (done in round 325) "can't play cards from
    your hand", granted look-at-top (Glowcap Lantern (done in round B186)), "until end of turn, you may look at the top card" (Gwenom, The
    Belligerent). Left from the ripple/sneak round: Karai's "if a sneak cost was paid this turn", sneak conditions on
-   Last Ronin's Technique and Turncoat Kunoichi, Melek and Mistbreath Elder, putting cards from a hand on the bottom
+   Last Ronin's Technique and Turncoat Kunoichi (done in round 371), Melek and Mistbreath Elder, putting cards from a hand on the bottom
    in any order (Arjun, Mindmoil), granting cascade, and the owner's order when several target spells or permanents
    go to the bottom at once (CR 401.4). Left from the
    earthbend/foretell round: {X} foretell and freerunning costs (Starnheim Unleashed done in round 300, Monastery Raid),

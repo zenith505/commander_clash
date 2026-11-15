@@ -4393,7 +4393,20 @@ export type Effect =
    * Darigaaz Reincarnated (round B202): "remove an egg counter from it. Then if ~ has no egg counters on it, return it to the
    * battlefield": the card in exile, still that object, onto the battlefield under its owner's control.
    */
-  | { type: "removeCounterThenReturn"; counter: CounterKind }
+  | { type: "removeCounterThenReturn"; counter: CounterKind; /** All Hallow's Eve (round B214): "put it into your graveyard" instead of onto the battlefield, setting ResolvingInfo.did for the "if" after it. */ toGraveyard?: true }
+  /**
+   * Ice Cave (round B214): "any other player may pay that spell's mana cost. If a player does, counter the spell.": the
+   * spell that triggered it (the cause), each other player asked in turn order (CR 101.4) until one pays; the mana cost
+   * as it is on the stack, X its announced value (CR 107.3h), no cost increases or reductions (rulings), and none to pay
+   * for a spell with no mana cost (CR 118.6).
+   */
+  | { type: "othersPaySpellCostToCounter" }
+  /**
+   * Tidal Flats (round B214): "For each attacking creature without flying, its controller may pay {1}. If that player
+   * doesn't, creatures you control blocking that creature gain first strike until end of turn.": asked as it resolves, the
+   * creatures counted then (rulings), each attacker's controller in turn order (CR 101.4).
+   */
+  | { type: "attackersPayOrBlockersGain"; filter: TargetSpec; cost: string; keyword: string }
   /**
    * Storm Herald (round B208): "return any number of Aura cards from your graveyard to the battlefield attached to creatures
    * you control": only Auras that could be attached to a creature you control (rulings), chosen as it resolves, each
@@ -6491,6 +6504,13 @@ export interface TriggeredAbility {
    * at the same time included, CR 603.10a, rulings), known as it triggers, for its target's mana value (TargetSpec.xRange).
    */
   xLookBackSubtype?: string;
+  /**
+   * Warping Wurm (round B214): its controller puts this trigger on the stack after their other triggers waiting at the same
+   * time (CR 603.3b), so it resolves first: "Whenever ~ phases in, put a +1/+1 counter on it" before its own upkeep "phases out
+   * unless you pay". The engine doesn't ask for the order; the other one can only lose the counter (a phased-out permanent is
+   * treated as though it doesn't exist, CR 702.26b).
+   */
+  resolveFirst?: true;
   /** Druid of Horns: "Whenever you cast an Aura spell that targets ~": heroic for spells like this only. */
   heroicSpell?: TargetSpec;
   /** Speedball, New Warrior: "Whenever a player casts a spell that targets ~": heroic for any player's spell, not only its controller's. */
@@ -7964,6 +7984,8 @@ export interface CompiledCard {
   exileInsteadOfGraveyard?: boolean;
   /** An instant or sorcery whose last instruction is "Exile ~.": exiled as it finishes resolving (CR 608.2n). */
   exileSelfOnResolve?: true;
+  /** With `exileSelfOnResolve`, All Hallow's Eve (round B214): "Exile ~ with two scream counters on it": the card in exile gets these (CR 122.1). */
+  exileSelfCounters?: { counter: CounterKind; n: number };
   /**
    * "If a card or token would be put into a graveyard from anywhere, exile it instead." (Rest in Peace), "If a card would
    * be put into an opponent's graveyard from anywhere, exile it instead." (Leyline of the Void), "..., instead exile it

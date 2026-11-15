@@ -17846,6 +17846,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c532ecd2-feeb-41f5-bda0-b05e86f86a45",
+  "name": "Ice Cave",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever a player casts a spell, any other player may pay that spell's mana cost. If a player does, counter the spell. (Mana cost includes color.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "apc",
+  "releasedAt": "2001-06-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a200daec-983c-4ea6-ae98-1c963b50fbb1",
   "name": "Identity Thief",
   "manaCost": "{2}{U}{U}",
@@ -39046,6 +39072,32 @@
   "set": "clb",
   "releasedAt": "2022-06-10",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "bf39d0f7-f689-45fd-b37b-12d1618fd6e7",
+  "name": "Tidal Flats",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "{U}{U}: For each attacking creature without flying, its controller may pay {1}. If that player doesn't, creatures you control blocking that creature gain first strike until end of turn.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fem",
+  "releasedAt": "1994-11-01",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

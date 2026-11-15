@@ -66,6 +66,13 @@ export function runLaneB202Effect(s: GameState, e: B202Effect, ctx: ResolveCtx, 
         countersRemoved(s, o, e.counter, 1);
       }
       if ((o.counters[e.counter] ?? 0) > 0) return;
+      // All Hallow's Eve (round B214): "put it into your graveyard", its owner's (CR 404.2); "and ..." happens only if it did.
+      if (e.toGraveyard) {
+        log(s, `${defOf(s, o).name} is put into ${player(s, o.owner).name}'s graveyard.`);
+        moveObject(s, o.id, "graveyard");
+        s.resolving!.did = true;
+        return;
+      }
       log(s, `${defOf(s, o).name} returns to the battlefield under ${player(s, o.owner).name}'s control.`);
       moveObject(s, o.id, "battlefield", { controller: o.owner });
       invalidateCharacteristics(s);

@@ -3039,7 +3039,9 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
     const i = turnOrderFromActive.indexOf(pid);
     return i < 0 ? 99 : i;
   };
-  s.triggerQueue = s.triggerQueue.map((t, i) => ({ t, i })).sort((a, b) => rank(a.t.controller) - rank(b.t.controller) || a.i - b.i).map((x) => x.t);
+  // Warping Wurm (TriggeredAbility.resolveFirst, round B214): after its controller's other triggers, so it resolves first.
+  const first = (t: PendingTrigger) => (!t.body && compileCard(s.cards[t.sourceCardId]!).triggers[t.index]?.resolveFirst ? 1 : 0);
+  s.triggerQueue = s.triggerQueue.map((t, i) => ({ t, i })).sort((a, b) => rank(a.t.controller) - rank(b.t.controller) || first(a.t) - first(b.t) || a.i - b.i).map((x) => x.t);
   // Firebender Ascension's and Aboleth Spawn's triggers go on the stack just above the ability that caused them (rulings),
   // whoever controls them.
   for (const t of s.triggerQueue.filter((x) => x.causeTag)) {

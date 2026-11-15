@@ -314,8 +314,8 @@ describe("upkeep 'unless you pay' and phasing triggers (CR 702.26, 603.10b)", ()
     expect(zone(s, djinn)).toBe("battlefield");
   });
 
-  it("Warping Wurm stays out: its phase-in counter and its upkeep phase-out are ordered by its controller (CR 603.3b)", () => {
-    expect(isFullySupported(warpingWurm)).toBe(false);
+  it("Warping Wurm is supported since round B214: its phase-in counter resolves before its upkeep phase-out (CR 603.3b)", () => {
+    expect(isFullySupported(warpingWurm)).toBe(true);
   });
 
   it("Teferi's Imp: discard as it phases out, draw as it phases in", () => {

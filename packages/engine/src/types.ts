@@ -2912,6 +2912,10 @@ export interface Resolving {
     mayExile?: { queue: { id: ObjectId; zc: number }[]; yes: { id: ObjectId; zc: number }[] };
     /** Decoy Gambit (Effect bounceUnlessDraw): the creatures whose controllers are still to choose, in order, how many chose the draw, the creatures to return, and how far it has got. */
     decoy?: { queue: { pid: PlayerId; id: ObjectId; zc: number }[]; draws: number; back: { id: ObjectId; zc: number }[]; step: number };
+    /** Ice Cave (Effect othersPaySpellCostToCounter, round B214): the players still to be asked, in turn order. */
+    iceCave?: { queue: PlayerId[] };
+    /** Tidal Flats (Effect attackersPayOrBlockersGain, round B214): the attackers whose controllers are still to choose, and those not paid for. */
+    tidal?: { queue: { id: ObjectId; zc: number; pid: PlayerId }[]; unpaid: ObjectId[] };
     /** Zevlor, Elturel Exile (Effect copyPerOtherOpponent): the opponents still to choose for, the choices so far ("p<player>" or an object id), and the last answer. */
     zevlor?: { left: PlayerId[]; picks: string[]; answer?: string };
     /** Effect "copyForPlayers" (Hive Mind, Tempt with Mayhem): the players still to copy, in APNAP order; how many have copied; whether the first of them chose to and is copying now. */

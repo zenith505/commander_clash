@@ -1,6 +1,6 @@
 # Roadmap
 
-31,447 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,452 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -9558,6 +9558,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   and target, Terminal Velocity's pick and end step, the Oppressor's opponent, a bot's type and its tap ability, the type
   you choose for Ana's Oppressor, and Storyweave's Saga mode. +4, 31,447 of 31,936. The compiled text of every other card is
   unchanged.
+- Round B222 (least played first, from the Lane B skip lists): Phyrexian Splicer (flying, first strike, trample or shadow
+  chosen as the ability is activated, before its targets, which depend on it, CR 602.2b, 601.2b-c, and kept by a copy,
+  CR 707.10: read as four modes; target creature with the chosen ability loses it and another target creature gains it
+  until end of turn, each target checked on its own, so the second gains it even with the first gone, rulings). Elemental
+  Expressionist (magecraft: target creature you control gains, until end of turn, "If this creature would leave the
+  battlefield, exile it instead" and "When this creature is put into exile, create a 4/4 blue and red Elemental creature
+  token", which can only trigger going from the battlefield, for any reason, a token too, and twice when granted twice,
+  rulings). Time Reaper (target face-up card the damaged player owns in exile, CR 406.3, put on the bottom of their library;
+  "If you do": it's in that library now, Condition targetExiled `to` library, so not a commander its owner put into the
+  command zone instead, CR 903.9b; then 3 life). Equipoise (at your upkeep, for target player's lands, then artifacts, then
+  creatures, as many as they control beyond yours, chosen by you as it resolves and phased out before the next type is
+  counted, rulings, CR 702.26b; you as the target: none; Effect phaseOutExcess; bots aim it at the opponent with the most
+  beyond theirs and phase out the best). Meeting of the Five (the top ten cards exiled, spells with exactly three colors cast
+  from among them this turn, the face cast counting, and ten mana spendable only on such spells, any part of their costs,
+  rulings; TargetSpec colorCount `three`). Browser tests for the Splicer's keyword and targets, the Expressionist's target
+  and token, Time Reaper's target among an opponent's cards in exile, and Equipoise's target player and two picks. +5,
+  31,452 of 31,936. The compiled text of every other card is unchanged.
+- Out after round B222 (looked at, not done): Noxious Vapors (whether one multicolored card can be the card kept for each
+  of its colors isn't settled by any ruling), Grime Gorger (the same for a card of several card types), Allure of the
+  Unknown and Glimpse of Tomorrow (as after round B221) stay out. Bots cast Meeting of the Five even with no three-color
+  card to cast (legal, not at their best).
 - Out after round B221 (looked at, not done): Allure of the Unknown (an opponent you choose exiles one of the revealed
   cards and may cast it free as your spell resolves, rulings: a cast by another player in the middle of a resolution),
   Glimpse of Tomorrow (still waiting for Lane A's Warp World), Next of Kin, Lodestone Bauble and Sanctuary Blade stay out.

@@ -4,6 +4,7 @@ import type { AbilityBody, CompiledCard, Effect, TargetSpec, TriggeredAbility } 
 import { parseActivated } from "./activated";
 import { parseBody } from "./body";
 import { parseTrigger } from "./triggers";
+import { roundB222Spell } from "./laneb222";
 
 /** A trigger line read the usual way, or null. */
 const trig = (text: string) => {
@@ -93,5 +94,5 @@ export function roundB221Spell(text: string): AbilityBody | null | undefined {
     const second = { ...modes[1]!, effects: [...modes[1]!.effects, next], text: "Put two lore counters on target Saga you control. The next time one or more enchantment creatures you control enter this turn, each enters with two additional +1/+1 counters on it." };
     return { ...body, text, modal: { ...body.modal!, modes: [modes[0]!, second] } };
   }
-  return undefined;
+  return roundB222Spell(text);
 }

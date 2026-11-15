@@ -782,7 +782,7 @@ export interface TargetSpec {
   /** Each of these colors: "a spell that's both blue and red" (the Mimics). */
   bothColors?: Color[];
   /** "Multicolored spell" (two or more colors, CR 105.4), "monocolored" (exactly one), "colorless" (none, CR 105.2c). */
-  colorCount?: "multicolored" | "monocolored" | "colorless" | /** one or more colors (CR 105.2c) */ "colored" | /** exactly two colors, or not exactly two */ "two" | "notTwo" | /** "all colors" (Jenson Carthalion): all five */ "all" | /** "that isn't all colors" (Iridian Maelstrom) */ "notAll";
+  colorCount?: "multicolored" | "monocolored" | "colorless" | /** one or more colors (CR 105.2c) */ "colored" | /** exactly two colors, or not exactly two */ "two" | "notTwo" | /** exactly three colors (Meeting of the Five, round B222) */ "three" | /** "all colors" (Jenson Carthalion): all five */ "all" | /** "that isn't all colors" (Iridian Maelstrom) */ "notAll";
   supertypes?: string[]; // "basic land", "legendary creature"
   /** At least one of these subtypes: "Spirit card", "Walls" (changelings have every creature type). */
   subtypes?: string[];
@@ -4454,6 +4454,13 @@ export type Effect =
    */
   | { type: "exchangeGroups"; a: PlayerRef; b: PlayerRef }
   /**
+   * Equipoise (round B222): "for each land target player controls in excess of the number you control, choose a land that
+   * player controls, then the chosen permanents phase out. Repeat this process for artifacts and creatures.": one pass for
+   * each of `types` in order, counted anew after the last pass's permanents phased out (rulings), this ability's controller
+   * choosing as it resolves (CR 702.26b).
+   */
+  | { type: "phaseOutExcess"; who: PlayerRef; types: string[] }
+  /**
    * Mirror of Fate (round B218): "Choose up to seven face-up exiled cards you own. Exile all the cards from your library,
    * then put the chosen cards on top of your library.": up to `n`, chosen as it resolves; then the library exiled face up,
    * and the chosen cards still in exile put on top in the order their owner chooses (rulings).
@@ -5791,7 +5798,7 @@ export type SpellCondition =
   /** Shuriken's granted ability: "unless it was unattached from a Ninja", the creature its cost unattached it from as that was paid (StackItem.unattachedFromNinja). */
   | { kind: "unattachedFromNinja" }
   /** "Exile up to one target creature card from a graveyard. If you exiled a card this way, ..." (Ardyn): target `index` is now in exile, moved there by this (CR 400.7). */
-  | { kind: "targetExiled"; index: number }
+  | { kind: "targetExiled"; index: number; /** Time Reaper (round B222): "put target ... on the bottom of their library. If you do": it is now in a library instead, moved there by this. */ to?: "library" }
   /** "If the player doesn't" after "target opponent may have you draw three cards" (Combustible Gearhulk): whether that player chose to (eachMay's choseThisWay). */
   | { kind: "theyChose"; not?: true }
   /**

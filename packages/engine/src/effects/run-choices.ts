@@ -1130,7 +1130,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
                 return defOf(s, card).types.some((t) => types.includes(t));
               })(s.resolving!.revealed)
             : e.cond.kind === "targetExiled"
-            ? ((t) => !!t && t.kind === "object" && !!ctx.legal[e.cond.index] && s.objects[t.id]?.zone === "exile" && (s.objects[t.id]!.zoneChanges ?? 0) === (t.zc ?? 0) + 1)(ctx.targets[e.cond.index])
+            ? ((t) => !!t && t.kind === "object" && !!ctx.legal[e.cond.index] && s.objects[t.id]?.zone === ((e.cond as { to?: "library" }).to ?? "exile") && (s.objects[t.id]!.zoneChanges ?? 0) === (t.zc ?? 0) + 1)(ctx.targets[e.cond.index])
             : e.cond.kind === "revealedMv"
             ? revealedMv(s) === amountNow(s, e.cond.mv, ctx)
             : e.cond.kind === "createdNone"

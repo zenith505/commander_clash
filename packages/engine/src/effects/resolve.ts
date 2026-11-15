@@ -68,6 +68,7 @@ import { runLaneB216Effect } from "./run-laneb216";
 import { runLaneB218Effect } from "./run-laneb218";
 import { runLaneB220Effect } from "./run-laneb220";
 import { runLaneB221Effect } from "./run-laneb221";
+import { runLaneB222Effect } from "./run-laneb222";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -1967,6 +1968,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB220Effect(s, e, ctx, src);
     case "nextEntersCounters":
       return runLaneB221Effect(s, e, ctx, src);
+    case "phaseOutExcess":
+      return runLaneB222Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

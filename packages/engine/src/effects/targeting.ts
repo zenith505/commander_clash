@@ -19,7 +19,7 @@ import { landCouldProduce } from "../manaabilities";
 const CARD_TYPES = new Set(["Artifact", "Battle", "Creature", "Enchantment", "Kindred", "Land", "Planeswalker", "Instant", "Sorcery"]);
 
 /** Multicolored: two or more colors (CR 105.4); monocolored: exactly one; colorless: none (CR 105.2c). */
-const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) => (want === "multicolored" ? n >= 2 : want === "monocolored" ? n === 1 : want === "two" ? n === 2 : want === "notTwo" ? n !== 2 : want === "colored" ? n >= 1 : want === "all" ? n >= 5 : want === "notAll" ? n < 5 : n === 0);
+const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) => (want === "multicolored" ? n >= 2 : want === "monocolored" ? n === 1 : want === "two" ? n === 2 : want === "notTwo" ? n !== 2 : want === "three" ? n === 3 : want === "colored" ? n >= 1 : want === "all" ? n >= 5 : want === "notAll" ? n < 5 : n === 0);
 
 /**
  * Does this permanent fit `spec` from `controller`'s point of view, using its current

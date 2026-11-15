@@ -1586,6 +1586,8 @@ export type ObjRef =
   | { ref: "costExiled" }
   /** Sword of the Ages: "those creature cards": the cards a sacrifice cost put into graveyards, while they're still there as those cards (CR 400.7); a token sacrificed is gone (CR 111.7). */
   | { ref: "sacrificedCards" }
+  /** Rescue from the Underworld: these cards, remembered as a delayed trigger was made, while each is still that object in a graveyard, exile or the command zone (CR 400.7). */
+  | { ref: "remembered"; cards: { id: ObjectId; zc: number }[] }
   /** Heart-Shaped Herb: "return that card" after "you may sacrifice a creature. If you do": the cards this resolution's sacrifices put into graveyards, while they're still there as those cards (CR 400.7); a token is gone (CR 111.7). */
   | { ref: "sacrificedThisWayCards" }
   /** "If an ability of an artifact, creature, or planeswalker is countered this way, that permanent" (Tishana's Tidebinder): the source of the ability this resolution countered, if it's still that object and fits `filter` now (rulings). */
@@ -2265,6 +2267,8 @@ export type Affects =
   | { kind: "chosenObject" }
   /** "Creatures blocking or blocked by ~" (Alms Beast): those in combat with the source now (CR 509.1h). */
   | { kind: "inCombatWithSelf" }
+  /** Ashes of the Fallen: nothing on the battlefield, only cards elsewhere (StaticAbility.offFieldCards "yardCreature"). */
+  | { kind: "none" }
   | {
       kind: "filter";
       types: string[]; // all of these card types, e.g. ["Creature"]
@@ -2334,9 +2338,9 @@ export interface StaticAbility {
   /**
    * Its type change applies to some of its controller's cards outside the battlefield and off the stack too (layers.ts
    * offFieldTyped): "nonland permanent cards you own that aren't on the battlefield" (Encroaching Mycosynth), "land cards
-   * in your library" (Rootpath Purifier).
+   * in your library" (Rootpath Purifier), "each creature card in your graveyard" (Ashes of the Fallen).
    */
-  offFieldCards?: "nonlandPermanent" | "libraryLand";
+  offFieldCards?: "nonlandPermanent" | "libraryLand" | "yardCreature";
 }
 
 /**
@@ -5330,6 +5334,31 @@ export type Effect =
   | { type: "damageMod"; mod: DamageMod; until?: "yourNextTurn"; byTarget?: number; /** "Would be dealt to target creature" (Kill-Suit Cultist): this ability's target `toTarget`, as the object it is. */ toTarget?: number; toPlayer?: PlayerRef; /** "A source of your choice", chosen as it resolves (CR 609.7a). */ choose?: TargetSpec; /** With `choose`: only a permanent ("an unblocked creature of your choice", Forcefield), not a spell or a gone source. */ choosePermanent?: true; /** "That source" (Desperate Gambit): the source an earlier "chooseSourceNow" of this resolution chose (ResolvingInfo.chosenSource); nothing without one. */ chosenSource?: true; /** "That creature": the trigger's subject. */ bySubject?: true }
   /** Desperate Gambit: "Choose a source you control": a source of damage chosen as it resolves (CR 609.7a), before the rest of it, kept for "that source" (ResolvingInfo.chosenSource); `yours`: one its controller controls (a spell on the stack, or a source an ability refers to, too: rulings). */
   | { type: "chooseSourceNow"; choose: TargetSpec; yours?: true }
+  /**
+   * Helm of Obedience (round 373): "Target opponent mills a card, then repeats this process until a creature card or X
+   * cards have been put into their graveyard this way, whichever comes first": one "mill a card" at a time (as many as a
+   * replacement makes of it, millCount), counting only the cards that went into that graveyard (ResolvingInfo.milled); a
+   * card exiled instead doesn't count, so with every card exiled the whole library goes (rulings). `until`: the card that
+   * ends it once one is put there.
+   */
+  | { type: "millUntil"; who: PlayerRef; n: Amount; until: TargetSpec }
+  /**
+   * Coin of Fate: "An opponent chooses one of the exiled cards. You put that card on the bottom of your library and return
+   * the other to the battlefield tapped.": the cards this activated ability's cost exiled (StackItem.costExiled), while
+   * they're still in exile; an opponent its controller chooses picks one (effects/run-round374.ts).
+   */
+  | { type: "opponentSplitsCostExiled" }
+  /**
+   * Rescue from the Underworld: "Return that card and the sacrificed card to the battlefield under your control at the
+   * beginning of your next upkeep.": one delayed trigger (CR 603.7) about the target card as it is now and the card the
+   * creature sacrificed to cast the spell became, in whatever public zone it went to (rulings); a token is gone (CR 111.7).
+   */
+  | { type: "returnWithSacrificedAtYourNextUpkeep"; what: ObjRef }
+  /**
+   * Dawnbreak Reclaimer: "choose a creature card in an opponent's graveyard, then that player chooses a creature card in
+   * your graveyard. You may return those cards to the battlefield under their owners' control." (effects/run-round374.ts).
+   */
+  | { type: "swapFromGraveyards" }
   /** Archnemesis: "you may attach this Aura to that player": the source, still that object on the battlefield, to the first of these players it could enchant (CR 701.3a-b, 702.5d); nothing if it's already attached there. */
   | { type: "attachSelfToPlayer"; who: PlayerRef }
   /**
@@ -7369,6 +7398,12 @@ export interface ManaAbility {
   text: string;
   /** "{T}: A player of your choice adds {C}." (Victory Chimes): the player chosen as it's activated adds it (Action activateMana `to`). */
   toChosenPlayer?: true;
+  /**
+   * With `toChosenPlayer`, Spectral Searchlight: "That player adds one mana of any color they choose": the chosen player
+   * chooses the color as it resolves (CR 605.3b, 608.2d). Its activator's own pick is the mana it's activated for; another
+   * player is asked (GameState.manaColorFor, chooseOption "manaColorFor").
+   */
+  getterChooses?: true;
   /** "{1}, {T}: Each player adds {B}{R}{G}." (Yurlok of Scorch Thrash): every player still in the game adds what it makes, the activator included. */
   toEachPlayer?: true;
   manaCost: string; // "{1}" or ""
@@ -7690,7 +7725,7 @@ export type AdditionalCost =
    * `linked`: "Put a card exiled with ~ into its owner's graveyard" (Jester's Scepter): one of the cards the source's
    * linked exile took (CR 607.2a), moved to its owner's graveyard, chosen in CostChoices.exileCards.
    */
-  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true; linked?: true; /** Nethergoyf's escape: "Exile any number of other cards from your graveyard with four or more card types among them": any number of them (at least one), as long as the cards chosen have this many card types among them (CR 205.2a, rulings); `n` is 1. */ cardTypes?: number; /** Night Soil: "Exile two creature cards from a single graveyard": all `n` from any one player's graveyard (yours too). */ singleGraveyard?: true; /** Osgir, the Reconstructor: "{X}, Exile an artifact card with mana value X from your graveyard": the one X announced as it's activated (CR 107.3a, 602.2b), and `filter` gets that mana value. */ mvX?: true; /** "Put three cards from your graveyard on the bottom of your library" (Battlefield Scrounger): the chosen cards go to the bottom of your library, in the order chosen (CR 401.4), not into exile. */ toBottom?: true; /** "Put a card an opponent owns from exile into that player's graveyard" (the Eldrazi processors): any card an opponent owns in exile, chosen in CostChoices.exileCards. */ process?: true; /** Gorex, the Tombshell: a spell's cost whose cards are all linked to the permanent the spell becomes (CR 607.2q, StackItem.costExiled, CompiledCard.costExileLinked). */ linkSpell?: true }
+  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true; linked?: true; /** Nethergoyf's escape: "Exile any number of other cards from your graveyard with four or more card types among them": any number of them (at least one), as long as the cards chosen have this many card types among them (CR 205.2a, rulings); `n` is 1. */ cardTypes?: number; /** Night Soil: "Exile two creature cards from a single graveyard": all `n` from any one player's graveyard (yours too). */ singleGraveyard?: true; /** Osgir, the Reconstructor: "{X}, Exile an artifact card with mana value X from your graveyard": the one X announced as it's activated (CR 107.3a, 602.2b), and `filter` gets that mana value. */ mvX?: true; /** "Put three cards from your graveyard on the bottom of your library" (Battlefield Scrounger): the chosen cards go to the bottom of your library, in the order chosen (CR 401.4), not into exile. */ toBottom?: true; /** "Put a card an opponent owns from exile into that player's graveyard" (the Eldrazi processors): any card an opponent owns in exile, chosen in CostChoices.exileCards. */ process?: true; /** Gorex, the Tombshell: a spell's cost whose cards are all linked to the permanent the spell becomes (CR 607.2q, StackItem.costExiled, CompiledCard.costExileLinked). */ linkSpell?: true; /** Coin of Fate: an activated ability's cost whose cards are all kept for "the exiled cards" (StackItem.costExiled). */ costCards?: true }
   /**
    * "Exile an instant or sorcery spell you control" (Nivmagus Elemental, CR 602.2b): one of the ability's controller's spells
    * on the stack that matches, a copy too, chosen in CostChoices.exileSpell; it leaves the stack without being countered.

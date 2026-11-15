@@ -7683,7 +7683,7 @@ export type AdditionalCost =
    * +1/+1 counters from among creatures you control" (Hopeful Initiate): counters on permanents you control that match,
    * any mix of them (of `counter`'s kind if set), chosen as it's paid (CR 602.2b, 601.2h); CostChoices.counters.
    */
-  | { kind: "removeCounters"; n: number; filter: TargetSpec; counter?: string; /** Ion Storm: "Remove a +1/+1 counter or a charge counter from a permanent you control": a counter of any of these kinds. */ counters?: string[]; other?: true; /** "Remove a counter from ~" (Glen Elendra Guardian): any kind, from this permanent only. */ self?: true; /** "Remove X +1/+1 counters from among creatures you control" (Retribution of the Ancients): as many as the X announced (CR 107.3a). */ x?: true; /** Moxite Refinery: "Remove X counters from an artifact or creature you control": every counter removed from the same one permanent (`filter.text` names it, "an artifact or creature you control"). */ one?: true }
+  | { kind: "removeCounters"; n: number; filter: TargetSpec; counter?: string; /** Ion Storm: "Remove a +1/+1 counter or a charge counter from a permanent you control": a counter of any of these kinds. */ counters?: string[]; other?: true; /** "Remove a counter from ~" (Glen Elendra Guardian): any kind, from this permanent only. */ self?: true; /** "Remove X +1/+1 counters from among creatures you control" (Retribution of the Ancients): as many as the X announced (CR 107.3a). */ x?: true; /** Moxite Refinery: "Remove X counters from an artifact or creature you control": every counter removed from the same one permanent (`filter.text` names it, "an artifact or creature you control"). */ one?: true; /** Rift Elemental: "from a permanent you control or suspended card you own": a suspended card in exile its owner owns too (CR 702.62b). */ orSuspended?: true }
   /**
    * "Put a -1/-1 counter on a creature you control" (Hatchet Bully, Wandering Mage): on one permanent you control that
    * matches, chosen as it's paid (CR 602.2b, 601.2h; CostChoices.counterOn), the source too. Not payable on one counters
@@ -8895,6 +8895,8 @@ export interface CompiledCard {
   spendAnyColor?: true;
   /** Sunglasses of Urza: "You may spend white mana as though it were red mana." (CR 609.4b): for its controller's costs, white mana pays {R}; it stays white. */
   spendWhiteAsRed?: true;
+  /** Averna, the Chaos Bloom: "As you cascade, you may put a land card from among the exiled cards onto the battlefield tapped." (CR 702.85a): for its controller's cascades, after the last card is exiled. */
+  cascadeLand?: true;
   /** "Players may spend mana as though it were mana of any color" (Mycosynth Lattice): every player, for every cost (CR 609.4b). */
   spendAnyColorAll?: true;
   /** Agatha's Soul Cauldron: "You may spend mana as though it were mana of any color to activate abilities of creatures you control" (CR 609.4b). */

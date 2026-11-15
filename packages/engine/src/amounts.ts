@@ -167,6 +167,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "eventAmount":
       return ctx.event?.amount ?? 0;
+    case "notedTypes": {
+      // Volo, Itinerant Scholar: the creature types noted for that object (GameState.notedFor), none for a new one (CR 400.7).
+      const o = refObjects(s, c.of, ctx)[0];
+      return o ? (s.notedFor?.[`${o.id}@${o.zoneChanges ?? 0}`]?.length ?? 0) : 0;
+    }
     case "castShortfall": {
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
       return item ? Math.max(0, spellManaValue(s, item) - (ctx.event?.amount ?? 0)) : 0;

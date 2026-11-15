@@ -34,6 +34,7 @@ import { runChooseSourceNowEffect } from "./run-round364";
 import { runMillUntilEffect } from "./run-round373";
 import { runOpponentSplitsCostExiledEffect, runReturnWithSacrificedEffect, runSwapFromGraveyardsEffect } from "./run-round374";
 import { runOpponentShufflesExiledInEffect, runThievesAuctionEffect, runWarpWorldEffect } from "./run-round376";
+import { runNoteCreatureTypeEffect } from "./run-round380";
 import { runCopyNamedCardEffect, runSearchTheyNameEffect } from "./run-round377";
 import { runAttachSelfToPlayerEffect } from "./run-round365";
 import { runFlickerWithAurasEffect, runReturnAurasAttachedEffect } from "./run-round366";
@@ -1872,6 +1873,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runSearchTheyNameEffect(s, e, ctx, src);
     case "copyNamedCard":
       return runCopyNamedCardEffect(s, e, ctx, src);
+    case "noteCreatureType":
+      return runNoteCreatureTypeEffect(s, e, ctx, src);
     case "attachSelfToPlayer":
       return runAttachSelfToPlayerEffect(s, e, ctx);
     case "flickerWithAuras":

@@ -1,6 +1,6 @@
 # Roadmap
 
-31,440 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,444 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,900 of
 9,979 (99%).
 
@@ -3144,6 +3144,36 @@ line blocks.
    ability another player activates, then "reselect which player ~ is attacking"); Tamiyo, Collector of Tales, Celestial
    Reunion, Fabrication Foundry, Ziatora's Envoy and Archelos, Lagoon Mystic (still out, as in their earlier lists).
    Polish: the log says "You chooses Hill Giant to attack." (the known "You chooses" wording).
+   Round 380 went on down the "Out after round N" lists and `npm run popular`, most played first, to a card given to the
+   player whose turn it is, a card cast from exile with undaunted, prevention that has your commanders strike back and
+   creature types noted for a token: The Beamtown Bullies' "{T}: Target opponent whose turn it is puts target nonlegendary
+   creature card from your graveyard onto the battlefield under their control. It gains haste. Goad it. At the beginning
+   of the next end step, exile it." (TargetSpec activePlayer, CR 102.1: activated only in an opponent's turn; that player
+   is the one who puts it, GameObject.putter; goaded by you, CR 701.15a; exiled by your delayed trigger, CR 603.7, while
+   it's that object, CR 400.7); Durnan of the Yawning Portal's "For as long as that card remains exiled, you may cast it.
+   That spell has undaunted." (dig `play` "exiled" with `playUndaunted`, mayPlay `undaunted`: {1} less for each opponent
+   as the total cost is determined, CR 702.125a-b, 601.2f; normal timing, rulings); Judgment of Alexander's "Whenever
+   damage from a creature is prevented this way, each commander creature you control deals damage equal to its power to
+   that creature." (once for each creature whose damage the shield prevents, DamageRuleSpec reflectEachCreature, CR
+   603.2, 903.3); Volo, Itinerant Scholar's Journal ("note one of its creature types that hasn't been noted for Volo's
+   Journal": Effect noteCreatureType, GameState.notedFor by object and zone changes, CR 400.7, every type for a
+   changeling, CR 702.73a; chosen as it resolves, chooseOption "noteType") and "Draw a card for each creature type noted
+   for target permanent you control named Volo's Journal." (Count notedTypes). Browser tests click through the Bullies'
+   ability at Ana's beginning of combat, Durnan's pick and the cast from exile for {R}, Judgment as Ana attacks, the
+   Journal's type picker and its "N noted" chip, and Volo's draw. New prompts: the creature type picker for noting a type
+   and the stop at an opponent's beginning of combat for an ability that targets the player whose turn it is. +4, 31,444
+   of 31,936. The compiled text of every other card is unchanged. Bots activate the Bullies at an opponent's beginning of
+   combat on their biggest creature card (power 2 or more), cast Judgment as a damage shield, cast Durnan's card like any
+   card they may play from exile, and note the first type offered.
+   Out after round 380 (looked at, not done): Long List of the Ents (each of its six chapters notes any creature type, chosen
+   from every type, not from a spell, and the next creature spell of that type cast this turn enters with an additional
+   +1/+1 counter: a delayed trigger for a spell of a chosen type, left for a round that can reuse Lane B's round B221
+   next-creature counters once they merge); Capricopian, Tamiyo, Collector of Tales, Celestial Reunion, Fabrication
+   Foundry, Ziatora's Envoy and Archelos, Lagoon Mystic (still out, as in their earlier lists).
+   Polish: the Bullies' delayed exile logs as "Hill Giant's ability triggers (Exile Hill Giant)" (the source named is the
+   creature, as for every "At the beginning of the next end step, exile it" of putOntoBattlefield); the page stops for an
+   ability targeting the player whose turn it is only at that player's beginning of combat, not in their upkeep or end
+   step.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

@@ -1767,7 +1767,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={pending?.kind === "chooseModes" ? undefined : () => setModePick(null)}
             />
           )}
-          {pending?.kind === "chooseOption" && (pending.what === "creatureType" || pending.what === "planeswalkerType" || ((pending.what === "textFrom" || pending.what === "textTo") && pending.options.length > 10)) && pending.player === HUMAN && (
+          {pending?.kind === "chooseOption" && (pending.what === "creatureType" || pending.what === "planeswalkerType" || pending.what === "noteType" || ((pending.what === "textFrom" || pending.what === "textTo") && pending.options.length > 10)) && pending.player === HUMAN && (
             <TypePicker key={pending.source} s={s} pending={pending} onDone={(choice) => dispatch([{ type: "chooseOption", player: HUMAN, choice }])} />
           )}
           {pending?.kind === "chooseOption" && pending.what === "cardName" && pending.player === HUMAN && (
@@ -3403,6 +3403,12 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
         {o.attachedToPlayer !== undefined && (
           <span className="chip other" title={`${s.players[controllerOf(s, o)]!.name}'s Aura, enchanting ${s.players[o.attachedToPlayer]!.name}.`}>
             On {s.players[o.attachedToPlayer]!.name}
+          </span>
+        )}
+        {(s.notedFor?.[`${o.id}@${o.zoneChanges ?? 0}`]?.length ?? 0) > 0 && (
+          // Volo's Journal (round 380): the creature types noted for it.
+          <span className="chip other noted" title={`Noted: ${s.notedFor![`${o.id}@${o.zoneChanges ?? 0}`]!.join(", ")}`}>
+            {s.notedFor![`${o.id}@${o.zoneChanges ?? 0}`]!.length} noted
           </span>
         )}
         {chosen && (
@@ -6005,7 +6011,7 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}:</strong> {pending.what === "cardName" ? `${pending.prompt ?? "choose a card name"}.` : pending.what === "planeswalkerType" ? "choose a planeswalker type." : "choose a creature type."}
+          <strong>{pending.source}:</strong> {pending.what === "cardName" ? `${pending.prompt ?? "choose a card name"}.` : pending.what === "planeswalkerType" ? "choose a planeswalker type." : pending.what === "noteType" ? `${pending.prompt ?? "note a creature type"}.` : "choose a creature type."}
         </span>
       </div>
     );

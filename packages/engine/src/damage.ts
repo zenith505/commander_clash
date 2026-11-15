@@ -1480,9 +1480,12 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     // controller chose to (planShields).
     if (r.dealTo && !plan.declined?.includes(r.id)) dealToLater.set(r.id, { r, n: (dealToLater.get(r.id)?.n ?? 0) + n });
     // New Way Forward: one reflexive trigger for all it prevented in this event (CR 603.12), about that source.
-    if (r.reflect) {
-      const was = ruleReflectLater.get(r.id);
-      ruleReflectLater.set(r.id, { r, n: (was?.n ?? 0) + n, src: was?.src ?? src });
+    // Judgment of Alexander: "Whenever damage from a creature is prevented this way": only damage from a creature source (as
+    // it would deal it), one trigger for each such creature in this event, about it.
+    if (r.reflect && (!r.reflect.eachCreature || (src.types.includes("Creature") && src.ref))) {
+      const key = r.reflect.eachCreature ? `${r.id}|${src.ref!.object}` : r.id;
+      const was = ruleReflectLater.get(key);
+      ruleReflectLater.set(key, { r, n: (was?.n ?? 0) + n, src: was?.src ?? src });
     }
   };
   const ruleReflectLater = new Map<string, { r: DamageRule; n: number; src: DamageSource }>();
@@ -1627,7 +1630,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     if (n <= 0 || !r.reflect || !from) continue;
     // "That source's controller": whoever controls it as the trigger resolves while it's still that object, otherwise
     // its controller as the damage was prevented (TriggerEventInfo.sourceOf).
-    s.triggerQueue.push({ sourceId: from.id, sourceCardId: r.cardId, controller: r.controller, index: -1, body: r.reflect.body, sourceZc: from.zoneChanges ?? 0, event: { amount: n, player: src.controller, ...(src.ref ? { sourceOf: { id: src.ref.object, zc: src.ref.zc } } : {}) } });
+    s.triggerQueue.push({ sourceId: from.id, sourceCardId: r.cardId, controller: r.controller, index: -1, body: r.reflect.body, sourceZc: from.zoneChanges ?? 0, event: { amount: n, player: src.controller, ...(src.ref ? { sourceOf: { id: src.ref.object, zc: src.ref.zc } } : {}) }, ...(r.reflect.eachCreature && src.ref ? { subject: { id: src.ref.object, zc: src.ref.zc } } : {}) });
   }
   for (const [id, { n, by, body }] of reflectLater) {
     const o = s.objects[id];

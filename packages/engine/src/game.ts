@@ -5108,7 +5108,7 @@ function linkedFlash(s: GameState, o: GameObject, pid: PlayerId): boolean {
  * How `pid` may play this exiled card now: its own permission, or a "play cards exiled with ~" one (any color of mana;
  * Valgavoth's for life equal to its mana value, `life`).
  */
-function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "anyColor" | "free" | "orPay" | "cost" | "more" | "less" | "affinity"> & { life?: true }) | undefined {
+function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "anyColor" | "free" | "orPay" | "cost" | "more" | "less" | "affinity" | "undaunted"> & { life?: true }) | undefined {
   if (ownExilePermission(s, o, pid)) return o.mayPlay;
   const how = linkedPlayPermission(s, o, pid);
   return how === "anyType" ? { anyType: true } : how === "life" ? { life: true } : how === "plain" || linkedPlayGrant(s, o, pid) >= 0 ? {} : undefined;
@@ -6693,6 +6693,9 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Chiss-Goria, Forge Tyrant: "it has affinity for artifacts": {1} less for each artifact its caster controls (CR 702.41a),
   // generic mana only (CR 601.2f).
   if (exiled?.affinity && !madness && freeCastOf(s, pid) !== o.id) mods.less += s.battlefield.filter((b) => controllerOf(s, obj(s, b)) === pid && objectMatches(s, exiled.affinity!, obj(s, b), pid, false)).length;
+  // Durnan of the Yawning Portal: "That spell has undaunted": {1} less for each opponent its caster has, those who left the
+  // game not counted (CR 702.125a-b), generic mana only (CR 601.2f); another undaunted it has applies too (CR 702.125c).
+  if (exiled?.undaunted && !madness && freeCastOf(s, pid) !== o.id) mods.less += opponents(s, pid).length;
   // A "Kicker {X}" is still paid, with its X (CR 118.9d).
   if ((freeCastOf(s, pid) === o.id && !madness) || (!how.faceDown && !realAlt && plottedCast(s, pid, o)) || freeFromExile) {
     const kicked = anyType(lessColored(parseManaCost(kickCost + moreMana)));
@@ -11730,6 +11733,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     (sc.equipHosts ??= {})[sc.equipAsking] = choice;
     log(s, `${p.name} chooses ${nameOf(s, choice)} for ${defOf(s, obj(s, sc.equipAsking)).name} (${pend.source}).`);
     sc.equipAsking = undefined;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "noteType") {
+    // Volo's Journal (Effect noteCreatureType, round 380): the creature type noted.
+    if (!pend.options.includes(choice)) throw new RulesError("note one of its creature types that hasn't been noted");
+    (r.scratch ??= {}).noteType = choice;
     continueResolution(s);
     return;
   }

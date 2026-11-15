@@ -735,6 +735,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (spec.kind === "any") return (!spec.opponent || t.id !== controller) && (!spec.dealtDamageThisTurn || !!s.damagedThisTurn?.includes(t.id));
     if (spec.kind !== "player") return false;
     if (spec.notEventPlayer || t.id === spec.notPlayer) return false;
+    // The Beamtown Bullies: "target opponent whose turn it is": only the active player (CR 102.1).
+    if (spec.activePlayer && t.id !== s.activePlayer) return false;
     if (spec.outnumbers && !outnumbersOk(s, spec.outnumbers, t.id)) return false;
     return !spec.opponent || t.id !== controller;
   }

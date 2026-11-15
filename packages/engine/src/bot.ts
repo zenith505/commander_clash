@@ -2069,6 +2069,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // step ends, so only what we could cast now counts, if anything).
     // Garth One-Eye (round 377): the name whose copy we'd cast now, to most effect.
     if (pend.kind === "chooseOption" && pend.what === "namedCopy") return [{ type: "chooseOption", player: pid, choice: namedCopyPick(s, pid, pend.options) ?? pend.options[0]! }];
+    // Volo's Journal (round 380): each noted type counts the same for its draw, so the first one.
+    if (pend.kind === "chooseOption" && pend.what === "noteType") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "manaColorFor") {
       const counts = new Map<string, number>(pend.options.map((o) => [o, 0]));
       for (const id of player(s, pid).hand) for (const c of defOf(s, obj(s, id)).colors) counts.set(COLOR_NAMES[c], (counts.get(COLOR_NAMES[c]) ?? 0) + 1);
@@ -2198,7 +2200,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   const dial = chooseEndTurnEscape(s, pid);
   if (dial) return dial;
-  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? choosePhaseAway(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid) ?? choosePayEnchantedCost(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? choosePhaseAway(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseGiftToActive(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid) ?? choosePayEnchantedCost(s, pid);
   if (regen) return regen;
   const silencer = chooseSilencerFaceUp(s, pid);
   if (silencer) return silencer;
@@ -8367,6 +8369,31 @@ function chooseForecast(s: GameState, pid: PlayerId): Action[] | null {
       const costs = abilityCosts(s, pid, obj(s, id), ab, targets ?? []);
       if (costs === null) continue;
       const plan = planActivate(s, pid, id, i, targets ?? undefined, undefined, undefined, undefined, costs);
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
+ * The Beamtown Bullies (round 380): at an opponent's beginning of combat, give that player the creature card in our
+ * graveyard with the greatest power (at least 2): goaded, it must attack another player if it can (CR 701.15b), and it's
+ * exiled at the next end step.
+ */
+function chooseGiftToActive(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.activePlayer === pid || s.step !== "beginCombat" || s.stack.length) return null;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid || o.tapped) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      const [who, what] = ab.body.targets;
+      if (ab.body.targets.length !== 2 || who?.kind !== "player" || !who.activePlayer || !what) continue;
+      const cards = legalTargets(s, what, pid, undefined, botSource(s, id), id).flatMap((x) => (x.kind === "object" ? [obj(s, x.id)] : []));
+      const best = cards.map((c) => ({ c, p: Number(defOf(s, c).power) || 0 })).sort((a, b) => b.p - a.p)[0];
+      if (!best || best.p < 2) continue;
+      const plan = planActivate(s, pid, id, i, [{ kind: "player", id: s.activePlayer }, { kind: "object", id: best.c.id }]);
       if (plan) return plan;
     }
   }

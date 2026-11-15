@@ -5760,6 +5760,20 @@ function Controls({
         })}
       </div>
     );
+  // Garth One-Eye (round 377): a button for each name not chosen yet for it.
+  if (pending?.kind === "chooseOption" && pending.what === "namedCopy" && pending.player === HUMAN)
+    return (
+      <div className="controls named-copy-pick">
+        <span>
+          <strong>{pending.source}:</strong> {pending.prompt ?? "choose a card name"}
+        </span>
+        {pending.options.map((o) => (
+          <button key={o} className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            {o}
+          </button>
+        ))}
+      </div>
+    );
   if (pending?.kind === "chooseOption" && pending.what === "keyword" && pending.player === HUMAN)
     return (
       <div className="controls keyword-pick">

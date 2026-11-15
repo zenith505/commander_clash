@@ -2544,7 +2544,7 @@ export function cantSearch(s: GameState, pid: PlayerId): boolean {
 }
 
 /** The fewest top cards an opponent's Aven Mindcensor lets this player search, if any does. */
-function searchTop(s: GameState, pid: PlayerId): number | undefined {
+export function searchTop(s: GameState, pid: PlayerId): number | undefined {
   const ns = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost).map((o) => abilitiesOf(s, o).opponentsSearchTop).filter((n): n is number => n !== undefined);
   return ns.length ? Math.min(...ns) : undefined;
 }

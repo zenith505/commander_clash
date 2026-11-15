@@ -8,7 +8,7 @@ import { characteristics, controllerOf, invalidateCharacteristics, staticConditi
 import type { Color, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, TYPE_ORDERS, pickOptions, printedMatches, sayBound, spellMatches, targetsMatch } from "./targeting";
 import { tokenDef } from "./run-tokens";
-import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected, sourceCreatureTypes, ctxSource } from "./resolve";
+import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected, sourceCreatureTypes, ctxSource, chosenPlayerOf } from "./resolve";
 import { dealDamageBatch } from "../damage";
 import { kickedMatches, paidUnless } from "./run-spells";
 import { discardCards } from "./run-library";
@@ -829,7 +829,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const keep = () => {
           const me = e.keepOnSource && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
           if (me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) && r.chosen?.player !== undefined) {
-            me.chosen = { ...me.chosen, player: r.chosen.player };
+            // Stalking Leonin: kept secret (Chosen.secret) until "Reveal the player you chose" is paid.
+            me.chosen = { ...me.chosen, player: r.chosen.player, ...(e.secret ? { secret: true as const } : {}) };
             invalidateCharacteristics(s);
           }
         };
@@ -871,10 +872,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
         if (opps.length === 1) {
           r.chosen = { ...r.chosen, player: opps[0]! };
-          log(s, `${player(s, ctx.controller).name} chooses ${player(s, opps[0]!).name} for ${src}.`);
+          log(s, e.secret ? `${player(s, ctx.controller).name} secretly chooses an opponent for ${src}.` : `${player(s, ctx.controller).name} chooses ${player(s, opps[0]!).name} for ${src}.`);
         }
         if (opps.length <= 1) return keep();
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: e.moreLandsThanYou ? "choose an opponent who controls more lands than you" : e.mostLife === "opponents" ? "choose an opponent with the most life" : e.mostLife === "least" ? "choose a player with the lowest life total" : e.mostLife ? "choose a player with the most life" : "choose an opponent" };
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), ...(e.secret ? { secret: true as const } : {}), prompt: e.secret ? "secretly choose an opponent" : e.moreLandsThanYou ? "choose an opponent who controls more lands than you" : e.mostLife === "opponents" ? "choose an opponent with the most life" : e.mostLife === "least" ? "choose a player with the lowest life total" : e.mostLife ? "choose a player with the most life" : "choose an opponent" };
         return "paused";
       }
       if (e.each) {
@@ -934,7 +935,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         r.chosen = { ...r.chosen, name: undefined };
         if (chooser === undefined || !options.length) return;
         const of = ctx.targets.find((t) => t?.kind === "player");
-        s.pending = { kind: "chooseOption", player: chooser, source: src, what: "cardName", options, prompt: `choose ${e.names ? `a ${e.names.text} name` : "a card name"}`, purpose: e.purpose ?? "deny", ...(of?.kind === "player" ? { of: of.id } : {}) };
+        s.pending = { kind: "chooseOption", player: chooser, source: src, what: "cardName", options, prompt: e.purpose === "guardLibrary" ? `choose a card name: if the card ${player(s, ctx.controller).name} found in your library is a creature card without that name, they may put it onto the battlefield under their control` : `choose ${e.names ? `a ${e.names.text} name` : "a card name"}`, purpose: e.purpose ?? "deny", ...(of?.kind === "player" ? { of: of.id } : {}) };
         return "paused";
       }
       if (e.choice === "number") {
@@ -1153,6 +1154,9 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.milled ?? []).some(({ id }) => printedMatches(bindChosen((e.cond as { filter: TargetSpec }).filter, ctx.chosen), defOf(s, s.objects[id]!)))
             : e.cond.kind === "targetIs"
             ? targetIs(s, ctx, e.cond.index, e.cond.filter)
+            : e.cond.kind === "targetControlledByChosen"
+            ? // Stalking Leonin (round 377): that target, still legal, controlled by the player chosen for the source now.
+              ((o, chosen) => !!o && o.zone === "battlefield" && chosen !== undefined && controllerOf(s, o) === chosen)(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined, chosenPlayerOf(s, ctx))
             : e.cond.kind === "targetSharesName"
             ? // Winnow: another permanent on the battlefield has its name; a face-down permanent has none (CR 708.2).
               ((o) => !!o && o.zone === "battlefield" && !o.faceDown && s.battlefield.some((id) => id !== o.id && !obj(s, id).faceDown && characteristics(s, obj(s, id)).name === characteristics(s, o).name))(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined)

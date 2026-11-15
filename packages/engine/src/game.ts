@@ -11724,6 +11724,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "namedCopy") {
+    // Garth One-Eye (Effect copyNamedCard, round 377): the name picked; the copy is made next.
+    const st = ((r.scratch ??= {}).garth ??= {});
+    st.pick = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "enchant") {
     // What an Aura entering without being cast enchants, chosen as it enters (CR 303.4f).
     const sc = (r.scratch ??= {});
@@ -11736,7 +11743,9 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "creatureType" && r.scratch?.eachAsked && r.chosen?.types) r.chosen = { ...r.chosen, types: [...r.chosen.types, choice], typesBy: { ...r.chosen.typesBy, [p.id]: choice } };
   else if (pend.what === "color" && r.scratch?.eachAsked && r.chosen?.colorsBy) r.chosen = { ...r.chosen, colorsBy: { ...r.chosen.colorsBy, [p.id]: withChoice({}, "color", choice).color! } };
   else r.chosen = withChoice(r.chosen, pend.what, choice);
-  log(s, `${p.name} chooses ${pend.what === "opponent" ? player(s, Number(choice)).name : choice}${pend.what === "opponent" ? ` for ${pend.source}` : ""}.`);
+  // Stalking Leonin: "secretly choose an opponent": nobody else learns who until it's revealed (round 377).
+  if (pend.secret) log(s, `${p.name} secretly chooses an opponent for ${pend.source}.`);
+  else log(s, `${p.name} chooses ${pend.what === "opponent" ? player(s, Number(choice)).name : choice}${pend.what === "opponent" ? ` for ${pend.source}` : ""}.`);
   continueResolution(s);
 }
 

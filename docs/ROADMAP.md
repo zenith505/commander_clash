@@ -1,7 +1,7 @@
 # Roadmap
 
-31,430 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,896 of
+31,433 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,897 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3064,6 +3064,35 @@ line blocks.
    Out after round 376 (looked at, not done): Celestial Reunion, Fabrication Foundry, Ziatora's Envoy, Arni Metalbrow and
    Archelos, Lagoon Mystic (still out, as in their earlier lists). Polish: Thieves' Auction asks Ken for every one of his
    picks, even with dozens of cards exiled (no "take the rest for me").
+   Round 377 went on down `npm run popular` and the "Out after round N" lists, most played first, to a search of another
+   player's library they try to guard by naming a card, an opponent chosen in secret and revealed, and copies of named cards
+   made outside the game: Sphinx Ambassador's "Whenever ~ deals combat damage to a player, search that player's library for
+   a card, then that player chooses a card name. If you searched for a creature card that doesn't have that name, you may
+   put it onto the battlefield under your control. Then that player shuffles." (a card must be found if there's one, CR
+   701.23d, kept hidden from that player, who names a card as it resolves, CR 608.2d, rulings; a creature card is any card
+   with the type; Aven Mindcensor and "can't search" still leave the name and the shuffle: Effect searchTheyName, NamePurpose
+   "guardLibrary"); Stalking Leonin's "When ~ enters, secretly choose an opponent." and "Reveal the player you chose: Exile
+   target creature that's attacking you if it's controlled by the chosen player. Activate only once." (kept on the
+   permanent while it's that object, CR 400.7, shown only to its controller; the reveal is a cost payable only with a player
+   chosen; exiled only if the chosen player controls it as it resolves, CR 608.2b: Choose `secret`, Condition
+   targetControlledByChosen); Garth One-Eye's "{T}: Choose a card name that hasn't been chosen from among Disenchant,
+   Braingeyser, Terror, Shivan Dragon, Regrowth, and Black Lotus. Create a copy of the card with the chosen name. You may
+   cast the copy. (You still pay its costs.)" (the name chosen as it resolves, one not chosen yet for this Garth as this
+   object, GameState.namesChosenFor; the copy made from the Oracle card outside the game, CR 707.13, cast as it resolves for
+   its costs or never, CR 707.12, a permanent spell becoming a token, CR 707.10; the six cards come with the card data, as
+   meld results do, meld-results.ts namedCardDef: Effect copyNamedCard, PendingDecision chooseOption "namedCopy"). Browser
+   tests click through Garth's name buttons and the copy cast, Leonin's secret opponent and its reveal against an attacker,
+   and the Sphinx's search, "put it onto the battlefield" question and the name you choose when a bot's Sphinx hits you.
+   +3, 31,433 of 31,936. The compiled text of every other card is unchanged. Bots name their own
+   best creature card against the Sphinx, search for a creature they expect not to be named, reveal Leonin only for an
+   attacker of the chosen player, and activate Garth in their first main phase for the card they can use (Shivan Dragon
+   with six mana, Terror or Disenchant with a target, Regrowth with a card in the graveyard, Braingeyser with four mana,
+   else Black Lotus).
+   Out after round 377 (looked at, not done): Tamiyo, Collector of Tales ("Spells and abilities your opponents control
+   can't cause you to discard cards or sacrifice permanents." cuts across every discard and sacrifice path, and who controls
+   the effect isn't passed to all of them); Celestial Reunion, Fabrication Foundry, Ziatora's Envoy, Arni Metalbrow and
+   Archelos, Lagoon Mystic (still out, as in their earlier lists). Polish: the Garth copy's cast prompt says "from exile"
+   (exile stands in for outside the game).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

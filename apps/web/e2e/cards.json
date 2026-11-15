@@ -3909,6 +3909,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5089ec1a-f881-4d55-af14-5d996171203b",
+  "name": "Black Lotus",
+  "manaCost": "{0}",
+  "cmc": 0,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}, Sacrifice this artifact: Add three mana of any one color.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "banned",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "dca51281-fb21-45b6-beb4-1f13397caee2",
   "name": "Blackblade Reforged",
   "manaCost": "{2}",
@@ -4984,6 +5013,32 @@
   "commanderLegal": "legal",
   "set": "khc",
   "releasedAt": "2021-02-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9908e597-9470-4c13-8387-39431b380138",
+  "name": "Braingeyser",
+  "manaCost": "{X}{U}{U}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target player draws X cards.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -14937,6 +14992,47 @@
   "set": "fin",
   "releasedAt": "2025-06-13",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d8c4312e-03ae-43f3-b92c-4adb6875534c",
+  "name": "Garth One-Eye",
+  "manaCost": "{W}{U}{B}{R}{G}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "{T}: Choose a card name that hasn't been chosen from among Disenchant, Braingeyser, Terror, Shivan Dragon, Regrowth, and Black Lotus. Create a copy of the card with the chosen name. You may cast the copy. (You still pay its costs.)",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mh2",
+  "releasedAt": "2021-06-18",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -30974,6 +31070,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e6e4a8bd-5c40-4654-8de1-0da9afed90fd",
+  "name": "Regrowth",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Return target card from your graveyard to your hand.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-10-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d39c378b-f0a2-400f-af40-a632e24b6d72",
   "name": "Relentless Pursuit",
   "manaCost": "{2}{G}",
@@ -35890,6 +36012,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "69e1a166-02f7-43f8-b099-dbb01034370c",
+  "name": "Sphinx Ambassador",
+  "manaCost": "{5}{U}{U}",
+  "cmc": 7,
+  "typeLine": "Creature — Sphinx",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx"
+  ],
+  "oracleText": "Flying\nWhenever this creature deals combat damage to a player, search that player's library for a card, then that player chooses a card name. If you searched for a creature card that doesn't have that name, you may put it onto the battlefield under your control. Then that player shuffles.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "m10",
+  "releasedAt": "2009-07-17",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "690df8d2-9538-4c51-b730-cee09ad0ef1c",
   "name": "Sphinx of the Chimes",
   "manaCost": "{4}{U}{U}",
@@ -36360,6 +36514,37 @@
   "commanderLegal": "legal",
   "set": "aer",
   "releasedAt": "2017-01-20",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6ec98a34-5c04-423c-98e5-8cf3047135c1",
+  "name": "Stalking Leonin",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Cat Archer",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Cat",
+   "Archer"
+  ],
+  "oracleText": "When this creature enters, secretly choose an opponent.\nReveal the player you chose: Exile target creature that's attacking you if it's controlled by the chosen player. Activate only once.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c17",
+  "releasedAt": "2017-08-25",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -38360,6 +38545,32 @@
   "commanderLegal": "legal",
   "set": "msc",
   "releasedAt": "2026-06-26",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b81f041d-98db-4408-9472-c483e4a502bc",
+  "name": "Terror",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Destroy target nonartifact, nonblack creature. It can't be regenerated.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "10e",
+  "releasedAt": "2007-07-13",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

@@ -2875,6 +2875,49 @@ line blocks.
    cost picks the Equipment, no ruling); Spectral Searchlight (still out: another player choosing a color inside a mana
    ability); Sanctuary Blade and Psychic Paper (a choice made as the Equipment becomes attached); Rift Elemental (still
    out); Altaïr Ibn-La'Ahad (its short name now reads; memory counters on token copies still missing).
+   Round 369 went on down `npm run popular`, most played first, to card types, supertypes and colors of cards outside the
+   battlefield: Encroaching Mycosynth's "Nonland permanents you control are artifacts in addition to their other types. The
+   same is true for permanent spells you control and nonland permanent cards you own that aren't on the battlefield." and
+   Biotransference's "Creatures you control are artifacts in addition to their other types. The same is true for creature
+   spells you control and creature cards you own that aren't on the battlefield." (a card type in layer 4, CR 613.1d, for
+   cards in every zone, hidden ones too, so Fabricate finds a creature card and Etherium Sculptor makes a creature spell
+   cheaper, rulings; StaticAbility.offFieldCards; a creature entering under an "artifacts enter tapped" effect enters
+   tapped, CR 614.12, rulings); Rootpath Purifier's "Lands you control and land cards in your library are basic." (the
+   supertype in layer 4, CR 205.4a, so a search for a basic land card may find any land card in your library, with no basic
+   land type, rulings; Blood Moon depends on it and stops applying to those lands, CR 613.8a, rulings; offFieldTyped now
+   adds supertypes); Painter's Servant's "All cards that aren't on the battlefield, spells, and permanents are the chosen
+   color in addition to their other colors." (layer 5, CR 613.1e, for every card, spell and permanent whoever owns it, two
+   Servants adding both colors and a Mycosynth Lattice the later of the two winning, CR 613.7, rulings; addColors
+   `chosen`). Spells cast this turn are now judged by the card types they had as they were cast (castCardAs), so Ethersworn
+   Canonist lets a creature spell cast under Biotransference count as an artifact spell. No new prompts. +4, 31,382 of
+   31,936 with Lane B's B209-B211. The compiled text of every other card is unchanged.
+   Out after round 369 (looked at, not done): Hatchery Sliver (still out: a second replicate cost beside the spell's own
+   kicker or replicate); Jasmine Boreal of the Seven, Archelos, Lagoon Mystic, Tamiyo, Collector of Tales, Nephalia Academy,
+   Celestial Reunion and Stalking Leonin (still out, as in their earlier lists).
+   Round 370 went on down `npm run popular`, most played first, to a free spell as big as the life gained this turn, spells
+   from exile made cheaper by the players attacked, a look as deep as the creatures that convoked it and a search of
+   graveyard and library: Bre of Clan Stoutarm's "At the beginning of your end step, if you gained life this turn, exile
+   cards from the top of your library until you exile a nonland card. You may cast that card without paying its mana cost
+   if the spell's mana value is less than or equal to the amount of life you gained this turn. Otherwise, put it into your
+   hand." (an intervening if, CR 603.4, rulings; cast as it resolves, X 0, CR 608.2g, 118.9; too big or not cast, into the
+   hand); Commander Liara Portyr's "Whenever you attack, spells you cast from exile this turn cost {X} less to cast, where
+   X is the number of players being attacked. Exile the top X cards of your library. Until end of turn, you may cast
+   spells from among those exiled cards." (X counted as it resolves, a planeswalker alone not counting its controller,
+   rulings; every spell cast from exile that turn by any permission, rulings; costModThisTurn now reads CostMod.fromZones
+   by the zone the card is cast from); Knight-Errant of Eos's "look at the top six cards of your library. You may reveal up
+   to two creature cards with mana value X or less from among them, where X is the number of creatures that convoked ~.
+   Put the revealed cards into your hand, then shuffle." (the convokers counted as the permanent last existed if it has
+   left, CR 608.2h: lastKnown.convoked); Chandra, Heart of Fire's "+1: Discard your hand, then exile the top three cards of
+   your library. Until end of turn, you may play cards exiled this way." and "−9: Search your graveyard and library for any
+   number of red instant and/or sorcery cards, exile them, then shuffle. You may cast them this turn. Add six {R}." (normal
+   timing, costs paid, rulings; not a mana ability, CR 605.1a). Browser tests click through Bre's free cast, Knight-Errant's
+   pick and Chandra's −9 search. No new prompts. +4, 31,391 of 31,936 with round 369 and Lane B's B209-B212. The compiled text of every other card is
+   unchanged.
+   Out after round 370 (looked at, not done): Words of Waste ("each opponent discards a card instead": a discard choice in
+   the middle of a replaced draw, with nothing to resume the draws after it); Verdant Mastery (three destinations for the
+   lands found, one under an opponent's control); Wayta, Trainer Prodigy and Invisible Woman, Sue Storm (still out, as in
+   their earlier lists). Polish: the free-cast prompt of Bre, Breaching Dragonstorm and Solstice
+   Revelations doesn't say the card goes to the hand if not cast.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

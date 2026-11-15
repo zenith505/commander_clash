@@ -10,7 +10,7 @@ import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layo
 import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
-import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
+import { abilitiesOf, castCardAs, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
@@ -1061,7 +1061,7 @@ export function moveObject(
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.fromOwnLibrary ? { fromOwnLibrary: true as const } : {}), ...(o.castFromHand && o.castBy !== undefined ? { castFromHandBy: o.castBy } : {}), ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.chosen?.object ? { chosenObject: { ...o.chosen.object } } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.fromOwnLibrary ? { fromOwnLibrary: true as const } : {}), ...(o.castFromHand && o.castBy !== undefined ? { castFromHandBy: o.castBy } : {}), ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), ...(o.convoked?.length ? { convoked: o.convoked.length } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.chosen?.object ? { chosenObject: { ...o.chosen.object } } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
@@ -6831,7 +6831,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       if (m.kicked && !kicked) continue;
       // Dream Chisel: only a spell cast face down (CR 708.4); Kadena counts the face-down spells cast earlier this turn.
       if (m.faceDown && !isFaceDownDef(d)) continue;
-      if (m.nth && (s.castThisTurn ?? []).filter((c) => c.player === pid && (!m.kicked || c.kicked) && (!m.faceDown || c.faceDown) && printedMatches(rest, c.faceDown ? FACE_DOWN : s.cards[c.card]!)).length !== m.nth - 1) continue;
+      if (m.nth && (s.castThisTurn ?? []).filter((c) => c.player === pid && (!m.kicked || c.kicked) && (!m.faceDown || c.faceDown) && printedMatches(rest, c.faceDown ? FACE_DOWN : castCardAs(s, c)!)).length !== m.nth - 1) continue;
       // The Defilers: offered as an additional cost, and only then a reduction.
       if (m.payLife) {
         if (!lifeOffers.some((l) => l.id === src.id)) lifeOffers.push({ id: src.id, life: m.payLife });
@@ -6867,7 +6867,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
   // "Spells your opponents cast" (Elspeth Conquers Death): the opponents of who it's from.
   for (const c of s.costModsThisTurn ?? []) {
     const m = c.mod;
-    if (!costModThisTurnApplies(s, c, pid, d, mv)) continue;
+    if (!costModThisTurnApplies(s, c, pid, d, mv, o.zone)) continue;
     // Saheeli, the Gifted's affinity: counted as this spell's cost is determined (CR 601.2f), for who it's from.
     const n = m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: c.player, sourceId: o.id })) : m.n;
     if (n > 0) more += n;
@@ -6877,8 +6877,11 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
 }
 
 /** Does a cost change from a resolved spell or ability (GameState.costModsThisTurn) apply to `d` as `pid` casts it? */
-function costModThisTurnApplies(s: GameState, c: NonNullable<GameState["costModsThisTurn"]>[number], pid: PlayerId, d: CardDef, mv: number): boolean {
+function costModThisTurnApplies(s: GameState, c: NonNullable<GameState["costModsThisTurn"]>[number], pid: PlayerId, d: CardDef, mv: number, from?: ZoneName): boolean {
   const m = c.mod;
+  // Commander Liara Portyr: "spells you cast from exile this turn", the zone the card is cast from (CR 601.2a), by
+  // whatever permission (rulings).
+  if (m.fromZones && !m.fromZones.includes(from as "graveyard" | "exile")) return false;
   // "Spells with the chosen name" (Cheering Fanatic): anyone's.
   if (m.who === "opponents" ? c.player === pid || !opponents(s, c.player).includes(pid) : m.who !== "all" && c.player !== pid) return false;
   // Goblin Maskmaker: "face-down spells you cast this turn" (CR 708.4).
@@ -6917,7 +6920,7 @@ export function hasConvoke(s: GameState, pid: PlayerId, o: GameObject): boolean 
  * itself is in TurnLog's list once it has been cast (its castNth is set then, CR 601.2i).
  */
 function firstOfKindThisTurn(s: GameState, pid: PlayerId, o: GameObject, filter: TargetSpec): boolean {
-  const n = (s.castThisTurn ?? []).filter((c) => c.player === pid && !!s.cards[c.card] && printedMatches(filter, s.cards[c.card]!)).length;
+  const n = (s.castThisTurn ?? []).filter((c) => c.player === pid && !!s.cards[c.card] && printedMatches(filter, castCardAs(s, c)!)).length;
   return n <= (o.zone === "stack" && o.castNth !== undefined ? 1 : 0);
 }
 
@@ -7406,7 +7409,7 @@ export function flashGranted(s: GameState, pid: PlayerId, d: CardDef, owner?: Pl
     if (abilitiesOf(s, o).flashWhile?.some((c) => staticConditionNow(s, c, id, pid))) return true;
     if (abilitiesOf(s, o).flashForWhile?.some((f) => printedMatches(f.filter, d) && staticConditionNow(s, f.condition, id, pid))) return true;
     // Radagast: the first creature spell you cast this turn, those cast before it was on the battlefield counted (rulings).
-    const first = (spec: TargetSpec) => printedMatches(spec, d) && !(s.castThisTurn ?? []).some((c) => c.player === pid && printedMatches(spec, s.cards[c.card]!));
+    const first = (spec: TargetSpec) => printedMatches(spec, d) && !(s.castThisTurn ?? []).some((c) => c.player === pid && printedMatches(spec, castCardAs(s, c)!));
     return !!abilitiesOf(s, o).flashFor?.some((spec) => printedMatches(spec, d)) || !!abilitiesOf(s, o).flashForFirst?.some(first);
   });
 }
@@ -7816,7 +7819,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // reduction is used up as it becomes cast (CR 601.2i), each such one that applied to it.
   if (s.costModsThisTurn?.some((c) => c.next)) {
     const mvNow = defMv(d) + (x ?? 0) * xCount(parseManaCost(d.manaCost));
-    s.costModsThisTurn = s.costModsThisTurn.filter((c) => !c.next || !costModThisTurnApplies(s, c, p.id, d, mvNow));
+    s.costModsThisTurn = s.costModsThisTurn.filter((c) => !c.next || !costModThisTurnApplies(s, c, p.id, d, mvNow, o.castFrom));
   }
   if (isMainPhase(s) && s.activePlayer === p.id) item.castInMain = o.castInMain = true;
   s.cards[d.oracleId] ??= d;
@@ -7962,7 +7965,7 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number, 
       if (l.who === "you" && controllerOf(s, o) !== pid) continue;
       if (l.who === "enchanted" && o.attachedToPlayer !== pid) continue;
       if (l.filter && !printedMatches(l.filter, d)) continue;
-      if ((s.castThisTurn ?? []).filter((c) => c.player === pid && (!l.filter || printedMatches(l.filter, s.cards[c.card]!))).length >= (l.n ?? 1))
+      if ((s.castThisTurn ?? []).filter((c) => c.player === pid && (!l.filter || printedMatches(l.filter, castCardAs(s, c)!))).length >= (l.n ?? 1))
         return `${characteristics(s, o).name}: ${l.text.replace(/~/g, characteristics(s, o).name).replace(/\.$/, "")}`;
     }
   }

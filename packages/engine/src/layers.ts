@@ -20,7 +20,7 @@ import { creatureCardAbove, creatureCardsAbove } from "./graveyard";
 import type { AbilityBody, Affects, Amount, DamageMod, Modification, MostStat, StaticAbility, StaticCondition, TargetSpec, TimingWindow, TurnPoint, Untargetable } from "./abilities";
 import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
-import { basePower, baseToughness, defOf, pairedWith } from "./cards";
+import { basePower, baseToughness, castCardAs, defOf, pairedWith } from "./cards";
 import { activatedAbilityCount } from "./manaabilities";
 import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
@@ -575,6 +575,8 @@ interface Inst {
   offFieldSpells?: true;
   /** Its type change applies to its controller's land cards outside the battlefield too (StaticAbility.offFieldLands). */
   offFieldLands?: true;
+  /** Its type change applies to some of its controller's cards outside the battlefield too (StaticAbility.offFieldCards). */
+  offFieldCards?: "nonlandPermanent" | "libraryLand";
   /** A stored effect for a group (ContinuousEffect.group): it needs no source. */
   live?: true;
 }
@@ -670,6 +672,7 @@ function gather(s: GameState): Inst[] {
         ...(st.offFieldAll ? { offFieldAll: true as const } : {}),
         ...(st.offFieldSpells ? { offFieldSpells: true as const } : {}),
         ...(st.offFieldLands ? { offFieldLands: true as const } : {}),
+        ...(st.offFieldCards ? { offFieldCards: st.offFieldCards } : {}),
       }),
     );
   }
@@ -1440,7 +1443,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.turnLog?.damageSources?.[you]?.length ?? 0) >= cond.n;
     case "castCount":
       // In a free-for-all game every other player is an opponent (CR 102.3).
-      return (s.castThisTurn ?? []).filter((c) => (cond.byOpponent ? c.player !== you : c.player === (cond.activePlayer ? s.activePlayer : you)) && (!cond.fromHand || c.from === "hand") && (cond.mvAtLeast === undefined || (c.mv ?? 0) >= cond.mvAtLeast) && printedMatches(cond.filter, s.cards[c.card]!)).length >= cond.n !== !!cond.not;
+      return (s.castThisTurn ?? []).filter((c) => (cond.byOpponent ? c.player !== you : c.player === (cond.activePlayer ? s.activePlayer : you)) && (!cond.fromHand || c.from === "hand") && (cond.mvAtLeast === undefined || (c.mv ?? 0) >= cond.mvAtLeast) && printedMatches(cond.filter, castCardAs(s, c)!)).length >= cond.n !== !!cond.not;
     case "colorsAmong": {
       const colors = new Set<Color>();
       for (const c of chars.values()) if (c.controller === you) for (const k of c.colors) colors.add(k);
@@ -1852,6 +1855,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.colors = [...m.colors];
       return;
     case "addColors":
+      // Painter's Servant: the color chosen as its source entered (CR 614.12); with none chosen, nothing changes.
+      if (m.chosen) {
+        const col = e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined;
+        if (col && !c.colors.includes(col)) c.colors.push(col);
+        return;
+      }
       for (const col of m.colors) if (!c.colors.includes(col)) c.colors.push(col);
       return;
     case "addKeywords":
@@ -2420,9 +2429,12 @@ function computeLayers(s: GameState, counted: { yes: boolean }, grants: OffField
       // Dune Chanter: its controller's land cards outside the battlefield too.
       if (pick.offFieldLands && layer === "4" && pick.sourceId)
         grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "4"), lands: true });
+      // Encroaching Mycosynth, Rootpath Purifier: its controller's nonland permanent cards, or land cards in their library.
+      if (pick.offFieldCards && layer === "4" && pick.sourceId)
+        grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "4"), cards: pick.offFieldCards });
       // Mycosynth Lattice: as it applied in layer 5, to every card and spell outside the battlefield too.
       if (pick.offFieldAll && layer === "5" && pick.sourceId)
-        grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "5"), everyone: true });
+        grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "5"), everyone: true, ...(s.objects[pick.sourceId]?.chosen?.color ? { chosenColor: s.objects[pick.sourceId]!.chosen!.color } : {}) });
     }
     // "Can't have hexproof or shroud": gone whatever gave them, after every layer 6 effect.
     if (layer === "6")
@@ -2604,16 +2616,21 @@ interface OffFieldGrant {
   chosen?: string;
   /** A color change for every card and spell outside the battlefield (Mycosynth Lattice), not only its controller's. */
   everyone?: true;
+  /** The color chosen as its source entered (Painter's Servant's "the chosen color"). */
+  chosenColor?: Color;
   /** A type change for its controller's permanent spells only (Secret Arcade): card types too. */
   permanentSpells?: true;
   /** A type change for land cards its controller owns outside the battlefield (Dune Chanter). */
   lands?: true;
+  /** A type change for its controller's nonland permanent cards outside the battlefield and the stack (Encroaching
+   * Mycosynth), or for land cards in its controller's library (Rootpath Purifier). */
+  cards?: "nonlandPermanent" | "libraryLand";
 }
 
 let building: { grants: OffFieldGrant[] } | undefined;
 
 /** Does anything on the battlefield have such an ability? (Cheap: compiled cards are cached.) */
-const offFieldSources = (s: GameState) => s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some((st) => st.offField || st.offFieldAll || st.offFieldSpells || st.offFieldLands));
+const offFieldSources = (s: GameState) => s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some((st) => st.offField || st.offFieldAll || st.offFieldSpells || st.offFieldLands || st.offFieldCards));
 
 function offFieldGrants(s: GameState): OffFieldGrant[] {
   if (building) return building.grants;
@@ -2648,9 +2665,12 @@ export function offFieldTyped(s: GameState, o: GameObject, d: CardDef): CardDef 
   const spells = o.zone === "stack" && PERMANENT_CARD_TYPES.some((t) => d.types.includes(t)) ? offFieldGrants(s).filter((g) => g.permanentSpells && o.controller === g.controller) : [];
   // Dune Chanter: land cards its controller owns (a land is played, never cast: CR 305.1; tokens can't stay there).
   const lands = d.types.includes("Land") && o.zone !== "stack" && !o.isToken ? offFieldGrants(s).filter((g) => g.lands && o.owner === g.controller) : [];
-  if (!d.types.includes("Creature") && !spells.length && !lands.length) return d;
-  const gs: { timestamp: number; mods: Modification[]; chosen?: string }[] = d.types.includes("Creature") ? offFieldGrants(s).filter((g) => !g.everyone && !g.permanentSpells && !g.lands && (o.zone === "stack" ? o.controller === g.controller : o.owner === g.controller && !o.isToken)) : [];
-  gs.push(...lands);
+  // Encroaching Mycosynth: nonland permanent cards its controller owns (CR 110.4a), off the stack (spells are above).
+  // Rootpath Purifier: land cards in its controller's library (a library holds only its owner's cards, CR 400.3).
+  const cards = o.zone !== "stack" && !o.isToken ? offFieldGrants(s).filter((g) => g.cards && o.owner === g.controller && (g.cards === "nonlandPermanent" ? !d.types.includes("Land") && PERMANENT_CARD_TYPES.some((t) => d.types.includes(t)) : o.zone === "library" && d.types.includes("Land"))) : [];
+  if (!d.types.includes("Creature") && !spells.length && !lands.length && !cards.length) return d;
+  const gs: { timestamp: number; mods: Modification[]; chosen?: string }[] = d.types.includes("Creature") ? offFieldGrants(s).filter((g) => !g.everyone && !g.permanentSpells && !g.lands && !g.cards && (o.zone === "stack" ? o.controller === g.controller : o.owner === g.controller && !o.isToken)) : [];
+  gs.push(...lands, ...cards);
   // The Tomb of Aclazotz: a creature spell cast with its permission "is a Vampire in addition to its other types" (rulings:
   // on the stack too).
   if (o.zone === "stack" && d.types.includes("Creature")) for (const g of o.spellGains ?? []) if (g.mods.some((m) => m.kind === "addTypes")) gs.push(g);
@@ -2658,12 +2678,14 @@ export function offFieldTyped(s: GameState, o: GameObject, d: CardDef): CardDef 
   if (!gs.length) return d;
   let subtypes = [...d.subtypes];
   const types = [...d.types];
+  const supertypes = [...d.supertypes];
   let all = everyCreatureType(d);
   for (const g of [...gs].sort((a, b) => a.timestamp - b.timestamp))
     for (const m of g.mods) {
       if (m.kind === "addTypes") {
         if (m.allCreatureTypes) all = true;
         for (const t of m.types) if (!types.includes(t)) types.push(t);
+        for (const t of m.supertypes ?? []) if (!supertypes.includes(t)) supertypes.push(t);
         for (const t of [...m.subtypes, ...(m.chosenType && g.chosen ? [g.chosen] : [])]) if (!subtypes.includes(t)) subtypes.push(t);
       } else if (m.kind === "setSubtypes") {
         const now = m.chosenType ? (g.chosen ? [g.chosen] : []) : m.subtypes;
@@ -2672,10 +2694,10 @@ export function offFieldTyped(s: GameState, o: GameObject, d: CardDef): CardDef 
         all = false;
       }
     }
-  if (all === everyCreatureType(d) && types.length === d.types.length && subtypes.length === d.subtypes.length && subtypes.every((t, i) => t === d.subtypes[i])) return d;
-  const key = `${d.oracleId}|${d.name}|${all}|${types.join(",")}|${subtypes.join(",")}`;
+  if (all === everyCreatureType(d) && types.length === d.types.length && supertypes.length === d.supertypes.length && subtypes.length === d.subtypes.length && subtypes.every((t, i) => t === d.subtypes[i])) return d;
+  const key = `${d.oracleId}|${d.name}|${all}|${supertypes.join(",")}|${types.join(",")}|${subtypes.join(",")}`;
   let out = typedDefs.get(key);
-  if (!out) typedDefs.set(key, (out = { ...d, types, subtypes, everyCreatureType: all }));
+  if (!out) typedDefs.set(key, (out = { ...d, supertypes, types, subtypes, everyCreatureType: all }));
   return out;
 }
 
@@ -2688,7 +2710,7 @@ const coloredDefs = new Map<string, CardDef>();
  */
 export function offFieldColored(s: GameState, o: GameObject, d: CardDef): CardDef {
   if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") return d;
-  const gs: { timestamp: number; mods: Modification[] }[] = offFieldGrants(s).filter((g) => g.everyone);
+  const gs: { timestamp: number; mods: Modification[]; chosenColor?: Color }[] = offFieldGrants(s).filter((g) => g.everyone);
   // The Laces: "target spell becomes green", while it's that spell (CR 105.3, 613.1e).
   if (o.zone === "stack") for (const g of o.spellGains ?? []) if (g.mods.some((m) => m.kind === "setColors" || m.kind === "addColors")) gs.push(g);
   if (!gs.length) return d;
@@ -2696,7 +2718,10 @@ export function offFieldColored(s: GameState, o: GameObject, d: CardDef): CardDe
   for (const g of [...gs].sort((a, b) => a.timestamp - b.timestamp))
     for (const m of g.mods) {
       if (m.kind === "setColors") colors = [...m.colors];
-      else if (m.kind === "addColors") colors = [...colors, ...m.colors.filter((c) => !colors.includes(c))];
+      else if (m.kind === "addColors") {
+        const add = m.chosen ? (g.chosenColor ? [g.chosenColor] : []) : m.colors;
+        colors = [...colors, ...add.filter((c) => !colors.includes(c))];
+      }
     }
   if (colors.length === d.colors.length && colors.every((c, i) => c === d.colors[i])) return d;
   const key = `${d.oracleId}|${d.name}|${d.subtypes.join(",")}|${d.everyCreatureType ?? ""}|${colors.join("")}`;

@@ -2016,7 +2016,7 @@ export type Modification =
   | { kind: "loseCreatureTypes" }
   /** `chosen`: "becomes the color of your choice", the color chosen as it resolved; "colors": "the color or colors of your choice", the colors chosen. */
   | { kind: "setColors"; colors: Color[]; chosen?: true | "colors" } // layer 5
-  | { kind: "addColors"; colors: Color[] } // layer 5, "is blue in addition to its other colors"
+  | { kind: "addColors"; colors: Color[]; /** "The chosen color in addition to their other colors" (Painter's Servant): the color chosen as its source entered. */ chosen?: true } // layer 5, "is blue in addition to its other colors"
   /** Layer 6. `spares`: "This effect doesn't remove ~": the protection it grants doesn't make its source fall off (Cho-Manno's Blessing). */
   /**
    * `sharedAmongYours`: "creatures you control gain first strike until end of turn if a creature you control has first
@@ -2323,6 +2323,12 @@ export interface StaticAbility {
    * offFieldTyped).
    */
   offFieldLands?: true;
+  /**
+   * Its type change applies to some of its controller's cards outside the battlefield and off the stack too (layers.ts
+   * offFieldTyped): "nonland permanent cards you own that aren't on the battlefield" (Encroaching Mycosynth), "land cards
+   * in your library" (Rootpath Purifier).
+   */
+  offFieldCards?: "nonlandPermanent" | "libraryLand";
 }
 
 /**

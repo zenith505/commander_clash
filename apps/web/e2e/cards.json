@@ -4912,6 +4912,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "59384481-3ca0-49dd-b94f-d3680b336f1e",
+  "name": "Bre of Clan Stoutarm",
+  "manaCost": "{2}{R}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Giant Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Giant",
+   "Warrior"
+  ],
+  "oracleText": "{1}{W}, {T}: Another target creature you control gains flying and lifelink until end of turn.\nAt the beginning of your end step, if you gained life this turn, exile cards from the top of your library until you exile a nonland card. You may cast that card without paying its mana cost if the spell's mana value is less than or equal to the amount of life you gained this turn. Otherwise, put it into your hand.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ebbd5b9c-07ff-4b42-81c2-ba09539f3a42",
   "name": "Breach the Multiverse",
   "manaCost": "{5}{B}{B}",
@@ -6325,6 +6360,40 @@
    "R"
   ],
   "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m21",
+  "releasedAt": "2020-07-03",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "58ad45fc-b625-4484-8d49-ebc42db9040a",
+  "name": "Chandra, Heart of Fire",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Planeswalker — Chandra",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Chandra"
+  ],
+  "oracleText": "+1: Discard your hand, then exile the top three cards of your library. Until end of turn, you may play cards exiled this way.\n+1: Chandra deals 2 damage to any target.\n−9: Search your graveyard and library for any number of red instant and/or sorcery cards, exile them, then shuffle. You may cast them this turn. Add six {R}.",
+  "loyalty": "5",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "R"
+  ],
   "commanderLegal": "legal",
   "set": "m21",
   "releasedAt": "2020-07-03",
@@ -20700,6 +20769,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4bd20d79-0861-494a-a8f2-f6ddb5088004",
+  "name": "Knight-Errant of Eos",
+  "manaCost": "{4}{W}",
+  "cmc": 5,
+  "typeLine": "Creature — Human Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "Convoke\nWhen this creature enters, look at the top six cards of your library. You may reveal up to two creature cards with mana value X or less from among them, where X is the number of creatures that convoked this creature. Put the revealed cards into your hand, then shuffle.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Convoke"
+  ],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "61ad3299-474a-400f-a1c1-b86024aca3e8",
   "name": "Knowledge Exploitation",
   "manaCost": "{5}{U}{U}",
@@ -21286,6 +21388,32 @@
   "set": "mul",
   "releasedAt": "2023-04-21",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "387b6b07-a283-412d-94c3-f7f1dc76e858",
+  "name": "Lava Axe",
+  "manaCost": "{4}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Lava Axe deals 5 damage to target player or planeswalker.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ulg",
+  "releasedAt": "1999-02-15",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

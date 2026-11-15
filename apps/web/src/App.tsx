@@ -307,6 +307,12 @@ type Corner = "tl" | "tr" | "bl" | "br";
  * Seats go clockwise in turn order with you in the bottom right:
  * you -> bottom left -> top left -> top right -> back to you.
  */
+/** Merseine (round B211): the permanent `o` is attached to is one you control. */
+function enchantsYours(s: GameState, o: GameObject): boolean {
+  const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
+  return host?.zone === "battlefield" && controllerOf(s, host) === HUMAN;
+}
+
 function seatCorners(s: GameState): Record<Corner, PlayerId | undefined> {
   const order = s.turnOrder;
   const h = order.indexOf(HUMAN);
@@ -1478,7 +1484,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // A permanent whose effect you may pay to ignore this turn (Leonin Arbiter, Volrath's Curse; CR 116.2d).
     if (o.zone === "battlefield" && ignorableBy(s, HUMAN, o.id)) return setMenu(o.id);
     // Another player's permanent with an ability any player may activate (Feral Hydra, Quicksilver Wall).
-    if (o.zone === "battlefield" && controllerOf(s, o) !== HUMAN && abilitiesOf(s, o).activated.some((ab) => ab.anyPlayer && (!ab.ownerOnly || o.owner === HUMAN) && (!ab.opponentsOnly || opponents(s, controllerOf(s, o)).includes(HUMAN)) && (ab.onlyPlayer === undefined || ab.onlyPlayer === HUMAN))) return setMenu(o.id);
+    if (o.zone === "battlefield" && controllerOf(s, o) !== HUMAN && abilitiesOf(s, o).activated.some((ab) => ab.anyPlayer && (!ab.ownerOnly || o.owner === HUMAN) && (!ab.opponentsOnly || opponents(s, controllerOf(s, o)).includes(HUMAN)) && (ab.onlyPlayer === undefined || ab.onlyPlayer === HUMAN) && (!ab.enchantedControllerOnly || enchantsYours(s, o)))) return setMenu(o.id);
     if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN) return;
     // An emblem of yours with an activated ability (Karn, Living Legacy's): its menu, from the command zone (CR 114.4).
     if (o.emblem) {
@@ -4807,11 +4813,11 @@ function AbilityMenu({
         <strong>{d.name}</strong>
         {ignoreButton}
         {abilitiesOf(s, o).activated.map((ab, i) => {
-          if (!ab.anyPlayer || (ab.ownerOnly && o.owner !== HUMAN) || (ab.opponentsOnly && !opponents(s, controllerOf(s, o)).includes(HUMAN)) || (ab.onlyPlayer !== undefined && ab.onlyPlayer !== HUMAN)) return null;
+          if (!ab.anyPlayer || (ab.ownerOnly && o.owner !== HUMAN) || (ab.opponentsOnly && !opponents(s, controllerOf(s, o)).includes(HUMAN)) || (ab.onlyPlayer !== undefined && ab.onlyPlayer !== HUMAN) || (ab.enchantedControllerOnly && !enchantsYours(s, o))) return null;
           const problem = abilityProblem(s, HUMAN, objectId, i);
           const ok = !problem || (/not enough mana/.test(problem) && planActivate(s, HUMAN, objectId, i) !== null);
           return (
-            <button key={i} disabled={!ok} title={problem ?? (ab.ownerOnly ? "Only its owner may activate this ability; you control it." : ab.onlyPlayer !== undefined ? "Only you may activate this ability; you control it." : ab.opponentsOnly ? "Only its controller's opponents may activate this ability; you control it." : "Any player may activate this ability; you control it.")} onClick={() => onUse(objectId, i)}>
+            <button key={i} disabled={!ok} title={problem ?? (ab.ownerOnly ? "Only its owner may activate this ability; you control it." : ab.onlyPlayer !== undefined ? "Only you may activate this ability; you control it." : ab.enchantedControllerOnly ? "Only the controller of the enchanted creature may activate this ability; you control it." : ab.opponentsOnly ? "Only its controller's opponents may activate this ability; you control it." : "Any player may activate this ability; you control it.")} onClick={() => onUse(objectId, i)}>
               <RulesText text={ab.text.replace(/~/g, d.name).replace(/ Any player may activate this ability\.$/, "")} />
             </button>
           );

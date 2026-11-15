@@ -9573,6 +9573,10 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   else if (ab.opponentsOnly && !opponents(s, controllerOf(s, o)).includes(pid)) return `only ${d.name}'s controller's opponents may activate that ability`;
   // Martyrdom (round B210): only the player its "Only you may activate this ability" names.
   else if (ab.onlyPlayer !== undefined && ab.onlyPlayer !== pid) return ab.onlyPlayer >= 0 && s.players[ab.onlyPlayer] ? `only ${player(s, ab.onlyPlayer).name} may activate that ability` : "no one may activate that ability";
+  // Merseine (round B211): only the player who controls the permanent it's attached to now.
+  else if (ab.enchantedControllerOnly && (!o.attachedTo || s.objects[o.attachedTo]?.zone !== "battlefield" || controllerOf(s, obj(s, o.attachedTo)) !== pid)) return `only the controller of the creature ${d.name} enchants may activate that ability`;
+  // Merseine: "Pay enchanted creature's mana cost" can't be paid for a creature with no mana cost (CR 118.6).
+  else if (ab.attachedManaCost && !attachedManaCostOf(s, o)) return `the creature ${d.name} enchants has no mana cost to pay`;
   else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
   else if (ab.tap && characteristics(s, o).cantActivateTap) return `${d.name}'s activated abilities with {T} in their costs can't be activated`; // Serra Bestiary
   const banned = nameActivationBan(s, o, !!ab.mana) ?? abolisherBan(s, pid, o); // Pithing Needle, in any zone (rulings); Grand Abolisher
@@ -9914,8 +9918,17 @@ export function freeCycling(s: GameState, pid: PlayerId, o: GameObject, ab: Acti
   });
 }
 
+/** Merseine (round B211): the mana cost of the permanent `o` is attached to (a copy's, a face-down one's none, CR 707.2, 708.2); undefined with none (CR 118.6). */
+export function attachedManaCostOf(s: GameState, o: GameObject): string | undefined {
+  const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
+  if (!host || host.zone !== "battlefield") return undefined;
+  const cost = defOf(s, host).manaCost;
+  return cost ? cost : undefined;
+}
+
 function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[], x = 0): ParsedCost {
-  const cost0 = parseManaCost(freeEquip(s, pid, ab) || freeCycling(s, pid, o, ab, x) ? "{0}" : ab.manaCost);
+  // Merseine (round B211): the mana cost of the permanent it's attached to, as it is now, {X} as 0 (CR 107.3h).
+  const cost0 = parseManaCost(freeEquip(s, pid, ab) || freeCycling(s, pid, o, ab, x) ? "{0}" : ab.attachedManaCost ? (attachedManaCostOf(s, o) ?? "").replace(/\{X\}/g, "") || "{0}" : ab.manaCost);
   // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
   // (CR 602.2b applies 601.2f).
   const more = (ab.mana ? activationTax(s, o, pid, ab, true) : activationTax(s, o, pid, ab) + opponentsTargetTax(s, pid, targets)) + (ab.costMore ? Math.max(0, evalAmount(s, ab.costMore, { controller: pid, sourceId: o.id })) : 0);

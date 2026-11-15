@@ -852,7 +852,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^[Cc]ards? named (~|[A-Z][\w'-]*(?: (?:[A-Z][\w'-]*|of|the|a))*) in (your|all|each) graveyards?$/.exec(p)))
     return count({ kind: "cardsInGraveyard", who: { ref: m[2] === "your" ? "you" : "eachPlayer" }, filter: { kind: "card", named: m[1]!, text: `card named ${m[1]}` } });
   // Carrion Grub: "the greatest power among creature cards in your graveyard" (0 with none).
-  if (!each && (m = /^the greatest power among creature cards in your graveyard$/i.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, greatestPower: true } };
+  // Coram, the Undertaker (round 381): "... in all graveyards", each card's power there, a characteristic-defining one too
+  // (CR 604.3).
+  if (!each && (m = /^the greatest power among creature cards in (your graveyard|all graveyards)$/i.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: m[1] === "your graveyard" ? "you" : "eachPlayer" }, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, greatestPower: true } };
   // Graveyards: "card in your graveyard", "creature card in your graveyard", "instant and sorcery card in all graveyards".
   // Revivify: "the number of creature cards in your graveyard that were put there from the battlefield this turn".
   // Wreck Hunter: "for each nonland card in that player's graveyard that was put there from the battlefield this turn".

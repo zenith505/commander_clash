@@ -712,6 +712,9 @@ export function withGranted(base: CompiledCard, granted: readonly string[]): Com
     // Glowcap Lantern's granted "You may look at the top card of your library any time": the creature's controller's
     // (rulings: only while it's attached to a creature you control; see topVisible in game.ts).
     if (extra.some((x) => x.lookTop)) hit.lookTop = true;
+    // Sokrates's granted prevention (round 381): each instance its own (see staticRules in damage.ts).
+    const halves = (base.combatToPlayerDrawsHalf ?? 0) + extra.reduce((n, x) => n + (x.combatToPlayerDrawsHalf ?? 0), 0);
+    if (halves) hit.combatToPlayerDrawsHalf = halves;
     // Jubilant Skybonder's granted "Spells your opponents cast that target this creature cost {2} more to cast": each
     // instance adds its own.
     const tax = (base.targetTax ?? 0) + extra.reduce((n, x) => n + (x.targetTax ?? 0), 0);

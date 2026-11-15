@@ -79,7 +79,7 @@ export function describeMods(s: GameState, mods: Modification[], controller: Pla
     else if (m.kind === "setToughness") parts.push(`has base toughness ${describeAmount(m.toughness)}`);
     else if (m.kind === "switchPT") parts.push("has its power and toughness switched");
     else if (m.kind === "addKeywords") parts.push(`gains ${m.keywords.map((k) => keywordLabel(k, (x) => player(s, x).name)).join(", ").toLowerCase()}`);
-    else if (m.kind === "addAbility") parts.push(`gains "${m.text.replace(/~/g, "this creature")}"`);
+    else if (m.kind === "addAbility") parts.push(`gains "${m.text.replace(/(\. )~/g, "$1This creature").replace(/~/g, "this creature")}"`);
     else if (m.kind === "removeKeywords") parts.push(`loses ${m.keywords.join(", ").toLowerCase()}`);
     else if (m.kind === "loseAllAbilities") parts.push("loses all abilities");
     else if (m.kind === "control") parts.push(`comes under ${player(s, controller).name}'s control`);

@@ -99,6 +99,7 @@ import { round376Line } from "./round376";
 import { round377Line } from "./round377";
 import { round378Line } from "./round378";
 import { round380Line } from "./round380";
+import { round381Chapter, round381Line } from "./round381";
 import { roundB189Line } from "./laneb189";
 
 const cache = new Map<string, CompiledCard>();
@@ -1092,7 +1093,9 @@ export function compile(d: CardDef): CompiledCard {
         // its chapter I exiled (CR 607.2a; linkExile).
         // The Aesir Escape Valhalla's linked chapters (round 345).
         // The Three Seasons (round B206).
-        const rB206 = roundB206Chapter(chapter[2]!);
+        // Long List of the Ents (round 381).
+        const r381 = round381Chapter(chapter[2]!);
+        const rB206 = r381 !== undefined ? r381 : roundB206Chapter(chapter[2]!);
         const r345 = rB206 !== undefined ? rB206 : round345Chapter(chapter[2]!, (x) => parseBody(x, {}));
         const body = r345 === "fail" ? null : r345 ? r345 : /^Return the exiled card to the battlefield under its owner's control\.$/.test(chapter[2]!)
           ? { targets: [], effects: [{ type: "returnLinked" as const, dest: "battlefield" as const, here: true as const }], text: chapter[2]! }
@@ -6186,6 +6189,7 @@ export function compile(d: CardDef): CompiledCard {
     if (round378Line(line, raw, out, isSpell)) continue;
     // Round 380's whole lines (oracle/round380.ts).
     if (round380Line(line, raw, out, isSpell, d)) continue;
+    if (round381Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,

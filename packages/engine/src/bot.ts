@@ -73,6 +73,7 @@ import {
   blockersNeeded,
   canEnterUntapped,
   othersMakeItEnterUntapped,
+  playsFromAnyGraveyard,
   entersRulesOf,
   conditionHolds,
   isSummoningSick,
@@ -159,7 +160,7 @@ import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { prepareSpellOf } from "./prepare";
-import { castingBody, castTimeTargets, compileCard } from "./oracle";
+import { castingBody, castTimeTargets, compileCard, compileGranted } from "./oracle";
 import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PendingDecision, type PlayerId, type StackItem, type DeferredAct } from "./types";
 import { evalAmount } from "./amounts";
 import { CHOSEN_HEXPROOF, CREATURE_TYPES, CHOSEN_PARITY_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, protectedFrom } from "./keywords";
@@ -2131,7 +2132,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Garth One-Eye (round 377): the name whose copy we'd cast now, to most effect.
     if (pend.kind === "chooseOption" && pend.what === "namedCopy") return [{ type: "chooseOption", player: pid, choice: namedCopyPick(s, pid, pend.options) ?? pend.options[0]! }];
     // Volo's Journal (round 380): each noted type counts the same for its draw, so the first one.
-    if (pend.kind === "chooseOption" && pend.what === "noteType") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+    // Long List of the Ents (round 381): any type, so the one most of our creature cards in hand (counted twice) and
+    // library have, for the next creature spell of it.
+    if (pend.kind === "chooseOption" && pend.what === "noteType") return [{ type: "chooseOption", player: pid, choice: noteTypePick(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "manaColorFor") {
       const counts = new Map<string, number>(pend.options.map((o) => [o, 0]));
       for (const id of player(s, pid).hand) for (const c of defOf(s, obj(s, id)).colors) counts.set(COLOR_NAMES[c], (counts.get(COLOR_NAMES[c]) ?? 0) + 1);
@@ -2175,6 +2178,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   const shield = chooseFullShield(s, pid);
   if (shield) return shield;
+  const dialogue = chooseSokraticDialogue(s, pid);
+  if (dialogue) return dialogue;
   const deflect = chooseDeflection(s, pid);
   if (deflect) return deflect;
   const echo = chooseCopyWithTaps(s, pid);
@@ -2292,7 +2297,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Locke, Treasure Hunter: the cards it milled, in anyone's graveyard.
     // Whispersteel Dagger: the damaged player's graveyard.
     const milled = (s.graveGrants ?? []).flatMap((g) => (g.player === pid && g.turn === s.turn && !(s.turnLog?.gravePermits ?? []).includes(g.key) ? (g.cards ? g.cards.map((c) => c.id) : g.fromYardOf !== undefined ? [...(s.players[g.fromYardOf]?.graveyard ?? [])] : []) : []));
-    const fromYard = [...new Set([...(anyYard ? s.players.flatMap((q) => q.graveyard) : p.graveyard), ...milled.filter((id) => s.objects[id]?.zone === "graveyard")])].filter((id) => graveyardWays(s, obj(s, id), pid).length);
+    // Coram, the Undertaker (round 381): every graveyard's, its own permission deciding which.
+    const fromYard = [...new Set([...(anyYard || playsFromAnyGraveyard(s, pid) ? s.players.flatMap((q) => q.graveyard) : p.graveyard), ...milled.filter((id) => s.objects[id]?.zone === "graveyard")])].filter((id) => graveyardWays(s, obj(s, id), pid).length);
     // Cards exiled with "you may play them until ..." first: they won't wait (impulse draw).
     const options = [...exilePlayable(s, pid), ...topPlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
       // A land with an Adventure can still go on its adventure (CR 715.3).
@@ -3704,6 +3710,34 @@ function chooseFullShield(s: GameState, pid: PlayerId): Action[] | null {
   return null;
 }
 
+/**
+ * Sokrates, Athenian Teacher (round 381): once blockers are declared, the opponent's unblocked attacker with the most power
+ * coming at us (at least 2) gets "prevent that damage ... each draw half": we take none of it and draw as many as they do.
+ */
+function chooseSokraticDialogue(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.step !== "declareBlockers" || s.activePlayer === pid || s.stack.length) return null;
+  const coming = s.battlefield
+    .map((x) => obj(s, x))
+    .filter((o) => o.attacking === pid && !o.attackingPermanent && !o.blockedBy?.length && power(s, o) >= 2 && !abilitiesOf(s, o).combatToPlayerDrawsHalf)
+    .sort((a, b) => power(s, b) - power(s, a));
+  if (!coming.length) return null;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const e = abilities[i]!.body.effects;
+      const grant = e.length === 1 && e[0]!.type === "continuous" ? e[0]! : undefined;
+      if (grant?.type !== "continuous" || !grant.mods.some((m) => m.kind === "addAbility" && compileGranted(m.text).combatToPlayerDrawsHalf)) continue;
+      for (const att of coming) {
+        const plan = planActivate(s, pid, id, i, [{ kind: "object", id: att.id }]);
+        if (plan) return plan;
+      }
+    }
+  }
+  return null;
+}
+
 /** Which target of the spell or ability being changed becomes our Spellskite: one of ours it would hurt, else the first. */
 function targetSlotFor(s: GameState, pid: PlayerId, options: string[]): string {
   const r = s.resolving;
@@ -4615,6 +4649,20 @@ function castNumberFor(s: GameState, id: ObjectId, targets: TargetChoice[] | und
   const o = t?.kind === "object" ? s.objects[t.id] : undefined;
   const need = o?.zone === "battlefield" ? Math.max(0, toughness(s, o) - (o.damage ?? 0)) : r.max;
   return Math.min(r.max, Math.max(r.min, need));
+}
+
+/** Long List of the Ents (round 381): the type to note, the one most of our creature cards have, in hand above all. */
+function noteTypePick(s: GameState, pid: PlayerId, options: string[]): string {
+  if (options.length === 1) return options[0]!;
+  const counts = new Map<string, number>();
+  const me = player(s, pid);
+  for (const [ids, w] of [[me.hand, 2], [me.library, 1]] as const)
+    for (const id of ids) {
+      const d = defOf(s, obj(s, id));
+      if (!d.types.includes("Creature")) continue;
+      for (const ty of d.subtypes) if (options.includes(ty)) counts.set(ty, (counts.get(ty) ?? 0) + w);
+    }
+  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? options[0]!;
 }
 
 /**

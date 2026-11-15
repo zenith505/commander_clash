@@ -3779,7 +3779,7 @@ export type Effect =
   /** "When you next cast an instant or sorcery spell this turn, ...": a delayed trigger on that cast (CR 603.7). */
   /** `cascade`: "the next noncreature spell you cast this turn has cascade" (Dark Apostle): that spell's own cascade. */
   /** `who`: "the next spell they cast": that player's (a target player), not the controller's. */
-  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; /** Ride the Avalanche: "put X +1/+1 counters on up to one target creature": the delayed trigger's own targets, chosen as it's put on the stack (rulings, CR 603.7). */ targets?: TargetSpec[]; /** Magus Lucea Kane: "When you next cast a spell with {X} in its mana cost or activate an ability with {X} in its activation cost this turn": an activated ability with the mana symbol {X} in its activation cost uses it up too (rulings), copied with `effects`. */ xAbility?: true; /** "Copy the next loyalty ability you activate this turn" (Jaya's Phoenix, `only`), "When you next cast an instant spell, cast a sorcery spell, or activate a loyalty ability this turn" (Repeated Reverberation, `also`): a loyalty ability its controller activates uses it up too (CR 606.3), and with `only` no spell does. */ loyalty?: "also" | "only"; /** Zevlor, Elturel Exile: "that targets only a single opponent or a single permanent an opponent controls": every target of the spell that one player or permanent (rulings), checked as it's cast (GameState.nextCast `onlyOpponentOrTheirs`). */ onlyOpponentOrTheirs?: true; cascade?: true; /** Yidris, Maelstrom Wielder: "as you cast spells from your hand this turn, they gain cascade": every such spell this turn, not only the next one (never used up). */ allTurn?: true; /** "The next instant or sorcery spell you cast this turn has storm" (Crackling Spellslinger). */ storm?: true; who?: PlayerRef; /** "When you next cast an instant or sorcery spell from your hand this turn" (Narset Transcendent). */ fromHand?: true; /** "The next spell you cast this turn can't be countered" (Mistrise Village). */ uncounterable?: true; /** "The next spell of the chosen type you cast this turn can be cast as though it had flash" (Progenitor's Icon; CR 702.8a): used up by that spell, whenever it's cast. */ flash?: true; /** Soulfire Grand Master: "put that card into your hand instead of into your graveyard as it resolves" (GameObject.toHandOnResolve). */ toHand?: true; /** Savage Summoning: "That creature enters with an additional +1/+1 counter on it" (CR 614.1c): the counter it enters with. */ counter?: string; /** "The next red or green creature spell you cast this turn can be cast without paying its mana cost" (World War Hulk, `free`) and "Rather than pay the mana cost of the next spell you cast this turn, you may pay life equal to that spell's mana value" (Marshland Bloodcaster, `life`): an alternative cost (CR 118.9) offered to that spell only, used up by it whichever cost is paid (rulings). */ alt?: "free" | "life"; /** Loki Laufeyson: "with mana value less than or equal to ~'s power": the source's power as the spell is cast, as it last existed if it has left the battlefield (round B202). */ mvMaxSourcePower?: true; /** Pit Automaton: "When you next activate an exhaust ability that isn't a mana ability this turn": only that (no spell), CR 702.177a, 605.1a. */ exhaust?: true }
+  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; /** Ride the Avalanche: "put X +1/+1 counters on up to one target creature": the delayed trigger's own targets, chosen as it's put on the stack (rulings, CR 603.7). */ targets?: TargetSpec[]; /** Magus Lucea Kane: "When you next cast a spell with {X} in its mana cost or activate an ability with {X} in its activation cost this turn": an activated ability with the mana symbol {X} in its activation cost uses it up too (rulings), copied with `effects`. */ xAbility?: true; /** "Copy the next loyalty ability you activate this turn" (Jaya's Phoenix, `only`), "When you next cast an instant spell, cast a sorcery spell, or activate a loyalty ability this turn" (Repeated Reverberation, `also`): a loyalty ability its controller activates uses it up too (CR 606.3), and with `only` no spell does. */ loyalty?: "also" | "only"; /** Zevlor, Elturel Exile: "that targets only a single opponent or a single permanent an opponent controls": every target of the spell that one player or permanent (rulings), checked as it's cast (GameState.nextCast `onlyOpponentOrTheirs`). */ onlyOpponentOrTheirs?: true; cascade?: true; /** Yidris, Maelstrom Wielder: "as you cast spells from your hand this turn, they gain cascade": every such spell this turn, not only the next one (never used up). */ allTurn?: true; /** "The next instant or sorcery spell you cast this turn has storm" (Crackling Spellslinger). */ storm?: true; who?: PlayerRef; /** "When you next cast an instant or sorcery spell from your hand this turn" (Narset Transcendent). */ fromHand?: true; /** "The next spell you cast this turn can't be countered" (Mistrise Village). */ uncounterable?: true; /** "The next spell of the chosen type you cast this turn can be cast as though it had flash" (Progenitor's Icon; CR 702.8a): used up by that spell, whenever it's cast. */ flash?: true; /** Soulfire Grand Master: "put that card into your hand instead of into your graveyard as it resolves" (GameObject.toHandOnResolve). */ toHand?: true; /** Savage Summoning: "That creature enters with an additional +1/+1 counter on it" (CR 614.1c): the counter it enters with. */ counter?: string; /** "The next red or green creature spell you cast this turn can be cast without paying its mana cost" (World War Hulk, `free`) and "Rather than pay the mana cost of the next spell you cast this turn, you may pay life equal to that spell's mana value" (Marshland Bloodcaster, `life`): an alternative cost (CR 118.9) offered to that spell only, used up by it whichever cost is paid (rulings). */ alt?: "free" | "life"; /** Loki Laufeyson: "with mana value less than or equal to ~'s power": the source's power as the spell is cast, as it last existed if it has left the battlefield (round B202). */ mvMaxSourcePower?: true; /** Pit Automaton: "When you next activate an exhaust ability that isn't a mana ability this turn": only that (no spell), CR 702.177a, 605.1a. */ exhaust?: true; /** Long List of the Ents (round 381): "a creature spell of that type": of the creature type a noteCreatureType `any` just noted in this resolution. */ ofNoted?: true }
   /**
    * "Until end of turn, whenever you cast a spell, ~ deals 2 damage to up to one target creature" (CR 603.7b): a delayed
    * triggered ability that triggers each time its event happens until `until` ends (see GameState.floatingTriggers).
@@ -5423,8 +5423,10 @@ export type Effect =
    * Volo's Journal (round 380): "Whenever you cast a creature spell, note one of its creature types that hasn't been noted
    * for ~": the controller chooses one of the cast spell's creature types not noted yet for the source as this object
    * (GameState.notedFor, CR 400.7); with none left, nothing is noted.
+   * `any` (Long List of the Ents, round 381): "Note a creature type that hasn't been noted for ~": any creature type
+   * (CR 205.3m), not one of a spell's; the one noted is kept for a later `nextCast` with `ofNoted` in the same resolution.
    */
-  | { type: "noteCreatureType" }
+  | { type: "noteCreatureType"; any?: true }
   /** Archnemesis: "you may attach this Aura to that player": the source, still that object on the battlefield, to the first of these players it could enchant (CR 701.3a-b, 702.5d); nothing if it's already attached there. */
   | { type: "attachSelfToPlayer"; who: PlayerRef }
   /**
@@ -8468,6 +8470,13 @@ export interface CompiledCard {
   /** The Mindskinner: "If a source you control would deal damage to an opponent, prevent that damage and each opponent mills that many cards." (CR 615.5) */
   damageToOpponentsMills?: true;
   /**
+   * Sokrates, Athenian Teacher's granted ability (round 381): "If this creature would deal combat damage to a player, prevent
+   * that damage. This creature's controller and that player each draw half that many cards, rounded down." (CR 615.5): the
+   * draws happen even if the damage can't be prevented (rulings, CR 615.12). See staticRules in damage.ts. How many
+   * instances it has: granted twice, each draws for damage that can't be prevented (CR 615.12a).
+   */
+  combatToPlayerDrawsHalf?: number;
+  /**
    * Hostility: "If a spell you control would deal damage to an opponent, prevent that damage. Create a 3/1 ... token
    * ... for each 1 damage prevented this way" (CR 615.5): one token for each 1 damage it prevents, none for damage that
    * can't be prevented. See staticRules in damage.ts.
@@ -9494,6 +9503,8 @@ export interface CompiledCard {
      * or milled this turn (Raul, Trouble Shooter: GameObject.milledTurn).
      */
     arrived?: "fromLibrary" | "notFromBattlefield" | "milled";
+    /** Coram, the Undertaker (round 381): "from among cards in graveyards": any player's graveyard, for this permanent's controller, cards they don't own too. */
+    anyGraveyard?: true;
   }[];
   /** Muldrotha: "you may play a land ... from your graveyard" once during each of your turns. "shared": the same use as its once-each-turn spell permission (Serra Paragon's "a land ... or a permanent spell"). */
   landFromGraveyardOnce?: true | "shared";
@@ -9501,6 +9512,8 @@ export interface CompiledCard {
   landFromGraveyardFilter?: TargetSpec;
   /** Kagha, Shadow Archdruid: that land only if it was put into the graveyard from a library this turn. */
   landFromGraveyardArrived?: "fromLibrary";
+  /** Coram, the Undertaker (round 381): that land from any player's graveyard, one its controller doesn't own too (CR 305.1, 110.2). */
+  landFromAnyGraveyard?: true;
   /**
    * "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells"
    * (Rogue Class): its controller may play the cards its linked exile took (CR 607.2a), with any mana (609.4b).

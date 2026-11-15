@@ -659,10 +659,19 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const id = item?.kind === "spell" ? item.objectId : ctx.sourceId;
       const o = id ? s.objects[id] : undefined;
       // "Of the chosen type": the source's; with none chosen, it does nothing (rulings on Progenitor's Icon).
-      const filter = e.filter.chosen ? bindChosen(e.filter, o?.chosen) : e.filter;
+      let filter = e.filter.chosen ? bindChosen(e.filter, o?.chosen) : e.filter;
       if (filter.chosen) {
         log(s, `${src}: no type was chosen, so it does nothing.`);
         return;
+      }
+      // Long List of the Ents (round 381): "a creature spell of that type": the creature type its chapter just noted.
+      if (e.ofNoted) {
+        const noted = s.resolving?.lastNoted;
+        if (!noted) {
+          log(s, `${src}: no creature type was noted, so it does nothing.`);
+          return;
+        }
+        filter = { ...filter, subtypes: [...(filter.subtypes ?? []), noted], text: `${noted} creature spell` };
       }
       if (e.flash) log(s, `${src}: ${player(s, ctx.controller).name} may cast ${e.text.replace(/^the next (.+?) you cast this turn can be cast .*$/, (_, w: string) => (w === "spell of the chosen type" ? `their next ${filter.subtypes?.join(" ") ?? ""} spell` : `their next ${w}`))} this turn as though it had flash.`);
       if (e.alt) log(s, `${src}: ${player(s, ctx.controller).name} may cast their next ${filter.text.replace(/^target /, "")} this turn ${e.alt === "free" ? "without paying its mana cost" : "for life equal to its mana value"}.`);

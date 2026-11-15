@@ -8098,6 +8098,45 @@
   "gameChanger": false
  },
  {
+  "oracleId": "51c511c0-783a-456d-a7e2-959f6e8ddfc8",
+  "name": "Coram, the Undertaker",
+  "manaCost": "{1}{B}{R}{G}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warrior"
+  ],
+  "oracleText": "Coram gets +X/+0, where X is the greatest power among creature cards in all graveyards.\nWhenever Coram attacks, each player mills a card.\nDuring each of your turns, you may play a land and cast a spell from among cards in graveyards that were put there from libraries this turn.",
+  "power": "0",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R"
+  ],
+  "keywords": [
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "m3c",
+  "releasedAt": "2024-06-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9ffb5615-124e-4848-9e0d-120851bd50e5",
   "name": "Corpseweft",
   "manaCost": "{2}{B}",
@@ -23824,6 +23863,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "01376449-5cd2-4079-8aaa-5128634ef20b",
+  "name": "Long List of the Ents",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after VI.)\nI, II, III, IV, V, VI — Note a creature type that hasn't been noted for this Saga. When you next cast a creature spell of that type this turn, that creature enters with an additional +1/+1 counter on it.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ltr",
+  "releasedAt": "2023-06-23",
+  "rarity": "uncommon",
+  "layout": "saga",
+  "gameChanger": false
+ },
+ {
   "oracleId": "fc8df5c8-fda6-454c-a1ac-21c6e3d75b9c",
   "name": "Long Rest",
   "manaCost": "{X}{G}{G}{G}",
@@ -36016,6 +36083,44 @@
   "set": "khm",
   "releasedAt": "2021-02-05",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f4a9d567-513b-487e-afed-c6e6513a7862",
+  "name": "Sokrates, Athenian Teacher",
+  "manaCost": "{1}{W}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Advisor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Advisor"
+  ],
+  "oracleText": "Defender\nSokrates has hexproof as long as it's untapped.\nSokratic Dialogue — {T}: Until end of turn, target creature gains \"If this creature would deal combat damage to a player, prevent that damage. This creature's controller and that player each draw half that many cards, rounded down.\"",
+  "power": "0",
+  "toughness": "4",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Sokratic Dialogue",
+   "Defender"
+  ],
+  "commanderLegal": "legal",
+  "set": "acr",
+  "releasedAt": "2024-07-05",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

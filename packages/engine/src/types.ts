@@ -23,6 +23,9 @@ export interface RedirectShield {
  * "damageRule" effect made, with its choices made and targets fixed as it resolved. `to` and `by` are checked when
  * damage would be dealt (CR 611.2c, 609.7b).
  */
+/** What drawing was part of, to carry on with once a draw replacement's question is answered: the draw step, or Sokrates's draws after combat damage (round 381). */
+export type DrawAfter = "drawStep" | "damageDraws";
+
 export interface DamageRule {
   id: string;
   turn: number;
@@ -74,6 +77,8 @@ export interface DamageRule {
    * after the damage event (CR 615.5), even if the damage can't be prevented (CR 615.12).
    */
   shuffleIn?: true;
+  /** Sokrates's granted ability (round 381): its controller and the player the damage would be dealt to each draw half that much, rounded down, prevented or not (CR 615.5, 615.12). */
+  drawHalf?: true;
   /** "For each 1 damage prevented this way, put a +1/+1 counter on that creature" (Test of Faith, CR 615.5): on `to.object`, as the damage is prevented; `tally`: counted in GameState.preventedTally for a delayed trigger instead (Sacred Boon). */
   countersOn?: { counter: string; tally?: true };
   /** Vengeful Archon: "If damage is prevented this way, ~ deals that much damage to target player or planeswalker", fixed as it resolved (rulings). */
@@ -1700,7 +1705,7 @@ export type PendingDecision =
       source: string;
       cards: ObjectId[];
       left: number;
-      after?: "drawStep";
+      after?: DrawAfter;
       /**
        * Other replacements of the same draw the player may apply first instead (CR 616.1): Alhammarret's Archive's
        * "draw two cards instead" (`archive`, the draws it makes) or dredging one of `dredge`. Either uses up "the
@@ -1722,7 +1727,7 @@ export type PendingDecision =
    * Out of the Tombs (CompiledCard.drawEmptyReturn): a draw from an empty library is replaced; `player` picks which of
    * `cards`, the creature cards in their graveyard, returns to the battlefield. `left` and `made` are the draws after it.
    */
-  | { kind: "drawEmptyReturn"; player: PlayerId; source: string; cards: ObjectId[]; left: number; made?: number[]; after?: "drawStep"; /** Forbidden Crypt (CompiledCard.drawReturnsFromGraveyard): any card of `cards`, the player's graveyard, to their hand instead, whatever their library holds. */ toHand?: true }
+  | { kind: "drawEmptyReturn"; player: PlayerId; source: string; cards: ObjectId[]; left: number; made?: number[]; after?: DrawAfter; /** Forbidden Crypt (CompiledCard.drawReturnsFromGraveyard): any card of `cards`, the player's graveyard, to their hand instead, whatever their library holds. */ toHand?: true }
   /**
    * Different replacements could apply to this draw (shields of Urabrask, Heretic Praetor and the Words, with each other
    * or with Underrealm Lich, Tomorrow, dredge, Notion Thief, Alhammarret's Archive, Scion of Halaster or Abundance; two
@@ -1737,7 +1742,7 @@ export type PendingDecision =
       labels: string[];
       left: number;
       made?: number[];
-      after?: "drawStep";
+      after?: DrawAfter;
       /** This draw is one a replacement made: how many Alhammarret's Archives can still replace it (CR 614.5). */
       archives?: number;
     }
@@ -1755,7 +1760,7 @@ export type PendingDecision =
       archive?: number;
       /** Abundance could replace this draw too (CR 616.1): the permanent's name; choosing land or nonland applies it. */
       abundance?: string;
-      after?: "drawStep";
+      after?: DrawAfter;
     }
   /**
    * Before the game: keep this opening hand or take a mulligan (CR 103.5). `taken` is how many
@@ -1768,7 +1773,7 @@ export type PendingDecision =
    * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
    * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
    */
-  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; /** Winter, Cynical Opportunist: the cards chosen, if any, have at least this many card types among them (CR 205.2a). */ cardTypes?: number; /** "Exile a card from a graveyard" (Cemetery Prowler): `cards` are in every player's graveyard, not only yours. */ anyGraveyard?: true; /** Choosing from cards in exile (`dig.looked`, Dauthi Voidwalker). */ exiled?: true; min: number; max: number; firstTo?: string; othersTo?: string; /** With `firstTo`: the first this many go there (one if left out). */ firstN?: number; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string; /** Each card taken costs this much life (Search for Blex). */ lifeEach?: number; /** Each card taken is paid for with this much life (Wand of Denial). */ payLife?: number }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal, with `bottom` to put on the bottom of the library. */ fromHand?: boolean; /** With `fromHand`: aura swap (CR 702.65a), the card exchanged with the source Aura. */ swap?: true; reveal?: true; /** With `reveal`: behold (CR 701.4a), so `cards` also holds permanents you control of that quality. */ behold?: true; bottom?: true; /** From the hand: the cards are shuffled into the library (Credit Voucher). */ shuffle?: true; /** From the hand: the cards are manifested (Kozilek, the Broken Reality). */ manifest?: true; /** With `hand`: `dig.looked` also holds that player's graveyard, after the hand (Never Happened). */ handYard?: true; /** With `manifest`: cloaked instead (Vannifar, Evolved Enigma). */ cloak?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield" | "libraryTop" | "libraryBottom" | /** The Three Seasons: the cards chosen are shuffled into their owners' libraries. */ "shuffleIn" | "castThisTurn" | /** The cards chosen stay; the rest of the graveyard is exiled (Watchers of the Dead). */ "keep"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** Wildfire Devils: the card exiled is copied, and the copy may be cast, by this player (for bots and the prompt). */ copiedBy?: PlayerId; /** "Creature and/or Vehicle cards with different powers" (Rip, Spawn Hunter): no two found with the same power. */ distinctPowers?: true; /** "Exactly two cards" (Burning-Rune Demon): `max` of them or none. */ exactly?: true; /** "With total mana value 4 or less" (Lively Dirge): the cards found together. */ totalMv?: number; /** "With total power X or less" (Moorland Rescuer, round B202): the cards found together, each card's power where it is. */ totalPower?: number; /** Jötun Grunt's cumulative upkeep: cards from every graveyard, an even number from each (two from a single graveyard for each age counter). */ pairsPerYard?: true; /** "Basic land cards that share a land type" (Myriad Landscape): every card found shares a land type with each other one. */ shareLandType?: true; /** "Basic land cards which have the same name as the chosen land" (Canoptek Wraith): every card found has the same name. */ oneName?: true; /** "A Forest card and a Plains card" (Krosan Verge): the cards found can each be one of these, a different one each. */ oneOfEach?: TargetSpec[]; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a); with `exile`, the cards from the hand Gemstone Caverns exiles ("If you do, exile a card from your hand"). */ opening?: true; exile?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** With `reveal`: the cards are revealed for this player to choose one of them for `player` to discard (Disciple of Phenax). */ revealFor?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[]; /** An opponent choosing from this player's revealed cards (Gifts Ungiven, Intuition); `helps` when where the chosen ones go is better for that player than where the rest go. */ /** Extract Brain: cards chosen from your hand for this player to look at, who may cast one of them. */ handFor?: PlayerId; forPlayer?: PlayerId; helps?: true; /** From `player`'s graveyard onto the battlefield under this player's control (Visions of Dread). */ under?: PlayerId; /** Separating `dig.looked` into two piles (CR 700.3): the cards chosen are the first pile, the rest the second. */ piles?: true; /** With `piles`: the cards are in the graveyard (Death or Glory), for the prompt. */ yardPiles?: true; /** Opposition Agent (CR 723.2): `player` controls this player while they search their own library and chooses what they find; with `foundExiled`, what they find is exiled instead, and `player` may play it. */ controlling?: PlayerId; foundExiled?: true; /** The cards found are exiled from the searcher's own library (Foresight): the ones they want least. */ away?: true; /** Archmage Ascension: a search instead of a draw; the card found goes into the hand, then the draws still to make (see `draw`). */ thenDraw?: { left: number; made: number[]; after?: "drawStep" } }
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; /** Winter, Cynical Opportunist: the cards chosen, if any, have at least this many card types among them (CR 205.2a). */ cardTypes?: number; /** "Exile a card from a graveyard" (Cemetery Prowler): `cards` are in every player's graveyard, not only yours. */ anyGraveyard?: true; /** Choosing from cards in exile (`dig.looked`, Dauthi Voidwalker). */ exiled?: true; min: number; max: number; firstTo?: string; othersTo?: string; /** With `firstTo`: the first this many go there (one if left out). */ firstN?: number; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string; /** Each card taken costs this much life (Search for Blex). */ lifeEach?: number; /** Each card taken is paid for with this much life (Wand of Denial). */ payLife?: number }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal, with `bottom` to put on the bottom of the library. */ fromHand?: boolean; /** With `fromHand`: aura swap (CR 702.65a), the card exchanged with the source Aura. */ swap?: true; reveal?: true; /** With `reveal`: behold (CR 701.4a), so `cards` also holds permanents you control of that quality. */ behold?: true; bottom?: true; /** From the hand: the cards are shuffled into the library (Credit Voucher). */ shuffle?: true; /** From the hand: the cards are manifested (Kozilek, the Broken Reality). */ manifest?: true; /** With `hand`: `dig.looked` also holds that player's graveyard, after the hand (Never Happened). */ handYard?: true; /** With `manifest`: cloaked instead (Vannifar, Evolved Enigma). */ cloak?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield" | "libraryTop" | "libraryBottom" | /** The Three Seasons: the cards chosen are shuffled into their owners' libraries. */ "shuffleIn" | "castThisTurn" | /** The cards chosen stay; the rest of the graveyard is exiled (Watchers of the Dead). */ "keep"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** Wildfire Devils: the card exiled is copied, and the copy may be cast, by this player (for bots and the prompt). */ copiedBy?: PlayerId; /** "Creature and/or Vehicle cards with different powers" (Rip, Spawn Hunter): no two found with the same power. */ distinctPowers?: true; /** "Exactly two cards" (Burning-Rune Demon): `max` of them or none. */ exactly?: true; /** "With total mana value 4 or less" (Lively Dirge): the cards found together. */ totalMv?: number; /** "With total power X or less" (Moorland Rescuer, round B202): the cards found together, each card's power where it is. */ totalPower?: number; /** Jötun Grunt's cumulative upkeep: cards from every graveyard, an even number from each (two from a single graveyard for each age counter). */ pairsPerYard?: true; /** "Basic land cards that share a land type" (Myriad Landscape): every card found shares a land type with each other one. */ shareLandType?: true; /** "Basic land cards which have the same name as the chosen land" (Canoptek Wraith): every card found has the same name. */ oneName?: true; /** "A Forest card and a Plains card" (Krosan Verge): the cards found can each be one of these, a different one each. */ oneOfEach?: TargetSpec[]; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a); with `exile`, the cards from the hand Gemstone Caverns exiles ("If you do, exile a card from your hand"). */ opening?: true; exile?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** With `reveal`: the cards are revealed for this player to choose one of them for `player` to discard (Disciple of Phenax). */ revealFor?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[]; /** An opponent choosing from this player's revealed cards (Gifts Ungiven, Intuition); `helps` when where the chosen ones go is better for that player than where the rest go. */ /** Extract Brain: cards chosen from your hand for this player to look at, who may cast one of them. */ handFor?: PlayerId; forPlayer?: PlayerId; helps?: true; /** From `player`'s graveyard onto the battlefield under this player's control (Visions of Dread). */ under?: PlayerId; /** Separating `dig.looked` into two piles (CR 700.3): the cards chosen are the first pile, the rest the second. */ piles?: true; /** With `piles`: the cards are in the graveyard (Death or Glory), for the prompt. */ yardPiles?: true; /** Opposition Agent (CR 723.2): `player` controls this player while they search their own library and chooses what they find; with `foundExiled`, what they find is exiled instead, and `player` may play it. */ controlling?: PlayerId; foundExiled?: true; /** The cards found are exiled from the searcher's own library (Foresight): the ones they want least. */ away?: true; /** Archmage Ascension: a search instead of a draw; the card found goes into the hand, then the draws still to make (see `draw`). */ thenDraw?: { left: number; made: number[]; after?: DrawAfter } }
   /**
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
@@ -1821,7 +1826,7 @@ export type PendingDecision =
    * A merged permanent was put into its owner's library (CR 730.3a): its cards are `cards` there, top first, together on
    * top of the library or at the bottom, and the owner arranges them without revealing the order.
    */
-  | { kind: "orderLibrary"; player: PlayerId; cards: ObjectId[]; bottom?: true; source: string; /** Whose library, if not `player`'s (Misinformation). */ owner?: PlayerId; /** Abundance replaced a draw of several: the draws still to make once these are ordered (see `draw`). */ thenDraw?: { left: number; made: number[]; after?: "drawStep" } };
+  | { kind: "orderLibrary"; player: PlayerId; cards: ObjectId[]; bottom?: true; source: string; /** Whose library, if not `player`'s (Misinformation). */ owner?: PlayerId; /** Abundance replaced a draw of several: the draws still to make once these are ordered (see `draw`). */ thenDraw?: { left: number; made: number[]; after?: DrawAfter } };
 
 export interface GameEvent {
   seq: number;
@@ -2361,6 +2366,12 @@ export interface GameState {
   topTurn?: { player: PlayerId; turn: number; top: FromTop; source: string }[];
   /** Plagiarize: "Until end of turn, if target player would draw a card, instead that player skips that draw and you draw a card" (CR 614.1a): `victim`'s draws are `by`'s, until the cleanup step (CR 514.2). `id` names it for CR 614.5. */
   drawSteals?: { id: string; victim: PlayerId; by: PlayerId; source: string }[];
+  /**
+   * Sokrates's granted ability (round 381, DamageRule.drawHalf): the draws its prevention calls for in this combat damage
+   * step, in order, made once the damage is dealt (dealCombatDamage); a draw replacement can stop them to ask (dredge), and
+   * the rest follow its answer (draw `after` "damageDraws").
+   */
+  damageDraws?: { player: PlayerId; n: number; card: string }[];
   handOnlyUntil?: { controller: PlayerId; source: string }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
   noPreventionTurn?: number;
@@ -2941,6 +2952,8 @@ export interface Resolving {
   flipped?: { won: boolean; wins: number; /** How many coins were flipped in that set, when it was several (Yusri). */ flips?: number };
   /** Effect "chooseOwnCommander" (Stinging Study): the chosen commander's mana value. */
   commanderMv?: number;
+  /** Long List of the Ents (round 381): the creature type this resolution noted, for "of that type" (Effect nextCast `ofNoted`). */
+  lastNoted?: string;
   /** Its last roll (CR 706.2): each die's natural result that counts (not the ignored ones, 706.6), and the result. */
   rolled?: { sides: number; naturals: number[]; result: number; /** "The other result" (Effect roll's chooseOne). */ other?: number };
   /** "Each player rolls a d20" (Chaos Dragon): each player's result. */

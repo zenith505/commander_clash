@@ -69,6 +69,7 @@ import {
   STARTING_LIFE,
   type TurnRule,
   type DeferredAct,
+  type DrawAfter,
 } from "./types";
 
 export const COMMANDER_DAMAGE_LIMIT = 21; // CR 903.10a
@@ -2727,7 +2728,7 @@ export function removeFromCombat(s: GameState, o: GameObject) {
  * card that could, the draws stop for that choice and it returns false; answering it (chooseDredge) does the rest
  * of them, then carries on with what was drawing (`after`, or the resolving spell or ability).
  */
-export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", made: number[] = [], resumed = false): boolean {
+export function draw(s: GameState, pid: PlayerId, n = 1, after?: DrawAfter, made: number[] = [], resumed = false): boolean {
   // Maralen of the Mornsong: the draws don't happen, so no replacement applies to them and an empty library loses nothing
   // (rulings).
   if (cantDraw(s, pid)) {
@@ -2846,7 +2847,7 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
  * card or none to look at and nothing else to choose, it just happens (an empty library loses no game: nothing is drawn).
  * `left` and `made` are the draws after this one. "paused" when it waits for the player, true when it replaced the draw.
  */
-function digInstead(s: GameState, pid: PlayerId, left: number, after: "drawStep" | undefined, made: number[], archives: number, chosen?: ObjectId): "paused" | boolean {
+function digInstead(s: GameState, pid: PlayerId, left: number, after: DrawAfter | undefined, made: number[], archives: number, chosen?: ObjectId): "paused" | boolean {
   // `chosen`: the look the player chose among the draw's replacements (drawReplacementChoices), so nothing else is offered.
   const src = chosen ?? s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawDig);
   if (!src) return false;
@@ -3023,7 +3024,7 @@ function stealDraw(s: GameState, pid: PlayerId, thief: Thief) {
  * first (CR 616.1); if it's the look, they can still replace the draw it makes; if it's another, that was the first
  * time, so the look is gone.
  */
-function firstDrawLook(s: GameState, pid: PlayerId, left: number, after?: "drawStep"): "paused" | void {
+function firstDrawLook(s: GameState, pid: PlayerId, left: number, after?: DrawAfter): "paused" | void {
   const p = player(s, pid);
   if (p.firstWouldDraw === s.turn) return;
   p.firstWouldDraw = s.turn;
@@ -3083,8 +3084,7 @@ function chooseDrawLook(s: GameState, p: Player, id?: ObjectId, instead?: "archi
     more = [pend.left + 1, []];
   }
   if (!draw(s, p.id, more[0], pend.after, more[1], true)) return;
-  if (pend.after === "drawStep") drawStepDrawn(s);
-  else if (s.resolving) continueResolution(s);
+  drawsDone(s, pend.after);
 }
 
 /** Answering Underrealm Lich's look (digInstead): the card to keep, or another replacement of that draw first. */
@@ -3151,7 +3151,7 @@ function archiveDraws(s: GameState, pid: PlayerId): number {
  * One draw, which nothing but an empty library's replacements can change any more. False when nothing was drawn and the
  * draws stop; "paused" when Out of the Tombs waits for its player to choose (`rest`: the draws after this one).
  */
-function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number[]; after?: "drawStep" } = { left: 0, made: [] }): boolean | "paused" {
+function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number[]; after?: DrawAfter } = { left: 0, made: [] }): boolean | "paused" {
   const p = player(s, pid);
   const top = p.library[0];
   if (!top) {
@@ -3368,6 +3368,28 @@ function abundanceInstead(s: GameState, p: Player, kind: "land" | "nonland", sou
  * between (rulings); then "at the beginning of the draw step" triggers (CR 504.2). A player's draws happen once, however
  * often a draw pauses on the way (dredge and the like resume here).
  */
+/** Draws a replacement's question stopped are all made: carry on with what was drawing (`after`, or the resolving spell or ability). */
+function drawsDone(s: GameState, after: DrawAfter | undefined) {
+  if (after === "drawStep") drawStepDrawn(s);
+  else if (after === "damageDraws") damageDrawsMade(s);
+  else if (s.resolving) continueResolution(s);
+}
+
+/**
+ * Sokrates's granted ability (round 381, GameState.damageDraws): the draws its prevention calls for, made in order once the
+ * combat damage is dealt. True when a draw replacement stopped them to ask (dredge); its answer makes the rest.
+ */
+export function damageDrawsMade(s: GameState): boolean {
+  while (s.damageDraws?.length) {
+    const d = s.damageDraws.shift()!;
+    if (!s.damageDraws.length) s.damageDraws = undefined;
+    if (player(s, d.player).lost || d.n <= 0) continue;
+    log(s, `${player(s, d.player).name} draws ${d.n === 1 ? "a card" : `${d.n} cards`} (${d.card}).`);
+    if (!draw(s, d.player, d.n, "damageDraws")) return true;
+  }
+  return false;
+}
+
 export function drawStepDrawn(s: GameState) {
   const ap = s.activePlayer;
   const order = s.turnOrder.slice(s.turnOrder.indexOf(ap) + 1).concat(s.turnOrder.slice(0, s.turnOrder.indexOf(ap)));
@@ -3479,7 +3501,7 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
  * one, CR 701.23d), puts it into their hand, then shuffles; then the draws after it go on (`left`, `made`). An empty
  * library finds nothing, and isn't drawn from (CR 704.5b).
  */
-function tutorInstead(s: GameState, pid: PlayerId, src: ObjectId, left: number, after: "drawStep" | undefined, made: number[]): "paused" | void {
+function tutorInstead(s: GameState, pid: PlayerId, src: ObjectId, left: number, after: DrawAfter | undefined, made: number[]): "paused" | void {
   const p = player(s, pid);
   if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
   log(s, `${p.name} searches their library instead of drawing (${nameOf(s, src)}).`);
@@ -3537,7 +3559,7 @@ function exileInstead(s: GameState, pid: PlayerId, src: ObjectId) {
  * "paused" when it waits for the player (Underrealm Lich's look and the like), "again" when a draw is still to come
  * (Scion of Halaster's "Then draw a card").
  */
-function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: number, after: "drawStep" | undefined, made: number[], madeArchives?: number): "paused" | "again" | void {
+function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: number, after: DrawAfter | undefined, made: number[], madeArchives?: number): "paused" | "again" | void {
   const p = player(s, pid);
   if (key === "exile" || key.startsWith("words:")) return applyDrawShield(s, pid, key);
   if (key === "thief") return stealDraw(s, pid, notionThief(s, pid)!);
@@ -3700,10 +3722,9 @@ function chooseDrawInstead(s: GameState, p: Player, choice: string) {
   continueDraws(s, p.id, pend.left + (done === "again" ? 1 : 0), pend.after, made);
 }
 
-export function continueDraws(s: GameState, pid: PlayerId, left: number, after: "drawStep" | undefined, made: number[]) {
+export function continueDraws(s: GameState, pid: PlayerId, left: number, after: DrawAfter | undefined, made: number[]) {
   if (!draw(s, pid, left, after, made, true)) return;
-  if (after === "drawStep") drawStepDrawn(s);
-  else if (s.resolving) continueResolution(s);
+  drawsDone(s, after);
 }
 
 /**
@@ -3711,7 +3732,7 @@ export function continueDraws(s: GameState, pid: PlayerId, left: number, after: 
  * their hand, their choice of any card there (not drawn, CR 614.6); with none to choose, they lose the game (rulings: "if you
  * can't" is about choosing a card as well as putting it into the hand). `left` and `made` are the draws after it.
  */
-function cryptInstead(s: GameState, pid: PlayerId, source: string, left: number, after: "drawStep" | undefined, made: number[]): "paused" | void {
+function cryptInstead(s: GameState, pid: PlayerId, source: string, left: number, after: DrawAfter | undefined, made: number[]): "paused" | void {
   const p = player(s, pid);
   if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
   const cards = [...p.graveyard];
@@ -3772,8 +3793,7 @@ function chooseDredge(s: GameState, p: Player, id?: ObjectId, abundance?: "land"
     made.unshift(pend.archive - 1, pend.archive - 1);
   } else if (drawOne(s, p.id, { left: pend.left - 1 - (pend.made?.length ?? 0), made, ...(pend.after ? { after: pend.after } : {}) }) === "paused") return;
   if (!draw(s, p.id, pend.left - 1 - (pend.made?.length ?? 0), pend.after, made, true)) return;
-  if (pend.after === "drawStep") drawStepDrawn(s);
-  else if (s.resolving) continueResolution(s);
+  drawsDone(s, pend.after);
 }
 
 // ---------------------------------------------------------------------------
@@ -5367,9 +5387,11 @@ export function plottedCast(s: GameState, pid: PlayerId, o: GameObject): boolean
  * Playing it is still their land play for the turn, with the usual timing (CR 305.1-2).
  */
 export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: PlayerId): boolean {
-  if (o.zone !== "graveyard" || o.owner !== pid || !isType(defOf(s, o), "Land")) return false;
+  if (o.zone !== "graveyard" || !isType(defOf(s, o), "Land")) return false;
   // Tomik, Distinguished Advokist: not while an opponent controls one (rulings: over any permission).
   if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).opponentsCantPlayYardLands && controllerOf(s, obj(s, id)) !== pid)) return false;
+  // Coram, the Undertaker (round 381): a land card in another player's graveyard, with its permission only.
+  if (o.owner !== pid) return !!landPermit(s, pid, o);
   return ownGraveyardPlay(s, o, pid) || mayhemPlay(s, o) || landsFromGraveyardNow(s, pid, o) || !!landPermit(s, pid, o);
 }
 
@@ -5412,6 +5434,14 @@ function arrivedThisTurn(s: GameState, o: GameObject, how: "fromLibrary" | "notF
   return how === "fromLibrary" ? o.fromLibraryTurn === s.turn : o.fromBattlefieldTurn !== s.turn;
 }
 
+/** Coram, the Undertaker (round 381): `pid` controls a permanent that lets them play cards from any graveyard. */
+export function playsFromAnyGraveyard(s: GameState, pid: PlayerId): boolean {
+  return s.battlefield.some((id) => {
+    const o = obj(s, id);
+    return controllerOf(s, o) === pid && (!!abilitiesOf(s, o).landFromAnyGraveyard || !!abilitiesOf(s, o).graveyardGrants?.some((g) => g.anyGraveyard));
+  });
+}
+
 /**
  * Muldrotha's "you may play a land ... from your graveyard" during each of your turns, if one isn't used yet this turn.
  * Kagha's only for a land card `o` put there from a library this turn.
@@ -5423,6 +5453,8 @@ function landPermit(s: GameState, pid: PlayerId, o?: GameObject): string | undef
     const p = obj(s, id);
     const once = controllerOf(s, p) === pid ? abilitiesOf(s, p).landFromGraveyardOnce : undefined;
     if (!once) continue;
+    // Coram, the Undertaker (round 381): any graveyard's; the others, only the player's own.
+    if (o && o.owner !== pid && !abilitiesOf(s, p).landFromAnyGraveyard) continue;
     const arrived = abilitiesOf(s, p).landFromGraveyardArrived;
     if (arrived && (!o || !arrivedThisTurn(s, o, arrived))) continue;
     // The Eighth Doctor: a historic land only (CR 700.6).
@@ -5712,7 +5744,8 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
     log(s, `${p.name} reveals ${nameOf(s, shown)} so ${d.name} enters untapped.`);
   }
   // Muldrotha's land from the graveyard is used up, unless something lets every land be played from there (Crucible).
-  if (o.zone === "graveyard" && !ownGraveyardPlay(s, o, p.id) && !mayhemPlay(s, o) && !landsFromGraveyardNow(s, p.id, o)) {
+  // Coram's land from another player's graveyard (round 381): always its permission.
+  if (o.zone === "graveyard" && (o.owner !== p.id || (!ownGraveyardPlay(s, o, p.id) && !mayhemPlay(s, o) && !landsFromGraveyardNow(s, p.id, o)))) {
     const permit = landPermit(s, p.id, o)!;
     ((s.turnLog ??= {}).gravePermits ??= []).push(permit);
     // Serra Paragon: "it gains ..." as the land it becomes.
@@ -5720,7 +5753,7 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
     if (gains) o.entersGaining = gains;
   }
   const fromZone = o.zone;
-  const from = o.zone === "exile" || o.zone === "graveyard" || o.zone === "library" ? ` from ${o.zone === "exile" ? "exile" : o.zone === "library" ? "their library" : "their graveyard"}` : "";
+  const from = o.zone === "exile" || o.zone === "graveyard" || o.zone === "library" ? ` from ${o.zone === "exile" ? "exile" : o.zone === "library" ? "their library" : o.owner !== p.id ? `${player(s, o.owner).name}'s graveyard` : "their graveyard"}` : "";
   // Under the control of the player who plays it (CR 305.1, 110.2), an opponent's card from exile too (Opposition Agent).
   s.playingLand = id;
   // Mariposa Military Base: not untapped means its player has it enter tapped, and they get the rad counters (CR 614.1c).
@@ -8161,9 +8194,13 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
     out.push({ kind: "permission", mana: m.free ? "{0}" : d.manaCost, costs: [], exile: false, ...(m.exileAfter ? { exileIfToGraveyard: true as const } : {}), ...(m.free ? { free: true as const } : {}), ...(m.tapped ? { entersTapped: true as const } : {}), ...(m.moreUnlessTargets ? { moreUnlessTargets: m.moreUnlessTargets } : {}) });
   // Permanents, and emblems in the command zone (Wrenn and Realmbreaker's, CR 114.4).
   for (const p of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
-    if (controllerOf(s, p) !== o.owner) continue;
+    const holder = controllerOf(s, p);
+    if (holder !== o.owner && holder !== caster) continue;
     for (const g of abilitiesOf(s, p).graveyardGrants ?? []) {
-      if (g.yourTurn && s.activePlayer !== o.owner) continue;
+      // Coram, the Undertaker (round 381, `anyGraveyard`): its controller's, for a card in any graveyard; the others, the
+      // card's owner's, for their own graveyard.
+      if (g.anyGraveyard ? holder !== caster : holder !== o.owner) continue;
+      if (g.yourTurn && s.activePlayer !== holder) continue;
       if (g.if && !staticConditionNow(s, g.if, p.id, o.owner)) continue;
       if (!d.manaCost && !g.way.mana) continue;
       if (!printedMatches(g.filter, d)) continue;
@@ -8179,7 +8216,7 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
         if (!permits.length) continue;
         const had = out.find((w) => w.kind === "turnPermission");
         if (had) had.permits = [...had.permits!, ...permits];
-        else out.push({ ...g.way, mana: d.manaCost, permits });
+        else out.push({ ...g.way, mana: d.manaCost, permits, ...(o.owner !== caster ? { anyOwner: true as const } : {}) });
         continue;
       }
       // Its caster would choose a permission that doesn't exile the spell afterwards over one that does (Jaya Ballard's
@@ -14550,7 +14587,9 @@ function finishCombatDamage(s: GameState): boolean {
   const byController = new Map<PlayerId, PlayerId[]>();
   for (const [player, g] of toPlayers) for (const c of g.controllers) byController.set(c, [...(byController.get(c) ?? []), player]);
   for (const [controller, players] of byController) fireEvent(s, { type: "creaturesDamagedPlayers", controller, players });
-  return false;
+  // Sokrates's granted ability (round 381): the draws its prevention calls for (CR 615.5), part of this damage event's
+  // replacement, made before anything else happens (no player gets priority, and state-based actions wait, CR 510.2).
+  return damageDrawsMade(s);
 }
 
 // ---------------------------------------------------------------------------
@@ -15261,9 +15300,9 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
   for (const id of s.battlefield) if (endEffectProblem(s, pid, id) === null) out.push({ type: "endEffect", player: pid, objectId: id });
   for (const d of payableDelayed(s, pid)) if (payDelayedProblem(s, pid, d.unlessPaid!.id) === null) out.push({ type: "payDelayed", player: pid, id: d.unlessPaid!.id });
   for (const id of s.battlefield) if (!ignorableBy(s, pid, id)?.costs && ignoreEffectProblem(s, pid, id) === null) out.push({ type: "ignoreEffect", player: pid, objectId: id });
-  // "You may play lands from your graveyard" (Crucible of Worlds).
+  // "You may play lands from your graveyard" (Crucible of Worlds). Coram, the Undertaker (round 381): any graveyard's.
   if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid))
-    for (const id of p.graveyard) if (mayPlayLandFromGraveyard(s, obj(s, id), pid) && !nameLandBan(s, pid, defOf(s, obj(s, id)))) out.push({ type: "playLand", player: pid, objectId: id });
+    for (const id of playsFromAnyGraveyard(s, pid) ? s.players.flatMap((q) => q.graveyard) : p.graveyard) if (mayPlayLandFromGraveyard(s, obj(s, id), pid) && !nameLandBan(s, pid, defOf(s, obj(s, id)))) out.push({ type: "playLand", player: pid, objectId: id });
   for (const id of p.command) if (canCast(s, pid, id) && !spellTargets(s, id).length && !spellModes(s, id)) out.push({ type: "castSpell", player: pid, objectId: id });
   for (const id of s.battlefield) {
     const o = obj(s, id);

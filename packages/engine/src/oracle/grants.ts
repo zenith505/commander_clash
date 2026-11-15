@@ -120,7 +120,7 @@ function namesGrantSource(c: CompiledCard): boolean {
  * keywords (or remove them) join layer 6 once granted (computeLayers in layers.ts); ones that change types, colors or other abilities
  * would have to come out of earlier layers than the one that grants them, so they stay out.
  */
-const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional", "roomsTwice", "firstDrawLook", "cantLose", "cantWin", "triggersAgain", "exileIfLeavesSelf", "exileInsteadOfDying", "noMaxHandSize", "targetTax", "combatLimit", "untapRemovesOwnCounter", "lookTop"]);
+const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional", "roomsTwice", "firstDrawLook", "cantLose", "cantWin", "triggersAgain", "exileIfLeavesSelf", "exileInsteadOfDying", "noMaxHandSize", "targetTax", "combatLimit", "untapRemovesOwnCounter", "lookTop", "combatToPlayerDrawsHalf"]);
 // Earthbind's granted "Enchanted creature loses flying" (removeKeywords) joins layer 6 the same way.
 export const grantedStaticOk = (mods: Modification[]) => mods.every((m) => (m.kind === "addKeywords" || m.kind === "removeKeywords" || !["2", "4", "5", "6"].includes(layerOf(m))) && !(m.kind === "definePT" && (m.power === undefined || m.toughness === undefined)));
 

@@ -1,7 +1,7 @@
 # Roadmap
 
-31,452 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
+31,477 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,902 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3165,15 +3165,47 @@ line blocks.
    of 31,936. The compiled text of every other card is unchanged. Bots activate the Bullies at an opponent's beginning of
    combat on their biggest creature card (power 2 or more), cast Judgment as a damage shield, cast Durnan's card like any
    card they may play from exile, and note the first type offered.
-   Out after round 380 (looked at, not done): Long List of the Ents (each of its six chapters notes any creature type, chosen
-   from every type, not from a spell, and the next creature spell of that type cast this turn enters with an additional
-   +1/+1 counter: a delayed trigger for a spell of a chosen type, left for a round that can reuse Lane B's round B221
-   next-creature counters once they merge); Capricopian, Tamiyo, Collector of Tales, Celestial Reunion, Fabrication
-   Foundry, Ziatora's Envoy and Archelos, Lagoon Mystic (still out, as in their earlier lists).
+   Out after round 380 (looked at, not done): Long List of the Ents (done in round 381); Capricopian, Tamiyo, Collector of
+   Tales, Celestial Reunion, Fabrication Foundry, Ziatora's Envoy and Archelos, Lagoon Mystic (still out, as in their
+   earlier lists).
    Polish: the Bullies' delayed exile logs as "Hill Giant's ability triggers (Exile Hill Giant)" (the source named is the
    creature, as for every "At the beginning of the next end step, exile it" of putOntoBattlefield); the page stops for an
    ability targeting the player whose turn it is only at that player's beginning of combat, not in their upkeep or end
    step.
+   Round 381 went on down the "Out after round N" lists and `npm run popular`, most played first, to creature types noted by
+   a Saga, prevented combat damage that draws cards, and cards from every graveyard: Long List of the Ents' "I, II, III,
+   IV, V, VI — Note a creature type that hasn't been noted for this Saga. When you next cast a creature spell of that type
+   this turn, that creature enters with an additional +1/+1 counter on it." (Effect noteCreatureType `any`: every creature
+   type, CR 205.3m, chosen as it resolves, CR 608.2d, kept for the Saga as this object, CR 400.7; then Effect nextCast
+   `ofNoted`, a delayed trigger for the next creature spell of that type this turn, CR 603.7c, a changeling's too, CR
+   702.73a); Sokrates, Athenian Teacher's granted "If this creature would deal combat damage to a player, prevent that
+   damage. This creature's controller and that player each draw half that many cards, rounded down." (CompiledCard
+   combatToPlayerDrawsHalf, one per instance, granted through GRANTED_FIELDS; DamageRule drawHalf, CR 615.5, the draws
+   made even when the damage can't be prevented, rulings and CR 615.12; the draws are queued in GameState.damageDraws and
+   made at the end of the combat damage event, where a draw replacement such as dredge can stop them to ask, draw `after`
+   "damageDraws" carrying on with the rest; only combat damage queues them, so Swans of Bryn Argoll, whose draws come from
+   any damage, still needs the same after noncombat damage); Coram, the
+   Undertaker's "+X/+0, where X is the greatest power among creature cards in all graveyards" (Count cardsInGraveyard
+   greatestPower for every player) and "During each of your turns, you may play a land and cast a spell from among cards in
+   graveyards that were put there from libraries this turn." (graveyardGrants `anyGraveyard` and landFromAnyGraveyard: a
+   land play and a spell, once each for each Coram as Muldrotha's, from any player's graveyard, cards you don't own too,
+   GameObject.fromLibraryTurn; the land enters under your control, CR 305.1). Browser tests click through Long List's type
+   picker (typing "Elf" among all creature types) and the Elf with its counter, Sokratic Dialogue on your Craw Wurm and the
+   draws, a dredge question in the middle of combat damage, and Coram's cast and land play from Ana's graveyard. New
+   prompts: the creature type picker with every type for noting a type; dredge asked during combat damage. +3, 31,477 of
+   31,936 (with rounds 375-380 and Lane B's B216-B222). The compiled text of every other card is unchanged. Bots note the type most of their creature cards have (in
+   hand counted twice), give Sokratic Dialogue to an opponent's biggest unblocked attacker (power 2 or more) coming at them
+   once blockers are declared, and cast or play the cards Coram lets them from every graveyard.
+   Out after round 381 (looked at, not done): Archelos, Lagoon Mystic (still out: with it untapped, the entering
+   permanent's controller chooses tapped or untapped when another "enters tapped" replacement applies, a choice at every
+   permanent entering); Wayta, Trainer Prodigy ("If a creature you control being dealt damage causes a triggered ability
+   ... to trigger": only abilities whose trigger condition is about damage dealt to a creature you control, rulings,
+   which needs every damage trigger event to say which creatures were dealt damage; and its fight's cost reduction "if it
+   targets two creatures you control"); Filigree Vector (still out: two "any number of target" sets in one ability);
+   Guff Rewrites History, Sunken Palace, Ulalek, Possibility Storm, Gale, Waterdeep Prodigy and the rest above rank 5,500
+   (still out, for the reasons in their earlier lists).
+   Polish: Sokrates's prevention and draws log under the creature's name ("prevented (Craw Wurm)"), not Sokrates's; a
+   land played from another player's graveyard logs "You plays".
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

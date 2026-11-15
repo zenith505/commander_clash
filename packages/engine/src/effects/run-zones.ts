@@ -3544,7 +3544,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // "Put a creature card from a graveyard onto the battlefield under your control" (Extract from Darkness): not
         // targeted; any permanent card matching, chosen as it resolves (CR 110.4b).
         const toField = e.dest === "battlefield";
-        const fits = (id: ObjectId) => (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!toField || isPermanentCard(defOf(s, obj(s, id))));
+        // Cemetery Desecrator (round B221): "another card", not the card with the ability (in a graveyard once it died).
+        const fits = (id: ObjectId) => (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!toField || isPermanentCard(defOf(s, obj(s, id)))) && (!e.notSelf || id !== ctx.sourceId);
         // "From among the milled cards" after "each player mills four cards" (Gyruda, Doom of Depths): only those, still the
         // same objects (CR 400.7), the ones a replacement exiled instead too (rulings).
         const same = (m: { id: ObjectId; zc: number }) => (obj(s, m.id).zoneChanges ?? 0) === m.zc;

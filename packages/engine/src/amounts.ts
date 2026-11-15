@@ -1125,6 +1125,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         const left = c.of.ref === "self" && !ctx.lki && ctx.sourceId !== undefined && ctx.sourceZc !== undefined ? s.lastKnown?.[ctx.sourceId] : undefined;
         if (left && left.zc === ctx.sourceZc && c.kind !== "manaValue") return Math.max(0, left[c.kind]);
         if ((c.of.ref === "self" || c.of.ref === "subject") && c.kind !== "manaValue") return Math.max(0, ctx.lki?.[c.kind] ?? 0);
+        // Terminal Velocity's (round B221) "When this permanent leaves the battlefield, it deals damage equal to its mana value":
+        // as it last existed on the battlefield (rulings, CR 608.2h), an {X} in its cost as 0 (CR 202.3e).
+        if ((c.of.ref === "self" || c.of.ref === "subject") && c.kind === "manaValue" && ctx.lki?.manaValue !== undefined) return Math.max(0, ctx.lki.manaValue);
         // The amassed Army that has left: as it last existed (CR 608.2h).
         const a = c.of.ref === "amassed" ? (s.resolving?.amassed ?? s.resolving?.item.amassed) : undefined;
         const lk = a && s.lastKnown?.[a.id];

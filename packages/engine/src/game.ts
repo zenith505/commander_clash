@@ -680,6 +680,8 @@ export function enterTogether(s: GameState, run: () => void) {
     for (const c of s.entersChoices ?? []) if (batch.ids.includes(c.id) && batch.ids.length > 1) c.together = batch.ids.filter((id) => id !== c.id);
     // Mystic Reflection's replacement is used up once that event is over.
     if (s.nextEntersAsCopy?.some((r) => r.used)) s.nextEntersAsCopy = s.nextEntersAsCopy.filter((r) => !r.used);
+    // Storyweave's too (round B221).
+    if (s.nextEntersCounters?.some((r) => r.used)) s.nextEntersCounters = s.nextEntersCounters.filter((r) => !r.used);
   }
   for (const ev of batch.events) fireEvent(s, ev);
 }
@@ -704,6 +706,25 @@ function reflectionKey(s: GameState, o: GameObject): string | undefined {
   }
   if (!together) s.nextEntersAsCopy = s.nextEntersAsCopy!.filter((r) => !r.used);
   return key;
+}
+
+/**
+ * Storyweave (round B221, GameState.nextEntersCounters): the extra counters for a permanent entering now, if it has all of a
+ * waiting replacement's types as it would enter (CR 614.12) and enters under that replacement's player's control. Each
+ * waiting one applies; it's used up by the first such event, the others entering with it too (enterTogether).
+ */
+function storyweaveCounters(s: GameState, o: GameObject): { counter: string; n: number }[] {
+  const waiting = (s.nextEntersCounters ?? []).filter((r) => r.turn === s.turn && (!r.used || together));
+  if (!waiting.length) return [];
+  invalidateCharacteristics(s);
+  const out: { counter: string; n: number }[] = [];
+  for (const r of waiting) {
+    if (controllerOf(s, o) !== r.controller || !r.types.every((t) => objIsType(s, o, t))) continue;
+    r.used = true;
+    out.push({ counter: r.counter, n: r.n });
+  }
+  if (!together) s.nextEntersCounters = s.nextEntersCounters!.filter((r) => !r.used);
+  return out;
 }
 
 /**
@@ -1344,6 +1365,8 @@ export function moveObject(
     // A spell that will "enter with an additional +1/+1 counter" (Boreal Outrider) as it resolves.
     const counters = { ...opts.counters };
     for (const [k, n] of Object.entries(fromZone === "stack" ? (o.extraCounters ?? {}) : {})) counters[k] = (counters[k] ?? 0) + n;
+    // Storyweave (round B221): "each enters with two additional +1/+1 counters on it" (CR 614.1c).
+    for (const k of storyweaveCounters(s, o)) counters[k.counter] = (counters[k.counter] ?? 0) + k.n;
     o.extraCounters = undefined;
     // "It gains haste until end of turn" while it was a spell (Tyvar Kell's emblem): the permanent it becomes has it (CR 400.7a).
     for (const g of fromZone === "stack" ? (o.spellGains ?? []).filter((g) => !g.whileSpell) : []) s.effects.push({ id: `e${s.nextId++}`, timestamp: g.timestamp, controller: g.controller, sourceName: g.source, duration: g.forever ? "game" : (g.until ?? "endOfTurn"), ...(g.until ? { turnOf: g.controller } : {}), affected: [o.id], mods: g.mods });
@@ -1612,7 +1635,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // "Look at an opponent's hand, then choose a card type" (Arachne): the opponent first.
   if (printed.entersChoosePlayer && printed.entersLookHand) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", except: "you", lookHand: true });
   // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
-  for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, ...c });
+  // Callous Oppressor (round B221): "an opponent chooses": its controller chooses the opponent first.
+  for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push(...(c.byOpponent ? [{ id, zc: o.zoneChanges ?? 0, what: "player" as const, except: "you" }] : []), { id, zc: o.zoneChanges ?? 0, ...c });
   // Null Chamber: the opponent first, then the two names (CompiledCard.entersNamesWithOpponent).
   if (printed.entersNamesWithOpponent) {
     const names = printed.entersNamesWithOpponent.names;
@@ -4258,6 +4282,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.resumeStep = undefined;
   s.lostLifeThisTurn = undefined;
   s.nextEntersAsCopy = undefined; // Mystic Reflection: "this turn"
+  s.nextEntersCounters = undefined; // Storyweave: "this turn"
   s.permanentLeftThisTurn = undefined;
   s.freerunningThisTurn = undefined;
   s.voidThisTurn = undefined;
@@ -12388,6 +12413,18 @@ function askEntersChoice(s: GameState): boolean {
     }
     // Greymond: "choose two abilities from among ...": one not chosen already.
     const many = c.many && c.what === "color" ? choiceOptions("color").filter((n) => !o.chosen?.colors?.some((col) => COLOR_NAMES[col] === n)) : c.many && c.what === "basicLandType" ? choiceOptions("basicLandType").filter((n) => !o.chosen?.landTypes?.includes(n)) : c.many ? (c.options ?? []).filter((k) => !o.chosen?.keywords?.includes(k)) : undefined;
+    // Callous Oppressor (round B221): "an opponent chooses a creature type": the opponent its controller chose just before;
+    // with that player gone from the game (CR 800.4a), or none chosen, no type is chosen.
+    const chooser = c.byOpponent ? o.chosen?.player : controllerOf(s, o);
+    if (chooser === undefined || player(s, chooser).lost || (c.byOpponent && chooser === controllerOf(s, o))) {
+      q.shift();
+      if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
+      continue;
+    }
+    if (c.byOpponent) {
+      s.pending = { kind: "chooseOption", player: chooser, source: defOf(s, o).name, what: c.what, options: choiceOptions(c.what, c.except), objectId: o.id, prompt: `choose a creature type for ${player(s, controllerOf(s, o)).name}'s ${defOf(s, o).name}` };
+      return true;
+    }
     s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: many ?? c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(c.what === "cardType" ? { prompt: "choose a card type" } : c.what === "direction" ? { labels: ["Left", "Right"], prompt: "choose left or right: each player may attack only the nearest opponent that way" } : many && c.what === "color" ? { prompt: o.chosen?.colors?.length ? "choose a second color" : "choose two colors: the first" } : many && c.what === "basicLandType" ? { prompt: o.chosen?.landTypes?.length ? `choose the second basic land type: basic ${o.chosen.landTypes[0]}${o.chosen.landTypes[0] === "Plains" ? "" : "s"} become it` : "choose two basic land types: the first (basic lands of this type change)" } : many ? { prompt: `choose ${o.chosen?.keywords?.length ? "another ability" : "an ability"} for ${defOf(s, o).name} to give` } : {}) };
     return true;
   }

@@ -4193,7 +4193,8 @@ function TypePicker({
       <div className="modal type-pick">
         <header>
           <strong>
-            {pending.source}: {pending.what === "creatureType" ? "choose a creature type" : pending.what === "planeswalkerType" ? "choose a planeswalker type" : pending.prompt}
+            {/* Callous Oppressor (round B221): an opponent's choice for its controller's permanent says whose. */}
+            {pending.source}: {pending.what === "creatureType" ? (pending.prompt?.startsWith("choose a creature type for ") ? pending.prompt : "choose a creature type") : pending.what === "planeswalkerType" ? "choose a planeswalker type" : pending.prompt}
           </strong>
           <input
             autoFocus

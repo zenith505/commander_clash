@@ -5762,6 +5762,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "de14f6a9-1c62-42e9-b174-3e8b1080e0dc",
+  "name": "Callous Oppressor",
+  "manaCost": "{1}{U}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Octopus",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Octopus"
+  ],
+  "oracleText": "You may choose not to untap this creature during your untap step.\nAs this creature enters, an opponent chooses a creature type.\n{T}: Gain control of target creature that isn't of the chosen type for as long as this creature remains tapped.",
+  "power": "1",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "312c7a7b-2084-42b0-9b13-0a6d3e43a73d",
   "name": "Camellia, the Seedmiser",
   "manaCost": "{1}{B}{G}",
@@ -6215,6 +6245,38 @@
   "set": "mic",
   "releasedAt": "2021-09-24",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "85e9a43e-5676-4d12-ac27-e8cf57307d5e",
+  "name": "Cemetery Desecrator",
+  "manaCost": "{4}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Creature — Zombie",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie"
+  ],
+  "oracleText": "Menace\nWhen this creature enters or dies, exile another card from a graveyard. When you do, choose one —\n• Remove X counters from target permanent, where X is the mana value of the exiled card.\n• Target creature an opponent controls gets -X/-X until end of turn, where X is the mana value of the exiled card.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -27269,6 +27331,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a9b345ea-3e34-48cf-8ab8-887c2b67df9c",
+  "name": "Nyxborn Courser",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment Creature — Centaur Scout",
+  "supertypes": [],
+  "types": [
+   "Enchantment",
+   "Creature"
+  ],
+  "subtypes": [
+   "Centaur",
+   "Scout"
+  ],
+  "oracleText": "",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "thb",
+  "releasedAt": "2020-01-24",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cf0dcb27-f02e-4065-81dc-75fbbb09ea3f",
   "name": "Oath of Druids",
   "manaCost": "{1}{G}",
@@ -37044,6 +37138,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "94389047-4976-4be2-aaca-25dcdc538abe",
+  "name": "Storyweave",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose one —\n• Put two +1/+1 counters on target creature you control.\n• Put two lore counters on target Saga you control. The next time one or more enchantment creatures you control enter this turn, each enters with two additional +1/+1 counters on it.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ffde2558-2168-4b40-a31a-86d160bdb289",
   "name": "Strax, Sontaran Nurse",
   "manaCost": "{3}{R}{G}",
@@ -38575,6 +38695,32 @@
   "commanderLegal": "legal",
   "set": "snc",
   "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cdda2f04-d59e-4ef8-a26d-964d80750940",
+  "name": "Terminal Velocity",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "You may put an artifact or creature card from your hand onto the battlefield. That permanent gains haste, \"When this permanent leaves the battlefield, it deals damage equal to its mana value to each creature,\" and \"At the beginning of your end step, sacrifice this permanent.\"",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "eoe",
+  "releasedAt": "2025-08-01",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

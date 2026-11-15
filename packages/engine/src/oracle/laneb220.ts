@@ -2,6 +2,7 @@
 // whole spells (chained from round B219's).
 import type { AbilityBody, CompiledCard, Effect } from "../abilities";
 import { parseBody } from "./body";
+import { roundB221Spell } from "./laneb221";
 import { parseTrigger } from "./triggers";
 
 /** A trigger line read the usual way, or null. */
@@ -80,5 +81,5 @@ export function roundB220Spell(text: string): AbilityBody | null | undefined {
     if (!two || two.targets.length !== 2 || two.targets.some((t) => t.kind !== "player") || two.targets[1]!.distinctFrom?.[0] !== 0) return null;
     return { targets: two.targets, effects: [{ type: "exchangeGroups", a: { ref: "target", index: 0 }, b: { ref: "target", index: 1 } }], text };
   }
-  return undefined;
+  return roundB221Spell(text);
 }

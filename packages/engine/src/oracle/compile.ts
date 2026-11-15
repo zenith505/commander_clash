@@ -62,6 +62,7 @@ import { roundB216Line } from "./laneb216";
 import { roundB217Line } from "./laneb217";
 import { roundB218Line } from "./laneb218";
 import { roundB219Line } from "./laneb219";
+import { roundB220Line } from "./laneb220";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2178,6 +2179,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB218Line(line, raw, out, isSpell)) continue;
     // Dreamshaper Shaman (round B219).
     if (roundB219Line(line, raw, out, isSpell)) continue;
+    // Spirit-Sister's Call (round B220).
+    if (roundB220Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

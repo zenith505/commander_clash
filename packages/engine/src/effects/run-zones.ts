@@ -276,7 +276,11 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const options4 = e.lesserPowerThanTarget === undefined ? options3 : than ? options3.filter((id) => power(s, obj(s, id)) < power(s, than)) : [];
     // Light of Judgment: only what's attached to that target as it resolves.
     const host = e.attachedToTargetAt !== undefined ? objects(s, { ref: "target", index: e.attachedToTargetAt }, ctx).find((o) => o.zone === "battlefield") : undefined;
-    const options = e.attachedToTargetAt === undefined ? options4 : host ? options4.filter((id) => obj(s, id).attachedTo === host.id) : [];
+    const options5 = e.attachedToTargetAt === undefined ? options4 : host ? options4.filter((id) => obj(s, id).attachedTo === host.id) : [];
+    // Spirit-Sister's Call (round B220): sharing a card type with the target card as it is now (CR 205.2a), wherever it is.
+    const kin = e.sharesCardTypeWithTarget !== undefined ? objects(s, { ref: "target", index: e.sharesCardTypeWithTarget }, ctx)[0] : undefined;
+    const kinTypes = kin ? characteristics(s, kin).types : [];
+    const options = e.sharesCardTypeWithTarget === undefined ? options5 : options5.filter((id) => characteristics(s, obj(s, id)).types.some((ty) => kinTypes.includes(ty)));
     // "Sacrifice any number of other creatures": as many as they like, asked even with only one.
     if (e.anyNumber) {
       if (!options.length) {

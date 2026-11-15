@@ -1,6 +1,6 @@
 # Roadmap
 
-31,439 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,443 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -9526,6 +9526,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   attackRequirementImprovement, which bots follow until no change is better). Browser tests for Trove of Temptation's
   refused "No attacks", Dreamshaper Shaman's payment and sacrifice, and Garruk's −4. +4, 31,439 of 31,936 with rounds 373-374. The compiled
   text of every other card is unchanged.
+- Round B220 (least played first, from the Lane B skip lists): Fervent Mastery (for its {2}{R}{R} cost, CR 118.9, the
+  opponent you choose as it resolves discards any number of cards, none too, and draws as many, rulings; then up to three
+  cards searched for, the shuffle and three discarded at random). Jailbreak (a permanent card from an opponent's graveyard
+  returned under their control; only once it has entered is the second target chosen, up to one permanent card in your
+  graveyard with a mana value no greater than that permanent's on the battlefield, rulings, CR 603.7a; Effect reflexive
+  xPutMv). Spirit-Sister's Call (at your end step, a sacrifice of a permanent sharing a card type with the target card as
+  it is then, CR 205.2a, the Call itself too, returns that card, which gains the exile-if-it-would-leave replacement for
+  good and keeps it once the Call has gone, rulings; pick sharesCardTypeWithTarget; bots sacrifice only something cheaper
+  than the card coming back). Cultural Exchange (two target players, CR 115.1; as it resolves you choose any number of the
+  first player's creatures, at most as many as the second has, then exactly as many of the second's, and they change hands
+  at once for good, CR 701.12a-b; Effect exchangeGroups; a bot that is one of the players trades its least creatures for
+  the other's best while each trade gains). Bots don't cast Jailbreak or Cultural Exchange. Browser tests for Cultural
+  Exchange's two picks, Spirit-Sister's Call's question and sacrifice, Jailbreak's second target and Fervent Mastery's
+  {2}{R}{R} cast and opponent. +4, 31,443 of 31,936. The compiled text of every other card is unchanged.
+- Out after round B220 (looked at, not done): Glimpse of Tomorrow (round 376 on Lane A, not merged yet, builds Warp World's
+  shuffle-and-reveal; Glimpse is that for one player, better done once it lands), Next of Kin (an Aura returned at the
+  next end step attached to the creature put onto the battlefield, from your hand or the command zone, with lesser mana
+  value than the enchanted creature as it last existed), Lodestone Bauble and Sanctuary Blade (still out for the reasons in
+  the earlier lists). Known gap: Jailbreak's X is the returned permanent's mana value as its trigger is put on the stack,
+  not checked again as it resolves (only a copy effect in between could change it).
 - Out after round B219 (looked at, not done): Turf War ("for each player, put a contested counter on target land that
   player controls": with a player who controls no land, Vaevictis Asmadi's rulings remove such an ability from the stack
   while Sylvan Primordial's only say a target must be chosen where there is one; nothing settles which applies), Blood

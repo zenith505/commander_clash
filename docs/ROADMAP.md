@@ -1,6 +1,6 @@
 # Roadmap
 
-31,423 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,427 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,891 of
 9,979 (99%).
 
@@ -9445,6 +9445,21 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   turn, rulings; CostChoices crewLoyalty, a button in the crew bar; bots still only crew with creatures). Browser tests for
   Forbidden Crypt's question, Heart of Kiran's button and Long Rest's targets. +5, 31,423 of 31,936. The compiled text of
   every other card is unchanged.
+- Round B218 (least played first, from the Lane B skip lists): Bishop of Binding (attacking, a Vampire gets +X/+X, X the
+  power of the card its enters ability exiled until it leaves, CR 607.2a, counted as the trigger resolves and kept, CR
+  608.2h; any card's power, a Vehicle's printed power too, none there or no power 0, rulings; Count linkedExiledPT anyCard).
+  Fugitive Codebreaker (its disguise cost {1} less for each instant and sorcery card in your graveyard, counted as it's
+  turned face up, generic mana only, CR 118.7d; faceDownCast reduceBy). Conundrum Sphinx (each player names a card, the
+  active player first, then the others in turn order, before anyone reveals; then each player's own top card goes to their
+  hand if it has the name they chose, otherwise to the bottom, rulings; Effect eachGuessTop, bots name their own most common
+  card). Mirror of Fate (up to seven face-up exiled cards you own, chosen as it resolves, however they got there; the
+  library is exiled face up, then the chosen cards go on top in the order you choose, rulings; Effect exiledToLibraryTop;
+  bots never activate it). Browser tests for Conundrum Sphinx's name, Mirror of Fate's pick and order, and Fugitive
+  Codebreaker's reduced face-up cost. +4, 31,427 of 31,936. The compiled text of every other card is unchanged.
+- Out after round B218 (looked at, not done): Enduring Renewal (its "Otherwise, draw a card" is a draw other replacements
+  may still replace but not Enduring Renewal itself, CR 614.5, which the draw replacements don't track yet; and "Play with
+  your hand revealed"), The Spot, Living Portal (its dies trigger returns the cards its enters trigger exiled, linked to the
+  permanent it was, CR 607.2a, 400.7) stay out.
 - Out after round B217 (looked at, not done): Lich and Nefarious Lich (life gained becomes cards drawn, and those draws
   can happen in the middle of lifelink damage, where a draw replacement can't pause yet, see Swans of Bryn Argoll; Nefarious
   Lich's and Dralnu, Lich Lord's choices of what to exile or sacrifice for each damage are in the middle of damage too),

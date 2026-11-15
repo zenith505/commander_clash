@@ -2920,6 +2920,10 @@ export interface Resolving {
     cleansing?: { queue: PlayerId[]; saved: ObjectId[] };
     /** Forbidden Ritual (round B216): the pass's step, the scratch keys from before it, and whether "repeat?" was asked. */
     repeatMaySteps?: { step?: number; keep: string[]; asked?: true };
+    /** Conundrum Sphinx (Effect eachGuessTop, round B218): the players asked so far, in turn order, the one being asked, and each one's name. */
+    guessTop?: { asked: PlayerId[]; waiting?: PlayerId; names: Partial<Record<PlayerId, string>> };
+    /** Mirror of Fate (Effect exiledToLibraryTop, round B218): the cards chosen, once the library is exiled and they're on top. */
+    mirrorTop?: ObjectId[];
     /** Preferred Selection (round B216): the cards looked at, whether it was done, and the card chosen to move. */
     lookTopMay?: { looked: ObjectId[]; did?: boolean; pick?: string };
     /** Ice Cave (Effect othersPaySpellCostToCounter, round B214): the players still to be asked, in turn order. */

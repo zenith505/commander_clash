@@ -15411,7 +15411,14 @@ export function faceUpWays(s: GameState, o: GameObject): { kind: FaceDownKind; c
   const fd = compileCard(faceUpDefOf(s, o)).faceDownCast;
   // Exiled Doomsayer: "All morph costs cost {2} more" (a megamorph cost is a morph cost, CR 702.37b).
   const tax = fd && (fd.kind === "morph" || fd.kind === "megamorph") ? s.battlefield.reduce((n, id) => n + (abilitiesOf(s, s.objects[id]!).morphTax ?? 0), 0) : 0;
-  if (fd) ways.push(tax ? { ...fd, cost: moreGeneric(fd.cost, tax) } : fd);
+  // Fugitive Codebreaker: "This cost is reduced by {1} for each ...", counted as it's turned face up, only the generic part
+  // (CR 118.7d); after any increase (CR 601.2f).
+  const less = fd?.reduceBy !== undefined ? Math.max(0, evalAmount(s, fd.reduceBy, { controller: controllerOf(s, o), sourceId: o.id })) : 0;
+  if (fd) {
+    const way = { ...fd };
+    delete way.reduceBy;
+    ways.push(tax || less ? { ...way, cost: lessGeneric(moreGeneric(fd.cost, tax), less) } : way);
+  }
   if (o.faceDown === "manifest" || o.faceDown === "cloak") {
     const card = realDefOf(s, o);
     if (isType(card, "Creature") && card.manaCost) ways.push({ kind: o.faceDown, cost: card.manaCost.replace(/\{X\}/g, "") || "{0}" });
@@ -15447,6 +15454,14 @@ export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId, way
 function moreGeneric(cost: string, n: number): string {
   const generic = /\{(\d+)\}/.exec(cost);
   return generic ? cost.replace(generic[0], `{${Number(generic[1]) + n}}`) : `{${n}}${cost}`;
+}
+
+/** A mana cost with up to `n` less generic mana (CR 118.7d): "{5}{R}" and 2 is "{3}{R}", and 7 is "{R}". */
+function lessGeneric(cost: string, n: number): string {
+  const generic = /\{(\d+)\}/.exec(cost);
+  if (!generic || n <= 0) return cost;
+  const left = Math.max(0, Number(generic[1]) - n);
+  return cost.replace(generic[0], left ? `{${left}}` : "") || "{0}";
 }
 
 /** The cost of turning a face-down permanent face up the `way`-th way, if it has one. */

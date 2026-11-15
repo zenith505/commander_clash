@@ -310,7 +310,7 @@ export type Count =
   | { kind: "linkedExiled"; ever?: true; /** "Creature cards exiled with ~" (Negative Zone Portal): only those matching this, as cards in exile. */ filter?: TargetSpec; /** Keen-Eyed Curator: "card types among cards exiled with ~": how many card types they have between them (CR 205.2a). */ cardTypes?: true; /** Sunbird Effigy: "the number of colors among the exiled cards used to craft it" (CR 105.2). */ colors?: true; /** "Used to craft it": linked by its craft cost (CR 702.167c), not by an exile ability of its own. */ crafted?: true; /** Azor's Gateway: "cards with five or more different mana values are exiled with ~": how many different mana values they have between them (CR 202.3), each card face up in exile once. */ manaValues?: true }
   /** "The exiled creature card's power" (Phyrexian Ingester): the power (or toughness) of each creature card its linked
    * exile took that's still there, as it is in exile (rulings: no bonus for a card that isn't a creature card). */
-  | { kind: "linkedExiledPT"; stat: "power" | "toughness"; /** Sutured Ghoul: "the total power of the exiled cards", a negative one subtracting (CR 107.1b). */ signed?: true; /** Linked by its craft cost (CR 702.167c). */ crafted?: true }
+  | { kind: "linkedExiledPT"; stat: "power" | "toughness"; /** Sutured Ghoul: "the total power of the exiled cards", a negative one subtracting (CR 107.1b). */ signed?: true; /** Linked by its craft cost (CR 702.167c). */ crafted?: true; /** Bishop of Binding (round B218): "the power of the exiled card": any card's, a Vehicle's printed power too (rulings), not only a creature card's. */ anyCard?: true }
   /** "The mana value of the exiled card used to craft it" (Jadeheart Attendant): the total mana value of the cards the craft
    * cost exiled that are still there (CR 702.167c; rulings: all of them if there were several, a token none). */
   | { kind: "linkedExiledMv" }
@@ -4429,6 +4429,19 @@ export type Effect =
    * a sacrifice of one, can't be done otherwise). The targets stay those chosen as it was cast (rulings).
    */
   | { type: "repeatMaySteps"; effects: Effect[]; text: string; while: TargetSpec }
+  /**
+   * Conundrum Sphinx (round B218): "each player chooses a card name. Then each player reveals the top card of their library.
+   * If the card a player revealed has the name they chose, that player puts it into their hand. If it doesn't, that player
+   * puts it on the bottom of their library.": every name chosen first, in turn order from the active player, then all the
+   * reveals (rulings).
+   */
+  | { type: "eachGuessTop" }
+  /**
+   * Mirror of Fate (round B218): "Choose up to seven face-up exiled cards you own. Exile all the cards from your library,
+   * then put the chosen cards on top of your library.": up to `n`, chosen as it resolves; then the library exiled face up,
+   * and the chosen cards still in exile put on top in the order their owner chooses (rulings).
+   */
+  | { type: "exiledToLibraryTop"; n: number }
   /**
    * Preferred Selection (round B216): "look at the top two cards of your library. You may sacrifice ~ and pay {2}{G}{G}. If
    * you do, put one of those cards into your hand. If you don't, put one of those cards on the bottom of your library.":
@@ -9656,7 +9669,8 @@ export interface CompiledCard {
   assist?: true;
   /** Morph, megamorph, disguise (CR 702.37, 702.168): cast face down for {3}, turned face up for `cost`. */
   /** `costs`: "Morph—Pay 5 life." (CR 702.37a, 118.8), a morph cost that isn't mana (`cost` is "" then); `text` says it. */
-  faceDownCast?: { kind: FaceDownKind; cost: string; costs?: AdditionalCost[]; text?: string };
+  /** `reduceBy` (Fugitive Codebreaker, round B218): "This cost is reduced by {1} for each ...": that much less generic mana to turn it face up, counted then (CR 118.7d). */
+  faceDownCast?: { kind: FaceDownKind; cost: string; costs?: AdditionalCost[]; text?: string; reduceBy?: Amount };
   /** Hooded Hydra: "As ~ is turned face up, put five +1/+1 counters on it" (a replacement, CR 614.1e), however it's turned face up (rulings). */
   faceUpCounters?: { counter: string; n: number | Amount };
   /** Keywords spelled out only in the text ("Protection from black", "Toxic 2"); see textKeywords in oracle.ts. */

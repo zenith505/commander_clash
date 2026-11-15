@@ -60,6 +60,7 @@ import { roundB214Line } from "./laneb214";
 import { roundB215Line } from "./laneb215";
 import { roundB216Line } from "./laneb216";
 import { roundB217Line } from "./laneb217";
+import { roundB218Line } from "./laneb218";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2168,6 +2169,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB216Line(line, raw, out, isSpell)) continue;
     // Dark Intimations, Fires of Mount Doom, Forbidden Crypt, Heart of Kiran (round B217).
     if (roundB217Line(line, raw, out, isSpell)) continue;
+    // Bishop of Binding, Fugitive Codebreaker, Conundrum Sphinx, Mirror of Fate (round B218).
+    if (roundB218Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

@@ -7802,6 +7802,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fb1bd39c-c870-4f63-9e4f-32c94ac46555",
+  "name": "Conundrum Sphinx",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Sphinx",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx"
+  ],
+  "oracleText": "Flying\nWhenever this creature attacks, each player chooses a card name. Then each player reveals the top card of their library. If the card a player revealed has the name they chose, that player puts it into their hand. If it doesn't, that player puts it on the bottom of their library.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "m11",
+  "releasedAt": "2010-07-16",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "685c4665-e04c-4012-aa5b-888a042c2a21",
   "name": "Convincing Mirage",
   "manaCost": "{1}{U}",
@@ -14478,6 +14510,41 @@
   "commanderLegal": "legal",
   "set": "j25",
   "releasedAt": "2024-11-15",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "af2b36ee-2945-41d3-a186-8fd28f3cde16",
+  "name": "Fugitive Codebreaker",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Creature — Goblin Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Rogue"
+  ],
+  "oracleText": "Prowess, haste\nDisguise {5}{R}. This cost is reduced by {1} for each instant and sorcery card in your graveyard. (You may cast this card face down for {3} as a 2/2 creature with ward {2}. Turn it face up any time for its disguise cost.)\nWhen this creature is turned face up, discard your hand, then draw three cards.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Prowess",
+   "Haste",
+   "Disguise"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -24621,6 +24688,28 @@
   "commanderLegal": "legal",
   "set": "ltc",
   "releasedAt": "2023-06-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "38ffe614-e8f7-4625-b921-9409e7e7ee5b",
+  "name": "Mirror of Fate",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}, Sacrifice this artifact: Choose up to seven face-up exiled cards you own. Exile all the cards from your library, then put the chosen cards on top of your library.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m10",
+  "releasedAt": "2009-07-17",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

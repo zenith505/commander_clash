@@ -270,7 +270,7 @@ export type Count =
   /** "For each creature it's blocking" (Guardian of the Gateless): the creatures the source is blocking as this resolves. */
   | { kind: "itBlocks" }
   /** "For each card returned to your hand this way" (Paradoxical Outcome): the cards it returned that you own, still in your hand (a token isn't a card; another player's goes to their hand). */
-  | { kind: "returnedToYourHand" }
+  | { kind: "returnedToYourHand"; /** "Return those cards to your hand. You gain life equal to their total mana value." (Song of Inspiration, round B219): the total mana value of those cards (X as 0, CR 107.3), not how many. */ totalMv?: true }
   /** "For each card you put into your hand this way" (Search for Blex): the cards its last look at the top of a library put into a hand. */
   | { kind: "dugToHand" }
   /** "You gain life equal to that card's mana value" after "put one of them into your hand" (Reviving Vapors): the one card its last look at the top of a library put into a hand, X counted as 0 (rulings). */
@@ -8467,6 +8467,12 @@ export interface CompiledCard {
    * on each opponent of its controller as they declare attackers, not on any one creature (rulings).
    */
   opponentsAttackWithOne?: true;
+  /**
+   * Trove of Temptation (round B219): "Each opponent must attack you or a planeswalker you control with at least one creature
+   * each combat if able" (CR 508.1d): a requirement on each opponent of its controller as they declare attackers, met by
+   * one creature in all (rulings), weighed with the others (game.ts attackRequirementImprovement).
+   */
+  opponentsAttackYouWithOne?: true;
   /** Viashino Bey: "If ~ attacks, all creatures you control attack if able" (CR 508.1d): its controller's other creatures, once it's declared as an attacker. */
   allAttackIfSelfAttacks?: true;
   /** Cunning Giant: "If ~ is unblocked, you may have it assign its combat damage to a creature defending player controls" (game.ts askDamageToCreature). */

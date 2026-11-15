@@ -573,8 +573,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const done = s.players[ctx.controller]?.completedDungeons ?? [];
       return c.distinct ? new Set(done).size : done.length;
     }
-    case "returnedToYourHand":
-      return (s.resolving?.returnedToHand ?? []).filter((id) => s.objects[id]?.zone === "hand" && s.objects[id]!.owner === ctx.controller).length;
+    case "returnedToYourHand": {
+      const back = (s.resolving?.returnedToHand ?? []).filter((id) => s.objects[id]?.zone === "hand" && s.objects[id]!.owner === ctx.controller);
+      return c.totalMv ? back.reduce((n, id) => n + defMv(defOf(s, s.objects[id]!)), 0) : back.length;
+    }
     case "milledManaValue": {
       // A milled card is found where it went, a graveyard or exile instead (Rest in Peace), as both are public (CR 701.17c);
       // with more than one card milled, their total (CR 701.17d).
@@ -1563,7 +1565,7 @@ function describeCount(c: Count): string {
     case "dungeonsCompleted":
       return c.distinct ? "#differently named dungeons you've completed" : "#dungeons you've completed";
     case "returnedToYourHand":
-      return "#cards returned to your hand";
+      return c.totalMv ? "the total mana value of the cards returned to your hand" : "#cards returned to your hand";
     case "searchFoundMv":
       return "the mana value of the card found";
     case "milledManaValue":

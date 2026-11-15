@@ -61,6 +61,7 @@ import { roundB215Line } from "./laneb215";
 import { roundB216Line } from "./laneb216";
 import { roundB217Line } from "./laneb217";
 import { roundB218Line } from "./laneb218";
+import { roundB219Line } from "./laneb219";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -1160,6 +1161,8 @@ export function compile(d: CardDef): CompiledCard {
     // ('Planeswalkers you control have "[−4]: ..."'): the ability is still a loyalty ability (CR 606.3).
     // Kaya, Ghost Assassin's 0 (round B206).
     if (d.types.includes("Planeswalker") && roundB206Line(line, raw, out, isSpell)) continue;
+    // Garruk, Curse Breaker's −4 (round B219).
+    if (d.types.includes("Planeswalker") && roundB219Line(line, raw, out, isSpell)) continue;
     const loyal = /^([+−-]?)(\d+|X): (.+)$/.exec(line) ?? /^\[([+−-]?)(\d+|X)\]: (.+)$/.exec(line);
     if (loyal && (d.types.includes("Planeswalker") || line.startsWith("["))) {
       const ab = parseLoyalty(loyal[1]!, loyal[2]!, loyal[3]!, raw);
@@ -2171,6 +2174,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB217Line(line, raw, out, isSpell)) continue;
     // Bishop of Binding, Fugitive Codebreaker, Conundrum Sphinx, Mirror of Fate (round B218).
     if (roundB218Line(line, raw, out, isSpell)) continue;
+    // Dreamshaper Shaman (round B219).
+    if (roundB219Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

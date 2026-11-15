@@ -8,7 +8,8 @@ import { manaValue } from "../mana";
 import { describeAmount } from "../amounts";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, linkedCards, objectMatches, pickOptions, printedMatches, spellManaValue } from "./targeting";
-import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, amountFor, runEffect } from "./resolve";
+import { phaseOut } from "../phasing";
+import { ResolveCtx, apnap, startingWith, objects, players, amountNow, amountCtx, amountFor, runEffect } from "./resolve";
 import { attackWhomOptions, createToken, takeAttackWhom, tokenCopies, tokenCopyBatch } from "./run-tokens";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
@@ -671,9 +672,13 @@ function eachPutFromHand(s: GameState, e: Extract<Effect, { type: "putFromHand" 
  */
 function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: ResolveCtx, src: string): "paused" | void {
   const sc = (s.resolving!.scratch ??= {});
-  const who = apnap(s, players(s, e.who, ctx));
+  // Disciple of Caelus Nin: "starting with you", in turn order from this ability's controller (CR 101.4 is for APNAP).
+  const who = e.startingWithYou ? startingWith(s, ctx.controller, players(s, e.who, ctx)) : apnap(s, players(s, e.who, ctx));
   const kr = (sc.keepRest ??= { queue: [...who], slot: 0, kept: {} });
-  const among = (pid: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, { ...e.among, controller: "you" }, obj(s, id), pid, false));
+  // "Other than ~": the source, while it's still that object (CR 400.7), is neither kept nor among the rest.
+  const me = e.notSource && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+  const self = me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me.id : undefined;
+  const among = (pid: PlayerId) => s.battlefield.filter((id) => id !== self && controllerOf(s, obj(s, id)) === pid && objectMatches(s, { ...e.among, controller: "you" }, obj(s, id), pid, false));
   // "Equal to the number of lands controlled by the player who controls the fewest": counted once, before anyone
   // chooses (Restore Balance rulings).
   if (e.keep.some((k) => k.fewest)) kr.fewest ??= Math.min(...who.map((pid) => among(pid).length));
@@ -719,7 +724,9 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
       }
       // Stick Together: which slot of the party this is.
       const party = k.notKept ? { prompt: `choose your party: click up to one ${k.filter.text} of yours${kr.slot < e.keep.length - 1 ? ` (then ${e.keep.slice(kr.slot + 1).map((x) => `a ${x.filter.text}`).join(", ")})` : ""}. Creatures not in your party are sacrificed.` } : {};
-      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...party, ...(k.upTo ? { min: 0 } : {}), ...(e.destroy ? { destroy: true as const } : {}), ...(e.bounce ? { bounce: true as const } : {}), ...(e.tap ? { tap: true as const } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}), ...(e.payLife !== undefined ? { payLife: lifeEach } : {}), ...(e.sparesTypeOfKept ? { sparesKin: true as const } : {}) };
+      // Disciple of Caelus Nin: the rest phase out.
+      const phase = e.phaseOut ? { prompt: `${max === 1 ? "click up to one" : `click up to ${max}`} ${k.filter.text}${max === 1 ? "" : "s"} of yours to keep. The rest of yours ${self && controllerOf(s, obj(s, self)) === pid ? `(other than ${nameOf(s, self)}) ` : ""}phase out, and while ${src} is on the battlefield, permanents can't phase in.` } : {};
+      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...party, ...phase, ...(k.upTo ? { min: 0 } : {}), ...(e.destroy ? { destroy: true as const } : {}), ...(e.bounce ? { bounce: true as const } : {}), ...(e.tap ? { tap: true as const } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}), ...(e.payLife !== undefined ? { payLife: lifeEach } : {}), ...(e.sparesTypeOfKept ? { sparesKin: true as const } : {}) };
       return "paused";
     }
     kr.queue.shift();
@@ -754,6 +761,12 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
     return;
   }
   if (e.counter && s.resolving) s.resolving.created = keptAll.filter((id) => s.objects[id]?.zone === "battlefield");
+  // Disciple of Caelus Nin: every player's rest phase out at once (CR 702.26b), with what's attached to them, chosen or not
+  // (indirectly, 702.26g).
+  if (e.phaseOut) {
+    phaseOut(s, gone.filter((id) => s.objects[id]?.zone === "battlefield"));
+    return;
+  }
   if (e.destroy) {
     for (const id of gone) if (s.objects[id]?.zone === "battlefield") destroyPermanent(s, obj(s, id), `${src} destroys ${nameOf(s, id)}.`, false, ctx.controller);
     return;

@@ -16,7 +16,7 @@ import { createExtraTokens, createToken } from "./run-tokens";
 import { discardCards, discardToTop } from "./run-library";
 import { describeMods } from "./describe";
 import { evolves, fireEvent } from "./triggers";
-import { phaseIn, phaseOut } from "../phasing";
+import { cantPhaseIn, phaseIn, phaseOut } from "../phasing";
 import { isSuspended } from "./run-zones";
 import { keywordLabel, protectionFromPlayer, THAT_PLAYER_PROTECTION } from "../keywords";
 
@@ -562,8 +562,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // first and then phasing at once.
       const back = (s.phasedOut ?? []).filter((id) => !s.objects[id]!.phased?.indirect && objIsType(s, obj(s, id), "Creature"));
       const out = s.battlefield.filter((id) => objIsType(s, obj(s, id), "Creature") && objHasKeyword(s, obj(s, id), "Phasing"));
+      // At once (CR 702.26a): "Permanents can't phase in" is checked before either (Disciple of Caelus Nin).
+      const blocked = cantPhaseIn(s);
       phaseOut(s, out);
-      phaseIn(s, back);
+      phaseIn(s, back, blocked);
       return;
     }
     case "phaseOut": {

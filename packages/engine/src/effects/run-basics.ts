@@ -414,8 +414,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     case "landManaUntilEndOfTurn":
       // Pale Moon, Deep Water: a replacement effect until the turn ends (CR 514.2), applied in manaabilities.ts tappedForMana.
-      (s.landManaRules ??= []).push({ turn: s.turn, player: ctx.controller, mana: e.mana, ...(e.nonbasic ? { nonbasic: true as const } : {}), ...(e.yours ? { yours: true as const } : {}) });
-      log(s, `Until end of turn, ${e.nonbasic ? "nonbasic lands" : `lands ${player(s, ctx.controller).name} controls`} tapped for mana produce ${e.mana === "C" ? "colorless mana" : `{${e.mana}}`} instead.`);
+      (s.landManaRules ??= []).push({ turn: s.turn, player: ctx.controller, mana: e.mana, ...(e.nonbasic ? { nonbasic: true as const } : {}), ...(e.yours ? { yours: true as const } : {}), ...(e.subtype ? { subtype: e.subtype } : {}) });
+      log(s, `Until end of turn, ${e.subtype ? `${e.subtype}s` : e.nonbasic ? "nonbasic lands" : `lands ${player(s, ctx.controller).name} controls`} tapped for mana produce ${e.mana === "C" ? "colorless mana" : `{${e.mana}}`} instead.`);
       return;
     case "turnRules":
       if (e.everyone) {

@@ -1228,6 +1228,13 @@ export interface TargetSpec {
   named?: string;
   /** "Target card named ~ from your graveyard" (Groffskithur): a card with the source's name (CR 201.2), worked out into `named` as the target is chosen and again as it resolves (bindBound): the name it has now on the battlefield, or had as it last existed there. Unbound, it matches nothing. */
   namedAsSource?: true;
+  /**
+   * Goblin Artisans (round B223): "target artifact spell you control that isn't the target of an ability from another
+   * creature named Goblin Artisans": not a target of an ability on the stack whose source is a creature with this name, as
+   * it is now or as it last existed (CR 113.7a), other than this ability's own source (`except`, bound as the target is
+   * chosen and again as it resolves, bindBound). Unbound, the source isn't known and any such ability counts.
+   */
+  notTargetOfAbilityFrom?: { types: string[]; name: string; except?: ObjectId };
   /** "Enchantment you control that doesn't have the same name as another permanent you control" (Yenna): no other permanent `you` control has its name (a face-down one has none, CR 708.2). */
   uniqueNameAmongYours?: true | /** The Apprentice's Folly: "that doesn't have the same name as a token you control". */ "tokens";
   /** "Dragon cards not named ~" (Tiamat): any other name; "~" is the source's (only for searches). */
@@ -1588,6 +1595,8 @@ export type ObjRef =
   | { ref: "sacrificedCards" }
   /** Rescue from the Underworld: these cards, remembered as a delayed trigger was made, while each is still that object in a graveyard, exile or the command zone (CR 400.7). */
   | { ref: "remembered"; cards: { id: ObjectId; zc: number }[] }
+  /** Maddening Imp (round B223): these permanents, remembered as a delayed trigger was made, each while it's still that object on the battlefield (CR 400.7), and matching `filter` if there is one. */
+  | { ref: "rememberedPermanents"; cards: { id: ObjectId; zc: number }[]; filter?: TargetSpec }
   /** Heart-Shaped Herb: "return that card" after "you may sacrifice a creature. If you do": the cards this resolution's sacrifices put into graveyards, while they're still there as those cards (CR 400.7); a token is gone (CR 111.7). */
   | { ref: "sacrificedThisWayCards" }
   /** "If an ability of an artifact, creature, or planeswalker is countered this way, that permanent" (Tishana's Tidebinder): the source of the ability this resolution countered, if it's still that object and fits `filter` now (rulings). */
@@ -3177,6 +3186,11 @@ export type Effect =
       payLife?: Amount;
       /** Winnowing: "all other creatures they control that don't share a creature type with the chosen creature": the rest sharing one with a kept one stay too. */
       sparesTypeOfKept?: true;
+      /** Disciple of Caelus Nin (round B223): "starting with you, each player chooses ...": in turn order from this ability's controller, not the active player. */
+      startingWithYou?: true;
+      /** Disciple of Caelus Nin: "All permanents other than ~ that weren't chosen this way phase out": the rest phase out at once (CR 702.26b), not sacrificed; the source itself, still that object, never does (`notSource`) and isn't offered to keep. */
+      phaseOut?: true;
+      notSource?: true;
     }
   /** Mount Doom: "Choose up to two creatures, then destroy the rest": the controller picks up to `n` among every player's (not targeted). */
   | { type: "keepDestroyRest"; filter: TargetSpec; n: number; /** Last One Standing: "Choose a creature at random, then destroy the rest": the one kept at random, not targeted (rulings). */ random?: true; /** Deadly Vanity: "Choose a creature or planeswalker": exactly `n` while there are that many (rulings), not up to. */ exactly?: true }
@@ -4461,6 +4475,13 @@ export type Effect =
    */
   | { type: "phaseOutExcess"; who: PlayerRef; types: string[] }
   /**
+   * Maddening Imp (round B223): "At the beginning of the next end step, destroy each of those creatures that didn't attack
+   * this turn": one delayed triggered ability (CR 603.7) about the permanents this resolution's last continuous effect
+   * changed (ResolvingState.affected, locked in as it began, CR 611.2c), each still that object on the battlefield
+   * (CR 400.7). Its `effects` are about ObjRef "rememberedPermanents", filled in with them as it's made.
+   */
+  | { type: "delayedForAffected"; when: "nextEndStep"; effects: Effect[]; text: string }
+  /**
    * Mirror of Fate (round B218): "Choose up to seven face-up exiled cards you own. Exile all the cards from your library,
    * then put the chosen cards on top of your library.": up to `n`, chosen as it resolves; then the library exiled face up,
    * and the chosen cards still in exile put on top in the order their owner chooses (rulings).
@@ -5266,7 +5287,7 @@ export type Effect =
    * type"; Deep Water: "Until end of turn, if you tap a land you control for mana, it produces {U} instead ..." (`yours`):
    * a replacement effect for the rest of the turn (CR 106.12b, 614.1a; GameState.landManaRules).
    */
-  | { type: "landManaUntilEndOfTurn"; mana: ManaType; nonbasic?: true; yours?: true }
+  | { type: "landManaUntilEndOfTurn"; mana: ManaType; nonbasic?: true; yours?: true; /** Chaos Moon (round B223): "if a player taps a Mountain for mana, that Mountain produces colorless mana instead": only lands with this subtype as they're tapped. */ subtype?: string }
   | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true; /** "That player can't activate abilities that aren't mana abilities" (Abeyance): for these players. */ who?: PlayerRef; /** For each opponent of its controller (Revel in Silence). */ opponents?: true; /** "Can't be countered by blue or black spells" (Autumn's Veil): only by spells of these colors. */ byColors?: Color[]; /** About the ability's source, the object it is now (Kaito, Dancing Shadow's "loyaltyTwice"). */ self?: true }
   /** "Until your next turn, you may cast sorcery spells as though they had flash." (Teferi, Time Raveler; CR 702.8a) */
   | { type: "flashUntilNextTurn"; filter: TargetSpec; /** "You may cast creature spells this turn as though they had flash" (Winding Canyons): until this turn ends instead. */ thisTurn?: true }
@@ -8878,6 +8899,8 @@ export interface CompiledCard {
   mostPermanentsCant?: TargetSpec;
   /** "Players can't play lands." (Territorial Dispute): no land plays for anyone, whatever lets them (CR 305.2, 101.2). */
   playersCantPlayLands?: true;
+  /** "Permanents can't phase in." (Disciple of Caelus Nin, round B223, CR 702.26c): no permanent phases in, anyone's, for any reason, while this is on the battlefield (rulings). */
+  permanentsCantPhaseIn?: true;
   /** "You can't play lands." (Aggressive Mining): no land plays for its controller (CR 305.2, 101.2). */
   youCantPlayLands?: true;
   /**

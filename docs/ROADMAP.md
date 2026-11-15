@@ -1,6 +1,6 @@
 # Roadmap
 
-31,452 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,456 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -2357,10 +2357,10 @@ line blocks.
    Defensive Formation, Sorrow's Path, Blaze of Glory (done in round B145) (block requirements and damage assignment); Piracy (tapping lands you
    don't control for mana); Aetherplasm (put onto the battlefield blocking); Lightform (done in round B155) (manifest, then becoming an Aura);
    Cathedral of Serra and the other "bands with other" lands (done in round B161); Mangara's Tome and Aladdin's Lamp (a draw replaced); All
-   Hallow's Eve (scream counters in exile); Land Equilibrium; Disciple of Caelus Nin (permanents can't phase in);
+   Hallow's Eve (scream counters in exile); Land Equilibrium; Disciple of Caelus Nin (done in round B223) (permanents can't phase in);
    Advancing the Spirit (power-up costs); Spy Kit (all names); Lightning Storm (an ability activated while it's on the
    stack); Damping Engine (done in round 313); Dimensional Breach; Phyrexian Splicer (a keyword chosen as a cost, then the target with it);
-   Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
+   Chaos Moon (done in round B223); A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (done in round B189) (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
    Round 334 took the next card no list named (Ore-Rich Stalactite) and the craft cards whose materials or back faces
@@ -4300,7 +4300,7 @@ line blocks.
    Out after round 294 (looked at, not done): Adventurers' Guildhouse, Mountain Stronghold, Unholy Citadel, Seafarer's
    Quay, Shelkin Brownie (done in round B161) ("bands with other"); Oracle en-Vec (chosen creatures attack next turn, the others can't); False
    Orders, Balduvian Warlord, General Jarkeld (a blocker removed, then blocking another attacker); Takklemaggot; Jötun Grunt (done in round B209)
-   (cumulative upkeep paid with cards from a single graveyard each time); Soul Echo; Goblin Artisans; Ice Cauldron (noted
+   (cumulative upkeep paid with cards from a single graveyard each time); Soul Echo; Goblin Artisans (done in round B223); Ice Cauldron (noted
    mana); Illusionary Mask; Stand or Fall and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
    paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
    spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (other players' graveyards as yours);
@@ -5266,7 +5266,7 @@ line blocks.
    - Tap-or-untap variants: Telekinetic Bonds, Tolarian Kraken, Chain Stasis. Berserker's Frenzy ("before combat or
      during combat before blockers are declared"). Arcum's Sleigh and Kjeldoran Guard ("only if defending player
      controls ..."), Grizzled Wolverine's "only if a creature blocks it", Ashen Ghoul's "creature cards above it" (done in round B131).
-     Coastal Wizard, Lady Sun, Diaochan (done in round B141), Maddening Imp, Norritt, Arcum's Whistle, Blood Frenzy and Berserk are out on
+     Coastal Wizard, Lady Sun, Diaochan (done in round B141), Maddening Imp (done in round B223), Norritt, Arcum's Whistle, Blood Frenzy and Berserk are out on
      their other lines.
    Left from the round after cascade ("when you lose control of", face-down exile, attach target Equipment,
    harmonize, paradigm, demonstrate):
@@ -9575,6 +9575,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   rulings; TargetSpec colorCount `three`). Browser tests for the Splicer's keyword and targets, the Expressionist's target
   and token, Time Reaper's target among an opponent's cards in exile, and Equipoise's target player and two picks. +5,
   31,452 of 31,936. The compiled text of every other card is unchanged.
+- Round B223 (least played first, from the Lane B skip lists): Chaos Moon (at each upkeep, every player's permanents
+  counted as it resolves, phased-out ones not, CR 702.26b; odd: the red creatures then, CR 611.2c, get +1/+1 and any
+  Mountain tapped for mana adds an additional {R}, a triggered mana ability for the turn, CR 605.1b; even: -1/-1 and a
+  Mountain makes colorless mana instead of any other type, a replacement for the turn, CR 106.12b, 614.1a, a Mountain
+  Forest's {G} too; landManaUntilEndOfTurn `subtype`). Maddening Imp (during an opponent's turn, before combat: the
+  active player's non-Wall creatures then attack if able, CR 508.1d; one delayed trigger, Effect delayedForAffected with
+  ObjRef rememberedPermanents, destroys at the next end step those of them that didn't attack, a tapped one too, rulings,
+  but not a creature that came under that player's control later). Goblin Artisans (the target, an artifact spell you
+  control, is chosen before the flip, CR 601.2c; not one another creature named Goblin Artisans has an ability targeting,
+  its source as it is or as it last existed, CR 113.7a, TargetSpec notTargetOfAbilityFrom; checked again as it resolves,
+  so with such an ability put on the stack since, it does nothing at all, CR 608.2b; bots never activate it). Disciple of
+  Caelus Nin (starting with you, keepRest `startingWithYou`, each player keeps up to five permanents, the Disciple not
+  offered; the rest but the Disciple phase out at once, CR 702.26b, with what's attached to them, a kept Aura too,
+  702.26g; "Permanents can't phase in" stops every phase-in, anyone's, while it's on the battlefield, checked before the
+  untap step's phasing, which is simultaneous, CR 702.26a; something phased out "until" an event that happens meanwhile
+  stays out for good, and a phased-out Disciple stops nothing, rulings; bots cast it only while they control five
+  permanents or fewer). Browser tests for the Disciple's pick and Goblin Artisans' target on the stack and flip. +4,
+  31,456 of 31,936. The compiled text of every other card is unchanged.
+- Out after round B223 (looked at, not done): Eye for an Eye (a replacement, not a prevention, that keeps the damage and
+  adds Eye for an Eye's own; the affected player orders it with prevention shields and redirections, CR 616.1, and the
+  result differs between orders), Oracle en-Vec (chosen creatures that must attack during that player's next turn while
+  the others can't), and Noxious Vapors, Grime Gorger, Allure of the Unknown and Glimpse of Tomorrow (as after round
+  B222) stay out.
 - Out after round B222 (looked at, not done): Noxious Vapors (whether one multicolored card can be the card kept for each
   of its colors isn't settled by any ruling), Grime Gorger (the same for a card of several card types), Allure of the
   Unknown and Glimpse of Tomorrow (as after round B221) stay out. Bots cast Meeting of the Five even with no three-color
@@ -9955,7 +9978,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B102 (looked at, not done): Lichenthrope and Phytohydra (damage replaced by counters: its controller
   orders it with prevention shields and with damage-increasing replacements, CR 616.1, and the best order differs between
   the two, so it needs that choice), Mausoleum Turnkey (done in round B110), Erithizon (done in round B110) and Ley Line (done in round B110) (a target chosen by another player),
-  Thirsting Axe (combat damage the equipped creature dealt to creatures this turn), Maddening Imp ("each of those creatures
+  Thirsting Axe (combat damage the equipped creature dealt to creatures this turn), Maddening Imp (done in round B223) ("each of those creatures
   that didn't attack": the group remembered for a delayed trigger), Time to Reflect (done in round B110) ("blocked or was blocked by a Zombie":
   its creature types as it blocked).
 - Out after round B101 (looked at, not done): Kang Dynasty (chapter I and II delayed triggers on goaded creatures), The Bears

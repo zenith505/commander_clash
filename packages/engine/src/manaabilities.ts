@@ -279,7 +279,7 @@ function manaReplacements(s: GameState, pid: PlayerId, tapped: GameObject | unde
     for (const r of ab.landManaAs ?? []) out.push({ kind: "as", mana: r.mana, ...(r.one ? { one: true as const } : {}) });
   }
   if (land) {
-    for (const r of s.landManaRules ?? []) if (r.turn === s.turn && (!r.nonbasic || !basic) && (!r.yours || controllerOf(s, tapped!) === r.player)) out.push({ kind: "as", mana: r.mana });
+    for (const r of s.landManaRules ?? []) if (r.turn === s.turn && (!r.nonbasic || !basic) && (!r.yours || controllerOf(s, tapped!) === r.player) && (!r.subtype || characteristics(s, tapped!).subtypes.includes(r.subtype))) out.push({ kind: "as", mana: r.mana });
     for (const r of tapped!.manaReplaced ?? []) out.push({ kind: "as", mana: r.to, only: r.from });
   }
   return out;

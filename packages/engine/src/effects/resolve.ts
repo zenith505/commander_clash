@@ -69,6 +69,7 @@ import { runLaneB218Effect } from "./run-laneb218";
 import { runLaneB220Effect } from "./run-laneb220";
 import { runLaneB221Effect } from "./run-laneb221";
 import { runLaneB222Effect } from "./run-laneb222";
+import { runLaneB223Effect } from "./run-laneb223";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -366,7 +367,12 @@ function sourceChosen(s: GameState, ctx: { sourceId?: ObjectId; sourceZc?: numbe
 
 /** Players in APNAP order: the active player first, then in turn order (CR 101.4). */
 export function apnap(s: GameState, pids: PlayerId[]): PlayerId[] {
-  const i = s.turnOrder.indexOf(s.activePlayer);
+  return startingWith(s, s.activePlayer, pids);
+}
+
+/** These players in turn order starting with `first` ("starting with you", Disciple of Caelus Nin). */
+export function startingWith(s: GameState, first: PlayerId, pids: PlayerId[]): PlayerId[] {
+  const i = s.turnOrder.indexOf(first);
   const order = [...s.turnOrder.slice(i), ...s.turnOrder.slice(0, i)];
   return order.filter((p) => pids.includes(p));
 }
@@ -627,6 +633,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   if (ref.ref === "sacrificedCards") return (ctx.sacrificed ?? []).flatMap((l) => (l.id !== undefined && l.cardZc !== undefined && s.objects[l.id]?.zone === "graveyard" && (s.objects[l.id]!.zoneChanges ?? 0) === l.cardZc ? [s.objects[l.id]!] : []));
   // Rescue from the Underworld: the cards remembered, each still that object outside the battlefield in a public zone.
   if (ref.ref === "remembered") return ref.cards.flatMap((c) => ((o) => (o && (o.zone === "graveyard" || o.zone === "exile" || o.zone === "command") && (o.zoneChanges ?? 0) === c.zc ? [o] : []))(s.objects[c.id]));
+  // Maddening Imp: the permanents remembered, each still that object on the battlefield (CR 400.7), matching the filter now.
+  if (ref.ref === "rememberedPermanents") return ref.cards.flatMap((c) => ((o) => (o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === c.zc && (!ref.filter || objectMatches(s, ref.filter, o, ctx.controller, false)) ? [o] : []))(s.objects[c.id]));
   if (ref.ref === "costExiled") return (s.resolving?.item.costExiled ?? []).flatMap((c) => (s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : []));
   if (ref.ref === "yourGraveyard") return player(s, ctx.controller).graveyard.map((id) => obj(s, id)).filter((o) => printedMatches(ref.filter, defOf(s, o)));
   // Fumble: the Auras and Equipment noted before it left, still those objects on the battlefield (CR 400.7).
@@ -1968,6 +1976,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB220Effect(s, e, ctx, src);
     case "nextEntersCounters":
       return runLaneB221Effect(s, e, ctx, src);
+    case "delayedForAffected":
+      return runLaneB223Effect(s, e, ctx, src);
     case "phaseOutExcess":
       return runLaneB222Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":

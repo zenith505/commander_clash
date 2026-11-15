@@ -2197,6 +2197,14 @@ function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell
   // Sigarda's Vanguard: "choose any number of creatures with different powers. Those creatures gain double strike until end
   // of turn.": anyone's creatures, chosen as it resolves, not targeted, no two with the same power (rulings); one alone is
   // a set too.
+  // Berserker's Frenzy (round 378): "Choose any number of creatures. They block this turn if able.": anyone's, chosen as it
+  // resolves, not targeted, none too; each chosen one blocks in each combat this turn if able (CR 509.1c).
+  if (/^[Cc]hoose any number of creatures$/.test(s) && /^They block this turn if able\.?$/.test(sentences[si + 1] ?? "")) {
+    return { effects: [
+      { type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, n: 0, action: "choose", anyNumber: true, anyController: true, prompt: "click any number of creatures (anyone's), then choose them: they block this turn if able" },
+      { type: "continuous", what: { ref: "created" }, mods: [{ kind: "mustBlock" }], duration: "endOfTurn" },
+    ], skip: 1 };
+  }
   if (/^[Cc]hoose any number of creatures with different powers$/.test(s)) {
     // Sigardian Zealot: "Each of them gets +X/+X and gains vigilance until end of turn, where X is ~'s power.": X is ~'s
     // power as this resolves, or as it last existed (CR 608.2h), the same for each of them, locked in (CR 611.2c).

@@ -13556,9 +13556,25 @@ export function maxBlocks(s: GameState, o: GameObject): number {
  * combat, its controller declares them for that player (GameState.blocksChosenBy).
  */
 export function blockersPending(s: GameState, defender: PlayerId, remaining: PlayerId[]): PendingDecision {
+  const chooser = blocksChooser(s, defender);
+  return chooser !== undefined && chooser !== defender ? { kind: "declareBlockers", player: chooser, remaining, defender } : { kind: "declareBlockers", player: defender, remaining };
+}
+
+/**
+ * Who declares `defender`'s blockers in this combat, when an effect says someone does: Odric's controller for this combat,
+ * Brutal Hordechief's and Berserker's Frenzy's for the turn (Hordechief's only for its opponents), the active player while
+ * Invasion Plans is on the battlefield (round 378). Of those that cover this defending player, the latest decides
+ * (Hordechief's rulings: "the controller of the last ability to resolve will choose"; Invasion Plans by its timestamp,
+ * CR 613.7); a player who has left the game decides nothing (CR 800.4a). Undefined: the defending player, as usual.
+ */
+export function blocksChooser(s: GameState, defender: PlayerId): PlayerId | undefined {
+  const all: { player: PlayerId; timestamp: number }[] = [];
   const by = s.blocksChosenBy;
-  const chooser = by && by.turn === s.turn && by.combat === (s.combatsThisTurn ?? 0) && by.player !== defender && !player(s, by.player).lost ? by.player : undefined;
-  return chooser !== undefined ? { kind: "declareBlockers", player: chooser, remaining, defender } : { kind: "declareBlockers", player: defender, remaining };
+  if (by && by.turn === s.turn && by.combat === (s.combatsThisTurn ?? 0)) all.push({ player: by.player, timestamp: by.timestamp ?? 0 });
+  for (const b of s.blocksChosenThisTurn ?? []) if (b.turn === s.turn && !(b.opponents && b.player === defender)) all.push(b);
+  for (const id of s.battlefield) if (abilitiesOf(s, obj(s, id)).attackerChoosesBlocks) all.push({ player: s.activePlayer, timestamp: obj(s, id).timestamp });
+  const live = all.filter((b) => !player(s, b.player).lost).sort((a, b) => b.timestamp - a.timestamp);
+  return live[0]?.player;
 }
 
 function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: ObjectId; attacker: ObjectId }[]) {

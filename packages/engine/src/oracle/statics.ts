@@ -940,6 +940,9 @@ export function parseOnlyClauses(text: string): { cond?: StaticCondition; once?:
     else if (clause === "as a sorcery") out.sorcery = true;
     else if (clause.startsWith("during ") && (c = parseDuring(clause.slice(7)))) conds.push(c);
     else if ((c = parseTurnPoint(clause))) conds.push(c);
+    // Berserker's Frenzy (round 378): "before combat or during combat before blockers are declared": either one, the
+    // first a point of the turn's first combat (CR 506.8d), the second any combat's steps before blockers (506.8b-c).
+    else if (/^before combat or during combat before blockers are declared$/.test(clause)) conds.push({ kind: "anyOf", conds: [parseTurnPoint("before combat")!, parseDuring("combat before blockers are declared")!] });
     else if (clause === "if you've been attacked this step") conds.push({ kind: "attackedThisStep" });
     else if (clause.startsWith("if ") && (c = parseActivateCondition(clause.slice(3)))) conds.push(c);
     else return null;

@@ -2310,7 +2310,14 @@ export interface GameState {
    * Odric, Master Tactician: "you choose which creatures block this combat and how those creatures block": `player`
    * declares each defending player's blockers in this turn's combat number `combat` (see blockersPending).
    */
-  blocksChosenBy?: { player: PlayerId; turn: number; combat: number };
+  blocksChosenBy?: { player: PlayerId; turn: number; combat: number; /** When it resolved (s.nextTimestamp), against the others in blockersPending. */ timestamp?: number };
+  /**
+   * Brutal Hordechief, Berserker's Frenzy (round 378): "you choose which creatures block this turn and how those creatures
+   * block": `player` declares the defending players' blockers in every combat of turn `turn` (`opponents`: only its
+   * opponents', Hordechief's "you choose how those creatures block"). With several of these, Odric's and Invasion Plans',
+   * the latest one that covers a defending player decides for that player (rulings), see blockersPending.
+   */
+  blocksChosenThisTurn?: { player: PlayerId; turn: number; timestamp: number; opponents?: true }[];
   namedBansUntil?: { name: string; players?: PlayerId[]; lands?: true; controller: PlayerId; source: string }[];
   /** "Until your next turn, you may cast sorcery spells as though they had flash" (Teferi, Time Raveler): `controller` may. */
   flashUntil?: { controller: PlayerId; filter: TargetSpec; /** Only during this turn (Winding Canyons). */ turn?: number }[];

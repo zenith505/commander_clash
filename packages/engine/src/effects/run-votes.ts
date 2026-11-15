@@ -16,7 +16,14 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
   switch (e.type) {
     case "chooseBlocks":
       // Odric: for this combat (the one its attack trigger is in); the last one to resolve decides.
-      s.blocksChosenBy = { player: ctx.controller, turn: s.turn, combat: s.combatsThisTurn ?? 0 };
+      if (e.thisTurn) {
+        // Brutal Hordechief, Berserker's Frenzy (round 378): every combat this turn; against the others, the latest one
+        // that covers a defending player decides for that player (rulings, game.ts blockersPending).
+        s.blocksChosenThisTurn = [...(s.blocksChosenThisTurn ?? []).filter((b) => b.turn === s.turn), { player: ctx.controller, turn: s.turn, timestamp: s.nextTimestamp++, ...(e.opponents ? { opponents: true as const } : {}) }];
+        log(s, `${player(s, ctx.controller).name} chooses how ${e.opponents ? "creatures their opponents control" : "creatures"} block this turn.`);
+        return;
+      }
+      s.blocksChosenBy = { player: ctx.controller, turn: s.turn, combat: s.combatsThisTurn ?? 0, timestamp: s.nextTimestamp++ };
       log(s, `${player(s, ctx.controller).name} chooses which creatures block this combat and how they block.`);
       return;
     case "chooseVotes":

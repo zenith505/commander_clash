@@ -3620,6 +3620,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5cd51d39-aebc-4367-9157-da70b8d9b1a3",
+  "name": "Berserker's Frenzy",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Cast this spell only before combat or during combat before blockers are declared.\nRoll two d20 and ignore the lower roll.\n1—14 | Choose any number of creatures. They block this turn if able.\n15—20 | You choose which creatures block this turn and how those creatures block.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afc",
+  "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "77849657-c872-4d54-9149-a08bbe90f787",
   "name": "Betrothed of Fire",
   "manaCost": "{1}{R}",
@@ -5493,6 +5519,39 @@
   "set": "chk",
   "releasedAt": "2004-10-01",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e70cac5e-674e-4df7-94c7-77f8801e3941",
+  "name": "Brutal Hordechief",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Orc Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Orc",
+   "Warrior"
+  ],
+  "oracleText": "Whenever a creature you control attacks, defending player loses 1 life and you gain 1 life.\n{3}{R/W}{R/W}: Creatures your opponents control block this turn if able, and you choose how those creatures block.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "frf",
+  "releasedAt": "2015-01-23",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -19186,6 +19245,32 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": true
+ },
+ {
+  "oracleId": "db9c0d94-9fa5-4f07-be48-23e19d2f3d68",
+  "name": "Invasion Plans",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "All creatures block each combat if able.\nThe attacking player chooses how each creature blocks each combat.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-02-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "8faa4330-07bb-4b65-810a-bbce29d3cd42",

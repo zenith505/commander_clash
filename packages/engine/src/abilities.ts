@@ -5677,8 +5677,12 @@ export type Effect =
    */
   /** Illusion of Choice: "You choose how each player votes this turn" (GameState.votesChosenBy). */
   | { type: "chooseVotes" }
-  /** Odric, Master Tactician: "You choose which creatures block this combat and how those creatures block" (GameState.blocksChosenBy). */
-  | { type: "chooseBlocks" }
+  /**
+   * Odric, Master Tactician: "You choose which creatures block this combat and how those creatures block" (GameState.blocksChosenBy).
+   * `thisTurn`: "... this turn ..." (Berserker's Frenzy), every combat of the turn (GameState.blocksChosenThisTurn);
+   * `opponents`: Brutal Hordechief's "you choose how those creatures block", only for creatures your opponents control.
+   */
+  | { type: "chooseBlocks"; thisTurn?: true; opponents?: true }
   /**
    * "Each player secretly chooses a number 0 or greater, then all players reveal those numbers simultaneously"
    * (Wheel of Misfortune, Menacing Ogre): each one chooses without seeing the others' numbers, then what the card does
@@ -8869,6 +8873,12 @@ export interface CompiledCard {
   firstDrawLook?: true;
   /** "Room abilities of dungeons you own trigger an additional time" (Hama Pashar, CR 603.2d): how many instances, granted ones too (Dungeon Delver). */
   roomsTwice?: number;
+  /**
+   * Invasion Plans: "The attacking player chooses how each creature blocks each combat." The active player declares every
+   * defending player's blockers (CR 509.1), as Odric's controller does, while this is on the battlefield; against Odric,
+   * Brutal Hordechief and Berserker's Frenzy the latest one decides (see game.ts blockersPending).
+   */
+  attackerChoosesBlocks?: true;
   /** "Players can't gain life." / "Your opponents can't gain life." (CR 119.7) */
   cantGainLife?: "all" | "opponents" | "enchanted";
   /** "Your life total can't change." (Platinum Emperion, CR 119.7-8): its controller can't gain or lose life, nor pay more than 0 life. */

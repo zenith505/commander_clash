@@ -2513,7 +2513,7 @@ line blocks.
    Out after round 354 (looked at, not done): Coram, the Undertaker ("cast a spell from among cards in graveyards that
    were put there from libraries this turn": a play-from-graveyards permission for any player's cards, and "+X/+0 where X
    is the greatest power among creature cards in all graveyards"); Emergent Ultimatum (an opponent chooses one of the cards
-   found, then the others are cast free as it resolves, rulings); Brutal Hordechief (still out: you choose how opponents'
+   found, then the others are cast free as it resolves, rulings); Brutal Hordechief (done in round 378) (still out: you choose how opponents'
    creatures block).
    Round 355 went on down `npm run popular` and the "Out after round N" lists, most played first, to casts bound by
    another spell and copies that must be cast: Spelltwine's "Exile target instant or sorcery card from your graveyard and
@@ -3093,6 +3093,30 @@ line blocks.
    the effect isn't passed to all of them); Celestial Reunion, Fabrication Foundry, Ziatora's Envoy, Arni Metalbrow and
    Archelos, Lagoon Mystic (still out, as in their earlier lists). Polish: the Garth copy's cast prompt says "from exile"
    (exile stands in for outside the game).
+   Round 378 went on down `npm run popular`, most played first, to blocks declared by someone other than the defending
+   player: Brutal Hordechief's "{3}{R/W}{R/W}: Creatures your opponents control block this turn if able, and you choose how
+   those creatures block." (a rule for whatever creatures they control at any time this turn, those that enter later too;
+   the blocks still legal, as many requirements obeyed as can be, CR 509.1c; with two activated, the last to resolve
+   decides for each defending player it covers, but not for its own controller's creatures, rulings: Effect chooseBlocks
+   `thisTurn` `opponents`, GameState.blocksChosenThisTurn); Invasion Plans' "The attacking player chooses how each creature
+   blocks each combat." (the active player declares every defending player's blockers while it's on the battlefield,
+   whoever controls it: CompiledCard.attackerChoosesBlocks); Berserker's Frenzy's "Cast this spell only before combat or
+   during combat before blockers are declared." (before the first combat, CR 506.8d, or in any combat before its declare
+   blockers step, 506.8b-c: an "or" of the two in parseOnlyClauses) and its "Roll two d20 and ignore the lower roll. 1—14 |
+   Choose any number of creatures. They block this turn if able. 15—20 | You choose which creatures block this turn and how
+   those creatures block." (anyone's creatures, not targeted). Odric's, Hordechief's, Frenzy's and Invasion Plans' choosers
+   are weighed together in game.ts blocksChooser: the latest one covering a defending player decides, Invasion Plans by its
+   timestamp, a player who has lost by none (CR 800.4a). Browser tests click through Hordechief's activation and Ana's
+   forced block, Invasion Plans' blocks you declare for Ana, and Frenzy's creature pick and its "you choose" blocks. No new
+   prompt kinds. +3, 31,436 of 31,936 with round 377. The compiled text of every other card is unchanged. Bots activate
+   Hordechief and cast Frenzy in their first main phase while they have an attacker and an opponent an untapped creature,
+   pick only the opponents' creatures for Frenzy, and send each creature that must block where it dies and the attacker
+   lives.
+   Out after round 378 (looked at, not done): Master Warcraft ("You choose which creatures attack this turn": another player
+   picks the attackers, then the active player chooses what each one attacks and pays its costs, rulings; no such split of
+   the attack declaration yet, nor its UI and bot); Melee ("Whenever a creature attacks and isn't blocked this
+   combat, untap it and remove it from combat": a trigger on not being blocked, then removing it from combat); Tamiyo, Collector of Tales, Celestial Reunion, Fabrication Foundry,
+   Ziatora's Envoy and Archelos, Lagoon Mystic (still out, as in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -4415,7 +4439,7 @@ line blocks.
    The Brothers' War (chapter II's attack requirement); Duelist's Flame; Spirit of Resilience; Eye of Ojer Taq and Ore-Rich
    Stalactite (done in round 334) (craft with cards that share a type, or four or more); Kaya, Spirits' Justice; Ashiok, Wicked Manipulator (a
    life payment replaced by exiling); Parallel Thoughts (a draw replaced by the exiled pile's top card); Nathan Drake,
-   Treasure Hunter (mana spent as any color for spells you don't own); Invasion Plans (the attacking player declares
+   Treasure Hunter (mana spent as any color for spells you don't own); Invasion Plans (done in round 378) (the attacking player declares
    blocks); Alaundo the Seer (time counters given to a card exiled from your hand).
    Still open from the top (looked at, not done): Ria Ivor, Bane of Bladehold (the next combat damage to players prevented,
    tokens for the amount); Volo, Itinerant Scholar and Long List of the Ents (noted creature types); Mavinda, Students'
@@ -4708,7 +4732,7 @@ line blocks.
    mana).
    Out after round 234 (looked at, not done): Monument to Perfection (Lane B round B71 has it); Rowan Kenrith (its +2's
    "each creature target player controls attacks you during that player's next turn if able" and the emblem copying
-   activated abilities); Brutal Hordechief (you choose how opponents' creatures block); Sudden Substitution (exchange
+   activated abilities); Brutal Hordechief (done in round 378) (you choose how opponents' creatures block); Sudden Substitution (exchange
    control of a spell and a creature); Lobelia, Defender of Bag End (exile the top card of each opponent's library face
    down, play them free); Spinerock Tyrant (copies that gain wither); Curse of Echoes (each other player may copy the
    spell); Sovereigns of Lost Alara (done in round 311) (an Aura that could enchant that creature); Durnan of the Yawning Portal (cast it
@@ -5341,7 +5365,7 @@ line blocks.
      only as their last spell in hand.
    - Free casts from hand still out: "mana value 1 or 2", "shares a card type" (Counterlash) (done in round B179), "where X is ..." (Gandalf, Party Guest, Epistolary Librarian), "once
      during each of your turns" (Zaffai, Vision), named filters (West Coast Expansion's Hero spell).
-   - Tap-or-untap variants: Telekinetic Bonds, Tolarian Kraken, Chain Stasis. Berserker's Frenzy ("before combat or
+   - Tap-or-untap variants: Telekinetic Bonds, Tolarian Kraken, Chain Stasis. Berserker's Frenzy (done in round 378) ("before combat or
      during combat before blockers are declared"). Arcum's Sleigh and Kjeldoran Guard ("only if defending player
      controls ..."), Grizzled Wolverine's "only if a creature blocks it", Ashen Ghoul's "creature cards above it" (done in round B131).
      Coastal Wizard, Lady Sun, Diaochan (done in round B141), Maddening Imp, Norritt, Arcum's Whistle, Blood Frenzy and Berserk are out on

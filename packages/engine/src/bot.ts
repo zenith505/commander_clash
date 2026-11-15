@@ -1026,6 +1026,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // would only gain it too).
     // Celestial Judgment: one of each power, the rest destroyed: our own best of each power, else the other player's least
     // valuable, so the better ones go.
+    // Berserker's Frenzy (round 378): "Choose any number of creatures. They block this turn if able.": our opponents'
+    // creatures that could block, not ours.
+    if (pend.kind === "pickPermanents" && pend.action === "choose" && pend.anyNumber && /they block this turn if able$/.test(pend.prompt ?? "")) {
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) !== pid && !obj(s, id).tapped) }];
+    }
     if (pend.kind === "pickPermanents" && pend.differentPowers && pend.action === "choose" && !pend.anyNumber) {
       const byPower = new Map<number, ObjectId[]>();
       for (const id of pend.options) byPower.set(power(s, obj(s, id)), [...(byPower.get(power(s, obj(s, id))) ?? []), id]);
@@ -2269,7 +2274,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Osteomancer Adept: before combat, so the creature cast from our graveyard comes in this main phase (and Adept
       // isn't tapped by attacking first).
       // Garth One-Eye (round 377): its copy before combat, rather than attacking with it.
-      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => (e.type === "graveyardTurn" && !!e.costs) || e.type === "copyNamedCard")) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
+      // Brutal Hordechief (round 378): the opponents' blocks before we attack.
+      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => (e.type === "graveyardTurn" && !!e.costs) || e.type === "copyNamedCard" || e.type === "chooseBlocks")) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
       if (crew) return crew;
     }
     // Use activated abilities once we're done casting spells, then cycle what we can't use.
@@ -6699,6 +6705,13 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         if (!att.length) continue;
         leoninTarget = [{ kind: "object", id: att[0]! }];
       }
+      // Brutal Hordechief (round 378): once a turn, on our turn before attackers are declared with the stack empty, while we
+      // have a creature that could attack and an opponent an untapped creature it makes block.
+      if (ab.body.effects.some((e) => e.type === "chooseBlocks")) {
+        const already = (s.blocksChosenThisTurn ?? []).some((b) => b.turn === s.turn && b.player === pid);
+        const before = (s.step === "main1" && !s.combatsThisTurn) || (s.step === "beginCombat" && (s.combatsThisTurn ?? 0) <= 1);
+        if (already || s.activePlayer !== pid || !before || s.stack.length || !potentialAttackers(s, pid).length || !opponents(s, pid).some((d) => s.battlefield.some((b) => { const c = obj(s, b); return !c.tapped && controllerOf(s, c) === d && objIsType(s, c, "Creature"); }))) continue;
+      }
       const problem = abilityProblem(s, pid, id, i);
       if (problem && !/not enough mana/.test(problem)) continue;
       const modes = ab.body.modal ? chooseModes(s, pid, ab.body, false, id)?.modes : undefined;
@@ -7232,6 +7245,9 @@ function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
     const c = compileCard(defOf(s, obj(s, id)));
     if (!c.castOnly || !timedCondition(c.castOnly) || !staticConditionNow(s, c.castOnly, id, pid)) continue;
     if (c.spell && doesNothingNow(s, id, c.spell)) continue;
+    // Berserker's Frenzy (round 378): in our first main phase, while we have a creature that could attack and an opponent an
+    // untapped creature to make block.
+    if (c.spell && allEffects(c.spell.effects).some((e) => e.type === "chooseBlocks") && (s.activePlayer !== pid || s.step !== "main1" || !potentialAttackers(s, pid).length || !opponents(s, pid).some((d) => s.battlefield.some((b) => { const x = obj(s, b); return !x.tapped && controllerOf(s, x) === d && objIsType(s, x, "Creature"); })))) continue;
     if (shieldBody(c.spell)) {
       const coming = s.battlefield.map((x) => obj(s, x)).filter((o) => o.attacking === pid && !o.attackingPermanent).reduce((n, o) => n + Math.max(0, power(s, o)), 0);
       if (coming < Math.min(4, player(s, pid).life)) continue;
@@ -8696,8 +8712,28 @@ function withCompany<B extends { blocker: ObjectId; attacker: ObjectId }>(s: Gam
 function blocksForOpponent(s: GameState, pid: PlayerId, defender: PlayerId): Action {
   // Blocks that cost mana (Archangel of Tithes) oblige no one (CR 509.1c): none, then.
   if (blockCost(s, 1) || !blockRequirementProblem(s, defender, [])) return { type: "declareBlockers", player: pid, blocks: [] };
+  // Brutal Hordechief, Invasion Plans (round 378): creatures that must block each block where they fare worst (an attacker
+  // that kills them and survives), as long as that obeys every requirement it can (CR 509.1c); else the defender's own.
+  const hostile = hostileBlocks(s, defender);
+  if (hostile) return { type: "declareBlockers", player: pid, blocks: hostile };
   const theirs = chooseBlocks(s, defender);
   return { type: "declareBlockers", player: pid, blocks: theirs.type === "declareBlockers" ? theirs.blocks : [] };
+}
+
+/** Round 378: the blocks the player choosing them for `defender` likes best, only creatures that must block, one each on attackers one creature can block. */
+function hostileBlocks(s: GameState, defender: PlayerId): { blocker: ObjectId; attacker: ObjectId }[] | null {
+  const incoming = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking === defender && blockersNeeded(s, o) === 1 && !cantBeBlockedNow(s, o));
+  const theirs = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === defender && objIsType(s, o, "Creature") && characteristics(s, o).mustBlock && !characteristics(s, o).mustBlockEach && untappedForBlocking(s, o) && !cantBlockNow(s, o));
+  if (!theirs.length || !incoming.length) return null;
+  const hit = combatHits(s);
+  const blocks: { blocker: ObjectId; attacker: ObjectId }[] = [];
+  for (const b of theirs) {
+    const able = incoming.filter((at) => !blockProblem(s, b, at));
+    const dies = (at: GameObject) => hit(at, b) >= toughness(s, b) || (objHasKeyword(s, at, "Deathtouch") && hit(at, b) > 0);
+    const at = able.find((a) => dies(a) && hit(b, a) < toughness(s, a)) ?? able.find(dies) ?? able[0];
+    if (at) blocks.push({ blocker: b.id, attacker: at.id });
+  }
+  return blocks.every((b) => !blockProblem(s, obj(s, b.blocker), obj(s, b.attacker))) && !blockRequirementProblem(s, defender, blocks) ? blocks : null;
 }
 
 function chooseBlocks(s: GameState, pid: PlayerId): Action {

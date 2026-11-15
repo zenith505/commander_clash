@@ -153,6 +153,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (/^You choose how each player votes this turn$/.test(s)) return [{ type: "chooseVotes" }];
   // Odric, Master Tactician: the defending players' blocks are declared by you (rulings: they must still be legal).
   if (/^[Yy]ou choose which creatures block this combat and how those creatures block$/.test(s)) return [{ type: "chooseBlocks" }];
+  // Berserker's Frenzy (round 378): "You choose which creatures block this turn and how those creatures block": the same
+  // for every combat of the turn (CR 509.1), whoever's creatures they are, yours too (rulings: the blocks must be legal).
+  if (/^[Yy]ou choose which creatures block this turn and how those creatures block$/.test(s)) return [{ type: "chooseBlocks", thisTurn: true }];
+  // Brutal Hordechief (round 378): "Creatures your opponents control block this turn if able, and you choose how those
+  // creatures block": a rule for whatever creatures they control at any time this turn, those that enter later too, and
+  // you declare those creatures' blocks (rulings; CR 509.1c: still only as many requirements as can be obeyed, none that
+  // costs to obey).
+  if (/^Creatures your opponents control block this turn if able, and you choose how those creatures block$/.test(s)) {
+    const affects = parseAffected("Creatures your opponents control");
+    return affects ? [{ type: "groupRules", affects, text: "creatures your opponents control", mods: [{ kind: "mustBlock" }], duration: "endOfTurn" }, { type: "chooseBlocks", thisTurn: true, opponents: true }] : null;
+  }
   // "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): a replacement effect that lasts
   // (CR 614.1c, 611.2b).
   const untilTapped = /^Until your next turn, ([a-z][^,]*?) enter tapped$/.exec(s);

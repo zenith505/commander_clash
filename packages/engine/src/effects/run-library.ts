@@ -2570,7 +2570,7 @@ const DEST_RANK: Record<string, number> = { battlefield: 4, hand: 3, libraryTop:
  * stay where they are). "An opponent" is one you choose as it resolves (rulings on Steam Augury). With no more cards
  * than that to choose from there's no choice: they're all chosen (rulings on Gifts Ungiven and Realms Uncharted).
  */
-export function opponentPicks(s: GameState, ctx: ResolveCtx, src: string, chooserRef: PlayerRef | undefined, owner: PlayerId, cards: ObjectId[], eligible: ObjectId[], n: number, to: SearchDest, rest: SearchDest | undefined, /** Coin of Fate: where the chosen cards go, said instead of `to` ("on the bottom of Ken's library"). */ toText?: string): ObjectId[] | "paused" {
+export function opponentPicks(s: GameState, ctx: ResolveCtx, src: string, chooserRef: PlayerRef | undefined, owner: PlayerId, cards: ObjectId[], eligible: ObjectId[], n: number, to: SearchDest, rest: SearchDest | undefined, /** Coin of Fate: where the chosen cards go, said instead of `to` ("on the bottom of Ken's library"). */ toText?: string, /** Emergent Ultimatum: what happens to the rest, said instead of `rest` ("may be cast by Ken without paying their mana costs"). */ restText?: string): ObjectId[] | "paused" {
   const r = s.resolving!;
   const sc = (r.scratch ??= {});
   if (sc.picking && sc.found) {
@@ -2600,7 +2600,7 @@ export function opponentPicks(s: GameState, ctx: ResolveCtx, src: string, choose
     cards: eligible,
     min: n,
     max: n,
-    dig: { looked: cards, to: `to put ${toText ?? theirs(to)}`, rest: rest ? `go ${theirs(rest)}` : theirs(rest) },
+    dig: { looked: cards, to: `to put ${toText ?? theirs(to)}`, rest: restText ?? (rest ? `go ${theirs(rest)}` : theirs(rest)) },
     forPlayer: owner,
     ...(DEST_RANK[to.zone]! > (rest ? DEST_RANK[rest.zone]! : 2.5) ? { helps: true as const } : {}),
   };

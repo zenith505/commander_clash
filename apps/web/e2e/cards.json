@@ -10905,6 +10905,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d901e17f-a5f4-49d9-8a6d-ab771949af24",
+  "name": "Dream Halls",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Rather than pay the mana cost for a spell, its controller may discard a card that shares a color with that spell.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sth",
+  "releasedAt": "1998-03-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "383e9005-5869-4d1d-917d-30e5f214fbd9",
   "name": "Drop of Honey",
   "manaCost": "{G}",
@@ -11724,6 +11750,36 @@
   "commanderLegal": "legal",
   "set": "mir",
   "releasedAt": "1996-10-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0eecdfb3-3b05-4051-a660-060ff6df80ef",
+  "name": "Emergent Ultimatum",
+  "manaCost": "{B}{B}{G}{G}{G}{U}{U}",
+  "cmc": 7,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Search your library for up to three monocolored cards with different names and exile them. An opponent chooses one of those cards. Shuffle that card into your library. You may cast the other cards without paying their mana costs. Exile Emergent Ultimatum.",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "iko",
+  "releasedAt": "2020-04-24",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -39410,6 +39466,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "230ee0b4-eb75-457f-b171-72d585cfb5aa",
+  "name": "Thieves' Auction",
+  "manaCost": "{4}{R}{R}{R}",
+  "cmc": 7,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile all nontoken permanents. Starting with you, each player chooses one of the exiled cards and puts it onto the battlefield tapped under their control. Repeat this process until all cards exiled this way have been chosen.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mmq",
+  "releasedAt": "1999-10-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f509ac02-f22e-4d1a-9fe1-afa96dd7806d",
   "name": "Thieving Skydiver",
   "manaCost": "{1}{U}",
@@ -43058,6 +43140,32 @@
   "set": "bro",
   "releasedAt": "2022-11-18",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "50a228a2-c8b6-4416-b0ab-417926a9b9b6",
+  "name": "Warp World",
+  "manaCost": "{5}{R}{R}{R}",
+  "cmc": 8,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player shuffles all permanents they own into their library, then reveals that many cards from the top of their library. Each player puts all artifact, creature, and land cards revealed this way onto the battlefield, then does the same for enchantment cards, then puts all cards revealed this way that weren't put onto the battlefield on the bottom of their library.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-06-15",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

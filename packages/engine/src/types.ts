@@ -3325,6 +3325,11 @@ export interface Resolving {
     splitDone?: true;
     /** Dawnbreak Reclaimer (Effect swapFromGraveyards): the pick being asked for, the cards chosen ("none" when there was none to choose) and the opponent choosing in your graveyard. */
     swap?: { asking?: "theirs" | "yours"; theirs?: { id: ObjectId; zc: number } | "none"; chooser?: PlayerId; yours?: { id: ObjectId; zc: number } | "none" };
+    /** Thieves' Auction (Effect thievesAuction): the cards exiled this way, whose pick it is (an index into the players from you in turn order), how many players in a row had nothing to choose, the card chosen and being put in, and whether a pick is being asked for; `auctionBefore` the exile zones' objects before the exile. */
+    auction?: { cards: { id: ObjectId; zc: number }[]; at: number; idle: number; chosen?: ObjectId; asking?: true };
+    auctionBefore?: Record<ObjectId, number>;
+    /** Warp World (Effect warpWorld): each player's revealed cards, and the step: 1 artifacts, creatures and lands; 2 enchantments; 3 the rest to the bottom (`bottomAt`, by APNAP). */
+    warp?: { revealed: Record<number, ObjectId[]>; stage: number; bottomAt?: number };
     /** Rona, Tolarian Obliterator (Effect "exileRandomThenPlay"): the card exiled, and whether it's been offered. */
     exiledAtRandom?: { id: ObjectId; zc: number; asked?: true };
     /** castTargetFree with several targets: the ones offered already. */

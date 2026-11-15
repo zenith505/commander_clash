@@ -87,6 +87,12 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
     const sum = (os: GameObject[]) => os.reduce((n, o) => n + worth(s, pid, o), 0);
     return Math.max(...(["left", "right"] as const).map((side) => sum(nonland(nearestOpponent(s, pid, side))))) - sum(nonland(pid));
   }
+  // Thieves' Auction, Warp World: everything is shared out again, so only when we're behind the opponents on average.
+  if (body.effects.some((e) => e.type === "thievesAuction" || e.type === "warpWorld")) {
+    const sum = (p: PlayerId) => s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== sourceId && controllerOf(s, o) === p).reduce((n, o) => n + worth(s, pid, o), 0);
+    const opps = livingPlayers(s).filter((p) => p !== pid);
+    return opps.length ? opps.reduce((n, p) => n + sum(p), 0) / opps.length - sum(pid) : 0;
+  }
   let v: number | null = null;
   const group = (r: ObjRef) => {
     // Sanguine Praetor, Endemic Plague: which ones depends on the creature sacrificed, not weighed (worth nothing to bots).

@@ -1,7 +1,7 @@
 # Roadmap
 
-31,426 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,893 of
+31,430 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,896 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3038,6 +3038,32 @@ line blocks.
    controls the exiling effect for costs and replacement effects too, not recorded on zone moves); Stardew Valley
    ("another player of your choice may gain control": a player chosen as it resolves, then that player's yes or no).
    Polish: Lorcan's prompt says "pay life equal to its mana value" without the number (the Pay button pays it).
+   Round 376 went on down `npm run popular` and the "Out after round N" lists, most played first, to a search an opponent
+   splits, a draft of every exiled permanent, every permanent shuffled away and replaced from the library, and a discard
+   for any player's mana cost: Emergent Ultimatum's "Search your library for up to three monocolored cards with different
+   names and exile them. An opponent chooses one of those cards. Shuffle that card into your library. You may cast the
+   other cards without paying their mana costs. Exile ~." (exactly one color, CR 105.2; an opponent you choose picks as it
+   resolves, CR 608.2d, and with one card found that one goes back, rulings; the others cast as it resolves or not at all,
+   X 0, card-type timing ignored, rulings, CR 608.2g: Effect opponentShufflesExiledIn, castFromAmong fromExiledThisWay);
+   Thieves' Auction's "Exile all nontoken permanents. Starting with you, each player chooses one of the exiled cards and
+   puts it onto the battlefield tapped under their control. Repeat this process until all cards exiled this way have been
+   chosen." (in turn order from you, one card at a time; only a permanent card, CR 403.4, and an Aura only while it could
+   enchant something, not targeted, CR 303.4f; one with nothing to enchant waits, and stays exiled if nothing ever can,
+   rulings; an exiled commander is still in exile until state-based actions, CR 903.9a, so it's drafted too: Effect
+   thievesAuction); Warp World's whole text (each player's permanents counted, tokens too but never revealed, a commander
+   going to the command zone instead still counted, CR 903.9b; artifacts, creatures and lands enter at once, then the
+   enchantments, Auras on what's already there, APNAP, CR 303.4f, 101.4; the rest on the bottom in the order their owner
+   chooses, rulings: Effect warpWorld); Dream Halls' "Rather than pay the mana cost for a spell, its controller may discard
+   a card that shares a color with that spell." (an alternative cost for every player while it's on the battlefield, CR
+   118.9; colors of the spell as cast and of the card in hand, CR 105.4; a colorless spell can't; additional costs and a
+   commander's tax still paid, X 0, rulings: AltCostKind "dreamHalls"). Browser tests click through Dream Halls' menu entry
+   and discard picker, Emergent Ultimatum's search, opponent and free casts, Thieves' Auction's two picks, and Warp World.
+   No new prompt kinds. +4, 31,430 of 31,936 with round 375. The compiled text of every other card is unchanged. Bots cast
+   Thieves' Auction and Warp World only when the opponents' boards are worth more than theirs on average, take the
+   exiled card worth most to them, and use Dream Halls only for a spell whose mana cost they can't pay.
+   Out after round 376 (looked at, not done): Celestial Reunion, Fabrication Foundry, Ziatora's Envoy, Arni Metalbrow and
+   Archelos, Lagoon Mystic (still out, as in their earlier lists). Polish: Thieves' Auction asks Ken for every one of his
+   picks, even with dozens of cards exiled (no "take the rest for me").
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

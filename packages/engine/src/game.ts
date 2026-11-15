@@ -7050,6 +7050,7 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
     return mana ? { kind: "foretell", mana } : undefined;
   }
   if (alt === "wubrg") return s && pid !== undefined && controlsPayWUBRG(s, pid) ? { kind: "wubrg", mana: "{W}{U}{B}{R}{G}" } : undefined;
+  if (alt === "dreamHalls") return s && dreamHallsOn(s) ? dreamHallsCost(d) : undefined;
   // Omniscience: nothing at all, for a spell cast from the hand (checked in castProblem).
   if (alt === "omniscience") return s && pid !== undefined && controlsPayWUBRG(s, pid, "castFromHandFree") ? { kind: "omniscience", mana: "", text: "without paying its mana cost" } : undefined;
   // Court of Locthwain: nothing at all, for a card exiled with it (castProblem checks the card is one).
@@ -7293,6 +7294,18 @@ export const payZeroFlash = (s: GameState, pid: PlayerId, o: GameObject, life: f
   return ok.some((p) => compileCard(defOf(s, p)).payZero!.energy === least && compileCard(defOf(s, p)).payZero!.flash);
 };
 
+/** Dream Halls on the battlefield with its abilities (any player's, CR 118.9: "its controller" is the spell's). */
+const dreamHallsOn = (s: GameState) => s.battlefield.some((id) => compileCard(defOf(s, obj(s, id))).dreamHalls && characteristics(s, obj(s, id)).hasPrintedAbilities);
+
+/**
+ * Dream Halls' alternative cost (CR 118.9) for the spell `d`: discard a card that shares a color with it (CR 105.4), the
+ * spell's colors as it's cast (its face or half), the discarded card's in the hand; the spell is on the stack by then
+ * (CR 601.2a), so never itself. A colorless spell shares a color with nothing (CR 105.2c), so it can't be cast this way.
+ * It replaces only the mana cost: additional costs are still paid, and X is 0 (rulings, CR 107.3b).
+ */
+const dreamHallsCost = (d: CardDef): NonNullable<CompiledCard["altCosts"]>[number] | undefined =>
+  d.colors.length ? { kind: "dreamHalls", mana: "", costs: [{ kind: "discard", n: 1, filter: { kind: "card", types: [], notTypes: [], notColors: [], colors: [...d.colors], text: "card that shares a color with it" } }], text: "discard a card that shares a color with it" } : undefined;
+
 /** A "next spell you cast this turn" alternative cost waiting for `pid`'s spell `d` (World War Hulk, Marshland Bloodcaster). */
 const nextCastAlt = (s: GameState, pid: PlayerId, d: CardDef, kind: "free" | "life") => !!s.nextCast?.some((r) => r.alt === kind && r.controller === pid && r.turn === s.turn && printedMatches(r.filter, d));
 
@@ -7306,7 +7319,7 @@ export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNull
   const sling = grantedWebSlinging(s, pid, defOf(s, o));
   const blitz = grantedBlitz(s, pid, defOf(s, o));
   const emerge = grantedEmerge(s, pid, defOf(s, o));
-  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(topFreeGrant(s, o, pid) ? [altCost(defOf(s, o), "topFree", s, pid)!] : []), ...(["evidence" as const, "nextFree" as const, "nextLife" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
+  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...((dreamHallsOn(s) && dreamHallsCost(defOf(s, o))) ? [dreamHallsCost(defOf(s, o))!] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(topFreeGrant(s, o, pid) ? [altCost(defOf(s, o), "topFree", s, pid)!] : []), ...(["evidence" as const, "nextFree" as const, "nextLife" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */

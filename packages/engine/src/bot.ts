@@ -555,6 +555,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = [...pend.cards].sort((a, b) => hits(b) - hits(a))[0];
       return [{ type: "searchLibrary", player: pid, found: best && pend.max > 0 ? [best] : [] }];
     }
+    // Thieves' Auction: the exiled card worth the most to us on our side of the battlefield.
+    if (pend.kind === "searchLibrary" && s.resolving?.body.effects[s.resolving.next]?.type === "thievesAuction" && pend.cards.length)
+      return [{ type: "searchLibrary", player: pid, found: [[...pend.cards].sort((a, b) => worth(s, pid, obj(s, b)) + mv(s, b) - (worth(s, pid, obj(s, a)) + mv(s, a)))[0]!] }];
     if (pend.kind === "searchLibrary" && pend.what === "one of those creatures to copy") return [{ type: "searchLibrary", player: pid, found: [[...pend.cards].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
     if (pend.kind === "searchLibrary" && pend.zonesOf !== undefined) {
       const rank = (id: string) => (s.objects[id]!.zone === "hand" ? 1 : 0);
@@ -3932,7 +3935,7 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     if (plan) return plan;
   }
   // Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" too (CR 118.9).
-  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv" || x.kind === "nextLife" || x.kind === "genericMv" || x.kind === "energyForSpell" || x.kind === "grantedEmerge")]) {
+  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv" || x.kind === "nextLife" || x.kind === "genericMv" || x.kind === "energyForSpell" || x.kind === "grantedEmerge" || x.kind === "dreamHalls")]) {
     // Bolas's Citadel, Demon of Fate's Design: life rather than mana, while we'd still have 15 or more afterwards.
     if ((a.kind === "citadel" || a.kind === "lifeForMv" || a.kind === "nextLife") && player(s, pid).life - mv(s, id) < 15) continue;
     if (a.kind === "evoke" && !c.triggers.some((t) => t.event === "selfEnters" && !t.ifEvoked)) continue;

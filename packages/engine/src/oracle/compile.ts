@@ -54,6 +54,7 @@ import { roundB207Line } from "./laneb207";
 import { roundB208Line } from "./laneb208";
 import { roundB209Line } from "./laneb209";
 import { roundB210Line } from "./laneb210";
+import { roundB211Line } from "./laneb211";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -766,6 +767,8 @@ export function compile(d: CardDef): CompiledCard {
       // Booby Trap: "As ~ enters, choose an opponent and a card name other than a basic land card name.": two choices as it
       // enters (CR 614.12), each its own.
       .replace(/^As ~ enters, choose an opponent and (a card name other than a basic land card name)\.$/m, "As ~ enters, choose an opponent.\nAs ~ enters, choose $1.")
+      // Call to Arms (round B211): "As ~ enters, choose a color and an opponent.": two choices as it enters (CR 614.12).
+      .replace(/^As ~ enters, choose a color and an opponent\.$/m, "As ~ enters, choose a color.\nAs ~ enters, choose an opponent.")
       .replace(/^As ~ enters, choose an opponent\. (~ enters with an? [-+\/\d]+ counter on it for each creature) that player controls\.$/m, "As ~ enters, choose an opponent.\n$1 the chosen player controls.")
       // Shackles of Treachery's granted "Whenever ~ deals damage, destroy target Equipment attached to it.": "it" is the
       // creature, the trigger's source (rulings: any damage, any Equipment's controller).
@@ -2143,6 +2146,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB209Line(line, raw, out, isSpell)) continue;
     // Thought Lash, Mystic Barrier (round B210).
     if (roundB210Line(line, raw, out, isSpell)) continue;
+    // Chromatic Armor, Call to Arms, Nettlevine Blight, Strax, Merseine (round B211).
+    if (roundB211Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

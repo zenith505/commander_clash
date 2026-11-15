@@ -5,6 +5,7 @@ import { parseLoyalty } from "./activated";
 import { parseBody } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseTrigger } from "./triggers";
+import { roundB220Spell } from "./laneb220";
 
 /** A trigger line read the usual way, or null. */
 const trig = (text: string) => {
@@ -72,5 +73,5 @@ export function roundB219Spell(text: string): AbilityBody | null | undefined {
     const high: Effect = { type: "if", cond: { kind: "rollIn", min: 15 }, effects: [bounce, { type: "gainLife", who: { ref: "you" }, n: { count: { kind: "returnedToYourHand", totalMv: true } } }] };
     return { targets: body.targets, effects: [roll, low, high], text };
   }
-  return undefined;
+  return roundB220Spell(text);
 }

@@ -295,6 +295,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Pardic Dragon: "that player may put a time counter on ~": an opponent's suspended card, kept from being cast longer.
     const theirMay = pend.kind === "chooseMay" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
     // Disorienting Choice: our permanent exiled, or a land for its caster: only a token goes (a Treasure, a Clue).
+    // Spirit-Sister's Call (round B220): only for a permanent sharing a card type that costs less than the card coming back (a
+    // token nothing), never the card's own worth or more.
+    const kinPick = pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.effects.length === 1 && theirMay.effects[0]!.type === "pick" ? theirMay.effects[0]! : undefined;
+    if (kinPick?.type === "pick" && kinPick.sharesCardTypeWithTarget !== undefined) {
+      const t = s.resolving!.item.targets?.[kinPick.sharesCardTypeWithTarget];
+      const back = t?.kind === "object" ? s.objects[t.id] : undefined;
+      const c = back ? characteristics(s, back) : undefined;
+      const cheaper = !!c && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && characteristics(s, obj(s, id)).types.some((ty) => c.types.includes(ty)) && (obj(s, id).isToken ? 0 : characteristics(s, obj(s, id)).manaValue) < c.manaValue);
+      return [{ type: "chooseMay", player: pid, yes: cheaper }];
+    }
     if (pend.kind === "chooseMay" && theirMay?.type === "controllersMayExile") {
       const asked = s.resolving!.scratch?.mayExile?.queue[0];
       const o = asked ? s.objects[asked.id] : undefined;
@@ -891,6 +901,28 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const g = good(obj(s, pend.about));
         return [{ type: "chooseOption", player: pid, choice: g.includes("+1/+1") ? "+1/+1" : g.find((k) => pend.options.includes(k)) ?? pend.options[0]! }];
       }
+    }
+    // Cultural Exchange (round B220): as one of the two players, our least creatures for the other's best, one pair at a time
+    // while what we get is worth more than what we give; as neither, nothing.
+    const swap = pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    if (pend.kind === "pickPermanents" && swap?.type === "exchangeGroups") {
+      const playerAt = (ref: PlayerRef) => ((t) => (t?.kind === "player" ? t.id : undefined))(ref.ref === "target" ? s.resolving!.item.targets?.[ref.index ?? 0] : undefined);
+      const [a, b] = [playerAt(swap.a), playerAt(swap.b)];
+      const val = (id: ObjectId) => worth(s, pid, obj(s, id));
+      const ofPlayer = (p?: PlayerId) => s.battlefield.filter((id) => objIsType(s, obj(s, id), "Creature") && controllerOf(s, obj(s, id)) === p);
+      const firstPick = pend.min === 0;
+      const ours = a === pid ? "a" : b === pid ? "b" : undefined;
+      if (firstPick) {
+        if (!ours) return [{ type: "pickPermanents", player: pid, ids: [] }];
+        const mine = [...ofPlayer(pid)].sort((x, y) => val(x) - val(y));
+        const theirs = [...ofPlayer(ours === "a" ? b : a)].sort((x, y) => val(y) - val(x));
+        let k = 0;
+        while (k < pend.count && k < mine.length && k < theirs.length && val(theirs[k]!) > val(mine[k]!)) k++;
+        const picks = ours === "a" ? mine.slice(0, k) : theirs.slice(0, k);
+        return [{ type: "pickPermanents", player: pid, ids: picks.filter((id) => pend.options.includes(id)) }];
+      }
+      const order = [...pend.options].sort((x, y) => (ours === "b" ? val(x) - val(y) : val(y) - val(x)));
+      return [{ type: "pickPermanents", player: pid, ids: order.slice(0, pend.count) }];
     }
     // Fortunate Few: we can't spare our own, so we spare the least of the others' permanents.
     if (pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving?.body.effects[s.resolving.next]?.type === "othersChooseDestroyRest")

@@ -1150,6 +1150,22 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}), ...toPlayer(to), ...(m.mod.op === "counters" && (m.mod.onDamaged ? "object" in to : m.holder) ? { counters: { id: m.mod.onDamaged && "object" in to ? to.object : m.holder!.id, counter: m.mod.counter!, by: m.mod.you } } : {}), ...(m.mod.op === "destroy" && "object" in to ? { destroy: to.object } : {}), ...(m.mod.mill && "player" in to ? { mill: true as const, ...(m.mod.exileTop ? { exileTop: true as const } : {}) } : {}) });
       }
     };
+    // Battletide Alchemist: "you may prevent X of that damage": its controller chooses for each source's damage to each
+    // player, X counted as the damage would be dealt (rulings); declined, it doesn't apply to that damage. A bot prevents
+    // damage to itself only.
+    for (const m of allMods) {
+      if (!m.mod.may) continue;
+      for (const [i, e] of incoming.entries()) {
+        if (!("player" in to) || left[i]! <= 0 || done[i]!.has(m.key) || !modApplies(s, m, e, prev(e))) continue;
+        const x = modExtra(s, m);
+        if (x <= 0) continue;
+        const labels = [`Prevent ${x} of it`, "Don't prevent it"];
+        const order = to.player === m.mod.you ? [0, 1] : [1, 0];
+        const i2 = choose({ player: m.mod.you, prompt: `${m.card}: ${e.src.name} would deal ${e.n} damage to ${to.player === m.mod.you ? "you" : toName}. Prevent ${x} of that damage?`, labels: order.map((k) => labels[k]!) });
+        if (i2 === null) return { ask, ops, final, used: next };
+        if (order[i2] === 1) done[i]!.add(m.key);
+      }
+    }
     // How much of the damage a shield takes from each source's: `pick` chooses one at a time, among the options in the
     // chooser's order of preference, while two or more sources' damage is left and it can't take it all.
     const allocate = (sh: PlanShield, at: number[], pick: (ranked: number[], room: number) => number | null): number[] | null => {

@@ -2,6 +2,7 @@
 import type { Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { roundB173Sentence } from "./laneb173";
+import { parseSearchFilter } from "./search";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -16,6 +17,12 @@ export function roundB172Sentence(s: string, sentences: string[], si: number, ct
   // process until no one puts a card onto the battlefield." (rulings: over only once every player in turn has put none).
   if (s === "Starting with you, each player may put a permanent card from their hand onto the battlefield" && sentences[si + 1]?.replace(/\.$/, "") === "Repeat this process until no one puts a card onto the battlefield" && !effects.length && si + 2 === sentences.length) {
     return { effect: { type: "putFromHandRounds" }, next: si + 2 };
+  }
+  // Hypergenesis: the same with "an artifact, creature, enchantment, or land card" (no planeswalker or battle card).
+  if (s === "Starting with you, each player may put an artifact, creature, enchantment, or land card from their hand onto the battlefield" && sentences[si + 1]?.replace(/\.$/, "") === "Repeat this process until no one puts a card onto the battlefield" && !effects.length && si + 2 === sentences.length) {
+    const filter = parseSearchFilter("artifact, creature, enchantment, or land card");
+    if (!filter || filter.kind !== "card" || filter.types?.length !== 4) return "fail";
+    return { effect: { type: "putFromHandRounds", filter }, next: si + 2 };
   }
   return roundB173Sentence(s, sentences, si, ctx, effects);
 }

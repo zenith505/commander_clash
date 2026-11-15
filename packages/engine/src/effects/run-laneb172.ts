@@ -4,6 +4,7 @@ import { defOf, isPermanentCard } from "../cards";
 import { auraHostName, log, moveObject, obj, player, turnOrderFrom } from "../game";
 import type { GameState } from "../types";
 import type { ResolveCtx } from "./resolve";
+import { printedMatches } from "./targeting";
 import { chooseAuraHosts } from "./run-zones";
 
 type B172Effect = Extract<Effect, { type: "putFromHandRounds" }>;
@@ -15,6 +16,8 @@ export function runLaneB172Effect(s: GameState, e: B172Effect, ctx: ResolveCtx, 
       // battlefield, each one entering as it's chosen; around and around until every player in the game, one after the
       // other, has put none (rulings: one who put none may put one the next time around). X in a mana cost is 0 there
       // (CR 107.3b). Its triggers wait until it has resolved (CR 603.3).
+      // Hypergenesis: only cards of the types it names (Effect putFromHandRounds.filter).
+      const fits = (id: string) => isPermanentCard(defOf(s, obj(s, id))) && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
       const sc = (s.resolving!.scratch ??= {});
       const hr = (sc.handRounds ??= { next: ctx.controller, passes: 0, entered: [] });
       for (;;) {
@@ -29,15 +32,15 @@ export function runLaneB172Effect(s: GameState, e: B172Effect, ctx: ResolveCtx, 
         const p = player(s, pid);
         if (hr.picked === undefined) {
           if (sc.found !== undefined && hr.asked === pid) {
-            hr.picked = sc.found.find((id) => p.hand.includes(id) && isPermanentCard(defOf(s, obj(s, id))));
+            hr.picked = sc.found.find((id) => p.hand.includes(id) && fits(id));
             sc.found = undefined;
             hr.asked = undefined;
             if (hr.picked === undefined) log(s, `${p.name} puts no card onto the battlefield.`);
           } else {
-            const cards = p.hand.filter((id) => isPermanentCard(defOf(s, obj(s, id))));
+            const cards = p.hand.filter(fits);
             if (cards.length) {
               hr.asked = pid;
-              s.pending = { kind: "searchLibrary", player: pid, source: src, what: "a permanent card", cards, min: 0, max: 1, fromHand: true };
+              s.pending = { kind: "searchLibrary", player: pid, source: src, what: e.filter ? `an ${e.filter.text}` : "a permanent card", cards, min: 0, max: 1, fromHand: true };
               return "paused";
             }
           }

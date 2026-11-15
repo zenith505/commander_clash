@@ -43,6 +43,14 @@ export function parseGraveyardKeyword(
     return { fromGraveyard: { ...way, if: cond } };
   }
   // Not "Flashback costs you pay cost {2} less" (Catalyst Stone), a static ability about flashback.
+  // Light Up the Night: "Flashback—..., Remove X loyalty counters .... If you cast ~ this way, X can't be 0.": X is at
+  // least 1 only when it's cast with that flashback (CR 107.3a, 601.2b).
+  const xMin = /\. If you cast (?:~|this spell) this way, X can't be 0\.?$/.exec(line);
+  if (xMin && /^Flashback—/.test(line)) {
+    const r = parseGraveyardKeyword(line.slice(0, xMin.index) + ".", d);
+    if (!r || r === "fail" || !("fromGraveyard" in r) || !r.fromGraveyard || r.fromGraveyard.kind !== "flashback" || !r.fromGraveyard.costs.some((c) => "x" in c && c.x) || !parseManaCost(d.manaCost).hasX) return "fail";
+    return { fromGraveyard: { ...r.fromGraveyard, xMin: 1 } };
+  }
   if ((m = /^(Flashback|Escape)(?: (?!costs )|—)(.+?)\.?$/.exec(line))) {
     const kind = m[1] === "Flashback" ? "flashback" : "escape";
     if (kind === "flashback" && !isSpell) return "fail";
@@ -964,6 +972,10 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
   }
   // Processor Assault: "put a card an opponent owns from exile into that player's graveyard", exactly one (rulings).
   if (/^put a card an opponent owns from exile into that player's graveyard$/i.test(text)) return { kind: "exileFromGraveyard", n: 1, process: true };
+  // Light Up the Night's flashback: "Remove X loyalty counters from among planeswalkers you control": the spell's X (CR
+  // 107.3a), any mix of those planeswalkers' loyalty counters, chosen as it's paid (CR 601.2h).
+  if (allowX && /^remove X loyalty counters from among planeswalkers you control$/i.test(text))
+    return { kind: "removeCounters", n: 0, x: true, counter: "loyalty", filter: { kind: "object", types: ["Planeswalker"], notTypes: [], notColors: [], controller: "you", text: "planeswalkers you control" } };
   // "Removing six counters from among creatures you control" (Quilled Greatwurm): any mix of counters on those
   // permanents, chosen as it's paid (CR 601.2h).
   if ((m = new RegExp(`^remove ${NUM} counters from among creatures you control$`, "i").exec(text)))

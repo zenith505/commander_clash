@@ -918,6 +918,19 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (d.to?.includes(ev.to) && !diesLocked)
         s.triggerQueue.push({ sourceId: d.source?.id ?? ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.about ?? { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body, ...(d.source ? { sourceZc: d.source.zc } : {}), ...(d.lkiCounters ? { lki: { counters: { ...ev.counters } } } : {}), ...(d.ifCond ? { ifCond: d.ifCond } : {}) });
     }
+    // Kodama of the Center Tree (TriggeredAbility.xLookBackSubtype): the permanents of that subtype its controller controlled
+    // just before it left, as they last existed for the ones leaving at the same time, itself included (CR 603.10a).
+    const lookBackX = (subtype: string | undefined): number | undefined => {
+      if (!subtype) return undefined;
+      const spec: TargetSpec = { kind: "object", subtypes: [subtype], controller: "you", text: subtype };
+      let n = s.battlefield.filter((id) => objectMatches(s, spec, obj(s, id), ev.controller, false)).length;
+      for (const l of s.leftTogether ?? []) {
+        const lk = s.lastKnown?.[l.id];
+        if (!lk || lk.controller !== ev.controller || s.objects[l.id]?.zone === "battlefield") continue;
+        if (lk.creatureTypes === "all" || lk.source?.allCreatureTypes || lk.source?.subtypes.includes(subtype)) n++;
+      }
+      return n;
+    };
     // Its abilities as it last existed on the battlefield (CR 603.10a): a merged permanent's from all its cards (730.2a),
     // a copy's from what it copied.
     const lastAbilities = withGranted(ev.hadAbilities ? compileCard(ev.snapshot ? defOf(s, ev.snapshot) : defOf(s, o)) : NO_ABILITIES, ev.grantedAbilities ?? []).triggers;
@@ -937,6 +950,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       undefined,
       undefined,
       { counters: ev.counters, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) },
+      lookBackX(lastAbilities.find((t) => t.event === "selfDies" && t.xLookBackSubtype)?.xLookBackSubtype),
     );
     // Zenos yae Galvus: "When the chosen creature leaves the battlefield": the permanent noted as it, that object (CR 400.7),
     // gone to any zone; Zenos's own ability, so only while Zenos is on the battlefield.
@@ -1484,6 +1498,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const o = obj(s, ev.id);
     // Mana Web: what the land could produce as it was tapped (CR 106.7), for when it's gone by the time that resolves.
     const info = { player: ev.player, ...(o.zone === "battlefield" && objIsType(s, o, "Land") ? { couldProduce: landCouldProduce(s, o) } : {}) };
+    // Desolation: "each player who tapped a land for mana this turn" (CR 106.12), whatever was on the battlefield then (rulings).
+    if (o.zone === "battlefield" && objIsType(s, o, "Land")) {
+      const tl = ((s.turnLog ??= {}).tappedLandForMana ??= []);
+      if (!tl.includes(ev.player)) tl.push(ev.player);
+    }
     const byOk = (t: TriggeredAbility, you: PlayerId) => !!t.manaTap && (t.manaTap.by === "any" || (t.manaTap.by === "you") === (ev.player === you));
     add(o, controllerOf(s, o), (e, t) => e === "tappedForMana" && !t.manaTap?.filter && byOk(t, controllerOf(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, info);
     for (const id of s.battlefield) {
@@ -3022,7 +3041,9 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
     const i = turnOrderFromActive.indexOf(pid);
     return i < 0 ? 99 : i;
   };
-  s.triggerQueue = s.triggerQueue.map((t, i) => ({ t, i })).sort((a, b) => rank(a.t.controller) - rank(b.t.controller) || a.i - b.i).map((x) => x.t);
+  // Warping Wurm (TriggeredAbility.resolveFirst, round B214): after its controller's other triggers, so it resolves first.
+  const first = (t: PendingTrigger) => (!t.body && compileCard(s.cards[t.sourceCardId]!).triggers[t.index]?.resolveFirst ? 1 : 0);
+  s.triggerQueue = s.triggerQueue.map((t, i) => ({ t, i })).sort((a, b) => rank(a.t.controller) - rank(b.t.controller) || first(a.t) - first(b.t) || a.i - b.i).map((x) => x.t);
   // Firebender Ascension's and Aboleth Spawn's triggers go on the stack just above the ability that caused them (rulings),
   // whoever controls them.
   for (const t of s.triggerQueue.filter((x) => x.causeTag)) {
@@ -3272,6 +3293,13 @@ function triggerBodyAsIs(s: GameState, t: PendingTrigger): AbilityBody {
   const who = t.event?.player;
   // Colfenor: "other target creature card": not the card that died (TargetSpec.notSubject).
   if (t.subject && body.targets.some((x) => x.notSubject)) return { ...body, targets: body.targets.map((x) => (x.notSubject ? { ...x, notId: t.subject!.id } : x)) };
+  // Necrotic Plague: "creature one of their opponents controls", "their" being the subject's controller as it last existed
+  // (the player choosing the target, TargetSpec.chosenBy "subjectController").
+  if (body.targets.some((x) => x.opponentOfSubjectController)) {
+    const subj = t.subject && s.objects[t.subject.id];
+    const chooser = subj && subj.zone === "battlefield" && (subj.zoneChanges ?? 0) === t.subject!.zc ? controllerOf(s, subj) : (s.lastKnown?.[t.subject?.id ?? ""]?.controller ?? t.controller);
+    return { ...body, targets: body.targets.map((x) => (x.opponentOfSubjectController ? (({ opponentOfSubjectController: _, ...rest }) => ({ ...rest, controlledByAny: opponents(s, chooser) }))(x) : x)) };
+  }
   const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || x.attackingWhom === "eventPlayer" || !!x.notEventPlayer || x.outnumbers?.than === "eventPlayer" || !!x.sameNameAsCause || !!x.anyOf?.some(isEvent);
   if (!body.targets.some(isEvent) && !body.modal?.modes.some((m) => m.targets?.some(isEvent))) return body;
   const fix = (x0: TargetSpec): TargetSpec => {

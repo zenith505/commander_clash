@@ -485,6 +485,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const noAttacks = pu && s.resolving ? allEffects(s.resolving.body.effects).some((x) => x.type === "punisher" && x.effects.some((y) => y.type === "cantAttackRule" && !!y.combat)) : false;
       if (noAttacks && !potentialAttackers(s, pid).length) return [{ type: "payUnless", player: pid, pay: false }];
       const generic = [...pend.cost.matchAll(/\{(\d+)\}|\{[^}]+\}/g)].reduce((n, x) => n + (x[1] ? Number(x[1]) : 1), 0);
+      // Ice Cave (round B214): another player's spell countered for its mana cost, worth it from two mana up.
+      if (s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "othersPaySpellCostToCounter") && generic < 2) return [{ type: "payUnless", player: pid, pay: false }];
       if (pu && !noAttacks && pu.lose === undefined && generic >= 2 && !planMana(s, pid, parseManaCost(`{${generic + 3}}`))) return [{ type: "payUnless", player: pid, pay: false }];
       const taps = planMana(s, pid, parseManaCost(pend.cost));
       // Ward—Waterbend: mana first, then artifacts and creatures for the rest (CR 701.67a).
@@ -1126,6 +1128,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const pw = (id: ObjectId) => power(s, obj(s, id));
       for (const id of [...pend.options].sort((a, b) => Number(pw(a) > 0) - Number(pw(b) > 0) || worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))))
         if (total + pw(id) <= pend.maxTotalPower) (ids.push(id), (total += pw(id)));
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
+    // Cleansing: our own lands, the best first, while we keep 6 life or more; never anyone else's.
+    if (pend.kind === "pickPermanents" && pend.action === "keep" && pend.payLife !== undefined && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "eachLandUnlessAnyPaysLife")) {
+      const ids: ObjectId[] = [];
+      let life = player(s, pid).life;
+      for (const id of pend.options.filter((x) => controllerOf(s, obj(s, x)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))) {
+        if (ids.length >= pend.count || life - pend.payLife < 6) break;
+        ids.push(id);
+        life -= pend.payLife;
+      }
       return [{ type: "pickPermanents", player: pid, ids }];
     }
     // Killing Wave: our best creatures, each while it's worth the life it costs (the more, the closer to 0), never all of it.
@@ -6472,6 +6485,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (lifeSwapHurts(s, pid, ab.body.effects)) continue;
       // Goblin Test Pilot: a target chosen at random might be us or ours.
       if (ab.body.targets.some((x) => x.random)) continue;
+      // Tidal Flats (round B214): once a turn, after blockers are declared, while a creature of ours without first strike
+      // blocks an attacker without flying.
+      if (ab.body.effects.some((e) => e.type === "attackersPayOrBlockersGain") && (o.activatedThisTurn?.includes(i) || s.step !== "declareBlockers" || !s.battlefield.some((b) => { const x = obj(s, b); return controllerOf(s, x) === pid && !objHasKeyword(s, x, "First strike") && !!x.blocking?.some((a) => !!s.objects[a] && !objHasKeyword(s, s.objects[a]!, "Flying")); }))) continue;
       // The Deck of Many Things: "roll a d20 and subtract the number of cards in your hand. If the result is 0 or less,
       // discard your hand": with more than three cards in hand, the risk outweighs what the roll brings.
       if (ab.body.effects.some((e) => e.type === "if" && e.cond.kind === "rollIn" && e.cond.max !== undefined && e.cond.max <= 0 && e.effects.some((x) => x.type === "discard" && x.hand)) && player(s, pid).hand.length > 3) continue;
@@ -7173,7 +7189,8 @@ function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
       if (plan) return plan;
     }
   }
-  const timed = (ab: ActivatedAbility) => timedCondition(ab.activateIf);
+  // Tidal Flats (round B214): after blockers are declared (see chooseActivation).
+  const timed = (ab: ActivatedAbility) => timedCondition(ab.activateIf) || ab.body.effects.some((e) => e.type === "attackersPayOrBlockersGain");
   // The Words (Words of Wilding, Words of Worship): in our own upkeep, one to replace the draw step's draw.
   if (s.step === "upkeep" && s.activePlayer === pid && !player(s, pid).nextDrawInstead?.some((w) => w.turn === s.turn)) {
     const words = chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => e.type === "nextDrawInstead"));

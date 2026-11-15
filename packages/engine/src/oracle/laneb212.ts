@@ -1,6 +1,7 @@
 // Lane B round B212's whole spells, read after round B210's.
 import type { AbilityBody, Effect, TargetSpec } from "../abilities";
 import { parseBody } from "./body";
+import { roundB213Spell } from "./laneb213";
 
 /** Round B212's whole spells: the body, null when it's one of these but can't be read, undefined when it isn't. */
 export function roundB212Spell(text: string): AbilityBody | null | undefined {
@@ -27,5 +28,5 @@ export function roundB212Spell(text: string): AbilityBody | null | undefined {
     const effects: Effect[] = [{ type: "punisher", who: { ref: "eachPlayer" }, options: [{ pay: { cost: "{1}" } }, { sacrifice: permanent }], effects: [], picksEach: { count: { kind: "permanents", filter: creature, whose: { ref: "eachOne" } } }, required: true }];
     return { targets: [], effects, text };
   }
-  return undefined;
+  return roundB213Spell(text);
 }

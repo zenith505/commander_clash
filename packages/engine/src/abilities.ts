@@ -697,6 +697,12 @@ export interface TargetSpec {
   /** An Aura's target when what the Aura does hurts the enchanted permanent's controller (Brand of Ill Omen): bots aim it at an opponent's. */
   harmsEnchanted?: true;
   /**
+   * Necrotic Plague (round B215): "its controller chooses target creature one of their opponents controls", with `chosenBy`
+   * "subjectController": controlled by an opponent of the player choosing (the trigger's subject's controller as it last
+   * existed), made concrete as `controlledByAny` once the trigger knows that player. The ability's controller may be one.
+   */
+  opponentOfSubjectController?: true;
+  /**
    * "object" = a permanent, "player", "any" = creature/planeswalker/player (CR 115.4),
    * "spell" = an object on the stack, "card" = a card in a graveyard ("target creature card
    * from your graveyard", CR 109.2a, 115.2).
@@ -1548,7 +1554,7 @@ export type ObjRef =
   | { ref: "sharingName"; subject?: true }
   | { ref: "subject" } // the object its trigger event was about: exalted's "that creature" (see PendingTrigger.subject)
   /** "All Auras attached to that creature" (Treefolk Mystic): the permanents matching `filter` attached to the subject as this resolves. */
-  | { ref: "attachedToSubject"; filter: TargetSpec }
+  | { ref: "attachedToSubject"; filter: TargetSpec; /** Corrosive Ooze: once the subject has left the battlefield, the ones attached to it just before it left, still on the battlefield as those objects (rulings, CR 400.7). */ lastKnown?: true }
   /** "Whenever one or more tokens your opponents control enter, for each of them, ..." (Kambal): those that entered, while on the battlefield. */
   | { ref: "eventGroup" }
   /**
@@ -1711,7 +1717,9 @@ export type PlayerRef =
   /** Infernal Offering: "you and that player", the chosen opponent (Chosen.player), in APNAP order (CR 101.4). */
   | { ref: "youAndChosenPlayer" }
   /** Infernal Offering: "each player who sacrificed a creature this way": the controllers of what this resolution sacrificed (ResolvingInfo.sacrificedThisWay), still in the game, in APNAP order. */
-  | { ref: "sacrificedThisWay" }
+  | { ref: "sacrificedThisWay"; /** Desolation: "each player who sacrificed a Plains this way": only those who sacrificed one with this subtype, as it last existed (CR 608.2h). */ subtype?: string }
+  /** Desolation: "each player who tapped a land for mana this turn" (TurnLog.tappedLandForMana), still in the game, in APNAP order. */
+  | { ref: "tappedLandForMana" }
   /** Erestor of the Council: "each opponent who voted for a choice you voted for" in the vote that triggered it. */
   | { ref: "votedWithYou" }
   /** Grudge Keeper: "each opponent who voted for a choice you didn't vote for", in the vote that triggered it: one none of whose votes matches one of yours (rulings: with extra votes, an opponent counts only if they voted for none of your choices). */
@@ -1993,6 +2001,8 @@ export interface DamageMod {
   nextTime?: true;
   /** Well-Laid Plans: "... to a creature by another creature if they share a color": only when the source, as it deals the damage, and the permanent it's dealt to share a color, and aren't the same object. */
   shareColor?: true;
+  /** Battletide Alchemist: "you may prevent X of that damage": the mod's controller chooses, for each player and each source's damage, whether it applies (rulings). */
+  may?: true;
   text: string;
 }
 
@@ -4399,7 +4409,27 @@ export type Effect =
    * Darigaaz Reincarnated (round B202): "remove an egg counter from it. Then if ~ has no egg counters on it, return it to the
    * battlefield": the card in exile, still that object, onto the battlefield under its owner's control.
    */
-  | { type: "removeCounterThenReturn"; counter: CounterKind }
+  | { type: "removeCounterThenReturn"; counter: CounterKind; /** All Hallow's Eve (round B214): "put it into your graveyard" instead of onto the battlefield, setting ResolvingInfo.did for the "if" after it. */ toGraveyard?: true }
+  /**
+   * Ice Cave (round B214): "any other player may pay that spell's mana cost. If a player does, counter the spell.": the
+   * spell that triggered it (the cause), each other player asked in turn order (CR 101.4) until one pays; the mana cost
+   * as it is on the stack, X its announced value (CR 107.3h), no cost increases or reductions (rulings), and none to pay
+   * for a spell with no mana cost (CR 118.6).
+   */
+  | { type: "othersPaySpellCostToCounter" }
+  /**
+   * Cleansing (round B215): "For each land, destroy that land unless any player pays 1 life.": each player in turn order
+   * from the active player (CR 101.4), knowing the choices before theirs, chooses any of the lands no one has paid for yet
+   * (anyone's) and pays `life` for each as they choose (as many as they can pay, CR 119.4); then every land not paid for is
+   * destroyed at once.
+   */
+  | { type: "eachLandUnlessAnyPaysLife"; filter: TargetSpec; life: number }
+  /**
+   * Tidal Flats (round B214): "For each attacking creature without flying, its controller may pay {1}. If that player
+   * doesn't, creatures you control blocking that creature gain first strike until end of turn.": asked as it resolves, the
+   * creatures counted then (rulings), each attacker's controller in turn order (CR 101.4).
+   */
+  | { type: "attackersPayOrBlockersGain"; filter: TargetSpec; cost: string; keyword: string }
   /**
    * Storm Herald (round B208): "return any number of Aura cards from your graveyard to the battlefield attached to creatures
    * you control": only Auras that could be attached to a creature you control (rulings), chosen as it resolves, each
@@ -5227,7 +5257,7 @@ export type Effect =
    * process until no one puts a card onto the battlefield.": in turn order from you, each card entering as it's chosen;
    * over once every player in the game in a row has put none (rulings).
    */
-  | { type: "putFromHandRounds" }
+  | { type: "putFromHandRounds"; /** Hypergenesis (round B215): "an artifact, creature, enchantment, or land card": only permanent cards that match this. */ filter?: TargetSpec }
   /**
    * Predatory Focus: "You may have creatures you control assign their combat damage this turn as though they weren't
    * blocked": chosen as it resolves (rulings), for every creature this ability's controller controls as it assigns its
@@ -6516,6 +6546,19 @@ export type TriggerEvent =
 export type TriggerDuration = "endOfTurn" | "yourNextTurn" | "endOfYourNextTurn" | "endOfCombat" | /** Chancellor of the Annex: for the rest of the game (with `once` and `forPlayer`, until that player's first spell). */ "game";
 
 export interface TriggeredAbility {
+  /**
+   * Kodama of the Center Tree: "soulshift X, where X is the number of Spirits you control": for a "selfDies" trigger, X is
+   * the number of permanents of this subtype its controller controlled just before it left (itself and the others leaving
+   * at the same time included, CR 603.10a, rulings), known as it triggers, for its target's mana value (TargetSpec.xRange).
+   */
+  xLookBackSubtype?: string;
+  /**
+   * Warping Wurm (round B214): its controller puts this trigger on the stack after their other triggers waiting at the same
+   * time (CR 603.3b), so it resolves first: "Whenever ~ phases in, put a +1/+1 counter on it" before its own upkeep "phases out
+   * unless you pay". The engine doesn't ask for the order; the other one can only lose the counter (a phased-out permanent is
+   * treated as though it doesn't exist, CR 702.26b).
+   */
+  resolveFirst?: true;
   /** Druid of Horns: "Whenever you cast an Aura spell that targets ~": heroic for spells like this only. */
   heroicSpell?: TargetSpec;
   /** Speedball, New Warrior: "Whenever a player casts a spell that targets ~": heroic for any player's spell, not only its controller's. */
@@ -7791,6 +7834,8 @@ export const GRANTED_WAY_COSTS: Partial<Record<CastFromGraveyardKind, Additional
 };
 export interface CastFromGraveyard {
   kind: CastFromGraveyardKind;
+  /** Light Up the Night: "If you cast this spell this way, X can't be 0" (CR 107.3a, 601.2b). */
+  xMin?: number;
   /** A split card's half this way casts (graveyardWays): an aftermath half, or a half given flashback. */
   face?: number;
   mana?: string;
@@ -7993,6 +8038,8 @@ export interface CompiledCard {
   exileInsteadOfGraveyard?: boolean;
   /** An instant or sorcery whose last instruction is "Exile ~.": exiled as it finishes resolving (CR 608.2n). */
   exileSelfOnResolve?: true;
+  /** With `exileSelfOnResolve`, All Hallow's Eve (round B214): "Exile ~ with two scream counters on it": the card in exile gets these (CR 122.1). */
+  exileSelfCounters?: { counter: CounterKind; n: number };
   /**
    * "If a card or token would be put into a graveyard from anywhere, exile it instead." (Rest in Peace), "If a card would
    * be put into an opponent's graveyard from anywhere, exile it instead." (Leyline of the Void), "..., instead exile it

@@ -2741,6 +2741,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "23695bc2-86d3-4d78-b374-9e83c4cc9cc4",
+  "name": "Averna, the Chaos Bloom",
+  "manaCost": "{G}{U}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Elemental Shaman",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental",
+   "Shaman"
+  ],
+  "oracleText": "As you cascade, you may put a land card from among the exiled cards onto the battlefield tapped. (Do this after the last card is exiled but before deciding whether to cast a nonland card.)",
+  "power": "4",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "j25",
+  "releasedAt": "2024-11-15",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "35b3ae1c-4116-49b0-89a9-7332fe9bbff0",
   "name": "Axebane Ferox",
   "manaCost": "{2}{G}{G}",
@@ -2899,6 +2936,32 @@
   "set": "woe",
   "releasedAt": "2023-09-08",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fc5d3341-cbce-49e5-93cc-8add92479dca",
+  "name": "Bad Moon",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Black creatures get +1/+1.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -4173,6 +4236,42 @@
   "set": "rix",
   "releasedAt": "2018-01-19",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3f0c9466-5ab9-4205-a84f-b4b27b5a678e",
+  "name": "Bloodbraid Elf",
+  "manaCost": "{2}{R}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Elf Berserker",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Berserker"
+  ],
+  "oracleText": "Haste (This creature can attack and {T} as soon as it comes under your control.)\nCascade (When you cast this spell, exile cards from the top of your library until you exile a nonland card that costs less. You may cast it without paying its mana cost. Put the exiled cards on the bottom in a random order.)",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [
+   "Haste",
+   "Cascade"
+  ],
+  "commanderLegal": "legal",
+  "set": "ema",
+  "releasedAt": "2016-06-10",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -30212,6 +30311,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7fcb8472-1e77-4dcd-b18f-8abf8806da08",
+  "name": "Reap",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Return up to X target cards from your graveyard to your hand, where X is the number of black permanents target opponent controls as you cast this spell.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4fb83127-00cf-4ce7-aedf-cb0b2740c66f",
   "name": "Reckless Bushwhacker",
   "manaCost": "{2}{R}",
@@ -31167,6 +31292,36 @@
   "set": "sld",
   "releasedAt": "2025-04-28",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e9602731-2e8e-44ea-96a1-6b38e1efbbd9",
+  "name": "Rift Elemental",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Creature — Elemental",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "{1}{R}, Remove a time counter from a permanent you control or suspended card you own: This creature gets +2/+0 until end of turn.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -37613,6 +37768,28 @@
   "set": "dsc",
   "releasedAt": "2024-09-27",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1bd3e453-aa21-4ee6-95c2-d6d920ee8e7a",
+  "name": "Terramorphic Expanse",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}, Sacrifice this land: Search your library for a basic land card, put it onto the battlefield tapped, then shuffle.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

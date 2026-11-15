@@ -974,8 +974,21 @@ export function offerMany(s: GameState, body0: AbilityBody, controller: PlayerId
  * number as the targets are chosen (CR 601.2c), before any cost is paid (601.2h): Recantation's verse counters are
  * counted while it's still on the battlefield.
  */
-export function manyX(s: GameState, targets: TargetSpec[], controller: PlayerId, sourceId: ObjectId | undefined, x = 0): number {
+export function manyX(s: GameState, targets: TargetSpec[], controller: PlayerId, sourceId: ObjectId | undefined, x = 0, chosen?: TargetChoice[]): number {
   const spec = targets[manySlot(targets)];
+  // Reap: "where X is the number of black permanents target opponent controls as you cast ~": that player's, the target
+  // chosen for it before these (an earlier entry, so its place is the same whatever is chosen here), counted as the targets
+  // are chosen (rulings: during announcement, not again later). Before it's chosen, the most any player it could be
+  // would allow.
+  const count = spec?.manyCount?.count;
+  const whose = count?.kind === "permanents" ? count.whose : undefined;
+  if (spec?.manyCount && count?.kind === "permanents" && whose?.ref === "target") {
+    const pick = chosen?.[whose.index];
+    const spec0 = targets[whose.index];
+    const who = pick?.kind === "player" ? [pick.id] : pick || !spec0 ? [] : legalTargets(s, spec0, controller, undefined, undefined, sourceId).flatMap((t) => (t.kind === "player" ? [t.id] : []));
+    const theirs = { ...spec.manyCount, count: { ...count, whose: { ref: "you" as const } } };
+    return Math.max(0, ...who.map((pid) => evalAmount(s, theirs, { ...targetingCtx(s, controller, sourceId), controller: pid })));
+  }
   return spec?.manyCount ? Math.max(0, evalAmount(s, spec.manyCount, targetingCtx(s, controller, sourceId))) : x * (spec?.manyTimes ?? 1);
 }
 

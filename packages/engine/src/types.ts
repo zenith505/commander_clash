@@ -3073,7 +3073,7 @@ export interface Resolving {
     exploreScries?: number; // scries still to do before an explore (Twists and Turns, one each)
     /** Effect "exploreEach": the creatures still to explore, and the one exploring now. */
     exploreEach?: { left: ObjectId[]; current?: ObjectId };
-    cascade?: { exiled: ObjectId[]; hit?: ObjectId; /** Discover: its value, for "whenever you discover" (Curator of Sun's Creation). */ n?: number }; // cards cascade exiled, and the one it may cast
+    cascade?: { exiled: ObjectId[]; hit?: ObjectId; /** Discover: its value, for "whenever you discover" (Curator of Sun's Creation). */ n?: number; /** Averna: the lands from among them have been put onto the battlefield (or none chosen). */ landsDone?: true; /** The castFree prompt for `hit` has been asked. */ castAsked?: true }; // cards cascade exiled, and the one it may cast
     untilNonland?: { hit?: ObjectId; caster: PlayerId; seen?: ObjectId[] }; // the nonland card exileUntilNonland found, and who may cast it
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
     /** Wall of Shards' cumulative upkeep: the opponent chosen for each age counter so far (see Effect "cumulativeUpkeep" giveLife). */

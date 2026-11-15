@@ -1138,6 +1138,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         for (const a of o.blocking) {
           const at = s.objects[a];
           if (at) add(o, you, (e, t) => (e === "selfBlocksCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, at, you), undefined, undefined, at);
+          // Goblin Flotilla (round B225): "whenever ~ blocks or becomes blocked by a creature this combat", a delayed trigger
+          // about ~ (CR 603.7b-c): once for each creature it blocks.
+          if (at) fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfBlocksOrBlockedByCreature" && fits(t, at, ctrl), triggers, undefined, at), o);
           // "Whenever enchanted creature blocks or becomes blocked by a creature" (Mammoth Harness): once for each, that
           // creature the subject; the two of them the event's group ("destroy both creatures", Dead-Iron Sledge).
           if (at) addHosted(o, (e, t, w) => e === "selfBlocksOrBlockedByCreature" && fits(t, at, w), undefined, at, { group: [o, at].map((x) => ({ id: x.id, zc: x.zoneChanges ?? 0 })) });
@@ -1180,7 +1183,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           const bl = s.objects[b];
           if (bl) add(o, you, (e, t) => (e === "selfBlockedByCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, bl, you), undefined, undefined, bl);
           // Zombie Boa: "Whenever ~ becomes blocked by a creature of that color this turn": a delayed trigger about ~ (CR 603.7b).
-          if (bl) fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfBlockedByCreature" && fits(t, bl, ctrl), triggers, undefined, bl), o);
+          if (bl) fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => (e === "selfBlockedByCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, bl, ctrl), triggers, undefined, bl), o);
           if (bl) addHosted(o, (e, t, w) => e === "selfBlocksOrBlockedByCreature" && fits(t, bl, w), undefined, bl, { player: o.attacking, group: [o, bl].map((x) => ({ id: x.id, zc: x.zoneChanges ?? 0 })) });
           // "Whenever equipped creature becomes blocked by a creature" (Infiltration Lens): once for each blocker (rulings).
           if (bl) addHosted(o, (e) => e === "selfBlockedByCreature", undefined, bl, { player: o.attacking });
@@ -2162,6 +2165,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const info = { amount: ev.amount, ...(ev.excess ? { excess: ev.excess } : {}) };
       // Vampire Slayer: "deals damage to a Vampire", only a creature that fits (as it's dealt the damage).
       add(o, controllerOf(s, o), (e, t) => (e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature")) && (!t.subjectFilter || objectMatches(s, t.subjectFilter, hit, controllerOf(s, o), false)), undefined, undefined, hit, undefined, undefined, undefined, info);
+      // Acidic Dagger (round B225): "Whenever target creature deals combat damage to a non-Wall creature this turn", a
+      // delayed trigger about that creature (CR 603.7b-c), the creature dealt damage the subject, as it was dealt it.
+      fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => (e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature")) && (!t.subjectFilter || objectMatches(s, t.subjectFilter, hit, ctrl, false)), triggers, undefined, hit, undefined, undefined, undefined, info), o);
       addHosted(o, (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, hit, info);
       // Kusari-Gama: to a creature that's blocking as it's dealt the damage (CR 509.1h), any damage; the defending player
       // the one the equipped creature is attacking (CR 508.5), if it is.

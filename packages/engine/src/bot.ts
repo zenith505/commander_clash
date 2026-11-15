@@ -6521,6 +6521,12 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Harvest Mage (round B224): a card for lands that make a color of our choice this turn, which no payment plans
       // for in advance: not on its own.
       if (ab.body.effects.length && ab.body.effects.every((e) => e.type === "landManaUntilEndOfTurn" && e.mana === "any")) continue;
+      // Acidic Dagger (round B225): which of our creatures will deal combat damage to which blockers isn't planned for in
+      // advance: not on its own.
+      if (ab.body.effects.some((e) => e.type === "floatingTrigger" && e.about !== undefined && e.trigger.event === "selfDealsCombatDamageToCreature")) continue;
+      // Lesser Werewolf (round B225): "If ~'s power is 1 or more, ...": nothing at all while it isn't.
+      const w0 = ab.body.effects.length === 1 ? ab.body.effects[0] : undefined;
+      if (w0?.type === "if" && w0.cond.kind === "state" && w0.cond.cond.kind === "amount" && typeof w0.cond.cond.amount === "object" && w0.cond.cond.amount.count.kind === "power" && w0.cond.cond.amount.count.of.ref === "self" && !staticConditionNow(s, w0.cond.cond, id, pid)) continue;
       // Goblin Artisans (round B223): losing the flip counters a spell of our own: never worth the card.
       if (ab.body.targets.some((t) => t.kind === "spell" && t.controller === "you") && allEffects(ab.body.effects).some((e) => e.type === "counterSpell")) continue;
       // Keep our permanents (but cash in Food and Clues), and avoid free loops.

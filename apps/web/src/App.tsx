@@ -795,7 +795,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (!s) return;
     setMenu(null);
     const ab = abilitiesOf(s, s.objects[objectId]!).activated[index]!;
-    const label = `${cardOf(s, objectId).name}: ${ab.text}`;
+    // "~" read as the card's name (Lesser Werewolf's "If ~'s power is 1 or more").
+    const label = `${cardOf(s, objectId).name}: ${ab.text.replace(/~/g, cardOf(s, objectId).name)}`;
     // Crew: pick the creatures to tap, starting from a suggestion.
     if (ab.crew !== undefined) return setTapPick({ kind: "crew", objectId, index, n: ab.crew, chosen: autoCrew(s, HUMAN, objectId, ab.crew, ab.saddle, ab.tapPower) ?? [], ...(ab.saddle ? { saddle: true } : {}), ...(ab.tapPower ? { plain: true } : {}) });
     // Station: pick the one creature to tap, starting from the one with the greatest power.
@@ -1637,7 +1638,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
             <div className="targeting">
               <span>
                 {/* Blatant Thievery: one required target for each opponent, named. */}
-                <strong>{targeting.label}</strong>: choose {(nextSpec?.controlledBy !== undefined && !inRun ? nextSpec.text.replace(/\bthat player controls\b/, nextSpec.controlledBy === HUMAN ? "you control" : `${s.players[nextSpec.controlledBy]!.name} controls`).replace(/\bthat player\b/, nextSpec.controlledBy === HUMAN ? "you" : s.players[nextSpec.controlledBy]!.name) : (nextSpec?.text ?? "")).replace(/ of (?:their|defending player's|an opponent's) choice$/, "")}{" "}
+                <strong>{targeting.label}</strong>: choose {(nextSpec?.controlledBy !== undefined && !inRun ? nextSpec.text.replace(/\bthat player controls\b/, nextSpec.controlledBy === HUMAN ? "you control" : `${s.players[nextSpec.controlledBy]!.name} controls`).replace(/\bthat player\b/, nextSpec.controlledBy === HUMAN ? "you" : s.players[nextSpec.controlledBy]!.name) : (nextSpec?.text ?? "")).replace(/ of (?:their|defending player's|an opponent's) choice$/, "").replace(/~/g, targeting.mode === "activate" ? cardOf(s, targeting.objectId).name : "~")}{" "}
                 {inRun
                   ? `(optional, one for each ${targeting.specs.slice(targeting.chosen.length, runEnd).some((sp) => sp.controlledBy === HUMAN) ? "player" : "opponent"}: ${targeting.specs
                       .slice(targeting.chosen.length, runEnd)

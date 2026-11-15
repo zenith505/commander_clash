@@ -9624,6 +9624,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7ec3aaa4-8b6a-4046-b599-654f9844ca6c",
+  "name": "Day of the Moon",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI, II, III — Choose a creature card name, then goad all creatures with a name chosen for this enchantment. (Until your next turn, they attack each combat if able and attack a player other than you if able.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Goad"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "saga",
+  "gameChanger": false
+ },
+ {
   "oracleId": "70486bee-6ee7-41ea-b834-8caf4699302b",
   "name": "Daze",
   "manaCost": "{1}{U}",
@@ -15747,6 +15777,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8a44e4e7-dfa2-427b-bbff-11c398fa60bb",
+  "name": "Gavony Township",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{2}{G}{W}, {T}: Put a +1/+1 counter on each creature you control.",
+  "colors": [],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "68e45c07-96c5-4f87-a816-d9fa4f119740",
   "name": "Gemcutter Buccaneer",
   "manaCost": "{3}{R}",
@@ -21326,6 +21384,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4e420f43-a4a3-44bb-9a4e-a943f93a3534",
+  "name": "Kang Dynasty",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI, II — For each opponent, tap up to one target creature that player controls. Goad those creatures. Until your next turn, whenever any of those creatures deals combat damage to a player, draw a card.\nIII — Target creature you control gets +1/+1 until end of turn for each card in your hand and can't be blocked this turn.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Goad"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "saga",
+  "gameChanger": false
+ },
+ {
   "oracleId": "09ab1278-811f-4b97-bd34-7493d6e081e9",
   "name": "Karn, Living Legacy",
   "manaCost": "{4}",
@@ -24413,6 +24501,28 @@
   "commanderLegal": "legal",
   "set": "mb2",
   "releasedAt": "2024-08-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ae3517db-bb96-4c29-91dc-5bd68683dced",
+  "name": "Manascape Refractor",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "This artifact enters tapped.\nThis artifact has all activated abilities of all lands on the battlefield.\nYou may spend mana as though it were mana of any color to pay the activation costs of this artifact's abilities.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c20",
+  "releasedAt": "2020-04-17",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

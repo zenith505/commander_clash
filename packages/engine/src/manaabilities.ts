@@ -45,12 +45,20 @@ export function manaAbilitiesOn(s: GameState, o: GameObject): ManaAbility[] {
   if (borrows && !borrows.noMana) {
     const { objects, cards } = lendersOf(s, o, borrows);
     lendingMana = true; // a lender's own borrowed mana abilities aren't followed (no loops)
+    const lent: ManaAbility[] = [];
     try {
-      for (const x of objects) out.push(...manaAbilitiesOn(s, x));
+      for (const x of objects) lent.push(...manaAbilitiesOn(s, x));
     } finally {
       lendingMana = false;
     }
-    for (const d of cards) out.push(...d.subtypes.map(basicLandManaAbility).filter((x): x is ManaAbility => x !== null), ...compileCard(d).mana);
+    for (const d of cards) lent.push(...d.subtypes.map(basicLandManaAbility).filter((x): x is ManaAbility => x !== null), ...compileCard(d).mana);
+    // The same ability borrowed from several lenders (Manascape Refractor with fourteen basic lands around, round 382) is
+    // the same ability of this permanent, "~" in it being this one: offered once.
+    const seen = new Set(out.map((ab) => ab.text));
+    for (const ab of lent) if (!seen.has(ab.text)) {
+      seen.add(ab.text);
+      out.push(ab);
+    }
   }
   // Agatha's Soul Cauldron: the exiled creature cards' mana abilities too. Steward of the Harvest: a land card's basic land
   // types' among them (CR 305.6, rulings).

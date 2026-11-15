@@ -100,6 +100,7 @@ import { round377Line } from "./round377";
 import { round378Line } from "./round378";
 import { round380Line } from "./round380";
 import { round381Chapter, round381Line } from "./round381";
+import { round382Chapter, round382Line } from "./round382";
 import { roundB189Line } from "./laneb189";
 
 const cache = new Map<string, CompiledCard>();
@@ -1004,7 +1005,8 @@ export function compile(d: CardDef): CompiledCard {
       const yard = /^all (.+?) cards in (all graveyards|your graveyard)$/.exec(borrow[1]!);
       const what = yard ? parseTargetPhrase(yard[1]!) : null;
       const same = / that don't have the same name as ~$/.exec(borrow[1]!);
-      const group = yard ? null : parseGroup(same ? borrow[1]!.slice(0, same.index) : borrow[1]!);
+      // Manascape Refractor: "all lands on the battlefield" (round 382) is all lands, whoever controls them.
+      const group = yard ? null : parseGroup((same ? borrow[1]!.slice(0, same.index) : borrow[1]!).replace(/^(all [a-z]+) on the battlefield$/, "$1"));
       if (yard && what?.kind === "object" && !what.controller && Object.entries(what).every(([k, v]) => v === undefined || ["kind", "types", "notTypes", "notColors", "subtypes", "text"].includes(k)))
         out.borrows = { filter: { ...what, text: `${yard[1]} cards` }, graveyard: true, ...(yard[2] === "your graveyard" ? { yours: true as const } : {}), ...(borrow[2] ? { noMana: true as const } : {}) };
       else if (group && group.filter.controller !== "enchanted") out.borrows = { filter: group.filter, ...(group.other ? { other: true } : {}), ...(same ? { notSameName: true as const } : {}), ...(borrow[2] ? { noMana: true as const } : {}), ...(borrow[3] ? { anyColor: true as const } : {}) };
@@ -1094,7 +1096,9 @@ export function compile(d: CardDef): CompiledCard {
         // The Aesir Escape Valhalla's linked chapters (round 345).
         // The Three Seasons (round B206).
         // Long List of the Ents (round 381).
-        const r381 = round381Chapter(chapter[2]!);
+        // Day of the Moon (round 382).
+        const r382 = round382Chapter(chapter[2]!);
+        const r381 = r382 !== undefined ? r382 : round381Chapter(chapter[2]!);
         const rB206 = r381 !== undefined ? r381 : roundB206Chapter(chapter[2]!);
         const r345 = rB206 !== undefined ? rB206 : round345Chapter(chapter[2]!, (x) => parseBody(x, {}));
         const body = r345 === "fail" ? null : r345 ? r345 : /^Return the exiled card to the battlefield under its owner's control\.$/.test(chapter[2]!)
@@ -6190,6 +6194,8 @@ export function compile(d: CardDef): CompiledCard {
     // Round 380's whole lines (oracle/round380.ts).
     if (round380Line(line, raw, out, isSpell, d)) continue;
     if (round381Line(line, raw, out, isSpell)) continue;
+    // Round 382's whole lines (oracle/round382.ts).
+    if (round382Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,

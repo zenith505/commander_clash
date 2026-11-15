@@ -677,6 +677,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (controllerOf(s, host) !== you || !characteristics(s, host).types.includes("Creature")) return;
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e) => e === "auraAttachedToYours", undefined, undefined, aura);
   };
+  // River Song (round 382): "Whenever an opponent scries, surveils, or searches their library": the permanents of that
+  // player's opponents (CR 102.2), once for each of those events, "that player" being the one who did it.
+  const opponentLooks = (pid: PlayerId) => {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      if (opponents(s, you).includes(pid)) add(o, you, (e) => e === "opponentScriesSurveilsOrSearches", undefined, undefined, undefined, undefined, undefined, undefined, { player: pid });
+    }
+  };
   /**
    * The cards in graveyards with abilities that work there, each with its owner, who controls those abilities
    * (CR 113.6m, 113.8); `f` adds the ones that trigger.
@@ -1366,6 +1375,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (ev.how === "scry" && ev.bottom) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.player) add(obj(s, id), ev.player, (e) => e === "youScryToBottom", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.bottom });
     // "Whenever you surveil, if ~ is in your graveyard" (Blood Operative): its owner's.
     fromGraveyards((o, owner) => owner === ev.player && watch(o));
+    // River Song: "Whenever an opponent scries, surveils, or searches their library" (round 382).
+    opponentLooks(ev.player);
   } else if (ev.type === "clashed") {
     // "Whenever you clash" triggers on a clash an opponent's spell started too (rulings on Entangling Trap); "If you
     // won" is about that clash (TriggerEventInfo.wonClash).
@@ -2794,6 +2805,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const you = controllerOf(s, o);
       if (you !== ev.player) add(o, you, (e) => e === "opponentSearchesLibrary", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
+    opponentLooks(ev.player);
   } else if (ev.type === "shuffledLibrary") {
     // Cosi's Trickster, Psychic Surgery: each shuffle triggers it once (rulings: twice for Green Sun's Zenith).
     for (const id of s.battlefield) {

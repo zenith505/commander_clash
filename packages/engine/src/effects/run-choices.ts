@@ -937,7 +937,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         r.chosen = { ...r.chosen, name: undefined };
         if (chooser === undefined || !options.length) return;
         const of = ctx.targets.find((t) => t?.kind === "player");
-        s.pending = { kind: "chooseOption", player: chooser, source: src, what: "cardName", options, prompt: e.purpose === "guardLibrary" ? `choose a card name: if the card ${player(s, ctx.controller).name} found in your library is a creature card without that name, they may put it onto the battlefield under their control` : `choose ${e.names ? `a ${e.names.text} name` : "a card name"}`, purpose: e.purpose ?? "deny", ...(of?.kind === "player" ? { of: of.id } : {}) };
+        s.pending = { kind: "chooseOption", player: chooser, source: src, what: "cardName", options, prompt: e.purpose === "guardLibrary" ? `choose a card name: if the card ${player(s, ctx.controller).name} found in your library is a creature card without that name, they may put it onto the battlefield under their control` : e.purpose === "goadTheirs" ? `choose a creature card name: you goad every creature with a name chosen for ${src}` : `choose ${e.names ? `a ${e.names.text} name` : "a card name"}`, purpose: e.purpose ?? "deny", ...(of?.kind === "player" ? { of: of.id } : {}) };
         return "paused";
       }
       if (e.choice === "number") {

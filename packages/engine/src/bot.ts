@@ -6338,6 +6338,13 @@ function chooseCardName(s: GameState, pid: PlayerId, pend: Extract<PendingDecisi
     const ready = board.filter((id) => !obj(s, id).tapped && !isSummoningSick(s, obj(s, id)));
     return best(ready.length ? ready : board, (o) => power(s, o)) ?? best([...me.hand, ...me.library], value) ?? pend.options[0]!;
   }
+  // Day of the Moon (round 382): goaded creatures must attack someone other than us, so an opponent's biggest creature
+  // whose name none of ours has; else any opponent's.
+  if (pend.purpose === "goadTheirs") {
+    const ours = new Set(s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid).map((id) => characteristics(s, obj(s, id)).name));
+    const theirs = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) !== pid && objIsType(s, obj(s, id), "Creature"));
+    return best(theirs.filter((id) => !ours.has(characteristics(s, obj(s, id)).name)), (o) => power(s, o)) ?? best(theirs, (o) => power(s, o)) ?? pend.options[0]!;
+  }
   if (pend.purpose === "own") return best([...me.hand, ...me.library], (o) => value(o) + (o.zone === "hand" ? 10 : 0)) ?? pend.options[0]!;
   // Null Chamber's opponent: a name that hurts the player whose Chamber it is.
   const chamber = pend.objectId && s.objects[pend.objectId] && compileCard(defOf(s, obj(s, pend.objectId))).entersNamesWithOpponent ? controllerOf(s, obj(s, pend.objectId)) : undefined;

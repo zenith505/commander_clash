@@ -3153,7 +3153,9 @@ function archiveDraws(s: GameState, pid: PlayerId): number {
  */
 function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number[]; after?: DrawAfter } = { left: 0, made: [] }): boolean | "paused" {
   const p = player(s, pid);
-  const top = p.library[0];
+  // River Song (round 382): "You draw cards from the bottom of your library rather than the top." Otherwise it's the same
+  // draw (rulings), so `top` is the card drawn wherever it comes from.
+  const top = drawsFromBottom(s, pid) ? p.library[p.library.length - 1] : p.library[0];
   if (!top) {
     // Laboratory Maniac: the draw is replaced, so it isn't a draw from an empty library, even if the win is stopped
     // (Platinum Angel) (CR 614.1a, 104.2b). With Out of the Tombs too, the player would choose which applies (CR 616.1):
@@ -3240,6 +3242,11 @@ function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number
       });
   }
   return true;
+}
+
+/** Whether `pid` draws from the bottom of their library (River Song, CompiledCard.drawsFromBottom): a permanent of theirs says so. */
+export function drawsFromBottom(s: GameState, pid: PlayerId): boolean {
+  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).drawsFromBottom);
 }
 
 /**

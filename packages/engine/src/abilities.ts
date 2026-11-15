@@ -5427,6 +5427,13 @@ export type Effect =
    * (CR 205.3m), not one of a spell's; the one noted is kept for a later `nextCast` with `ofNoted` in the same resolution.
    */
   | { type: "noteCreatureType"; any?: true }
+  /**
+   * Day of the Moon (round 382): after "Choose a creature card name", "goad all creatures with a name chosen for ~": the name
+   * just chosen is added to the names chosen for the source as this object (GameState.namesChosenFor, CR 400.7), then every
+   * creature on the battlefield with any of them is goaded by this ability's controller (CR 701.15a), the group locked in as
+   * it resolves (CR 611.2c). effects/run-round382.ts.
+   */
+  | { type: "goadChosenNames" }
   /** Archnemesis: "you may attach this Aura to that player": the source, still that object on the battlefield, to the first of these players it could enchant (CR 701.3a-b, 702.5d); nothing if it's already attached there. */
   | { type: "attachSelfToPlayer"; who: PlayerRef }
   /**
@@ -5807,7 +5814,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
  * "ownCreature", a creature of its own on the battlefield (The Clone Saga's "a creature with the chosen name deals combat
  * damage").
  */
-export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature" | /** Mindblaze: a card in that player's library. */ "inLibrary" | /** Sphinx Ambassador: a card someone else found in this player's own library and would take if it's a creature card without that name. */ "guardLibrary";
+export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature" | /** Mindblaze: a card in that player's library. */ "inLibrary" | /** Day of the Moon: the name of creatures to goad, an opponent's. */ "goadTheirs" | /** Sphinx Ambassador: a card someone else found in this player's own library and would take if it's a creature card without that name. */ "guardLibrary";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
 export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters";
@@ -6516,6 +6523,8 @@ export type TriggerEvent =
   | "playerDiscards"
   /** "Whenever an opponent searches their library" (Archivist of Oghma): their own library, not another's (rulings). */
   | "opponentSearchesLibrary"
+  /** River Song (round 382): "Whenever an opponent scries, surveils, or searches their library": once for each of those events (CR 701.22, 701.25, 701.23). */
+  | "opponentScriesSurveilsOrSearches"
   /**
    * "Whenever an opponent shuffles their library" (Cosi's Trickster, Psychic Surgery): each time one is told to shuffle
    * their library (CR 701.24), an empty one too; cards put on the bottom in a random order aren't shuffled (rulings).
@@ -9118,6 +9127,16 @@ export interface CompiledCard {
   spendAnyColorAll?: true;
   /** Agatha's Soul Cauldron: "You may spend mana as though it were mana of any color to activate abilities of creatures you control" (CR 609.4b). */
   spendAnyColorCreatureAbilities?: true;
+  /**
+   * Manascape Refractor (round 382): "You may spend mana as though it were mana of any color to pay the activation costs of
+   * ~'s abilities." (CR 609.4b): every activated ability it has, mana abilities and borrowed ones among them (CR 602.1).
+   */
+  spendAnyColorOwnAbilities?: true;
+  /**
+   * River Song (round 382): "You draw cards from the bottom of your library rather than the top.": every card its
+   * controller draws while it's on the battlefield, not only in the draw step (rulings); it's a draw like any other.
+   */
+  drawsFromBottom?: true;
   /** Oath of Nissa: "You may spend mana as though it were mana of any color to cast planeswalker spells" (CR 609.4b), its controller's. */
   spendAnyColorPlaneswalkerSpells?: true;
   /** Case File Auditor: "You may spend mana as though it were mana of any color to cast Case spells" (CR 609.4b): spells with this subtype. */

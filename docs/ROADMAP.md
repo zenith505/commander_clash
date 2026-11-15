@@ -1,6 +1,6 @@
 # Roadmap
 
-31,477 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,481 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,902 of
 9,979 (99%).
 
@@ -3206,6 +3206,40 @@ line blocks.
    (still out, for the reasons in their earlier lists).
    Polish: Sokrates's prevention and draws log under the creature's name ("prevented (Craw Wurm)"), not Sokrates's; a
    land played from another player's graveyard logs "You plays".
+   Round 382 went on down `npm run popular` and the "Out after round N" lists, most played first, to every land's abilities
+   paid for with any color, draws from the bottom, a trigger on an opponent's scry, surveil or search, and goad by Saga
+   chapters: Manascape Refractor's "~ has all activated abilities of all lands on the battlefield." (CompiledCard.borrows,
+   every land whoever controls it, their mana abilities and basic land types' among them, not their triggered abilities,
+   rulings; an ability linked to a land's non-activated ability isn't linked on it, so Thriving Grove's "one mana of the
+   chosen color" adds only {G}; the same ability borrowed from several lands is offered once) and "You may spend mana as
+   though it were mana of any color to pay the activation costs of ~'s abilities." (CompiledCard.spendAnyColorOwnAbilities,
+   CR 609.4b: every activated ability it has, mana abilities too, so Graven Cairns' {B/R} is paid with white); River Song's
+   "You draw cards from the bottom of your library rather than the top." (CompiledCard.drawsFromBottom, every draw, rulings)
+   and "Whenever an opponent scries, surveils, or searches their library, put a +1/+1 counter on ~. Then ~ deals damage to
+   that player equal to its power." (trigger event opponentScriesSurveilsOrSearches, once for each scry, surveil or search
+   of their own library, CR 701.22, 701.25, 701.23); Day of the Moon's "I, II, III — Choose a creature card name, then goad
+   all creatures with a name chosen for ~." (Effect goadChosenNames: the name joins GameState.namesChosenFor for the Saga as
+   this object, CR 400.7, then every creature with any of them is goaded by you, CR 701.15a, as it resolves, CR 611.2c);
+   Kang Dynasty's "I, II — For each opponent, tap up to one target creature that player controls. Goad those creatures.
+   Until your next turn, whenever any of those creatures deals combat damage to a player, draw a card." (a delayed trigger
+   about each target, CR 603.7b-c; modes.ts spreadRefs now spreads a floatingTrigger's `about`/`each` over the per-opponent
+   targets). Browser tests click through the Refractor's borrowed Gavony Township ability paid with Plains, Day of the
+   Moon's name picker and the goaded Hill Giants, and Kang Dynasty's targets for each opponent. New prompt: Day of the
+   Moon's name picker text. +4, 31,481 of 31,936. The compiled text of every other card is unchanged. Bots name an
+   opponent's biggest creature whose name none of theirs has for Day of the Moon, and tap the Refractor for mana like any
+   land.
+   Out after round 382 (looked at, not done): Aragorn, Company Leader ("Whenever you put one or more counters on ~, put one
+   of each of those kinds of counters on up to one other target creature": counters of several kinds put at once are one
+   event, but the engine fires one countersPut event for each kind); Crafty Cutpurse (tokens that would be created under an
+   opponent's control this turn are created under yours: applied before every other token replacement, and with several
+   players' Cutpurse effects the would-be controller chooses the order, rulings, a choice in the middle of every token
+   creation); Kraven the Hunter ("a creature an opponent controls with the greatest power among creatures that player
+   controls dies": the comparison as it died, with the others leaving at the same time); Helm of Kaldra ("Attach those
+   Equipment to it": which ones when you control several with a name isn't settled by its rulings); Quicksilver Elemental
+   and Grell Philosopher (still out: gaining another permanent's activated abilities for a while); Wayta, Trainer Prodigy,
+   Archelos, Lagoon Mystic and the rest above rank 9,000 (still out, for the reasons in their earlier lists).
+   Polish: Manascape Refractor lists one mana ability for each different land ability (Thriving Grove's shows "or one mana
+   of the chosen color" though it adds only {G} there).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

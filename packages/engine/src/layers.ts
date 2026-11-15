@@ -576,7 +576,7 @@ interface Inst {
   /** Its type change applies to its controller's land cards outside the battlefield too (StaticAbility.offFieldLands). */
   offFieldLands?: true;
   /** Its type change applies to some of its controller's cards outside the battlefield too (StaticAbility.offFieldCards). */
-  offFieldCards?: "nonlandPermanent" | "libraryLand";
+  offFieldCards?: "nonlandPermanent" | "libraryLand" | "yardCreature";
   /** A stored effect for a group (ContinuousEffect.group): it needs no source. */
   live?: true;
 }
@@ -1651,6 +1651,7 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
     const o = c && s.objects[c.id];
     return o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === c.zc && chars.has(o.id) ? [o.id] : [];
   }
+  if (a.kind === "none") return [];
   if (a.kind === "inCombatWithSelf") {
     // Blocking it, or attacking and blocked by it, while both are in combat (CR 509.1h, 506.4).
     const me = s.objects[e.sourceId!];
@@ -2436,7 +2437,7 @@ function computeLayers(s: GameState, counted: { yes: boolean }, grants: OffField
         grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "4"), lands: true });
       // Encroaching Mycosynth, Rootpath Purifier: its controller's nonland permanent cards, or land cards in their library.
       if (pick.offFieldCards && layer === "4" && pick.sourceId)
-        grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "4"), cards: pick.offFieldCards });
+        grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "4"), cards: pick.offFieldCards, ...(s.objects[pick.sourceId]?.chosen?.type ? { chosen: s.objects[pick.sourceId]!.chosen!.type } : {}) });
       // Mycosynth Lattice: as it applied in layer 5, to every card and spell outside the battlefield too.
       if (pick.offFieldAll && layer === "5" && pick.sourceId)
         grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "5"), everyone: true, ...(s.objects[pick.sourceId]?.chosen?.color ? { chosenColor: s.objects[pick.sourceId]!.chosen!.color } : {}) });
@@ -2628,8 +2629,9 @@ interface OffFieldGrant {
   /** A type change for land cards its controller owns outside the battlefield (Dune Chanter). */
   lands?: true;
   /** A type change for its controller's nonland permanent cards outside the battlefield and the stack (Encroaching
-   * Mycosynth), or for land cards in its controller's library (Rootpath Purifier). */
-  cards?: "nonlandPermanent" | "libraryLand";
+   * Mycosynth), for land cards in its controller's library (Rootpath Purifier), or for creature cards in its controller's
+   * graveyard (Ashes of the Fallen, with `chosen`). */
+  cards?: "nonlandPermanent" | "libraryLand" | "yardCreature";
 }
 
 let building: { grants: OffFieldGrant[] } | undefined;
@@ -2672,7 +2674,8 @@ export function offFieldTyped(s: GameState, o: GameObject, d: CardDef): CardDef 
   const lands = d.types.includes("Land") && o.zone !== "stack" && !o.isToken ? offFieldGrants(s).filter((g) => g.lands && o.owner === g.controller) : [];
   // Encroaching Mycosynth: nonland permanent cards its controller owns (CR 110.4a), off the stack (spells are above).
   // Rootpath Purifier: land cards in its controller's library (a library holds only its owner's cards, CR 400.3).
-  const cards = o.zone !== "stack" && !o.isToken ? offFieldGrants(s).filter((g) => g.cards && o.owner === g.controller && (g.cards === "nonlandPermanent" ? !d.types.includes("Land") && PERMANENT_CARD_TYPES.some((t) => d.types.includes(t)) : o.zone === "library" && d.types.includes("Land"))) : [];
+  // Ashes of the Fallen: creature cards in its controller's graveyard (a graveyard holds only its owner's cards, CR 404.2).
+  const cards = o.zone !== "stack" && !o.isToken ? offFieldGrants(s).filter((g) => g.cards && o.owner === g.controller && (g.cards === "nonlandPermanent" ? !d.types.includes("Land") && PERMANENT_CARD_TYPES.some((t) => d.types.includes(t)) : g.cards === "yardCreature" ? o.zone === "graveyard" && d.types.includes("Creature") : o.zone === "library" && d.types.includes("Land"))) : [];
   if (!d.types.includes("Creature") && !spells.length && !lands.length && !cards.length) return d;
   const gs: { timestamp: number; mods: Modification[]; chosen?: string }[] = d.types.includes("Creature") ? offFieldGrants(s).filter((g) => !g.everyone && !g.permanentSpells && !g.lands && !g.cards && (o.zone === "stack" ? o.controller === g.controller : o.owner === g.controller && !o.isToken)) : [];
   gs.push(...lands, ...cards);

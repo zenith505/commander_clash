@@ -31,6 +31,8 @@ import { runKinCountersEffect } from "./run-round361";
 import { runRedistributeLifeEffect } from "./run-round362";
 import { runMayCastExiledSpellEffect, runUntilLeavesToBottomEffect } from "./run-round363";
 import { runChooseSourceNowEffect } from "./run-round364";
+import { runMillUntilEffect } from "./run-round373";
+import { runOpponentSplitsCostExiledEffect, runReturnWithSacrificedEffect, runSwapFromGraveyardsEffect } from "./run-round374";
 import { runAttachSelfToPlayerEffect } from "./run-round365";
 import { runFlickerWithAurasEffect, runReturnAurasAttachedEffect } from "./run-round366";
 import { runTapLandsSharingManaEffect } from "./run-round367";
@@ -620,6 +622,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   }
   if (ref.ref === "sacrificedThisWayCards") return (s.resolving?.sacrificedThisWay ?? []).flatMap((l) => (l.id !== undefined && l.cardZc !== undefined && s.objects[l.id]?.zone === "graveyard" && (s.objects[l.id]!.zoneChanges ?? 0) === l.cardZc ? [s.objects[l.id]!] : []));
   if (ref.ref === "sacrificedCards") return (ctx.sacrificed ?? []).flatMap((l) => (l.id !== undefined && l.cardZc !== undefined && s.objects[l.id]?.zone === "graveyard" && (s.objects[l.id]!.zoneChanges ?? 0) === l.cardZc ? [s.objects[l.id]!] : []));
+  // Rescue from the Underworld: the cards remembered, each still that object outside the battlefield in a public zone.
+  if (ref.ref === "remembered") return ref.cards.flatMap((c) => ((o) => (o && (o.zone === "graveyard" || o.zone === "exile" || o.zone === "command") && (o.zoneChanges ?? 0) === c.zc ? [o] : []))(s.objects[c.id]));
   if (ref.ref === "costExiled") return (s.resolving?.item.costExiled ?? []).flatMap((c) => (s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : []));
   if (ref.ref === "yourGraveyard") return player(s, ctx.controller).graveyard.map((id) => obj(s, id)).filter((o) => printedMatches(ref.filter, defOf(s, o)));
   // Fumble: the Auras and Equipment noted before it left, still those objects on the battlefield (CR 400.7).
@@ -1850,6 +1854,14 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runUntilLeavesToBottomEffect(s, ctx, src);
     case "chooseSourceNow":
       return runChooseSourceNowEffect(s, e, ctx, src);
+    case "millUntil":
+      return runMillUntilEffect(s, e, ctx);
+    case "opponentSplitsCostExiled":
+      return runOpponentSplitsCostExiledEffect(s, ctx, src);
+    case "returnWithSacrificedAtYourNextUpkeep":
+      return runReturnWithSacrificedEffect(s, e, ctx, src);
+    case "swapFromGraveyards":
+      return runSwapFromGraveyardsEffect(s, ctx, src);
     case "attachSelfToPlayer":
       return runAttachSelfToPlayerEffect(s, e, ctx);
     case "flickerWithAuras":

@@ -1,4 +1,5 @@
-// Round 368's sentences, read before round 367's (round367Sentence in oracle/round367.ts reads these first), and its whole
+// Round 368's sentences, read before round 367's (round367Sentence in oracle/round367.ts reads these first; round 373's
+// before them), and its whole
 // lines (compile.ts, after round 367's): a creature growing by how much bigger the creature that died was (Drizzt
 // Do'Urden), an Aura traded for a copy of it on each other attacker (Three Dog, Galaxy News DJ) and mana that finds a
 // cheaper instant or sorcery for the next spell (Codie, Vociferous Codex).
@@ -6,12 +7,14 @@ import type { AbilityBody, Amount, CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseManaAbility } from "./mana-abilities";
 import { parseTrigger } from "./triggers";
+import { round373Sentence } from "./round373";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 export function round368Sentence(s: string, sentences: string[], si: number, ctx: Ctx, effects: Effect[]): Found {
-  void sentences;
-  void effects;
+  // Round 373's sentences first (oracle/round373.ts).
+  const r373 = round373Sentence(s, sentences, si, ctx, effects);
+  if (r373) return r373;
   // Gorex, the Tombshell: "choose a card at random exiled with ~ and put that card into its owner's hand": one of the cards
   // linked to it still in exile (CR 607.2a, 607.2q), as it is or as it last existed for "dies" (CR 603.10a).
   if (/^[Cc]hoose a card at random exiled with ~ and put that card into its owner's hand\.?$/.test(s)) {

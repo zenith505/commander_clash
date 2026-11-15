@@ -101,7 +101,7 @@ describe("Lane B round B213", () => {
     for (let i = 0; i < 8 && s.pending?.kind === "chooseOption" && s.pending.player === ap; i++) {
       const p = s.pending.prompt ?? "";
       asked.push(p);
-      s = settle(answer(s, ap, p.includes(` to ${s.players[ap]!.name}.`) ? yes : no), ap);
+      s = settle(answer(s, ap, p.includes(" damage to you.") ? yes : no), ap);
     }
     expect(asked.length).toBe(4);
     s = settle(s);

@@ -7243,6 +7243,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e43b478b-4cb8-42b1-a5b0-0b1421b84852",
+  "name": "Coin of Fate",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "When this artifact enters, surveil 1.\n{3}{W}, {T}, Exile two creature cards from your graveyard, Sacrifice this artifact: An opponent chooses one of the exiled cards. You put that card on the bottom of your library and return the other to the battlefield tapped. You become the monarch.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Surveil"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ad786230-4045-46af-bc89-078d45891e5b",
   "name": "Colfenor's Plans",
   "manaCost": "{2}{B}{B}",
@@ -9170,6 +9198,38 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2024-09-30",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6fa7229d-18b6-43d8-aa57-a56cdb815767",
+  "name": "Dawnbreak Reclaimer",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Creature — Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flying\nAt the beginning of your end step, choose a creature card in an opponent's graveyard, then that player chooses a creature card in your graveyard. You may return those cards to the battlefield under their owners' control.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "c15",
+  "releasedAt": "2015-11-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -30760,6 +30820,32 @@
   "set": "eoe",
   "releasedAt": "2025-08-01",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7217ea53-3685-48d6-9df1-58a551f8c979",
+  "name": "Rescue from the Underworld",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, sacrifice a creature.\nChoose target creature card in your graveyard. Return that card and the sacrificed card to the battlefield under your control at the beginning of your next upkeep. Exile Rescue from the Underworld.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ths",
+  "releasedAt": "2013-09-27",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

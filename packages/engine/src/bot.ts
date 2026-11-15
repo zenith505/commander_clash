@@ -306,6 +306,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const keep = !!o && (o.isToken || o.isCommander || mv(s, o.id) >= 4 || Object.values(o.counters ?? {}).some((n) => (n ?? 0) > 0) || s.battlefield.some((id) => s.objects[id]!.attachedTo === o.id));
       return [{ type: "chooseMay", player: pid, yes: keep }];
     }
+    // Dawnbreak Reclaimer: both cards return or neither: ours for theirs only when ours is worth at least as much (mana
+    // value), and ours alone always.
+    if (pend.kind === "chooseMay" && theirMay?.type === "swapFromGraveyards") {
+      const st = s.resolving!.scratch?.swap;
+      const worth = (c: { id: string; zc: number } | "none" | undefined) => (c && c !== "none" && s.objects[c.id]?.zone === "graveyard" ? mv(s, c.id) : undefined);
+      const ours = worth(st?.yours);
+      const theirs = worth(st?.theirs);
+      return [{ type: "chooseMay", player: pid, yes: ours !== undefined && (theirs === undefined || ours >= theirs) }];
+    }
     // Covenant of Minds: the three cards seen rather than five unseen, unless five more draws would empty that library.
     if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && s.resolving!.item.controller !== pid && theirMay.effects.length === 1 && theirMay.effects[0]!.type === "revealedTo") {
       const lib = player(s, s.resolving!.item.controller).library.length - (s.resolving!.revealedUntil?.length ?? 0);

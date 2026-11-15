@@ -1392,6 +1392,8 @@ export interface LastKnown {
   returnedSubtypes?: string[];
   /** The object it was (a card keeps its id in its new zone): "another permanent card" than the one sacrificed this way. */
   id?: ObjectId;
+  /** For a sacrifice cost: the card it became in the graveyard, or in exile if a replacement put it there instead (Rescue from the Underworld's "the sacrificed card", rulings). */
+  cardIn?: { id: ObjectId; zc: number };
   counters?: Record<string, number>;
   /** Its card types as it last existed (CR 608.2h): "a permanent that shares a card type with it" (Braids). */
   types?: string[];
@@ -3308,6 +3310,8 @@ export interface Resolving {
     castingTarget?: ObjectId;
     /** Wake to Slaughter: the opponent's pick is done (opponentSplitsTargets). */
     splitDone?: true;
+    /** Dawnbreak Reclaimer (Effect swapFromGraveyards): the pick being asked for, the cards chosen ("none" when there was none to choose) and the opponent choosing in your graveyard. */
+    swap?: { asking?: "theirs" | "yours"; theirs?: { id: ObjectId; zc: number } | "none"; chooser?: PlayerId; yours?: { id: ObjectId; zc: number } | "none" };
     /** Rona, Tolarian Obliterator (Effect "exileRandomThenPlay"): the card exiled, and whether it's been offered. */
     exiledAtRandom?: { id: ObjectId; zc: number; asked?: true };
     /** castTargetFree with several targets: the ones offered already. */

@@ -1,6 +1,6 @@
 # Roadmap
 
-31,404 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,408 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -321,7 +321,7 @@ line blocks.
    "instead" sweepers), Chandra, Heart of Fire, Lynde, Salt Road Ambushers, Origin of the Hidden Ones, Grab the Reins (done in round 325),
    Pyromancer Ascension (done in round 367), Verdant Mastery, Primal Adversary, Planar Void (done in round 299), In Too Deep, Dollhouse of Horrors, Harald
    Unites the Elves (done in round 326), Exquisite Archangel (done in round 329), Kellan, Planar
-   Trailblazer, Najal, Rescue from the Underworld, Seal of the Guildpact (done in round 299), Fear of Infinity (done in round 371), Elderscale Wurm (done in round 324), Cradle of
+   Trailblazer, Najal, Rescue from the Underworld (done in round 374), Seal of the Guildpact (done in round 299), Fear of Infinity (done in round 371), Elderscale Wurm (done in round 324), Cradle of
    Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order (done in round 324),
    Scheming Fence, Oath of Lieges (done in round B143), Helm of Obedience (done in round 373), Concerted Effort, Belbe's Portal (done in round 324), Edgewall Innkeeper, Simic
    Manipulator, Endless Whispers, Burn from Within (done in round 325), Skyfire Phoenix (done in round 276), Contagion (done in round 325), Gutter Grime, Coffin Queen, Genesis
@@ -1382,7 +1382,7 @@ line blocks.
    goaded for as long as they control it); Nephalia Academy (a discard an opponent causes put on top instead); Heirloom
    Epic (tap creatures for an activation cost's mana, like convoke); Kaldring, the Rimestaff (play a snow permanent card
    from your graveyard this turn, entering tapped); Hostile Hostel (done in round 338) (soul counters, transform, then untap; Creeping Inn's
-   "creature cards exiled with this creature"); Dawnbreak Reclaimer (an opponent chooses a card in your graveyard);
+   "creature cards exiled with this creature"); Dawnbreak Reclaimer (done in round 374) (an opponent chooses a card in your graveyard);
    Cryptic Gateway (done in round 302), Mogg Assassin, Karplusan Minotaur (done in round 318), The Phasing of Zhalfir (done in round 363), Mirror of Life Trapping, Grasping Shadows (done in round 371)
    ("transform it" is the enchantment, not the attacker).
    Round 233 (top of the list, now done): "you may pay one or more {E}. If you do, create an X/X ... Vehicle token"
@@ -2656,7 +2656,7 @@ line blocks.
    608.2g; it stays there if not). No new prompt: each uses the existing target, keep-tapped, attack, search and free-cast
    paths, with browser tests for Knowledge Exploitation and Coffin Queen. Bots keep Coffin Queen tapped while the creature it
    returned is on the battlefield. +6, 31,275 of 31,936 with Lane B's B199 and B200. The compiled text of every other card is unchanged.
-   Out after round 360 (looked at, not done): Rescue from the Underworld ("Return that card and the sacrificed card":
+   Out after round 360 (looked at, not done): Rescue from the Underworld (done in round 374) ("Return that card and the sacrificed card":
    the card sacrificed for its cost, returned from whatever public zone it went to, rulings, with no ref for it yet);
    Reap (still out: a target count set by another target); Choice of Damnations (done in round B204) (an opponent chooses a number, a new
    prompt, then life or "sacrifices all but that many permanents"); Helm of Obedience (done in round 373) (mill one at a time until a creature
@@ -2686,7 +2686,7 @@ line blocks.
    cost removing a time counter from a permanent or a suspended card); Thought Lash (done in round B210) ("When a player doesn't pay ~'s
    cumulative upkeep": a trigger on a cumulative upkeep left unpaid, with exiling the top card as the upkeep); Lavabrink
    Floodgates (each player's choice in their upkeep to add or remove a doom counter, a new prompt, then a reflexive
-   sacrifice trigger); Coin of Fate (still out: an opponent chooses which of the two cards exiled as a cost goes to the
+   sacrifice trigger); Coin of Fate (done in round 374) (still out: an opponent chooses which of the two cards exiled as a cost goes to the
    bottom).
    Round 362 went on down the "Out after round N" lists and `npm run popular`, most played first: Dimir Doppelganger's
    "{1}{U}{B}: Exile target creature card from a graveyard. ~ becomes a copy of that card, except it has this ability."
@@ -2785,7 +2785,7 @@ line blocks.
    31,936 with Lane B's B204. The compiled text of every other card is unchanged.
    Out after round 365 (looked at, not done): Archelos, Lagoon Mystic and Kraven the Hunter (still out, as in the earlier
    lists); The Pandorica ("It can't phase in for as long as ~ remains tapped", then phasing in when it untaps or leaves:
-   a lock tied to the source's tapped state); Ashes of the Fallen (a chosen creature type for creature cards in your
+   a lock tied to the source's tapped state); Ashes of the Fallen (done in round 374) (a chosen creature type for creature cards in your
    graveyard only: the off-field type statics cover every zone outside the battlefield); Garland, Royal Kidnapper and Reap
    (still out).
    Round 366 went on down `npm run popular`, most played first, to prevention that makes tokens, triggers on turning face
@@ -2994,6 +2994,27 @@ line blocks.
    two cards and lose 1 life" replacing one draw, the life lost after both draws, each Scrivener applying once to each
    draw it made, rulings; the draw loop's made draws only count Alhammarret's Archives); Callous Oppressor (still out: an
    opponent, chosen by its controller, chooses the creature type as it enters).
+   Round 374 went on down the "Out after round N" lists, most played first, to a creature type for the cards in your
+   graveyard, an opponent splitting the two cards a cost exiled, a card returned with the creature sacrificed to cast the
+   spell and two creature cards chosen in two graveyards: Ashes of the Fallen's "Each creature card in your graveyard has
+   the chosen creature type in addition to its other types." (layer 4, CR 613.1d, for its controller's graveyard only,
+   nothing on the battlefield: Affects `none`, StaticAbility.offFieldCards "yardCreature"; added as the cards enter the
+   graveyard, so soulshift can target one, rulings); Coin of Fate's "{3}{W}, {T}, Exile two creature cards from your
+   graveyard, Sacrifice ~: An opponent chooses one of the exiled cards. You put that card on the bottom of your library and
+   return the other to the battlefield tapped. You become the monarch." (the opponent you choose picks as it resolves,
+   CR 608.2d; with one of them gone from exile it's the only one left to choose, and none returns, CR 400.7: Effect
+   opponentSplitsCostExiled, AdditionalCost exileFromGraveyard `costCards`); Rescue from the Underworld's "Choose target
+   creature card in your graveyard. Return that card and the sacrificed card to the battlefield under your control at the
+   beginning of your next upkeep. Exile ~." (one delayed trigger, CR 603.7, about both cards as they are then, the
+   sacrificed one in whatever public zone it went to, rulings: LastKnown.cardIn, ObjRef `remembered`; a token or a card
+   that moved again doesn't return; a sacrificed commander moved to the command zone by the state-based action is a new
+   object, CR 903.9a, 400.7, so the older ruling about the command zone no longer applies); Dawnbreak Reclaimer's "At the
+   beginning of your end step, choose a creature card in an opponent's graveyard, then that player chooses a creature card
+   in your graveyard. You may return those cards to the battlefield under their owners' control." (not an opponent with
+   none when one has a creature card; with none, you choose the opponent who chooses, rulings; both or neither return:
+   Effect swapFromGraveyards; bots return the pair when theirs is worth at least the opponent's). Browser tests click
+   through Coin of Fate's cost and opponent, Rescue's target and sacrifice, and both of Dawnbreak's pickers and its yes.
+   No new prompt kinds. +4, 31,408 of 31,936 with round 373. The compiled text of every other card is unchanged.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -4474,7 +4495,7 @@ line blocks.
    Terminal Velocity (a permanent put from your hand gains a leaves-the-battlefield trigger and an end-step sacrifice);
    Hurkyl, Master Wizard (one revealed card for each card type among noncreature spells you cast this turn); Hew the
    Entwood (sacrifice any number of lands as it resolves, then reveal that many and pick artifact and land cards, nonland
-   ones entering first); Coin of Fate (an opponent chooses which of the two cards exiled as a cost goes to the bottom).
+   ones entering first); Coin of Fate (done in round 374) (an opponent chooses which of the two cards exiled as a cost goes to the bottom).
    Out after round 259 (looked at, not done): Requiem Monolith (a granted "whenever this creature is dealt damage" trigger
    and "that creature's controller may have ~ deal 1 damage to it"); Sorceress's Schemes (done in round 272); Reyhan, Last of the Abzan ("or is
    put into the command zone", with "if it had one or more +1/+1 counters on it"); Red Sun's Twilight (done in round 304) (token copies of
@@ -9255,7 +9276,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   replacement exiled instead not among them, rulings; X the total power of the cards exiled). +6, 31,269 of 31,936 with B201.
 - Out after round B202 (looked at, not done): Long Rest ("X target cards with different mana values": no targeting rule
   across a spell's targets yet), Song of Inspiration (no ruling settles whether a target that became illegal still adds its
-  mana value to the roll, CR 608.2b), Lodestone Bauble, Decoy Gambit (done in round B212) and Coin of Fate stay out for the reasons in the
+  mana value to the roll, CR 608.2b), Lodestone Bauble, Decoy Gambit (done in round B212) and Coin of Fate (done in round 374) stay out for the reasons in the
   earlier lists.
 - Round B203 (least played first, from the Lane B skip lists): Nyla, Shirshu Sleuth ("If you do, you lose X life and create
   X Clue tokens, where X is that card's mana value" after exiling up to one target card: only if it was exiled, its mana
@@ -9940,7 +9961,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B67 (looked at, not done): Words of War (done in round B163), Words of Waste and Words of Wind (a target or choices in the
   middle of a draw), Hedonist's Trove (done in round B192) (lands from its exile any number of times, one spell a turn), Day of the Dragons,
   Lumbering Battlement, Wall of Mourning (cards exiled with ~ from abilities not linked yet; Kayla's Music Box and
-  Serpent's Soul-Jar done in round B70), Ashes of the Fallen (creature types of cards in a graveyard: Lane A's round 227 adds those for Roshan,
+  Serpent's Soul-Jar done in round B70), Ashes of the Fallen (done in round 374) (creature types of cards in a graveyard: Lane A's round 227 adds those for Roshan,
   so after it merges), Desolation (who tapped a land for mana this turn), Nefarious Lich (damage replaced by exiling
   from the graveyard, losing if you can't).
 - Next for Lane B, least played first: the unsupported ones no round has written down yet (`npm run popular -- --least`,

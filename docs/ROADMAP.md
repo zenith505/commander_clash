@@ -1,6 +1,6 @@
 # Roadmap
 
-31,443 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,447 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -9540,6 +9540,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the other's best while each trade gains). Bots don't cast Jailbreak or Cultural Exchange. Browser tests for Cultural
   Exchange's two picks, Spirit-Sister's Call's question and sacrifice, Jailbreak's second target and Fervent Mastery's
   {2}{R}{R} cast and opponent. +4, 31,443 of 31,936. The compiled text of every other card is unchanged.
+- Round B221 (least played first, from the Lane B skip lists): Cemetery Desecrator (entering or dying, another card,
+  not its own, exiled from any graveyard as the trigger resolves, as Cemetery Prowler's; that triggers the reflexive modal
+  ability, its mode and target chosen only then, rulings, CR 603.12, X the exiled card's mana value: X counters of its
+  controller's choice removed from target permanent, all of them with fewer, or -X/-X to an opponent's creature).
+  Terminal Velocity (an artifact or creature card put from your hand gains haste, "When this permanent leaves the
+  battlefield, it deals damage equal to its mana value to each creature" and "At the beginning of your end step, sacrifice
+  this permanent" for good, CR 611.2a; the damage is its mana value as it last existed, rulings, CR 608.2h: a self-leaves
+  trigger's last known information now carries the mana value; bots don't cast it). Callous Oppressor ("As ~ enters, an
+  opponent chooses a creature type": its controller chooses the opponent, as for tribute, CR 702.104a, then that opponent
+  chooses, CR 614.12, entersChoose `byOpponent`, a bot choosing its own creatures' most common type; "{T}: Gain control of
+  target creature that isn't of the chosen type for as long as ~ remains tapped", a changeling never a target, CR 702.73a:
+  activated and triggered targets "not of the chosen type" or color are now bound to the choice). Storyweave (its second
+  mode's two lore counters, then a replacement for the next event this turn in which enchantment creatures enter under your
+  control, each of them as it would enter getting two more +1/+1 counters, CR 614.1c, 614.12: Effect nextEntersCounters,
+  GameState.nextEntersCounters, used up as Mystic Reflection's is). Browser tests for the Desecrator's graveyard pick, mode
+  and target, Terminal Velocity's pick and end step, the Oppressor's opponent, a bot's type and its tap ability, the type
+  you choose for Ana's Oppressor, and Storyweave's Saga mode. +4, 31,447 of 31,936. The compiled text of every other card is
+  unchanged.
+- Out after round B221 (looked at, not done): Allure of the Unknown (an opponent you choose exiles one of the revealed
+  cards and may cast it free as your spell resolves, rulings: a cast by another player in the middle of a resolution),
+  Glimpse of Tomorrow (still waiting for Lane A's Warp World), Next of Kin, Lodestone Bauble and Sanctuary Blade stay out.
+  Known gap: tokens one instruction creates several at a time enter one at a time here, so only the first enchantment
+  creature token gets Storyweave's counters (Mystic Reflection's copy has the same gap).
 - Out after round B220 (looked at, not done): Glimpse of Tomorrow (round 376 on Lane A, not merged yet, builds Warp World's
   shuffle-and-reveal; Glimpse is that for one player, better done once it lands), Next of Kin (an Aura returned at the
   next end step attached to the creature put onto the battlefield, from your hand or the command zone, with lesser mana

@@ -3851,6 +3851,10 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "flipCoinEachWon") && !s.battlefield.some((b) => (obj(s, b).blocking ?? []).some((a) => s.objects[a] && controllerOf(s, obj(s, a)) === pid))) return null;
   // Stunning Reversal: kept for when our life is low enough that we might lose this turn.
   if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "loseInsteadThisTurn") && player(s, pid).life > 5) return null;
+  // Terminal Velocity (round B221): the permanent it puts from our hand is sacrificed at our end step and its damage hits our
+  // creatures too; bots have no plan for that, so they don't cast it.
+  const spellFx = compileCard(d).spell?.effects ?? [];
+  if (spellFx.some((e) => e.type === "putFromHand") && spellFx.some((e) => e.type === "continuous" && e.what.ref === "created" && e.mods.some((m) => m.kind === "addAbility" && /^At the beginning of your end step, sacrifice ~\.$/.test(m.text)))) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.

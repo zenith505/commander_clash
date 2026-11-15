@@ -2426,6 +2426,12 @@ export interface GameState {
    * neither is known). `used` once some have, so the others entering with them still do (enterTogether).
    */
   nextEntersAsCopy?: { id: ObjectId; zc: number; key: string; turn: number; timestamp: number; source: string; used?: true }[];
+  /**
+   * Storyweave (round B221): the next time this turn one or more permanents with all of `types` enter under `controller`'s
+   * control, each of them as it would enter (CR 614.12) enters with `n` more `counter` counters. `used` once some have, so
+   * the others entering with them still do (enterTogether).
+   */
+  nextEntersCounters?: { controller: PlayerId; types: string[]; counter: string; n: number; turn: number; source: string; used?: true }[];
   /** Something happened during the cleanup step, so players get priority and then there's another one (CR 514.3a). */
   cleanupAgain?: boolean;
   /**
@@ -2472,7 +2478,7 @@ export interface GameState {
   manaColorFor?: { player: PlayerId; n: number; from: ManaOrigin[]; source: string };
   /** The replacement a player chose for the game loss they're about to have (CR 616.1): an option of loseReplacements. */
   loseChoice?: { player: PlayerId; choice: string };
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; /** CompiledCard.entersChoose's `opponentHands`; `revealedHands` once they're revealed. */ opponentHands?: true; revealedHands?: true; many?: true; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; random?: number[]; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; /** One of "two players" (Sower of Discord): added to Chosen.players, not one chosen before. */ pair?: true; /** Null Chamber: the first or second of two card names, chosen by its controller and the opponent it chose, in turn order from the active player (CR 101.4). */ pairName?: 0 | 1; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean } }[];
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; /** CompiledCard.entersChoose's `byOpponent`: the opponent chosen just before (Chosen.player) makes this choice. */ byOpponent?: true; /** CompiledCard.entersChoose's `opponentHands`; `revealedHands` once they're revealed. */ opponentHands?: true; revealedHands?: true; many?: true; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; random?: number[]; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; /** One of "two players" (Sower of Discord): added to Chosen.players, not one chosen before. */ pair?: true; /** Null Chamber: the first or second of two card names, chosen by its controller and the opponent it chose, in turn order from the active player (CR 101.4). */ pairName?: 0 | 1; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean } }[];
   nextId: number;
   /**
    * Resolutions in a row in this step with every player only passing priority, and the states they left (as hashes,

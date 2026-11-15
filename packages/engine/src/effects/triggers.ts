@@ -949,7 +949,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       lastAbilities,
       undefined,
       undefined,
-      { counters: ev.counters, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) },
+      // Terminal Velocity's granted "it deals damage equal to its mana value" (round B221): its mana value then (CR 608.2h).
+      { counters: ev.counters, ...(ev.snapshot ? { manaValue: defMv(defOf(s, ev.snapshot)) } : {}), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) },
       lookBackX(lastAbilities.find((t) => t.event === "selfDies" && t.xLookBackSubtype)?.xLookBackSubtype),
     );
     // Zenos yae Galvus: "When the chosen creature leaves the battlefield": the permanent noted as it, that object (CR 400.7),

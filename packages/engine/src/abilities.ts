@@ -4182,6 +4182,12 @@ export type Effect =
    * chosen creature": a replacement effect for the next such event (CR 614.1c, 707.5), see GameState.nextEntersAsCopy.
    */
   | { type: "nextEntersAsCopy"; of: ObjRef }
+  /**
+   * Storyweave (round B221): "The next time one or more enchantment creatures you control enter this turn, each enters with
+   * two additional +1/+1 counters on it": a replacement effect for the next event this turn in which permanents with all of
+   * `allTypes` enter under its controller's control (CR 614.1c, 614.12), see GameState.nextEntersCounters.
+   */
+  | { type: "nextEntersCounters"; allTypes: string[]; counter: CounterKind; n: number }
   /** `attacking`: "tapped and attacking" (CR 508.4), attacking whom the ability's source attacks. */
   | {
       type: "createToken";
@@ -8166,7 +8172,7 @@ export interface CompiledCard {
   entersTappedIfXAtMost?: number;
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */
-  entersChoose?: { what: ChoiceKind; except?: string; /** With "cardName": "each opponent reveals their hand. You choose the name of a nonland card revealed this way" (Alhammarret, High Arbiter): only the names of the cards matching `names` in its controller's opponents' hands, revealed as it enters; none chosen if there's none. */ opponentHands?: true; /** "Choose two abilities from among first strike, vigilance, and lifelink" (Greymond): one of several keywords chosen, each added to Chosen.keywords and not offered again. */ many?: true; names?: TargetSpec; purpose?: NamePurpose; /** "Choose artifact, creature, enchantment, instant, or sorcery" (Cloud Key): the card types offered. */ options?: string[]; /** "Choose a number between 1 and 10" (Talion): any whole number in it. */ range?: { min: number; max: number }; /** "Choose 2, 3, or 4 at random" (Haktos): one of these, at random, with no one choosing. */ random?: number[] }[];
+  entersChoose?: { what: ChoiceKind; except?: string; /** Callous Oppressor (round B221): "an opponent chooses a creature type": its controller chooses an opponent (Chosen.player), who makes this choice. */ byOpponent?: true; /** With "cardName": "each opponent reveals their hand. You choose the name of a nonland card revealed this way" (Alhammarret, High Arbiter): only the names of the cards matching `names` in its controller's opponents' hands, revealed as it enters; none chosen if there's none. */ opponentHands?: true; /** "Choose two abilities from among first strike, vigilance, and lifelink" (Greymond): one of several keywords chosen, each added to Chosen.keywords and not offered again. */ many?: true; names?: TargetSpec; purpose?: NamePurpose; /** "Choose artifact, creature, enchantment, instant, or sorcery" (Cloud Key): the card types offered. */ options?: string[]; /** "Choose a number between 1 and 10" (Talion): any whole number in it. */ range?: { min: number; max: number }; /** "Choose 2, 3, or 4 at random" (Haktos): one of these, at random, with no one choosing. */ random?: number[] }[];
   /** "Noncreature spells with mana value equal to the chosen number can't be cast." (Sanctum Prelate): anyone's. */
   noncreatureChosenMvCantBeCast?: true;
   /** "You may cast ~ as though it had flash if it targets a commander." (Timely Ward) */

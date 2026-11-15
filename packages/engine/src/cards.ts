@@ -632,7 +632,8 @@ function withChosenName(base: CompiledCard, name: string): CompiledCard {
 const typed = new WeakMap<CompiledCard, Map<string, CompiledCard>>();
 /** Triggered and activated abilities whose targets are "of the chosen type", with that type filled in (bindChosen). */
 function withChosenType(base: CompiledCard, chosen: Chosen): CompiledCard {
-  const bound = (t: TargetSpec) => (t.chosen === "type" && chosen.type !== undefined) || (t.chosen === "color" && chosen.color !== undefined);
+  // Callous Oppressor (round B221): "that isn't of the chosen type" too.
+  const bound = (t: TargetSpec) => ((t.chosen === "type" || t.chosen === "notType") && chosen.type !== undefined) || ((t.chosen === "color" || t.chosen === "notColor") && chosen.color !== undefined);
   const has = (b: AbilityBody) => b.targets.some(bound) || !!b.modal?.modes.some((m) => m.targets.some(bound));
   if (!base.activated.some((a) => has(a.body)) && !base.triggers.some((t) => has(t.body))) return base;
   let byType = typed.get(base);

@@ -10393,6 +10393,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2e5440ef-6887-4c79-98f5-49db82406d71",
+  "name": "Disciple of Caelus Nin",
+  "manaCost": "{4}{W}",
+  "cmc": 5,
+  "typeLine": "Creature — Human Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "When this creature enters, starting with you, each player chooses up to five permanents they control. All permanents other than this creature that weren't chosen this way phase out.\nPermanents can't phase in.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "brc",
+  "releasedAt": "2022-11-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d7cbe54b-f217-45f5-8583-c254a1c80bb8",
   "name": "Disciple of Phenax",
   "manaCost": "{2}{B}{B}",
@@ -16138,6 +16169,37 @@
   "set": "msh",
   "releasedAt": "2026-06-26",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ec85a375-fe38-4b11-af0e-f2b466181dd7",
+  "name": "Goblin Artisans",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Creature — Goblin Artificer",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Artificer"
+  ],
+  "oracleText": "{T}: Flip a coin. If you win the flip, draw a card. If you lose the flip, counter target artifact spell you control that isn't the target of an ability from another creature named Goblin Artisans.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "atq",
+  "releasedAt": "1994-03-04",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -516,13 +516,18 @@ export const spellQuality = (s: GameState, cardId?: string, item?: StackItem): S
  * (its characteristics, CR 613) or in another zone (a channel ability: its card's); if it has left the battlefield, as it
  * last existed there (CR 113.7a, 608.2h). An ability without a source (the monarch's) has none to match.
  */
-function abilitySourceIs(s: GameState, item: StackItem, from: NonNullable<TargetSpec["abilityFrom"]>): boolean {
-  if (!item.sourceId) return false;
+function abilitySourceNow(s: GameState, item: StackItem) {
+  if (!item.sourceId) return undefined;
   const o = s.objects[item.sourceId];
   const same = o && (item.sourceZc === undefined || (o.zoneChanges ?? 0) === item.sourceZc);
   const lk = !same ? s.lastKnown?.[item.sourceId] : undefined;
   const d = item.sourceCardId ? s.cards[item.sourceCardId] : undefined;
-  const q = same ? (o.zone === "battlefield" ? characteristics(s, o) : defOf(s, o)) : lk && lk.zc === item.sourceZc && lk.source ? lk.source : d;
+  return same ? (o.zone === "battlefield" ? characteristics(s, o) : defOf(s, o)) : lk && lk.zc === item.sourceZc && lk.source ? lk.source : d;
+}
+
+function abilitySourceIs(s: GameState, item: StackItem, from: NonNullable<TargetSpec["abilityFrom"]>): boolean {
+  const o = item.sourceId ? s.objects[item.sourceId] : undefined;
+  const q = abilitySourceNow(s, item);
   if (!q) return false;
   if (from.colorless && q.colors.length) return false;
   if (from.supertypes?.some((t) => !(q.supertypes ?? []).includes(t))) return false;
@@ -530,6 +535,21 @@ function abilitySourceIs(s: GameState, item: StackItem, from: NonNullable<Target
   if (from.notCommander && o?.isCommander) return false;
   if (from.notTypes?.some((t) => q.types.includes(t))) return false;
   return !from.types?.length || from.types.some((t) => q.types.includes(t));
+}
+
+/**
+ * Goblin Artisans: is the spell `stackId` a target of an ability on the stack from a source of these types with this name
+ * (as the source is now, or as it last existed, CR 113.7a), other than `except` (the ability's own source)? A face-down
+ * source has no name (CR 708.2).
+ */
+function targetOfAbilityFrom(s: GameState, stackId: string, from: NonNullable<TargetSpec["notTargetOfAbilityFrom"]>): boolean {
+  return s.stack.some((x) => {
+    if (x.kind !== "ability" || !x.sourceId || x.sourceId === from.except || !(x.targets ?? []).some((t) => t.kind === "stack" && t.id === stackId)) return false;
+    const q = abilitySourceNow(s, x);
+    const o = s.objects[x.sourceId];
+    const faceDown = !!o && o.zone === "battlefield" && (x.sourceZc === undefined || (o.zoneChanges ?? 0) === x.sourceZc) && !!o.faceDown;
+    return !!q && !faceDown && q.name === from.name && from.types.every((t) => q.types.includes(t));
+  });
 }
 
 /** Filters checked against a card's printed characteristics, for spells and cards in graveyards. */
@@ -754,6 +774,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     // "Target spell you control", "... you don't control" / "... an opponent controls" (no teammates here).
     if ((spec.controller === "you" && item.controller !== controller) || (spec.controller === "opponent" && item.controller === controller)) return false;
     if (!aims) return false;
+    if (spec.notTargetOfAbilityFrom && targetOfAbilityFrom(s, item.id, spec.notTargetOfAbilityFrom)) return false;
     // Nothing in the engine changes a spell's characteristics on the stack yet, so the card's are used. Its mana value
     // counts the X chosen for it (CR 202.3e); a face-down spell's is 0 (CR 708.2).
     if (spec.manaValue && !inRange(spellManaValue(s, item), spec.manaValue)) return false;
@@ -900,6 +921,8 @@ export function bindBound(s: GameState, spec0: TargetSpec, ctx: AmountCtx): Targ
   const spec5: TargetSpec = spec4.namedAsSource && myName !== undefined ? (({ namedAsSource: _, ...r }) => ({ ...r, named: myName }))(spec4) : spec4;
   // Mitotic Manipulation: "if it has the same name as a permanent": the names of the permanents on the battlefield now,
   // anyone's (rulings); a face-down one has none (CR 708.2). With none, nothing matches.
+  // Goblin Artisans: "another creature named Goblin Artisans": not this ability's own source.
+  if (spec5.notTargetOfAbilityFrom && ctx.sourceId && spec5.notTargetOfAbilityFrom.except === undefined) return bindBound(s, { ...spec5, notTargetOfAbilityFrom: { ...spec5.notTargetOfAbilityFrom, except: ctx.sourceId } }, ctx);
   const spec: TargetSpec = spec5.sameNameAsPermanent ? (({ sameNameAsPermanent: _, ...r }) => ({ ...r, namedAny: [...new Set(s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown).map((o) => characteristics(s, o).name))].filter((n) => !r.namedAny || r.namedAny.some((m) => sameName(m, n))) }))(spec5) : spec5;
   if (!spec.bound) return spec;
   const { bound, ...rest } = spec;

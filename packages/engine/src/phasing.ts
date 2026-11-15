@@ -1,6 +1,6 @@
 // Phasing (CR 702.26): a phased-out permanent is treated as though it doesn't exist, without changing zones.
 
-import { objHasKeyword } from "./cards";
+import { abilitiesOf, objHasKeyword } from "./cards";
 import { clearCombat, log, nameOf, obj, removeFromCombat, whileControlledHolds } from "./game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
 import { pairedWith } from "./cards";
@@ -59,8 +59,11 @@ export function phaseOut(s: GameState, ids: ObjectId[]) {
  * Aura or Equipment that phased out directly comes back attached to what it was attached to if that's still on the
  * battlefield, and unattached otherwise (702.26i); state-based actions do the rest.
  */
-export function phaseIn(s: GameState, ids: ObjectId[]) {
+export function phaseIn(s: GameState, ids: ObjectId[], blocked = cantPhaseIn(s)) {
   const list = (s.phasedOut ??= []);
+  // Disciple of Caelus Nin: "Permanents can't phase in": nothing does, whatever would phase it in (rulings). Something phased
+  // out "until" an event that happens meanwhile stays phased out for good (rulings: its `until` never comes again).
+  if (blocked) return;
   // "They can't phase in" (Teferi, Timeless Voyager) until that lock ends, whatever would phase them in.
   // The Phasing of Zhalfir: "It can't phase in for as long as you control ~" (lockWhile).
   const all = [...new Set(ids)].filter((id) => s.objects[id]?.zone === "phasedOut" && !s.objects[id]!.phased?.lock && !phaseLockedWhile(s, id));
@@ -87,6 +90,12 @@ export function phaseIn(s: GameState, ids: ObjectId[]) {
 }
 
 /**
+ * "Permanents can't phase in." (Disciple of Caelus Nin, CR 702.26c): a phased-in permanent with that ability is on the
+ * battlefield; a phased-out one is treated as though it doesn't exist (CR 702.26b), so its ability does nothing then.
+ */
+export const cantPhaseIn = (s: GameState): boolean => s.battlefield.some((id) => !!abilitiesOf(s, obj(s, id)).permanentsCantPhaseIn);
+
+/**
  * The Phasing of Zhalfir: a phased-out permanent that can't phase in "for as long as you control ~", while that player
  * still controls that object (CR 400.7, 611.2b); a phased-out ~ isn't controlled by anyone (CR 702.26b, rulings).
  */
@@ -106,8 +115,11 @@ export function untapStepPhasing(s: GameState, ap: PlayerId) {
     const p = s.objects[id]!.phased;
     return p && !p.indirect && !p.until && !p.lock && !phaseLockedWhile(s, id) && (p.by === ap || p.released);
   });
+  // Phasing out and in happen at once (CR 702.26a): what can't phase in is decided before either, so a Disciple of Caelus Nin
+  // phasing out now still stops the others phasing in now; one already phased out phases in with the rest (rulings).
+  const blocked = cantPhaseIn(s);
   phaseOut(s, out);
-  phaseIn(s, back);
+  phaseIn(s, back, blocked);
 }
 
 /**

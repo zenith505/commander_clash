@@ -3868,6 +3868,9 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // creatures too; bots have no plan for that, so they don't cast it.
   const spellFx = compileCard(d).spell?.effects ?? [];
   if (spellFx.some((e) => e.type === "putFromHand") && spellFx.some((e) => e.type === "continuous" && e.what.ref === "created" && e.mods.some((m) => m.kind === "addAbility" && /^At the beginning of your end step, sacrifice ~\.$/.test(m.text)))) return null;
+  // Disciple of Caelus Nin (round B223): everything but five permanents of each player phases out for as long as it stays;
+  // cast only while we'd keep all of ours.
+  if (compileCard(d).permanentsCantPhaseIn && compileCard(d).triggers.some((tr) => tr.body.effects.some((e) => e.type === "keepRest" && e.phaseOut)) && s.battlefield.filter((b) => controllerOf(s, obj(s, b)) === pid).length > 5) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
@@ -6515,6 +6518,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.mana) continue;
       // Fractured Powerstone's planar die outside Planechase: nothing to gain.
       if (ab.body.effects.every((e) => e.type === "noEffect")) continue;
+      // Goblin Artisans (round B223): losing the flip counters a spell of our own: never worth the card.
+      if (ab.body.targets.some((t) => t.kind === "spell" && t.controller === "you") && allEffects(ab.body.effects).some((e) => e.type === "counterSpell")) continue;
       // Keep our permanents (but cash in Food and Clues), and avoid free loops.
       const cashIn = ab.sacrificeSelf && o.isToken && !objIsType(s, o, "Creature");
       // A cost of nothing, "{0}" included, could be paid over and over.

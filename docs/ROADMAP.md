@@ -1,6 +1,6 @@
 # Roadmap
 
-31,456 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,460 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -5191,7 +5191,7 @@ line blocks.
    - Autopay doesn't try to spend mana from creatures for Inga and Esika, or a single color for Steel Exemplar.
    - Snow: all 45 legal {S} cards are supported. Mana Reflection and Nyxbloom Ancient multiply mana as a replacement
      effect while a {T} mana ability resolves (CR 106.12b); changes of type (Contamination, Infernal Darkness) since round
-     B92; a color of the player's choice instead (Pulse of Llanowar) is still out.
+     B92; a color of the player's choice instead (Pulse of Llanowar) since round B224.
    - "Each player chooses ..., then sacrifices the rest" still out: Natural Balance, Promise of Loyalty's vow counters,
      Stick Together (done in round 302)'s party, Single Combat's "can't cast creature or planeswalker spells until the end of your next
      turn".
@@ -9593,6 +9593,24 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   stays out for good, and a phased-out Disciple stops nothing, rulings; bots cast it only while they control five
   permanents or fewer). Browser tests for the Disciple's pick and Goblin Artisans' target on the stack and flip. +4,
   31,456 of 31,936. The compiled text of every other card is unchanged.
+- Round B224 (least played first, from the Lane B skip lists): a color chosen as a land is tapped for mana, a replacement
+  effect whose new type the player tapping it picks (CR 106.12b, 614.1a; ManaOption and the activateMana and
+  activateAbility actions carry `instead`, offered as one more button per color in the land's menu, and used by autopay).
+  Naked Singularity and Reality Twist (any player's land makes the color its basic land type is listed with, the same
+  amount; a land with two of the listed types, Taiga under Naked Singularity, makes either, all the mana of the one color
+  chosen, rulings; CompiledCard.landManaBySubtype, a type listed twice after a text change giving the choice too). Pulse of
+  Llanowar (your basic lands make mana of a color of your choice, the same amount, chosen each time, the color it would make
+  included, rulings; CompiledCard.basicLandManaAnyColor). Harvest Mage (until end of turn, a land you tap makes one mana of
+  a color of your choice instead of any other type and amount; landManaUntilEndOfTurn mana `any` with `one`; bots don't
+  activate it). The replacements combine in any order the player picks (CR 616.1): with Mana Reflection, twice as much of
+  the chosen color. With no color given, a land keeps the type it would have made when it can. Browser tests for Pulse of
+  Llanowar's five colors on a Forest, Naked Singularity's {U} or {B} for Taiga, and Harvest Mage's discard and then one {G}
+  from a Mountain. +4, 31,460 of 31,936. The compiled text of
+  every other card is unchanged.
+- Out after round B224 (looked at, not done): Peace Talks (activated abilities, not triggered ones, can't target: target
+  legality doesn't yet know whether an ability was activated or triggered), False Dawn (mana from spells and abilities, not
+  only lands, turned white, and white mana spent as any color), Benthic Explorers (untapping an opponent's land as a mana
+  ability's cost) and the lists after round B223 stay out.
 - Out after round B223 (looked at, not done): Eye for an Eye (a replacement, not a prevention, that keeps the damage and
   adds Eye for an Eye's own; the affected player orders it with prevention shields and redirections, CR 616.1, and the
   result differs between orders), Oracle en-Vec (chosen creatures that must attack during that player's next turn while
@@ -10042,13 +10060,13 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Drafna's Restoration (done in round B159) (targets in the graveyard of an earlier target player), Rite of Ruin (done in round B129) (an order for three card
   types, then three rounds of sacrifices), Tariff (a punisher whose cost is the chosen creature's mana cost), Powerleech (done in round B122)
   and Haunting Wind (done in round B122) ("activates an artifact's ability without {T} in its activation cost", and "that artifact's
-  controller"), Fasting (done in round B136) (a may skip of the draw step as it would begin), Naked Singularity (a land with two basic land
+  controller"), Fasting (done in round B136) (a may skip of the draw step as it would begin), Naked Singularity (done in round B224) (a land with two basic land
   types, as Reality Twist), Harsh Judgment and Aegis of Honor (an instant or sorcery's damage redirected to its
   controller), Peace Talks ("this turn and next turn"), Stronghold Gambit, Grenzo's Rebuttal (done in round B152), Planar Overlay (done in round B114), Worldpurge (done in round B189),
   Call to Arms (done in round B211).
-- Out after round B92 (looked at, not done): Reality Twist ("Plains produce {R}, Swamps produce {G}...": a land with two
+- Out after round B92 (looked at, not done): Reality Twist (done in round B224) ("Plains produce {R}, Swamps produce {G}...": a land with two
   basic land types lets its controller pick the color, rulings), Harvest Mage and Pulse of Llanowar (mana of a color of
-  your choice instead: a choice as the land is tapped), Escaped Shapeshifter (keywords and protection read from opponents'
+  your choice instead: a choice as the land is tapped; both done in round B224), Escaped Shapeshifter (keywords and protection read from opponents'
   creatures, a layer 6 dependency), Spoils of War (done in round B164) (X set by an opponent's graveyard as you cast it), Drain Life (done in round B179), Soul Burn
   and Consume Spirit (done in round B179) ("Spend only black mana on X" on a spell, with cost reductions), Emblazoned Golem (one mana of each
   color on X), Fatal Lore (done in round B142) (an opponent chooses the mode), Echo Chamber (done in round B141) (an opponent chooses the target), Butcher Orgg and

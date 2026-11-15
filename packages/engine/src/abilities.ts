@@ -5287,7 +5287,7 @@ export type Effect =
    * type"; Deep Water: "Until end of turn, if you tap a land you control for mana, it produces {U} instead ..." (`yours`):
    * a replacement effect for the rest of the turn (CR 106.12b, 614.1a; GameState.landManaRules).
    */
-  | { type: "landManaUntilEndOfTurn"; mana: ManaType; nonbasic?: true; yours?: true; /** Chaos Moon (round B223): "if a player taps a Mountain for mana, that Mountain produces colorless mana instead": only lands with this subtype as they're tapped. */ subtype?: string }
+  | { type: "landManaUntilEndOfTurn"; /** "any": "mana of a color of your choice" (Harvest Mage, round B224). */ mana: ManaType | "any"; /** "... instead of any other type and amount": one mana. */ one?: true; nonbasic?: true; yours?: true; /** Chaos Moon (round B223): "if a player taps a Mountain for mana, that Mountain produces colorless mana instead": only lands with this subtype as they're tapped. */ subtype?: string }
   | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true; /** "That player can't activate abilities that aren't mana abilities" (Abeyance): for these players. */ who?: PlayerRef; /** For each opponent of its controller (Revel in Silence). */ opponents?: true; /** "Can't be countered by blue or black spells" (Autumn's Veil): only by spells of these colors. */ byColors?: Color[]; /** About the ability's source, the object it is now (Kaito, Dancing Shadow's "loyaltyTwice"). */ self?: true }
   /** "Until your next turn, you may cast sorcery spells as though they had flash." (Teferi, Time Raveler; CR 702.8a) */
   | { type: "flashUntilNextTurn"; filter: TargetSpec; /** "You may cast creature spells this turn as though they had flash" (Winding Canyons): until this turn ends instead. */ thisTurn?: true }
@@ -8755,6 +8755,14 @@ export interface CompiledCard {
    * this type; `one`: "... instead of any other type and amount" (Contamination), exactly one mana of it.
    */
   landManaAs?: { mana: ManaType; one?: true }[];
+  /**
+   * Naked Singularity, Reality Twist (round B224): "If tapped for mana, Plains produce {R}, Islands produce {G}, ... instead
+   * of any other type": for any player's land, the color its basic land type is listed with; a land with two of them makes
+   * the color of its controller's choice (rulings). One list for each such ability.
+   */
+  landManaBySubtype?: { subtype: string; mana: ManaType }[][];
+  /** Pulse of Llanowar (round B224): "If a basic land you control is tapped for mana, it produces mana of a color of your choice instead of any other type." */
+  basicLandManaAnyColor?: true;
   /** "If you would gain life, you gain that much life plus 1 instead" (CR 614.1a): N for each. */
   lifeGainPlus?: number;
   /** "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): that number. */

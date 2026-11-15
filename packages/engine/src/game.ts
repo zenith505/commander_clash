@@ -11,7 +11,7 @@ import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, castCardAs, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
-import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
@@ -363,7 +363,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "activateMana":
       if (!paysManaNow(s)) requireNoPending(s);
-      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra, action.combo, action.to);
+      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra, action.combo, action.to, action.instead);
       break;
     case "castSpell":
       if (action.assisted !== undefined) throw new RulesError("the assisting player chooses how much they pay");
@@ -5758,7 +5758,7 @@ export function tapAbilitySick(s: GameState, o: GameObject) {
   return !s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).creatureAbilitiesHaste && controllerOf(s, obj(s, id)) === you);
 }
 
-function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number, to?: PlayerId) {
+function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number, to?: PlayerId, instead?: ManaType) {
   const o = obj(s, id);
   // Its source as it was activated ("whenever you activate an ability of a creature", Elrond), before its costs.
   const activatedFrom = o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
@@ -5776,8 +5776,10 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // many counters it removes, announced as it's activated (CR 107.3a), and how that mana is split.
   const combos = manaCombos(s, o, ab);
   if (combos ? combo === undefined || !combos[combo] : combo !== undefined) throw new RulesError(combos ? `choose which mana ${name} adds` : `${name}'s ability has no combinations of mana to choose from`);
+  // A color chosen for a replacement that lets the player tapping it choose (round B224): one it offers.
+  if (instead !== undefined && !(ab.tap && insteadChoices(s, p.id, o).includes(instead))) throw new RulesError(`${name}'s mana can't be made {${instead}} instead`);
   // What it makes is worked out before the costs change anything ("for each creature you control").
-  const adds = manaProduced(s, o, ab, mana, combo);
+  const adds = manaProduced(s, o, ab, mana, combo, instead);
   // The triggered mana abilities tapping it triggers (CR 605.1b), with the player's picks for their mana.
   const triggered = manaTriggerResults(s, p.id, o, ab, adds);
   const picked = triggered.find((r) => r.extra.length === extra.length && r.extra.every((m, i) => m === extra[i]));
@@ -6013,7 +6015,7 @@ function runActivate(s: GameState, p: Player, action: Extract<Action, { type: "a
   // A mana ability can be activated wherever mana abilities can (CR 605.3a); abilityProblem says which it is.
   if (!paysManaNow(s)) requireNoPending(s);
   if (askChoosers(s, p, action)) return false;
-  const mana = activateAbility(s, p, action.objectId, action.index, action.targets, action.modes, action.tapCreatures, action.x, action.costs, action.mana, action.extra);
+  const mana = activateAbility(s, p, action.objectId, action.index, action.targets, action.modes, action.tapCreatures, action.x, action.costs, action.mana, action.extra, action.instead);
   s.passedInSuccession = [];
   return mana;
 }
@@ -10223,7 +10225,7 @@ function crewProblem(s: GameState, pid: PlayerId, vehicle: GameObject, n: number
  * Activate an ability (CR 602.2). Returns whether it was a mana ability, which resolved right away instead of going on
  * the stack (CR 605.3b). `mana` and `extra`: for a mana ability, as for activateMana.
  */
-function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x0?: number, costs?: CostChoices, mana?: ManaType, extra?: ManaType[]): boolean {
+function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x0?: number, costs?: CostChoices, mana?: ManaType, extra?: ManaType[], instead?: ManaType): boolean {
   const o = obj(s, id);
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
@@ -10255,8 +10257,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     [body, targets] = [fit.body, fit.targets];
   }
   if (chooserSlots(body.targets).length) [body, targets] = withChosenTargets(body, targets, costs);
-  const manaPick = ab.mana ? manaAbilityPick(s, p.id, o, index, mana, extra) : undefined;
-  if (!ab.mana && (mana !== undefined || extra !== undefined)) throw new RulesError(`${d.name}'s ability isn't a mana ability`);
+  const manaPick = ab.mana ? manaAbilityPick(s, p.id, o, index, mana, extra, instead) : undefined;
+  if (!ab.mana && (mana !== undefined || extra !== undefined || instead !== undefined)) throw new RulesError(`${d.name}'s ability isn't a mana ability`);
   // The source as it was activated, for "whenever an opponent activates an ability of a creature".
   const activatedFrom = o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
   // "Whenever you activate an ability of a card in your graveyard" (Neerdiv): where it was as it was activated (CR 602.2),
@@ -10420,7 +10422,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
     ...(o.transforms ? { sourceTransforms: o.transforms } : {}),
     ...(JSON.stringify(body.effects).includes('"kind":"activatedTimes"') ? { activatedIndex: index } : {}),
-    ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(manaFrom.length ? { from: manaFrom } : {}) } } : {}),
+    ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(manaPick.instead ? { instead: manaPick.instead } : {}), ...(manaFrom.length ? { from: manaFrom } : {}) } } : {}),
     ...(paid.treasure ? { treasureSpent: paid.treasure } : {}),
     ...(ab.crew !== undefined && !ab.saddle && !ab.tapPower && tapCreatures?.length ? { crewers: tapCreatures.length } : {}),
     ...(paid.spent && Object.values(paid.spent).some((n) => n > 0) ? { manaSpentTypes: (Object.keys(paid.spent) as ManaType[]).flatMap((m) => Array<ManaType>(paid.spent[m]).fill(m)) } : {}),
@@ -10472,10 +10474,13 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
  * picks for the triggered mana abilities tapping its source triggers (CR 605.4a). Without a color, it's asked as it
  * resolves, which can't happen while another decision is open (paying for ward, say). Throws if a choice is missing.
  */
-function manaAbilityPick(s: GameState, pid: PlayerId, o: GameObject, index: number, mana?: ManaType, extra?: ManaType[]): { mana?: Color; extra?: ManaType[] } {
+function manaAbilityPick(s: GameState, pid: PlayerId, o: GameObject, index: number, mana?: ManaType, extra?: ManaType[], instead?: ManaType): { mana?: Color; extra?: ManaType[]; instead?: ManaType } {
   const name = characteristics(s, o).name;
   const ab = abilitiesOf(s, o).activated[index]!;
-  const options = activatedManaOptions(s, o, index);
+  // A color for a replacement that lets the player tapping it choose (round B224): only the options made with it.
+  const offered = activatedManaOptions(s, o, index);
+  if (instead !== undefined && !offered?.some((x) => x.instead === instead)) throw new RulesError(`${name}'s mana can't be made {${instead}} instead`);
+  const options = offered && instead !== undefined ? offered.filter((x) => x.instead === instead) : offered;
   const sameExtra = (x: { extra?: ManaType[] }) => (x.extra ?? []).length === (extra ?? []).length && (x.extra ?? []).every((m, i) => m === extra![i]);
   if (options) {
     const colors = [...new Set(options.map((x) => x.mana))];
@@ -10493,7 +10498,7 @@ function manaAbilityPick(s: GameState, pid: PlayerId, o: GameObject, index: numb
     const pick = ofColor.length === 1 ? ofColor[0]! : ofColor.find(sameExtra);
     if (!pick) throw new RulesError(`choose the mana that tapping ${name} also adds`);
     // A color only for "one mana of any color" (a fixed {C}{C} has none to choose).
-    return { ...(activatedAsMana(ab)!.produces.kind === "oneOf" ? { mana: mana as Color } : {}), ...(pick.extra ? { extra: pick.extra } : {}) };
+    return { ...(activatedAsMana(ab)!.produces.kind === "oneOf" ? { mana: mana as Color } : {}), ...(pick.extra ? { extra: pick.extra } : {}), ...(instead !== undefined ? { instead } : {}) };
   }
   if (mana !== undefined) throw new RulesError(`${name}'s ability has no color to choose before it resolves`);
   // What it adds isn't known until it resolves ("add {G}{G} instead"): it can't be activated if what tapping it
@@ -15093,7 +15098,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
     manaAbilitiesOn(s, o).forEach((ab, i) => {
       if (manaAbilityProblem(s, pid, o, i)) return;
       const tap = ab.tapCost ? tapCostCandidates(s, pid, o, ab.tapCost).slice(0, ab.tapCost.n) : undefined;
-      for (const x of options) if (x.ability === i) out.push({ type: "activateMana", player: pid, objectId: id, mana: x.mana, ability: i, ...(x.combo !== undefined ? { combo: x.combo } : {}), ...(tap ? { tap } : {}), ...(x.extra ? { extra: x.extra } : {}) });
+      for (const x of options) if (x.ability === i) out.push({ type: "activateMana", player: pid, objectId: id, mana: x.mana, ability: i, ...(x.combo !== undefined ? { combo: x.combo } : {}), ...(tap ? { tap } : {}), ...(x.extra ? { extra: x.extra } : {}), ...(x.instead ? { instead: x.instead } : {}) });
     });
   }
   return out;

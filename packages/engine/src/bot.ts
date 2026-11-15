@@ -6518,6 +6518,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.mana) continue;
       // Fractured Powerstone's planar die outside Planechase: nothing to gain.
       if (ab.body.effects.every((e) => e.type === "noEffect")) continue;
+      // Harvest Mage (round B224): a card for lands that make a color of our choice this turn, which no payment plans
+      // for in advance: not on its own.
+      if (ab.body.effects.length && ab.body.effects.every((e) => e.type === "landManaUntilEndOfTurn" && e.mana === "any")) continue;
       // Goblin Artisans (round B223): losing the flip counters a spell of our own: never worth the card.
       if (ab.body.targets.some((t) => t.kind === "spell" && t.controller === "you") && allEffects(ab.body.effects).some((e) => e.type === "counterSpell")) continue;
       // Keep our permanents (but cash in Food and Clues), and avoid free loops.

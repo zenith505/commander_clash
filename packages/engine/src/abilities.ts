@@ -1870,6 +1870,8 @@ export interface DamageRuleSpec {
   countersOn?: { counter: CounterKind; endStep?: true; ifCreature?: true };
   /** Vengeful Archon: "If damage is prevented this way, ~ deals that much damage to target player or planeswalker" (CR 615.5): the target chosen as it was activated; dealt at once, by the source, after the damage (rulings). */
   dealTo?: DamageRecipient;
+  /** With dealTo, Channel Harm's "you may have ~ deal that much damage": its controller chooses each time it prevents damage (rulings). */
+  dealToMay?: true;
   /** New Way Forward: "When damage is prevented this way, ..." (CR 603.12): a reflexive trigger of this rule's source, once for each damage event it prevents damage in, "that much" the damage prevented then and "that source's controller" the controller of the source whose damage it was. */
   reflect?: AbilityBody;
 }
@@ -2620,7 +2622,7 @@ export type StaticCondition =
    * "If an opponent cast a blue spell this turn" (Ricochet Trap), "if an opponent has cast a blue or black spell this
    * turn" (Veil of Summer): one of these colors, the spell's colors as it was cast.
    */
-  | { kind: "opponentCast"; colors: Color[] }
+  | { kind: "opponentCast"; colors: Color[]; /** Refraction Trap: also one of these card types (an instant or sorcery spell). */ types?: string[] }
   /** "If an opponent cast three or more spells this turn" (Mindbreak Trap): one opponent, that many (rulings). */
   | { kind: "opponentCastCount"; n: number }
   /** "If you have no land cards in hand" (Land Grant). */
@@ -4972,7 +4974,7 @@ export type Effect =
    * damage to them. If no one does, ..." once if no one did ("ifNone"). Each player still chooses in turn order, knowing
    * the earlier choices, and the chosen actions happen together (rulings on Clackbridge Troll and Vexing Devil).
    */
-  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount; picks?: Amount; mode?: "ifAny" | "ifNone"; /** With `mode`: what happens instead when `effects` don't ("If they do, ~ deals 2 damage to the permanent or player", Rhystic Lightning). */ otherwise?: Effect[]; /** What `effects` do, for the prompt; without `mode`, what its controller does to those who don't ("may draw a card"). */ thenText?: string; /** The penalty's button as it is ("Lose 5 life (Ann sacrifices Pillar Tombs of Aku)"), ~ its source. */ penalty?: string; /** With `mode` "ifAny": "Any opponent may have you put that card into your graveyard. If a player does, ~ deals damage to that player ..." (Sin Prodder): asked in turn order until one does; that player is { ref: "choseThisWay" } (rulings). */ firstOnly?: true }
+  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount; picks?: Amount; /** Fade Away: "for each creature, its controller ...": each player's own number of choices, counted for them (eachOne) as it starts (rulings). */ picksEach?: Amount; /** Fade Away: one of the options must be chosen ("sacrifices a permanent unless they pay {1}"); "neither" only for a player who can do none of them. */ required?: true; mode?: "ifAny" | "ifNone"; /** With `mode`: what happens instead when `effects` don't ("If they do, ~ deals 2 damage to the permanent or player", Rhystic Lightning). */ otherwise?: Effect[]; /** What `effects` do, for the prompt; without `mode`, what its controller does to those who don't ("may draw a card"). */ thenText?: string; /** The penalty's button as it is ("Lose 5 life (Ann sacrifices Pillar Tombs of Aku)"), ~ its source. */ penalty?: string; /** With `mode` "ifAny": "Any opponent may have you put that card into your graveyard. If a player does, ~ deals damage to that player ..." (Sin Prodder): asked in turn order until one does; that player is { ref: "choseThisWay" } (rulings). */ firstOnly?: true }
   /**
    * Cumulative upkeep (CR 702.24a): put an age counter on it, then you may pay the cost once for each
    * age counter on it; if you don't, sacrifice it.
@@ -5096,6 +5098,8 @@ export type Effect =
    * only if ~ is still the object it was (one that already left never leaves again, so the card stays exiled).
    */
   | { type: "exileReturnWhenSourceLeaves" }
+  /** Decoy Gambit: for each of these targets still legal, its controller chooses whether you draw a card instead of it being returned to its owner's hand; then the draws, then the returns (rulings). */
+  | { type: "bounceUnlessDraw"; what: ObjRef }
   /** A class level bar's "This Class's level becomes N" (CR 716.2a). */
   | { type: "classLevel"; n: number }
   /** A "To solve" trigger's "this Case becomes solved" (CR 719.3a). */

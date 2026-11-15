@@ -12337,13 +12337,18 @@ function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?
       /^At the beginning of the next end step, put an? ([+-]\d+\/[+-]\d+) counter on that creature for each 1 damage prevented this way$/.exec(s) ??
       /^If it's a creature, put an? ([+-]\d+\/[+-]\d+) counter on it for each 1 damage prevented this way at the beginning of the next end step$/.exec(s);
     // Vengeful Archon: "If damage is prevented this way, ~ deals that much damage to target player or planeswalker".
-    const dealToM = /^If damage is prevented this way, ~ deals that much damage to (target [a-z ]+|any target)$/.exec(s);
-    let extraRider: Pick<DamageRuleSpec, "countersOn" | "dealTo"> | undefined;
+    // Channel Harm: "If damage is prevented this way, you may have ~ deal that much damage to target creature": a choice
+    // each time it prevents damage (dealToMay).
+    const dealToM = /^If damage is prevented this way, ~ deals that much damage to (target [a-z ]+|any target)$/.exec(s) ?? /^If damage is prevented this way, you may have ~ deal that much damage to (target [a-z ]+|any target)$/.exec(s);
+    let extraRider: Pick<DamageRuleSpec, "countersOn" | "dealTo" | "dealToMay"> | undefined;
     if (counterRider || dealToM) {
       // The prevention before it as a damage rule ("Prevent the next 3 damage that would be dealt to target creature this
-      // turn", "Prevent all damage that would be dealt to target creature this turn"), which can carry the rider.
+      // turn", "Prevent all damage that would be dealt to target creature this turn"), which can carry the rider; or one
+      // already (Divine Deflection's "you and/or permanents you control", Channel Harm's "by sources you don't control"),
+      // with no other additional effect yet.
       const prev = effects[effects.length - 1];
-      const asRule = prevAsDamageRule(prev);
+      const plainRule = prev?.type === "damageRule" && !counterRider && Object.keys(prev.rule).every((k) => ["to", "n", "by"].includes(k)) && !prev.rule.to?.target ? prev : undefined;
+      const asRule = prevAsDamageRule(prev) ?? plainRule;
       if (!asRule) return null;
       effects[effects.length - 1] = asRule;
       const on = asRule.rule.to?.target;
@@ -12357,7 +12362,7 @@ function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?
         const fx = parseOne(`~ deals 1 damage to ${dealToM![1]}`, ctx);
         const d = fx?.length === 1 ? fx[0]! : undefined;
         if (d?.type !== "damage" || d.amount !== 1 || !Object.keys(d).every((k) => ["type", "amount", "to"].includes(k))) return null;
-        extraRider = { dealTo: d.to };
+        extraRider = { dealTo: d.to, ...(/^If damage is prevented this way, you may /.test(s) ? { dealToMay: true as const } : {}) };
       }
     }
     const rider = extraRider ?? (toCreature ? { dealBack: { creatureToIt: true as const } } : tokenRider?.type === "createToken" ? { tokens: tokenRider.token } : parsePreventionRider(s));

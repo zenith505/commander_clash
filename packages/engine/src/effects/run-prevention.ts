@@ -230,6 +230,7 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     // prevented, but Acolyte's Reward won't deal damage" (rulings, CR 608.2b).
     const r = fixedRecipient(s, spec.dealTo, ctx);
     if (r) rule.dealTo = r;
+    if (r && spec.dealToMay) rule.dealToMay = true;
   }
   if (spec.countersOn && rule.to?.object) {
     const on = rule.to.object;

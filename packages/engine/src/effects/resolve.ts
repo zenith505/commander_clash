@@ -59,6 +59,7 @@ import { runLaneB201Effect } from "./run-laneb201";
 import { runLaneB202Effect } from "./run-laneb202";
 import { runLaneB208Effect } from "./run-laneb208";
 import { runLaneB210Effect } from "./run-laneb210";
+import { runLaneB212Effect } from "./run-laneb212";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -1919,6 +1920,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "cumulativeUpkeepUnpaid":
     case "exileReturnWhenSourceLeaves":
       return runLaneB210Effect(s, e, ctx, src);
+    case "bounceUnlessDraw":
+      return runLaneB212Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
       return runRound327Effect(s, e, ctx, src);
     case "dividedDamageBack":

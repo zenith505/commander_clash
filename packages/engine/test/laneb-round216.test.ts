@@ -271,6 +271,21 @@ describe("Lane B round B216", () => {
     expect(s.objects[curse]!.counters.time).toBe(3);
   });
 
+  it("Curse of the Cabal: a player with no permanent to sacrifice isn't asked", () => {
+    const { s: s0, ap } = setup([]);
+    const curse = toZone(s0, ap, curseOfTheCabal(), "exile");
+    s0.objects[curse]!.counters.time = 2;
+    for (const id of [...s0.battlefield]) if (s0.objects[id]!.controller === ap) {
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      delete s0.objects[id];
+    }
+    invalidateCharacteristics(s0);
+    // Round to A's next draw step with no question for A: only suspend's counter comes off.
+    let s = playUntil(s0, (x) => x.activePlayer !== ap, [ap]);
+    s = playUntil(s, (x) => x.activePlayer === ap && x.step === "draw", [ap]);
+    expect(s.objects[curse]!.counters.time).toBe(1);
+  });
+
   it("Curse of the Cabal: not suspended (no time counters), the upkeep ability does nothing", () => {
     const { s: s0, ap } = setup([]);
     const b = nextOf(s0, ap, 1);

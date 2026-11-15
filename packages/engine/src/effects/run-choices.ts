@@ -1519,6 +1519,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     // "You may gain 1 life for each creature card in your graveyard. If you do, ..." (Skyfisher Spider): gaining no life,
     // or life that can't be gained, isn't gaining life (CR 119.7, 119.9).
     if (e.type === "gainLife" && e.who.ref === "you" && (!canGainLife(s, ctx.controller) || amountNow(s, e.n, ctx) <= 0)) return false;
+    // Curse of the Cabal (round B216): "that player may sacrifice a permanent of their choice": not with none to sacrifice.
+    if (e.type === "pick" && e.action === "sacrifice" && e.who.ref === "eventPlayer" && ctx.event?.player !== undefined && !pickOptions(s, e, ctx.event.player).length) return false;
     // Sigarda, Host of Herons: an opponent's spell or ability can't give its controller the option (rulings).
     if (e.type === "sacrifice" && !objects(s, e.what, ctx).some((o) => (e.byController || controllerOf(s, o) === ctx.controller) && canBeSacrificed(s, o))) return false;
     if (e.type === "exile" && (e.what.ref === "selfCard" || e.what.ref === "subjectCard") && !objects(s, e.what, ctx).length) return false;

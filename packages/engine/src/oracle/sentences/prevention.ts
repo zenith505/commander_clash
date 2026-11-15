@@ -399,8 +399,10 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
  * prevented this way", "If damage from a black source is prevented this way, you gain that much life", "If damage is
  * prevented this way, ~ deals that much damage to that source's controller".
  */
-export function parsePreventionRider(s: string): Pick<DamageRuleSpec, "gainLife" | "dealBack"> | undefined {
+export function parsePreventionRider(s: string): Pick<DamageRuleSpec, "gainLife" | "dealBack" | "exileTopPrevented"> | undefined {
   if (/^You gain life equal to the damage prevented this way$/i.test(s)) return { gainLife: {} };
+  // Bone Mask (round B216): exiled as part of the prevention (CR 615.5), all of the library with fewer cards (rulings).
+  if (/^Exile cards from the top of your library equal to the damage prevented this way$/.test(s)) return { exileTopPrevented: true };
   const m =
     /^(?:If|Whenever) damage(?: from an? ((?:white|blue|black|red|green)(?: or (?:white|blue|black|red|green))?) source)? is prevented this way(?: this turn)?, (you gain that much life|~ deals that much damage to (?:that|the) source's controller)$/i.exec(s);
   if (!m) return undefined;

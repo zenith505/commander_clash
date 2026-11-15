@@ -1,7 +1,7 @@
 # Roadmap
 
-31,405 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,890 of
+31,418 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,891 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1893,7 +1893,7 @@ line blocks.
    counters on it, exile it. When you do, take an extra turn" needs a reflexive trigger after a mandatory exile, and its
    order against vanishing's own trigger on the last counter matters); Magma Pummeler ("When one or more counters are
    removed from ~ this way": a reflexive trigger from inside the damage shield); Pardic Dragon (done in round B152) ("that player may put a
-   time counter on ~": another player's "may" about a card in exile), Nihilith and Curse of the Cabal (other "if ~ is
+   time counter on ~": another player's "may" about a card in exile), Nihilith and Curse of the Cabal (done in round B216) (other "if ~ is
    suspended" triggers: a card put into a graveyard, each player's upkeep); Greater Gargadon (an activated ability of a
    card in exile: none can be activated there yet, for the engine, bots or the UI).
    Round 265 made permanents tapped at the same time one event (game.ts batchTaps: the attackers declared together, CR
@@ -5094,7 +5094,7 @@ line blocks.
    - "If you've completed a dungeon" inside an effect still out: Caves of Chaos Adventurer (a free play of the exiled
      card), White Plume Adventurer ("untap a creature you control").
    - Punishers still out: Possessed Portal (done in round B111) (its punisher parses since round 212; its draw replacement doesn't), "another nonland permanent" (Torment of Venom (done in round B148)),
-     "that many permanents" (Archfiend of Spite (done in round 302)), "any number of times" (Forbidden Ritual). Rottenmouth Viper's
+     "that many permanents" (Archfiend of Spite (done in round 302)), "any number of times" (Forbidden Ritual (done in round B216)). Rottenmouth Viper's
      trigger works; its "sacrifice any number of nonland permanents, costs {1} less for each" additional cost doesn't
      (it needs a picker when casting). The same "sacrifice any number of X, then that many" shape blocks Pitiless
      Carnage, Renounce, Reprocess, Scapeshift, Malevolent Witchkite, Mana Seism and Lich-Knights' Conquest.
@@ -9417,6 +9417,22 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Hypergenesis (Eureka's rounds limited to artifact, creature, enchantment and land cards, Effect putFromHandRounds
   filter). Browser tests for Cleansing's land picker and Necrotic Plague's target chosen by the dead creature's controller.
   +4, 31,405 of 31,936. The compiled text of every other card is unchanged.
+- Round B216 (least played first, from the Lane B skip lists): Bone Mask (the next damage from a source of your choice
+  prevented, and that many cards exiled from the top of your library as part of the prevention, CR 615.5, all of it with
+  fewer cards, rulings; DamageRule exileTopPrevented). Forbidden Ritual (each pass you sacrifice a nontoken permanent as it
+  resolves and, if you did, the target opponent chosen as it was cast loses 2 life unless they sacrifice a permanent or
+  discard a card, rulings; then you choose whether to go again, asked only while you have a nontoken permanent; Effect
+  repeatMaySteps, a repeat whose passes can pause for choices). Preferred Selection (the two cards looked at are named in
+  the question; sacrificing it and paying {2}{G}{G} only with it still on the battlefield and the mana payable, then one of
+  them into your hand, otherwise one to the bottom, the other staying on top; Effect lookTopMaySacrificePay and the
+  chooseOption "lookedCard"). Curse of the Cabal (its upkeep ability works while it's suspended in exile, CR 702.62b,
+  603.4; the player whose upkeep it is may sacrifice a permanent, and only if they do it gets two time counters; bots
+  sacrifice for another player's Curse with five or more permanents). Browser tests for Preferred Selection's question
+  (both answers), Forbidden Ritual's repeat question and Curse of the Cabal's question. +4, 31,418 of 31,936 with rounds
+  371-372. The compiled text of every other card is unchanged.
+- Out after round B216 (looked at, not done): Swans of Bryn Argoll (see round B66: its draws in the middle of damage can
+  be replaced by dredge) and Immortal Coil (a card of your choice exiled from your graveyard for each 1 damage, a choice
+  in the middle of damage) stay out.
 - Out after round B215 (looked at, not done): Land Equilibrium (whether it applies once for each land when several enter
   at once isn't settled by its rulings), Winter's Chill (a three-way payment for each target, {1}, {2} or nothing),
   Sacred Ground (what caused a land to go to the graveyard) and Over the Top (every player's permanent cards entering at
@@ -9584,7 +9600,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B151 (looked at, not done): Thelon's Chant (done in round B207) and Tourach's Chant (done in round B207) (the player who put a land onto the
   battlefield isn't tracked), Gloom (the tax would apply to mana abilities too, which take no cost increase here), Spoils
   of War (X as you cast it from the cards in an opponent's graveyard), Selective Snare (a creature type chosen as it's
-  cast), Sutured Ghoul (done in round B171) (a characteristic-defining power and toughness from the cards it exiled), Preferred Selection (a
+  cast), Sutured Ghoul (done in round B171) (a characteristic-defining power and toughness from the cards it exiled), Preferred Selection (done in round B216) (a
   look held across the may decision), Graceful Takedown (done in round B187) (two target groups that must differ), Glass Asp and Nafs Asp
   (a payment any time before the draw step, as a special action), Noxious Vapors (keeping one card of each color in
   hand), Kodama of the Center Tree (done in round B213), Reflecting Mirror.
@@ -9618,7 +9634,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   several defending players, CR 508.5a), North Star (mana spent as though any type for one spell), Lumbering Laundry (done in round B186)
   (looking at face-down creatures), Guard Dogs (a prevention shield tied to a permanent chosen as it resolves), Butcher
   Orgg (combat damage divided among the player and their creatures).
-- Out after round B143 (looked at, not done): Preferred Selection (the two cards looked at should be shown with the
+- Out after round B143 (looked at, not done): Preferred Selection (done in round B216) (the two cards looked at should be shown with the
   "sacrifice ~ and pay {2}{G}{G}" question, a look with no prompt yet, and that sacrifice-and-pay "you may" isn't parsed).
 - Out after round B142 (looked at, not done): Decaying Soil (a dies trigger granted by threshold needs a look-back,
   CR 603.10a), Nivmagus Elemental (a cost that exiles a spell from the stack), Benthic Explorers (untapping an
@@ -9671,7 +9687,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   pipeline doesn't offer yet).
 - Out after round B125 (looked at, not done): Cut the Tethers (done in round B136) (a punisher for each Spirit paid by its owner, all returned
   at once: keepRest has no mana payment), Liquid Fire (done in round B136) (a number chosen as an additional cost as it's cast, CR 601.2b: no
-  cast-time number choice yet), Preferred Selection (the two cards looked at are held across a "you may sacrifice ~ and
+  cast-time number choice yet), Preferred Selection (done in round B216) (the two cards looked at are held across a "you may sacrifice ~ and
   pay" choice), Thelon's Chant (done in round B207) and Tourach's Chant (done in round B207) (the player who put it onto the battlefield isn't tracked), Wand of Ith
   and Tainted Specter (a payment or a library-top choice for the revealed or discarded card; both done in round B132).
 - Out after round B123 (looked at, not done): Misfortune (done in round B142), Library of Lat-Nam (done in round B142) and Fatal Lore (done in round B142) (an opponent chooses the mode
@@ -9801,7 +9817,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   unless they put a card from their hand on top of their library": a punisher option with a card from hand, done in round
   B132), Vortex
   Elemental (done in round B114) (creatures blocking or blocked by it as it last existed, rulings, when it has left the battlefield), Stromgald
-  Spy (play with that hand revealed for as long as it remains), Bone Mask and Mourner's Shield (damage prevented by a
+  Spy (play with that hand revealed for as long as it remains), Bone Mask (done in round B216) and Mourner's Shield (damage prevented by a
   source of your choice, then exile that many / sharing a color with the imprinted card), Soltari Guerrillas (redirect the
   next combat damage to an opponent), Shifty Doppelganger (done in round B136) (return the exiled card at end step if the creature was
   sacrificed), Noxious Vapors (one card of each color chosen), Gauntlets of Chaos (exchange of control sharing a type) (done in round B152).
@@ -9848,7 +9864,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   names), Threefold Signal (replicate granted to spells, beside a spell's own kicker-like cost), Blade of the Swarm
   (done in round 272), Blaze Commando and Flame Channeler (an instant or sorcery spell dealing damage to
   anything, once per instruction), Shorecrasher Elemental (done in round B129) and Skittish Valesk (returning or turning a permanent face
-  down), Preferred Selection, Scrying Glass, Hedron Alignment, Ertai's Familiar (done in round B128), Death-Mask Duplicant (done in round B152), Relive the Past (done in round B128).
+  down), Preferred Selection (done in round B216), Scrying Glass, Hedron Alignment, Ertai's Familiar (done in round B128), Death-Mask Duplicant (done in round B152), Relive the Past (done in round B128).
 - Out after round B89 (looked at, not done): Barbed Foliage (done in round B144) ("loses flanking": flanking is a triggered ability granted
   by the keyword, not just a keyword to remove), Brothers Yamazaki (an exception to the legend rule), Rogue Skycaptain
   and Rohgahh of Kher Keep ("an opponent gains control of ~"), Stangg and Dance of the Many (linked tokens that leave

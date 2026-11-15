@@ -58,6 +58,7 @@ import { roundB211Line } from "./laneb211";
 import { roundB213Line } from "./laneb213";
 import { roundB214Line } from "./laneb214";
 import { roundB215Line } from "./laneb215";
+import { roundB216Line } from "./laneb216";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2162,6 +2163,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB214Line(line, raw, out, isSpell)) continue;
     // Necrotic Plague (round B215).
     if (roundB215Line(line, raw, out, isSpell)) continue;
+    // Preferred Selection, Curse of the Cabal (round B216).
+    if (roundB216Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

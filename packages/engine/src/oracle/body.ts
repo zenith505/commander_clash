@@ -7898,7 +7898,7 @@ function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Agony): that many, counted as it resolves.
     // "Exile the top X cards of your library, where X is the number of creatures you control with power 4 or greater"
     // (Dragonhawk, Fate's Tempest): X counted once, as it resolves (rulings).
-    const exEqual = /^Exile cards from the top of your library equal to (.+)$/.exec(s) ?? /^[Ee]xile the top X cards of your library, where X is (.+)$/.exec(s);
+    const exEqual = /^Exile cards from the top of your library equal to (?!the damage prevented this way$)(.+)$/.exec(s) ?? /^[Ee]xile the top X cards of your library, where X is (.+)$/.exec(s);
     const exEqualN = exEqual ? parseCount(exEqual[1]!, ctx) : null;
     if (exEqual && !exEqualN) return null;
     // "Shuffle your library, then exile the top card." (Urza, Lord High Artificer): the top card of your library, after.

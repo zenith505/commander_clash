@@ -11332,6 +11332,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "lookedCard") {
+    // Preferred Selection (round B216): the card looked at that moves.
+    const st = r.scratch?.lookTopMay;
+    if (!st || !pend.options.includes(choice)) throw new RulesError("nothing to choose");
+    st.pick = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "auraForToken") {
     // Liberated Livestock (round B208): the Aura card for this token, or none.
     const st = r.scratch?.auraForToken;

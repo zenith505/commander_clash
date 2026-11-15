@@ -1872,6 +1872,8 @@ export interface DamageRuleSpec {
   /** "~ deals that much damage to that source's controller" (CR 615.5); `colors`: only for damage from a source of those colors. */
   /** `creatureToIt` (Comeuppance): damage from a creature source is dealt back to that creature instead, if it's still that permanent. */
   dealBack?: { colors?: Color[]; creatureToIt?: true };
+  /** Bone Mask: "Exile cards from the top of your library equal to the damage prevented this way" (CR 615.5): its controller exiles that many, all their library with fewer (rulings), only for damage really prevented. */
+  exileTopPrevented?: true;
   /** "For each 1 damage prevented this way, create a ... token" (Inkshield, CR 615.5): its controller creates them. */
   tokens?: TokenSpec;
   /** "For each 1 damage prevented this way, put a +1/+1 counter on that creature" (Test of Faith, Temper, Brace for Impact): on the creature it protects, as the damage is prevented (rulings: before state-based actions). `endStep`: "at the beginning of the next end step" (Sacred Boon), by a delayed trigger counting all it prevented (CR 603.7); `ifCreature`: only if what it protects is a creature then (Scars of the Veteran's "If it's a creature"). */
@@ -4420,6 +4422,21 @@ export type Effect =
    * destroyed at once.
    */
   | { type: "eachLandUnlessAnyPaysLife"; filter: TargetSpec; life: number }
+  /**
+   * Forbidden Ritual (round B216): "... You may repeat this process any number of times.": `effects` in order, each pass
+   * pausing for its own choices (CR 608.2c), its results cleared before the next pass; after each pass its controller
+   * decides whether to go again, asked only while they control a permanent matching `while` (the pass's own first step,
+   * a sacrifice of one, can't be done otherwise). The targets stay those chosen as it was cast (rulings).
+   */
+  | { type: "repeatMaySteps"; effects: Effect[]; text: string; while: TargetSpec }
+  /**
+   * Preferred Selection (round B216): "look at the top two cards of your library. You may sacrifice ~ and pay {2}{G}{G}. If
+   * you do, put one of those cards into your hand. If you don't, put one of those cards on the bottom of your library.":
+   * the `n` cards looked at are named in the question (only to the player looking); it can be done only with ~ still on
+   * the battlefield as the same object (CR 400.7) and `pay` payable. Then one of those cards, still on top of the library,
+   * goes to `then` if it was done, else to `otherwise`; the other stays on top.
+   */
+  | { type: "lookTopMaySacrificePay"; n: number; pay: PayCost; then: "hand" | "bottom"; otherwise: "hand" | "bottom"; text: string }
   /**
    * Tidal Flats (round B214): "For each attacking creature without flying, its controller may pay {1}. If that player
    * doesn't, creatures you control blocking that creature gain first strike until end of turn.": asked as it resolves, the

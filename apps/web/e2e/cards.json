@@ -8691,6 +8691,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cafede0d-aa14-4266-b619-321ac756262d",
+  "name": "Curse of the Cabal",
+  "manaCost": "{9}{B}",
+  "cmc": 10,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target player sacrifices half the permanents they control of their choice, rounded down.\nSuspend 2—{2}{B}{B} (Rather than cast this card from your hand, you may pay {2}{B}{B} and exile it with two time counters on it. At the beginning of your upkeep, remove a time counter. When the last is removed, you may cast it without paying its mana cost.)\nAt the beginning of each player's upkeep, if this card is suspended, that player may sacrifice a permanent of their choice. If the player does, put two time counters on this card.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Suspend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f22c3624-6bd5-4761-b8ad-ac301ad9351c",
   "name": "Curse of the Pierced Heart",
   "manaCost": "{1}{R}",
@@ -14033,6 +14061,32 @@
   "set": "2x2",
   "releasedAt": "2022-07-08",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4b5d9c76-8be8-4e25-b978-9750df3d8c15",
+  "name": "Forbidden Ritual",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Sacrifice a nontoken permanent. If you do, target opponent loses 2 life unless that player sacrifices a permanent of their choice or discards a card. You may repeat this process any number of times.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "vis",
+  "releasedAt": "1997-02-03",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -29116,6 +29170,32 @@
   "set": "gpt",
   "releasedAt": "2006-02-03",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1d05d2d6-3ea1-4d8a-9f1c-6fc3f5e38ea9",
+  "name": "Preferred Selection",
+  "manaCost": "{2}{G}{G}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, look at the top two cards of your library. You may sacrifice this enchantment and pay {2}{G}{G}. If you do, put one of those cards into your hand. If you don't, put one of those cards on the bottom of your library.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

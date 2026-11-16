@@ -1706,7 +1706,7 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
  * stack, CR 608.2n; the spell itself isn't, CR 115.5). With none, the target stays as it is, legal or not. Its new
  * target becomes a target of it ("becomes the target" triggers, ward).
  */
-function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string, unless?: UnlessPays, toSelf?: true, all?: true, mustBe?: "player" | "creature"): "paused" | void {
+export function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string, unless?: UnlessPays, toSelf?: true, all?: true, mustBe?: "player" | "creature", /** Captured by the Consulate (round B238): with `toSelf`, to this permanent instead of the source, if it's on the battlefield. */ toId?: ObjectId): "paused" | void {
   const item = s.stack.find((x) => x.id === stackId);
   const o = item?.objectId ? s.objects[item.objectId] : undefined;
   if (!item || (item.kind === "spell" && !o)) return;
@@ -1731,12 +1731,12 @@ function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string
     (mustBe !== "creature" || (t.kind === "object" && !!s.objects[t.id] && objIsType(s, s.objects[t.id]!, "Creature")));
   if (toSelf) {
     // To this ability's source, still on the battlefield as the same object, and only if it's a legal target for it.
-    const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-    const here = !!me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);
+    const me = toId ? s.objects[toId] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    const here = !!me && me.zone === "battlefield" && (toId !== undefined || ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);
     // Muck Drubb: with `all`, ~ must be a legal target for each of them (rulings).
     const to = here ? changeTargetOptions(s, item, spec, current).find((t) => t.kind === "object" && t.id === me!.id && (!all || slots.every((k) => !!specs[k] && changeTargetOptions(s, item, specs[k]!, current).some((x) => sameTarget(x, t))))) : undefined;
     if (!to) {
-      log(s, `${by} can't become the target of ${item.description}, so its target stays the same.`);
+      log(s, `${toId && me ? characteristics(s, me).name : by} can't become the target of ${item.description}, so its target stays the same.`);
       return;
     }
     sc.newTarget = to;

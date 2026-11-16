@@ -1,14 +1,14 @@
 import { asFace } from "./faces";
 import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
-import { MANA_ABILITY_OFFSET, activatedAsMana, payableActivatedMana, manaAbilityCost, manaAbilityCostOf, withManaTax, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, activatedAsMana, payableActivatedMana, manaAbilityCost, manaAbilityCostOf, withManaTax, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax, piracyTap, PIRACY_SPEND } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, costIsPaid, spellHow, definedX, definedCastX, firstArtifactLess, lessWaterbend, waterbendCap, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, payableDelayed, payDelayedProblem, ignorableBy, ignoreEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, sylexed, suspendProblem, plotProblem, plotCost, foretellProblem, foretellActionCost, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
 import { abilityUse, boundSpend, payableCost, poolFor, spendAllows, usableTypes, type ManaUse } from "./spend";
-import type { AdditionalCost, ManaSpend, SpentReq, TargetChoice } from "./abilities";
+import type { AdditionalCost, ManaAbility, ManaSpend, SpentReq, TargetChoice } from "./abilities";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, type ManaPool, type ParsedCost } from "./mana";
 import { COLORS, type Action, type CardDef, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 
@@ -58,13 +58,17 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
   const onlyBasicLands = use !== "other" && "spell" in use && !!use.basicLandOnly;
   // "Spend only mana of the chosen color to activate this ability": only sources of that mana help.
   const only = usableTypes(use);
+  // Piracy (round B238): this player may tap other players' lands for mana this turn.
+  const pirating = (s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === pid && r.rule === "tapOthersLands");
+  const pirated = (o: GameObject, ab: ManaAbility) => !ab.anyPlayer && controllerOf(s, o) !== pid;
   // Current controller, types and mana abilities, after continuous effects (CR 613).
   const isCreature = (id: string) => objIsType(s, obj(s, id), "Creature");
   return s.battlefield
     .filter((id) => !exclude.includes(id))
     .map((id) => obj(s, id))
     // Mana Cache (round B236): another player's permanent with a mana ability any player may activate (CR 602.2), only that one.
-    .filter((o) => (controllerOf(s, o) === pid || manaAbilitiesOn(s, o).some((ab) => ab.anyPlayer)) && (!onlyCreatures || objIsType(s, o, "Creature")) && (!onlyBasicLands || (objIsType(s, o, "Land") && characteristics(s, o).supertypes.includes("Basic"))))
+    // Piracy (round B238): another player's land, for spells only (piracyTap).
+    .filter((o) => (controllerOf(s, o) === pid || manaAbilitiesOn(s, o).some((ab) => ab.anyPlayer || (pirating && piracyTap(s, pid, o, ab)))) && (!onlyCreatures || objIsType(s, o, "Creature")) && (!onlyBasicLands || (objIsType(s, o, "Land") && characteristics(s, o).supertypes.includes("Basic"))))
     .map((o) => {
       const abs = manaAbilitiesOn(s, o);
       const treasure = isTreasure(s, o);
@@ -76,11 +80,11 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
         // Battery gives its one mana without removing any.
         // Discarding a hand (Lion's Eye Diamond) is never an automatic choice: the player activates it.
         // Doubling Cube is never an automatic choice either: what it adds depends on what's in the pool then.
-        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === (abs[x.ability]!.produces.kind === "removeX" && (abs[x.ability]!.produces as { base?: number }).base ? 0 : 1) && !abs[x.ability]!.discardHand && !abs[x.ability]!.returnSelf && !abs[x.ability]!.untapSelf && abs[x.ability]!.produces.kind !== "doublePool" && !(abs[x.ability]!.sacrificeIfActivated && (o.activatedThisTurn ?? []).filter((n) => n === MANA_ABILITY_OFFSET + x.ability).length >= abs[x.ability]!.sacrificeIfActivated! - 1) && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)) && (!only || x.adds.every((m) => only.includes(m))))
+        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === (abs[x.ability]!.produces.kind === "removeX" && (abs[x.ability]!.produces as { base?: number }).base ? 0 : 1) && !abs[x.ability]!.discardHand && !abs[x.ability]!.returnSelf && !abs[x.ability]!.untapSelf && abs[x.ability]!.produces.kind !== "doublePool" && !(abs[x.ability]!.sacrificeIfActivated && (o.activatedThisTurn ?? []).filter((n) => n === MANA_ABILITY_OFFSET + x.ability).length >= abs[x.ability]!.sacrificeIfActivated! - 1) && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use)) && (!pirated(o, abs[x.ability]!) || spendAllows(s, pid, PIRACY_SPEND, use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)) && (!only || x.adds.every((m) => only.includes(m))))
         .map((x) => {
           const ab = abs[x.ability]!;
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };
-          return { id: o.id, ...x, cost: manaAbilityCostOf(s, pid, o, ab), penalty: manaPenalty(ab) + (ab.tap ? tapRider : 0), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly ? { restricted: true } : {}), ...(ab.spendOnly?.notGeneric ? { colorOnly: true as const } : {}) };
+          return { id: o.id, ...x, cost: manaAbilityCostOf(s, pid, o, ab), penalty: manaPenalty(ab) + (ab.tap ? tapRider : 0), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly || pirated(o, ab) ? { restricted: true } : {}), ...(ab.spendOnly?.notGeneric ? { colorOnly: true as const } : {}) };
         });
       if ((!onlyTreasures || treasure) && controllerOf(s, o) === pid) options.push(...activatedOptions(s, pid, o).filter((x) => (!x.spendOnly || spendAllows(s, pid, boundSpend(o, x.spendOnly), use)) && (!only || x.adds.every((m) => only.includes(m)))));
       const makes = [...new Set(options.filter((x) => !x.cost).flatMap((x) => x.adds))];

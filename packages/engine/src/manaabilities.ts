@@ -1,7 +1,7 @@
 // Mana abilities (CR 605) as they are on the battlefield: what each one can make right now,
 // whether it can be activated, and which one to use for a given mana.
 
-import { allEffects, type ActivatedAbility, type ManaAbility, type ManaProduce, type ManaTrigger } from "./abilities";
+import { allEffects, type ActivatedAbility, type ManaAbility, type ManaProduce, type ManaSpend, type ManaTrigger } from "./abilities";
 import { abilitiesOf, basicLandManaAbility, canSacrificeForCost, exiledLentTo, defOf, lendersOf, objIsType } from "./cards";
 import { objectMatches, printedMatches } from "./effects";
 import { abilityProblem, activationLessCost, canActAtSorcerySpeed, firstArtifactLess, linkedExileCards, manaActivationTax, obj, payableLife, player, sylexed, tapAbilitySick, tapCostCandidates } from "./game";
@@ -477,6 +477,21 @@ function manaTriggerSources(s: GameState): { src?: GameObject; controller: Playe
   return out;
 }
 
+/** Piracy (round B238): "Spend this mana only to cast spells" (CR 106.6), for mana made by tapping a land another player controls. */
+export const PIRACY_SPEND: ManaSpend = { spells: { kind: "spell", text: "spells" }, text: "Spend this mana only to cast spells." };
+
+/**
+ * Piracy (round B238): may `pid` activate this mana ability of `o`, a land another player controls (TurnRule
+ * "tapOthersLands")? Only one with {T} in its cost (CR 106.12). Not one whose mana already has a spending restriction of its
+ * own, nor one a triggered mana ability would add to (CR 106.12a: Mana Flare's or Wild Growth's mana, which may go to the
+ * land's controller): those combinations aren't modeled, so they aren't offered.
+ */
+export function piracyTap(s: GameState, pid: PlayerId, o: GameObject, ab: ManaAbility): boolean {
+  if (!ab.tap || ab.spendOnly || ab.anyPlayer || o.zone !== "battlefield" || controllerOf(s, o) === pid || !objIsType(s, o, "Land")) return false;
+  if (!(s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === pid && r.rule === "tapOthersLands")) return false;
+  return !manaTriggerSources(s).some(({ src, controller, t }) => (!t.you || controller === pid) && (!t.attached || src?.attachedTo === o.id) && (!t.filter || objectMatches(s, t.filter, o, controller, false)));
+}
+
 /** What the triggered mana abilities add: the picks for their mana, the mana, and each mana's source (`from`, CR 106.3). */
 export interface ManaTriggerResult {
   extra: ManaType[];
@@ -614,7 +629,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   const ab = manaAbilitiesOn(s, o)[index];
   const name = characteristics(s, o).name;
   if (!ab) return `${name} has no such mana ability`;
-  if (o.zone !== "battlefield" || (controllerOf(s, o) !== pid && !ab.anyPlayer)) return "you don't control that permanent";
+  if (o.zone !== "battlefield" || (controllerOf(s, o) !== pid && !ab.anyPlayer && !piracyTap(s, pid, o, ab))) return "you don't control that permanent";
   if (characteristics(s, o).cantActivate === "all") return `${name}'s activated abilities can't be activated`; // Arrest: mana abilities too (CR 605.1a)
   if (ab.tap && characteristics(s, o).cantActivateTap) return `${name}'s activated abilities with {T} in their costs can't be activated`; // Serra Bestiary (rulings)
   const banned = nameActivationBan(s, o, true) ?? abolisherBan(s, pid, o); // Phyrexian Revoker, Grand Abolisher: mana abilities too

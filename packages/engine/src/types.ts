@@ -2639,7 +2639,7 @@ export interface TurnRule {
   /** "noActivations": Abeyance's "that player can't activate abilities that aren't mana abilities" this turn, in any zone (rulings). */
   /** "castFromHandFree": Chandra, Flame's Catalyst's "Until end of turn, you may cast spells from your hand without paying their mana costs" (Omniscience's alternative cost for this turn, CR 118.9). */
   /** "loyaltyTwice": Kaito, Dancing Shadow's "you may activate loyalty abilities of ~ twice this turn rather than only once": of `object` only (CR 606.3), not more than twice however often (rulings). */
-  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof" | "noLoyalty" | "noActivations" | "castFromHandFree" | "loyaltyTwice";
+  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof" | "noLoyalty" | "noActivations" | "castFromHandFree" | "loyaltyTwice" | /** Piracy (round B238): this player may tap lands they don't control for mana (CR 106.12), that mana spendable only to cast spells. */ "tapOthersLands";
   /** The permanent the rule is about ("loyaltyTwice"), as the object it was then (CR 400.7). */
   object?: { id: ObjectId; zc: number };
   /** "Can't be countered by blue or black spells this turn" (Autumn's Veil): only by spells of these colors, as they resolve. */

@@ -2,6 +2,7 @@
 // whole spells (after round B234's).
 import type { AbilityBody, CompiledCard } from "../abilities";
 import { parseTrigger } from "./triggers";
+import { roundB238Spell } from "./laneb238";
 
 const JUSTICE_COST = "As an additional cost to cast ~, you may pay {1}{R} and/or {1}{G} any number of times.";
 const RENEWAL = "If you would draw a card, reveal the top card of your library instead. If it's a creature card, put it into your graveyard. Otherwise, draw a card.";
@@ -75,5 +76,5 @@ export function roundB236Spell(text: string): AbilityBody | null | undefined {
       text,
     };
   }
-  return undefined;
+  return roundB238Spell(text);
 }

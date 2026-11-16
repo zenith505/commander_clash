@@ -14546,6 +14546,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7aa31280-12c3-479d-a6dd-f1c669043083",
+  "name": "Firebolt",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Firebolt deals 2 damage to any target.\nFlashback {4}{R} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flashback"
+  ],
+  "commanderLegal": "legal",
+  "set": "ema",
+  "releasedAt": "2016-06-10",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7d309b18-8dc5-41ee-888c-e275761029e7",
   "name": "Fishing Gear",
   "manaCost": "{3}",
@@ -37596,6 +37624,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7ef7d902-1f05-40b3-8997-dec197b0b678",
+  "name": "Spider-Verse",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "The \"legend rule\" doesn't apply to Spiders you control.\nWhenever you cast a spell from anywhere other than your hand, you may copy it. If you do, you may choose new targets for the copy. If the copy is a permanent spell, it gains haste. Do this only once each turn.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "spm",
+  "releasedAt": "2025-09-26",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4a4cf6e2-8673-45b8-bc21-cd030f312cd1",
   "name": "Spin into Myth",
   "manaCost": "{4}{U}",
@@ -40250,6 +40304,34 @@
   "releasedAt": "2022-04-29",
   "rarity": "mythic",
   "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "43040c34-acad-4d62-893d-fd606fa9d8fe",
+  "name": "The Brothers' War",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Create two tapped Powerstone tokens.\nII — Choose two target players. Until your next turn, each creature they control attacks the other chosen player each combat if able.\nIII — This Saga deals X damage to any target and X damage to any other target, where X is the number of artifacts you control.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "brc",
+  "releasedAt": "2022-11-18",
+  "rarity": "rare",
+  "layout": "saga",
   "gameChanger": false
  },
  {

@@ -8,13 +8,16 @@ import { parseActivated } from "./activated";
 import { parseBody, type Ctx } from "./body";
 import { parseObject } from "./targets";
 import { round387Sentence } from "./round387";
+import { round388Sentence } from "./round388";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round373Sentence(s: string, sentences: string[], si: number, ctx: Ctx, _effects: Effect[]): Found {
-  // Round 387's sentences (oracle/round387.ts) first.
+  // Round 388's sentences (oracle/round388.ts), then round 387's (oracle/round387.ts), first.
+  const r388 = round388Sentence(s, sentences, si, ctx, _effects);
+  if (r388) return r388;
   const r387 = round387Sentence(s, sentences, si, ctx, _effects);
   if (r387) return r387;
   // Nashi, Moon's Legacy: "exile up to one target legendary or Rat card from your graveyard and copy it. You may cast the

@@ -1,6 +1,6 @@
 # Roadmap
 
-31,481 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,488 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,902 of
 9,979 (99%).
 
@@ -3266,6 +3266,37 @@ line blocks.
    Filigree Vector, Lich's Mirror, Over the Top, Vault 11: Voter's Dilemma, Riddles in the Dark and the rest above rank
    14,000 (still out, for the reasons in their earlier lists).
    Polish: Explosion of Riches's reflexive triggers log the target before "triggers ... targeting" (two lines for each).
+   Round 384 went on down `npm run popular` and the "Out after round N" lists, most played first, to a council's dilemma
+   milling and exiling once for each vote, lands flooded into Islands by each player in turn, a trigger on an attacker
+   that enlisted, and a secret number an opponent guesses: Fateful Tempest's "Starting with you, each player votes for past
+   or present. You mill a card for each past vote, then ~ deals damage to each opponent equal to the total mana value of
+   cards milled this way. Exile the top card of your library for each present vote. Until the end of your next turn, you
+   may play the exiled cards." (CR 701.38a, no abstaining; one mill of that many, CR 701.17a, the damage the milled cards'
+   total mana value wherever they went, X as 0, rulings; an impulse of that many, normal timing, rulings; nothing for a
+   word with no vote); Quicksilver Fountain's "At the beginning of each player's upkeep, that player puts a flood counter
+   on target non-Island land they control of their choice. That land is an Island for as long as it has a flood counter on
+   it." (the Fountain's controller's trigger, CR 603.3a, its target chosen by the upkeep's player, TargetSpec.chosenBy
+   "eventPlayer", who puts the counter; an Island only, losing its other land types, CR 305.7, while the counter stays,
+   even after the Fountain leaves, rulings) and "At the beginning of each end step, if all lands on the battlefield are
+   Islands, remove all flood counters from them." (an intervening if, CR 603.4); Aradesh, the Founder's "Whenever a
+   creature you control attacks, if it enlisted a creature this combat, the creature that attacked gains double strike
+   until end of turn. If that creature's power is 4 or greater, draw a card." (StaticCondition subjectEnlisted,
+   GameState.enlistedThisCombat by object and combat, CR 702.154a, 400.7; the power as it resolves, CR 608.2h if gone);
+   The Toymaker's Trap's "At the beginning of your upkeep, secretly choose a number between 1 and 5 that hasn't been
+   chosen. If you do, an opponent guesses which number you chose, then you reveal the number you chose. If they guessed
+   wrong, they lose life equal to the number they guessed and you draw a card. If they guessed right, sacrifice ~."
+   (Effect secretNumberGuess, GameState.numbersChosenFor by object, CR 400.7, rulings: a new object or a second Trap
+   remembers none; the controller chooses the opponent, CR 608.2d; chooseOption "toyNumber" and "toyGuess"). Browser
+   tests click through the Trap's number, opponent and guess buttons (yours and Ana's Trap), your target for Ana's
+   Fountain on your upkeep and Fateful Tempest's vote. +4, 31,488 of 31,936. The compiled text of every other card is
+   unchanged. Bots vote past (damage) as the caster and present as an opponent, pick the Trap's number and guess at
+   random among the numbers not chosen before, and choose a Fountain target like any target of another player's ability.
+   Out after round 384 (looked at, not done): Whims of the Fates (still out: each player separates all their permanents
+   into three piles, a choice the browser has no prompt for yet); Stardew Valley ("another player of your choice may gain
+   control of that permanent"); Daring Thief and Lagrella, the Magpie (still out, as in their earlier lists); Hero of
+   Bretagard, Rinoa, Angel Wing, Supper for Spiders, Immortal Coil, Nefarious Lich and the rest above rank 15,000 (still
+   out, for the reasons in their earlier lists).
+   Polish: the Trap's log reads "You reveals" and "You guesses" (the "You plays" grammar of the log).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

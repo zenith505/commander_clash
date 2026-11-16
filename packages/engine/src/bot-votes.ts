@@ -106,6 +106,10 @@ function perVoteValue(s: GameState, pid: PlayerId, controller: PlayerId, es: Eff
   for (const e of es) {
     if (e.type === "search" && c.library.some((id) => { const def = defOf(s, obj(s, id)); return def.types.includes("Land") && def.supertypes.includes("Basic"); })) d += 3;
     if (e.type === "chooseFromGraveyard" && c.graveyard.length) d += 2 + Math.max(...c.graveyard.map((id) => defMv(defOf(s, obj(s, id))))) / 2;
+    // Fateful Tempest (round 384): a card milled is about 2 damage to each opponent (a land's 0, a spell's more); a card
+    // exiled to play until the end of the caster's next turn is about as good as a card drawn.
+    if (e.type === "mill" && c.library.length) d += opponents(s, controller).length;
+    if (e.type === "impulse" && c.library.length) d += 2;
   }
   return pid === controller ? d : -d / 2;
 }

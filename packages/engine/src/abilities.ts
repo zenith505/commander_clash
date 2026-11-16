@@ -2376,6 +2376,8 @@ export type StaticCondition =
   | { kind: "subjectDealtExcess" }
   /** Firkraag, Cunning Instigator: "if that creature had to attack this combat": a requirement applied to the trigger's subject as it was declared an attacker in this combat (GameState.hadToAttack). */
   | { kind: "subjectHadToAttack" }
+  /** Aradesh, the Founder (round 384): "if it enlisted a creature this combat": the trigger's subject, as that object, tapped a creature for its enlist ability as it was declared an attacker in this combat (GameState.enlistedThisCombat, CR 702.154a). */
+  | { kind: "subjectEnlisted" }
   /** "If that creature has a +1/+1 counter on it" (Marcus, Mutant Mayor): the trigger's subject, or as it last existed. */
   | { kind: "subjectCounter"; counter: CounterKind; /** "If that creature has three or more +1/+1 counters on it" (Hadana's Climb): at least this many (default 1). */ min?: number }
   /**
@@ -5513,6 +5515,8 @@ export type Effect =
    * before (Chosen.landOrNonland), then it's revealed; `right` happens if they guessed right, `wrong` otherwise (an empty
    * library: never right, rulings). */
   | { type: "guessTopKind"; right: Effect[]; wrong: Effect[] }
+  /** The Toymaker's Trap (round 384): "secretly choose a number between 1 and `max` that hasn't been chosen. If you do, an opponent guesses which number you chose, then you reveal the number you chose. If they guessed wrong, they lose life equal to the number they guessed and you draw a card. If they guessed right, sacrifice ~." (GameState.numbersChosenFor). */
+  | { type: "secretNumberGuess"; max: number }
   /**
    * Sin, Spira's Punishment: "exile a permanent card from your graveyard at random, then create a tapped token that's a copy
    * of that card. If the exiled card is a land card, repeat this process.": a card matching `filter` chosen at random as

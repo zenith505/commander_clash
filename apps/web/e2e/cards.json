@@ -13806,6 +13806,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9d2f02f7-adcd-4d23-a051-ebca70f22ba5",
+  "name": "Fateful Tempest",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Council's dilemma — Starting with you, each player votes for past or present. You mill a card for each past vote, then Fateful Tempest deals damage to each opponent equal to the total mana value of cards milled this way. Exile the top card of your library for each present vote. Until the end of your next turn, you may play the exiled cards.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Council's dilemma",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "soc",
+  "releasedAt": "2026-04-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "676935c8-22e0-427f-9566-16778cea0873",
   "name": "Fatespinner",
   "manaCost": "{1}{U}{U}",
@@ -31411,6 +31440,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0e7cf14a-6149-4ba9-b3f5-c5faf9f772bc",
+  "name": "Quicksilver Fountain",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of each player's upkeep, that player puts a flood counter on target non-Island land they control of their choice. That land is an Island for as long as it has a flood counter on it.\nAt the beginning of each end step, if all lands on the battlefield are Islands, remove all flood counters from them.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "82372776-bedd-4893-92ad-f1272f9c3250",
   "name": "Quicksilver Wall",
   "manaCost": "{2}{U}",
@@ -40713,6 +40764,32 @@
   "releasedAt": "2021-02-05",
   "rarity": "uncommon",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8e93ea21-5e3f-448e-a175-96c8438c328e",
+  "name": "The Toymaker's Trap",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, secretly choose a number between 1 and 5 that hasn't been chosen. If you do, an opponent guesses which number you chose, then you reveal the number you chose. If they guessed wrong, they lose life equal to the number they guessed and you draw a card. If they guessed right, sacrifice this enchantment.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "normal",
   "gameChanger": false
  },
  {

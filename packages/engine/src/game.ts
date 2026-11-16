@@ -11883,6 +11883,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "toyNumber" || pend.what === "toyGuess") {
+    // The Toymaker's Trap (Effect secretNumberGuess, round 384): the secret number, then the opponent's guess.
+    if (!pend.options.includes(choice)) throw new RulesError(pend.what === "toyNumber" ? "choose a number that hasn't been chosen" : "guess a number from the list");
+    const st = ((r.scratch ??= {}).toy ??= {});
+    if (pend.what === "toyNumber") st.pick = Number(choice);
+    else st.guess = Number(choice);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "namedCopy") {
     // Garth One-Eye (Effect copyNamedCard, round 377): the name picked; the copy is made next.
     const st = ((r.scratch ??= {}).garth ??= {});
@@ -13925,6 +13934,11 @@ function enlistChosen(s: GameState, at: ObjectId, ids: ObjectId[]) {
   if (c) {
     tapPermanent(s, obj(s, c));
     d.enlisted.push([at, c]);
+    // Aradesh, the Founder (round 384): "if it enlisted a creature this combat", as that object, in this combat.
+    const key = `${at}@${obj(s, at).zoneChanges ?? 0}`;
+    const en = s.enlistedThisCombat;
+    if (en && en.turn === s.turn && en.combat === (s.combatsThisTurn ?? 0)) en.keys.push(key);
+    else s.enlistedThisCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0, keys: [key] };
     log(s, `${nameOf(s, at)} enlists ${nameOf(s, c)}.`);
   }
   s.pending = null;

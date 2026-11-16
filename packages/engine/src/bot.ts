@@ -2130,6 +2130,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Spectral Searchlight: mana another player gave us, in the color of most of the cards in our hand (it empties as the
     // step ends, so only what we could cast now counts, if anything).
     // Garth One-Eye (round 377): the name whose copy we'd cast now, to most effect.
+    // The Toymaker's Trap (round 384): the secret number and the guess, each at random among the options (the bot can't
+    // see the number; a guess of a number already chosen can't be right, so only the others).
+    if (pend.kind === "chooseOption" && (pend.what === "toyNumber" || pend.what === "toyGuess")) {
+      const opts = pend.what === "toyGuess" ? toyGuessOptions(s, pend.options) : pend.options;
+      return [{ type: "chooseOption", player: pid, choice: opts[((s.rngState >>> 3) ^ (s.log.length * 7)) % opts.length]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "namedCopy") return [{ type: "chooseOption", player: pid, choice: namedCopyPick(s, pid, pend.options) ?? pend.options[0]! }];
     // Volo's Journal (round 380): each noted type counts the same for its draw, so the first one.
     // Long List of the Ents (round 381): any type, so the one most of our creature cards in hand (counted twice) and
@@ -2704,6 +2710,15 @@ function chooseLimitedUntap(s: GameState, pid: PlayerId, options: ObjectId[]): O
   const chosen: ObjectId[] = [];
   for (const id of [...options].sort((a, b) => value(b) - value(a))) if (!untapChoiceProblem(s, pid, [], [...chosen, id])) chosen.push(id);
   return chosen;
+}
+
+/** The numbers a Toymaker's Trap guess could be right with: those not chosen for it before this one (GameState.numbersChosenFor). */
+function toyGuessOptions(s: GameState, options: string[]): string[] {
+  const r = s.resolving;
+  const key = r ? `${r.item.sourceId}@${r.item.sourceZc ?? 0}` : "";
+  const earlier = (s.numbersChosenFor?.[key] ?? []).slice(0, -1).map(String);
+  const left = options.filter((o) => !earlier.includes(o));
+  return left.length ? left : options;
 }
 
 /**

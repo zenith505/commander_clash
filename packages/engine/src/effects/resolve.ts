@@ -42,6 +42,7 @@ import { runFlickerWithAurasEffect, runReturnAurasAttachedEffect } from "./run-r
 import { runTapLandsSharingManaEffect } from "./run-round367";
 import { runAuraCopiesOnAttackersEffect } from "./run-round368";
 import { runAttackingNowEffect, runDiscardOrSacrificeEffect, runExileTopDamageEachEffect, runGuessTopKindEffect, runReturnSacrificedCardsEffect, runSacrificeTargetsRevealEffect } from "./run-round319";
+import { runSecretNumberGuessEffect } from "./run-round384";
 import { runRepeatIfDidEffect } from "./run-round320";
 import { runChooseHostOrNamedEffect, runPutMilledPairEffect, runSearchEachExileEffect } from "./run-round321";
 import { runLaneB160Effect } from "./run-laneb160";
@@ -1851,6 +1852,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runSearchEachExileEffect(s, e, ctx, src);
     case "guessTopKind":
       return runGuessTopKindEffect(s, e, ctx, src);
+    case "secretNumberGuess":
+      return runSecretNumberGuessEffect(s, e, ctx, src);
     case "exileRandomTokenCopy":
       return runExileRandomTokenCopyEffect(s, e, ctx, src);
     case "kinCounters":

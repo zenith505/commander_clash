@@ -8032,6 +8032,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "603e518c-8f12-432c-ae03-790db5be77bf",
+  "name": "Cosmos Charger",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Horse Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Horse",
+   "Spirit"
+  ],
+  "oracleText": "Flash\nFlying\nForetelling cards from your hand costs {1} less and can be done on any player's turn.\nForetell {2}{U} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Flash",
+   "Foretell"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "acf4d685-a718-42f7-9a7a-dee069ae8db2",
   "name": "Council's Judgment",
   "manaCost": "{1}{W}{W}",
@@ -17475,6 +17510,34 @@
   "set": "lcc",
   "releasedAt": "2023-11-17",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3da9fecc-064a-44e6-b88e-4b10194e367e",
+  "name": "Hall of Gemstone",
+  "manaCost": "{1}{G}{G}",
+  "cmc": 3,
+  "typeLine": "World Enchantment",
+  "supertypes": [
+   "World"
+  ],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of each player's upkeep, that player chooses a color. Until end of turn, lands tapped for mana produce mana of the chosen color instead of any other color.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -34702,6 +34765,32 @@
   "set": "csp",
   "releasedAt": "2006-07-21",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f557fb2c-581b-4a8d-8766-1e46e92224fa",
+  "name": "Shimmer",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "As this enchantment enters, choose a land type.\nEach land of the chosen type has phasing. (It phases in or out before its controller untaps during each of their untap steps. While it's phased out, it's treated as though it doesn't exist.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

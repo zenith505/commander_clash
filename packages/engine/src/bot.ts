@@ -3871,6 +3871,9 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // Disciple of Caelus Nin (round B223): everything but five permanents of each player phases out for as long as it stays;
   // cast only while we'd keep all of ours.
   if (compileCard(d).permanentsCantPhaseIn && compileCard(d).triggers.some((tr) => tr.body.effects.some((e) => e.type === "keepRest" && e.phaseOut)) && s.battlefield.filter((b) => controllerOf(s, obj(s, b)) === pid).length > 5) return null;
+  // Shimmer (round B226): lands of the chosen type phase out every other turn, ours too; cast only with a land type that
+  // hurts opponents more than us.
+  if (/^Each land of the chosen type has phasing\./m.test(d.oracleText) && phasingLandTypeScore(s, pid).best <= 0) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
@@ -6071,6 +6074,11 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
     const holder = pend?.kind === "chooseOption" && pend.objectId ? s.objects[pend.objectId] : undefined;
     const second = holder ? !!holder.chosen?.landTypes?.length : what === "basicLandType" && s.resolving?.scratch?.swapFrom !== undefined;
     return chooseSwapLandType(s, pid, options, second);
+  }
+  // Shimmer (round B226): each land of the chosen type has phasing, so the type opponents have the most lands of, net of ours.
+  if (what === "landType" && /^Each land of the chosen type has phasing\./m.test(card?.oracleText ?? "")) {
+    const { type, best } = phasingLandTypeScore(s, pid, options);
+    return type !== undefined && best > 0 ? type : (options.find((t) => !s.battlefield.some((id) => characteristics(s, obj(s, id)).subtypes.includes(t))) ?? type ?? options[0]!);
   }
   if (what === "basicLandType" || what === "landType") return chooseLandType(s, pid, options);
   if (what === "keyword") return chooseKeyword(s, pid, options);
@@ -8913,6 +8921,25 @@ function chooseSwapLandType(s: GameState, pid: PlayerId, options: string[], seco
       return n + (opps.includes(controllerOf(s, o)) ? 1 : controllerOf(s, o) === pid ? -1 : 0);
     }, 0);
   return [...options].sort((a, b) => score(b) - score(a))[0]!;
+}
+
+/**
+ * Shimmer (round B226): the land type whose lands phasing hurts opponents most against us: each opponent's land of that type
+ * counts 1, each of ours as much as all the opponents together (they lose one land each, we lose ours). Among `options`, or
+ * every land type on the battlefield.
+ */
+function phasingLandTypeScore(s: GameState, pid: PlayerId, options?: string[]): { type?: string; best: number } {
+  const opps = s.turnOrder.filter((p) => p !== pid && !player(s, p).lost).length;
+  const score = new Map<string, number>();
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (!objIsType(s, o, "Land")) continue;
+    for (const t of characteristics(s, o).subtypes) if (!options || options.includes(t)) score.set(t, (score.get(t) ?? 0) + (controllerOf(s, o) === pid ? -opps : 1));
+  }
+  let type: string | undefined;
+  let best = 0;
+  for (const [t, n] of score) if (type === undefined || n > best) [type, best] = [t, n];
+  return { ...(type !== undefined ? { type } : {}), best };
 }
 
 function chooseLandType(s: GameState, pid: PlayerId, options: string[]): string {

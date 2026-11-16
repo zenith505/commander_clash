@@ -1,6 +1,6 @@
 # Roadmap
 
-31,464 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,468 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -4312,7 +4312,7 @@ line blocks.
    by that creature's controller); Frankenstein's Monster (done in round B171) (a counter chosen for each exiled card as it enters); Cyclopean
    Tomb; Apocalypse Chime, Golgothian Sylex and City in a Bottle (names first printed in a set); Reflecting Mirror;
    Extrapolate the Impossible and Golden Wish (cards from outside the game); Search the City; Minamo's Meddling (spliced
-   cards); Ghostly Flame; Steamflogger Boss (Contraptions); Vodalian War Machine (Merfolk tapped to pay its costs).
+   cards); Ghostly Flame; Steamflogger Boss (done in round B226) (Contraptions); Vodalian War Machine (Merfolk tapped to pay its costs).
    Out after round 292 (looked at, not done): Balthier and Fran (a Vehicle "crewed by ~ this turn" attacking in the first
    combat phase); Eriette, the Beguiler (control while an Aura stays attached); The Fourteenth Doctor (Doctor cards put
    into your graveyard from your library this turn); Tahngarth, First Mate (given to an attacking opponent until end of
@@ -5569,7 +5569,7 @@ line blocks.
    in any order (Arjun, Mindmoil), granting cascade, and the owner's order when several target spells or permanents
    go to the bottom at once (CR 401.4). Left from the
    earthbend/foretell round: {X} foretell and freerunning costs (Starnheim Unleashed done in round 300, Monastery Raid),
-   "if this spell was cast from exile" conditions on foretell cards (Cosmos Charger), Avatar Kyoshi's "then untap that land", Feral Contest and Mark for
+   "if this spell was cast from exile" conditions on foretell cards (Cosmos Charger, done in round B226), Avatar Kyoshi's "then untap that land", Feral Contest and Mark for
    Death's lures with extra clauses, Kingpin of Crime (done in round B192).
 
 ## Lane B (bottom up)
@@ -9620,6 +9620,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   targeting bar reads "~" in an activated ability's text as the card's name. Browser tests for Heart of Bogardan's unpaid
   upkeep and target, Lesser Werewolf's target, Goblin Flotilla's {R} question and Acidic Dagger's target. +4, 31,464 of
   31,936. The compiled text of every other card is unchanged.
+- Round B226 (least played first, from the Lane B skip lists): Steamflogger Boss (its "If a Rigger you control would
+  assemble a Contraption" line never applies: assembling is an Unstable keyword action outside the rules and nothing
+  Commander-legal assembles a Contraption, CR 701.45a, so it's read and does nothing; its Rigger bonus already worked).
+  Shimmer (any land type, basic or not, chosen as it enters, CR 205.3i; each land of that type, anyone's, has phasing,
+  CR 702.26a, layer 6; bots pick the type opponents have the most lands of, net of their own, and don't cast it without
+  one). Hall of Gemstone (at each player's upkeep that player chooses a color; until end of turn each colored mana any land
+  is tapped for becomes that color, the same amount, colorless mana unchanged, rulings; landManaRules `colored`, in any order
+  with the other mana replacements, CR 616.1). Cosmos Charger (foretelling, the special action, costs {1} less for each
+  Charger you control, to {0}, and can be done any time you have priority while you control one, rulings;
+  CompiledCard.foretellActionLess, game.ts foretellActionCost; the Foretell button shows the cost). Browser tests for
+  Shimmer's land type, Hall of Gemstone's color at your upkeep and foretelling on Ana's turn for {1}. +4, 31,468 of 31,936.
+  The compiled text of every other card is unchanged.
+- Out after round B226 (looked at, not done): Snowfall (its "may add" in a triggered mana ability, a choice that matters
+  with mana burn like Yurlok of Scorch Thrash's, and mana from a trigger spendable only on cumulative upkeep, which autopay
+  would have to keep apart), Jasmine Boreal of the Seven (a creature spell with no abilities, counting abilities other
+  permanents give spells, rulings), Mana Cache (a mana ability any player may activate), Worms of the Earth ("Lands can't
+  enter the battlefield" for every way a land is put onto it, a copy entering as a land too, rulings), The Prismatic Piper,
+  Faceless One and Clara Oswald (a color chosen before the game that changes the commander's color identity for deck
+  building, CR 903.4b), Ranar the Ever-Watchful (its exile trigger, still out; its free first foretell would use Cosmos
+  Charger's foretellActionCost) and the lists after round B225 stay out.
 - Out after round B225 (looked at, not done): Cultivator Drone (its mana pays "a cost that contains {C}", a trigger's
   payment too, rulings: a cost paid as something resolves isn't known to the mana yet), Threefold Signal (a second
   replicate cost beside a spell's own, rulings: one kicker-like cost per spell is modeled), Bösium Strip (casting from the top
@@ -10063,7 +10083,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   permanent cards entering at once, Auras needing hosts among them), Spirit-Sister's Call (a sacrifice sharing a card
   type with a card put into your graveyard, then a granted leave-the-battlefield replacement), Back from the Brink (a
   token copy of the card exiled to pay the cost), Dream Halls (an alternative cost for every player's spells: discard a
-  card sharing a color), Hall of Gemstone (lands tapped for mana make the chosen color instead, a mana replacement).
+  card sharing a color), Hall of Gemstone (done in round B226) (lands tapped for mana make the chosen color instead, a mana replacement).
 - Out after round B94 (looked at, not done): Forgotten Lore (done in round B142) and Shrouded Lore (done in round B142) (an opponent chooses a card in your
   graveyard, repeated while you pay, none chosen twice), Graceful Takedown (done in round B187) ("any number of target enchanted creatures you
   control and up to one other target creature" each dealing damage), Nahiri's Sacrifice (an additional sacrifice with

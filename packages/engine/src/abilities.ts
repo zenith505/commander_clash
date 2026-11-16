@@ -5287,7 +5287,7 @@ export type Effect =
    * type"; Deep Water: "Until end of turn, if you tap a land you control for mana, it produces {U} instead ..." (`yours`):
    * a replacement effect for the rest of the turn (CR 106.12b, 614.1a; GameState.landManaRules).
    */
-  | { type: "landManaUntilEndOfTurn"; /** "any": "mana of a color of your choice" (Harvest Mage, round B224). */ mana: ManaType | "any"; /** "... instead of any other type and amount": one mana. */ one?: true; nonbasic?: true; yours?: true; /** Chaos Moon (round B223): "if a player taps a Mountain for mana, that Mountain produces colorless mana instead": only lands with this subtype as they're tapped. */ subtype?: string }
+  | { type: "landManaUntilEndOfTurn"; /** "any": "mana of a color of your choice" (Harvest Mage, round B224). "chosen": the color chosen before it as this resolves (Hall of Gemstone, round B226). */ mana: ManaType | "any" | "chosen"; /** Hall of Gemstone: "mana of the chosen color instead of any other color": only colored mana changes, colorless stays (rulings). */ colored?: true; /** "... instead of any other type and amount": one mana. */ one?: true; nonbasic?: true; yours?: true; /** Chaos Moon (round B223): "if a player taps a Mountain for mana, that Mountain produces colorless mana instead": only lands with this subtype as they're tapped. */ subtype?: string }
   | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true; /** "That player can't activate abilities that aren't mana abilities" (Abeyance): for these players. */ who?: PlayerRef; /** For each opponent of its controller (Revel in Silence). */ opponents?: true; /** "Can't be countered by blue or black spells" (Autumn's Veil): only by spells of these colors. */ byColors?: Color[]; /** About the ability's source, the object it is now (Kaito, Dancing Shadow's "loyaltyTwice"). */ self?: true }
   /** "Until your next turn, you may cast sorcery spells as though they had flash." (Teferi, Time Raveler; CR 702.8a) */
   | { type: "flashUntilNextTurn"; filter: TargetSpec; /** "You may cast creature spells this turn as though they had flash" (Winding Canyons): until this turn ends instead. */ thisTurn?: true }
@@ -9165,6 +9165,8 @@ export interface CompiledCard {
   handMiracle?: { filter: TargetSpec; mana: string; /** Aminatou, Veil Piercer: "Its miracle cost is equal to its mana cost reduced by {4}": the card's mana cost less this much generic mana (`mana` unused). */ reduce?: number; text: string }[];
   /** "Each nonland card in your hand without foretell has foretell. Its foretell cost is equal to its mana cost reduced by {2}." (Dream Devourer): foretell for those cards in its controller's hand (CR 702.143a), a foretell cost of their mana cost less this much generic mana (rulings). */
   handForetell?: { reduce: number; text: string }[];
+  /** Cosmos Charger (round B226): "Foretelling cards from your hand costs {1} less and can be done on any player's turn": the {2} of foretelling (CR 702.143a, a special action, 116.2h) costs its controller this much less, and they may foretell any time they have priority. */
+  foretellActionLess?: number;
   /** "Instant and sorcery spells you cast have storm" (Prismari, Ral's emblem): each such spell's own storm triggers (CR 702.40a). */
   spellsHaveStorm?: { filter: TargetSpec; text: string }[];
   spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; /** 'Have "Cascade, cascade."' (Zhulodok): two instances. */ twice?: true; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];

@@ -643,7 +643,7 @@ describe("Lane B round 50", () => {
     expect([zone(s, a1), zone(s, a2), zone(s, blocker)]).toEqual(["graveyard", "battlefield", "graveyard"]);
   });
 
-  it("Decaying Soil stays unsupported: its granted dies trigger would read the graveyard after the creature arrives (CR 603.10a)", () => {
-    expect(isFullySupported(decayingSoil())).toBe(false);
+  it("Decaying Soil is supported since round B234: its granted dies trigger looks back at the graveyard before the creature arrives (CR 603.10a)", () => {
+    expect(isFullySupported(decayingSoil())).toBe(true);
   });
 });

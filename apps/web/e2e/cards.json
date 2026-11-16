@@ -14315,6 +14315,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2fc42640-983a-49ca-9020-7756135077b4",
+  "name": "Fight or Flight",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of combat on each opponent's turn, separate all creatures that player controls into two piles. Only creatures in the pile of their choice can attack this turn.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "inv",
+  "releasedAt": "2000-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ae92942b-919c-4ea9-b693-85fcef765d5a",
   "name": "Fire // Ice",
   "manaCost": "{1}{R} // {1}{U}",
@@ -37538,6 +37564,32 @@
   "commanderLegal": "legal",
   "set": "aer",
   "releasedAt": "2017-01-20",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "927d0085-9bd9-4454-8ac5-0e374237ed35",
+  "name": "Stand or Fall",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of combat on your turn, for each defending player, separate all creatures that player controls into two piles and that player chooses one. Only creatures in the chosen piles can block this turn.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "inv",
+  "releasedAt": "2000-10-02",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

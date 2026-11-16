@@ -1738,7 +1738,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Our own permanents to sacrifice (Liliana of the Veil): the pile worth less.
       // Boneyard Parley: creature cards to put onto the battlefield, worth their mana value.
       // Death or Glory: the pile exiled, the other returning to the battlefield, so an opponent's bigger pile.
-      const worth = pend.sacrificePile ? (id: string) => permanentWorth(s, pid, id) : pend.pileMode === "battlefield" || pend.pileMode === "exile" ? (id: string) => 1 + mv(s, id) : (id: string) => handWorth(s, id);
+      // Fight or Flight, Stand or Fall: the creatures that may still attack (block), so our own pile worth more.
+      const worth = pend.sacrificePile || pend.pileMode === "canAttack" || pend.pileMode === "canBlock" ? (id: string) => permanentWorth(s, pid, id) : pend.pileMode === "battlefield" || pend.pileMode === "exile" ? (id: string) => 1 + mv(s, id) : (id: string) => handWorth(s, id);
       // Atris: a face-down pile is guessed at by its size alone; Truth or Tale: a pile is worth its best card.
       const [a, b] = pend.piles.map((pile, i) => (pend.pileMode === "faceDown" && i === 0 ? pile.length * 2 : pend.pileMode === "pickOne" ? Math.max(0, ...pile.map(worth)) : pile.reduce((n, id) => n + worth(id), 0)));
       // Make an Example: another player's pile for them to sacrifice, so the one worth more.

@@ -1007,10 +1007,20 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       });
       if (equipment.length) (lki as LastKnown).equipment = equipment;
       const dying = { o: ev.snapshot, c: ev.chars };
+      // Decaying Soil (round B234, TriggeredAbility.lookBackYardAtLeast): the cards in that player's graveyard just before
+      // this event (CR 603.10a), so not those the same event put there (moves of one instruction happen at once, CR 608.2c),
+      // and with those it took out.
+      const yardBefore = (pid: PlayerId) => {
+        const moves = s.zoneBatch ?? [];
+        const yard = player(s, pid).graveyard;
+        const came = new Set(moves.filter((m) => m.to === "graveyard" && yard.includes(m.id)).map((m) => m.id));
+        const left = new Set(moves.filter((m) => m.from === "graveyard" && m.owner === pid && !yard.includes(m.id)).map((m) => m.id));
+        return yard.length - came.size + left.size;
+      };
       const hadCounter = Object.values(ev.counters).some((n) => n > 0);
       const went = (d: NonNullable<TriggeredAbility["dies"]>) => (d.leaves ? !(d.notDies && ev.to === "graveyard") && (!d.toZones || (d.toZones as string[]).includes(ev.to)) : ev.to === "graveyard") && (!d.hadCounter || (d.hadCounter === true ? hadCounter : (ev.counters[d.hadCounter] ?? 0) > 0)) && !(d.notSacrificed && ev.sacrificed);
       const consider = (src: GameObject, ctrl: PlayerId, attachedTo: ObjectId | undefined, triggers?: TriggeredAbility[], damagedById?: ObjectId) =>
-        add(src, ctrl, (e, t) => e === "permanentDies" && !!t.dies && went(t.dies) && diesMatches(s, t.dies, src.id, attachedTo, dying, ctrl, src.chosen, damagedById), triggers, undefined, o, lki);
+        add(src, ctrl, (e, t) => e === "permanentDies" && !!t.dies && went(t.dies) && !(t.lookBackYardAtLeast !== undefined && yardBefore(ctrl) < t.lookBackYardAtLeast) && diesMatches(s, t.dies, src.id, attachedTo, dying, ctrl, src.chosen, damagedById), triggers, undefined, o, lki);
       for (const id of s.battlefield) {
         const src = obj(s, id);
         consider(src, controllerOf(s, src), ev.attachments?.includes(id) ? ev.id : src.attachedTo);

@@ -617,8 +617,13 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       // Haunting Imitation: the creature cards among them, as they were revealed.
       if (c.creature) return (s.resolving?.parley?.ids ?? []).filter((id) => s.objects[id] && isType(defOf(s, s.objects[id]!), "Creature")).length;
       return (c.mv ? s.resolving?.parley?.mv : c.land ? s.resolving?.parley?.land : s.resolving?.parley?.nonland) ?? 0;
-    case "damageThisWay":
-      return (c.capped ? s.resolving?.damageCappedThisWay : s.resolving?.damageThisWay) ?? 0;
+    case "damageThisWay": {
+      const dealt = (c.capped ? s.resolving?.damageCappedThisWay : s.resolving?.damageThisWay) ?? 0;
+      // Soul Burn (round B234): no more than the {B} spent on X, as the spell was cast (none for a copy, CR 707.10).
+      if (!c.spentOnXCap) return dealt;
+      const spell = s.resolving?.item.objectId ? s.objects[s.resolving.item.objectId] : undefined;
+      return Math.min(dealt, s.resolving?.item.kind === "spell" ? (spell?.spentOnX ?? 0) : 0);
+    }
     case "excessThisWay":
       if (c.target !== undefined) {
         const t = s.resolving?.item.targets?.[c.target];

@@ -5680,10 +5680,13 @@ function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Words of Wilding, Words of Worship: "The next time you would draw a card this turn, create a 2/2 green Bear creature
     // token (you gain 5 life) instead." A replacement effect for the controller's next draw this turn (Player.nextDrawInstead).
     // Words of War: "~ deals 2 damage to any target instead": the target chosen as the ability is activated (CR 115.1c,
-    // 602.2b), and the damage dealt to it when the draw is replaced. Waste and Wind (choices) aren't done.
-    const wordsOf = /^[Tt]he next time you would draw a card this turn, (you gain (\d+) life|create an? [^.]+? token|~ deals (\d+) damage to any target) instead$/.exec(s);
+    // 602.2b), and the damage dealt to it when the draw is replaced. Words of Waste (round 383): "each opponent discards a
+    // card instead", each opponent's own choice (CR 701.9b) as the draw is replaced. Wind (each player's choice of a
+    // permanent to return) isn't done.
+    const wordsOf = /^[Tt]he next time you would draw a card this turn, (you gain (\d+) life|create an? [^.]+? token|~ deals (\d+) damage to any target|(each opponent discards a card)) instead$/.exec(s);
     if (wordsOf && !ctx.spell) {
-      if (wordsOf[2]) effects.push({ type: "nextDrawInstead", gain: Number(wordsOf[2]) });
+      if (wordsOf[4]) effects.push({ type: "nextDrawInstead", discard: true });
+      else if (wordsOf[2]) effects.push({ type: "nextDrawInstead", gain: Number(wordsOf[2]) });
       else if (wordsOf[3]) {
         const before = ctx.targets.length;
         const fx = parseOne(capital(wordsOf[1]!), ctx);

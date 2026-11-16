@@ -23,6 +23,7 @@ import { isSuspended } from "./effects/run-zones";
 import { canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
 import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
 import { watchExileLookers } from "./effects/run-laneb189";
+import { chooseWasteDiscard, chooseWasteToTop, wasteInstead } from "./effects/run-round383";
 import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, enchantableBy, everyCreatureType, ignoredBy, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
@@ -3203,6 +3204,7 @@ function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number
   }
   moveObject(s, top, "hand");
   s.resolving?.drawnThisWay?.push(top);
+  if (s.resolving) s.resolving.drawnCount = (s.resolving.drawnCount ?? 0) + 1; // Explosion of Riches (round 383)
   const drawnCard = obj(s, top);
   if (drawnCard.zone === "hand") drawnCard.drawn = { turn: s.turn, zc: drawnCard.zoneChanges ?? 0 };
   // Jandor's Ring: each card drawn is the last one drawn until the next (rulings: of several drawn at once, the last).
@@ -3425,11 +3427,11 @@ export function drawShields(s: GameState, pid: PlayerId): { key: string; label: 
   (p.nextDrawInstead ?? []).forEach((w, i) => {
     if (w.turn !== s.turn) return;
     // Words of War's shields are told apart by their targets.
-    const kind = JSON.stringify([w.source, w.gain ?? null, w.token ?? null, w.damage ?? null]);
+    const kind = JSON.stringify([w.source, w.gain ?? null, w.token ?? null, w.damage ?? null, w.discard ?? null]);
     if (seen.has(kind)) return;
     seen.add(kind);
     const whom = w.damage && ("player" in w.damage.to ? player(s, w.damage.to.player).name : characteristics(s, obj(s, w.damage.to.object)).name);
-    const what = [w.token ? `create a ${w.token.power}/${w.token.toughness} ${w.token.name.replace(/ Token$/, "")} token` : "", w.gain !== undefined ? `gain ${w.gain} life` : "", w.damage ? `deal ${w.damage.n} damage to ${whom}` : ""].filter(Boolean).join(" and ");
+    const what = [w.token ? `create a ${w.token.power}/${w.token.toughness} ${w.token.name.replace(/ Token$/, "")} token` : "", w.gain !== undefined ? `gain ${w.gain} life` : "", w.damage ? `deal ${w.damage.n} damage to ${whom}` : "", w.discard ? "each opponent discards a card" : ""].filter(Boolean).join(" and ");
     out.push({ key: `words:${i}`, label: `${what.charAt(0).toUpperCase()}${what.slice(1)} (${w.source})` });
   });
   return out;
@@ -3568,7 +3570,7 @@ function exileInstead(s: GameState, pid: PlayerId, src: ObjectId) {
  */
 function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: number, after: DrawAfter | undefined, made: number[], madeArchives?: number): "paused" | "again" | void {
   const p = player(s, pid);
-  if (key === "exile" || key.startsWith("words:")) return applyDrawShield(s, pid, key);
+  if (key === "exile" || key.startsWith("words:")) return applyDrawShield(s, pid, key, left, after, made);
   if (key === "thief") return stealDraw(s, pid, notionThief(s, pid)!);
   if (key === "skip") return skipDraw(s, pid, drawSkipper(s)!);
   if (key.startsWith("exiles:")) return exileInstead(s, pid, key.slice("exiles:".length));
@@ -3635,7 +3637,7 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
 }
 
 /** One of drawShields' shields replaces a draw of `pid`'s (CR 614.6), and is used up. */
-function applyDrawShield(s: GameState, pid: PlayerId, key: string) {
+function applyDrawShield(s: GameState, pid: PlayerId, key: string, left: number, after: DrawAfter | undefined, made: number[]): "paused" | void {
   const p = player(s, pid);
   if (key === "exile") {
     // Urabrask, Heretic Praetor: "the next time they would draw a card this turn, instead they exile the top card of
@@ -3661,6 +3663,8 @@ function applyDrawShield(s: GameState, pid: PlayerId, key: string) {
   const w = p.nextDrawInstead!.splice(Number(key.slice("words:".length)), 1)[0]!;
   p.nextDrawInstead = p.nextDrawInstead!.filter((x) => x.turn === s.turn);
   if (!p.nextDrawInstead.length) p.nextDrawInstead = undefined;
+  // Words of Waste (round 383): each opponent's discard, then the draws after it (effects/run-round383.ts).
+  if (w.discard) return wasteInstead(s, pid, w.source, left, after, made);
   if (w.gain !== undefined) {
     log(s, `${p.name} gains ${w.gain} life instead of drawing a card (${w.source}).`);
     gainLife(s, pid, w.gain);
@@ -10712,6 +10716,7 @@ const hasLegalTargetsFor: typeof hasLegalTargets = (...a) => hasLegalTargets(...
 /** A resolving spell or ability is waiting for `p` to choose cards to discard (CR 701.9b). */
 function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
+  if (pend?.kind === "discard" && pend.waste) return chooseWasteDiscard(s, p, ids);
   const r = s.resolving;
   if (pend?.kind !== "discard" || pend.player !== p.id || !r?.scratch?.queue) throw new RulesError("no discard pending");
   if ((pend.upTo ? new Set(ids).size !== ids.length || ids.length > pend.count : new Set(ids).size !== pend.count) || ids.some((id) => !p.hand.includes(id))) throw new RulesError(pend.upTo ? `choose up to ${pend.count} card(s) from your hand` : `choose exactly ${pend.count} card(s) from your hand`);
@@ -10727,6 +10732,7 @@ function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
 function chooseHandToTop(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
+  if (pend?.kind === "handToTop" && pend.waste) return chooseWasteToTop(s, p, ids);
   if (pend?.kind !== "handToTop" || pend.player !== p.id || !r) throw new RulesError("no cards to put on top");
   if (pend.discarding) {
     // Library of Leng: which of the cards being discarded go on top instead (see discardToTop).

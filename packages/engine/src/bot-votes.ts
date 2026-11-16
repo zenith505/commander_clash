@@ -84,12 +84,30 @@ function wordScore(s: GameState, pid: PlayerId, controller: PlayerId, effects: E
         if (pid !== controller) v -= Math.max(0, ...s.battlefield.map((id) => obj(s, id)).filter((o) => o.owner === pid).map((o) => worth(s, pid, o)));
         continue;
       }
+      // Travel Through Caradhras (round 383): one more vote for a word is one more basic land onto the battlefield, or one
+      // more card back from the graveyard, for the controller (only if there's one to find or return).
+      const per = e.type === "if" && e.cond.kind === "amountNow" && typeof e.cond.amount === "object" && "count" in e.cond.amount && e.cond.amount.count.kind === "votes" ? e.cond.amount.count.option : undefined;
+      if (per !== undefined) {
+        if (per === option) v += perVoteValue(s, pid, controller, e.type === "if" ? e.effects : []);
+        continue;
+      }
       // "For each strength vote": what one more vote for it adds.
       if (JSON.stringify(e).includes(`"option":${JSON.stringify(option)}`)) v += effectsValue(s, pid, controller, [e]);
     }
   };
   walk(effects);
   return v;
+}
+
+/** One more vote's worth of these (Travel Through Caradhras): a basic land found, or the best card in the controller's graveyard returned. */
+function perVoteValue(s: GameState, pid: PlayerId, controller: PlayerId, es: Effect[]): number {
+  let d = 0;
+  const c = player(s, controller);
+  for (const e of es) {
+    if (e.type === "search" && c.library.some((id) => { const def = defOf(s, obj(s, id)); return def.types.includes("Land") && def.supertypes.includes("Basic"); })) d += 3;
+    if (e.type === "chooseFromGraveyard" && c.graveyard.length) d += 2 + Math.max(...c.graveyard.map((id) => defMv(defOf(s, obj(s, id))))) / 2;
+  }
+  return pid === controller ? d : -d / 2;
 }
 
 /** Roughly what these instructions are worth to `pid`, done by `controller`: good for us, less than that bad for others. */

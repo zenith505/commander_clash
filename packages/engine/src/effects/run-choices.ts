@@ -621,7 +621,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Craig Boone, Novac Guard: once for every two quest counters put on it this way, so twice with Doubling Season's
       // four and not at all if none could be put (rulings).
       const perCounters = e.perCounters;
-      const times = perCounters ? Math.floor((s.resolving!.countersPutThisWay ?? []).filter((c) => c.id === sourceId && c.kind === perCounters.counter).reduce((a, c) => a + (c.n ?? 1), 0) / perCounters.n) : kind ? (s.resolving!.created ?? []).filter((id) => s.objects[id]?.cardId === kind).length : 1;
+      const times = e.perDrawn ? (s.resolving!.drawnCount ?? 0) : perCounters ? Math.floor((s.resolving!.countersPutThisWay ?? []).filter((c) => c.id === sourceId && c.kind === perCounters.counter).reduce((a, c) => a + (c.n ?? 1), 0) / perCounters.n) : kind ? (s.resolving!.created ?? []).filter((id) => s.objects[id]?.cardId === kind).length : 1;
       // Forum Filibuster (round 371): "attached to that token": each one about its own token (CR 603.12a).
       const tokens = e.perTokenSubject && kind ? (s.resolving!.created ?? []).filter((id) => s.objects[id]?.cardId === kind).map((id) => ({ id, zc: s.objects[id]!.zoneChanges ?? 0 })) : undefined;
       for (let i = 0; i < times; i++) s.triggerQueue.push({

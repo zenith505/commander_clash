@@ -26,6 +26,27 @@ export interface RedirectShield {
 /** What drawing was part of, to carry on with once a draw replacement's question is answered: the draw step, or Sokrates's draws after combat damage (round 381). */
 export type DrawAfter = "drawStep" | "damageDraws";
 
+/**
+ * Words of Waste (round 383): a draw replaced by "each opponent discards a card instead" (CR 614.1a). Every opponent with a
+ * choice to make chooses in APNAP order (CR 101.4), one card each (CR 701.9b); a Library of Leng's controller then says
+ * whether theirs goes on top; all of them are discarded at the same time, then the draws still to make go on (CR 614.11a).
+ */
+export interface WasteDraw {
+  drawer: PlayerId;
+  source: string;
+  /** Every opponent still in the game, in APNAP order. */
+  order: PlayerId[];
+  /** The opponents still to choose, in APNAP order. */
+  queue: PlayerId[];
+  chosen: Record<PlayerId, ObjectId[]>;
+  /** The Library of Leng controllers still to answer, and what they put on top. */
+  leng?: PlayerId[];
+  toTop?: Record<PlayerId, ObjectId[]>;
+  left: number;
+  made: number[];
+  after?: DrawAfter;
+}
+
 export interface DamageRule {
   id: string;
   turn: number;
@@ -1010,7 +1031,7 @@ export interface Player {
    * Bear creature token (you gain 5 life) instead." One entry for each activation, in turn `turn`; each replaces one draw
    * (CR 614.1a, 614.11); with different ones waiting, the player chooses (PendingDecision "drawInstead").
    */
-  nextDrawInstead?: { turn: number; source: string; sourceId?: ObjectId; sourceZc?: number; gain?: number; token?: TokenSpec; /** Words of War: the damage and the target chosen as the ability was activated (an object as the one it was then, CR 400.7). */ damage?: { n: number; to: { player: PlayerId } | { object: ObjectId; zc: number } } }[];
+  nextDrawInstead?: { turn: number; source: string; sourceId?: ObjectId; sourceZc?: number; gain?: number; token?: TokenSpec; /** Words of War: the damage and the target chosen as the ability was activated (an object as the one it was then, CR 400.7). */ damage?: { n: number; to: { player: PlayerId } | { object: ObjectId; zc: number } }; /** Words of Waste (round 383): each opponent of the drawing player discards a card instead. */ discard?: true }[];
   /**
    * Stunning Reversal: "The next time you would lose the game this turn, instead draw seven cards and your life total
    * becomes 1." One entry for each resolved, in turn `turn`; each replaces one loss (CR 614.1a, 614.11).
@@ -1659,9 +1680,9 @@ export type PendingDecision =
   | { kind: "declareBlockers"; player: PlayerId; remaining: PlayerId[]; defender?: PlayerId }
   | { kind: "discardToHandSize"; player: PlayerId; count: number }
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
-  | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true; /** Up to `count` ("discard any number of cards"), none too. */ upTo?: true; /** Only these cards ("then discard one of them": the cards just drawn, Soldevi Sage). */ among?: ObjectId[]; /** Worldpurge: the cards clicked are the ones kept (up to `count`, with `upTo`); the rest are shuffled into the library. */ keep?: true }
+  | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true; /** Up to `count` ("discard any number of cards"), none too. */ upTo?: true; /** Only these cards ("then discard one of them": the cards just drawn, Soldevi Sage). */ among?: ObjectId[]; /** Worldpurge: the cards clicked are the ones kept (up to `count`, with `upTo`); the rest are shuffled into the library. */ keep?: true; /** Words of Waste (round 383): the discard replacing a draw, not a resolving spell's. */ waste?: WasteDraw }
   /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
-  | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true; /** Shuffled into the library instead (See Beyond). */ shuffle?: true; /** Scroll Rack: any number up to `count`, exiled face down first and traded for as many from the top of the library. */ upTo?: true; /** Library of Leng: these cards are being discarded because of an effect, and any of them may go on top of the library instead of into the graveyard (`upTo`, the first pick ending on top). */ discarding?: ObjectId[] }
+  | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true; /** Shuffled into the library instead (See Beyond). */ shuffle?: true; /** Scroll Rack: any number up to `count`, exiled face down first and traded for as many from the top of the library. */ upTo?: true; /** Library of Leng: these cards are being discarded because of an effect, and any of them may go on top of the library instead of into the graveyard (`upTo`, the first pick ending on top). */ discarding?: ObjectId[]; /** With `discarding`: Words of Waste's discard (round 383), not a resolving spell's. */ waste?: WasteDraw }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
   /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
   /** "bottom": the cards go to the bottom of the library together and their owner orders them (CR 401.4). */
@@ -2733,6 +2754,8 @@ export interface Resolving {
   flippedTails?: PlayerId[];
   /** The cards drawn so far while this resolves, for "you may cast one of them" (Dungeon of the Mad Mage's last room). */
   drawnThisWay?: ObjectId[];
+  /** Explosion of Riches (round 383): every card drawn while this resolves, by any of its instructions ("whenever a card is drawn this way", rulings). */
+  drawnCount?: number;
   /** The cards the draw instruction before this one drew ("each opponent who drew a card this way", Cut a Deal). */
   drawnBefore?: ObjectId[];
   /**

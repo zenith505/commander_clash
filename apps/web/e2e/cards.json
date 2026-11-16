@@ -25697,6 +25697,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "583cdebe-0195-45be-bd2e-5765f07cb902",
+  "name": "Mines of Moria",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Legendary Land",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "Mines of Moria enters tapped unless you control a legendary creature.\n{T}: Add {R}.\n{3}{R}, {T}, Exile three cards from your graveyard: Create two Treasure tokens.",
+  "colors": [],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Treasure"
+  ],
+  "producedMana": [
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "ltr",
+  "releasedAt": "2023-06-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2593944c-1bde-4307-b3ca-f7ecbeb027c1",
   "name": "Minion of the Wastes",
   "manaCost": "{3}{B}{B}{B}",
@@ -42320,6 +42351,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2d47a98b-5700-4096-b080-32df4d79910c",
+  "name": "Travel Through Caradhras",
+  "manaCost": "{5}{G}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Council's dilemma — Starting with you, each player votes for Redhorn Pass or Mines of Moria. For each Redhorn Pass vote, search your library for a basic land card and put it onto the battlefield tapped. If you search your library this way, shuffle. For each Mines of Moria vote, return a card from your graveyard to your hand.\nExile Travel Through Caradhras.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Council's dilemma"
+  ],
+  "commanderLegal": "legal",
+  "set": "ltc",
+  "releasedAt": "2023-06-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5241182d-e2ca-4b31-809f-fbff2822dbf6",
   "name": "Traveler's Cloak",
   "manaCost": "{2}{U}",
@@ -43958,6 +44017,32 @@
   "set": "sld",
   "releasedAt": "2025-12-01",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6d42dff5-97ec-4768-b112-84a3584d0b87",
+  "name": "Vision Skeins",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player draws two cards.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dis",
+  "releasedAt": "2006-05-05",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -45750,6 +45835,32 @@
   ],
   "colorIdentity": [
    "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3fe5cfcd-b25f-49d8-9f60-8b4c388a9c68",
+  "name": "Words of Waste",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}: The next time you would draw a card this turn, each opponent discards a card instead.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
   ],
   "keywords": [],
   "commanderLegal": "legal",

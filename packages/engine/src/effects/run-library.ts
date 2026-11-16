@@ -92,9 +92,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (!ctx.legal[e.damage.target] || !t || (t.kind !== "player" && t.kind !== "object")) return;
         damage = { n: e.damage.n, to: t.kind === "player" ? { player: t.id } : { object: t.id, zc: t.zc ?? obj(s, t.id).zoneChanges ?? 0 } };
       }
-      (p.nextDrawInstead ??= []).push({ turn: s.turn, source: src, ...(ctx.sourceId !== undefined ? { sourceId: ctx.sourceId, sourceZc: ctx.sourceZc ?? 0 } : {}), ...(e.gain !== undefined ? { gain: e.gain } : {}), ...(e.token ? { token: e.token } : {}), ...(damage ? { damage } : {}) });
+      (p.nextDrawInstead ??= []).push({ turn: s.turn, source: src, ...(ctx.sourceId !== undefined ? { sourceId: ctx.sourceId, sourceZc: ctx.sourceZc ?? 0 } : {}), ...(e.gain !== undefined ? { gain: e.gain } : {}), ...(e.token ? { token: e.token } : {}), ...(damage ? { damage } : {}), ...(e.discard ? { discard: true as const } : {}) });
       const whom = damage && ("player" in damage.to ? player(s, damage.to.player).name : characteristics(s, obj(s, damage.to.object)).name);
-      log(s, `The next time ${p.name} would draw a card this turn, ${damage ? `${src} deals ${damage.n} damage to ${whom}` : e.token ? `they create a ${e.token.power}/${e.token.toughness} ${e.token.name} token` : `they gain ${e.gain} life`} instead (${src}).`);
+      log(s, `The next time ${p.name} would draw a card this turn, ${damage ? `${src} deals ${damage.n} damage to ${whom}` : e.token ? `they create a ${e.token.power}/${e.token.toughness} ${e.token.name} token` : e.discard ? "each opponent discards a card" : `they gain ${e.gain} life`} instead (${src}).`);
       return;
     }
     case "revealUntilLandToGraveyard":
@@ -2459,7 +2459,7 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
 }
 
 /** The Library of Leng `pid` controls, if any: its name. */
-function lengName(s: GameState, pid: PlayerId): string | undefined {
+export function lengName(s: GameState, pid: PlayerId): string | undefined {
   const o = s.battlefield.map((id) => obj(s, id)).find((o) => controllerOf(s, o) === pid && abilitiesOf(s, o).discardToTop);
   return o && defOf(s, o).name;
 }

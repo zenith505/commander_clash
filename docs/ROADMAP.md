@@ -317,7 +317,7 @@ line blocks.
    Gloom Ripper, Backlash, Tribute to Hunger, Turn the Earth, Curse of Stalked Prey, Wall of Essence, Eyeblight
    Massacre, Kirri, Of One Mind, Eagle of Deliverance, Tui and La, Carnival of Souls and others), taking the easy ones.
    Out after round 182 (ranks 12,330 to 13,222): City of
-   Solitude (mana abilities only on your turn), Words of Waste, Kirtar's Wrath and Cleansing Meditation (threshold
+   Solitude (mana abilities only on your turn), Words of Waste (done in round 383), Kirtar's Wrath and Cleansing Meditation (threshold
    "instead" sweepers), Chandra, Heart of Fire, Lynde, Salt Road Ambushers, Origin of the Hidden Ones, Grab the Reins (done in round 325),
    Pyromancer Ascension (done in round 367), Verdant Mastery, Primal Adversary, Planar Void (done in round 299), In Too Deep, Dollhouse of Horrors, Harald
    Unites the Elves (done in round 326), Exquisite Archangel (done in round 329), Kellan, Planar
@@ -2913,7 +2913,7 @@ line blocks.
    timing, costs paid, rulings; not a mana ability, CR 605.1a). Browser tests click through Bre's free cast, Knight-Errant's
    pick and Chandra's −9 search. No new prompts. +4, 31,391 of 31,936 with round 369 and Lane B's B209-B212. The compiled text of every other card is
    unchanged.
-   Out after round 370 (looked at, not done): Words of Waste ("each opponent discards a card instead": a discard choice in
+   Out after round 370 (looked at, not done): Words of Waste (done in round 383) ("each opponent discards a card instead": a discard choice in
    the middle of a replaced draw, with nothing to resume the draws after it); Verdant Mastery (three destinations for the
    lands found, one under an opponent's control); Wayta, Trainer Prodigy and Invisible Woman, Sue Storm (still out, as in
    their earlier lists). Polish: the free-cast prompt of Bre, Breaching Dragonstorm and Solstice
@@ -3240,6 +3240,32 @@ line blocks.
    Archelos, Lagoon Mystic and the rest above rank 9,000 (still out, for the reasons in their earlier lists).
    Polish: Manascape Refractor lists one mana ability for each different land ability (Thriving Grove's shows "or one mana
    of the chosen color" though it adds only {G} there).
+   Round 383 went on down `npm run popular` and the "Out after round N" lists, most played first, to a draw replaced by
+   each opponent's discard, a reflexive trigger for each card drawn while a spell resolves, and a council's dilemma acting
+   once for each vote: Words of Waste's "{1}: The next time you would draw a card this turn, each opponent discards a card
+   instead." (Player.nextDrawInstead `discard`; the draw doesn't happen, CR 614.6, even from an empty library, CR 614.11;
+   each opponent with a choice chooses in APNAP order, CR 101.4, 701.9b, a Library of Leng's controller then may put theirs
+   on top, and all are discarded at once by the Words' controller, so an Obstinate Baloth enters; the draws after it wait,
+   CR 614.11a: PendingDecision "discard" and "handToTop" `waste`, effects/run-round383.ts; what a resolving spell counts as
+   "discarded this way" isn't changed); Explosion of Riches's "Draw a card, then each other player may draw a card.
+   Whenever a card is drawn this way, ~ deals 5 damage to target opponent chosen at random from among your opponents."
+   (rulings: each other player chooses in turn order, then those who chose draw, then the reflexive ability triggers once
+   for each card drawn while it resolved, ResolvingState.drawnCount, reflexive `perDrawn`, each with a random target; a
+   replaced draw draws nothing); Travel Through Caradhras's "Council's dilemma — Starting with you, each player votes for
+   Redhorn Pass or Mines of Moria. For each Redhorn Pass vote, search your library for a basic land card and put it onto the
+   battlefield tapped. If you search your library this way, shuffle. For each Mines of Moria vote, return a card from your
+   graveyard to your hand." (one search for up to that many basic lands, CR 701.23b, none and no shuffle with no such vote;
+   that many cards from the graveyard, each chosen, not targeted). Browser tests click through Words of Waste's discard
+   when Ana's draw is replaced and Caradhras's vote buttons, land search and graveyard pick. +3, 31,484 of 31,936. The
+   compiled text of every other card is unchanged. Bots answer the discard as any other, may draw for Explosion like any
+   "may draw", and vote for Caradhras by what one more land (3) or the best graveyard card (2 + half its mana value) is
+   worth to the caster.
+   Out after round 383 (looked at, not done): Reed Richards, Smartest Man (still out: with Alhammarret's Archive replacing
+   the same first draw, whether the Archive's two draws are still "the first time you would draw" isn't settled, CR 614.6,
+   616.1); Lodestone Bauble (still out: a player chosen as it's activated even with no target, rulings); Pulmonic Sliver,
+   Filigree Vector, Lich's Mirror, Over the Top, Vault 11: Voter's Dilemma, Riddles in the Dark and the rest above rank
+   14,000 (still out, for the reasons in their earlier lists).
+   Polish: Explosion of Riches's reflexive triggers log the target before "triggers ... targeting" (two lines for each).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -3456,7 +3482,7 @@ line blocks.
    surveil and suspend's cast trigger aren't ordered by their controller (as with Aeon Chronicler).
    Out after round 340 (looked at, not done): Regenerations Restored (its last-counter trigger and vanishing's sacrifice
    trigger go on the stack in an order its controller picks, CR 603.3b, and the engine has no such choice yet); Rift
-   Elemental (a cost removing a time counter from a permanent or suspended card); Words of Waste (a choice in the middle
+   Elemental (a cost removing a time counter from a permanent or suspended card); Words of Waste (done in round 383) (a choice in the middle
    of a draw); Fade Away (done in round B212) (every player's payments announced before any sacrifice); Lodestone Bauble (one player's
    graveyard chosen with no target).
    Round 339 went on down the "Out after round N" lists, most played first: Kadena's Silencer's "counter all abilities
@@ -5317,7 +5343,7 @@ line blocks.
    like Hickory Woodlot and Land Cap):
    - Votes still out: Tivit ("enters or deals combat damage"), Council Guardian (done in round B148) (protection from the colors with the
      most votes), Split Decision ("Choose target spell", then "the spell"), Messenger Jays ("for each card drawn this
-     way"), Sail into the West (done in round 321), Galadriel, Expropriate, Fateful Tempest, Selvala's Stampede, Travel Through Caradhras;
+     way"), Sail into the West (done in round 321), Galadriel, Expropriate, Fateful Tempest, Selvala's Stampede, Travel Through Caradhras (done in round 383);
      votes for a player (Mob Verdict, Círdan), Trap the Trespassers, Truth or Consequences ("an opponent at random");
      the Sagas Vault 11 and Trial of a Time Lord (done in round 363); "whenever players finish voting" (Grudge Keeper (done in round 302), Model of Unity (done in round 302),
      Erestor: an opponent counts only if none of their votes match yours, rulings); Elrond; the Planechase "Will of the
@@ -6535,7 +6561,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   round B132), Taunt (a rule
   bound to a target player), Goblin Sappers ("destroy it and ~ at end of combat"), Curtain of Light (done in round B110), Dazzling Beauty (done in round B110) and
   Trap Runner (done in round B110) ("becomes blocked" by an effect), Kill-Suit Cultist (done in round B135) (a destroy-instead damage shield), Rock Jockey,
-  Explosion of Riches, Power Pack, Cinderheart Giant (done in round B116) (chosen at random as it resolves, not targeted), Juju Bubble ("play
+  Explosion of Riches (done in round 383), Power Pack, Cinderheart Giant (done in round B116) (chosen at random as it resolves, not targeted), Juju Bubble ("play
   a card"), Curse Artifact, Erithizon (done in round B110) (a target chosen by the defending player), Selfless Exorcist (done in round B126), Cut the Tethers (done in round B136).
 - Round B32 (harder skipped cards, least played first): "you may pay ... If you do ... Otherwise, ..." (Spitting
   Slug), "each permanent with fading you control" (Parallax Inhibitor), "a land with a trap counter on it" as a
@@ -9889,7 +9915,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ("when you cast a spell with the chosen name for the first time this turn": a spell of that name cast earlier that turn,
   before chapter III, isn't settled by its rulings), Spectral Searchlight (another player choosing a color in the middle of a
   mana ability), Day of the Moon (every name chosen for the Saga kept on it), Dralnu, Lich Lord (sacrifices chosen in the
-  middle of dealing damage), Words of Waste and Fade Away (done in round B212) (see round 340's list) stay out.
+  middle of dealing damage), Words of Waste (done in round 383) and Fade Away (done in round B212) (see round 340's list) stay out.
 - Out after round B181 (looked at, not done): Ludevic, Necrogenius (its back face becomes a copy of a creature card exiled
   with it as it transforms), Song of Inspiration (done in round B219) ("add the total mana value of those cards" to a d20 roll: whether a target
   that became illegal still counts isn't settled by its rulings) stay out.
@@ -9960,7 +9986,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B165 (looked at, not done): Gloom (the tax reaches mana abilities), Twinning Glass, Yixlid Jailer,
   Decaying Soil, Nature's Wrath (done in round B207), Graceful Takedown (done in round B187), Alpine Moon (done in round B214), Thought Prison (done in round B189), Grimoire Thief (done in round B189) and Kianne, Dean of Substance (done in round B189)
   stay out for the reasons in the earlier lists. Protective Sphere and Imperiosaur, out after B162 and B67, are done.
-- Out after round B163 (looked at, not done): Words of Waste and Words of Wind (an opponent's discard or each player's
+- Out after round B163 (looked at, not done): Words of Waste (done in round 383) and Words of Wind (an opponent's discard or each player's
   bounce chosen in the middle of a draw: a pause the draw sequence resumes from only for some replacements), Strax,
   Sontaran Nurse (done in round B211) ("Choose a player at random. When you do, ~ fights another target creature that player controls": a
   reflexive trigger's targets limited by the chosen player), Goblin Maskmaker (done in round B198) (face-down spells as a cost reduction's
@@ -10375,7 +10401,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B68 (looked at, not done): Oko, Lorwyn Liege (the back face's emblem of a chosen creature type),
   Abuelo's Awakening (the returned artifact that's also a Spirit creature), Light of Judgment (done in round B156) ("up to one Equipment"
   chosen as it resolves), Chandra, Chill of Compliance (done in round 329) (which cards surveil put into the graveyard).
-- Out after round B67 (looked at, not done): Words of War (done in round B163), Words of Waste and Words of Wind (a target or choices in the
+- Out after round B67 (looked at, not done): Words of War (done in round B163), Words of Waste (done in round 383) and Words of Wind (a target or choices in the
   middle of a draw), Hedonist's Trove (done in round B192) (lands from its exile any number of times, one spell a turn), Day of the Dragons,
   Lumbering Battlement, Wall of Mourning (cards exiled with ~ from abilities not linked yet; Kayla's Music Box and
   Serpent's Soul-Jar done in round B70), Ashes of the Fallen (done in round 374) (creature types of cards in a graveyard: Lane A's round 227 adds those for Roshan,

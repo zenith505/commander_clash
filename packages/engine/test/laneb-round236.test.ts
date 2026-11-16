@@ -16,6 +16,10 @@ const divination = (): CardDef => ({"oracleId":"273b339c-964b-4a18-8eb5-ceb8abcd
 const bloodScrivener = (): CardDef => ({"oracleId":"af66da4b-2f36-4dd2-a5c6-18e6023c5aba","name":"Blood Scrivener","manaCost":"{1}{B}","cmc":2,"typeLine":"Creature — Zombie Wizard","supertypes":[],"types":["Creature"],"subtypes":["Zombie","Wizard"],"oracleText":"If you would draw a card while you have no cards in hand, instead you draw two cards and you lose 1 life.","power":"2","toughness":"1","colors":["B"],"colorIdentity":["B"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/9/e/9ea8179a-d3c9-4cdc-a5b5-68cc73279050.jpg?1783940040","artUrl":"https://cards.scryfall.io/art_crop/front/9/e/9ea8179a-d3c9-4cdc-a5b5-68cc73279050.jpg?1783940040","commanderLegal":"legal","set":"dgm","releasedAt":"2013-05-03","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 const grizzlyBears = (): CardDef => ({"oracleId":"14c8f55d-d177-4c25-a931-ebeb9e6062a0","name":"Grizzly Bears","manaCost":"{1}{G}","cmc":2,"typeLine":"Creature — Bear","supertypes":[],"types":["Creature"],"subtypes":["Bear"],"oracleText":"","power":"2","toughness":"2","colors":["G"],"colorIdentity":["G"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/2/4/24a5e5fb-d1d4-4f09-9593-f2b25d0dcabf.jpg?1787745798","artUrl":"https://cards.scryfall.io/art_crop/front/2/4/24a5e5fb-d1d4-4f09-9593-f2b25d0dcabf.jpg?1787745798","commanderLegal":"legal","set":"slz","releasedAt":"2026-09-02","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
 const lightningBolt = (): CardDef => ({"oracleId":"4457ed35-7c10-48c8-9776-456485fdf070","name":"Lightning Bolt","manaCost":"{R}","cmc":1,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Lightning Bolt deals 3 damage to any target.","colors":["R"],"colorIdentity":["R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.jpg?1783903008","artUrl":"https://cards.scryfall.io/art_crop/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.jpg?1783903008","commanderLegal":"legal","set":"msc","releasedAt":"2026-06-26","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
+const diabolicServitude = (): CardDef => ({"oracleId":"e275cbfb-3d25-4189-84f0-3162eadc7d65","name":"Diabolic Servitude","manaCost":"{3}{B}","cmc":4,"typeLine":"Enchantment","supertypes":[],"types":["Enchantment"],"subtypes":[],"oracleText":"When this enchantment enters, return target creature card from your graveyard to the battlefield.\nWhen the creature put onto the battlefield with this enchantment dies, exile it and return this enchantment to its owner's hand.\nWhen this enchantment leaves the battlefield, exile the creature put onto the battlefield with this enchantment.","colors":["B"],"colorIdentity":["B"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/0/c/0cb1e0c9-9041-44cd-9e96-87cf14c67068.jpg?1783946346","artUrl":"https://cards.scryfall.io/art_crop/front/0/c/0cb1e0c9-9041-44cd-9e96-87cf14c67068.jpg?1783946346","commanderLegal":"legal","set":"usg","releasedAt":"1998-10-12","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
+const akromasVengeance = (): CardDef => ({"oracleId":"ae19dce5-c9fc-4fbe-99b5-dc6a12124a68","name":"Akroma's Vengeance","manaCost":"{4}{W}{W}","cmc":6,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Destroy all artifacts, creatures, and enchantments.\nCycling {3} ({3}, Discard this card: Draw a card.)","colors":["W"],"colorIdentity":["W"],"keywords":["Cycling"],"imageUrl":"https://cards.scryfall.io/normal/front/4/f/4f112edd-1d2f-45ad-aaeb-6c0934d24c1f.jpg?1783939877","artUrl":"https://cards.scryfall.io/art_crop/front/4/f/4f112edd-1d2f-45ad-aaeb-6c0934d24c1f.jpg?1783939877","commanderLegal":"legal","set":"v13","releasedAt":"2013-08-23","rarity":"mythic","layout":"normal","gameChanger":false}) as CardDef;
+const disenchant = (): CardDef => ({"oracleId":"a7e97fa9-4b72-4548-b854-5be5f18a6f1a","name":"Disenchant","manaCost":"{1}{W}","cmc":2,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Destroy target artifact or enchantment.","colors":["W"],"colorIdentity":["W"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/6/5/658c5caa-d739-4d30-a512-43ac4de900cb.jpg?1783920133","artUrl":"https://cards.scryfall.io/art_crop/front/6/5/658c5caa-d739-4d30-a512-43ac4de900cb.jpg?1783920133","commanderLegal":"legal","set":"bro","releasedAt":"2022-11-18","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
+const unsummon = (): CardDef => ({"oracleId":"837182db-1bf3-4a2c-bd01-1af9d9873561","name":"Unsummon","manaCost":"{U}","cmc":1,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Return target creature to its owner's hand.","colors":["U"],"colorIdentity":["U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/d/d/ddad9f16-52d5-49de-82b0-b1a5294a9c44.jpg?1789556722","artUrl":"https://cards.scryfall.io/art_crop/front/d/d/ddad9f16-52d5-49de-82b0-b1a5294a9c44.jpg?1789556722","commanderLegal":"legal","set":"fra","releasedAt":"2026-10-02","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -55,7 +59,7 @@ const onlyInHand = (s: GameState, pid: PlayerId, keep: string[]) => {
 };
 
 describe("Lane B round B236", () => {
-  it("are fully supported", () => supported(primitiveJustice(), enduringRenewal()));
+  it("are fully supported", () => supported(primitiveJustice(), enduringRenewal(), diabolicServitude()));
 });
 
 describe("Lane B round B236: Primitive Justice", () => {
@@ -198,5 +202,71 @@ describe("Lane B round B236: Enduring Renewal", () => {
     expect(s.players[ap]!.life).toBe(s0.players[ap]!.life - 1);
     expect(zone(s, tops[0]!)).toBe("graveyard");
     expect(zone(s, tops[1]!)).toBe("hand");
+  });
+});
+
+describe("Lane B round B236: Diabolic Servitude", () => {
+  /** `ap` has Diabolic Servitude and `more` in hand and Grizzly Bears in their graveyard; Servitude is cast, returning it. */
+  const game = (more: CardDef[] = []) => {
+    const { s: s0, ap, ids, opp } = setup([diabolicServitude(), ...more]);
+    const bear = onTop(s0, ap, grizzlyBears());
+    const p = s0.players[ap]!;
+    p.library.shift();
+    s0.objects[bear]!.zone = "graveyard";
+    p.graveyard.push(bear);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    return { s, ap, opp, servitude: ids[0]!, more: ids.slice(1), bear };
+  };
+
+  it("returns the creature card; when that creature dies, it's exiled and Servitude returns to its owner's hand", () => {
+    const { s: s0, ap, servitude, bear, more } = game([lightningBolt()]);
+    expect(zone(s0, bear)).toBe("battlefield");
+    expect(zone(s0, servitude)).toBe("battlefield");
+    const s = settle(run(s0, planCast(s0, ap, more[0]!, [tgt(bear)])));
+    expect(zone(s, bear)).toBe("exile");
+    expect(zone(s, servitude)).toBe("hand");
+  });
+
+  it("when Servitude leaves the battlefield, the creature is exiled", () => {
+    const { s: s0, ap, servitude, bear, more } = game([disenchant()]);
+    const s = settle(run(s0, planCast(s0, ap, more[0]!, [tgt(servitude)])));
+    expect(zone(s, servitude)).toBe("graveyard");
+    expect(zone(s, bear)).toBe("exile");
+  });
+
+  it("a creature returned to its owner's hand is lost track of: it isn't exiled later, and a new one can't be", () => {
+    const { s: s0, ap, servitude, bear, more } = game([unsummon(), disenchant()]);
+    let s = settle(run(s0, planCast(s0, ap, more[0]!, [tgt(bear)])));
+    expect(zone(s, bear)).toBe("hand");
+    s = settle(run(s, planCast(s, ap, more[1]!, [tgt(servitude)])));
+    expect(zone(s, servitude)).toBe("graveyard");
+    expect(zone(s, bear)).toBe("hand");
+  });
+
+  it("destroyed together: the creature card is exiled, but Servitude, a new object in the graveyard, stays there", () => {
+    const { s: s0, ap, servitude, bear, more } = game([akromasVengeance()]);
+    const s = settle(run(s0, planCast(s0, ap, more[0]!)));
+    expect(zone(s, bear)).toBe("exile");
+    expect(zone(s, servitude)).toBe("graveyard");
+  });
+
+  it("gone before its enters ability resolves: the creature returns and stays, and its death later does nothing", () => {
+    const { s: s0, ap, ids } = setup([diabolicServitude(), disenchant(), lightningBolt()]);
+    const bear = onTop(s0, ap, grizzlyBears());
+    const p = s0.players[ap]!;
+    p.library.shift();
+    s0.objects[bear]!.zone = "graveyard";
+    p.graveyard.push(bear);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    // Servitude resolves; its enters ability waits on the stack.
+    for (let i = 0; i < 20 && !(s.stack.length === 1 && zone(s, ids[0]!) === "battlefield" && !s.pending); i++)
+      s = act(s, s.pending?.kind === "chooseTargets" ? { type: "chooseTargets", player: ap, targets: [tgt(bear)] } : { type: "passPriority", player: waitingOn(s)! });
+    expect(s.stack.length).toBe(1);
+    s = settle(run(s, planCast(s, ap, ids[1]!, [tgt(ids[0]!)])));
+    expect(zone(s, ids[0]!)).toBe("graveyard");
+    expect(zone(s, bear)).toBe("battlefield");
+    s = settle(run(s, planCast(s, ap, ids[2]!, [tgt(bear)])));
+    expect(zone(s, bear)).toBe("graveyard");
+    expect(zone(s, ids[0]!)).toBe("graveyard");
   });
 });

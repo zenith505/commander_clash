@@ -1,9 +1,12 @@
 // Lane B round B236's lines, read by compileCard before its triggers and activated abilities (after round B235's), and its
 // whole spells (after round B234's).
 import type { AbilityBody, CompiledCard } from "../abilities";
+import { parseTrigger } from "./triggers";
 
 const JUSTICE_COST = "As an additional cost to cast ~, you may pay {1}{R} and/or {1}{G} any number of times.";
 const RENEWAL = "If you would draw a card, reveal the top card of your library instead. If it's a creature card, put it into your graveyard. Otherwise, draw a card.";
+const SERVITUDE_DIES = "When the creature put onto the battlefield with ~ dies, exile it and return ~ to its owner's hand.";
+const SERVITUDE_LEAVES = "When ~ leaves the battlefield, exile the creature put onto the battlefield with ~.";
 const JUSTICE = "Destroy target artifact. For each additional {1}{R} you paid, destroy another target artifact. For each additional {1}{G} you paid, destroy another target artifact, and you gain 1 life.";
 
 /**
@@ -29,6 +32,28 @@ export function roundB236Line(line: string, raw: string, out: CompiledCard, isSp
   if (line === RENEWAL) {
     if (out.drawRevealCreatureToYard) out.unsupported.push(raw);
     else out.drawRevealCreatureToYard = true;
+    return true;
+  }
+  // Diabolic Servitude: its enters ability's creature is linked to it (CR 607.2a, servitudeLink after the return); its
+  // dies ability watches that creature (TriggeredAbility.dies.animatedBySelf, a leaves-the-battlefield ability that looks
+  // back, CR 603.10a), exiling the card it became and returning ~ only if ~ is still the object it was (CR 400.7: if it left
+  // at the same time, it's a new object it can't find); its leaves ability exiles that creature if it's still there.
+  if (line === SERVITUDE_DIES) {
+    const enters = out.triggers.find((t) => t.event === "selfEnters" && t.body.targets.length === 1 && t.body.effects.length === 1 && t.body.effects[0]!.type === "putOntoBattlefield");
+    const put = enters?.body.effects[0];
+    const t = parseTrigger("Whenever another creature dies, exile it and return ~ to its owner's hand.");
+    const spec = enters?.body.targets[0];
+    if (!enters || put?.type !== "putOntoBattlefield" || put.what.ref !== "target" || put.what.index !== 0 || spec?.kind !== "card" || spec.types?.[0] !== "Creature" || !t || t === "fail" || t.event !== "permanentDies" || !t.dies || t.body.effects.length !== 2) {
+      out.unsupported.push(raw);
+      return true;
+    }
+    enters.body = { ...enters.body, effects: [...enters.body.effects, { type: "servitudeLink", target: 0 }] };
+    out.triggers.push({ ...t, dies: { ...t.dies, other: false, animatedBySelf: true }, body: { ...t.body, text: SERVITUDE_DIES.slice(SERVITUDE_DIES.indexOf(", ") + 2) } });
+    return true;
+  }
+  if (line === SERVITUDE_LEAVES) {
+    if (!out.triggers.some((t) => t.dies?.animatedBySelf)) out.unsupported.push(raw);
+    else out.triggers.push({ event: "selfLeaves", body: { targets: [], effects: [{ type: "servitudeExile" }], text: SERVITUDE_LEAVES.slice(SERVITUDE_LEAVES.indexOf(", ") + 2) } });
     return true;
   }
   return false;

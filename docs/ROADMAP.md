@@ -1,6 +1,6 @@
 # Roadmap
 
-31,508 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,511 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -4417,7 +4417,7 @@ line blocks.
    a creature); Fraying Line (done in round B199) (rope counters each upkeep, or everything without one is exiled); Whims of the Fates (three
    piles of permanents and one chosen at random); Glimpse of Tomorrow (non-Aura permanents first, then Auras attached as
    they enter); Abstract Performance (a face-down pile exiled from the library, then a free cast from the other pile);
-   Lich's Mirror (a replacement of losing the game); Chains of Mephistopheles (a draw replacement that depends on which
+   Lich's Mirror (a replacement of losing the game); Chains of Mephistopheles (done in round B237) (a draw replacement that depends on which
    draw it is in the draw step).
    Out after round 279 (looked at, not done): Game of Chaos (done in round 298) (each next flip's stakes double and the winner or loser
    decides whether to flip again); Grothama, All-Devouring (done in round 295) (damage dealt to it by each player's sources this turn);
@@ -4575,7 +4575,7 @@ line blocks.
    −8 a search of every library and casting the cards); Rat King, Verminister ("and all other cards with the same name as
    that card"); Noctis, Heir Apparent (done in round B199) (its "enters during combat" line now compiles; Warp-Strike's return at that player's
    next declare attackers step doesn't).
-   Out after round 244 (looked at, not done): Reed Richards, Smartest Man ("the first time you would draw a card each
+   Out after round 244 (looked at, not done): Reed Richards, Smartest Man (done in round B237) ("the first time you would draw a card each
    turn except the first in your draw step, draw four instead": needs a place among the draw replacements the player
    orders, CR 616.1); The First Tyrannic War I ("if its mana cost contains {X}": a copy's cost counts, rulings, and the
    counters must be there as it enters); Daretti, Ingenious Iconoclast's −6 (a target that's an artifact card in a
@@ -9776,6 +9776,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   {C}; automatic payment uses another player's Cache on your turn, once for each counter, autopay.ts "#n" sources). Browser
   tests for Primitive Justice's two counts and targets, Enduring Renewal's reveal beside dredge and paying with an opponent's
   Mana Cache. +4, 31,508 of 31,936. The compiled text of every other card is unchanged.
+- Round B237 (least played first, from the Lane B skip lists): draw replacements now ordered among the others by the drawing
+  player (CR 616.1, drawReplacementChoices). Reed Richards, Smartest Man (the turn's first draw of an instruction but the first
+  card drawn in his controller's own draw step becomes four draws, CR 614.1a, each still replaceable by the Archives and the
+  rest; another replacement chosen first takes "the first time" away, as for Scion of Halaster's look; the opening hand's draws
+  aren't draws of turn 1, for Scion either). Chains of Mephistopheles (every player's draws but the first card they draw in
+  their own draw step: a discard of their choice, then a new draw that this Chains doesn't replace again, CR 614.5, but another
+  does; with an empty hand a mill instead and no draw, rulings; a draw for a cost too). Zur's Weirding (every player's hand
+  revealed; each draw: the top card revealed, then each other player in turn order from the active player who can pay 2 life,
+  CR 119.4, may, until one does: the card goes into its owner's graveyard straight from the library, never drawn, rulings;
+  otherwise its player draws, a draw dredge and the rest can still replace, rulings). The made draws' `scriv` number now holds
+  one base-100 digit for each kind (Scriveners, Renewals, Chains, Weirdings). Browser tests for Reed's four draws beside the
+  Archive, Chains' discard for your Divination and paying 2 life for Zur's Weirding when Ana draws. +3, 31,511 of 31,936. The
+  compiled text of every other card is unchanged.
+- Out after round B237 (looked at, not done): the lists after round B236 stay out, and Breathstealer's Crypt ("instead they draw
+  a card and reveal it": once another replacement, such as an Archive's two draws or dredge, applies to that draw, which card
+  "it" is isn't settled). Known gaps: Chains of Mephistopheles' discard doesn't ask Library of Leng; bots pay Zur's Weirding's 2
+  life for an opponent's nonland card while at 12 life or more, the first in turn order who can.
 - Out after round B236 (looked at, not done): the lists after round B235 stay out, and Turf War (still out: a player with no
   land to target), Emblazoned Golem (one mana of each color on its kicker X, not tracked by the kicker's payment), Snowblind and
   Titania's Song (as before). Known gaps: another player can use Mana Cache only through automatic payment (not by clicking it),
@@ -10278,8 +10295,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   source of your choice, then exile that many / sharing a color with the imprinted card), Soltari Guerrillas (redirect the
   next combat damage to an opponent), Shifty Doppelganger (done in round B136) (return the exiled card at end step if the creature was
   sacrificed), Noxious Vapors (one card of each color chosen), Gauntlets of Chaos (exchange of control sharing a type) (done in round B152).
-- Out after round B95 (looked at, not done): Enduring Renewal, Breathstealer's Crypt, Zur's Weirding and Chains of
-  Mephistopheles (draw replacements that would have to be ordered with the existing draw replacements, CR 616.1), Wheel
+- Out after round B95 (looked at, not done): Enduring Renewal, Breathstealer's Crypt, Zur's Weirding (done in round B237) and Chains of
+  Mephistopheles (done in round B237) (draw replacements that would have to be ordered with the existing draw replacements, CR 616.1), Wheel
   of Sun and Moon (a replacement for cards going to a player's graveyard from anywhere), Over the Top (every player's
   permanent cards entering at once, Auras needing hosts among them), Spirit-Sister's Call (a sacrifice sharing a card
   type with a card put into your graveyard, then a granted leave-the-battlefield replacement), Back from the Brink (a

@@ -8923,6 +8923,23 @@ export interface CompiledCard {
    */
   drawRevealCreatureToYard?: true;
   /**
+   * Reed Richards, Smartest Man (round B237): "The first time you would draw a card each turn except the first card you draw
+   * during each of your draw steps, you draw four cards instead." (CR 614.1a).
+   */
+  drawFourFirstOther?: true;
+  /**
+   * Chains of Mephistopheles (round B237): "If a player would draw a card except the first one they draw in each of their draw
+   * steps, that player discards a card instead. If the player discards a card this way, they draw a card. If the player doesn't
+   * discard a card this way, they mill a card." (CR 614.1a): every player's draws.
+   */
+  drawChains?: true;
+  /**
+   * Zur's Weirding (round B237): "If a player would draw a card, they reveal it instead. Then any other player may pay 2 life.
+   * If a player does, put that card into its owner's graveyard. Otherwise, that player draws a card." (CR 614.1a): every
+   * player's draws.
+   */
+  drawWeirding?: true;
+  /**
    * "Max speed — If you would draw a card, draw two cards instead" (Vnwxt): `drawTwoInstead` only while this holds (CR
    * 702.178a). "If you would draw a card while you have no cards in hand, draw two cards instead" (Phial of Galadriel): as
    * each draw would happen.

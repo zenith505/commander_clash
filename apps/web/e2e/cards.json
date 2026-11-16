@@ -6672,6 +6672,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "eae87919-6322-4bd2-ae9c-b1ce25d686da",
+  "name": "Chains of Mephistopheles",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If a player would draw a card except the first one they draw in each of their draw steps, that player discards a card instead. If the player discards a card this way, they draw a card. If the player doesn't discard a card this way, they mill a card.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9cb7f23f-322d-4a87-b6c6-15b9d446aef3",
   "name": "Champions of the Perfect",
   "manaCost": "{3}{G}",
@@ -32178,6 +32206,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "51f55021-04e0-49bf-8f1f-de2a578c95fc",
+  "name": "Reed Richards, Smartest Man",
+  "manaCost": "{5}{U}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Human Scientist Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Scientist",
+   "Hero"
+  ],
+  "oracleText": "Reach\nYou have no maximum hand size.\nThe first time you would draw a card each turn except the first card you draw during each of your draw steps, you draw four cards instead.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Reach"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2fb505c6-3d28-4b83-9820-4b9db64c8304",
   "name": "Reflecting Mirror",
   "manaCost": "{4}",
@@ -46763,6 +46827,32 @@
   "commanderLegal": "legal",
   "set": "clb",
   "releasedAt": "2022-06-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c6eaa147-3566-43a9-999a-d58b877496f5",
+  "name": "Zur's Weirding",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Players play with their hands revealed.\nIf a player would draw a card, they reveal it instead. Then any other player may pay 2 life. If a player does, put that card into its owner's graveyard. Otherwise, that player draws a card.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

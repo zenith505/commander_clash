@@ -10023,6 +10023,19 @@ export function freeEquip(s: GameState, pid: PlayerId, ab: ActivatedAbility): bo
  * Autumn) alike, its discard still paid (rulings). Taken whenever it applies, as with freeEquip: with {X} in the cost,
  * only when X is 0 (X is 0 paying {0}, rulings), so it's never worse than the cost itself.
  */
+/**
+ * Advancing the Spirit (round B228): "You may pay {0} rather than pay the power-up cost of the first power-up ability you
+ * activate during each of your turns": an alternative cost (CR 118.9, 602.2b) for a power-up ability (CR 702.193a) `pid`
+ * activates during their own turn with none activated yet this turn, while they control such a permanent. Taken whenever
+ * it applies, as with freeCycling: every power-up cost is mana only, so {0} is never worse, and passing it up leaves no
+ * later power-up ability "the first" of the turn; with {X} in the cost (Stature, Size Shifter), only when X is 0 (X is 0
+ * paying {0}, CR 107.3b), so an X chosen above 0 pays the cost itself.
+ */
+export function freePowerUp(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, x = 0): boolean {
+  if (ab.keyword !== "Power-up" || o.zone !== "battlefield" || s.activePlayer !== pid || s.turnLog?.powerUps?.[pid] || (x && /\{X\}/.test(ab.manaCost))) return false;
+  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).freePowerUp);
+}
+
 export function freeCycling(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, x = 0): boolean {
   if (!ab.cycling || ab.tap || o.zone !== "hand" || o.owner !== pid || (x && /\{X\}/.test(ab.manaCost))) return false;
   return s.battlefield.some((id) => {
@@ -10042,7 +10055,7 @@ export function attachedManaCostOf(s: GameState, o: GameObject): string | undefi
 
 function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[], x = 0): ParsedCost {
   // Merseine (round B211): the mana cost of the permanent it's attached to, as it is now, {X} as 0 (CR 107.3h).
-  const cost0 = parseManaCost(freeEquip(s, pid, ab) || freeCycling(s, pid, o, ab, x) ? "{0}" : ab.attachedManaCost ? (attachedManaCostOf(s, o) ?? "").replace(/\{X\}/g, "") || "{0}" : ab.manaCost);
+  const cost0 = parseManaCost(freeEquip(s, pid, ab) || freeCycling(s, pid, o, ab, x) || freePowerUp(s, pid, o, ab, x) ? "{0}" : ab.attachedManaCost ? (attachedManaCostOf(s, o) ?? "").replace(/\{X\}/g, "") || "{0}" : ab.manaCost);
   // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
   // (CR 602.2b applies 601.2f).
   const more = (ab.mana ? activationTax(s, o, pid, ab, true) : activationTax(s, o, pid, ab) + opponentsTargetTax(s, pid, targets)) + (ab.costMore ? Math.max(0, evalAmount(s, ab.costMore, { controller: pid, sourceId: o.id })) : 0);
@@ -10351,6 +10364,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // activated (CR 602.2), whoever owns it, even if a cost moves it.
   if (inGraveyard && !s.turnLog?.activatedInGraveyard?.includes(p.id)) ((s.turnLog ??= {}).activatedInGraveyard ??= []).push(p.id);
   if (ab.onceEver) (o.activatedEver ??= []).push(index); // exhaust (CR 702.177a)
+  // Advancing the Spirit: power-up abilities each player has activated this turn (after the cost is paid).
+  if (ab.keyword === "Power-up") ((s.turnLog ??= {}).powerUps ??= {})[p.id] = (s.turnLog.powerUps?.[p.id] ?? 0) + 1;
   if (ab.keyword === "Exhaust") p.exhaustTurn = s.turn; // CR 702.177b
   // "Choose one that hasn't been chosen" (Three Bowls of Porridge): chosen as it's activated.
   if (ab.body.modal && modes) noteModesChosen(s, ab.body, o.id, modes);

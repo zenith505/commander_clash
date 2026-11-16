@@ -6616,7 +6616,7 @@ export type TriggerEvent =
  * turn's cleanup step.
  */
 /** `endOfCombat`: "this combat" (Stensian Sanguinist), until this combat's end of combat step ends (CR 511.3). */
-export type TriggerDuration = "endOfTurn" | "yourNextTurn" | "endOfYourNextTurn" | "endOfCombat" | /** Chancellor of the Annex: for the rest of the game (with `once` and `forPlayer`, until that player's first spell). */ "game";
+export type TriggerDuration = "endOfTurn" | "yourNextTurn" | "endOfYourNextTurn" | "endOfCombat" | /** Chancellor of the Annex: for the rest of the game (with `once` and `forPlayer`, until that player's first spell). */ "game" | /** Giant Oyster (round B228): "for as long as ~ remains tapped": until the source untaps or leaves the battlefield (CR 611.2b), from an activated ability whose source is tapped. */ "whileTapped";
 
 export interface TriggeredAbility {
   /**
@@ -9220,6 +9220,8 @@ export interface CompiledCard {
    * in hand" (`handAtLeast`, the card being cycled counted, rulings). The discard is still part of the cost (rulings).
    */
   freeCycling?: { first?: true; handAtLeast?: number }[];
+  /** Advancing the Spirit (round B228): "You may pay {0} rather than pay the power-up cost of the first power-up ability you activate during each of your turns" (CR 118.9, 702.193a; game.ts freePowerUp). */
+  freePowerUp?: true;
   /**
    * "Players can't untap more than one nonbasic land during their untap steps" (Winter Moon), "You can't untap more than
    * one land during your untap step" (Mungha Wurm, `you`), "As long as ~ is untapped, players can't untap more than two

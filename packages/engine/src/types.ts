@@ -1842,6 +1842,8 @@ export interface TurnLog {
   blocks?: { blocker: string; attacker: string; /** The combat phase it was declared in (GameState.combatsThisTurn): Ride Down's "this combat". */ combat?: number; /** The blocker's and the attacker's creature types ("all" for a changeling) and supertypes as the block was declared: Time to Reflect's "blocked or was blocked by a Zombie" (TargetSpec.blockedWith). */ bq?: BlockQualities; aq?: BlockQualities }[];
   /** Cards each player cycled this turn (Valiant Rescuer's "for the first time each turn"). */
   cycled?: Record<number, number>;
+  /** Power-up abilities each player activated this turn (Advancing the Spirit's "the first power-up ability you activate during each of your turns"). */
+  powerUps?: Record<number, number>;
   /** Times each player investigated this turn (Erdwal Illuminator's "for the first time each turn"). */
   investigated?: Record<number, number>;
   /**
@@ -2121,7 +2123,7 @@ export interface GameState {
    * them (603.7d-e), `sourceZc` as it was then: an ability about "~" is about that object only (603.7c, 400.7). `turn`: the
    * turn it was made, for "until the end of your next turn".
    */
-  floatingTriggers?: { id: string; controller: PlayerId; sourceId: ObjectId; sourceCardId: string; sourceZc: number; fromSpell?: true; trigger: TriggeredAbility; until: TriggerDuration; turn: number; /** What its self events are about, if not its source (Effect floatingTrigger's `about`). */ about?: { id: ObjectId; zc: number }; /** Only for combat damage dealt to this player (`aboutPlayer`). */ toPlayer?: PlayerId; /** It triggers only once ("when you next attack this turn"), then is gone. */ once?: true; /** Nuka-Nuke Launcher: only this player's spells trigger it, and "endOfYourNextTurn" is the end of this player's next turn. */ forPlayer?: PlayerId }[];
+  floatingTriggers?: { id: string; controller: PlayerId; sourceId: ObjectId; sourceCardId: string; sourceZc: number; fromSpell?: true; trigger: TriggeredAbility; until: TriggerDuration; turn: number; /** What its self events are about, if not its source (Effect floatingTrigger's `about`). */ about?: { id: ObjectId; zc: number }; /** Only for combat damage dealt to this player (`aboutPlayer`). */ toPlayer?: PlayerId; /** It triggers only once ("when you next attack this turn"), then is gone. */ once?: true; /** Nuka-Nuke Launcher: only this player's spells trigger it, and "endOfYourNextTurn" is the end of this player's next turn. */ forPlayer?: PlayerId; /** With `until` "whileTapped" (Giant Oyster): its source as the object it was and how often it had untapped then; the ability is gone once that no longer holds (game.ts whileTappedHolds). */ whileTapped?: { id: ObjectId; zc: number; untaps: number } }[];
   /** Spells cast this turn, by anyone (storm, CR 702.40a). */
   spellsCastThisTurn?: number;
   /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */

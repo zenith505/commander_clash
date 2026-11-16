@@ -890,6 +890,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     if (pend.kind === "manaMix") return [{ type: "manaMix", player: pid, counts: chooseManaMix(s, pid, pend.n, pend.colors) }];
+    if (pend.kind === "divideDamage" && pend.combat) return [{ type: "divideDamage", player: pid, parts: chooseCombatDivision(s, pend.by, pend.toPlayer, pend.options, pend.total) }];
     if (pend.kind === "divideDamage") return [{ type: "divideDamage", player: pid, parts: chooseDamageDivision(s, pid, pend.by, pend.options, pend.total) }];
     if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.remove ? chooseCounterRemoval(s, pid, pend.options, pend.total, pend.has ?? {}) : pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter, !!pend.upTo) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
@@ -5129,6 +5130,31 @@ function chooseDamageDivision(s: GameState, pid: PlayerId, by: ObjectId, options
   return parts;
 }
 
+/**
+ * Butcher Orgg (round B232): all of it to the defending player when that's lethal; otherwise lethal damage to the most
+ * valuable of their creatures it can kill (indestructible ones and those with 1 power or less skipped), the rest to the
+ * player. Nothing to kill: the usual way while unblocked (none given), else all to the player rather than the blockers.
+ */
+function chooseCombatDivision(s: GameState, by: ObjectId, defender: PlayerId | undefined, options: ObjectId[], total: number): Record<string, number> {
+  const at = s.objects[by];
+  if (!at || defender === undefined) return {};
+  const toPlayer = `p${defender}`;
+  if (player(s, defender).life <= total && !at.attackingPermanent) return { [toPlayer]: total };
+  const deathtouch = objHasKeyword(s, at, "Deathtouch");
+  const parts: Record<string, number> = {};
+  let left = total;
+  const byWorth = options.map((id) => obj(s, id)).filter((o) => !objHasKeyword(s, o, "Indestructible") && power(s, o) >= 2).sort((a, b) => power(s, b) + toughness(s, b) - (power(s, a) + toughness(s, a)));
+  for (const o of byWorth) {
+    const need = deathtouch ? 1 : Math.max(1, toughness(s, o) - o.damage);
+    if (need > left) continue;
+    parts[o.id] = need;
+    left -= need;
+  }
+  if (!Object.keys(parts).length && !at.blockedBy) return {};
+  if (left > 0) parts[toPlayer] = left;
+  return parts;
+}
+
 function chooseDistribution(s: GameState, pid: PlayerId, options0: ObjectId[], total: number, counter: CounterKind, upTo = false): Record<ObjectId, number> {
   // Counters that help, with some of ours among the options (Stumpsquall Hydra's commanders): only ours; with none of ours
   // and none required, none at all.
@@ -6606,6 +6632,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Tidal Flats (round B214): once a turn, after blockers are declared, while a creature of ours without first strike
       // blocks an attacker without flying.
       if (ab.body.effects.some((e) => e.type === "attackersPayOrBlockersGain") && (o.activatedThisTurn?.includes(i) || s.step !== "declareBlockers" || !s.battlefield.some((b) => { const x = obj(s, b); return controllerOf(s, x) === pid && !objHasKeyword(s, x, "First strike") && !!x.blocking?.some((a) => !!s.objects[a] && !objHasKeyword(s, s.objects[a]!, "Flying")); }))) continue;
+      // Heroism (round B232): once a turn, after blockers are declared, against red attackers of another player's that would
+      // deal us 4 or more combat damage in all.
+      if (ab.body.effects.some((e) => e.type === "attackersPayOrPrevent") && (o.activatedThisTurn?.includes(i) || s.step !== "declareBlockers" || s.activePlayer === pid || s.battlefield.map((b) => obj(s, b)).filter((a) => a.attacking === pid && !a.attackingPermanent && characteristics(s, a).colors.includes("R")).reduce((n, a) => n + Math.max(0, power(s, a)), 0) < 4)) continue;
       // The Deck of Many Things: "roll a d20 and subtract the number of cards in your hand. If the result is 0 or less,
       // discard your hand": with more than three cards in hand, the risk outweighs what the roll brings.
       if (ab.body.effects.some((e) => e.type === "if" && e.cond.kind === "rollIn" && e.cond.max !== undefined && e.cond.max <= 0 && e.effects.some((x) => x.type === "discard" && x.hand)) && player(s, pid).hand.length > 3) continue;
@@ -7313,8 +7342,8 @@ function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
       if (plan) return plan;
     }
   }
-  // Tidal Flats (round B214): after blockers are declared (see chooseActivation).
-  const timed = (ab: ActivatedAbility) => timedCondition(ab.activateIf) || ab.body.effects.some((e) => e.type === "attackersPayOrBlockersGain");
+  // Tidal Flats (round B214), Heroism (round B232): after blockers are declared (see chooseActivation).
+  const timed = (ab: ActivatedAbility) => timedCondition(ab.activateIf) || ab.body.effects.some((e) => e.type === "attackersPayOrBlockersGain" || e.type === "attackersPayOrPrevent");
   // The Words (Words of Wilding, Words of Worship): in our own upkeep, one to replace the draw step's draw.
   if (s.step === "upkeep" && s.activePlayer === pid && !player(s, pid).nextDrawInstead?.some((w) => w.turn === s.turn)) {
     const words = chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => e.type === "nextDrawInstead"));

@@ -74,6 +74,7 @@ import { runLaneB227Effect } from "./run-laneb227";
 import { runLaneB229Effect } from "./run-laneb229";
 import { runLaneB230Effect } from "./run-laneb230";
 import { runLaneB231Effect } from "./run-laneb231";
+import { runLaneB232Effect } from "./run-laneb232";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -2000,6 +2001,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "tombLeaves":
     case "tombRemove":
       return runLaneB231Effect(s, e, ctx, src);
+    case "attackersPayOrPrevent":
+      return runLaneB232Effect(s, e, ctx, src);
     case "phaseOutExcess":
       return runLaneB222Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":

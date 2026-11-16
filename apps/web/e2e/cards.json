@@ -5744,6 +5744,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6656d47a-9490-46ee-a6ed-7cbcab7539c8",
+  "name": "Butcher Orgg",
+  "manaCost": "{4}{R}{R}{R}",
+  "cmc": 7,
+  "typeLine": "Creature — Orgg",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Orgg"
+  ],
+  "oracleText": "You may assign this creature's combat damage divided as you choose among defending player and/or any number of creatures they control.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d64e96bf-6815-462c-93b4-c9c22dc43eda",
   "name": "By Invitation Only",
   "manaCost": "{3}{W}{W}",
@@ -18698,6 +18728,33 @@
   "set": "moc",
   "releasedAt": "2023-04-21",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "74716642-fc8c-4f62-a556-154ed0b4af0e",
+  "name": "Heroism",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Sacrifice a white creature: For each attacking red creature, prevent all combat damage that would be dealt by that creature this turn unless its controller pays {2}{R}.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fem",
+  "releasedAt": "1994-11-01",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

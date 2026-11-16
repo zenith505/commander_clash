@@ -424,6 +424,11 @@ export interface GameObject {
   /** The permanents that dealt it damage this turn, for "whenever a creature dealt damage by ~ this turn dies". */
   damagedBy?: ObjectId[];
   /**
+   * Ogre Enforcer (round B232): the damage marked on it, by source (CR 120.3e), each source as the object it was
+   * ("id@zc"), cleared with the damage (CR 514.2, regeneration, CR 701.19c).
+   */
+  damageFrom?: Record<string, number>;
+  /**
    * Shelob, Child of Ungoliant: "dealt damage this turn by a Spider you controlled": each subtype the sources that dealt
    * it damage this turn had then, with their controller then, as "player|Subtype" ("player|*" for every creature type,
    * CR 702.73a), each once.
@@ -1782,7 +1787,7 @@ export type PendingDecision =
    * Master of the Wild Hunt: `by` deals `total` damage divided as `player` (its controller) chooses among any number of
    * `options` (Effect "dividedDamageBack"): how much each gets, adding up to `total`, the ones chosen at least 1 each.
    */
-  | { kind: "divideDamage"; player: PlayerId; source: string; by: ObjectId; total: number; options: ObjectId[]; what: string }
+  | { kind: "divideDamage"; player: PlayerId; source: string; by: ObjectId; total: number; options: ObjectId[]; what: string; /** Butcher Orgg (round B232): its combat damage as it's assigned (GameState.creatureDamageChoice `divide`), among `toPlayer` (the key "p<player>") and the creatures in `options`, or, with an empty division, assigned the usual way. */ combat?: true; toPlayer?: PlayerId }
   /** `x`: the trigger's X (an enters trigger's is its spell's, CR 107.3m), which "up to X target ..." can't choose more than. */
   /** `controller`: the ability's controller, when `player` chooses its target for them ("target creature of their choice", TargetSpec.chosenBy). */
   | { kind: "chooseTargets"; player: PlayerId; sourceId: ObjectId; specs: TargetSpec[]; description: string; x?: number; controller?: PlayerId; /** A spell or activated ability's target of an opponent's choice, as it's cast or activated (not a trigger's). */ deferred?: DeferredAct }
@@ -2462,7 +2467,7 @@ export interface GameState {
    */
   unblockedChoice?: { turn: number; step: Step; asked: PlayerId[]; ids: ObjectId[] };
   /** Cunning Giant: the unblocked attackers asked this combat damage step, the one being asked, and the creature each assigns its combat damage to. */
-  creatureDamageChoice?: { turn: number; step: Step; asked: ObjectId[]; current?: ObjectId; to: Record<ObjectId, ObjectId> };
+  creatureDamageChoice?: { turn: number; step: Step; asked: ObjectId[]; current?: ObjectId; to: Record<ObjectId, ObjectId>; /** Butcher Orgg (round B232): the attackers asked whether to divide their combat damage, and each division ("p<player>" or a creature's id, to the damage). */ divideAsked?: ObjectId[]; divide?: Record<ObjectId, Record<string, number>> };
   /** "Can't block with more than one creature this combat" (Mirri, Weatherlight Duelist): each player's limit, until the end of combat step ends. */
   blockLimits?: { player: PlayerId; n: number }[];
   /** Attackers just declared, waiting on their enlist choices (CR 508.1g) before "whenever ~ attacks" triggers. */
@@ -2667,7 +2672,7 @@ export interface TriggerEventInfo {
   castAlt?: "surge" | "spectacle" | "prowl" | "emerge";
   /** A permanent's enters trigger: the creature sacrificed to pay its spell's emerge cost, as it last existed (Adipose Offspring, CR 702.119a). */
   emergeSacrificed?: LastKnown;
-  /** A permanent's enters trigger, or a cast trigger: the mana spent to cast that spell by type (CR 601.2h). */
+  /** A permanent's enters trigger, or a cast trigger: the mana spent to cast that spell by type (CR 601.2h); Balduvian Fallen's (round B232): the mana spent to pay its cumulative upkeep (Amount "eventSpent"). */
   spent?: SpentMana;
   /** A permanent's enters trigger, or a "when you cast this spell" one: how much mana was spent to cast that spell (CR 601.2h). */
   manaSpent?: number;
@@ -2972,6 +2977,10 @@ export interface Resolving {
     iceCave?: { queue: PlayerId[] };
     /** Tidal Flats (Effect attackersPayOrBlockersGain, round B214): the attackers whose controllers are still to choose, and those not paid for. */
     tidal?: { queue: { id: ObjectId; zc: number; pid: PlayerId }[]; unpaid: ObjectId[] };
+    /** Heroism (Effect attackersPayOrPrevent, round B232): the attackers whose controllers are still to choose, and those not paid for. */
+    heroism?: { queue: { id: ObjectId; zc: number; pid: PlayerId }[]; unpaid: ObjectId[] };
+    /** Balduvian Fallen (round B232): the mana spent on the cumulative upkeep just paid ("may" with `cumulativeUpkeep`). */
+    upkeepSpent?: Partial<Record<ManaType, number>>;
     /** Zevlor, Elturel Exile (Effect copyPerOtherOpponent): the opponents still to choose for, the choices so far ("p<player>" or an object id), and the last answer. */
     zevlor?: { left: PlayerId[]; picks: string[]; answer?: string };
     /** Effect "copyForPlayers" (Hive Mind, Tempt with Mayhem): the players still to copy, in APNAP order; how many have copied; whether the first of them chose to and is copying now. */

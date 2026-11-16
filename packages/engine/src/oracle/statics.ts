@@ -1517,6 +1517,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // a token too (rulings).
   // Undead Sprinter: "if a non-Zombie creature died this turn", under anyone's control.
   if ((m = /^a non-([A-Z][a-z]+) creature died( under your control)? this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "amount", amount: { count: { kind: "diedThisTurn", notSubtype: m[1]!, ...(m[2] ? { yours: true as const } : {}) } }, min: 1 };
+  // Intermediate Chirography: "if a modified creature died under your control this turn": one with a counter on it, equipped,
+  // or enchanted by an Aura its controller controlled, as it last existed (CR 700.9, rulings), a token too.
+  if (text === "a modified creature died under your control this turn") return { kind: "amount", amount: { count: { kind: "diedThisTurn", modified: true, yours: true } }, min: 1 };
   // Titan Hunter: "if no creatures died this turn".
   if (text === "no creatures died this turn") return { kind: "not", cond: { kind: "creatureDied" } };
   // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).

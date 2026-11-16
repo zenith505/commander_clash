@@ -69,6 +69,7 @@ import { roundB223Line } from "./laneb223";
 import { roundB224Line } from "./laneb224";
 import { roundB225Line } from "./laneb225";
 import { roundB226Line } from "./laneb226";
+import { roundB227Line } from "./laneb227";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2199,6 +2200,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB225Line(line, raw, out, isSpell)) continue;
     // Steamflogger Boss, Shimmer, Hall of Gemstone (round B226).
     if (roundB226Line(line, raw, out, isSpell, lines)) continue;
+    // Anafenza, the Foremost, Cherished Hatchling (round B227).
+    if (roundB227Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

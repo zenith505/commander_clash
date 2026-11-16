@@ -4,7 +4,7 @@ import { abilitiesOf, cardIdOf, defOf, isType, objIsType } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { blightOptions, putCounters } from "../counters";
-import { castProblem, collectEvidence, destroyPermanent, enterTogether, evidenceProblem, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
+import { castProblem, collectEvidence, destroyPermanent, enterTogether, evidenceProblem, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player, whileTappedHolds } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import { PERMANENT_TYPES } from "../oracle/targets";
 import type { CardDef, Chosen, DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
@@ -701,6 +701,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (e.aboutPlayer !== undefined && toPlayer === undefined) return;
       const forPlayer = e.forPlayer ? players(s, e.forPlayer, ctx)[0] : undefined;
       if (e.forPlayer && forPlayer === undefined) return;
+      // Giant Oyster: "for as long as ~ remains tapped" (CR 611.2b): its source as it is now and how often it has untapped;
+      // already over, there's nothing to make (as for the continuous effect, run-permanents).
+      const whileTapped = e.until === "whileTapped" ? { id: o.id, zc: ctx.sourceZc ?? o.zoneChanges ?? 0, untaps: ctx.sourceUntaps ?? o.untaps ?? 0 } : undefined;
+      if (whileTapped && !whileTappedHolds(s, whileTapped)) return;
       for (const about of e.each || e.aboutGroup ? abouts : abouts.slice(0, 1)) {
         (s.floatingTriggers ??= []).push({
           ...(about ? { about: { id: about.id, zc: about.zoneChanges ?? 0 } } : {}),
@@ -719,6 +723,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           until: e.until,
           turn: s.turn,
           ...(e.once ? { once: true as const } : {}),
+          ...(whileTapped ? { whileTapped } : {}),
         });
       }
       return;

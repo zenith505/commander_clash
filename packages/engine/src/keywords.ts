@@ -295,6 +295,19 @@ export const LINKED_CREATURE_CARD_KEYWORD = "If a creature card exiled with it h
  * keyword written after this prefix is had while a creature card in any graveyard has that keyword itself (round 358).
  */
 export const YARD_CREATURE_CARD_KEYWORD = "As long as a creature card in a graveyard has it: ";
+/**
+ * Rayami, First of the Fallen (round B228): "As long as an exiled creature card with a blood counter on it has flying, ~ has
+ * flying. The same is true for ...": each keyword written after this prefix is had while a face-up creature card in exile
+ * with a blood counter on it, anyone's, has that keyword itself (variants as those variants, rulings).
+ */
+export const EXILED_BLOOD_CREATURE_KEYWORD = "As long as an exiled creature card with a blood counter on it has it: ";
+/**
+ * Escaped Shapeshifter (round B228): "As long as an opponent controls a creature with flying not named ~, ~ has flying. The
+ * same is true for ...": each keyword written after this prefix is had while a creature an opponent of its controller
+ * controls, not named as this object is, has it as the layers have applied so far ("Protection": each color one of them
+ * has protection from).
+ */
+export const OPPONENT_CREATURE_KEYWORD = "As long as an opponent's creature not named ~ has it: ";
 /** "Protection from creatures" and the like for each of these card types (CR 205.2a, 702.16a). */
 export function protectionFromCardTypes(types: readonly string[]): string[] {
   return Object.entries(PROTECTION_TYPES).filter(([, t]) => types.includes(t)).map(([q]) => `Protection from ${q}`);

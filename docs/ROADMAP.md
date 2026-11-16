@@ -1,6 +1,6 @@
 # Roadmap
 
-31,473 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,477 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -9645,6 +9645,28 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   counts from the last normal one; GameState.seating keeps the seats, so "left" and "right" and the screen don't move).
   Browser tests for Fishing Pole's granted ability and Aeon Engine's reversal. +5, 31,473 of 31,936. The compiled text of
   every other card is unchanged. Bots never activate Aeon Engine (an exile-itself cost).
+- Round B228 (least played first, from the Lane B skip lists): Rayami, First of the Fallen (any player's nontoken creature
+  that would die is exiled with a blood counter instead, CR 614.1a, a creature as it is on the battlefield, those dying as
+  Rayami leaves too; Rayami has each listed keyword a face-up creature card in exile with a blood counter has as its own
+  printed keyword, anyone's however it got there, variants such as "protection from black" or "hexproof from white" as
+  those variants, a conditional one not, rulings). Escaped Shapeshifter (flying, first strike, trample and protection from
+  each color, each while a creature an opponent controls, not named as it is, has it as layer 6 has applied so far; its
+  effect depends on the layer 6 effects that give or take those creatures' keywords, CR 613.8a, so it waits for them;
+  "protection from each color" and "from all colors" count as every color, CR 702.16h). Giant Oyster ("for as long as ~
+  remains tapped": the target stays tapped and a delayed trigger, TriggerDuration `whileTapped`, puts a -1/-1 counter on it
+  at each of your draw steps, one already triggered still resolving after the Oyster untaps, rulings; the first time the
+  Oyster leaves or untaps, all -1/-1 counters come off the creature; bots keep it tapped but never activate it). Advancing
+  the Spirit ({0} rather than the power-up cost of the first power-up ability you activate during each of your turns, CR
+  118.9, 702.193a; game.ts freePowerUp, TurnLog.powerUps; with {X} in the cost only when X is 0, CR 107.3b). Browser tests
+  for Giant Oyster's tapped-creature target and a {0} power-up with no lands. +4, 31,477 of 31,936. The compiled text of
+  every other card is unchanged.
+- Out after round B228 (looked at, not done): Hollow Warrior (attack and block costs that tap another creature that
+  isn't attacking or blocking: attack costs that aren't mana only sacrifice or return, and no block cost asks for a pick), Reflecting Mirror (its {X} set by
+  the target spell's mana value: definedX doesn't see an ability's targets yet), North Star ("for one spell this turn": the
+  player picks the spell the permission is used on), Brutal Suppression and Drought (a sacrifice added to other abilities'
+  costs). Known gap: with Rayami and another "exile it instead" effect (Rest in Peace), the creature's controller should
+  choose which applies (CR 616.1), and so whether it gets a blood counter (rulings); the engine applies the first one it
+  finds. Escaped Shapeshifter doesn't count "protection from everything" (CR 702.16j) as protection from a color.
 - Out after round B227 (looked at, not done): the lists after round B226 stay out.
 - Out after round B226 (looked at, not done): Snowfall (its "may add" in a triggered mana ability, a choice that matters
   with mana burn like Yurlok of Scorch Thrash's, and mana from a trigger spendable only on cumulative upkeep, which autopay

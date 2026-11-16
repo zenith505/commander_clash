@@ -3,7 +3,7 @@ import { defMv, hasName, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import { isRealKicker, type AbilityBody, type BatchTrigger, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, castCardAs, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, pairedWith, power, toughness } from "../cards";
-import { checkAscend, isEmerge, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, spellHasFlash, conspireGranted, casualtyGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
+import { whileTappedHolds, checkAscend, isEmerge, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, spellHasFlash, conspireGranted, casualtyGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, modeRange, withModes } from "../modes";
 import { compileCard, compileGranted } from "../oracle";
@@ -746,6 +746,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // definition what the ability remembers (CR 113.7a).
       const o: GameObject | undefined = s.objects[ft.sourceId] ?? (s.cards[ft.sourceCardId] ? { id: ft.sourceId, cardId: ft.sourceCardId, owner: ft.controller, controller: ft.controller, zone: "graveyard", timestamp: 0, tapped: false, controlledSinceTurn: -1, damage: 0, deathtouchDamage: false, counters: {}, isCommander: false, isToken: true, zoneChanges: ft.sourceZc + 1 } : undefined);
       if (!o || player(s, ft.controller).lost) continue;
+      // Giant Oyster: "for as long as ~ remains tapped" (CR 611.2b): gone once its source untapped or left (whileTapped).
+      if (ft.whileTapped && !whileTappedHolds(s, ft.whileTapped)) {
+        s.floatingTriggers = s.floatingTriggers!.filter((x) => x !== ft);
+        continue;
+      }
       if (ft.toPlayer !== undefined && ft.toPlayer !== dealtTo) continue;
       if (self && (ft.about ? ft.about.id !== self.id || (self.zoneChanges ?? 0) !== ft.about.zc : o.id !== self.id || (o.zoneChanges ?? 0) !== ft.sourceZc)) continue;
       floating = ft;
@@ -3035,7 +3040,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     fromExiled(stepWatch);
     fromEmblems(stepWatch);
     // "At the beginning of each combat this turn" (Full Throttle): a delayed trigger made by a spell (CR 603.7b).
-    fromFloating((o, you, triggers) => add(o, you, (e) => e === each, triggers, undefined, undefined, undefined, undefined, undefined, { player: ev.active }));
+    // Giant Oyster: "at the beginning of each of your draw steps" for as long as it remains tapped, the delayed trigger's
+    // controller's (CR 603.7d-e).
+    fromFloating((o, you, triggers) => add(o, you, (e) => e === each || (e === want && you === ev.active), triggers, undefined, undefined, undefined, undefined, undefined, { player: ev.active }));
   }
 }
 

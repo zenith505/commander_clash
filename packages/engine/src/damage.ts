@@ -485,7 +485,7 @@ export function dealDamage(
   }
   if (has(src, "Lifelink")) {
     if (opts.lifelink) opts.lifelink.n += n;
-    else gainLife(s, src.controller, n); // CR 702.15b
+    else gainLife(s, src.controller, n, "lifelink"); // CR 702.15b
   }
   return n;
 }
@@ -1604,7 +1604,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     }
   }
   for (const { r, n } of dealToLater.values()) if (n > 0 && r.dealTo) back.push({ cardId: r.cardId, controller: r.controller, to: "player" in r.dealTo ? r.dealTo.player : r.controller, n, ...("object" in r.dealTo ? { toObject: r.dealTo } : {}) });
-  for (const { pid, n } of gains.values()) if (n > 0) gainLife(s, pid, n);
+  for (const { pid, n } of gains.values()) if (n > 0) gainLife(s, pid, n, { controller: pid }); // the shield's own controller's rule (Rain of Gore)
   // Bone Mask (CR 615.5): not a mill (CR 701.17a); with fewer cards, all of them (rulings).
   for (const { r, n } of exileTopLater.values()) {
     const p = player(s, r.controller);

@@ -4518,6 +4518,20 @@ export type Effect =
    */
   | { type: "authorityDestroy"; host: { id: ObjectId; zc: number } }
   /**
+   * Cyclopean Tomb (round B231), after its "Put a mire counter on target non-Swamp land": the land, as the object it is, if
+   * a mire counter was put onto it this way (Resolving.countersPutThisWay), noted for the Tomb as the object it is
+   * (GameState.mireTomb).
+   */
+  | { type: "tombNote" }
+  /**
+   * Cyclopean Tomb's "When ~ is put into a graveyard from the battlefield, at the beginning of each of your upkeeps for the
+   * rest of the game, remove all mire counters from a land that ...": the delayed trigger (CR 603.7), about the Tomb as it
+   * was on the battlefield (the key of its GameState.mireTomb list), the trigger's controller's.
+   */
+  | { type: "tombLeaves" }
+  /** Cyclopean Tomb's delayed trigger: one land of `key`'s list, still that object, whose mire counters weren't removed this way. */
+  | { type: "tombRemove"; key: string }
+  /**
    * Vodalian War Machine (round B229): "destroy all Merfolk tapped this turn to pay for its abilities": the permanents tapped
    * for the costs of the source's abilities this turn (TurnLog.costTapped), the source as the permanent it was, each still the
    * object it was and matching `filter`.
@@ -7315,6 +7329,13 @@ export interface ActivatedAbility {
   enchantedControllerOnly?: true;
   /** Merseine (round B211): "Pay enchanted creature's mana cost": the mana cost of the permanent its source is attached to as it's activated (CardDef.manaCost by defOf: a copy's, CR 707.2), {X} as 0 (CR 107.3h); unpayable with none, or with nothing attached (CR 118.6). `manaCost` is unused. */
   attachedManaCost?: true;
+  /**
+   * Back from the Brink (round B231): "Exile a creature card from your graveyard and pay its mana cost": the mana part of
+   * the cost is the mana cost of the card its exile cost exiles (CostChoices.exileCards, chosen as it's activated, CR
+   * 602.2b, 601.2f-h), a double-faced card's front face's, {X} as 0 (rulings); not casting it, so nothing that changes a
+   * spell's cost applies (rulings). With no card chosen yet, {0}.
+   */
+  manaCostOfExiled?: true;
   /** "Reveal the player you chose" (Guardian Archon): payable only if a player was secretly chosen for it as it entered. */
   revealChosen?: true;
   /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object (CR 400.7): see GameObject.activatedEver. */
@@ -9013,6 +9034,12 @@ export interface CompiledCard {
   gainsNoLife?: true;
   /** "If an opponent would gain life, that player loses that much life instead" (Tainted Remedy, CR 614.1a). */
   opponentsGainLose?: true;
+  /**
+   * Rain of Gore (round B231): "If a spell or ability would cause its controller to gain life, that player loses that much
+   * life instead" (CR 614.1a): a life gain a spell or ability (resolving, or a static or replacement ability, CR 113.3)
+   * causes for the player who controls it; not lifelink's (CR 702.15b, rulings). See game.ts gainLife's `cause`.
+   */
+  causedGainLose?: true;
   /**
    * "If an opponent would begin an extra turn, that player skips that turn instead" (Trouble in Pairs, Stranglehold), "If a
    * player would ..." (Ugin's Nexus): a replacement effect skipping it as it would begin (CR 614.10, 500.7); one created

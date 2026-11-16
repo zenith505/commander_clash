@@ -305,7 +305,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${src}: ${off} of that damage is prevented.`);
       }
       const dealt = dealtWithExcess(s, from, events, (evs) => dealDamageBatch(s, evs, { lifelink }));
-      gainLife(s, from.controller, lifelink.n);
+      gainLife(s, from.controller, lifelink.n, "lifelink");
       if (dealt && from.id) fireEvent(s, { type: "dealtDamage", id: from.id, amount: dealt, combat: false });
       return;
     }
@@ -324,7 +324,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         .map((o) => ({ src: objectSource(s, o), to: e.toHost ? { object: hostOf(o)! } : recTo ?? (victim ? { object: victim.id } : { player: controllerOf(s, o) }), n: e.ownPower ? power(s, o) : n }));
       const gains = new Map<PlayerId, { n: number }>();
       const dealt = dealPlanned(s, planDamage(s, events), { lifelink: (ev) => gains.get(ev.src.controller) ?? gains.set(ev.src.controller, { n: 0 }).get(ev.src.controller)! });
-      for (const [pid, g] of gains) gainLife(s, pid, g.n);
+      for (const [pid, g] of gains) gainLife(s, pid, g.n, "lifelink");
       const by = new Map<ObjectId, number>();
       for (const d of dealt) if (d.dealt > 0 && d.src.id) by.set(d.src.id, (by.get(d.src.id) ?? 0) + d.dealt);
       for (const [id, amount] of by) fireEvent(s, { type: "dealtDamage", id, amount, combat: false });

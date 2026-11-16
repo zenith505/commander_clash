@@ -3,6 +3,7 @@
 import type { AbilityBody, CompiledCard } from "../abilities";
 import { parseBody } from "./body";
 import { parseTrigger } from "./triggers";
+import { roundB231Spell } from "./laneb231";
 
 const BONE_SHAMAN = "Creatures dealt damage by ~ this turn can't be regenerated this turn.";
 const INFINITE_AUTHORITY = "Whenever enchanted creature blocks or becomes blocked by a creature with toughness 3 or less, destroy the other creature at end of combat. At the beginning of the next end step, if that creature was destroyed this way, put a +1/+1 counter on the first creature.";
@@ -46,5 +47,5 @@ export function roundB230Spell(text: string): AbilityBody | null | undefined {
     if (!b || b.targets.length !== 1 || b.targets[0]!.kind !== "object" || !b.targets[0]!.subtypes?.includes("Wall")) return null;
     return { targets: b.targets, effects: [{ type: "glyphReincarnation" }], text };
   }
-  return undefined;
+  return roundB231Spell(text);
 }

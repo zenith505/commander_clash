@@ -3041,6 +3041,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "704aaf92-590f-46d3-8b39-4ab84e1c766d",
+  "name": "Back from the Brink",
+  "manaCost": "{4}{U}{U}",
+  "cmc": 6,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile a creature card from your graveyard and pay its mana cost: Create a token that's a copy of that card. Activate only as a sorcery.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "80734bb0-5032-4355-9304-49f4a4557aba",
   "name": "Backdraft",
   "manaCost": "{1}{R}",
@@ -9112,6 +9138,28 @@
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": true
+ },
+ {
+  "oracleId": "1edee40f-d153-4d67-aee7-ef08e11e4a79",
+  "name": "Cyclopean Tomb",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}, {T}: Put a mire counter on target non-Swamp land. That land is a Swamp for as long as it has a mire counter on it. Activate only during your upkeep.\nWhen this artifact is put into a graveyard from the battlefield, at the beginning of each of your upkeeps for the rest of the game, remove all mire counters from a land that a mire counter was put onto with this artifact but that a mire counter has not been removed from with this artifact.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "14221c18-7801-49c9-a2c8-53b8c5181d63",
@@ -21654,6 +21702,38 @@
   "set": "hob",
   "releasedAt": "2026-08-14",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "dfea918b-5702-4c12-ba36-e6aa4ace09c7",
+  "name": "Kheru Mind-Eater",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Creature — Vampire",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vampire"
+  ],
+  "oracleText": "Menace\nWhenever this creature deals combat damage to a player, that player exiles a card from their hand face down.\nYou may look at cards exiled with this creature, and you may play lands and cast spells from among those cards.",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "c17",
+  "releasedAt": "2017-08-25",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

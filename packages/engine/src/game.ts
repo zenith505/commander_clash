@@ -943,7 +943,7 @@ export function moveObject(
     // "Exiled with ~" while that permanent is still on the battlefield (CR 607.2a): the card as it will be in exile.
     const src = s.objects[by];
     if (x.linked && src?.zone === "battlefield" && by !== o.id) ((s.linkedExile ??= {})[`${by}@${src.zoneChanges ?? 0}`] ??= []).push({ id, zc: (o.zoneChanges ?? 0) + 1 });
-    if (x.gainLife) gainLife(s, you, x.gainLife);
+    if (x.gainLife) gainLife(s, you, x.gainLife, { controller: you });
     // Ravenous Slime: +1/+1 counters equal to the creature's power as it last existed (rulings), on the Slime if it's
     // still on the battlefield (not if it's dying at the same time).
     if (x.countersPower && src?.zone === "battlefield" && by !== o.id) {
@@ -2144,8 +2144,15 @@ export function canEnterUntapped(s: GameState, pid: PlayerId, landId: ObjectId):
   return p.hand.some((id) => id !== landId && printedMatches(choice.filter, defOf(s, obj(s, id))));
 }
 
+/**
+ * What causes a life gain, for Rain of Gore (CompiledCard.causedGainLose): the controller of the spell or ability that
+ * causes it; "lifelink" for lifelink's (CR 702.15b: the damage causes it, rulings); left out, the spell or ability that's
+ * resolving, if any (a mana ability too, effects/resolve.ts resolveManaAbility).
+ */
+export type GainCause = { controller: PlayerId } | "lifelink";
+
 /** A player gains life (CR 119.3): one life-gain event, which "whenever you gain life" abilities see (CR 119.10). */
-export function gainLife(s: GameState, pid: PlayerId, n: number) {
+export function gainLife(s: GameState, pid: PlayerId, n: number, cause?: GainCause) {
   if (n <= 0) return;
   if (!canGainLife(s, pid)) {
     log(s, `${player(s, pid).name} can't gain life.`); // CR 119.7
@@ -2160,6 +2167,14 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
   // "That player loses that much life instead" (Tainted Remedy, CR 614.1a): the player chooses the order of the
   // replacements (CR 616.1, rulings); this one first replaces the gain before anything doubles it, so the least is lost.
   if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).opponentsGainLose && controllerOf(s, obj(s, id)) !== pid)) {
+    log(s, `${player(s, pid).name} loses ${n} life instead of gaining it.`);
+    loseLife(s, pid, n);
+    return;
+  }
+  // Rain of Gore (round B231): the same, for a gain a spell or ability causes for its own controller. Applied first too
+  // (CR 616.1: the player loses the least that way).
+  const causer = cause === "lifelink" ? undefined : cause ? cause.controller : s.resolving?.item.controller;
+  if (causer === pid && s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).causedGainLose)) {
     log(s, `${player(s, pid).name} loses ${n} life instead of gaining it.`);
     loseLife(s, pid, n);
     return;
@@ -2294,7 +2309,7 @@ function lifeZeroReplaced(s: GameState, pid: PlayerId): boolean {
   log(s, `${p.name}'s life total would be reduced to 0 or less; instead ${name} transforms and their life total becomes 3.`);
   const turned = transformPermanent(s, angel);
   if (p.life > 3) lifeDown(s, pid, p.life - 3);
-  else if (p.life < 3) gainLife(s, pid, 3 - p.life);
+  else if (p.life < 3) gainLife(s, pid, 3 - p.life, { controller: controllerOf(s, angel) });
   if (!turned) {
     log(s, `${name} didn't transform.`);
     playerLoses(s, pid, `${name} didn't transform`);
@@ -3671,7 +3686,7 @@ function applyDrawShield(s: GameState, pid: PlayerId, key: string) {
   if (!p.nextDrawInstead.length) p.nextDrawInstead = undefined;
   if (w.gain !== undefined) {
     log(s, `${p.name} gains ${w.gain} life instead of drawing a card (${w.source}).`);
-    gainLife(s, pid, w.gain);
+    gainLife(s, pid, w.gain, { controller: pid });
   }
   if (w.damage) wordsDamage(s, pid, w as typeof w & { damage: NonNullable<typeof w.damage> });
   if (w.token) {
@@ -9563,7 +9578,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       // Unchosen (a caller that didn't ask), the cost is still paid: by the first opponent who can gain life.
       const to = c.each ? opponents(s, p.id) : [choices.lifeTo ?? opponents(s, p.id).find((q) => canGainLife(s, q))!];
       log(s, `${p.name} has ${to.map((q) => player(s, q).name).join(", ")} gain ${c.n} life.`);
-      for (const q of to) gainLife(s, q, c.n);
+      for (const q of to) gainLife(s, q, c.n, { controller: p.id });
     }
     else if (c.kind === "exileFromHand" && c.toLibrary) {
       const ids = choices.exileFromHand ?? [];
@@ -9856,7 +9871,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     const cp = extraCostProblem(s, pid, o, activatedCosts(ab, x, o, s, pid), costs, `activate ${d.name}'s ability`, ab.mana ? "mana" : "costs");
     if (cp) return cp;
   }
-  const cost = activationCost(s, pid, o, ab, targets, x);
+  const cost = activationCost(s, pid, o, ab, targets, x, costs);
   // A cost's X (Corpseweft's "one or more creature cards") is chosen as it's activated: asked before that (no X and no
   // costs chosen, the menu's check), only whether the ability could be activated at all.
   const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) && !(x === undefined && costs === undefined && !ab.loyaltyX) ? "X can't be 0" : null) : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : xProblem(cost, x);
@@ -9911,7 +9926,7 @@ export function lessWaterbend(cost: ParsedCost, extra: number, ab: ActivatedAbil
  * An activated ability's mana cost as `pid` activates it, after "Equip abilities you activate cost {1} less to activate"
  * (CR 602.2b applies 601.2f): reductions only take off generic mana. Without `targets` chosen yet, as if the best one were.
  */
-export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[], x = 0): ParsedCost {
+export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[], x = 0, costs?: CostChoices): ParsedCost {
   // Zirda, the Dawnwaker: abilities `pid` activates that aren't mana abilities, wherever they are (rulings).
   let less = 0;
   let atLeastOne = false;
@@ -9935,7 +9950,7 @@ export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: A
     }
   less += firstArtifactLess(s, pid, o, !!ab.mana);
   if (!ab.mana) less += firstOwnCreatureTargetLess(s, pid, ab, targets);
-  return activationLessCost(s, o, activationCostBefore(s, pid, o, ab, targets, x), x, less ? { n: less, atLeastOne } : undefined);
+  return activationLessCost(s, o, activationCostBefore(s, pid, o, ab, targets, x, costs), x, less ? { n: less, atLeastOne } : undefined);
 }
 
 /**
@@ -10074,9 +10089,11 @@ export function attachedManaCostOf(s: GameState, o: GameObject): string | undefi
   return cost ? cost : undefined;
 }
 
-function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[], x = 0): ParsedCost {
+function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[], x = 0, costs?: CostChoices): ParsedCost {
   // Merseine (round B211): the mana cost of the permanent it's attached to, as it is now, {X} as 0 (CR 107.3h).
-  const cost0 = parseManaCost(freeEquip(s, pid, ab) || freeCycling(s, pid, o, ab, x) || freePowerUp(s, pid, o, ab, x) ? "{0}" : ab.attachedManaCost ? (attachedManaCostOf(s, o) ?? "").replace(/\{X\}/g, "") || "{0}" : ab.manaCost);
+  // Back from the Brink (round B231): the exiled card's mana cost, {X} as 0.
+  const exiledCard = ab.manaCostOfExiled ? s.objects[costs?.exileCards?.[0] ?? ""] : undefined;
+  const cost0 = parseManaCost(freeEquip(s, pid, ab) || freeCycling(s, pid, o, ab, x) || freePowerUp(s, pid, o, ab, x) ? "{0}" : ab.attachedManaCost ? (attachedManaCostOf(s, o) ?? "").replace(/\{X\}/g, "") || "{0}" : ab.manaCostOfExiled ? (exiledCard ? defOf(s, exiledCard).manaCost ?? "" : "").replace(/\{X\}/g, "") || "{0}" : ab.manaCost);
   // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
   // (CR 602.2b applies 601.2f).
   const more = (ab.mana ? activationTax(s, o, pid, ab, true) : activationTax(s, o, pid, ab) + opponentsTargetTax(s, pid, targets)) + (ab.costMore ? Math.max(0, evalAmount(s, ab.costMore, { controller: pid, sourceId: o.id })) : 0);
@@ -10321,7 +10338,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const fromOwnGraveyard = o.zone === "graveyard" && o.owner === p.id ? (true as const) : undefined;
   const inGraveyard = o.zone === "graveyard";
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
-  const abCost = activationCost(s, p.id, o, ab, targets, x);
+  const abCost = activationCost(s, p.id, o, ab, targets, x, costs);
   // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
   const halfLife = halfLifeCost(s, p.id, ab);
   const lifeCost = activatedLifeCost(s, p.id, ab, o, x);
@@ -11514,6 +11531,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "mireLand") {
+    // Cyclopean Tomb (round B231): the land whose mire counters are removed.
+    const st = r.scratch?.mireLand;
+    if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the lands offered");
+    st.pick = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "spellDamageBack") {
     // Backdraft (round B229): the player and the spell's damage.
     const st = r.scratch?.spellDamageBack;
@@ -12594,7 +12619,7 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     if (yes) {
       const gain = s.objects[from]?.zone === "battlefield" ? (abilitiesOf(s, obj(s, from)).maySkipDraw?.gain ?? 0) : 0;
       log(s, `${p.name} skips their draw step (${nameOf(s, from)}).`);
-      gainLife(s, p.id, gain);
+      gainLife(s, p.id, gain, { controller: p.id });
       return advanceStep(s);
     }
     if (askSkipDraw(s, [...declined, from])) return;
@@ -14473,7 +14498,7 @@ function finishCombatDamage(s: GameState): boolean {
   }
   for (const e of done) {
     const gained = lifelink.get(key(e));
-    if (gained?.n) gainLife(s, e.src.controller, gained.n);
+    if (gained?.n) gainLife(s, e.src.controller, gained.n, "lifelink");
     lifelink.delete(key(e));
   }
   // "Whenever ~ deals (combat) damage": once per creature, for all it dealt this step (CR 510.2, 603.2c).
@@ -15076,7 +15101,7 @@ export function playerLoses(s: GameState, pid: PlayerId, reason: string, concede
       log(s, `${p.name} would lose the game (${reason}), but exiles ${src} instead and their life total becomes ${pick.life}.`);
       moveObject(s, pick.id!, "exile");
     }
-    if (p.life < pick.life && canGainLife(s, pid)) gainLife(s, pid, pick.life - p.life);
+    if (p.life < pick.life && canGainLife(s, pid)) gainLife(s, pid, pick.life - p.life, { controller: pid });
     else if (p.life > pick.life && canLoseLife(s, pid)) loseLife(s, pid, p.life - pick.life);
     invalidateCharacteristics(s);
     return true;

@@ -32,6 +32,9 @@ export function ofPlayerTargets(body: AbilityBody): number[] {
     const o = v as Record<string, unknown>;
     const of = o.of as { ref?: string; index?: number } | undefined;
     if (o.ref === "each" && of?.ref === "target" && of.index !== undefined) out.add(of.index);
+    // Ghastly Conscription (round 391): "all creature cards from target player's graveyard".
+    const yard = o.yardOf as { ref?: string; index?: number } | undefined;
+    if (o.type === "faceDownPile" && yard?.ref === "target" && yard.index !== undefined) out.add(yard.index);
     Object.values(o).forEach(walk);
   };
   walk(body.effects);
@@ -115,6 +118,20 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
     };
     const avg = lib.length ? lib.reduce((n, o) => n + cardWorth(o), 0) / lib.length : 0;
     return Math.min(mine.length, lib.length + mine.filter((o) => !o.isToken).length) * avg - mine.reduce((n, o) => n + worth(s, pid, o), 0);
+  }
+  // Round 391's face-down piles: each card a face-down 2/2 of ours (about 3, more than a bare 2/2 for the chance to turn
+  // it face up), less what goes into the pile of ours: Ghastly Conscription, the creature cards of the player we'd target;
+  // Become Anonymous, the creature we target (bot.ts picks our least worth) and the top two cards of our library.
+  const pile = body.effects.find((e) => e.type === "faceDownPile");
+  if (pile?.type === "faceDownPile" && !pile.chooseDisguised) {
+    if (pile.yardOf?.ref === "target") {
+      const p = ofPick?.get(pile.yardOf.index);
+      return p === undefined ? 0 : player(s, p).graveyard.filter((id) => characteristics(s, obj(s, id)).types.includes("Creature")).length * 3;
+    }
+    const mine = s.battlefield.map((id) => obj(s, id)).filter((o) => o.owner === pid && !o.isToken && !o.faceDown && controllerOf(s, o) === pid && characteristics(s, o).types.includes("Creature"));
+    if (!mine.length) return -1;
+    const least = Math.min(...mine.map((o) => worth(s, pid, o)));
+    return (1 + Math.min(pile.top ?? 0, player(s, pid).library.length)) * 3 - least;
   }
   let v: number | null = null;
   const group = (r: ObjRef) => {

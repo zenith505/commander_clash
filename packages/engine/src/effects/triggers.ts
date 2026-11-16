@@ -2797,6 +2797,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Leori, Sparktouched Hunter: "Until end of turn, whenever you activate an ability of a planeswalker of that type" (a
     // delayed triggered ability, CR 603.7b), matched the same way.
     fromFloating((src, ctrl, triggers) => add(src, ctrl, activatedMatch(src, ctrl), triggers, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player }));
+    // Rowan Kenrith's emblem: its owner's (CR 114.4), from the command zone.
+    fromEmblems((o, owner) => add(o, owner, activatedMatch(o, owner), undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player }));
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);

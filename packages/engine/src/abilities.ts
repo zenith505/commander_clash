@@ -5531,6 +5531,15 @@ export type Effect =
    */
   | { type: "glimpseOfTomorrow" }
   /**
+   * Round 391: "Exile all creature cards from target player's graveyard in a face-down pile, shuffle that pile, then
+   * manifest those cards." (Ghastly Conscription: `yardOf`) and "Exile target nontoken creature you own and the top two
+   * cards of your library in a face-down pile, shuffle that pile, then cloak those cards. They enter tapped." (Become
+   * Anonymous: `what`, `top`, `tapped`), "Exile any number of face-up creatures you control with disguise in a face-down
+   * pile, shuffle that pile, then cloak them." (Expose the Culprit: `chooseDisguised`, chosen as it resolves):
+   * effects/run-round391.ts.
+   */
+  | { type: "faceDownPile"; yardOf?: PlayerRef; what?: ObjRef; top?: number; chooseDisguised?: true; into: "manifest" | "cloak"; tapped?: true }
+  /**
    * Sphinx Ambassador (round 377): "search that player's library for a card, then that player chooses a card name. If you
    * searched for a creature card that doesn't have that name, you may put it onto the battlefield under your control. Then
    * that player shuffles." The card found is kept hidden from that player (rulings) until it's put in (effects/run-round377.ts).
@@ -5837,8 +5846,10 @@ export type Effect =
   /**
    * Taunt: "During target player's next turn, creatures that player controls attack you if able": every creature that player
    * controls during that turn has to attack this effect's controller if able (CR 508.1d), GameState.attackPlayerNextTurn.
+   * `anyone` (Rowan Kenrith's +2, round 391): "During target player's next turn, each creature that player controls
+   * attacks if able": attacking any player, planeswalker or battle it can obeys it (CR 508.1d).
    */
-  | { type: "attackYouNextTurn"; who: PlayerRef }
+  | { type: "attackYouNextTurn"; who: PlayerRef; anyone?: true }
   | {
       type: "playerGains";
       keywords: string[];

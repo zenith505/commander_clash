@@ -382,6 +382,8 @@ export const EMBLEM_EVENTS = new Set<TriggeredAbility["event"]>([
   "castSpell", "permanentEnters", "anotherCreatureYouControlEnters", "landYouControlEnters", "permanentDies", "youGainLife",
   "playerDraws", "creatureYouControlAttacks", "creatureYouControlDealsCombatDamageToPlayer", "permanentBecomesTapped",
   "creaturesYouControlDealCombatDamageToPlayer",
+  // Rowan Kenrith's emblem (round 391): "Whenever you activate an ability that isn't a mana ability, copy it." (triggers.ts).
+  "abilityActivated",
 ]);
 
 /**

@@ -1,6 +1,6 @@
 # Roadmap
 
-31,546 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,558 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,904 of
 9,979 (99%).
 
@@ -3440,6 +3440,31 @@ line blocks.
    Out after round 390 (looked at, not done): Psychic Paper (still out: a name and a creature type chosen as it becomes
    attached, the equipped creature's name changed); Lich's Mirror, Immortal Coil, Supper for Spiders, Duelist's Flame,
    Wizard's Spellbook, Lodestone Bauble and the rest above rank 15,000 (still out, for the reasons in their earlier lists).
+   Round 391 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards exiled in a
+   face-down pile, shuffled, then manifested or cloaked, and every creature a player controls attacking during their next
+   turn: Ghastly Conscription's "Exile all creature cards from target player's graveyard in a face-down pile, shuffle that
+   pile, then manifest those cards." (Effect faceDownPile `yardOf`: the creature cards as it resolves, under your control
+   whoever owns them, CR 701.40a; the pile shuffled so nobody knows which is which, rulings; bots aim it at the graveyard
+   with the most creature cards); Become Anonymous's "Exile target nontoken creature you own and the top two cards of your
+   library in a face-down pile, shuffle that pile, then cloak those cards. They enter tapped." (one you own whoever
+   controls it; with the target gone it doesn't resolve, CR 608.2b; an instant or sorcery card cloaked stays face down,
+   rulings; bots cloak their least worth creature); Expose the Culprit's "Exile any number of face-up creatures you control
+   with disguise in a face-down pile, shuffle that pile, then cloak them." (chosen as it resolves, after its first mode, so
+   the creature that mode turned face up can be cloaked again; disguise as the creature has it now, none after Humility;
+   bots pick those with no counters and nothing attached); Rowan Kenrith's "+2: During target player's next turn, each
+   creature that player controls attacks if able." (a rule, so every creature they control during that turn, those that
+   come later too, CR 508.1d, 611.2c; your next turn if you target yourself: Effect attackYouNextTurn `anyone`, game.ts
+   attacksIfAbleNow; bots aim it at the opponent with the most creatures) and "−8: Target player gets an emblem with
+   "Whenever you activate an ability that isn't a mana ability, copy it. You may choose new targets for the copy.""
+   (abilityActivated among the emblem events, CR 114.4; a copy isn't activated, CR 707.10, so no loop). Browser tests
+   click through Ghastly Conscription's player target, Expose the Culprit's mode and pick, Become Anonymous's target and
+   Rowan's +2. +4, 31,558 of 31,936 with main's rounds B232 and B233 merged into the Lane A chain. The compiled text of
+   every other card is unchanged.
+   Out after round 391 (looked at, not done): Metamorphic Alteration (still out: an Aura's copy effect of a chosen
+   creature); Mastermind's Acquisition and Spawnsire of Ulamog (cards from outside the game); Swans of Bryn Argoll
+   (draws in the middle of damage); Sala, Deck Boss (exhaust creatures given haste); The Enigma Jewel (craft with four or
+   more nonlands with activated abilities); Psychic Paper and the rest above rank 15,000 (still out, for the reasons in
+   their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -4741,7 +4766,7 @@ line blocks.
    Out after round 292 (looked at, not done): Balthier and Fran (a Vehicle "crewed by ~ this turn" attacking in the first
    combat phase); Eriette, the Beguiler (control while an Aura stays attached); The Fourteenth Doctor (Doctor cards put
    into your graveyard from your library this turn); Tahngarth, First Mate (given to an attacking opponent until end of
-   combat, attacking for them); Ertai's Meddling (delay counters, then put onto the stack as a copy); Expose the Culprit
+   combat, attacking for them); Ertai's Meddling (delay counters, then put onto the stack as a copy); Expose the Culprit (done in round 391)
    (cloaking a face-down pile of disguise creatures); Lady Loki, Agent of Chaos; The Dragon-Kami Reborn (hatching
    counters); The Face of Boe (casting a suspend card for its suspend cost); Parnesse, the Subtle Brush; Nihiloor (a tap
    for each opponent, then control by power); The Celestial Toymaker (counting what made players group cards into piles);
@@ -4809,7 +4834,7 @@ line blocks.
    exiled card cast free only if it's an instant with mana value 2 or less, else into your hand); Meeting of the Five
    (spells with exactly three colors, and mana only for them); Essence of the Wild (creatures entering as a copy of it,
    ordered with other copy effects, CR 616.1); Ice Cave (done in round B214) (any other player may pay a spell's mana cost to counter it);
-   Journey to the Lost City (done in round B204) (a d20 table over the four exiled cards); Ghastly Conscription (manifesting a shuffled
+   Journey to the Lost City (done in round B204) (a d20 table over the four exiled cards); Ghastly Conscription (done in round 391) (manifesting a shuffled
    face-down pile); Soulflayer (done in round B182) and Rayami, First of the Fallen (keywords of cards exiled by delve or with blood counters,
    as Urborg Scavengers).
    Round 282 took earlier skips from the top: "choose left or right" and "each player may attack only the nearest
@@ -5053,7 +5078,7 @@ line blocks.
    round 266); Clockspinning (choose a counter kind on a permanent or suspended card);
    Radiant Lotus (sacrifice one or more artifacts, another player adds the
    mana).
-   Out after round 234 (looked at, not done): Monument to Perfection (Lane B round B71 has it); Rowan Kenrith (its +2's
+   Out after round 234 (looked at, not done): Monument to Perfection (Lane B round B71 has it); Rowan Kenrith (done in round 391) (its +2's
    "each creature target player controls attacks you during that player's next turn if able" and the emblem copying
    activated abilities); Brutal Hordechief (done in round 378) (you choose how opponents' creatures block); Sudden Substitution (exchange
    control of a spell and a creature); Lobelia, Defender of Bag End (exile the top card of each opponent's library face
@@ -5075,7 +5100,7 @@ line blocks.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
-   10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator (done in round 314), The Foretold Soldier, Radiant Scrollwielder (done in round 314), Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
+   10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator (done in round 314), The Foretold Soldier, Radiant Scrollwielder (done in round 314), Become Anonymous (done in round 391), Night Soil, Overabundance, Avalanche of Sector
    7, Grappling Hook (done in round 278), Otrimi, Zhao, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained (done in round 278), Identity
    Thief, Mishra, Eminent One (done in round 337), Spell Queller (done in round 336), Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon (done in round 358), Grub, Storied Matriarch,
    Taskmaster, Mercenary Mimic, Gideon Blackblade (done in round 296), Kolvori, God of Kinship (done in round 358), Fisher's Talent (done in round 318), Niko, Light of Hope,
@@ -10984,7 +11009,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Phasing: "phases out until ~ leaves the battlefield" (Oubliette, The Moment), "can't phase
   in", "whenever ~ phases in or out", Teferi's Protection; flavor words before an ability ("Teleport —", CR 207.2d).
 - Manifest and cloak: from another player's library ("manifest the top card of that player's library"), from a hand
-  (Scroll of Fate), several cards from a face-down pile (Become Anonymous, Primordial Mist), "manifest dread X times",
+  (Scroll of Fate), several cards from a face-down pile (Become Anonymous (done in round 391), Primordial Mist), "manifest dread X times",
   "whenever you manifest dread", Cloudform's "it becomes an Aura with enchant creature" (done in round B155); Arbiter of the Ideal's
   manifestation counters. Ward granted with a variable or non-mana cost (Minthara's ward {X}, Mishra's "Ward—Sacrifice a
   permanent"), Thran Power Suit's "for each Aura and Equipment", Plate Armor's equip reduction, Leyline Immersion's

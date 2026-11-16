@@ -155,6 +155,7 @@ import {
   ignorableBy,
   payableDelayed,
   plotCost,
+  attacksIfAbleNow,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -935,6 +936,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Oracle en-Vec (round B233): none of ours, so none of them can be made to attack into blockers or be destroyed for
     // not attacking (we can't attack with any creature that turn either).
+    // Expose the Culprit (round 391): cloak again only the disguise creatures that lose nothing by leaving (no counters,
+    // nothing attached), so they can be turned face up once more.
+    if (pend.kind === "pickPermanents" && pend.action === "choose" && pend.what === "face-up creatures you control with disguise")
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => !Object.values(obj(s, id).counters ?? {}).some((n) => n > 0) && !s.battlefield.some((b) => obj(s, b).attachedTo === id)) }];
     const enVec = pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
     if (pend.kind === "pickPermanents" && enVec?.type === "chosenAttackNextTurn") return [{ type: "pickPermanents", player: pid, ids: [] }];
     // A Killer Among Us (round B233): any of the three types (which token we'd pump isn't planned for).
@@ -3591,6 +3596,22 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
       : reanimate
         ? forOwner ? all.filter((t) => t.kind === "object" && obj(s, t.id).owner === pid) : onOurs ? all.filter((t) => t.kind === "object" && (!defOf(s, obj(s, t.id)).subtypes.includes("Aura") || auraHelps(defOf(s, obj(s, t.id))))) : all
         : all.filter((t) => (harm[i] ? !isMine(s, pid, t) : isMine(s, pid, t)) && !isBattleTarget(s, t));
+    // Become Anonymous (round 391): our least worth creature becomes one of three face-down 2/2s (value.ts weighs it).
+    if (allEffects(body.effects).some((e) => e.type === "faceDownPile" && e.what?.ref === "target" && e.what.index === i)) {
+      const ours = all.filter((t) => t.kind === "object" && controllerOf(s, obj(s, t.id)) === pid && !obj(s, t.id).faceDown);
+      if (!ours.length) return null;
+      out.push([...ours].sort((a, b) => worth(s, pid, obj(s, (a as { id: string }).id)) - worth(s, pid, obj(s, (b as { id: string }).id)))[0]!);
+      continue;
+    }
+    // Rowan Kenrith's +2 (round 391): never us; the opponent with the most creatures, which all have to attack during
+    // their next turn and leave them open to the rest of us.
+    if (spec.kind === "player" && allEffects(body.effects).some((e) => e.type === "attackYouNextTurn" && e.anyone && e.who.ref === "target" && e.who.index === i)) {
+      const creatures = (p: PlayerId) => s.battlefield.filter((b) => controllerOf(s, obj(s, b)) === p && objIsType(s, obj(s, b), "Creature")).length;
+      const opps = all.filter((t): t is Extract<TargetChoice, { kind: "player" }> => t.kind === "player" && t.id !== pid);
+      if (!opps.length) return null;
+      out.push([...opps].sort((a, b) => creatures(b.id) - creatures(a.id))[0]!);
+      continue;
+    }
     // Provoke: a creature ours kills without dying (wantsMay then says yes), else anything (and it says no).
     const provoke = allEffects(body.effects).some((e) => e.type === "mustBlockSource" && e.what.ref === "target" && e.what.index === i);
     if (provoke && sourceId && s.objects[sourceId]) {
@@ -7517,7 +7538,7 @@ function attackersForOpponent(s: GameState, pid: PlayerId, ap: PlayerId): Object
   const ok = (ids: ObjectId[]) => !chosenAttackersProblem(s, pid, ids);
   if (ok([])) return [];
   const all = potentialAttackers(s, ap);
-  const must = all.filter((o) => { const c = characteristics(s, o); return c.attacksIfAble || c.goadedBy.length > 0 || c.mustAttack.length > 0; }).map((o) => o.id);
+  const must = all.filter((o) => { const c = characteristics(s, o); return attacksIfAbleNow(s, o) || c.goadedBy.length > 0 || c.mustAttack.length > 0; }).map((o) => o.id);
   if (must.length && ok(must)) return must;
   for (const o of all) if (ok([o.id])) return [o.id];
   const ids = all.map((o) => o.id);
@@ -8929,10 +8950,10 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   // Swing with everything when we outnumber their untapped blockers; otherwise only with creatures that survive a block.
   const allIn = ready.length > theirBlockers.length;
   // Creatures that attack each combat if able have to (CR 508.1d), whatever their power, at whoever they can.
-  const must = potentialAttackers(s, pid).filter((o) => characteristics(s, o).attacksIfAble && !ready.includes(o));
+  const must = potentialAttackers(s, pid).filter((o) => attacksIfAbleNow(s, o) && !ready.includes(o));
   let attacks = [
     ...ready
-      .filter((o) => allIn || characteristics(s, o).attacksIfAble || survivesBlocks(o))
+      .filter((o) => allIn || attacksIfAbleNow(s, o) || survivesBlocks(o))
       .map((o) => ({ attacker: o.id, defender: target })),
     ...must.map((o) => ({ attacker: o.id, defender: attackProblem(s, o, target) ? opps.find((d) => !attackProblem(s, o, d))! : target })),
   ];
@@ -8998,7 +9019,7 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   // "No more than one creature can attack each combat" (Silent Arbiter): the ones that have to attack, then the strongest.
   const cap = combatLimit(s, "attack");
   if (declared.length > cap) {
-    const must = (a: { attacker: string }) => (characteristics(s, obj(s, a.attacker)).attacksIfAble ? 1 : 0);
+    const must = (a: { attacker: string }) => (attacksIfAbleNow(s, obj(s, a.attacker)) ? 1 : 0);
     declared = [...declared].sort((a, b) => must(b) - must(a) || power(s, obj(s, b.attacker)) - power(s, obj(s, a.attacker))).slice(0, cap);
   }
   // Seeker of Slaanesh: with nobody attacking, one creature has to (CR 508.1d): the toughest one that can go alone, at
@@ -9016,7 +9037,7 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
     const room = attackYouLimit(s, d);
     const at = declared.filter((a) => a.defender === d && a.planeswalker === undefined);
     if (at.length <= room) continue;
-    const must = (a: { attacker: string }) => (characteristics(s, obj(s, a.attacker)).attacksIfAble ? 1 : 0);
+    const must = (a: { attacker: string }) => (attacksIfAbleNow(s, obj(s, a.attacker)) ? 1 : 0);
     const extra = [...at].sort((a, b) => must(b) - must(a) || power(s, obj(s, b.attacker)) - power(s, obj(s, a.attacker))).slice(room);
     declared = declared.flatMap((a) => {
       if (!extra.includes(a)) return [a];

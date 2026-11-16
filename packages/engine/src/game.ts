@@ -2968,12 +2968,29 @@ export function mustAttackPlayers(s: GameState, o: GameObject): PlayerId[] {
   const c = characteristics(s, o);
   // Taunt: this turn is its target's next turn, for each creature they control now (CR 508.1d).
   const ctl = controllerOf(s, o);
-  const taunts = (s.attackPlayerNextTurn ?? []).filter((r) => r.turn === s.turn && r.player === ctl && r.attack !== ctl).map((r) => r.attack);
+  const taunts = (s.attackPlayerNextTurn ?? []).filter((r) => r.turn === s.turn && r.player === ctl && r.attack !== ctl && !r.anyone).map((r) => r.attack);
   const must = taunts.length ? [...new Set([...c.mustAttack, ...taunts])] : c.mustAttack;
   if (!c.mustAttackMostLife) return must;
   const opps = opponents(s, ctl);
   const most = Math.max(...opps.map((p) => player(s, p).life));
   return [...new Set([...must, ...opps.filter((p) => player(s, p).life === most)])];
+}
+
+/**
+ * Does creature `o` have to attack each combat if able (CR 508.1d): "attacks each combat if able" and goad as the layers
+ * give them, or, during its controller's turn that Rowan Kenrith's +2 named ("During target player's next turn, each
+ * creature that player controls attacks if able"), every creature that player controls then, whenever it came under
+ * their control (a rule, not a characteristic, so CR 611.2c doesn't fix the group).
+ */
+export function attacksIfAbleNow(s: GameState, o: GameObject): boolean {
+  return characteristics(s, o).attacksIfAble || nextTurnAttackRequirements(s, o) > 0;
+}
+
+/** Rowan Kenrith's +2 requirements on creature `o` this turn, each one a requirement of its own (CR 508.1d). */
+function nextTurnAttackRequirements(s: GameState, o: GameObject): number {
+  if (!s.attackPlayerNextTurn) return 0;
+  const ctl = controllerOf(s, o);
+  return s.attackPlayerNextTurn.filter((r) => r.anyone && r.turn === s.turn && r.player === ctl).length;
 }
 
 /**
@@ -13620,6 +13637,7 @@ function attackRequirementScore(s: GameState, pid: PlayerId, attacks: AttackDecl
     const o = obj(s, a.attacker);
     const c = characteristics(s, o);
     if (c.attacksIfAble && (!c.attacksPlayerIfAble || a.planeswalker === undefined)) n++;
+    n += nextTurnAttackRequirements(s, o);
     n += attackTargetScore(s, o, a.defender, a.planeswalker);
   }
   if (attacks.length && attackWithOneRequired(s, pid) !== undefined) n++;
@@ -13756,10 +13774,10 @@ export function attackDeclarationProblem(s: GameState, pid: PlayerId, attacks: {
   if (attacks.length > limit) return `no more than ${limit === 1 ? "one creature" : `${limit} creatures`} can attack each combat`;
   // Gideon's "attacks ~ if able" is a requirement to attack too, when that planeswalker can be attacked (rulings).
   const walkers = new Map(potentialAttackers(s, pid).map((o) => [o.id, walkersFreeToAttack(s, o)] as const));
-  const mustAttack = (o: GameObject) => (characteristics(s, o).attacksIfAble && opps.some((d) => free(o, d))) || !!walkers.get(o.id)?.length;
+  const mustAttack = (o: GameObject) => (attacksIfAbleNow(s, o) && opps.some((d) => free(o, d))) || !!walkers.get(o.id)?.length;
   const shirking = potentialAttackers(s, pid).find((o) => mustAttack(o) && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0) && !withoutCompany(s, o.id, [...attacks, { attacker: o.id }]));
   const required = potentialAttackers(s, pid).filter(mustAttack);
-  const shirks = (o: GameObject) => (characteristics(s, o).attacksIfAble && opps.some((d) => free(o, d)) ? `${defOf(s, o).name} attacks each combat if able` : `${defOf(s, o).name} must attack ${walkers.get(o.id)!.map((w) => nameOf(s, w)).join(" or ")} if able`);
+  const shirks = (o: GameObject) => (attacksIfAbleNow(s, o) && opps.some((d) => free(o, d)) ? `${defOf(s, o).name} attacks each combat if able` : `${defOf(s, o).name} must attack ${walkers.get(o.id)!.map((w) => nameOf(s, w)).join(" or ")} if able`);
   // Trove of Temptation: its requirement weighed with the others below (attackRequirementImprovement), in place of the
   // checks of one requirement at a time that it could compete with (CR 508.1d).
   const trove = attackYouWithOneRequired(s, pid).size > 0;
@@ -13973,7 +13991,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   const beyNow = attacks.some((a) => abilitiesOf(s, obj(s, a.attacker)).allAttackIfSelfAttacks);
   const hadTo = attacks.filter((a) => {
     const o = obj(s, a.attacker);
-    return tollNow || beyNow || characteristics(s, o).attacksIfAble || mustAttackPlayers(s, o).length > 0 || walkersToAttack(s, o).length > 0 || (abilitiesOf(s, o).attacksIfOneAttacks && attacks.some((x) => x.attacker !== o.id));
+    return tollNow || beyNow || attacksIfAbleNow(s, o) || mustAttackPlayers(s, o).length > 0 || walkersToAttack(s, o).length > 0 || (abilitiesOf(s, o).attacksIfOneAttacks && attacks.some((x) => x.attacker !== o.id));
   });
   if (hadTo.length) s.hadToAttack = { turn: s.turn, combat: s.combatsThisTurn ?? 0, keys: hadTo.map((a) => `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`) };
   else delete s.hadToAttack;

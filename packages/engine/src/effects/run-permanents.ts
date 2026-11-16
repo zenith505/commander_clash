@@ -2218,8 +2218,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     }
     case "attackYouNextTurn": {
       for (const pid of players(s, e.who, ctx)) {
-        (s.attackPlayerNextTurn ??= []).push({ player: pid, attack: ctx.controller, since: s.turn });
-        log(s, `During ${player(s, pid).name}'s next turn, creatures they control attack ${player(s, ctx.controller).name} if able.`);
+        (s.attackPlayerNextTurn ??= []).push({ player: pid, attack: ctx.controller, since: s.turn, ...(e.anyone ? { anyone: true as const } : {}) });
+        log(s, `During ${player(s, pid).name}'s next turn, ${e.anyone ? "each creature they control attacks if able" : `creatures they control attack ${player(s, ctx.controller).name} if able`}.`);
       }
       return;
     }

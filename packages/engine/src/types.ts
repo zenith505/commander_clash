@@ -2234,7 +2234,7 @@ export interface GameState {
    * Taunt: during `player`'s next turn after turn `since`, the creatures they control attack `attack` if able (CR 508.1d).
    * `turn` is that turn, set as it begins (game.ts mustAttackPlayers).
    */
-  attackPlayerNextTurn?: { player: PlayerId; attack: PlayerId; since: number; turn?: number }[];
+  attackPlayerNextTurn?: { player: PlayerId; attack: PlayerId; since: number; turn?: number; /** Rowan Kenrith (round 391): "attacks if able", attacking anything it can, not `attack` (game.ts attacksIfAbleNow). */ anyone?: true }[];
   /** "Creatures can't be blocked this turn": matching creatures can't be blocked, also ones that arrive later. */
   cantBeBlockedThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
   /** Each spell cast (and ability activated) this turn as it was put on the stack, by stack id: what a copy of it copies if it has left the stack (CR 707.10). */

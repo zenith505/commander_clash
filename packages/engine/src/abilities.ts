@@ -4698,6 +4698,12 @@ export type Effect =
    * (CR 607.2a) that the search just exiled are put in a random order, and nobody may look at them (CR 406.3).
    */
   | { type: "shuffleExiledPile" }
+  /**
+   * Memory Vessel (round 386): "Until your next turn, ... they can't play cards from their hand": every player still in the
+   * game, its controller too (GameState.handPlayBansUntil, game.ts handPlayBanned), over as its controller's next turn
+   * begins (CR 611.2b, 800.4m).
+   */
+  | { type: "noHandPlaysUntilYourNextTurn" }
   /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
   | { type: "orderTop"; who: PlayerRef; n: Amount; /** "Then put the rest on top ... in any order" (Psychic Surgery): only the cards a dig before it left there, at most `n` (one left has no order to choose). */ digRest?: true; /** Fateseal (CR 701.29a): with `who` the chosen player and `mayBottom`, the opponent is chosen first, as it resolves. */ fateseal?: true; /** "You may put that card on the bottom of that player's library" (Jace, the Mind Sculptor): as a scry of their library. */ mayBottom?: true; /** "Look at the top five cards of target player's library" (Visions): only looked at, never reordered. */ lookOnly?: true; /** "That player looks at the top three cards of your library, then puts them back in any order" (Tahngarth's Glare): who orders them, if not the controller. */ by?: PlayerRef }
   /**
@@ -7808,7 +7814,7 @@ export type AdditionalCost =
    */
   | { kind: "forage" }
   /** `other`: "sacrifice another creature", not the ability's source. */
-  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; /** With `other`: the source itself may be sacrificed if it's one of these ("another creature or an artifact"). */ selfIf?: TargetSpec; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up"; /** "Exile a creature you control" (The Soul Stone): chosen the same way, but exiled, not sacrificed (CR 701.21a doesn't apply). */ exile?: true; /** "You may sacrifice one or more creatures" (Plumb the Forbidden): X may be 0, and is how many. */ optional?: true; /** With `x`: "Sacrifice up to three permanents" (Baba Lysaga, Night Witch): X is at most this. */ upTo?: number; /** "Sacrifice a creature you control with mana value X other than ~" (Sidisi, Regent of the Mire): X announced as it's activated (CR 107.3a, 602.2b), then one with that mana value. */ mvX?: true; /** "Sacrifice a Swamp and a Forest" (Jarad): `n` permanents, each matching a different one of these (a land that's both is either, not both; rulings). */ oneOfEach?: TargetSpec[]; /** "Sacrifice three artifact tokens with different names" (Transmutation Font): no two with the same name. */ differentNames?: true }
+  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; /** With `other`: the source itself may be sacrificed if it's one of these ("another creature or an artifact"). */ selfIf?: TargetSpec; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up"; /** "Exile a creature you control" (The Soul Stone): chosen the same way, but exiled, not sacrificed (CR 701.21a doesn't apply). */ exile?: true; /** "You may sacrifice one or more creatures" (Plumb the Forbidden): X may be 0, and is how many. */ optional?: true; /** With `x`: "Sacrifice up to three permanents" (Baba Lysaga, Night Witch): X is at most this. */ upTo?: number; /** "Sacrifice a creature you control with mana value X other than ~" (Sidisi, Regent of the Mire): X announced as it's activated (CR 107.3a, 602.2b), then one with that mana value. */ mvX?: true; /** "Sacrifice a Swamp and a Forest" (Jarad): `n` permanents, each matching a different one of these (a land that's both is either, not both; rulings). */ oneOfEach?: TargetSpec[]; /** "Sacrifice three artifact tokens with different names" (Transmutation Font): no two with the same name. */ differentNames?: true; /** Fabrication Foundry (round 386): "Exile one or more other artifacts you control with total mana value X": X announced as it's activated (CR 107.3a, 602.2b), then any number of them, at least one, whose mana values add up to X (`n` unused); `totalMv` is that X once announced (game.ts activatedCosts). */ totalMvX?: true; totalMv?: number }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
   | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec; /** "Discard a card with mana value X" (Kozilek, the Great Distortion): X is announced as it's activated (CR 107.3a), and `filter` gets that mana value. */ mvX?: true; /** "Discard two nonland cards with the same name" (Sphinx of the Chimes): all of the `n` cards share a name (CR 201.2). */ sameName?: true; /** "Discard three cards with different names" (Ormos, Archive Keeper): no two with the same name. */ differentNames?: true; /** "Discard the last card you drew this turn" (Jandor's Ring): that card only, while it's still in your hand (rulings); nothing to choose. */ lastDrawn?: true }
   | { kind: "payLife"; n: number; x?: true; /** Phyrexian Purge: "costs 3 life more to cast for each target": `n` for each target chosen (CR 601.2c, 601.2f). */ perTarget?: true }
@@ -8873,6 +8879,13 @@ export interface CompiledCard {
   drawStepMaySkip?: { attackOnlyBy: string[] };
   /** Pursuit of Knowledge: "If you would draw a card, you may put a study counter on ~ instead." (CR 614.1a): the kind of counter, each draw their choice. */
   drawMayCounter?: CounterKind;
+  /**
+   * Parallel Thoughts (round 386): "If you would draw a card, you may instead put the top card of the pile you exiled into
+   * your hand." (CR 614.1a): each of its controller's draws, their choice; the pile its own enters ability exiled
+   * (shuffleExiledPile, linked to it as it is, CR 607.2a). With the pile empty it may still replace the draw, and nothing
+   * happens (rulings: it skips the draw).
+   */
+  drawFromPile?: true;
   /**
    * Archmage Ascension: "As long as ~ has six or more quest counters on it, if you would draw a card, you may instead search
    * your library for a card, put that card into your hand, then shuffle" (CR 614.1a): while this holds, each draw.

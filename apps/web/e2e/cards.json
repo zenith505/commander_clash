@@ -7806,6 +7806,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0b67c4e2-f88b-4e01-85a1-9d5f5b8db13b",
+  "name": "Commander's Sphere",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add one mana of any color in your commander's color identity.\nSacrifice this artifact: Draw a card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f947808c-a1cc-41ea-9d06-e1279a0da527",
   "name": "Compulsive Research",
   "manaCost": "{2}{U}",
@@ -13567,6 +13596,35 @@
   "set": "acr",
   "releasedAt": "2024-07-05",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0bb20c36-689f-4a7c-80b5-a12bda821847",
+  "name": "Fabrication Foundry",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {W}. Spend this mana only to cast an artifact spell or activate an ability of an artifact source.\n{2}{W}, {T}, Exile one or more other artifacts you control with total mana value X: Return target artifact card with mana value X or less from your graveyard to the battlefield. Activate only as a sorcery.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "lci",
+  "releasedAt": "2023-11-17",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -25285,6 +25343,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0179bc62-823e-46b9-b536-342904fedafc",
+  "name": "Memory Vessel",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}, Exile this artifact: Each player exiles the top seven cards of their library. Until your next turn, players may play cards they exiled this way, and they can't play cards from their hand. Activate only as a sorcery.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "big",
+  "releasedAt": "2024-04-19",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "75e9ac31-5993-4039-93b2-9380ced2499a",
   "name": "Memory's Journey",
   "manaCost": "{1}{U}",
@@ -29450,6 +29534,32 @@
   "commanderLegal": "legal",
   "set": "mkc",
   "releasedAt": "2024-02-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2daee7cb-6736-4aa6-9921-0371c1abe69f",
+  "name": "Parallel Thoughts",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, search your library for seven cards, exile them in a face-down pile, and shuffle that pile. Then shuffle your library.\nIf you would draw a card, you may instead put the top card of the pile you exiled into your hand.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "scg",
+  "releasedAt": "2003-05-26",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

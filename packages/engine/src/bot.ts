@@ -167,6 +167,7 @@ import { CHOSEN_HEXPROOF, CREATURE_TYPES, CHOSEN_PARITY_PROTECTION, CHOSEN_PROTE
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
 import { damageEstimate, objectSource, protectionHolder } from "./damage";
 import { blightOptions, removableCounters } from "./counters";
+import { pileCards } from "./effects/run-round386";
 
 /**
  * A simple heuristic opponent. Returns the sequence of actions it wants to take next
@@ -281,10 +282,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const grounded = (only: string[]) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) !== pid && objIsType(s, obj(s, id), "Creature") && !only.some((k) => objHasKeyword(s, obj(s, id), k))).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
       const shelter = sanctuary && !player(s, pid).attackOnlyByUntil && grounded(abilitiesOf(s, s.objects[sanctuary.slice("mayskip:".length)]!).drawStepMaySkip!.attackOnlyBy) * 2 >= player(s, pid).life ? sanctuary : undefined;
       const skip = shelter ?? (player(s, pid).library.length <= 5 ? has("mayskip") : undefined);
-      const declinable = (k: string) => k === "thief" || /^(?:dredge|mayskip|counter):/.test(k);
+      const declinable = (k: string) => k === "thief" || /^(?:dredge|mayskip|counter|pthoughts):/.test(k);
+      // Parallel Thoughts (round 386): the pile's card while it has one (the cards searched for), its empty pile only to
+      // skip a draw from an empty library.
+      const pileOpts = pend.options.filter((k) => k.startsWith("pthoughts:"));
+      const pile = pileOpts.find((k) => pileCards(s, k.slice("pthoughts:".length)).length > 0) ?? (!player(s, pid).library.length ? pileOpts[0] : undefined);
       // Forbidden Crypt with an empty graveyard loses the game: anything else first.
       const loses = (k: string) => k.startsWith("crypt:") && !player(s, pid).graveyard.length;
-      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("archive") ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? pend.options.find((k) => !declinable(k) && !loses(k)) ?? pend.options.find((k) => !loses(k)) ?? pend.options[0]!;
+      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("archive") ?? pile ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? pend.options.find((k) => !declinable(k) && !loses(k)) ?? pend.options.find((k) => !loses(k)) ?? pend.options[0]!;
       return [{ type: "drawInstead", player: pid, choice: pick }];
     }
     if (pend.kind === "dredge") {
@@ -2361,7 +2366,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // isn't tapped by attacking first).
       // Garth One-Eye (round 377): its copy before combat, rather than attacking with it.
       // Brutal Hordechief (round 378): the opponents' blocks before we attack.
-      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => (e.type === "graveyardTurn" && !!e.costs) || e.type === "copyNamedCard" || e.type === "chooseBlocks")) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
+      // Memory Vessel (round 386): first, so the exiled cards can be played this turn (see chooseActivation).
+      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => (e.type === "graveyardTurn" && !!e.costs) || e.type === "copyNamedCard" || e.type === "chooseBlocks" || e.type === "noHandPlaysUntilYourNextTurn")) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
       if (crew) return crew;
     }
     // Use activated abilities once we're done casting spells, then cycle what we can't use.
@@ -6688,7 +6694,11 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const craft = ab.keyword === "Craft" && s.activePlayer === pid && (s.step === "main1" || s.step === "main2") && !s.stack.length;
       // Stalking Leonin (round 377): its cost is revealing the chosen player, once ever (weighed below).
       const leonin = !!ab.revealChosen && ab.body.effects.some((e) => e.type === "if" && e.cond.kind === "targetControlledByChosen");
-      if ((ab.exileSelf && !titan && !craft) || (freeCost && !necro && !flipNow && !leonin) || ab.station) continue;
+      // Memory Vessel (round 386): seven fresh cards for every player, and nobody plays from their hand until our next turn:
+      // only with at most one card in our own hand (little to lose); its sorcery timing is our main phase anyway.
+      const vessel = ab.body.effects.some((e) => e.type === "noHandPlaysUntilYourNextTurn");
+      if (vessel && player(s, pid).hand.length > 1) continue;
+      if ((ab.exileSelf && !titan && !craft && !vessel) || (freeCost && !necro && !flipNow && !leonin) || ab.station) continue;
       // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
       if (halfLifeCost(s, pid, ab) > 3) continue;
       if (lifeSwapHurts(s, pid, ab.body.effects)) continue;
@@ -6728,6 +6738,12 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // graveyard with one more mana value.
       if (ab.costs?.some((c) => c.kind === "sacrifice" && c.mvX)) {
         const plan = sacrificeMvXPlan(s, pid, o, i, ab);
+        if (plan) return plan;
+        continue;
+      }
+      // Fabrication Foundry (round 386): the artifact card back for artifacts worth less (totalMvXPlan).
+      if (ab.costs?.some((c) => c.kind === "sacrifice" && c.totalMvX)) {
+        const plan = totalMvXPlan(s, pid, o, i, ab);
         if (plan) return plan;
         continue;
       }
@@ -6877,7 +6893,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const body = withModes(ab.body, modes);
       // Clay Golem: "the result" of the die its cost rolls, weighed at the middle of the die (rounded down).
       const valued = ab.rollCost ? (JSON.parse(JSON.stringify(body).replaceAll('{"count":{"kind":"rollResult"}}', String(Math.floor((ab.rollCost + 1) / 2)))) as typeof body) : body;
-      if (!craft && (groupValue(s, pid, valued, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
+      if (!craft && !vessel && (groupValue(s, pid, valued, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
       // An X ability: the biggest X we can pay for (never 0).
       const cost = parseManaCost(ab.manaCost);
       // Prototype Portal: X set by the ability (CR 107.3c).
@@ -7770,6 +7786,46 @@ function sacrificeMvXPlan(s: GameState, pid: PlayerId, o: GameObject, i: number,
       if (size(card) <= power(s, c) + toughness(s, c)) continue;
       if (abilityProblem(s, pid, o.id, i, t, undefined, undefined, x, { sacrifice: [c.id] })) continue;
       const plan = planActivate(s, pid, o.id, i, t, undefined, undefined, x, { sacrifice: [c.id] });
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
+ * Fabrication Foundry (round 386): "Exile one or more other artifacts you control with total mana value X: Return target
+ * artifact card with mana value X or less from your graveyard to the battlefield." The most expensive artifact card in our
+ * graveyard (not a land, mana value 2 or more), for the smallest X at least its mana value that some of our other artifacts add up to: tokens
+ * and the least valuable first, never our commander, each of them cheaper than the card coming back, three at most.
+ */
+function totalMvXPlan(s: GameState, pid: PlayerId, o: GameObject, i: number, ab: ActivatedAbility): Action[] | null {
+  if (ab.body.modal || ab.body.targets.length !== 1 || parseManaCost(ab.manaCost).hasX) return null;
+  const cards = player(s, pid).graveyard.filter((c) => isType(defOf(s, obj(s, c)), "Artifact") && !isType(defOf(s, obj(s, c)), "Land")).sort((a, b) => mv(s, b) - mv(s, a));
+  const mine = s.battlefield.map((x) => obj(s, x)).filter((c) => c.id !== o.id && controllerOf(s, c) === pid && !c.isCommander && objIsType(s, c, "Artifact")).sort((a, b) => worth(s, pid, a) - worth(s, pid, b)).slice(0, 8);
+  const mvOf = (c: GameObject) => characteristics(s, c).manaValue;
+  for (const card of cards) {
+    const want = mv(s, card);
+    if (want < 2) break;
+    const pool = mine.filter((c) => mvOf(c) < Math.max(1, want));
+    // Every pick of one to three of them, the smallest total first, then the least valuable.
+    const picks: GameObject[][] = [];
+    for (let a = 0; a < pool.length; a++) {
+      picks.push([pool[a]!]);
+      for (let b = a + 1; b < pool.length; b++) {
+        picks.push([pool[a]!, pool[b]!]);
+        for (let c = b + 1; c < pool.length; c++) picks.push([pool[a]!, pool[b]!, pool[c]!]);
+      }
+    }
+    const total = (p: GameObject[]) => p.reduce((n, c) => n + mvOf(c), 0);
+    const cost = (p: GameObject[]) => p.reduce((n, c) => n + worth(s, pid, c), 0);
+    const fits = picks.filter((p) => total(p) >= want).sort((a, b) => total(a) - total(b) || cost(a) - cost(b));
+    for (const p of fits) {
+      const x = total(p);
+      const t: TargetChoice[] = [{ kind: "object", id: card }];
+      const sacrifice = p.map((c) => c.id);
+      const problem = abilityProblem(s, pid, o.id, i, t, undefined, undefined, x, { sacrifice });
+      if (problem && !/not enough mana/.test(problem)) continue;
+      const plan = planActivate(s, pid, o.id, i, t, undefined, undefined, x, { sacrifice });
       if (plan) return plan;
     }
   }

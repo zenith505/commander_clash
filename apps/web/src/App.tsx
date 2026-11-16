@@ -515,6 +515,8 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; fac
   craftSlots?: Extract<AdditionalCost, { kind: "craft" }>;
   /** Nethergoyf's escape: the cards picked have at least this many card types among them (cardTypesAmong). */
   cardTypes?: number;
+  /** Fabrication Foundry (round 386): one or more permanents whose mana values add up to this (`n` is how many there are to pick from). */
+  totalMv?: number;
   what: string;
   n: number;
   candidates: string[];
@@ -833,6 +835,14 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       // of the spell on top of the stack when that one does.
       // "Sacrifice a creature you control with mana value X other than ~" (Sidisi, Regent of the Mire): likewise.
       const mvX = ab.costs?.find((c) => (c.kind === "discard" || c.kind === "sacrifice") && c.mvX);
+      // Fabrication Foundry (round 386): "Exile one or more other artifacts you control with total mana value X": only the X
+      // some of them add up to (and a target fits), the greatest first.
+      const totalMv = ab.costs?.find((c) => c.kind === "sacrifice" && c.totalMvX);
+      if (totalMv) {
+        const fits = (n: number) => !!planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n);
+        const max = Array.from({ length: 21 }, (_, n) => 20 - n).find(fits) ?? 0;
+        return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: max, modes, extra: "exile one or more other artifacts you control with total mana value X" });
+      }
       if (mvX) {
         const fits = (n: number) => !!planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n);
         const max = Array.from({ length: 21 }, (_, n) => 20 - n).find(fits) ?? 0;
@@ -967,6 +977,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           ? s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === HUMAN && !(c.other && id === d.objectId && !(c.selfIf && objectMatches(s, c.selfIf, s.objects[id]!, HUMAN, false))) && objectMatches(s, c.filter, s.objects[id]!, HUMAN, false))
           : s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
       const what = c.kind === "sacrifice" ? c.filter.text.replace(/~/g, cardOf(s, d.objectId).name) : (c.filter?.text ?? "card");
+      // Fabrication Foundry (round 386): "Exile one or more other artifacts you control with total mana value X", X announced.
+      if (c.kind === "sacrifice" && c.totalMvX) return setCostPick({ activate: d, kind: "sacrifice", label: cardOf(s, d.objectId).name, what: `exile one or more ${what}`, n: candidates.length, candidates, chosen: [], exile: true, totalMv: c.totalMv ?? 0 });
       // "Sacrifice a creature with mana value 2 other than Sidisi": its text already says which.
       // Bloodfire Infusion: "Sacrifice enchanted creature": that one permanent.
       const article = c.kind === "sacrifice" && c.filter.objectId !== undefined ? "the" : c.kind === "sacrifice" && c.other && !/ other than /.test(c.filter.text) ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
@@ -2164,6 +2176,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
             <CostPickBar
               pick={costPick}
               valid={!costPick.share || costChoiceShares(s, costPick.share, costPick.chosen)}
+              costPickMv={(id) => characteristics(s, s.objects[id]!).manaValue}
               onDone={() => finishCostPick(costPick)}
               onSkip={costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "conspire" || (costPick.kind === "offering" && !costPick.required) ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
               onCancel={() => setCostPick(null)}
@@ -2760,13 +2773,14 @@ function KickPickBar({
 }
 
 /** Sacrificing as an additional cost (CR 601.2h): click the permanents to sacrifice. */
-function CostPickBar({ pick, valid = true, onDone, onSkip, onCancel }: { pick: CostPick; valid?: boolean; onDone: () => void; onSkip?: () => void; onCancel: () => void }) {
+function CostPickBar({ pick, valid = true, costPickMv = () => 0, onDone, onSkip, onCancel }: { pick: CostPick; valid?: boolean; /** A permanent's mana value as it is now (Fabrication Foundry's total). */ costPickMv?: (id: string) => number; onDone: () => void; onSkip?: () => void; onCancel: () => void }) {
   return (
     <div className="targeting">
       <span>
         <strong>{pick.label}</strong>: {pick.what} (click {pick.n === 1 ? "it" : "them"})
       </span>
-      <button disabled={pick.chosen.length !== pick.n || !valid} onClick={onDone}>
+      {pick.totalMv !== undefined && <span> total mana value {pick.chosen.reduce((n, id) => n + costPickMv(id), 0)} of {pick.totalMv}</span>}
+      <button disabled={(pick.totalMv !== undefined ? !pick.chosen.length || pick.chosen.reduce((n, id) => n + costPickMv(id), 0) !== pick.totalMv : pick.chosen.length !== pick.n) || !valid} onClick={onDone}>
         {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "counterOn" ? `${pick.what.startsWith("blight") ? "Blight" : "Put the counter"} and ${pick.draft ? "cast" : "activate"}` : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : pick.ignore ? "Sacrifice" : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
       </button>
       {onSkip && <button onClick={onSkip}>Cast without</button>}

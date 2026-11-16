@@ -25,6 +25,7 @@ import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
 import { watchExileLookers } from "./effects/run-laneb189";
 import { chooseWasteDiscard, chooseWasteToTop, wasteInstead } from "./effects/run-round383";
 import { chooseLampKeep, chooseWindPick, lampInstead, pileInstead, windInstead } from "./effects/run-round385";
+import { pileDrawLabel } from "./effects/run-round386";
 import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, enchantableBy, everyCreatureType, ignoredBy, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
@@ -3476,7 +3477,9 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   // Forbidden Crypt: one of each name, mandatory (two of them do the same thing; the first replaces the draw, CR 614.5).
   const crypts: ObjectId[] = [];
   for (const id of mine((a) => a.drawReturnsFromGraveyard)) if (!crypts.some((d) => nameOf(s, d) === nameOf(s, id))) crypts.push(id);
-  if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length) return undefined;
+  // Parallel Thoughts (round 386): optional, each with its own pile (two of them are two different replacements).
+  const piles = mine((a) => a.drawFromPile);
+  if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length) return undefined;
   const out = [...shields];
   for (const id of crypts) out.push({ key: `crypt:${id}`, label: `Return a card from your graveyard to your hand instead; with none, you lose the game (${nameOf(s, id)})` });
   for (const id of sages) out.push({ key: `sages:${id}`, label: `Reveal the top ${abilitiesOf(s, obj(s, id)).drawRevealCreatures} cards instead, the creature cards into your hand, the rest on the bottom of your library (${nameOf(s, id)})` });
@@ -3503,11 +3506,12 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
     const only = abilitiesOf(s, obj(s, id)).drawStepMaySkip?.attackOnlyBy;
     out.push({ key: `${kind ? "counter" : "mayskip"}:${id}`, label: kind ? `Put a ${kind} counter on ${nameOf(s, id)} instead` : only ? `Skip this draw; until your next turn you can't be attacked except by creatures with ${only.map((k) => k.toLowerCase()).join(" and/or ")} (${nameOf(s, id)})` : `Skip this draw (${nameOf(s, id)})` });
   }
+  for (const id of piles) out.push({ key: `pthoughts:${id}`, label: pileDrawLabel(s, id) });
   // A Notion Thief with nothing else to choose from goes on as before.
-  if (!shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && digs.length < 2 && out.length < 2) return undefined;
+  if (!shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && digs.length < 2 && out.length < 2) return undefined;
   // Only replacements its player may decline (dredge, Abundance, Archmage Ascension, Obstinate Familiar, Pursuit of
-  // Knowledge): or none of them, the draw itself.
-  if (out.every((x) => /^(?:dredge|abundance|tutor|mayskip|counter):/.test(x.key))) out.push({ key: "draw", label: "Draw the card" });
+  // Knowledge, Parallel Thoughts): or none of them, the draw itself.
+  if (out.every((x) => /^(?:dredge|abundance|tutor|mayskip|counter|pthoughts):/.test(x.key))) out.push({ key: "draw", label: "Draw the card" });
   return out;
 }
 
@@ -3607,6 +3611,11 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
     return;
   }
   if (key.startsWith("tutor:")) return tutorInstead(s, pid, key.slice("tutor:".length), left, after, made);
+  // Parallel Thoughts (round 386): the top card of the pile its enters ability exiled (effects/run-round385.ts pileInstead).
+  if (key.startsWith("pthoughts:")) {
+    const src = key.slice("pthoughts:".length);
+    return pileInstead(s, pid, nameOf(s, src), src, obj(s, src).zoneChanges ?? 0);
+  }
   if (key.startsWith("crypt:")) return cryptInstead(s, pid, nameOf(s, key.slice("crypt:".length)), left, after, made);
   if (key === "draw") {
     // None of the optional replacements: the card is drawn (an empty library's own replacements still apply).
@@ -4227,6 +4236,16 @@ function startNextTurn(s: GameState, skipping = false) {
     }
   if (s.namedBansUntil) s.namedBansUntil = s.namedBansUntil.filter((r) => !began.has(r.controller));
   if (!s.namedBansUntil?.length) s.namedBansUntil = undefined;
+  // Memory Vessel (round 386): the hand bans, and "until your next turn, you may play" permissions (Three Wishes, Nivix;
+  // Memory Vessel's for each player, ending with its controller's turn, `untilOf`), end as that turn begins (CR 611.2b,
+  // 800.4m), so they don't come back once it's over.
+  if (s.handPlayBansUntil) s.handPlayBansUntil = s.handPlayBansUntil.filter((r) => !began.has(r.controller));
+  if (!s.handPlayBansUntil?.length) s.handPlayBansUntil = undefined;
+  for (const q of s.players)
+    for (const id of q.exile) {
+      const m = obj(s, id).mayPlay;
+      if (m?.until === "yourNextTurn" && m.turn < s.turn && began.has(m.untilOf ?? m.player)) obj(s, id).mayPlay = undefined;
+    }
   if (s.flashUntil) s.flashUntil = s.flashUntil.filter((r) => !began.has(r.controller) && r.turn === undefined);
   if (!s.flashUntil?.length) s.flashUntil = undefined;
   if (s.graveGrants) s.graveGrants = s.graveGrants.filter((g) => g.turn === s.turn).length ? s.graveGrants.filter((g) => g.turn === s.turn) : undefined;
@@ -5350,7 +5369,7 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   if (o.zone !== "exile" || o.mayPlay?.player !== pid || o.mayPlay.zc !== (o.zoneChanges ?? 0)) return false;
   const m = o.mayPlay;
   // "Until your next turn" (Three Wishes): over once that turn begins.
-  if (m.until === "yourNextTurn" && s.activePlayer === pid && s.turn > m.turn) return false;
+  if (m.until === "yourNextTurn" && s.activePlayer === (m.untilOf ?? pid) && s.turn > m.turn) return false;
   // "For as long as Intet remains on the battlefield": that object (CR 400.7).
   if (m.until === "source" && !(m.source && s.objects[m.source.id]?.zone === "battlefield" && (s.objects[m.source.id]!.zoneChanges ?? 0) === m.source.zc)) return false;
   // Uba Mask: "this turn", and only while it's still that Mask (CR 400.7).
@@ -5658,7 +5677,9 @@ export function handRevealed(s: GameState, pid: PlayerId, viewer: PlayerId): boo
 /** Experimental Frenzy: the name of a permanent `pid` controls that says "You can't play lands or cast spells from your hand", or undefined. */
 export function handPlayBanned(s: GameState, pid: PlayerId): string | undefined {
   const id = s.battlefield.find((b) => abilitiesOf(s, obj(s, b)).youCantPlayFromHand && controllerOf(s, obj(s, b)) === pid);
-  return id ? characteristics(s, obj(s, id)).name : undefined;
+  if (id) return characteristics(s, obj(s, id)).name;
+  // Memory Vessel (round 386): every player, until its controller's next turn.
+  return s.handPlayBansUntil?.[0]?.source;
 }
 
 /** How many permanents of this card type the player controls (Ward of Bones). */
@@ -8790,6 +8811,8 @@ export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?
     const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, src?.chosen) } : c0;
     const c2 = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, src?.id, src?.attachedTo) } : c1;
     const c = s && pid !== undefined ? bindLegendaryNames(s, pid, c2) : c2;
+    // Fabrication Foundry (round 386): the total the exiled artifacts' mana values add up to.
+    if (c.kind === "sacrifice" && c.totalMvX) return { ...c, totalMv: x ?? 0, filter: { ...c.filter, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } };
     return xCost(c) ? { ...c, n: x ?? 0 } : (c.kind === "discard" || c.kind === "sacrifice" || c.kind === "exileFromGraveyard") && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c;
   });
 }
@@ -8807,7 +8830,7 @@ export function bindLegendaryNames(s: GameState, pid: PlayerId, c: AdditionalCos
 }
 
 /** "Discard a card with mana value X" (Kozilek, the Great Distortion): X announced, then a card with that mana value. */
-const mvXCost = (c: AdditionalCost) => (c.kind === "discard" || c.kind === "sacrifice" || c.kind === "exileFromGraveyard") && !!c.mvX && !!c.filter;
+const mvXCost = (c: AdditionalCost) => ((c.kind === "discard" || c.kind === "sacrifice" || c.kind === "exileFromGraveyard") && !!c.mvX && !!c.filter) || (c.kind === "sacrifice" && !!c.totalMvX);
 
 /** Does the ability have an X to announce in a cost beyond mana, as Chatterfang's "Sacrifice X Squirrels"? */
 export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.energyX || !!ab.removeCounters?.x || !!ab.costs?.some((c) => xCost(c) || mvXCost(c));
@@ -9035,7 +9058,9 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           ? processCandidates(s, pid)
           : p.graveyard.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))); // "other cards" for escape
     const what =
-      c.kind === "sacrifice"
+      c.kind === "sacrifice" && c.totalMvX
+        ? `one or more ${c.filter.text}`
+        : c.kind === "sacrifice"
         ? `${c.n === 1 ? (c.other ? "another" : "a") : c.n} ${c.filter.text}`
         : c.kind === "tap"
         ? `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`
@@ -9082,6 +9107,17 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     const share = (c.kind === "tap" && c.shareCreatureType) || (c.kind === "reveal" && c.shareColor) ? c : undefined;
     const full0 = oneOf ? `${/^[aeiou]/i.test(oneOf.text) ? "an" : "a"} ${oneOf.text} and ${c.n === 2 ? "another card" : `${c.n - 1} other cards`}` : alike ? `${c.n} ${c.filter?.text ?? "card"}s with the same name` : what;
     const full = share ? (c.kind === "tap" ? `${c.n} ${c.filter.text.replace(/^(.*?[a-z])( you control)?$/, "$1s$2")} that share a creature type` : `${c.n} cards from your hand that share a color`) : full0;
+    // Fabrication Foundry (round 386): one or more of them whose mana values add up to the X announced.
+    if (c.kind === "sacrifice" && c.totalMvX) {
+      const total = c.totalMv ?? 0;
+      const mvOf = (id: ObjectId) => characteristics(s, obj(s, id)).manaValue;
+      if (!chosen) {
+        if (!totalMvPick(pool.map(mvOf), total)) return `you need to exile ${full} to ${doing}`;
+        continue;
+      }
+      if (!chosen.length || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || chosen.reduce((n, id) => n + mvOf(id), 0) !== total) return `choose ${full} to exile`;
+      continue;
+    }
     // "You may exile any number of blue cards from your hand": none is fine.
     if (c.kind === "exileFromHand" && c.anyNumber) {
       if (chosen && (new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)))) return `choose ${c.filter?.text ?? "card"}s in your hand to exile`;
@@ -9103,6 +9139,20 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if ((c.kind === "sacrifice" || c.kind === "discard") && c.differentNames && !namesDiffer(s, chosen)) return `choose ${full}${c.kind === "discard" ? " with different names" : ""} to ${verb}`;
   }
   return null;
+}
+
+/** Can some of these mana values, at least one, add up to exactly `total`? (Fabrication Foundry, round 386.) */
+export function totalMvPick(mvs: number[], total: number): boolean {
+  if (!mvs.length || total < 0) return false;
+  // Sums reachable with at least one value picked.
+  let some = new Set<number>();
+  for (const v of mvs) {
+    const next = new Set(some);
+    next.add(v);
+    for (const t of some) if (t + v <= total) next.add(t + v);
+    some = next;
+  }
+  return some.has(total);
 }
 
 /**
@@ -9854,7 +9904,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   // "Discard a card with mana value X: Counter target spell with mana value X" (Kozilek): before X is announced, the
   // ability can be activated if some X works for both the cost and the target (CR 107.3a, 602.2b).
   // Sidisi, Regent of the Mire: "Sacrifice a creature you control with mana value X" the same way.
-  if (x === undefined && ab.costs?.some((c) => (c.kind === "discard" || c.kind === "sacrifice" || c.kind === "exileFromGraveyard") && c.mvX)) {
+  if (x === undefined && ab.costs?.some((c) => ((c.kind === "discard" || c.kind === "sacrifice" || c.kind === "exileFromGraveyard") && c.mvX) || (c.kind === "sacrifice" && c.totalMvX))) {
     // Osgir, the Reconstructor: an X the card fits but the mana doesn't is "not enough mana" (autopay decides).
     let short: string | null = null;
     for (let n = 0; n <= 20; n++) {

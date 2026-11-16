@@ -523,7 +523,7 @@ export interface GameObject {
     source?: { id: ObjectId; zc: number };
     /** "Without paying its mana cost" (CR 118.9). */
     free?: true;
-    /** With until "yourNextEndStep": whose end step ends it, if not `player`'s (Rocco, Street Chef: "Until your next end step, each player may play the card they exiled this way"). */
+    /** With until "yourNextEndStep": whose end step ends it, if not `player`'s (Rocco, Street Chef: "Until your next end step, each player may play the card they exiled this way"); with "yourNextTurn", whose turn (Memory Vessel, round 386). */
     untilOf?: PlayerId;
     /** With until "thisTurn": only while `source` is still on the battlefield as that object too (Uba Mask's "cards they exiled with ~ this turn"). */
     whileSource?: true;
@@ -2388,6 +2388,8 @@ export interface GameState {
    */
   attacksChosenThisTurn?: { player: PlayerId; turn: number; timestamp: number }[];
   namedBansUntil?: { name: string; players?: PlayerId[]; lands?: true; controller: PlayerId; source: string }[];
+  /** Memory Vessel (round 386): "until your next turn, ... they can't play cards from their hand": every player, until `controller`'s next turn begins. */
+  handPlayBansUntil?: { controller: PlayerId; source: string }[];
   /** "Until your next turn, you may cast sorcery spells as though they had flash" (Teferi, Time Raveler): `controller` may. */
   flashUntil?: { controller: PlayerId; filter: TargetSpec; /** Only during this turn (Winding Canyons). */ turn?: number }[];
   /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): `controller`'s opponents. */

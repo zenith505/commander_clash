@@ -610,7 +610,7 @@ export type Count =
   | { kind: "artifactsToGraveyardThisTurn" }
   /** "If an enchantment was put into your graveyard from the battlefield this turn" (Kami of Transience): 1 if one was, as it last existed there (a token too, CR 111.7), else 0. */
   | { kind: "typeToYourGraveyardThisTurn"; type: string; /** "A land you controlled was put into a graveyard from the battlefield this turn" (The Lady of Otaria): any graveyard, controlled by you as it left. */ controlled?: true }
-  | { kind: "diedThisTurn"; yours?: true; /** "If a creature died under an opponent's control this turn" (Sidequest: Hunt the Mark). */ opponents?: true; nontoken?: true; /** "For each Zubera that died this turn": of this creature type as it last existed. */ subtype?: string; /** "A non-Skeleton creature died under your control this turn" (Cult Conscript): not of this type as it last existed. */ notSubtype?: string }
+  | { kind: "diedThisTurn"; yours?: true; /** "If a creature died under an opponent's control this turn" (Sidequest: Hunt the Mark). */ opponents?: true; nontoken?: true; /** "For each Zubera that died this turn": of this creature type as it last existed. */ subtype?: string; /** "A non-Skeleton creature died under your control this turn" (Cult Conscript): not of this type as it last existed. */ notSubtype?: string; /** Intermediate Chirography: "a modified creature died under your control this turn": modified as it last existed (CR 700.9). */ modified?: true }
   /** Genesis of the Daleks: "the total power of Daleks that died this turn": of this creature type, each one's power as it last existed (CR 608.2h), anyone's. */
   | { kind: "diedThisTurnPower"; subtype: string }
   /** "The number of (Treasure) tokens you created this turn" (CR 111.2): tokens its controller created. */
@@ -1232,6 +1232,13 @@ export interface TargetSpec {
   named?: string;
   /** "Target card named ~ from your graveyard" (Groffskithur): a card with the source's name (CR 201.2), worked out into `named` as the target is chosen and again as it resolves (bindBound): the name it has now on the battlefield, or had as it last existed there. Unbound, it matches nothing. */
   namedAsSource?: true;
+  /**
+   * Goblin Artisans (round B223): "target artifact spell you control that isn't the target of an ability from another
+   * creature named Goblin Artisans": not a target of an ability on the stack whose source is a creature with this name, as
+   * it is now or as it last existed (CR 113.7a), other than this ability's own source (`except`, bound as the target is
+   * chosen and again as it resolves, bindBound). Unbound, the source isn't known and any such ability counts.
+   */
+  notTargetOfAbilityFrom?: { types: string[]; name: string; except?: ObjectId };
   /** "Enchantment you control that doesn't have the same name as another permanent you control" (Yenna): no other permanent `you` control has its name (a face-down one has none, CR 708.2). */
   uniqueNameAmongYours?: true | /** The Apprentice's Folly: "that doesn't have the same name as a token you control". */ "tokens";
   /** "Dragon cards not named ~" (Tiamat): any other name; "~" is the source's (only for searches). */
@@ -1592,6 +1599,8 @@ export type ObjRef =
   | { ref: "sacrificedCards" }
   /** Rescue from the Underworld: these cards, remembered as a delayed trigger was made, while each is still that object in a graveyard, exile or the command zone (CR 400.7). */
   | { ref: "remembered"; cards: { id: ObjectId; zc: number }[] }
+  /** Maddening Imp (round B223): these permanents, remembered as a delayed trigger was made, each while it's still that object on the battlefield (CR 400.7), and matching `filter` if there is one. */
+  | { ref: "rememberedPermanents"; cards: { id: ObjectId; zc: number }[]; filter?: TargetSpec }
   /** Heart-Shaped Herb: "return that card" after "you may sacrifice a creature. If you do": the cards this resolution's sacrifices put into graveyards, while they're still there as those cards (CR 400.7); a token is gone (CR 111.7). */
   | { ref: "sacrificedThisWayCards" }
   /** "If an ability of an artifact, creature, or planeswalker is countered this way, that permanent" (Tishana's Tidebinder): the source of the ability this resolution countered, if it's still that object and fits `filter` now (rulings). */
@@ -1724,6 +1733,11 @@ export type PlayerRef =
   | { ref: "sacrificedThisWay"; /** Desolation: "each player who sacrificed a Plains this way": only those who sacrificed one with this subtype, as it last existed (CR 608.2h). */ subtype?: string }
   /** Desolation: "each player who tapped a land for mana this turn" (TurnLog.tappedLandForMana), still in the game, in APNAP order. */
   | { ref: "tappedLandForMana" }
+  /**
+   * Suffocation (round B229): "the controller of the last red instant or sorcery spell that dealt damage to you this turn":
+   * the latest such damage to you (TurnLog.spellDamage), the spell's controller as it dealt it, while still in the game.
+   */
+  | { ref: "lastSpellDamagedYou"; color: Color; types: string[] }
   /** Erestor of the Council: "each opponent who voted for a choice you voted for" in the vote that triggered it. */
   | { ref: "votedWithYou" }
   /** Grudge Keeper: "each opponent who voted for a choice you didn't vote for", in the vote that triggered it: one none of whose votes matches one of yours (rulings: with extra votes, an opponent counts only if they voted for none of your choices). */
@@ -2722,6 +2736,10 @@ export type StaticCondition =
   | { kind: "sourceDealtAtLeast"; n: number }
   /** "Red sources you controlled dealt 4 or more noncombat damage this turn" (Temple of Power). */
   | { kind: "noncombatByColor"; color: Color; n: number }
+  /** Suffocation (round B229): "you were dealt damage this turn by a red instant or sorcery spell": a spell of one of `types` with `color` as it dealt the damage (TurnLog.spellDamage). */
+  | { kind: "spellDamagedYou"; color: Color; types: string[] }
+  /** Sea Troll (round B230): "~ blocked or was blocked by a blue creature this turn": the source as the object it is (CR 400.7), in a block declared this turn with a creature of `color` as the block was declared (TurnLog.blocks `bq`/`aq` `col`). */
+  | { kind: "blockedWithColorThisTurn"; color: Color }
   /** "You've cast four or more instant and sorcery spells this turn": your spells this turn matching `filter` as they were cast. */
   | { kind: "castCount"; n: number; filter: TargetSpec; /** "If you didn't cast a spell this turn" (Nightpack Ambusher): fewer than `n`. */ not?: true; /** "If you haven't cast a spell from your hand this turn" (Prairie Dog): only spells cast from a hand. */ fromHand?: true; /** "At the beginning of each player's end step, if that player didn't cast a spell this turn" (Impatience): the active player's spells. */ activePlayer?: true; /** "A spell with mana value 4 or greater" (Rhino, Barreling Brute): its mana value as it was cast. */ mvAtLeast?: number; /** "As long as an opponent has cast a spell this turn" (Captain Mar-Vell): spells cast by any one opponent. */ byOpponent?: true }
   /** "There are five colors among permanents you control" (CR 105.2). */
@@ -3185,6 +3203,11 @@ export type Effect =
       payLife?: Amount;
       /** Winnowing: "all other creatures they control that don't share a creature type with the chosen creature": the rest sharing one with a kept one stay too. */
       sparesTypeOfKept?: true;
+      /** Disciple of Caelus Nin (round B223): "starting with you, each player chooses ...": in turn order from this ability's controller, not the active player. */
+      startingWithYou?: true;
+      /** Disciple of Caelus Nin: "All permanents other than ~ that weren't chosen this way phase out": the rest phase out at once (CR 702.26b), not sacrificed; the source itself, still that object, never does (`notSource`) and isn't offered to keep. */
+      phaseOut?: true;
+      notSource?: true;
     }
   /** Mount Doom: "Choose up to two creatures, then destroy the rest": the controller picks up to `n` among every player's (not targeted). */
   | { type: "keepDestroyRest"; filter: TargetSpec; n: number; /** Last One Standing: "Choose a creature at random, then destroy the rest": the one kept at random, not targeted (rulings). */ random?: true; /** Deadly Vanity: "Choose a creature or planeswalker": exactly `n` while there are that many (rulings), not up to. */ exactly?: true }
@@ -4471,6 +4494,60 @@ export type Effect =
    */
   | { type: "phaseOutExcess"; who: PlayerRef; types: string[] }
   /**
+   * Maddening Imp (round B223): "At the beginning of the next end step, destroy each of those creatures that didn't attack
+   * this turn": one delayed triggered ability (CR 603.7) about the permanents this resolution's last continuous effect
+   * changed (ResolvingState.affected, locked in as it began, CR 611.2c), each still that object on the battlefield
+   * (CR 400.7). Its `effects` are about ObjRef "rememberedPermanents", filled in with them as it's made.
+   */
+  | { type: "delayedForAffected"; when: "nextEndStep"; effects: Effect[]; text: string }
+  /** Aeon Engine: "Reverse the game's turn order." (rulings: anything that uses turn order uses the new one; again, back). */
+  | { type: "reverseTurnOrder" }
+  /**
+   * Backdraft (round B229): "Choose a player who cast one or more sorcery spells this turn. ~ deals damage to that player equal
+   * to half the damage dealt by one of those sorcery spells this turn, rounded down.": both chosen as it resolves (CR 608.2d),
+   * the damage each spell dealt this turn from TurnLog.spellDamage.
+   */
+  | { type: "halfSpellDamageBack" }
+  /**
+   * Glyph of Reincarnation (round B230): "Destroy all creatures that were blocked by target Wall this turn. They can't be
+   * regenerated. For each creature that died this way, put a creature card from the graveyard of the player who controlled
+   * that creature the last time it became blocked by that Wall onto the battlefield under its owner's control.": target 0.
+   */
+  | { type: "glyphReincarnation" }
+  /**
+   * Infinite Authority (round B230), as its trigger resolves: "destroy the other creature at end of combat" (a delayed
+   * trigger about that creature as it is now, CR 603.7c, 400.7), with the enchanted creature as the trigger's event had it
+   * (its group: rulings, moving the Aura after it triggered changes nothing) for "the first creature".
+   */
+  | { type: "authorityLink" }
+  /**
+   * Infinite Authority's end of combat trigger: destroy that creature; if it's destroyed (CR 701.8; wherever a replacement
+   * then sends it), "At the beginning of the next end step, if that creature was destroyed this way, put a +1/+1 counter on
+   * the first creature" is set up then, about `host` as the object it was (an intervening if, CR 603.4: with none destroyed,
+   * nothing triggers).
+   */
+  | { type: "authorityDestroy"; host: { id: ObjectId; zc: number } }
+  /**
+   * Cyclopean Tomb (round B231), after its "Put a mire counter on target non-Swamp land": the land, as the object it is, if
+   * a mire counter was put onto it this way (Resolving.countersPutThisWay), noted for the Tomb as the object it is
+   * (GameState.mireTomb).
+   */
+  | { type: "tombNote" }
+  /**
+   * Cyclopean Tomb's "When ~ is put into a graveyard from the battlefield, at the beginning of each of your upkeeps for the
+   * rest of the game, remove all mire counters from a land that ...": the delayed trigger (CR 603.7), about the Tomb as it
+   * was on the battlefield (the key of its GameState.mireTomb list), the trigger's controller's.
+   */
+  | { type: "tombLeaves" }
+  /** Cyclopean Tomb's delayed trigger: one land of `key`'s list, still that object, whose mire counters weren't removed this way. */
+  | { type: "tombRemove"; key: string }
+  /**
+   * Vodalian War Machine (round B229): "destroy all Merfolk tapped this turn to pay for its abilities": the permanents tapped
+   * for the costs of the source's abilities this turn (TurnLog.costTapped), the source as the permanent it was, each still the
+   * object it was and matching `filter`.
+   */
+  | { type: "destroyCostTapped"; filter: TargetSpec }
+  /**
    * Mirror of Fate (round B218): "Choose up to seven face-up exiled cards you own. Exile all the cards from your library,
    * then put the chosen cards on top of your library.": up to `n`, chosen as it resolves; then the library exiled face up,
    * and the chosen cards still in exile put on top in the order their owner chooses (rulings).
@@ -5287,7 +5364,7 @@ export type Effect =
    * type"; Deep Water: "Until end of turn, if you tap a land you control for mana, it produces {U} instead ..." (`yours`):
    * a replacement effect for the rest of the turn (CR 106.12b, 614.1a; GameState.landManaRules).
    */
-  | { type: "landManaUntilEndOfTurn"; mana: ManaType; nonbasic?: true; yours?: true }
+  | { type: "landManaUntilEndOfTurn"; /** "any": "mana of a color of your choice" (Harvest Mage, round B224). "chosen": the color chosen before it as this resolves (Hall of Gemstone, round B226). */ mana: ManaType | "any" | "chosen"; /** Hall of Gemstone: "mana of the chosen color instead of any other color": only colored mana changes, colorless stays (rulings). */ colored?: true; /** "... instead of any other type and amount": one mana. */ one?: true; nonbasic?: true; yours?: true; /** Chaos Moon (round B223): "if a player taps a Mountain for mana, that Mountain produces colorless mana instead": only lands with this subtype as they're tapped. */ subtype?: string }
   | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true; /** "That player can't activate abilities that aren't mana abilities" (Abeyance): for these players. */ who?: PlayerRef; /** For each opponent of its controller (Revel in Silence). */ opponents?: true; /** "Can't be countered by blue or black spells" (Autumn's Veil): only by spells of these colors. */ byColors?: Color[]; /** About the ability's source, the object it is now (Kaito, Dancing Shadow's "loyaltyTwice"). */ self?: true }
   /** "Until your next turn, you may cast sorcery spells as though they had flash." (Teferi, Time Raveler; CR 702.8a) */
   | { type: "flashUntilNextTurn"; filter: TargetSpec; /** "You may cast creature spells this turn as though they had flash" (Winding Canyons): until this turn ends instead. */ thisTurn?: true }
@@ -5832,7 +5909,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature" | /** Mindblaze: a card in that player's library. */ "inLibrary" | /** Day of the Moon: the name of creatures to goad, an opponent's. */ "goadTheirs" | /** Sphinx Ambassador: a card someone else found in this player's own library and would take if it's a creature card without that name. */ "guardLibrary";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters";
+export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters" | /** CompiledCard.entersProcess: the cards in exile put into graveyards as it enters (round B229). */ "processExile";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -6675,7 +6752,7 @@ export type TriggerEvent =
  * turn's cleanup step.
  */
 /** `endOfCombat`: "this combat" (Stensian Sanguinist), until this combat's end of combat step ends (CR 511.3). */
-export type TriggerDuration = "endOfTurn" | "yourNextTurn" | "endOfYourNextTurn" | "endOfCombat" | /** Chancellor of the Annex: for the rest of the game (with `once` and `forPlayer`, until that player's first spell). */ "game";
+export type TriggerDuration = "endOfTurn" | "yourNextTurn" | "endOfYourNextTurn" | "endOfCombat" | /** Chancellor of the Annex: for the rest of the game (with `once` and `forPlayer`, until that player's first spell). */ "game" | /** Giant Oyster (round B228): "for as long as ~ remains tapped": until the source untaps or leaves the battlefield (CR 611.2b), from an activated ability whose source is tapped. */ "whileTapped";
 
 export interface TriggeredAbility {
   /**
@@ -7273,7 +7350,7 @@ export interface ActivatedAbility {
    * aim counters from Hankyu"): every `counter` counter on it, none included, the number for "removed this way"
    * (StackItem.countersRemoved).
    */
-  grantSourceCost?: { ref: "grantSource"; action: "sacrifice" | "unattach" | "removeAllCounters"; counter?: CounterKind; id?: ObjectId; zc?: number };
+  grantSourceCost?: { ref: "grantSource"; action: "sacrifice" | "unattach" | "tap" | "removeAllCounters"; counter?: CounterKind; id?: ObjectId; zc?: number };
   sorcerySpeed: boolean;
   body: AbilityBody;
   text: string;
@@ -7334,6 +7411,13 @@ export interface ActivatedAbility {
   enchantedControllerOnly?: true;
   /** Merseine (round B211): "Pay enchanted creature's mana cost": the mana cost of the permanent its source is attached to as it's activated (CardDef.manaCost by defOf: a copy's, CR 707.2), {X} as 0 (CR 107.3h); unpayable with none, or with nothing attached (CR 118.6). `manaCost` is unused. */
   attachedManaCost?: true;
+  /**
+   * Back from the Brink (round B231): "Exile a creature card from your graveyard and pay its mana cost": the mana part of
+   * the cost is the mana cost of the card its exile cost exiles (CostChoices.exileCards, chosen as it's activated, CR
+   * 602.2b, 601.2f-h), a double-faced card's front face's, {X} as 0 (rulings); not casting it, so nothing that changes a
+   * spell's cost applies (rulings). With no card chosen yet, {0}.
+   */
+  manaCostOfExiled?: true;
   /** "Reveal the player you chose" (Guardian Archon): payable only if a player was secretly chosen for it as it entered. */
   revealChosen?: true;
   /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object (CR 400.7): see GameObject.activatedEver. */
@@ -8190,7 +8274,7 @@ export interface CompiledCard {
    * (not tokens or copies of spells, rulings) going to the graveyard of the player it enchants, its owner's (CR 404.2).
    */
   graveyardToLibraryBottom?: true;
-  graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind; notYours?: true; linked?: true; permanents?: true; /** Sanctifier en-Vec: "a black or red permanent, spell, or card not on the battlefield": any one of these colors, as it is in the zone it's leaving (rulings), a permanent's from the layers. */ colorsNow?: Color[] };
+  graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind; notYours?: true; linked?: true; permanents?: true; /** Sanctifier en-Vec: "a black or red permanent, spell, or card not on the battlefield": any one of these colors, as it is in the zone it's leaving (rulings), a permanent's from the layers. */ colorsNow?: Color[]; /** Anafenza, the Foremost: "a nontoken creature ... would die or a creature card not on the battlefield": of one of these card types as it is in the zone it's leaving (rulings), a permanent's from the layers. */ typesNow?: string[] };
   /** "This creature enters prepared" (CR 722.3a): it becomes prepared as it enters. */
   entersPrepared?: boolean;
   /** "As ~ enters, discard your hand" (Heightened Awareness): its controller discards their hand as it enters (CR 614.1c). */
@@ -8217,6 +8301,16 @@ export interface CompiledCard {
    * it never enters); `counterEach`: one counter of a kind chosen from these for each card exiled.
    */
   entersExileFromYard?: { filter: TargetSpec; n: "any" | "one" | "x"; counterEach?: CounterKind[] };
+  /**
+   * Ulamog's Despoiler (round B229): "As ~ enters, you may put two cards your opponents own from exile into their owners'
+   * graveyards. If you do, ~ enters with four +1/+1 counters on it.": `n` cards chosen as it enters (CR 614.12), all or none,
+   * for `counters` +1/+1 counters (EntersOption "processExile").
+   */
+  entersProcess?: { n: number; counters: number };
+  /** Vodalian War Machine (round B229): the permanents tapped to pay its abilities' costs are kept this turn (TurnLog.costTapped). */
+  logsCostTapped?: true;
+  /** Bone Shaman (round B230): "Creatures dealt damage by ~ this turn can't be regenerated this turn." (game.ts damagedNoRegen). */
+  damagedCantRegenerate?: true;
   /**
    * "Creatures your opponents control enter tapped", "Artifacts and lands enter tapped": a replacement effect on other
    * permanents entering (CR 614.1c, 614.12), checked against them as they'd be on the battlefield.
@@ -8823,6 +8917,14 @@ export interface CompiledCard {
    * this type; `one`: "... instead of any other type and amount" (Contamination), exactly one mana of it.
    */
   landManaAs?: { mana: ManaType; one?: true }[];
+  /**
+   * Naked Singularity, Reality Twist (round B224): "If tapped for mana, Plains produce {R}, Islands produce {G}, ... instead
+   * of any other type": for any player's land, the color its basic land type is listed with; a land with two of them makes
+   * the color of its controller's choice (rulings). One list for each such ability.
+   */
+  landManaBySubtype?: { subtype: string; mana: ManaType }[][];
+  /** Pulse of Llanowar (round B224): "If a basic land you control is tapped for mana, it produces mana of a color of your choice instead of any other type." */
+  basicLandManaAnyColor?: true;
   /** "If you would gain life, you gain that much life plus 1 instead" (CR 614.1a): N for each. */
   lifeGainPlus?: number;
   /** "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): that number. */
@@ -8974,6 +9076,8 @@ export interface CompiledCard {
   mostPermanentsCant?: TargetSpec;
   /** "Players can't play lands." (Territorial Dispute): no land plays for anyone, whatever lets them (CR 305.2, 101.2). */
   playersCantPlayLands?: true;
+  /** "Permanents can't phase in." (Disciple of Caelus Nin, round B223, CR 702.26c): no permanent phases in, anyone's, for any reason, while this is on the battlefield (rulings). */
+  permanentsCantPhaseIn?: true;
   /** "You can't play lands." (Aggressive Mining): no land plays for its controller (CR 305.2, 101.2). */
   youCantPlayLands?: true;
   /**
@@ -9032,6 +9136,12 @@ export interface CompiledCard {
   gainsNoLife?: true;
   /** "If an opponent would gain life, that player loses that much life instead" (Tainted Remedy, CR 614.1a). */
   opponentsGainLose?: true;
+  /**
+   * Rain of Gore (round B231): "If a spell or ability would cause its controller to gain life, that player loses that much
+   * life instead" (CR 614.1a): a life gain a spell or ability (resolving, or a static or replacement ability, CR 113.3)
+   * causes for the player who controls it; not lifelink's (CR 702.15b, rulings). See game.ts gainLife's `cause`.
+   */
+  causedGainLose?: true;
   /**
    * "If an opponent would begin an extra turn, that player skips that turn instead" (Trouble in Pairs, Stranglehold), "If a
    * player would ..." (Ugin's Nexus): a replacement effect skipping it as it would begin (CR 614.10, 500.7); one created
@@ -9246,6 +9356,8 @@ export interface CompiledCard {
   handMiracle?: { filter: TargetSpec; mana: string; /** Aminatou, Veil Piercer: "Its miracle cost is equal to its mana cost reduced by {4}": the card's mana cost less this much generic mana (`mana` unused). */ reduce?: number; text: string }[];
   /** "Each nonland card in your hand without foretell has foretell. Its foretell cost is equal to its mana cost reduced by {2}." (Dream Devourer): foretell for those cards in its controller's hand (CR 702.143a), a foretell cost of their mana cost less this much generic mana (rulings). */
   handForetell?: { reduce: number; text: string }[];
+  /** Cosmos Charger (round B226): "Foretelling cards from your hand costs {1} less and can be done on any player's turn": the {2} of foretelling (CR 702.143a, a special action, 116.2h) costs its controller this much less, and they may foretell any time they have priority. */
+  foretellActionLess?: number;
   /** "Instant and sorcery spells you cast have storm" (Prismari, Ral's emblem): each such spell's own storm triggers (CR 702.40a). */
   spellsHaveStorm?: { filter: TargetSpec; text: string }[];
   spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; /** 'Have "Cascade, cascade."' (Zhulodok): two instances. */ twice?: true; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];
@@ -9297,6 +9409,8 @@ export interface CompiledCard {
    * in hand" (`handAtLeast`, the card being cycled counted, rulings). The discard is still part of the cost (rulings).
    */
   freeCycling?: { first?: true; handAtLeast?: number }[];
+  /** Advancing the Spirit (round B228): "You may pay {0} rather than pay the power-up cost of the first power-up ability you activate during each of your turns" (CR 118.9, 702.193a; game.ts freePowerUp). */
+  freePowerUp?: true;
   /**
    * "Players can't untap more than one nonbasic land during their untap steps" (Winter Moon), "You can't untap more than
    * one land during your untap step" (Mungha Wurm, `you`), "As long as ~ is untapped, players can't untap more than two

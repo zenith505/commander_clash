@@ -715,6 +715,8 @@ export function withGranted(base: CompiledCard, granted: readonly string[]): Com
     // Sokrates's granted prevention (round 381): each instance its own (see staticRules in damage.ts).
     const halves = (base.combatToPlayerDrawsHalf ?? 0) + extra.reduce((n, x) => n + (x.combatToPlayerDrawsHalf ?? 0), 0);
     if (halves) hit.combatToPlayerDrawsHalf = halves;
+    // Bone Shaman's granted "Creatures dealt damage by this creature this turn can't be regenerated this turn" (round B230).
+    if (extra.some((x) => x.damagedCantRegenerate)) hit.damagedCantRegenerate = true;
     // Jubilant Skybonder's granted "Spells your opponents cast that target this creature cost {2} more to cast": each
     // instance adds its own.
     const tax = (base.targetTax ?? 0) + extra.reduce((n, x) => n + (x.targetTax ?? 0), 0);

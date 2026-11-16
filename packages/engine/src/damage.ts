@@ -46,6 +46,8 @@ export interface DamageSource {
   ref?: { object: ObjectId; zc: number };
   /** It's a spell (CR 112.1), for "if a spell would deal damage" (Benevolent Unicorn, Fire Servant). */
   spell?: true;
+  /** With `spell`: a spell that was cast, not a copy (CR 707.10), for Backdraft's "sorcery spells" a player cast (round B229). */
+  cast?: true;
   /** A permanent with a corruption counter on it (Geyadrone Dihada's protection). */
   corrupted?: true;
   /** The damage it deals can't be prevented (CR 615.12): all of it, or its combat damage. */
@@ -287,6 +289,9 @@ export function dealDamage(
   if (!sources.includes(key)) sources.push(key);
   const totals = ((s.turnLog.sourceDamage ??= {})[src.controller] ??= {});
   totals[key] = (totals[key] ?? 0) + n;
+  // Suffocation and Backdraft (round B229): damage an instant or sorcery spell dealt, the spell as the object it is (CR 400.7).
+  if (src.spell && src.ref && src.types.some((t) => t === "Instant" || t === "Sorcery"))
+    (s.turnLog.spellDamage ??= []).push({ key, controller: src.controller, colors: [...src.colors], types: src.types.filter((t) => t === "Instant" || t === "Sorcery"), ...(src.cast ? { cast: true as const } : {}), amount: n, ...("player" in to ? { player: to.player } : {}) });
   // Temple of Power: "red sources you controlled dealt 4 or more noncombat damage this turn".
   if (!opts.combat) for (const c of src.colors) ((s.turnLog.noncombatByColor ??= {})[src.controller] ??= {})[c] = (s.turnLog.noncombatByColor[src.controller]![c] ?? 0) + n;
   if ("object" in to) {
@@ -480,7 +485,7 @@ export function dealDamage(
   }
   if (has(src, "Lifelink")) {
     if (opts.lifelink) opts.lifelink.n += n;
-    else gainLife(s, src.controller, n); // CR 702.15b
+    else gainLife(s, src.controller, n, "lifelink"); // CR 702.15b
   }
   return n;
 }
@@ -1618,7 +1623,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     }
   }
   for (const { r, n } of dealToLater.values()) if (n > 0 && r.dealTo) back.push({ cardId: r.cardId, controller: r.controller, to: "player" in r.dealTo ? r.dealTo.player : r.controller, n, ...("object" in r.dealTo ? { toObject: r.dealTo } : {}) });
-  for (const { pid, n } of gains.values()) if (n > 0) gainLife(s, pid, n);
+  for (const { pid, n } of gains.values()) if (n > 0) gainLife(s, pid, n, { controller: pid }); // the shield's own controller's rule (Rain of Gore)
   // Bone Mask (CR 615.5): not a mill (CR 701.17a); with fewer cards, all of them (rulings).
   for (const { r, n } of exileTopLater.values()) {
     const p = player(s, r.controller);

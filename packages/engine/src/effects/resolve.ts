@@ -1,7 +1,7 @@
 import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type Effect, type ManaAbility, type Modification, type ObjRef, type PlayerRef, type TargetChoice } from "../abilities";
 import { tokenChoicesPossible, TokenQuestionPause, withPutter, withTokenAnswers } from "../counters";
 import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
-import { addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, draw, endTheCombatPhase, endTheTurn, enterTogether, inCombatPhase, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
+import { seatOrder, addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, draw, endTheCombatPhase, endTheTurn, enterTogether, inCombatPhase, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
 import { CAST_BY_SOURCE, casterMark, compileCard, SPELL_CONTROLLER, playerMark } from "../oracle";
 import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LANDWALK, SACRIFICED_LANDWALK, landwalkLand, CHOSEN_SNOW_LANDWALK, chosenLandwalk, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, TARGET_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION, CAST_SPELL_COLORS_PROTECTION, isLandwalk } from "../keywords";
@@ -76,6 +76,11 @@ import { runLaneB218Effect } from "./run-laneb218";
 import { runLaneB220Effect } from "./run-laneb220";
 import { runLaneB221Effect } from "./run-laneb221";
 import { runLaneB222Effect } from "./run-laneb222";
+import { runLaneB223Effect } from "./run-laneb223";
+import { runLaneB227Effect } from "./run-laneb227";
+import { runLaneB229Effect } from "./run-laneb229";
+import { runLaneB230Effect } from "./run-laneb230";
+import { runLaneB231Effect } from "./run-laneb231";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -373,7 +378,12 @@ function sourceChosen(s: GameState, ctx: { sourceId?: ObjectId; sourceZc?: numbe
 
 /** Players in APNAP order: the active player first, then in turn order (CR 101.4). */
 export function apnap(s: GameState, pids: PlayerId[]): PlayerId[] {
-  const i = s.turnOrder.indexOf(s.activePlayer);
+  return startingWith(s, s.activePlayer, pids);
+}
+
+/** These players in turn order starting with `first` ("starting with you", Disciple of Caelus Nin). */
+export function startingWith(s: GameState, first: PlayerId, pids: PlayerId[]): PlayerId[] {
+  const i = s.turnOrder.indexOf(first);
   const order = [...s.turnOrder.slice(i), ...s.turnOrder.slice(0, i)];
   return order.filter((p) => pids.includes(p));
 }
@@ -634,6 +644,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   if (ref.ref === "sacrificedCards") return (ctx.sacrificed ?? []).flatMap((l) => (l.id !== undefined && l.cardZc !== undefined && s.objects[l.id]?.zone === "graveyard" && (s.objects[l.id]!.zoneChanges ?? 0) === l.cardZc ? [s.objects[l.id]!] : []));
   // Rescue from the Underworld: the cards remembered, each still that object outside the battlefield in a public zone.
   if (ref.ref === "remembered") return ref.cards.flatMap((c) => ((o) => (o && (o.zone === "graveyard" || o.zone === "exile" || o.zone === "command") && (o.zoneChanges ?? 0) === c.zc ? [o] : []))(s.objects[c.id]));
+  // Maddening Imp: the permanents remembered, each still that object on the battlefield (CR 400.7), matching the filter now.
+  if (ref.ref === "rememberedPermanents") return ref.cards.flatMap((c) => ((o) => (o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === c.zc && (!ref.filter || objectMatches(s, ref.filter, o, ctx.controller, false)) ? [o] : []))(s.objects[c.id]));
   if (ref.ref === "costExiled") return (s.resolving?.item.costExiled ?? []).flatMap((c) => (s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : []));
   if (ref.ref === "yourGraveyard") return player(s, ctx.controller).graveyard.map((id) => obj(s, id)).filter((o) => printedMatches(ref.filter, defOf(s, o)));
   // Fumble: the Auras and Equipment noted before it left, still those objects on the battlefield (CR 400.7).
@@ -928,6 +940,11 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const by = new Set(s.turnLog?.tappedLandForMana ?? []);
       return apnap(s, livingPlayers(s).filter((x) => by.has(x)));
     }
+    case "lastSpellDamagedYou": {
+      // Suffocation (round B229): the latest damage to you from such a spell this turn, its controller as it dealt it.
+      const last = (s.turnLog?.spellDamage ?? []).filter((d) => d.player === ctx.controller && d.colors.includes(ref.color) && d.types.some((t) => ref.types.includes(t))).at(-1);
+      return last && !player(s, last.controller).lost ? [last.controller] : [];
+    }
     case "youAndEventPlayers":
       return apnap(s, livingPlayers(s).filter((p) => p === ctx.controller || !!ctx.event?.players?.includes(p)));
     case "attackingPlayer":
@@ -1018,7 +1035,7 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "neighbor": {
       // Seats follow turn order, which goes to each player's left (CR 101.4); players who left the game have no seat.
-      const seats = s.turnOrder.filter((p) => !player(s, p).lost || p === ctx.controller);
+      const seats = seatOrder(s).filter((p) => !player(s, p).lost || p === ctx.controller);
       const i = seats.indexOf(ctx.controller);
       const p = seats[(i + (ref.side === "left" ? 1 : seats.length - 1)) % seats.length];
       return i >= 0 && p !== undefined && p !== ctx.controller ? [p] : [];
@@ -1995,6 +2012,21 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB220Effect(s, e, ctx, src);
     case "nextEntersCounters":
       return runLaneB221Effect(s, e, ctx, src);
+    case "delayedForAffected":
+      return runLaneB223Effect(s, e, ctx, src);
+    case "reverseTurnOrder":
+      return runLaneB227Effect(s, e, ctx, src);
+    case "halfSpellDamageBack":
+    case "destroyCostTapped":
+      return runLaneB229Effect(s, e, ctx, src);
+    case "glyphReincarnation":
+    case "authorityLink":
+    case "authorityDestroy":
+      return runLaneB230Effect(s, e, ctx, src);
+    case "tombNote":
+    case "tombLeaves":
+    case "tombRemove":
+      return runLaneB231Effect(s, e, ctx, src);
     case "phaseOutExcess":
       return runLaneB222Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
@@ -2244,7 +2276,7 @@ export function ctxSource(s: GameState, ctx: ResolveCtx): DamageSource {
   // controls as the damage is dealt.
   if (spell?.zone === "stack" && item) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === item.controller) for (const g of abilitiesOf(s, obj(s, id)).spellsHaveKeywords ?? []) if (spellMatches(s, g.filter, item)) gained.push(g.keyword);
   const base = cardSource(ctx.sourceDef, ctx.controller, ref);
-  return { ...base, ...(gained.length ? { keywords: [...new Set([...base.keywords, ...gained])] } : {}), ...(spell || item?.fromSpell ? { spell: true as const } : {}), ...(spell && item ? { manaValue: spellManaValue(s, item) } : {}) };
+  return { ...base, ...(gained.length ? { keywords: [...new Set([...base.keywords, ...gained])] } : {}), ...(spell || item?.fromSpell ? { spell: true as const } : {}), ...(spell && item && !item.copy ? { cast: true as const } : {}), ...(spell && item ? { manaValue: spellManaValue(s, item) } : {}) };
 }
 
 /**

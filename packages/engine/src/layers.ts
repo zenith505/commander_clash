@@ -25,7 +25,7 @@ import { activatedAbilityCount } from "./manaabilities";
 import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
 import { liveEmblems } from "./emblems";
-import { bindChosenKeywords, CHOSEN_LAND_TYPE, COLOR_WORD, CREATURE_TYPES, IDENTITY_PROTECTION, isLandwalk, YOURS_BASIC_LANDWALK, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, LINKED_CREATURE_CARD_KEYWORD, YARD_CREATURE_CARD_KEYWORD, YOURS_COLORS_PROTECTION, YOURS_ARTIFACT_MV_PROTECTION, protectionFromCardTypes, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
+import { bindChosenKeywords, CHOSEN_LAND_TYPE, COLOR_WORD, CREATURE_TYPES, IDENTITY_PROTECTION, isLandwalk, YOURS_BASIC_LANDWALK, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, LINKED_CREATURE_CARD_KEYWORD, YARD_CREATURE_CARD_KEYWORD, EXILED_BLOOD_CREATURE_KEYWORD, OPPONENT_CREATURE_KEYWORD, YOURS_COLORS_PROTECTION, YOURS_ARTIFACT_MV_PROTECTION, protectionFromCardTypes, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
 import { bindGrantSource, compileCard, compileGranted, QUOTED_SOURCE_NAME } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
@@ -1442,6 +1442,15 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return cond.types.some((t) => !!s.turnLog?.toOwnGraveyardTypes?.[you]?.includes(t));
     case "noncombatByColor":
       return (s.turnLog?.noncombatByColor?.[you]?.[cond.color] ?? 0) >= cond.n;
+    case "blockedWithColorThisTurn": {
+      // Sea Troll (round B230): in a block this turn, as this object (CR 400.7), with a creature of that color as the block
+      // was declared (TurnLog.blocks).
+      const me = s.objects[sourceId];
+      const key = me ? `${sourceId}@${me.zoneChanges ?? 0}` : "";
+      return !!me && (s.turnLog?.blocks ?? []).some((b) => (b.blocker === key && !!b.aq?.col?.includes(cond.color)) || (b.attacker === key && !!b.bq?.col?.includes(cond.color)));
+    }
+    case "spellDamagedYou":
+      return (s.turnLog?.spellDamage ?? []).some((d) => d.player === you && d.colors.includes(cond.color) && d.types.some((t) => cond.types.includes(t)));
     case "sourceDealtAtLeast":
       return Object.values(s.turnLog?.sourceDamage?.[you] ?? {}).some((n) => n >= cond.n);
     case "sourcesDealtDamage":
@@ -1753,6 +1762,55 @@ function graveyardCreatureCardKeyword(s: GameState, keyword: string): string[] {
   return cards.some((o) => printedKeywords(defOf(s, o)).some((k) => k.toLowerCase() === keyword.toLowerCase())) ? [keyword] : [];
 }
 
+/**
+ * Rayami, First of the Fallen (round B228): `keyword` if a face-up creature card in exile with a blood counter on it, anyone's
+ * (rulings: however it got there), has it as its own printed keyword (CR 113.6; a conditional one doesn't apply there,
+ * rulings); "Protection" is each protection ability such a card has and "Hexproof" each hexproof one, variants as those
+ * variants (rulings), as for Soulflayer.
+ */
+function exiledBloodCreatureKeyword(s: GameState, keyword: string): string[] {
+  const cards = s.turnOrder.flatMap((pid) => (s.players[pid]?.exile ?? []).flatMap((id) => { const o = s.objects[id]; return o && o.zone === "exile" && !o.faceDown && (o.counters.blood ?? 0) > 0 && defOf(s, o).types.includes("Creature") ? [o] : []; }));
+  if (keyword === "Protection") return [...new Set(cards.flatMap((o) => printedKeywords(defOf(s, o)).filter((k) => /^Protection from /i.test(k))))];
+  if (keyword === "Hexproof") {
+    const kws = new Set(cards.flatMap((o) => printedKeywords(defOf(s, o)).filter((k) => /^Hexproof(?: from |$)/i.test(k)).map((k) => (/^hexproof$/i.test(k) ? "Hexproof" : k))));
+    return kws.has("Hexproof") ? ["Hexproof"] : [...kws];
+  }
+  return cards.some((o) => printedKeywords(defOf(s, o)).some((k) => k.toLowerCase() === keyword.toLowerCase())) ? [keyword] : [];
+}
+
+const COLOR_PROTECTIONS: Record<string, Color> = { white: "W", blue: "U", black: "B", red: "R", green: "G" };
+
+/**
+ * Escaped Shapeshifter (round B228): `keyword` if a creature an opponent of this effect's controller controls, not named as
+ * its source is now, has it as the layers have applied so far (layer 6 waits for the effects that give or take those
+ * creatures' keywords, opponentKeywordsRead); "Protection" is protection from each color one of them has protection from,
+ * "from each color" or "from all colors" being one for every color (CR 702.16h).
+ */
+function opponentCreatureKeyword(s: GameState, e: Inst, chars: CharMap, keyword: string): string[] {
+  const you = controllerOfInst(e, chars);
+  const name = e.sourceId ? chars.get(e.sourceId)?.name : undefined;
+  const opps = new Set(s.turnOrder.filter((p) => p !== you && !s.players[p]?.lost));
+  const theirs = [...chars.entries()].filter(([id, c]) => id !== e.sourceId && opps.has(c.controller) && c.types.includes("Creature") && c.name !== name).map(([, c]) => c);
+  if (keyword === "Protection") {
+    const colors = new Set<Color>();
+    for (const c of theirs)
+      for (const k of c.keywords) {
+        const m = /^Protection from (white|blue|black|red|green|each color|all colors)$/i.exec(k);
+        if (!m) continue;
+        const q = m[1]!.toLowerCase();
+        for (const col of q === "each color" || q === "all colors" ? (["W", "U", "B", "R", "G"] as Color[]) : [COLOR_PROTECTIONS[q]!]) colors.add(col);
+      }
+    return [...colors].map((col) => `Protection from ${COLOR_WORD[col]}`);
+  }
+  return theirs.some((c) => c.keywords.some((k) => k.toLowerCase() === keyword.toLowerCase())) ? [keyword] : [];
+}
+
+/** Escaped Shapeshifter: the keywords an OPPONENT_CREATURE_KEYWORD effect gives now, for its dependency on other layer 6 effects (CR 613.8a). */
+function opponentKeywordsRead(s: GameState, e: Inst, chars: CharMap): string {
+  const kws = e.mods.flatMap((m) => (m.kind === "addKeywords" ? m.keywords.filter((k) => k.startsWith(OPPONENT_CREATURE_KEYWORD)) : []));
+  return kws.flatMap((k) => opponentCreatureKeyword(s, e, chars, k.slice(OPPONENT_CREATURE_KEYWORD.length))).join(",");
+}
+
 /** Duplicant: the last creature card exiled with this object that's still in exile (CR 607.2a). */
 function lastLinkedCreatureCard(s: GameState, sourceId: ObjectId | undefined): GameObject | undefined {
   const src = sourceId ? s.objects[sourceId] : undefined;
@@ -1877,7 +1935,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "addKeywords":
       // "Has protection from the chosen color": the color chosen as the source entered.
       // Empty-Shrine Kannushi: "protection from each color among permanents you control", the colors layer 5 left them.
-      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) || m.keywords.includes(YOURS_COLORS_PROTECTION) || m.keywords.includes(YOURS_ARTIFACT_MV_PROTECTION) || m.keywords.includes(YOURS_BASIC_LANDWALK) || m.keywords.some((k) => k.startsWith(LINKED_CARD_KEYWORD) || k.startsWith(LINKED_CREATURE_CARD_KEYWORD) || k.startsWith(YARD_CREATURE_CARD_KEYWORD)) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : k === YOURS_COLORS_PROTECTION ? colorsAmongYours(chars, controllerOfInst(e, chars)).map((col) => `Protection from ${COLOR_WORD[col]}`) : k === YOURS_ARTIFACT_MV_PROTECTION ? artifactManaValuesAmongYours(chars, controllerOfInst(e, chars)).map((n) => `Protection from mana value ${n}`) : k === YOURS_BASIC_LANDWALK ? basicLandTypesAmongYours(chars, controllerOfInst(e, chars)).map((t) => `${t}walk`) : k.startsWith(LINKED_CARD_KEYWORD) ? linkedCardKeyword(s, e.sourceId, k.slice(LINKED_CARD_KEYWORD.length)) : k.startsWith(LINKED_CREATURE_CARD_KEYWORD) ? linkedCardKeyword(s, e.sourceId, k.slice(LINKED_CREATURE_CARD_KEYWORD.length), true) : k.startsWith(YARD_CREATURE_CARD_KEYWORD) ? graveyardCreatureCardKeyword(s, k.slice(YARD_CREATURE_CARD_KEYWORD.length)) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors, e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.parity : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.number : undefined)) {
+      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) || m.keywords.includes(YOURS_COLORS_PROTECTION) || m.keywords.includes(YOURS_ARTIFACT_MV_PROTECTION) || m.keywords.includes(YOURS_BASIC_LANDWALK) || m.keywords.some((k) => k.startsWith(LINKED_CARD_KEYWORD) || k.startsWith(LINKED_CREATURE_CARD_KEYWORD) || k.startsWith(YARD_CREATURE_CARD_KEYWORD) || k.startsWith(EXILED_BLOOD_CREATURE_KEYWORD) || k.startsWith(OPPONENT_CREATURE_KEYWORD)) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : k === YOURS_COLORS_PROTECTION ? colorsAmongYours(chars, controllerOfInst(e, chars)).map((col) => `Protection from ${COLOR_WORD[col]}`) : k === YOURS_ARTIFACT_MV_PROTECTION ? artifactManaValuesAmongYours(chars, controllerOfInst(e, chars)).map((n) => `Protection from mana value ${n}`) : k === YOURS_BASIC_LANDWALK ? basicLandTypesAmongYours(chars, controllerOfInst(e, chars)).map((t) => `${t}walk`) : k.startsWith(LINKED_CARD_KEYWORD) ? linkedCardKeyword(s, e.sourceId, k.slice(LINKED_CARD_KEYWORD.length)) : k.startsWith(LINKED_CREATURE_CARD_KEYWORD) ? linkedCardKeyword(s, e.sourceId, k.slice(LINKED_CREATURE_CARD_KEYWORD.length), true) : k.startsWith(YARD_CREATURE_CARD_KEYWORD) ? graveyardCreatureCardKeyword(s, k.slice(YARD_CREATURE_CARD_KEYWORD.length)) : k.startsWith(EXILED_BLOOD_CREATURE_KEYWORD) ? exiledBloodCreatureKeyword(s, k.slice(EXILED_BLOOD_CREATURE_KEYWORD.length)) : k.startsWith(OPPONENT_CREATURE_KEYWORD) ? opponentCreatureKeyword(s, e, chars, k.slice(OPPONENT_CREATURE_KEYWORD.length)) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors, e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.parity : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.number : undefined)) {
         const key = k.toLowerCase();
         if (/^ward\b/i.test(k)) delete c.wardLost;
         if (!c.keywords.some((x) => sameCI(x, k))) {
@@ -2318,8 +2376,11 @@ const CAN_CREATE_DEPENDENCY = new Set<Modification["kind"]>(["control", "addType
  */
 function readsKeywords(e: Inst): boolean {
   const c = e.condition;
-  return ((c?.kind === "selfIs" || c?.kind === "attachedIs") && !!c.filter.keywords?.length) || readsAbilities(e);
+  return ((c?.kind === "selfIs" || c?.kind === "attachedIs") && !!c.filter.keywords?.length) || readsAbilities(e) || readsOpponentKeywords(e);
 }
+
+/** Escaped Shapeshifter: what it gives is read from opponents' creatures' keywords in layer 6 (CR 613.8a). */
+const readsOpponentKeywords = (e: Inst) => e.mods.some((m) => m.kind === "addKeywords" && m.keywords.some((k) => k.startsWith(OPPONENT_CREATURE_KEYWORD)));
 
 /**
  * Ruxa, Patient Professor's "for each creature you control with no abilities, you may have that creature assign its combat
@@ -2331,7 +2392,7 @@ const GIVES_ABILITIES = new Set<Modification["kind"]>(["addAbility", "enchantCre
 
 function signature(s: GameState, e: Inst, chars: CharMap): string {
   if (!exists(s, e, chars)) return "gone";
-  return `${controllerOfInst(e, chars)}|${appliesTo(s, e, chars).join(",")}`;
+  return `${controllerOfInst(e, chars)}|${appliesTo(s, e, chars).join(",")}${readsOpponentKeywords(e) ? `|${opponentKeywordsRead(s, e, chars)}` : ""}`;
 }
 
 /**

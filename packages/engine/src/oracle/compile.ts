@@ -66,6 +66,15 @@ import { roundB219Line } from "./laneb219";
 import { roundB220Line } from "./laneb220";
 import { roundB221Line } from "./laneb221";
 import { roundB222Line } from "./laneb222";
+import { roundB223Line } from "./laneb223";
+import { roundB224Line } from "./laneb224";
+import { roundB225Line } from "./laneb225";
+import { roundB226Line } from "./laneb226";
+import { roundB227Line } from "./laneb227";
+import { roundB228Line } from "./laneb228";
+import { roundB229Line } from "./laneb229";
+import { roundB230Line } from "./laneb230";
+import { roundB231Line } from "./laneb231";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2207,6 +2216,24 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB221Line(line, raw, out, isSpell)) continue;
     // Phyrexian Splicer, Elemental Expressionist, Time Reaper, Equipoise (round B222).
     if (roundB222Line(line, raw, out, isSpell)) continue;
+    // Chaos Moon, Maddening Imp, Goblin Artisans, Disciple of Caelus Nin (round B223).
+    if (roundB223Line(line, raw, out, isSpell, d.name)) continue;
+    // Naked Singularity, Reality Twist, Pulse of Llanowar, Harvest Mage (round B224).
+    if (roundB224Line(line, raw, out, isSpell)) continue;
+    // Heart of Bogardan, Lesser Werewolf, Goblin Flotilla, Acidic Dagger (round B225).
+    if (roundB225Line(line, raw, out, isSpell)) continue;
+    // Steamflogger Boss, Shimmer, Hall of Gemstone (round B226).
+    if (roundB226Line(line, raw, out, isSpell, lines)) continue;
+    // Anafenza, the Foremost, Cherished Hatchling (round B227).
+    if (roundB227Line(line, raw, out, isSpell)) continue;
+    // Rayami, First of the Fallen, Escaped Shapeshifter, Giant Oyster, Advancing the Spirit (round B228).
+    if (roundB228Line(line, raw, out, isSpell)) continue;
+    // Ulamog's Despoiler, Vodalian War Machine (round B229).
+    if (roundB229Line(line, raw, out, isSpell)) continue;
+    // Bone Shaman's granted ability (round B230).
+    if (roundB230Line(line, raw, out, isSpell)) continue;
+    // Rain of Gore, Kheru Mind-Eater, Cyclopean Tomb, Back from the Brink (round B231).
+    if (roundB231Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -7865,7 +7892,10 @@ function linkExile(out: CompiledCard) {
     const faceDown = all.filter((e): e is Extract<Effect, { type: "exileFaceDown" }> => e.type === "exileFaceDown");
     const others = all.some((e) => e.type === "exile" || e.type === "exileTop" || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileHand" || (e.type === "discard" && !!e.exile) || (e.type === "search" && e.dest.zone === "exile") || e.type === "castFromAmong" || e.type === "pick" || e.type === "chooseFromGraveyard");
     const f = faceDown[0];
-    if (others || out.spell || faceDown.length !== 1 || f!.from !== "top" || f!.actor || f!.who || f!.pickOne || f!.foretold !== undefined) out.unsupported.push("(plays cards exiled with it that it can't link to one exile ability)");
+    // Kheru Mind-Eater (round B231): "that player exiles a card from their hand face down", the damaged player's choice,
+    // seen by whoever controls it (lookControllers).
+    const kheru = f?.from === "handCard" && f.actor?.ref === "eventPlayer" && !!f.lookControllers;
+    if (others || out.spell || faceDown.length !== 1 || (!kheru && (f!.from !== "top" || f!.actor)) || f!.who || f!.pickOne || f!.foretold !== undefined) out.unsupported.push("(plays cards exiled with it that it can't link to one exile ability)");
     else f!.look = true;
   } else if (out.playLinkedWhile) {
     const all = bodies.flatMap((b) => allEffects(b.effects));

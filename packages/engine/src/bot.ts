@@ -771,6 +771,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "searchLibrary", player: pid, found: [best] }];
     }
     if (pend.kind === "searchLibrary" && pend.dig?.to === "to exile face down" && pend.min === 0 && pend.cards.length === 1 && s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "exileFaceDown" && !!x.optional)) return [{ type: "searchLibrary", player: pid, found: [...pend.cards] }];
+    // Kheru Mind-Eater (round B231): a card of our hand exiled face down for another player to play: the one worth least.
+    if (pend.kind === "searchLibrary" && pend.dig?.to === "to exile face down" && pend.hand === pid && s.resolving && s.resolving.item.controller !== pid && pend.cards.length)
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => handWorth(s, a) - handWorth(s, b)).slice(0, Math.max(1, pend.min)) }];
     if (pend.kind === "searchLibrary" && pend.dig && /face down/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: chooseManifest(s, pid, pend.cards, pend.max) }];
     // "Exile a card from a graveyard" (Cemetery Prowler): an opponent's card if there is one, the one sharing the most card
     // types with the cards in our hand (the exiled card's types matter to these cards), the dearest first.
@@ -2011,6 +2014,24 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // namer's hand isn't in it; otherwise we expect them to have named a card they hold. Only public information is used.
     // Liberated Livestock (round B208): the costliest Aura that helps a creature of ours, else none.
     // Preferred Selection (round B216): the card we'd rather draw into our hand, the other one to the bottom.
+    // Backdraft (round B229): the most damage to an opponent; with only ourselves to choose, the least.
+    // Cyclopean Tomb (round B231): our own land with mire counters (it gets its land types back), else one with none (nothing
+    // changes), else an opponent's (only theirs are left).
+    if (pend.kind === "chooseOption" && pend.what === "mireLand") {
+      const score = (id: string) => {
+        const o = s.objects[id];
+        if (!o) return 3;
+        const mine = controllerOf(s, o) === pid;
+        return (o.counters.mire ?? 0) > 0 ? (mine ? 0 : 2) : 1;
+      };
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => score(a) - score(b))[0]! }];
+    }
+    if (pend.kind === "chooseOption" && pend.what === "spellDamageBack") {
+      const parsed = pend.options.map((o) => ({ o, who: Number(o.split(":")[0]), n: Number(o.split(":")[1]) }));
+      const foes = parsed.filter((x) => x.who !== pid).sort((a, b) => b.n - a.n);
+      const pick = foes[0] ?? parsed.sort((a, b) => a.n - b.n)[0]!;
+      return [{ type: "chooseOption", player: pid, choice: pick.o }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "lookedCard") {
       const toHand = /into your hand/.test(pend.prompt ?? "");
       const want = pend.options.filter((o) => wantOnTop(s, pid, o));
@@ -3955,6 +3976,12 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // creatures too; bots have no plan for that, so they don't cast it.
   const spellFx = compileCard(d).spell?.effects ?? [];
   if (spellFx.some((e) => e.type === "putFromHand") && spellFx.some((e) => e.type === "continuous" && e.what.ref === "created" && e.mods.some((m) => m.kind === "addAbility" && /^At the beginning of your end step, sacrifice ~\.$/.test(m.text)))) return null;
+  // Disciple of Caelus Nin (round B223): everything but five permanents of each player phases out for as long as it stays;
+  // cast only while we'd keep all of ours.
+  if (compileCard(d).permanentsCantPhaseIn && compileCard(d).triggers.some((tr) => tr.body.effects.some((e) => e.type === "keepRest" && e.phaseOut)) && s.battlefield.filter((b) => controllerOf(s, obj(s, b)) === pid).length > 5) return null;
+  // Shimmer (round B226): lands of the chosen type phase out every other turn, ours too; cast only with a land type that
+  // hurts opponents more than us.
+  if (/^Each land of the chosen type has phasing\./m.test(d.oracleText) && phasingLandTypeScore(s, pid).best <= 0) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
@@ -6170,6 +6197,11 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
     const second = holder ? !!holder.chosen?.landTypes?.length : what === "basicLandType" && s.resolving?.scratch?.swapFrom !== undefined;
     return chooseSwapLandType(s, pid, options, second);
   }
+  // Shimmer (round B226): each land of the chosen type has phasing, so the type opponents have the most lands of, net of ours.
+  if (what === "landType" && /^Each land of the chosen type has phasing\./m.test(card?.oracleText ?? "")) {
+    const { type, best } = phasingLandTypeScore(s, pid, options);
+    return type !== undefined && best > 0 ? type : (options.find((t) => !s.battlefield.some((id) => characteristics(s, obj(s, id)).subtypes.includes(t))) ?? type ?? options[0]!);
+  }
   if (what === "basicLandType" || what === "landType") return chooseLandType(s, pid, options);
   if (what === "keyword") return chooseKeyword(s, pid, options);
   // "The color or colors of your choice": one color is enough, the one it would choose alone.
@@ -6653,6 +6685,17 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.mana) continue;
       // Fractured Powerstone's planar die outside Planechase: nothing to gain.
       if (ab.body.effects.every((e) => e.type === "noEffect")) continue;
+      // Harvest Mage (round B224): a card for lands that make a color of our choice this turn, which no payment plans
+      // for in advance: not on its own.
+      if (ab.body.effects.length && ab.body.effects.every((e) => e.type === "landManaUntilEndOfTurn" && e.mana === "any")) continue;
+      // Acidic Dagger (round B225): which of our creatures will deal combat damage to which blockers isn't planned for in
+      // advance: not on its own.
+      if (ab.body.effects.some((e) => e.type === "floatingTrigger" && e.about !== undefined && e.trigger.event === "selfDealsCombatDamageToCreature")) continue;
+      // Lesser Werewolf (round B225): "If ~'s power is 1 or more, ...": nothing at all while it isn't.
+      const w0 = ab.body.effects.length === 1 ? ab.body.effects[0] : undefined;
+      if (w0?.type === "if" && w0.cond.kind === "state" && w0.cond.cond.kind === "amount" && typeof w0.cond.cond.amount === "object" && w0.cond.cond.amount.count.kind === "power" && w0.cond.cond.amount.count.of.ref === "self" && !staticConditionNow(s, w0.cond.cond, id, pid)) continue;
+      // Goblin Artisans (round B223): losing the flip counters a spell of our own: never worth the card.
+      if (ab.body.targets.some((t) => t.kind === "spell" && t.controller === "you") && allEffects(ab.body.effects).some((e) => e.type === "counterSpell")) continue;
       // Keep our permanents (but cash in Food and Clues), and avoid free loops.
       const cashIn = ab.sacrificeSelf && o.isToken && !objIsType(s, o, "Creature");
       // A cost of nothing, "{0}" included, could be paid over and over.
@@ -6752,6 +6795,12 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (sweepX !== undefined) {
         if (sweepX === null) continue;
         const plan = planActivate(s, pid, id, i, undefined, undefined, undefined, sweepX.x, { exileCards: sweepX.cards });
+        if (plan) return plan;
+        continue;
+      }
+      // Back from the Brink (round B231): a copy of the costliest creature card in our graveyard whose mana cost we can pay.
+      if (ab.manaCostOfExiled) {
+        const plan = exileMvXPlan(s, pid, o, i, ab);
         if (plan) return plan;
         continue;
       }
@@ -7863,10 +7912,11 @@ function graveSweepX(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAb
 /** Osgir, the Reconstructor ("{X}, {T}, Exile an artifact card with mana value X from your graveyard: Create two tokens that are copies of the exiled card"): the card with the greatest mana value we can pay X for, never a land. */
 function exileMvXPlan(s: GameState, pid: PlayerId, o: GameObject, i: number, ab: ActivatedAbility): Action[] | null {
   if (ab.body.modal || ab.body.targets.length || !ab.body.effects.every((e) => e.type === "createTokenCopy" && e.what.ref === "costExiled")) return null;
-  const cost = ab.costs!.find((c) => c.kind === "exileFromGraveyard" && c.mvX)!;
+  const cost = ab.costs!.find((c) => c.kind === "exileFromGraveyard" && (c.mvX || ab.manaCostOfExiled))!;
   const cards = player(s, pid).graveyard.filter((c) => cost.kind === "exileFromGraveyard" && !!cost.filter && printedMatches(cost.filter, defOf(s, obj(s, c))) && !isType(defOf(s, obj(s, c)), "Land")).sort((a, b) => defMv(defOf(s, obj(s, b))) - defMv(defOf(s, obj(s, a))));
   for (const card of cards) {
-    const x = defMv(defOf(s, obj(s, card)));
+    // Back from the Brink (round B231): the card's own mana cost is the cost, no X to announce.
+    const x = ab.manaCostOfExiled ? undefined : defMv(defOf(s, obj(s, card)));
     const plan = planActivate(s, pid, o.id, i, undefined, undefined, undefined, x, { exileCards: [card] });
     if (plan) return plan;
   }
@@ -9200,6 +9250,25 @@ function chooseSwapLandType(s: GameState, pid: PlayerId, options: string[], seco
       return n + (opps.includes(controllerOf(s, o)) ? 1 : controllerOf(s, o) === pid ? -1 : 0);
     }, 0);
   return [...options].sort((a, b) => score(b) - score(a))[0]!;
+}
+
+/**
+ * Shimmer (round B226): the land type whose lands phasing hurts opponents most against us: each opponent's land of that type
+ * counts 1, each of ours as much as all the opponents together (they lose one land each, we lose ours). Among `options`, or
+ * every land type on the battlefield.
+ */
+function phasingLandTypeScore(s: GameState, pid: PlayerId, options?: string[]): { type?: string; best: number } {
+  const opps = s.turnOrder.filter((p) => p !== pid && !player(s, p).lost).length;
+  const score = new Map<string, number>();
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (!objIsType(s, o, "Land")) continue;
+    for (const t of characteristics(s, o).subtypes) if (!options || options.includes(t)) score.set(t, (score.get(t) ?? 0) + (controllerOf(s, o) === pid ? -opps : 1));
+  }
+  let type: string | undefined;
+  let best = 0;
+  for (const [t, n] of score) if (type === undefined || n > best) [type, best] = [t, n];
+  return { ...(type !== undefined ? { type } : {}), best };
 }
 
 function chooseLandType(s: GameState, pid: PlayerId, options: string[]): string {

@@ -305,7 +305,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${src}: ${off} of that damage is prevented.`);
       }
       const dealt = dealtWithExcess(s, from, events, (evs) => dealDamageBatch(s, evs, { lifelink }));
-      gainLife(s, from.controller, lifelink.n);
+      gainLife(s, from.controller, lifelink.n, "lifelink");
       if (dealt && from.id) fireEvent(s, { type: "dealtDamage", id: from.id, amount: dealt, combat: false });
       return;
     }
@@ -324,7 +324,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         .map((o) => ({ src: objectSource(s, o), to: e.toHost ? { object: hostOf(o)! } : recTo ?? (victim ? { object: victim.id } : { player: controllerOf(s, o) }), n: e.ownPower ? power(s, o) : n }));
       const gains = new Map<PlayerId, { n: number }>();
       const dealt = dealPlanned(s, planDamage(s, events), { lifelink: (ev) => gains.get(ev.src.controller) ?? gains.set(ev.src.controller, { n: 0 }).get(ev.src.controller)! });
-      for (const [pid, g] of gains) gainLife(s, pid, g.n);
+      for (const [pid, g] of gains) gainLife(s, pid, g.n, "lifelink");
       const by = new Map<ObjectId, number>();
       for (const d of dealt) if (d.dealt > 0 && d.src.id) by.set(d.src.id, (by.get(d.src.id) ?? 0) + d.dealt);
       for (const [id, amount] of by) fireEvent(s, { type: "dealtDamage", id, amount, combat: false });
@@ -414,8 +414,18 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     case "landManaUntilEndOfTurn":
       // Pale Moon, Deep Water: a replacement effect until the turn ends (CR 514.2), applied in manaabilities.ts tappedForMana.
-      (s.landManaRules ??= []).push({ turn: s.turn, player: ctx.controller, mana: e.mana, ...(e.nonbasic ? { nonbasic: true as const } : {}), ...(e.yours ? { yours: true as const } : {}) });
-      log(s, `Until end of turn, ${e.nonbasic ? "nonbasic lands" : `lands ${player(s, ctx.controller).name} controls`} tapped for mana produce ${e.mana === "C" ? "colorless mana" : `{${e.mana}}`} instead.`);
+      // Harvest Mage (round B224): "one mana of a color of your choice instead of any other type and amount" (mana "any", `one`).
+      // Hall of Gemstone (round B226): "mana of the chosen color instead of any other color", the color chosen before it as
+      // this resolves (none chosen, nothing changes), only colored mana (`colored`).
+      if (e.mana === "chosen") {
+        const color = s.resolving?.chosen?.color;
+        if (!color) return;
+        (s.landManaRules ??= []).push({ turn: s.turn, player: ctx.controller, mana: color, ...(e.colored ? { colored: true as const } : {}) });
+        log(s, `Until end of turn, lands tapped for mana produce ${COLOR_NAMES[color].toLowerCase()} mana instead of any other color (${src}).`);
+        return;
+      }
+      (s.landManaRules ??= []).push({ turn: s.turn, player: ctx.controller, mana: e.mana, ...(e.one ? { one: true as const } : {}), ...(e.nonbasic ? { nonbasic: true as const } : {}), ...(e.yours ? { yours: true as const } : {}), ...(e.subtype ? { subtype: e.subtype } : {}) });
+      log(s, `Until end of turn, ${e.subtype ? `${e.subtype}s` : e.nonbasic ? "nonbasic lands" : `lands ${player(s, ctx.controller).name} controls`} tapped for mana produce ${e.mana === "any" ? `${e.one ? "one mana" : "mana"} of a color of ${player(s, ctx.controller).name}'s choice` : e.mana === "C" ? "colorless mana" : `{${e.mana}}`} instead.`);
       return;
     case "turnRules":
       if (e.everyone) {
@@ -460,7 +470,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     case "flashUntilNextTurn":
       (s.flashUntil ??= []).push({ controller: ctx.controller, filter: e.filter, ...(e.thisTurn ? { turn: s.turn } : {}) });
-      log(s, `${player(s, ctx.controller).name} may cast ${e.filter.text} as though they had flash until their next turn.`);
+      log(s, `${player(s, ctx.controller).name} may cast ${e.filter.text} as though they had flash ${e.thisTurn ? "this turn" : "until their next turn"}.`);
       return;
     case "opponentsHandOnlyUntilNextTurn":
       (s.handOnlyUntil ??= []).push({ controller: ctx.controller, source: src });
@@ -834,7 +844,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         delete sc.either;
         // Tapped for mana (Orcish Lumberjack): Mana Reflection's replacement multiplies it (CR 106.12b).
         const made = [...mix(k).matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType);
-        const added = s.resolving?.item.manaAbility?.tapped ? tappedForMana(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined, made) : made;
+        const added = s.resolving?.item.manaAbility?.tapped ? tappedForMana(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined, made, s.resolving.item.manaAbility.instead) : made;
         for (const m of added) addMana(s, p.id, [m], { from: manaSourceOrigins(s, ctx) });
         log(s, `${p.name} adds ${added.map((m) => `{${m}}`).join("")}.`);
         return;
@@ -862,7 +872,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         delete sc.manaMix;
         const from = manaSourceOrigins(s, ctx);
         const mixed = COLORS.flatMap((c) => Array<ManaType>(mix[c] ?? 0).fill(c));
-        const colors = s.resolving?.item.manaAbility?.tapped ? tappedForMana(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined, mixed) : mixed;
+        const colors = s.resolving?.item.manaAbility?.tapped ? tappedForMana(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined, mixed, s.resolving.item.manaAbility.instead) : mixed;
         for (const c of colors) addMana(s, p.id, [c], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: e.keep } : {}) });
         if (colors.length) log(s, `${p.name} adds ${colors.map((c) => `{${c}}`).join("")}.`);
         return;
@@ -873,7 +883,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (marked) (marked.triggeredThisTurn ??= []).push(`${ctx.sourceZc ?? marked.zoneChanges ?? 0}|addedMana`);
       // An activated mana ability with {T} in its cost taps its source for mana (CR 106.12): Mana Reflection's
       // replacement effect multiplies what it produces (106.12b).
-      if (s.resolving?.item.manaAbility?.tapped) added = tappedForMana(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined, [...added.matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType)).map((m) => `{${m}}`).join("");
+      if (s.resolving?.item.manaAbility?.tapped) added = tappedForMana(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined, [...added.matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType), s.resolving.item.manaAbility.instead).map((m) => `{${m}}`).join("");
       // What the mana's source was (CR 106.3): a mana ability's source as it was activated, else a snow spell, or the
       // ability's source (snow mana, CR 107.4h; mana from a creature).
       const from = s.resolving?.item.manaAbility ? (s.resolving.item.manaAbility.from ?? []) : manaSourceOrigins(s, ctx);
@@ -1254,7 +1264,7 @@ function castSpellSource(s: GameState, ctx: ResolveCtx): DamageSource | undefine
   const o = item?.objectId ? s.objects[item.objectId] : undefined;
   if (!item || !o) return undefined;
   const d = defOf(s, o);
-  return { ...cardSource(d, item.controller, { object: o.id, zc: o.zone === "stack" ? (o.zoneChanges ?? 0) : (s.lastKnown?.[o.id]?.zc ?? o.zoneChanges ?? 0) }), spell: true, colors: item.castColors ?? d.colors, ...(item.castMv !== undefined ? { manaValue: item.castMv } : {}) };
+  return { ...cardSource(d, item.controller, { object: o.id, zc: o.zone === "stack" ? (o.zoneChanges ?? 0) : (s.lastKnown?.[o.id]?.zc ?? o.zoneChanges ?? 0) }), spell: true, ...(item.copy ? {} : { cast: true as const }), colors: item.castColors ?? d.colors, ...(item.castMv !== undefined ? { manaValue: item.castMv } : {}) };
 }
 
 function subjectSource(s: GameState, ctx: ResolveCtx): DamageSource | undefined {

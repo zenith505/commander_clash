@@ -3,7 +3,7 @@ import { defMv, hasName, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import { isRealKicker, type AbilityBody, type BatchTrigger, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, castCardAs, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, pairedWith, power, toughness } from "../cards";
-import { checkAscend, isEmerge, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, spellHasFlash, conspireGranted, casualtyGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
+import { whileTappedHolds, checkAscend, isEmerge, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, spellHasFlash, conspireGranted, casualtyGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, modeRange, withModes } from "../modes";
 import { compileCard, compileGranted } from "../oracle";
@@ -757,6 +757,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // definition what the ability remembers (CR 113.7a).
       const o: GameObject | undefined = s.objects[ft.sourceId] ?? (s.cards[ft.sourceCardId] ? { id: ft.sourceId, cardId: ft.sourceCardId, owner: ft.controller, controller: ft.controller, zone: "graveyard", timestamp: 0, tapped: false, controlledSinceTurn: -1, damage: 0, deathtouchDamage: false, counters: {}, isCommander: false, isToken: true, zoneChanges: ft.sourceZc + 1 } : undefined);
       if (!o || player(s, ft.controller).lost) continue;
+      // Giant Oyster: "for as long as ~ remains tapped" (CR 611.2b): gone once its source untapped or left (whileTapped).
+      if (ft.whileTapped && !whileTappedHolds(s, ft.whileTapped)) {
+        s.floatingTriggers = s.floatingTriggers!.filter((x) => x !== ft);
+        continue;
+      }
       if (ft.toPlayer !== undefined && ft.toPlayer !== dealtTo) continue;
       if (self && (ft.about ? ft.about.id !== self.id || (self.zoneChanges ?? 0) !== ft.about.zc : o.id !== self.id || (o.zoneChanges ?? 0) !== ft.sourceZc)) continue;
       floating = ft;
@@ -1149,6 +1154,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         for (const a of o.blocking) {
           const at = s.objects[a];
           if (at) add(o, you, (e, t) => (e === "selfBlocksCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, at, you), undefined, undefined, at);
+          // Goblin Flotilla (round B225): "whenever ~ blocks or becomes blocked by a creature this combat", a delayed trigger
+          // about ~ (CR 603.7b-c): once for each creature it blocks.
+          if (at) fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfBlocksOrBlockedByCreature" && fits(t, at, ctrl), triggers, undefined, at), o);
           // "Whenever enchanted creature blocks or becomes blocked by a creature" (Mammoth Harness): once for each, that
           // creature the subject; the two of them the event's group ("destroy both creatures", Dead-Iron Sledge).
           if (at) addHosted(o, (e, t, w) => e === "selfBlocksOrBlockedByCreature" && fits(t, at, w), undefined, at, { group: [o, at].map((x) => ({ id: x.id, zc: x.zoneChanges ?? 0 })) });
@@ -1191,7 +1199,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           const bl = s.objects[b];
           if (bl) add(o, you, (e, t) => (e === "selfBlockedByCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, bl, you), undefined, undefined, bl);
           // Zombie Boa: "Whenever ~ becomes blocked by a creature of that color this turn": a delayed trigger about ~ (CR 603.7b).
-          if (bl) fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfBlockedByCreature" && fits(t, bl, ctrl), triggers, undefined, bl), o);
+          if (bl) fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => (e === "selfBlockedByCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, bl, ctrl), triggers, undefined, bl), o);
           if (bl) addHosted(o, (e, t, w) => e === "selfBlocksOrBlockedByCreature" && fits(t, bl, w), undefined, bl, { player: o.attacking, group: [o, bl].map((x) => ({ id: x.id, zc: x.zoneChanges ?? 0 })) });
           // "Whenever equipped creature becomes blocked by a creature" (Infiltration Lens): once for each blocker (rulings).
           if (bl) addHosted(o, (e) => e === "selfBlockedByCreature", undefined, bl, { player: o.attacking });
@@ -2181,6 +2189,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const info = { amount: ev.amount, ...(ev.excess ? { excess: ev.excess } : {}) };
       // Vampire Slayer: "deals damage to a Vampire", only a creature that fits (as it's dealt the damage).
       add(o, controllerOf(s, o), (e, t) => (e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature")) && (!t.subjectFilter || objectMatches(s, t.subjectFilter, hit, controllerOf(s, o), false)), undefined, undefined, hit, undefined, undefined, undefined, info);
+      // Acidic Dagger (round B225): "Whenever target creature deals combat damage to a non-Wall creature this turn", a
+      // delayed trigger about that creature (CR 603.7b-c), the creature dealt damage the subject, as it was dealt it.
+      fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => (e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature")) && (!t.subjectFilter || objectMatches(s, t.subjectFilter, hit, ctrl, false)), triggers, undefined, hit, undefined, undefined, undefined, info), o);
       addHosted(o, (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, hit, info);
       // Kusari-Gama: to a creature that's blocking as it's dealt the damage (CR 509.1h), any damage; the defending player
       // the one the equipped creature is attacking (CR 508.5), if it is.
@@ -3049,7 +3060,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     fromExiled(stepWatch);
     fromEmblems(stepWatch);
     // "At the beginning of each combat this turn" (Full Throttle): a delayed trigger made by a spell (CR 603.7b).
-    fromFloating((o, you, triggers) => add(o, you, (e) => e === each, triggers, undefined, undefined, undefined, undefined, undefined, { player: ev.active }));
+    // Giant Oyster: "at the beginning of each of your draw steps" for as long as it remains tapped, the delayed trigger's
+    // controller's (CR 603.7d-e).
+    fromFloating((o, you, triggers) => add(o, you, (e) => e === each || (e === want && you === ev.active), triggers, undefined, undefined, undefined, undefined, undefined, { player: ev.active }));
   }
 }
 

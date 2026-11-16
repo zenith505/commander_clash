@@ -11,7 +11,7 @@ import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, castCardAs, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
-import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
@@ -368,7 +368,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "activateMana":
       if (!paysManaNow(s)) requireNoPending(s);
-      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra, action.combo, action.to);
+      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra, action.combo, action.to, action.instead);
       break;
     case "castSpell":
       if (action.assisted !== undefined) throw new RulesError("the assisting player chooses how much they pay");
@@ -951,7 +951,7 @@ export function moveObject(
     // "Exiled with ~" while that permanent is still on the battlefield (CR 607.2a): the card as it will be in exile.
     const src = s.objects[by];
     if (x.linked && src?.zone === "battlefield" && by !== o.id) ((s.linkedExile ??= {})[`${by}@${src.zoneChanges ?? 0}`] ??= []).push({ id, zc: (o.zoneChanges ?? 0) + 1 });
-    if (x.gainLife) gainLife(s, you, x.gainLife);
+    if (x.gainLife) gainLife(s, you, x.gainLife, { controller: you });
     // Ravenous Slime: +1/+1 counters equal to the creature's power as it last existed (rulings), on the Slime if it's
     // still on the battlefield (not if it's dying at the same time).
     if (x.countersPower && src?.zone === "battlefield" && by !== o.id) {
@@ -1079,6 +1079,9 @@ export function moveObject(
   // "If you sacrificed a Food this turn" (Elanor Gardner): as it last existed (CR 701.21a: its controller sacrifices it).
   if (opts.sacrificed && fromZone === "battlefield") ((s.turnLog ??= {}).sacrificed ??= []).push({ player: lastController, types: [...last.types], subtypes: [...last.subtypes], ...(o.isToken ? { token: true as const } : {}) });
   const wasCreature = last.types.includes("Creature");
+  // Intermediate Chirography: "if a modified creature died under your control this turn": modified as it last existed, with
+  // counters, equipped, or enchanted by an Aura its controller controlled (CR 700.9), one leaving at the same time too.
+  const diedModified = fromZone === "battlefield" && to === "graveyard" && wasCreature && diedAsModified(s, o, lastController);
   // A face-down permanent has no abilities of its own (CR 708.2), so nothing of the card's triggers as it leaves.
   const hadAbilities = last.hasPrintedAbilities && !o.faceDown;
   // The permanent as it last existed, for "whenever a creature you control with a +1/+1 counter dies".
@@ -1406,7 +1409,7 @@ export function moveObject(
   // A creature put into a graveyard from the battlefield died (CR 700.4), a token too (it goes there first, CR 111.7).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedThisTurn ??= []).push(lastController);
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedNamesThisTurn ??= []).push(o.faceDown ? "" : last.name);
-  if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedTypesThisTurn ??= []).push(o.faceDown ? { subtypes: [], controller: lastController, power: last.power } : { subtypes: [...last.subtypes], ...(last.allCreatureTypes ? { all: true as const } : {}), controller: lastController, power: last.power });
+  if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedTypesThisTurn ??= []).push({ ...(o.faceDown ? { subtypes: [] } : { subtypes: [...last.subtypes], ...(last.allCreatureTypes ? { all: true as const } : {}) }), controller: lastController, power: last.power, ...(diedModified ? { modified: true as const } : {}) });
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature && !o.isToken) (s.nontokenDiedThisTurn ??= []).push(lastController);
   // "Put into your graveyard from the battlefield": its owner's graveyard (CR 404.2), a token too (CR 111.7).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) ((s.turnLog ??= {}).creaturesToYard ??= []).push({ owner: o.owner, ...(o.isToken ? { token: true as const } : {}) });
@@ -1665,7 +1668,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // it as it would exist on the battlefield (CR 614.12, rulings). Unleash likewise ("Other Dogs you control have unleash",
   // Tesak), each instance its own choice.
   const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot" || x === "unleash"));
-  const options: EntersOption[] = [...(printed.entersExileFromYard ? (["exileFromYard"] as const) : []), ...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.entersRemoveCounters ? (["removeCounters"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersDiscardKeywords ? (["discardKeywords"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
+  const options: EntersOption[] = [...(printed.entersExileFromYard ? (["exileFromYard"] as const) : []), ...(printed.entersProcess ? (["processExile"] as const) : []), ...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.entersRemoveCounters ? (["removeCounters"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersDiscardKeywords ? (["discardKeywords"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
   // Frankenstein's Monster: "exile X creature cards" with the X it was cast with (CR 107.3m).
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(what === "exileFromYard" && opts.x ? { enterOpts: { x: opts.x } } : {}), ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
@@ -2149,8 +2152,15 @@ export function canEnterUntapped(s: GameState, pid: PlayerId, landId: ObjectId):
   return p.hand.some((id) => id !== landId && printedMatches(choice.filter, defOf(s, obj(s, id))));
 }
 
+/**
+ * What causes a life gain, for Rain of Gore (CompiledCard.causedGainLose): the controller of the spell or ability that
+ * causes it; "lifelink" for lifelink's (CR 702.15b: the damage causes it, rulings); left out, the spell or ability that's
+ * resolving, if any (a mana ability too, effects/resolve.ts resolveManaAbility).
+ */
+export type GainCause = { controller: PlayerId } | "lifelink";
+
 /** A player gains life (CR 119.3): one life-gain event, which "whenever you gain life" abilities see (CR 119.10). */
-export function gainLife(s: GameState, pid: PlayerId, n: number) {
+export function gainLife(s: GameState, pid: PlayerId, n: number, cause?: GainCause) {
   if (n <= 0) return;
   if (!canGainLife(s, pid)) {
     log(s, `${player(s, pid).name} can't gain life.`); // CR 119.7
@@ -2165,6 +2175,14 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
   // "That player loses that much life instead" (Tainted Remedy, CR 614.1a): the player chooses the order of the
   // replacements (CR 616.1, rulings); this one first replaces the gain before anything doubles it, so the least is lost.
   if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).opponentsGainLose && controllerOf(s, obj(s, id)) !== pid)) {
+    log(s, `${player(s, pid).name} loses ${n} life instead of gaining it.`);
+    loseLife(s, pid, n);
+    return;
+  }
+  // Rain of Gore (round B231): the same, for a gain a spell or ability causes for its own controller. Applied first too
+  // (CR 616.1: the player loses the least that way).
+  const causer = cause === "lifelink" ? undefined : cause ? cause.controller : s.resolving?.item.controller;
+  if (causer === pid && s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).causedGainLose)) {
     log(s, `${player(s, pid).name} loses ${n} life instead of gaining it.`);
     loseLife(s, pid, n);
     return;
@@ -2299,7 +2317,7 @@ function lifeZeroReplaced(s: GameState, pid: PlayerId): boolean {
   log(s, `${p.name}'s life total would be reduced to 0 or less; instead ${name} transforms and their life total becomes 3.`);
   const turned = transformPermanent(s, angel);
   if (p.life > 3) lifeDown(s, pid, p.life - 3);
-  else if (p.life < 3) gainLife(s, pid, 3 - p.life);
+  else if (p.life < 3) gainLife(s, pid, 3 - p.life, { controller: controllerOf(s, angel) });
   if (!turned) {
     log(s, `${name} didn't transform.`);
     playerLoses(s, pid, `${name} didn't transform`);
@@ -2349,8 +2367,11 @@ function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName): { s
   // Sanctifier en-Vec: its colors in the zone it's leaving (rulings: a Clone copying a red creature is red; Order, cast, is
   // white), a permanent's from the layers (CR 613.1e), a spell's or card's as defOf gives them (CR 105.2).
   const colorsNow = fromZone === "battlefield" ? characteristics(s, o).colors : defOf(s, o).colors;
+  // Anafenza, the Foremost: its card types the same way (rulings: an animated land dies as a creature; a bestowed Aura
+  // isn't one, CR 702.103b).
+  const typesNow = fromZone === "battlefield" ? characteristics(s, o).types : defOf(s, o).types;
   const applies = (x: CompiledCard["graveyardExile"], controller: PlayerId) =>
-    !!x && (!o.isToken || !!x.tokens) && (!x.permanents || fromZone === "battlefield") && (x.whose === "any" || (x.whose === "yours") === (o.owner === controller)) && (!x.filter || printedMatches(x.filter, defOf(s, o))) && !(x.notYours && controlled === controller) && (!x.colorsNow || colorsNow.some((c) => x.colorsNow!.includes(c)));
+    !!x && (!o.isToken || !!x.tokens) && (!x.permanents || fromZone === "battlefield") && (x.whose === "any" || (x.whose === "yours") === (o.owner === controller)) && (!x.filter || printedMatches(x.filter, defOf(s, o))) && !(x.notYours && controlled === controller) && (!x.colorsNow || colorsNow.some((c) => x.colorsNow!.includes(c))) && (!x.typesNow || typesNow.some((t) => x.typesNow!.includes(t)));
   for (const id of s.battlefield) {
     const p = obj(s, id);
     const x = abilitiesOf(s, p).graveyardExile;
@@ -2367,6 +2388,19 @@ function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName): { s
     if (applies(x, l.controller)) return { source: defOf(s, obj(s, l.id)).name, ...(x!.counter ? { counter: x!.counter } : {}) };
   }
   return undefined;
+}
+
+/**
+ * Was `o`, about to die under `controller`'s control, modified (CR 700.9): a counter on it, an Equipment attached, or an
+ * Aura its controller controls; an Aura or Equipment leaving at the same time was still attached (CR 603.10a).
+ */
+function diedAsModified(s: GameState, o: GameObject, controller: PlayerId): boolean {
+  if (objectMatches(s, { kind: "object", types: [], notTypes: [], notColors: [], status: "modified", text: "modified creature" }, o, controller, false)) return true;
+  return (s.leftTogether ?? []).some((l) => {
+    if (l.attachedTo !== o.id || l.id === o.id) return false;
+    const subtypes = s.lastKnown?.[l.id]?.source?.subtypes ?? [];
+    return subtypes.includes("Equipment") || (subtypes.includes("Aura") && l.controller === controller);
+  });
 }
 
 /** Wheel of Sun and Moon: the name of a permanent whose replacement effect sends `o` (going to its owner's graveyard) to the bottom of that player's library, also one leaving at the same time. */
@@ -2592,6 +2626,25 @@ export function useShieldCounter(s: GameState, o: GameObject, what: string): boo
 }
 
 /**
+ * Bone Shaman (round B230): the permanents that can't be regenerated because a permanent with "Creatures dealt damage by ~
+ * this turn can't be regenerated this turn" (CompiledCard.damagedCantRegenerate) dealt them damage this turn, each as the
+ * object it is now (TurnLog.damageDealtTo `src`, CR 400.7). Worked out before a state-based action destroys several
+ * creatures at once (CR 704.3), so a Bone Shaman dying beside them still counts (its ability applies to the event it leaves in).
+ */
+export function damagedNoRegen(s: GameState): Set<ObjectId> {
+  const out = new Set<ObjectId>();
+  const dealt = s.turnLog?.damageDealtTo;
+  if (!dealt) return out;
+  const shamans = new Set(s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).damagedCantRegenerate).map((id) => `${id}@${obj(s, id).zoneChanges ?? 0}`));
+  if (!shamans.size) return out;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (objIsType(s, o, "Creature") && (dealt[`${id}@${o.zoneChanges ?? 0}`] ?? []).some((d) => !!d.src && shamans.has(d.src))) out.add(id);
+  }
+  return out;
+}
+
+/**
  * Destroy a permanent (CR 701.8): indestructible ones aren't (CR 702.12b), and a
  * regeneration shield replaces it (CR 701.19a): damage is removed, it's tapped, and it
  * leaves combat. Returns true if it was destroyed, wherever a replacement effect then sent it.
@@ -2612,6 +2665,8 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
   const name = defOf(s, o).name;
   // "It can't be regenerated (this turn)": its shields don't apply (CR 701.19c); they stay for later.
   // Mossbridge Troll: "If ~ would be destroyed, regenerate it": regenerated with no shield used up (rulings).
+  // Bone Shaman (round B230): "Creatures dealt damage by ~ this turn can't be regenerated this turn" (CR 701.19c).
+  if (!noRegen && ((o.regenShields ?? 0) > 0 || abilitiesOf(s, o).regeneratesInsteadOfDestroyed) && damagedNoRegen(s).has(o.id)) noRegen = true;
   const always = !noRegen && o.noRegenTurn !== s.turn && !!abilitiesOf(s, o).regeneratesInsteadOfDestroyed;
   if (!noRegen && o.noRegenTurn !== s.turn && ((o.regenShields ?? 0) > 0 || always)) {
     if (!always) {
@@ -3687,7 +3742,7 @@ function applyDrawShield(s: GameState, pid: PlayerId, key: string, left: number,
   if (w.lamp !== undefined) return lampInstead(s, pid, w.source, w.lamp, left, after, made, madeArchives);
   if (w.gain !== undefined) {
     log(s, `${p.name} gains ${w.gain} life instead of drawing a card (${w.source}).`);
-    gainLife(s, pid, w.gain);
+    gainLife(s, pid, w.gain, { controller: pid });
   }
   if (w.damage) wordsDamage(s, pid, w as typeof w & { damage: NonNullable<typeof w.damage> });
   if (w.token) {
@@ -5844,7 +5899,7 @@ export function tapAbilitySick(s: GameState, o: GameObject) {
   return !s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).creatureAbilitiesHaste && controllerOf(s, obj(s, id)) === you);
 }
 
-function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number, to?: PlayerId) {
+function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number, to?: PlayerId, instead?: ManaType) {
   const o = obj(s, id);
   // Its source as it was activated ("whenever you activate an ability of a creature", Elrond), before its costs.
   const activatedFrom = o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
@@ -5862,8 +5917,10 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // many counters it removes, announced as it's activated (CR 107.3a), and how that mana is split.
   const combos = manaCombos(s, o, ab);
   if (combos ? combo === undefined || !combos[combo] : combo !== undefined) throw new RulesError(combos ? `choose which mana ${name} adds` : `${name}'s ability has no combinations of mana to choose from`);
+  // A color chosen for a replacement that lets the player tapping it choose (round B224): one it offers.
+  if (instead !== undefined && !(ab.tap && insteadChoices(s, p.id, o).includes(instead))) throw new RulesError(`${name}'s mana can't be made {${instead}} instead`);
   // What it makes is worked out before the costs change anything ("for each creature you control").
-  const adds = manaProduced(s, o, ab, mana, combo);
+  const adds = manaProduced(s, o, ab, mana, combo, instead);
   // The triggered mana abilities tapping it triggers (CR 605.1b), with the player's picks for their mana.
   const triggered = manaTriggerResults(s, p.id, o, ab, adds);
   const picked = triggered.find((r) => r.extra.length === extra.length && r.extra.every((m, i) => m === extra[i]));
@@ -6099,7 +6156,7 @@ function runActivate(s: GameState, p: Player, action: Extract<Action, { type: "a
   // A mana ability can be activated wherever mana abilities can (CR 605.3a); abilityProblem says which it is.
   if (!paysManaNow(s)) requireNoPending(s);
   if (askChoosers(s, p, action)) return false;
-  const mana = activateAbility(s, p, action.objectId, action.index, action.targets, action.modes, action.tapCreatures, action.x, action.costs, action.mana, action.extra);
+  const mana = activateAbility(s, p, action.objectId, action.index, action.targets, action.modes, action.tapCreatures, action.x, action.costs, action.mana, action.extra, action.instead);
   s.passedInSuccession = [];
   return mana;
 }
@@ -9656,7 +9713,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       // Unchosen (a caller that didn't ask), the cost is still paid: by the first opponent who can gain life.
       const to = c.each ? opponents(s, p.id) : [choices.lifeTo ?? opponents(s, p.id).find((q) => canGainLife(s, q))!];
       log(s, `${p.name} has ${to.map((q) => player(s, q).name).join(", ")} gain ${c.n} life.`);
-      for (const q of to) gainLife(s, q, c.n);
+      for (const q of to) gainLife(s, q, c.n, { controller: p.id });
     }
     else if (c.kind === "exileFromHand" && c.toLibrary) {
       const ids = choices.exileFromHand ?? [];
@@ -9848,6 +9905,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (!g || g.zone !== "battlefield" || (g.zoneChanges ?? 0) !== ab.grantSourceCost.zc) return "the permanent that gave that ability is gone";
     if (ab.grantSourceCost.action === "sacrifice" && (controllerOf(s, g) !== pid || !canSacrificeForCost(s, g))) return `you can't sacrifice ${nameOf(s, g.id)}`;
     if (ab.grantSourceCost.action === "unattach" && g.attachedTo !== o.id) return `${nameOf(s, g.id)} isn't attached to ${d.name}`;
+    // "Tap Fishing Pole": an untapped one (CR 701.26a); the cost doesn't ask who controls it (unlike "you control").
+    if (ab.grantSourceCost.action === "tap" && g.tapped) return `${nameOf(s, g.id)} is tapped`;
   }
   // "Unattach ~" (Sunforger): only while it's attached to a creature (rulings, CR 602.2b).
   if (ab.unattachCost && !(o.attachedTo && s.objects[o.attachedTo]?.zone === "battlefield" && objIsType(s, obj(s, o.attachedTo), "Creature"))) return `${d.name} isn't attached to a creature`;
@@ -9947,7 +10006,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     const cp = extraCostProblem(s, pid, o, activatedCosts(ab, x, o, s, pid), costs, `activate ${d.name}'s ability`, ab.mana ? "mana" : "costs");
     if (cp) return cp;
   }
-  const cost = activationCost(s, pid, o, ab, targets, x);
+  const cost = activationCost(s, pid, o, ab, targets, x, costs);
   // A cost's X (Corpseweft's "one or more creature cards") is chosen as it's activated: asked before that (no X and no
   // costs chosen, the menu's check), only whether the ability could be activated at all.
   const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) && !(x === undefined && costs === undefined && !ab.loyaltyX) ? "X can't be 0" : null) : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : xProblem(cost, x);
@@ -10002,7 +10061,7 @@ export function lessWaterbend(cost: ParsedCost, extra: number, ab: ActivatedAbil
  * An activated ability's mana cost as `pid` activates it, after "Equip abilities you activate cost {1} less to activate"
  * (CR 602.2b applies 601.2f): reductions only take off generic mana. Without `targets` chosen yet, as if the best one were.
  */
-export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[], x = 0): ParsedCost {
+export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[], x = 0, costs?: CostChoices): ParsedCost {
   // Zirda, the Dawnwaker: abilities `pid` activates that aren't mana abilities, wherever they are (rulings).
   let less = 0;
   let atLeastOne = false;
@@ -10026,7 +10085,7 @@ export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: A
     }
   less += firstArtifactLess(s, pid, o, !!ab.mana);
   if (!ab.mana) less += firstOwnCreatureTargetLess(s, pid, ab, targets);
-  return activationLessCost(s, o, activationCostBefore(s, pid, o, ab, targets, x), x, less ? { n: less, atLeastOne } : undefined);
+  return activationLessCost(s, o, activationCostBefore(s, pid, o, ab, targets, x, costs), x, less ? { n: less, atLeastOne } : undefined);
 }
 
 /**
@@ -10135,6 +10194,19 @@ export function freeEquip(s: GameState, pid: PlayerId, ab: ActivatedAbility): bo
  * Autumn) alike, its discard still paid (rulings). Taken whenever it applies, as with freeEquip: with {X} in the cost,
  * only when X is 0 (X is 0 paying {0}, rulings), so it's never worse than the cost itself.
  */
+/**
+ * Advancing the Spirit (round B228): "You may pay {0} rather than pay the power-up cost of the first power-up ability you
+ * activate during each of your turns": an alternative cost (CR 118.9, 602.2b) for a power-up ability (CR 702.193a) `pid`
+ * activates during their own turn with none activated yet this turn, while they control such a permanent. Taken whenever
+ * it applies, as with freeCycling: every power-up cost is mana only, so {0} is never worse, and passing it up leaves no
+ * later power-up ability "the first" of the turn; with {X} in the cost (Stature, Size Shifter), only when X is 0 (X is 0
+ * paying {0}, CR 107.3b), so an X chosen above 0 pays the cost itself.
+ */
+export function freePowerUp(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, x = 0): boolean {
+  if (ab.keyword !== "Power-up" || o.zone !== "battlefield" || s.activePlayer !== pid || s.turnLog?.powerUps?.[pid] || (x && /\{X\}/.test(ab.manaCost))) return false;
+  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).freePowerUp);
+}
+
 export function freeCycling(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, x = 0): boolean {
   if (!ab.cycling || ab.tap || o.zone !== "hand" || o.owner !== pid || (x && /\{X\}/.test(ab.manaCost))) return false;
   return s.battlefield.some((id) => {
@@ -10152,9 +10224,11 @@ export function attachedManaCostOf(s: GameState, o: GameObject): string | undefi
   return cost ? cost : undefined;
 }
 
-function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[], x = 0): ParsedCost {
+function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[], x = 0, costs?: CostChoices): ParsedCost {
   // Merseine (round B211): the mana cost of the permanent it's attached to, as it is now, {X} as 0 (CR 107.3h).
-  const cost0 = parseManaCost(freeEquip(s, pid, ab) || freeCycling(s, pid, o, ab, x) ? "{0}" : ab.attachedManaCost ? (attachedManaCostOf(s, o) ?? "").replace(/\{X\}/g, "") || "{0}" : ab.manaCost);
+  // Back from the Brink (round B231): the exiled card's mana cost, {X} as 0.
+  const exiledCard = ab.manaCostOfExiled ? s.objects[costs?.exileCards?.[0] ?? ""] : undefined;
+  const cost0 = parseManaCost(freeEquip(s, pid, ab) || freeCycling(s, pid, o, ab, x) || freePowerUp(s, pid, o, ab, x) ? "{0}" : ab.attachedManaCost ? (attachedManaCostOf(s, o) ?? "").replace(/\{X\}/g, "") || "{0}" : ab.manaCostOfExiled ? (exiledCard ? defOf(s, exiledCard).manaCost ?? "" : "").replace(/\{X\}/g, "") || "{0}" : ab.manaCost);
   // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
   // (CR 602.2b applies 601.2f).
   const more = (ab.mana ? activationTax(s, o, pid, ab, true) : activationTax(s, o, pid, ab) + opponentsTargetTax(s, pid, targets)) + (ab.costMore ? Math.max(0, evalAmount(s, ab.costMore, { controller: pid, sourceId: o.id })) : 0);
@@ -10358,7 +10432,7 @@ function crewProblem(s: GameState, pid: PlayerId, vehicle: GameObject, n: number
  * Activate an ability (CR 602.2). Returns whether it was a mana ability, which resolved right away instead of going on
  * the stack (CR 605.3b). `mana` and `extra`: for a mana ability, as for activateMana.
  */
-function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x0?: number, costs?: CostChoices, mana?: ManaType, extra?: ManaType[]): boolean {
+function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x0?: number, costs?: CostChoices, mana?: ManaType, extra?: ManaType[], instead?: ManaType): boolean {
   const o = obj(s, id);
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
@@ -10390,8 +10464,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     [body, targets] = [fit.body, fit.targets];
   }
   if (chooserSlots(body.targets).length) [body, targets] = withChosenTargets(body, targets, costs);
-  const manaPick = ab.mana ? manaAbilityPick(s, p.id, o, index, mana, extra) : undefined;
-  if (!ab.mana && (mana !== undefined || extra !== undefined)) throw new RulesError(`${d.name}'s ability isn't a mana ability`);
+  const manaPick = ab.mana ? manaAbilityPick(s, p.id, o, index, mana, extra, instead) : undefined;
+  if (!ab.mana && (mana !== undefined || extra !== undefined || instead !== undefined)) throw new RulesError(`${d.name}'s ability isn't a mana ability`);
   // The source as it was activated, for "whenever an opponent activates an ability of a creature".
   const activatedFrom = o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
   // "Whenever you activate an ability of a card in your graveyard" (Neerdiv): where it was as it was activated (CR 602.2),
@@ -10399,7 +10473,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const fromOwnGraveyard = o.zone === "graveyard" && o.owner === p.id ? (true as const) : undefined;
   const inGraveyard = o.zone === "graveyard";
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
-  const abCost = activationCost(s, p.id, o, ab, targets, x);
+  const abCost = activationCost(s, p.id, o, ab, targets, x, costs);
   // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
   const halfLife = halfLifeCost(s, p.id, ab);
   const lifeCost = activatedLifeCost(s, p.id, ab, o, x);
@@ -10463,6 +10537,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // activated (CR 602.2), whoever owns it, even if a cost moves it.
   if (inGraveyard && !s.turnLog?.activatedInGraveyard?.includes(p.id)) ((s.turnLog ??= {}).activatedInGraveyard ??= []).push(p.id);
   if (ab.onceEver) (o.activatedEver ??= []).push(index); // exhaust (CR 702.177a)
+  // Advancing the Spirit: power-up abilities each player has activated this turn (after the cost is paid).
+  if (ab.keyword === "Power-up") ((s.turnLog ??= {}).powerUps ??= {})[p.id] = (s.turnLog.powerUps?.[p.id] ?? 0) + 1;
   if (ab.keyword === "Exhaust") p.exhaustTurn = s.turn; // CR 702.177b
   // "Choose one that hasn't been chosen" (Three Bowls of Porridge): chosen as it's activated.
   if (ab.body.modal && modes) noteModesChosen(s, ab.body, o.id, modes);
@@ -10495,6 +10571,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
       granter.attachedTo = undefined;
       invalidateCharacteristics(s);
     }
+    // Fishing Pole's granted "{1}, {T}, Tap Fishing Pole": the Equipment that gave it, as the costs are paid (CR 602.2b).
+    if (ab.grantSourceCost?.action === "tap" && granter?.zone === "battlefield" && (granter.zoneChanges ?? 0) === ab.grantSourceCost.zc && !granter.tapped) tapPermanent(s, granter);
     for (const c of tapCreatures ?? []) tapPermanent(s, obj(s, c));
     // Heart of Kiran: a loyalty counter removed instead (not a loyalty ability, rulings).
     if (ab.crew !== undefined && costs?.crewLoyalty !== undefined) removeCountersCost(s, obj(s, costs.crewLoyalty), { counter: "loyalty", n: 1 });
@@ -10510,6 +10588,12 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const costExiled: { id: ObjectId; zc: number }[] = [];
   const extraCosts = activatedCosts(ab, x, o, s, p.id);
   const sacrificed = extraCosts.length ? payExtraCosts(s, p, extraCosts, costs ?? {}, lki, costCardNames, costDiscarded, costExiled) : [];
+  // Vodalian War Machine (round B229): the permanents tapped to pay for its abilities this turn, by the source as the
+  // permanent it is (CR 400.7), for its dies trigger.
+  if (compileCard(d).logsCostTapped && extraCosts.some((c) => c.kind === "tap" && !c.untap) && costs?.tap?.length) {
+    const list = (((s.turnLog ??= {}).costTapped ??= {})[`${o.id}@${sourceZc}`] ??= []);
+    for (const t of costs.tap) if (s.objects[t] && !list.includes(`${t}@${s.objects[t]!.zoneChanges ?? 0}`)) list.push(`${t}@${s.objects[t]!.zoneChanges ?? 0}`);
+  }
   const tappedOne = ab.costs?.some((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x) && costs?.tap?.length === 1 ? costs.tap[0] : undefined;
   // Cryptic Gateway: the creatures its cost tapped, for "each creature tapped this way".
   const tappedKin = JSON.stringify(body.effects).includes('"kinOfCostTapped":true') ? (costs?.tap ?? []).flatMap((t) => (s.objects[t] ? [{ id: t, zc: s.objects[t]!.zoneChanges ?? 0, types: typesList(creatureTypesOf(s, s.objects[t]!)) }] : [])) : [];
@@ -10555,7 +10639,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
     ...(o.transforms ? { sourceTransforms: o.transforms } : {}),
     ...(JSON.stringify(body.effects).includes('"kind":"activatedTimes"') ? { activatedIndex: index } : {}),
-    ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(manaFrom.length ? { from: manaFrom } : {}) } } : {}),
+    ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(manaPick.instead ? { instead: manaPick.instead } : {}), ...(manaFrom.length ? { from: manaFrom } : {}) } } : {}),
     ...(paid.treasure ? { treasureSpent: paid.treasure } : {}),
     ...(ab.crew !== undefined && !ab.saddle && !ab.tapPower && tapCreatures?.length ? { crewers: tapCreatures.length } : {}),
     ...(paid.spent && Object.values(paid.spent).some((n) => n > 0) ? { manaSpentTypes: (Object.keys(paid.spent) as ManaType[]).flatMap((m) => Array<ManaType>(paid.spent[m]).fill(m)) } : {}),
@@ -10607,10 +10691,13 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
  * picks for the triggered mana abilities tapping its source triggers (CR 605.4a). Without a color, it's asked as it
  * resolves, which can't happen while another decision is open (paying for ward, say). Throws if a choice is missing.
  */
-function manaAbilityPick(s: GameState, pid: PlayerId, o: GameObject, index: number, mana?: ManaType, extra?: ManaType[]): { mana?: Color; extra?: ManaType[] } {
+function manaAbilityPick(s: GameState, pid: PlayerId, o: GameObject, index: number, mana?: ManaType, extra?: ManaType[], instead?: ManaType): { mana?: Color; extra?: ManaType[]; instead?: ManaType } {
   const name = characteristics(s, o).name;
   const ab = abilitiesOf(s, o).activated[index]!;
-  const options = activatedManaOptions(s, o, index);
+  // A color for a replacement that lets the player tapping it choose (round B224): only the options made with it.
+  const offered = activatedManaOptions(s, o, index);
+  if (instead !== undefined && !offered?.some((x) => x.instead === instead)) throw new RulesError(`${name}'s mana can't be made {${instead}} instead`);
+  const options = offered && instead !== undefined ? offered.filter((x) => x.instead === instead) : offered;
   const sameExtra = (x: { extra?: ManaType[] }) => (x.extra ?? []).length === (extra ?? []).length && (x.extra ?? []).every((m, i) => m === extra![i]);
   if (options) {
     const colors = [...new Set(options.map((x) => x.mana))];
@@ -10628,7 +10715,7 @@ function manaAbilityPick(s: GameState, pid: PlayerId, o: GameObject, index: numb
     const pick = ofColor.length === 1 ? ofColor[0]! : ofColor.find(sameExtra);
     if (!pick) throw new RulesError(`choose the mana that tapping ${name} also adds`);
     // A color only for "one mana of any color" (a fixed {C}{C} has none to choose).
-    return { ...(activatedAsMana(ab)!.produces.kind === "oneOf" ? { mana: mana as Color } : {}), ...(pick.extra ? { extra: pick.extra } : {}) };
+    return { ...(activatedAsMana(ab)!.produces.kind === "oneOf" ? { mana: mana as Color } : {}), ...(pick.extra ? { extra: pick.extra } : {}), ...(instead !== undefined ? { instead } : {}) };
   }
   if (mana !== undefined) throw new RulesError(`${name}'s ability has no color to choose before it resolves`);
   // What it adds isn't known until it resolves ("add {G}{G} instead"): it can't be activated if what tapping it
@@ -11059,6 +11146,16 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
     nextOpeningAction(s);
     return;
   }
+  if (pend?.kind === "searchLibrary" && pend.entering && pend.player === p.id) {
+    // Ulamog's Despoiler (round B229): the cards to put from exile into graveyards as it enters, all of them or none.
+    if (new Set(found).size !== found.length || found.some((id) => !pend.cards.includes(id))) throw new RulesError(`those cards aren't ${pend.what}`);
+    if (found.length && found.length !== pend.max) throw new RulesError(`choose exactly ${pend.max} cards or none`);
+    s.pending = null;
+    const entry = s.entersChoices?.[0]?.what === "processExile" && s.entersChoices[0].id === pend.entering ? s.entersChoices.shift() : undefined;
+    const o = s.objects[pend.entering];
+    if (o?.zone === "battlefield") processedAsEnters(s, o, found, entry?.enters);
+    return;
+  }
   if (pend?.kind === "searchLibrary" && pend.thenDraw && pend.player === p.id) {
     // Archmage Ascension: the card found goes into the hand, the library is shuffled, and the draws go on.
     if (found.length !== Math.min(pend.max, pend.cards.length) || found.some((id) => !pend.cards.includes(id) || !p.library.includes(id))) throw new RulesError(`find ${pend.what}`);
@@ -11462,7 +11559,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord" || pend.what === "removeCounters") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "processExile" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord" || pend.what === "removeCounters") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -11571,6 +11668,22 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "alternatePick") {
     const st = r.scratch?.alternate;
     if (!st) throw new RulesError("nothing to choose");
+    st.pick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "mireLand") {
+    // Cyclopean Tomb (round B231): the land whose mire counters are removed.
+    const st = r.scratch?.mireLand;
+    if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the lands offered");
+    st.pick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "spellDamageBack") {
+    // Backdraft (round B229): the player and the spell's damage.
+    const st = r.scratch?.spellDamageBack;
+    if (!st || !pend.options.includes(choice)) throw new RulesError("choose a player and damage offered");
     st.pick = choice;
     continueResolution(s);
     return;
@@ -12052,6 +12165,27 @@ export function removeCountersAsEntersOptions(s: GameState, o: GameObject): Obje
 }
 
 /**
+ * Ulamog's Despoiler (round B229): the cards chosen go from exile into their owners' graveyards (a face-down one chosen by its
+ * group, then at random within it: processPicks), and with that done it enters with its +1/+1 counters (CR 614.1c), even
+ * if a replacement effect kept a card in exile (rulings). Then it has entered, and its enters abilities trigger.
+ */
+const numberWord = (n: number) => ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"][n] ?? String(n);
+
+function processedAsEnters(s: GameState, o: GameObject, chosen: ObjectId[], enters?: { x?: number }) {
+  const how = compileCard(defOf(s, o)).entersProcess!;
+  const you = controllerOf(s, o);
+  const cards = chosen.filter((id) => s.objects[id]?.zone === "exile" && processCandidates(s, you).includes(id));
+  if (cards.length === how.n) {
+    processExiled(s, you, cards);
+    invalidateCharacteristics(s);
+    const put = putCounters(s, o, "+1/+1", how.counters, true);
+    log(s, `${defOf(s, o).name} enters with ${put} +1/+1 counter${put === 1 ? "" : "s"}.`);
+  } else log(s, `${player(s, you).name} puts no cards from exile into graveyards as ${defOf(s, o).name} enters.`);
+  invalidateCharacteristics(s);
+  if (enters) fireEvent(s, { type: "enters", id: o.id, ...enters });
+}
+
+/**
  * Sin, Unending Cataclysm: every counter comes off each permanent chosen, and it enters with `per` +1/+1 counters for each
  * one removed, as part of how it enters (CR 614.1c, 614.12).
  * Then it has entered, and its enters abilities trigger.
@@ -12242,6 +12376,20 @@ function askEntersChoice(s: GameState): boolean {
       // Sutured Ghoul, Living Lore, Frankenstein's Monster: one card at a time (enters-yard.ts).
       if (askYardExile(s, o, c)) return true;
       continue;
+    }
+    if (c.what === "processExile") {
+      // Ulamog's Despoiler (round B229): cards opponents own in exile, chosen as it enters (CR 614.12); fewer than it needs,
+      // none can be (rulings), and nothing is asked.
+      const how = compileCard(defOf(s, o)).entersProcess!;
+      const you = controllerOf(s, o);
+      const cards = processCandidates(s, you);
+      if (cards.length < how.n) {
+        q.shift();
+        processedAsEnters(s, o, [], c.enters);
+        continue;
+      }
+      s.pending = { kind: "searchLibrary", player: you, source: defOf(s, o).name, what: `${numberWord(how.n)} cards your opponents own`, cards, min: 0, max: how.n, exactly: true, exiled: true, entering: o.id, dig: { looked: cards, to: `to put into their owners' graveyards as it enters (then it enters with ${numberWord(how.counters)} +1/+1 counters), or none`, rest: "stay in exile" } };
+      return true;
     }
     if (c.what === "discardKeywords") {
       // Indominus Rex: any number of creature cards from its controller's hand (not itself, it isn't there).
@@ -12637,7 +12785,7 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     if (yes) {
       const gain = s.objects[from]?.zone === "battlefield" ? (abilitiesOf(s, obj(s, from)).maySkipDraw?.gain ?? 0) : 0;
       log(s, `${p.name} skips their draw step (${nameOf(s, from)}).`);
-      gainLife(s, p.id, gain);
+      gainLife(s, p.id, gain, { controller: p.id });
       return advanceStep(s);
     }
     if (askSkipDraw(s, [...declined, from])) return;
@@ -13110,11 +13258,19 @@ export function attackDirections(s: GameState): ("left" | "right")[] {
 }
 
 /**
+ * The players in their seats around the table, each one's left the next (CR 101.4): the turn order the game began with,
+ * even after Aeon Engine reverses the turn order: the players don't change seats, and "left" and "right" are about seats.
+ */
+export function seatOrder(s: GameState): PlayerId[] {
+  return s.seating ?? s.turnOrder;
+}
+
+/**
  * The nearest opponent of `pid` to their left or right: the next player in turn order is "usually the player seated to the
  * active player's left" (CR 101.4), so that one is to their left; players who left the game have no seat (CR 800.4a).
  */
 export function nearestOpponent(s: GameState, pid: PlayerId, side: "left" | "right"): PlayerId | undefined {
-  const seats = s.turnOrder.filter((p) => !player(s, p).lost || p === pid);
+  const seats = seatOrder(s).filter((p) => !player(s, p).lost || p === pid);
   const i = seats.indexOf(pid);
   const p = i < 0 ? undefined : seats[(i + (side === "left" ? 1 : seats.length - 1)) % seats.length];
   return p !== undefined && p !== pid ? p : undefined;
@@ -14140,9 +14296,10 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
 function blockQualities(s: GameState, bl: GameObject, at: GameObject): { bq?: BlockQualities; aq?: BlockQualities } {
   const q = (o: GameObject): BlockQualities => {
     const c = characteristics(s, o);
-    return { sub: c.allCreatureTypes ? "all" : c.subtypes.filter((t) => CREATURE_TYPES.has(t)), ...(c.supertypes.length ? { sup: [...c.supertypes] } : {}) };
+    return { sub: c.allCreatureTypes ? "all" : c.subtypes.filter((t) => CREATURE_TYPES.has(t)), ...(c.supertypes.length ? { sup: [...c.supertypes] } : {}), ...(c.colors.length ? { col: [...c.colors] } : {}) };
   };
-  const notable = (x: BlockQualities) => x.sub === "all" || x.sub.includes("Zombie") || !!x.sup?.includes("Legendary");
+  // Sea Troll (round B230): a blue creature in it, its colors then.
+  const notable = (x: BlockQualities) => x.sub === "all" || x.sub.includes("Zombie") || !!x.sup?.includes("Legendary") || !!x.col?.includes("U");
   const [b, a] = [q(bl), q(at)];
   return { ...(notable(b) ? { bq: b } : {}), ...(notable(a) ? { aq: a } : {}) };
 }
@@ -14156,7 +14313,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
     (at.blockedBy ??= []).push(bl.id);
     bl.blockedTurn = s.turn;
     bl.declaredInCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0 };
-    ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${at.id}@${at.zoneChanges ?? 0}`, combat: s.combatsThisTurn ?? 0, ...blockQualities(s, bl, at) });
+    ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${at.id}@${at.zoneChanges ?? 0}`, combat: s.combatsThisTurn ?? 0, ...blockQualities(s, bl, at), ac: controllerOf(s, at) });
     at.becameBlockedTurn = s.turn;
     log(s, `${defOf(s, bl).name} blocks ${defOf(s, at).name}${p.id !== chooser.id ? ` (${chooser.name} chose)` : ""}.`);
   }
@@ -14171,7 +14328,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
       bl.blocking!.push(m.id);
       (m.blockedBy ??= []).push(bl.id);
       m.becameBlockedTurn = s.turn;
-      ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${m.id}@${m.zoneChanges ?? 0}`, combat: s.combatsThisTurn ?? 0, ...blockQualities(s, bl, m) });
+      ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${m.id}@${m.zoneChanges ?? 0}`, combat: s.combatsThisTurn ?? 0, ...blockQualities(s, bl, m), ac: controllerOf(s, m) });
       log(s, `${defOf(s, bl).name} also blocks ${defOf(s, m).name} (banding).`);
     }
   }
@@ -14650,7 +14807,7 @@ function finishCombatDamage(s: GameState): boolean {
   }
   for (const e of done) {
     const gained = lifelink.get(key(e));
-    if (gained?.n) gainLife(s, e.src.controller, gained.n);
+    if (gained?.n) gainLife(s, e.src.controller, gained.n, "lifelink");
     lifelink.delete(key(e));
   }
   // "Whenever ~ deals (combat) damage": once per creature, for all it dealt this step (CR 510.2, 603.2c).
@@ -14787,6 +14944,8 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
         log(s, `${p.name} starts their engines: speed 1.`);
         changed = true;
       }
+    // Bone Shaman (round B230): which of them can't be regenerated, as this pass's actions all happen at once (CR 704.3).
+    const barred = damagedNoRegen(s);
     for (const id of [...s.battlefield]) {
       const o = s.objects[id];
       if (!o || o.zone !== "battlefield") continue;
@@ -14807,7 +14966,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
         moveObject(s, id, "graveyard");
         changed = true;
       } else if (((o.damage > 0 && lethalLeft(s, o) === 0) || o.deathtouchDamage) && !objHasKeyword(s, o, "Indestructible")) {
-        destroyPermanent(s, o, `${d.name} dies.`); // 704.5g, 704.5h: destroyed (or regenerated)
+        destroyPermanent(s, o, `${d.name} dies.`, barred.has(id)); // 704.5g, 704.5h: destroyed (or regenerated)
         changed = true;
       }
     }
@@ -15253,7 +15412,7 @@ export function playerLoses(s: GameState, pid: PlayerId, reason: string, concede
       log(s, `${p.name} would lose the game (${reason}), but exiles ${src} instead and their life total becomes ${pick.life}.`);
       moveObject(s, pick.id!, "exile");
     }
-    if (p.life < pick.life && canGainLife(s, pid)) gainLife(s, pid, pick.life - p.life);
+    if (p.life < pick.life && canGainLife(s, pid)) gainLife(s, pid, pick.life - p.life, { controller: pid });
     else if (p.life > pick.life && canLoseLife(s, pid)) loseLife(s, pid, p.life - pick.life);
     invalidateCharacteristics(s);
     return true;
@@ -15404,7 +15563,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
     manaAbilitiesOn(s, o).forEach((ab, i) => {
       if (manaAbilityProblem(s, pid, o, i)) return;
       const tap = ab.tapCost ? tapCostCandidates(s, pid, o, ab.tapCost).slice(0, ab.tapCost.n) : undefined;
-      for (const x of options) if (x.ability === i) out.push({ type: "activateMana", player: pid, objectId: id, mana: x.mana, ability: i, ...(x.combo !== undefined ? { combo: x.combo } : {}), ...(tap ? { tap } : {}), ...(x.extra ? { extra: x.extra } : {}) });
+      for (const x of options) if (x.ability === i) out.push({ type: "activateMana", player: pid, objectId: id, mana: x.mana, ability: i, ...(x.combo !== undefined ? { combo: x.combo } : {}), ...(tap ? { tap } : {}), ...(x.extra ? { extra: x.extra } : {}), ...(x.instead ? { instead: x.instead } : {}) });
     });
   }
   return out;
@@ -15535,9 +15694,25 @@ export function foretellProblem(s: GameState, pid: PlayerId, id: ObjectId): stri
   const d = defOf(s, o);
   if (!compileCard(d).foretell && grantedForetell(s, pid, o) === undefined) return `${d.name} doesn't have foretell`;
   if (s.priority !== pid || s.pending) return "you don't have priority";
-  if (s.activePlayer !== pid) return "you can only foretell during your own turn";
-  if (!canPayFromPool(s, pid, parseManaCost("{2}"), { ability: o, foretell: true })) return `not enough mana to foretell ${d.name} ({2})`;
+  const cosmos = cosmosChargers(s, pid);
+  if (s.activePlayer !== pid && !cosmos.length) return "you can only foretell during your own turn";
+  const cost = foretellActionCost(s, pid);
+  if (!canPayFromPool(s, pid, parseManaCost(cost), { ability: o, foretell: true })) return `not enough mana to foretell ${d.name} (${cost})`;
   return null;
+}
+
+/** Cosmos Charger (round B226): the permanents `pid` controls whose ability makes foretelling cheaper and possible on any player's turn. */
+function cosmosChargers(s: GameState, pid: PlayerId): GameObject[] {
+  return s.battlefield.map((id) => obj(s, id)).filter((p) => controllerOf(s, p) === pid && (abilitiesOf(s, p).foretellActionLess ?? 0) > 0);
+}
+
+/**
+ * What foretelling a card costs `pid` now (CR 702.143a): {2}, less {1} for each Cosmos Charger they control ("costs {1}
+ * less", CR 601.2f applied to the special action), never less than {0} (rulings).
+ */
+export function foretellActionCost(s: GameState, pid: PlayerId): string {
+  const less = cosmosChargers(s, pid).reduce((n, p) => n + (abilitiesOf(s, p).foretellActionLess ?? 0), 0);
+  return `{${Math.max(0, 2 - less)}}`;
 }
 
 /**
@@ -15572,7 +15747,7 @@ function foretellCard(s: GameState, p: Player, id: ObjectId) {
   const d = defOf(s, o);
   // Dream Devourer's foretell: the card keeps the foretell cost it was given, not the ability (rulings).
   const reduce = compileCard(d).foretell ? undefined : grantedForetell(s, p.id, o);
-  spendFromPool(s, p.id, parseManaCost("{2}"), { ability: o, foretell: true });
+  spendFromPool(s, p.id, parseManaCost(foretellActionCost(s, p.id)), { ability: o, foretell: true });
   moveObject(s, id, "exile");
   o.foretold = true;
   o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "foretell", turn: s.turn, ...(reduce !== undefined ? { foretellReduce: reduce } : {}) };

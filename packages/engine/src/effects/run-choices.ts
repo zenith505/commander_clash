@@ -669,7 +669,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Hibernation's End: "Whenever you pay ~'s cumulative upkeep" triggers once it's paid.
       const paid: Effect = { type: "cumulativeUpkeepPaid" };
       // Thought Lash (round B210): "When a player doesn't pay ~'s cumulative upkeep" triggers as it isn't paid, while ~ is
-      // still on the battlefield; then it's sacrificed (rulings). Only Thought Lash has such a trigger, and its cost is this one.
+      // still on the battlefield; then it's sacrificed (rulings). Thought Lash's cost is this one; Heart of Bogardan's (round
+      // B225) is mana, the plain payment at the end.
       const unpaid: Effect[] = [{ type: "cumulativeUpkeepUnpaid" }, { type: "sacrifice", what: { ref: "self" } }];
       // Thought Lash: the top card of your library for each age counter, all at once, or not at all (CR 702.24a); with fewer
       // cards in the library than that it can't be paid (CR 118.3). None to exile for no age counters.
@@ -801,7 +802,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       const pay = timesPay(e.pay, sc.n);
       // "If [cost] has choices ... either the entire set of costs is paid, or none of them is" (CR 702.24a).
-      return runEffect(s, { type: "may", effects: [paid], pay, otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Pay ${describePay(pay)} to keep ~ (cumulative upkeep)`, keep: true, cumulativeUpkeep: true }, ctx);
+      return runEffect(s, { type: "may", effects: [paid], pay, otherwise: unpaid, text: `Pay ${describePay(pay)} to keep ~ (cumulative upkeep)`, keep: true, cumulativeUpkeep: true }, ctx);
     }
     case "choosePlayer": {
       // Gluntch: one more player, different from those chosen before (rulings), any of them you; asked each time the

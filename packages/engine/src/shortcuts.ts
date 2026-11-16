@@ -443,6 +443,13 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     lifeLost: t.lifeLost,
     // Valiant Rescuer: only the first cycle each turn matters.
     cycled: Object.fromEntries(Object.entries(t.cycled ?? {}).map(([k, v]) => [k, Math.min(v, 2)])),
+    // Advancing the Spirit: only the first power-up ability each turn matters.
+    powerUps: Object.fromEntries(Object.entries(t.powerUps ?? {}).map(([k, v]) => [k, Math.min(v, 1)])),
+    // Suffocation and Backdraft (round B229): the spells that dealt damage, each one's total capped (Backdraft halves it);
+    // Vodalian War Machine: which permanents were tapped for which source.
+    spellDamage: t.spellDamage ? [...new Set(t.spellDamage.map((d) => `${d.controller}:${d.colors.join("")}:${d.types.join("")}:${d.cast ? 1 : 0}:${d.player ?? "-"}`))].sort() : undefined,
+    spellDamageTotal: t.spellDamage ? Math.min(t.spellDamage.reduce((n, d) => n + d.amount, 0), 2 * LIFE_CAP) : undefined,
+    costTapped: t.costTapped ? Object.fromEntries(Object.entries(t.costTapped).map(([k, v]) => [k, [...v].sort()])) : undefined,
     // Erdwal Illuminator: only the first investigation each turn matters.
     investigated: Object.fromEntries(Object.entries(t.investigated ?? {}).map(([k, v]) => [k, Math.min(v, 2)])),
     // Whispering Snitch: only the first surveil each turn matters.

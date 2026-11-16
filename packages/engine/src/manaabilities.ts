@@ -267,7 +267,26 @@ export const timesAsMuch = (mana: ManaType[], n: number): ManaType[] => (n === 1
  * amount"; "as", Infernal Darkness's "it produces {B} instead of any other type" (`one`: "... and amount", Contamination;
  * `only`: Quarum Trench Gnomes's "colorless mana instead of white mana", only mana of that type changes).
  */
-type ManaReplacement = { kind: "times"; n: number } | { kind: "damp" } | { kind: "as"; mana: ManaType; one?: true; only?: ManaType };
+type ManaReplacement = { kind: "times"; n: number } | { kind: "damp" } | { kind: "as"; mana: ManaType; one?: true; only?: ManaType; /** Hall of Gemstone (round B226): "of the chosen color instead of any other color": each colored mana, not colorless (rulings). */ colored?: true } | ChooseReplacement;
+
+/**
+ * A change of type whose new type the player tapping the land chooses (round B224): Pulse of Llanowar's and Harvest Mage's
+ * "mana of a color of your choice instead of any other type" (`one`: "... and amount"), and Naked Singularity's for a land
+ * with two of the basic land types it lists ("the player tapping the land for mana can choose to produce mana of either
+ * color", rulings). All the mana becomes the one color chosen (rulings).
+ */
+type ChooseReplacement = { kind: "choose"; colors: ManaType[]; one?: true };
+
+/**
+ * Naked Singularity, Reality Twist: "If tapped for mana, Plains produce {R}, Islands produce {G}, ... instead of any other
+ * type": the colors the land's basic land types (as it's tapped, CR 305.6) are listed as producing; one of them, or the
+ * player's choice of them (rulings).
+ */
+function bySubtype(s: GameState, land: GameObject, map: { subtype: string; mana: ManaType }[]): ManaReplacement | null {
+  const subtypes = characteristics(s, land).subtypes;
+  const colors = [...new Set(map.filter((x) => subtypes.includes(x.subtype)).map((x) => x.mana))];
+  return !colors.length ? null : colors.length === 1 ? { kind: "as", mana: colors[0]! } : { kind: "choose", colors: ([...COLORS, "C"] as ManaType[]).filter((m) => colors.includes(m)) };
+}
 
 /** The replacement effects that apply to mana `tapped` is tapped for by `pid`, in timestamp order (statics in battlefield order, then effects with a duration). */
 function manaReplacements(s: GameState, pid: PlayerId, tapped: GameObject | undefined): ManaReplacement[] {
@@ -285,32 +304,52 @@ function manaReplacements(s: GameState, pid: PlayerId, tapped: GameObject | unde
     if (!land) continue;
     if (ab.dampsLandMana) out.push({ kind: "damp" });
     for (const r of ab.landManaAs ?? []) out.push({ kind: "as", mana: r.mana, ...(r.one ? { one: true as const } : {}) });
+    for (const map of ab.landManaBySubtype ?? []) {
+      const r = bySubtype(s, tapped!, map);
+      if (r) out.push(r);
+    }
+    // Pulse of Llanowar: "If a basic land you control is tapped for mana, it produces mana of a color of your choice instead
+    // of any other type": the same amount, all of one color chosen each time (rulings), the type it would make included.
+    if (basic && ab.basicLandManaAnyColor && controllerOf(s, o) === controllerOf(s, tapped!)) out.push({ kind: "choose", colors: [...COLORS] });
   }
   if (land) {
-    for (const r of s.landManaRules ?? []) if (r.turn === s.turn && (!r.nonbasic || !basic) && (!r.yours || controllerOf(s, tapped!) === r.player)) out.push({ kind: "as", mana: r.mana });
+    for (const r of s.landManaRules ?? [])
+      if (r.turn === s.turn && (!r.nonbasic || !basic) && (!r.yours || controllerOf(s, tapped!) === r.player) && (!r.subtype || characteristics(s, tapped!).subtypes.includes(r.subtype)))
+        out.push(r.mana === "any" ? { kind: "choose", colors: [...COLORS], ...(r.one ? { one: true as const } : {}) } : { kind: "as", mana: r.mana, ...(r.colored ? { colored: true as const } : {}) });
     for (const r of tapped!.manaReplaced ?? []) out.push({ kind: "as", mana: r.to, only: r.from });
   }
   return out;
 }
 
-const applicable = (r: ManaReplacement, made: ManaType[]): boolean => made.length > 0 && (r.kind === "damp" ? made.length >= 2 : r.kind === "as" && r.only ? made.includes(r.only) : true);
-const applyReplacement = (r: ManaReplacement, made: ManaType[]): ManaType[] =>
-  r.kind === "times" ? timesAsMuch(made, r.n) : r.kind === "damp" ? ["C"] : r.one ? [r.mana] : made.map((m) => (!r.only || m === r.only ? r.mana : m));
+const applicable = (r: ManaReplacement, made: ManaType[]): boolean => made.length > 0 && (r.kind === "damp" ? made.length >= 2 : r.kind === "as" && r.only ? made.includes(r.only) : r.kind === "as" && r.colored ? made.some((m) => m !== "C") : true);
+const applyReplacement = (r: Exclude<ManaReplacement, ChooseReplacement>, made: ManaType[]): ManaType[] =>
+  r.kind === "times" ? timesAsMuch(made, r.n) : r.kind === "damp" ? ["C"] : r.one ? [r.mana] : made.map((m) => ((r.only ? m === r.only : !r.colored || m !== "C") ? r.mana : m));
 
 /**
  * Every result of applying these replacement effects in an order the player could choose (CR 616.1): each time one that
  * applies now (CR 616.1e, a land that makes one mana only becomes "tapped for two or more mana" after a multiplier), and
- * each one only once (CR 614.5). In the order they're listed first.
+ * each one only once (CR 614.5). In the order they're listed first. A replacement whose color the player chooses gives one
+ * result for each color (`instead`: only that one, when it's among them).
  */
-function replacedResults(made: ManaType[], effects: ManaReplacement[], used: boolean[] = effects.map(() => false)): ManaType[][] {
+function replacedResults(made: ManaType[], effects: ManaReplacement[], used: boolean[] = effects.map(() => false), instead?: ManaType): ManaType[][] {
   const out: ManaType[][] = [];
   effects.forEach((r, i) => {
     if (used[i] || !applicable(r, made)) return;
     const next = used.slice();
     next[i] = true;
-    out.push(...replacedResults(applyReplacement(r, made), effects, next));
+    const ways: Exclude<ManaReplacement, ChooseReplacement>[] = r.kind === "choose" ? (instead && r.colors.includes(instead) ? [instead] : r.colors).map((mana) => ({ kind: "as", mana, ...(r.one ? { one: true as const } : {}) })) : [r];
+    for (const w of ways) out.push(...replacedResults(applyReplacement(w, made), effects, next, instead));
   });
   return out.length ? out : [made];
+}
+
+/**
+ * The colors the player tapping `tapped` for mana could choose for the replacement effects that let them (round B224):
+ * none when there are no such effects. What manaOptions offers as `instead`.
+ */
+export function insteadChoices(s: GameState, pid: PlayerId, tapped: GameObject): ManaType[] {
+  const colors = new Set(manaReplacements(s, pid, tapped).flatMap((r) => (r.kind === "choose" ? r.colors : [])));
+  return ([...COLORS, "C"] as ManaType[]).filter((m) => colors.has(m));
 }
 
 /**
@@ -320,12 +359,17 @@ function replacedResults(made: ManaType[], effects: ManaReplacement[], used: boo
  * The player chooses the order (CR 616.1; rulings on Damping Sphere): the order that gives the most mana, and of those the
  * one closest to timestamp order, so a later change of type is the one that shows (the engine picks for the player).
  */
-export function tappedForMana(s: GameState, pid: PlayerId, tapped: GameObject | undefined, made: ManaType[]): ManaType[] {
+export function tappedForMana(s: GameState, pid: PlayerId, tapped: GameObject | undefined, made: ManaType[], instead?: ManaType): ManaType[] {
   if (!made.length) return made;
   const effects = manaReplacements(s, pid, tapped);
   if (!effects.length) return made;
+  // A color the player chose (`instead`, round B224): an order of the effects that ends with that color, if there is one;
+  // with none chosen, the type it would have made if there's a way to keep it.
+  const want = effects.some((r) => r.kind === "choose") ? (instead ?? made[0]) : undefined;
+  const all = replacedResults(made, effects, undefined, want);
+  const chosen = want ? all.filter((r) => r.includes(want)) : [];
   let best: ManaType[] | undefined;
-  for (const r of replacedResults(made, effects)) if (!best || r.length > best.length) best = r;
+  for (const r of chosen.length ? chosen : all) if (!best || r.length > best.length) best = r;
   return best!;
 }
 
@@ -334,7 +378,7 @@ export function tappedForMana(s: GameState, pid: PlayerId, tapped: GameObject | 
  * 106.7): what "could produce" reads (landCouldProduce).
  */
 function couldProduceAfterReplacements(s: GameState, land: GameObject, made: ManaType[]): ManaType[] {
-  const effects = manaReplacements(s, controllerOf(s, land), land).filter((r) => r.kind === "as" || r.kind === "damp");
+  const effects = manaReplacements(s, controllerOf(s, land), land).filter((r) => r.kind === "as" || r.kind === "damp" || r.kind === "choose");
   return effects.length ? [...new Set(replacedResults(made, effects).flat())] : made;
 }
 
@@ -342,9 +386,25 @@ function couldProduceAfterReplacements(s: GameState, land: GameObject, made: Man
  * Exactly what activating it with `choice` (or the combination numbered `combo`, for "combos") adds to the pool:
  * multiplied when it's tapped for mana (`tapManaTimes`).
  */
-export function manaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: ManaType, combo?: number): ManaType[] {
+export function manaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: ManaType, combo?: number, instead?: ManaType): ManaType[] {
   const made = baseManaProduced(s, o, ab, choice, combo);
-  return ab.tap && made.length ? tappedForMana(s, controllerOf(s, o), o, made) : made;
+  return ab.tap && made.length ? tappedForMana(s, controllerOf(s, o), o, made, instead) : made;
+}
+
+/**
+ * Each way the player could make `made` turn out with the color-choosing replacements on tapping `o` for mana (round
+ * B224): `instead` undefined when there are none or nothing to choose, else one per color giving a different result.
+ */
+function insteadWays(s: GameState, o: GameObject, tap: boolean | undefined, produce: (instead?: ManaType) => ManaType[]): { instead?: ManaType; adds: ManaType[] }[] {
+  const plain = produce();
+  const colors = tap && plain.length ? insteadChoices(s, controllerOf(s, o), o) : [];
+  if (!colors.length) return [{ adds: plain }];
+  const out: { instead?: ManaType; adds: ManaType[] }[] = [];
+  for (const instead of colors) {
+    const adds = produce(instead);
+    if (!out.some((x) => x.adds.join() === adds.join())) out.push({ instead, adds });
+  }
+  return out;
 }
 
 function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: ManaType, combo?: number): ManaType[] {
@@ -396,6 +456,11 @@ export interface ManaOption {
   removes?: number;
   /** Doubling Cube's: the mana from the pool that pays its cost (ManaProduce "doublePool"). */
   pays?: ManaType[];
+  /**
+   * The color chosen for a replacement effect that lets the player tapping it choose (round B224: Pulse of Llanowar,
+   * Harvest Mage, Naked Singularity on a land with two of its land types).
+   */
+  instead?: ManaType;
   adds: ManaType[];
   extra?: ManaType[];
   /** The part of `adds` that's snow mana (CR 107.4h): its own if the source is snow, a triggered ability's if that one's is. */
@@ -489,19 +554,37 @@ export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, a
 }
 
 export function manaOptions(s: GameState, o: GameObject): ManaOption[] {
+  const abs = manaAbilitiesOn(s, o);
+  const all = allManaOptions(s, o, abs);
+  if (!all.some((x) => x.instead)) return all;
+  // A color chosen for a replacement (round B224) can make two ways the same, Taiga's {R} and {G} both becoming {B}: one of
+  // each result, for abilities that cost the same (only `produces` and the text differ).
+  const costKey = (ab: ManaAbility) => JSON.stringify({ ...ab, produces: undefined, text: undefined });
+  const seen = new Set<string>();
+  return all.filter((x) => {
+    if (!x.instead) return true;
+    const key = `${costKey(abs[x.ability]!)}|${x.adds.join("")}|${x.extra?.join("") ?? ""}|${x.removes ?? ""}|${x.pays?.join("") ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function allManaOptions(s: GameState, o: GameObject, abs: ManaAbility[]): ManaOption[] {
   const pid = controllerOf(s, o);
   const sources = manaTriggerSources(s);
-  return manaAbilitiesOn(s, o).flatMap((ab, ability) => {
+  return abs.flatMap((ab, ability) => {
     const combos = manaCombos(s, o, ab);
     // "X mana in any combination of colors" with a big X: for planning a payment, the ways using one or two colors.
     // A storage land's mix (Crucible of the Spirit Dragon) the same way.
     const few = (ab.produces.kind === "anyColors" || (ab.produces.kind === "removeX" && ab.produces.mix)) && combos && combos.length > 126;
     const picks: { mana: ManaType; combo?: number }[] = combos ? combos.flatMap((c, combo) => (few && new Set(c).size > 2 ? [] : [{ mana: c[0] ?? manaChoices(s, o, ab)[0]!, combo }])) : manaChoices(s, o, ab).map((mana) => ({ mana }));
     return picks.flatMap(({ mana, combo }) => {
-      const adds = manaProduced(s, o, ab, mana, combo);
       const removed = ab.produces.kind === "removeX" ? { removes: combos![combo!]!.length - (ab.produces.base ?? 0) } : {};
       const pays = ab.produces.kind === "doublePool" ? { pays: combos![combo!]! } : {};
-      return manaTriggerResults(s, pid, o, ab, adds, sources).map((r) => ({ ability, mana, ...(combo !== undefined ? { combo } : {}), ...removed, ...pays, adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r) }));
+      return insteadWays(s, o, ab.tap, (instead) => manaProduced(s, o, ab, mana, combo, instead)).flatMap(({ instead, adds }) =>
+        manaTriggerResults(s, pid, o, ab, adds, sources).map((r) => ({ ability, mana, ...(combo !== undefined ? { combo } : {}), ...removed, ...pays, ...(instead ? { instead } : {}), adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r) })),
+      );
     });
   });
 }
@@ -660,10 +743,11 @@ export function activatedManaOptions(s: GameState, o: GameObject, index: number)
   const m = ab && activatedAsMana(ab);
   if (!m) return null;
   const pid = controllerOf(s, o);
-  return manaChoices(s, o, m).flatMap((mana) => {
-    const adds = manaProduced(s, o, m, mana);
-    return manaTriggerResults(s, pid, o, m, adds).map((r) => ({ ability: index, mana, adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r) }));
-  });
+  return manaChoices(s, o, m).flatMap((mana) =>
+    insteadWays(s, o, m.tap, (instead) => manaProduced(s, o, m, mana, undefined, instead)).flatMap(({ instead, adds }) =>
+      manaTriggerResults(s, pid, o, m, adds).map((r) => ({ ability: index, mana, ...(instead ? { instead } : {}), adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r) })),
+    ),
+  );
 }
 
 /** The types of mana an activated mana ability could add if it resolved now (CR 106.7): every one it names. */

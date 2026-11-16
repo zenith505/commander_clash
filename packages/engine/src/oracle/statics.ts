@@ -861,6 +861,10 @@ export function parseActivateCondition(text: string): StaticCondition | null {
     return conds.every((c): c is StaticCondition => !!c) ? { kind: "anyOf", conds } : null;
   }
   if (/^~ entered (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn" };
+  // Sea Troll (round B230): "Activate only if ~ blocked or was blocked by a blue creature this turn": a creature that was
+  // blue as the block was declared (TurnLog.blocks, which keeps the colors of a block with a blue creature in it), this
+  // object in it (CR 400.7).
+  if (/^~ blocked or was blocked by a blue creature this turn$/.test(text)) return { kind: "blockedWithColorThisTurn", color: "U" };
   // Tazri, Stalwart Survivor's granted ability: "Activate only if this creature has another activated ability": any other
   // one, even one that can't be activated now or on the battlefield (cycling, rulings), mana abilities too (CR 605.1a).
   if (/^~ has another activated ability$/.test(text)) return { kind: "self", is: "hasAnotherActivatedAbility" };
@@ -1272,6 +1276,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^${NUM} or more sources you controlled dealt damage this turn$`).exec(text))) return { kind: "sourcesDealtDamage", n: num(m[1]!) };
   if ((m = new RegExp(`^(white|blue|black|red|green) sources you controlled dealt ${NUM} or more noncombat damage this turn$`).exec(text))) return { kind: "noncombatByColor", color: COLOR_WORDS[m[1]!]!, n: num(m[2]!) };
   if ((m = /^a source you controlled dealt (\d+) or more damage this turn$/.exec(text))) return { kind: "sourceDealtAtLeast", n: Number(m[1]) };
+  // Suffocation (round B229): "if you were dealt damage this turn by a red instant or sorcery spell": a red instant or a red
+  // sorcery (rulings), red as it dealt the damage (TurnLog.spellDamage).
+  if (text === "you were dealt damage this turn by a red instant or sorcery spell") return { kind: "spellDamagedYou", color: "R", types: ["Instant", "Sorcery"] };
   // The card in the graveyard needn't still be there (rulings on Cloakwood Hermit).
   if ((m = /^an? (creature|artifact|enchantment|land|instant|sorcery) card was put into your graveyard(?: from anywhere)? this turn$/.exec(text))) return { kind: "cardToYourGraveyard", types: [capital(m[1]!)] };
   // Sigardian Paladin: "as long as you've put one or more +1/+1 counters on a creature this turn", a creature as the
@@ -1520,6 +1527,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // a token too (rulings).
   // Undead Sprinter: "if a non-Zombie creature died this turn", under anyone's control.
   if ((m = /^a non-([A-Z][a-z]+) creature died( under your control)? this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "amount", amount: { count: { kind: "diedThisTurn", notSubtype: m[1]!, ...(m[2] ? { yours: true as const } : {}) } }, min: 1 };
+  // Intermediate Chirography: "if a modified creature died under your control this turn": one with a counter on it, equipped,
+  // or enchanted by an Aura its controller controlled, as it last existed (CR 700.9, rulings), a token too.
+  if (text === "a modified creature died under your control this turn") return { kind: "amount", amount: { count: { kind: "diedThisTurn", modified: true, yours: true } }, min: 1 };
   // Titan Hunter: "if no creatures died this turn".
   if (text === "no creatures died this turn") return { kind: "not", cond: { kind: "creatureDied" } };
   // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).

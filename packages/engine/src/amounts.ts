@@ -698,6 +698,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "creaturesToYourGraveyard":
       return (s.turnLog?.creaturesToYard ?? []).filter((d) => d.owner === ctx.controller && !(c.nontoken && d.token)).length;
     case "diedThisTurn":
+      // Intermediate Chirography: "a modified creature died under your control this turn" (CR 700.9).
+      if (c.modified) return (s.diedTypesThisTurn ?? []).filter((d) => d.modified && (!c.yours || d.controller === ctx.controller)).length;
       if (c.subtype) return (s.diedTypesThisTurn ?? []).filter((d) => (d.all || d.subtypes.includes(c.subtype!)) && (!c.yours || d.controller === ctx.controller)).length;
       // A changeling is every creature type (CR 702.73a), so never "non-Skeleton".
       if (c.notSubtype) return (s.diedTypesThisTurn ?? []).filter((d) => !(d.all || d.subtypes.includes(c.notSubtype!)) && (!c.yours || d.controller === ctx.controller)).length;

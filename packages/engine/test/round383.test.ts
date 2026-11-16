@@ -207,7 +207,7 @@ describe("Explosion of Riches: a reflexive trigger for each card drawn, each at 
       const who = (s.pending as { player: PlayerId }).player;
       s = act(s, { type: "chooseMay", player: who, yes: yes.has(who) });
     }
-    const life = (pids: (PlayerId | undefined)[]) => pids.reduce((n, pid) => n + s.players[pid!]!.life, 0);
+    const life = (pids: (PlayerId | undefined)[]): number => pids.reduce<number>((n, pid) => n + s.players[pid!]!.life, 0);
     const before = life([b, c, d]);
     s = settle(s);
     // The spell left the caster's hand, and the caster drew one.
